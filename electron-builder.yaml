@@ -1,0 +1,12 @@
+appId: "com.falkordb.browser"
+productName: "FalkorDB Browser"
+copyright: "Copyright (c) 2023 FalkorDB"
+win:
+  target: ["dir", "portable", "zip"]
+  icon: "resources/icon.ico"
+linux:
+  target: ["dir", "appimage", "zip"]
+  icon: "resources/icon.png"
+mac:
+  target: ["dir", "dmg", "zip"]
+  icon: "resources/icon.icns"
