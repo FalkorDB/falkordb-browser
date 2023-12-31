@@ -31,8 +31,6 @@ export default function Page() {
                 'Content-Type': 'application/json'
             }
         }).then((result) => {
-            console.log(result)
-
             if (result.status >= 300) {
                 toast({
                     title: "Error",
@@ -44,8 +42,16 @@ export default function Page() {
                 .then((json) => {
                     return extractData(json.result)
                 })
-                .then((elements) => {
-                    console.log(elements)
+                .then((data) => {
+                    let elements: any[] = []
+
+                    data.nodes.forEach((node: GraphData) => {
+                        elements.push({ data: node })
+                    })
+                    data.edges.forEach((node: GraphLink) => {
+                        elements.push({ data: node })
+                    })
+                    
                     setElements(elements)
                 })
 
@@ -77,16 +83,14 @@ export default function Page() {
             {elements.length > 0 &&
                 <div className="m-2 p-2 rounded-lg border border-gray-300 h-5/6">
                     <CytoscapeComponent
-                        cy={(cy) => {
-                            console.log("cy! " + cy) 
-
-                            cy.ready( function () {
-                                console.log("Ready!")
-                                // this.fit(); // Fits all elements in the viewport
-                                // this.center(); // Centers the graph in the viewport
-                                // return this
-                            });
-                        }}
+                        // cy={(cy) => {
+                        //     cy.ready( function () {
+                        //         console.log("Ready!")
+                        //         // this.fit(); // Fits all elements in the viewport
+                        //         // this.center(); // Centers the graph in the viewport
+                        //         // return this
+                        //     });
+                        // }}
                         elements={elements}
                         layout={layout}
                         className="w-full h-full"
@@ -106,12 +110,13 @@ export interface Category {
     id: string,
     name: string,
     value: string,
-    category: number
+    label: string
   }
   
   export interface GraphLink {
     source: string,
-    target: string
+    target: string,
+    label: string
   }
 
 interface GraphResult {
@@ -128,7 +133,6 @@ interface ExtractedData {
 }
 
 function extractData(results: GraphResult | null) : ExtractedData {
-    console.log("extractData " + results)
     let columns: string[] = []
     let data: any[][] = []
     if (results?.data?.length) {
@@ -151,18 +155,18 @@ function extractData(results: GraphResult | null) : ExtractedData {
 
                     let sourceId = cell.sourceId.toString();
                     let destinationId = cell.destinationId.toString()
-                    edges.add({ source: sourceId, target: destinationId })
+                    edges.add({ source: sourceId, target: destinationId, label: cell.relationshipType })
 
                     // creates a fakeS node for the source and target
                     let source = nodes.get(cell.sourceId)
                     if(!source) {
-                        source = { id: cell.sourceId.toString(), name: cell.sourceId.toString(), value: "", category: 0 }
+                        source = { id: cell.sourceId.toString(), name: cell.sourceId.toString(), value: "", label: "" }
                         nodes.set(cell.sourceId, source)
                     }
 
                     let destination = nodes.get(cell.destinationId)
                     if(!destination) {
-                        destination = { id: cell.destinationId.toString(), name: cell.destinationId.toString(), value: "", category: 0 }
+                        destination = { id: cell.destinationId.toString(), name: cell.destinationId.toString(), value: "", label: "" }
                         nodes.set(cell.destinationId, destination)
                     }
                 } else if (cell.labels) {
@@ -177,7 +181,7 @@ function extractData(results: GraphResult | null) : ExtractedData {
                     // check if node already exists in nodes or fake node was created
                     let node = nodes.get(cell.id)
                     if (!node || node.value === "") {
-                        node = { id: cell.id.toString(), name: cell.id.toString(), value: JSON.stringify(cell), category: category.index }
+                        node = { id: cell.id.toString(), name: cell.id.toString(), value: JSON.stringify(cell), label: category.name }
                         nodes.set(cell.id, node)
                     }
                 }
