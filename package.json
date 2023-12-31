@@ -1,6 +1,5 @@
 {
   "name": "falkordb-browser",
-  "main": "main/main.js",
   "author": "FalkorDB",
   "description": "FalkorDB Browser",
   "version": "0.1.0",

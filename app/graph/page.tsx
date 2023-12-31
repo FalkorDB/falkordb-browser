@@ -25,13 +25,14 @@ export default function Page() {
     }
 
     function runQuery() {
-        console.log("Query running!")
         fetch(`/api/graph?graph=${prepareArg(graph)}&query=${prepareArg(query)}`, {
             method: 'GET',
             headers: {
                 'Content-Type': 'application/json'
             }
         }).then((result) => {
+            console.log(result)
+
             if (result.status >= 300) {
                 toast({
                     title: "Error",
@@ -39,14 +40,9 @@ export default function Page() {
                 })
             }
 
-
             result.json()
                 .then((json) => {
-                    return json.result.data.map((row: Map<any, any>) => {
-                        console.log(row)
-                        // row.values.ma
-                        return { data: { id: row.n.id, label: row.n.labels[0] } }
-                    })
+                    return extractData(json.result)
                 })
                 .then((elements) => {
                     console.log(elements)
@@ -99,4 +95,95 @@ export default function Page() {
             }
         </div>
     )
+}
+
+export interface Category {
+    name: string,
+    index: number
+  }
+  
+  export interface GraphData {
+    id: string,
+    name: string,
+    value: string,
+    category: number
+  }
+  
+  export interface GraphLink {
+    source: string,
+    target: string
+  }
+
+interface GraphResult {
+    data: any[],
+    metadata: any
+}
+
+interface ExtractedData {
+    data: any[][],
+    columns: string[],
+    categories: Map<String, Category>,
+    nodes: Map<number, GraphData>,
+    edges: Set<GraphLink>,
+}
+
+function extractData(results: GraphResult | null) : ExtractedData {
+    console.log("extractData " + results)
+    let columns: string[] = []
+    let data: any[][] = []
+    if (results?.data?.length) {
+        if (results.data[0] instanceof Object) {
+            columns = Object.keys(results.data[0])
+        }
+        data = results.data
+    }
+
+    let nodes = new Map<number, GraphData>()
+    let categories = new Map<String, Category>()
+    categories.set("default", { name: "default", index: 0})
+
+    let edges = new Set<GraphLink>()
+
+    data.forEach((row: any[]) => {
+        Object.values(row).forEach((cell: any) => {
+            if (cell instanceof Object) {
+                if (cell.relationshipType) {
+
+                    let sourceId = cell.sourceId.toString();
+                    let destinationId = cell.destinationId.toString()
+                    edges.add({ source: sourceId, target: destinationId })
+
+                    // creates a fakeS node for the source and target
+                    let source = nodes.get(cell.sourceId)
+                    if(!source) {
+                        source = { id: cell.sourceId.toString(), name: cell.sourceId.toString(), value: "", category: 0 }
+                        nodes.set(cell.sourceId, source)
+                    }
+
+                    let destination = nodes.get(cell.destinationId)
+                    if(!destination) {
+                        destination = { id: cell.destinationId.toString(), name: cell.destinationId.toString(), value: "", category: 0 }
+                        nodes.set(cell.destinationId, destination)
+                    }
+                } else if (cell.labels) {
+
+                    // check if category already exists in categories
+                    let category = categories.get(cell.labels[0])
+                    if (!category) {
+                        category = { name: cell.labels[0], index: categories.size }
+                        categories.set(category.name, category)
+                    }
+
+                    // check if node already exists in nodes or fake node was created
+                    let node = nodes.get(cell.id)
+                    if (!node || node.value === "") {
+                        node = { id: cell.id.toString(), name: cell.id.toString(), value: JSON.stringify(cell), category: category.index }
+                        nodes.set(cell.id, node)
+                    }
+                }
+            }
+        })
+    })
+
+    return { data, columns, categories, nodes, edges}
 }
