@@ -7,7 +7,7 @@ export default function Home() {
       <main className="flex flex-col items-center justify-center flex-1 px-20 text-center">
         <h1 className="text-6xl font-bold">
           Welcome to{' '}
-          <Link className="text-blue-600 underline underline-offset-2" href="/login">
+          <Link className="text-blue-600 underline underline-offset-2" href="/graph">
             FalkorDB Browser
           </Link>
         </h1>
