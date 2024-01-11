@@ -20,6 +20,12 @@ You can start editing the page by modifying `app/page.tsx`. The page auto-update
 
 This project uses [`next/font`](https://nextjs.org/docs/basic-features/font-optimization) to automatically optimize and load Inter, a custom Google Font.
 
+## Running FalkorDB database
+
+```
+docker run -p 6379:6379 -it --rm falkordb/falkordb:latest
+```
+
 ## Learn More
 
 To learn more about Next.js, take a look at the following resources:
