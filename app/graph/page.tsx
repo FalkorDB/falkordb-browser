@@ -27,7 +27,7 @@ export default function Page() {
     function runQuery() {
 
         let q = query.trim() || "MATCH (n)-[e]-() RETURN n,e limit 100";
-        
+
         fetch(`/api/graph?graph=${prepareArg(graph)}&query=${prepareArg(q)}`, {
             method: 'GET',
             headers: {
@@ -80,8 +80,8 @@ export default function Page() {
                                     "text-valign": "center",
                                     "text-halign": "center",
                                     shape: "ellipse",
-                                    height: 20,
-                                    width: 20,
+                                    height: 10,
+                                    width: 10,
                                     "font-size": "5",
                                 },
                             },
@@ -89,8 +89,8 @@ export default function Page() {
                                 selector: "edge",
                                 style: {
                                     width: 1,
-
                                     'line-color': '#ccc',
+                                    "arrow-scale": 0.5,
                                     "target-arrow-shape": "triangle",
                                     label: "data(label)",
                                     'curve-style': 'straight',
@@ -121,13 +121,14 @@ export interface Category {
 }
 
 export interface GraphData {
-    id: string,
+    id: number,
     name: string,
     value: string,
     label: string
 }
 
 export interface GraphLink {
+    id: number,
     source: string,
     target: string,
     label: string
@@ -143,7 +144,7 @@ interface ExtractedData {
     columns: string[],
     categories: Map<String, Category>,
     nodes: Map<number, GraphData>,
-    edges: Set<GraphLink>,
+    edges: Map<number,GraphLink>,
 }
 
 function extractData(results: GraphResult | null): ExtractedData {
@@ -160,28 +161,31 @@ function extractData(results: GraphResult | null): ExtractedData {
     let categories = new Map<String, Category>()
     categories.set("default", { name: "default", index: 0 })
 
-    let edges = new Set<GraphLink>()
+    let edges = new Map<number, GraphLink>()
 
     data.forEach((row: any[]) => {
         Object.values(row).forEach((cell: any) => {
             if (cell instanceof Object) {
                 if (cell.relationshipType) {
 
-                    let sourceId = cell.sourceId.toString();
-                    let destinationId = cell.destinationId.toString()
-                    edges.add({ source: sourceId, target: destinationId, label: cell.relationshipType })
+                    let edge = edges.get(cell.id)
+                    if(!edge) {
+                        let sourceId = cell.sourceId.toString();
+                        let destinationId = cell.destinationId.toString()
+                        edges.set(cell.id, { id: cell.id, source: sourceId, target: destinationId, label: cell.relationshipType })
+                    
+                        // creates a fakeS node for the source and target
+                        let source = nodes.get(cell.sourceId)
+                        if (!source) {
+                            source = { id: cell.sourceId.toString(), name: cell.sourceId.toString(), value: "", label: "" }
+                            nodes.set(cell.sourceId, source)
+                        }
 
-                    // creates a fakeS node for the source and target
-                    let source = nodes.get(cell.sourceId)
-                    if (!source) {
-                        source = { id: cell.sourceId.toString(), name: cell.sourceId.toString(), value: "", label: "" }
-                        nodes.set(cell.sourceId, source)
-                    }
-
-                    let destination = nodes.get(cell.destinationId)
-                    if (!destination) {
-                        destination = { id: cell.destinationId.toString(), name: cell.destinationId.toString(), value: "", label: "" }
-                        nodes.set(cell.destinationId, destination)
+                        let destination = nodes.get(cell.destinationId)
+                        if (!destination) {
+                            destination = { id: cell.destinationId.toString(), name: cell.destinationId.toString(), value: "", label: "" }
+                            nodes.set(cell.destinationId, destination)
+                        }
                     }
                 } else if (cell.labels) {
 
