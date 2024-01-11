@@ -25,7 +25,10 @@ export default function Page() {
     }
 
     function runQuery() {
-        fetch(`/api/graph?graph=${prepareArg(graph)}&query=${prepareArg(query)}`, {
+
+        let q = query.trim() || "MATCH (n)-[e]-() RETURN n,e limit 100";
+        
+        fetch(`/api/graph?graph=${prepareArg(graph)}&query=${prepareArg(q)}`, {
             method: 'GET',
             headers: {
                 'Content-Type': 'application/json'
@@ -37,7 +40,6 @@ export default function Page() {
                     description: result.text(),
                 })
             }
-
             result.json()
                 .then((json) => {
                     return extractData(json.result)
@@ -51,23 +53,10 @@ export default function Page() {
                     data.edges.forEach((node: GraphLink) => {
                         elements.push({ data: node })
                     })
-                    
+
                     setElements(elements)
                 })
-
-
-            //         { data: { id: 'one', label: 'Node 1' }, position: { x: 100, y: 10 } },
-            //         { data: { id: 'two', label: 'Node 2' }, position: { x: 300, y: 330 } },
-            //         { data: { source: 'one', target: 'two', label: 'Edge from Node1 to Node2' } }
-            // ])
         })
-    }
-
-    let layout = {
-        name: "cose",
-        fit: true,
-        padding: 30,
-        avoidOverlap: true,
     }
 
     return (
@@ -77,22 +66,47 @@ export default function Page() {
                 <Input id="graph" className="border-gray-500 w-2/12"
                     placeholder="Enter Graph name" type="text" onChange={updateGraph} />
                 <Input id="query" className="border-gray-500 w-8/12"
-                    placeholder="Enter Cypher query" type="text" onChange={updateQuery} />
+                    placeholder="MATCH (n)-[e]-() RETURN n,e limit 100" type="text" onChange={updateQuery} />
                 <Button onClick={runQuery}>Run</Button>
             </div>
             {elements.length > 0 &&
                 <div className="m-2 p-2 rounded-lg border border-gray-300 h-5/6">
                     <CytoscapeComponent
-                        // cy={(cy) => {
-                        //     cy.ready( function () {
-                        //         console.log("Ready!")
-                        //         // this.fit(); // Fits all elements in the viewport
-                        //         // this.center(); // Centers the graph in the viewport
-                        //         // return this
-                        //     });
-                        // }}
+                        stylesheet={[
+                            {
+                                selector: 'node',
+                                style: {
+                                    label: "data(label)",
+                                    "text-valign": "center",
+                                    "text-halign": "center",
+                                    shape: "ellipse",
+                                    height: 20,
+                                    width: 20,
+                                    "font-size": "5",
+                                },
+                            },
+                            {
+                                selector: "edge",
+                                style: {
+                                    width: 1,
+
+                                    'line-color': '#ccc',
+                                    "target-arrow-shape": "triangle",
+                                    label: "data(label)",
+                                    'curve-style': 'straight',
+                                    "text-background-color": "#ffffff",
+                                    "text-background-opacity": 1,
+                                    "font-size": "5",
+                                },
+                            },
+                        ]}
                         elements={elements}
-                        layout={layout}
+                        layout={{
+                            name: "cose",
+                            fit: true,
+                            padding: 30,
+                            avoidOverlap: true,
+                        }}
                         className="w-full h-full"
                     />
                 </div>
@@ -104,20 +118,20 @@ export default function Page() {
 export interface Category {
     name: string,
     index: number
-  }
-  
-  export interface GraphData {
+}
+
+export interface GraphData {
     id: string,
     name: string,
     value: string,
     label: string
-  }
-  
-  export interface GraphLink {
+}
+
+export interface GraphLink {
     source: string,
     target: string,
     label: string
-  }
+}
 
 interface GraphResult {
     data: any[],
@@ -132,7 +146,7 @@ interface ExtractedData {
     edges: Set<GraphLink>,
 }
 
-function extractData(results: GraphResult | null) : ExtractedData {
+function extractData(results: GraphResult | null): ExtractedData {
     let columns: string[] = []
     let data: any[][] = []
     if (results?.data?.length) {
@@ -144,7 +158,7 @@ function extractData(results: GraphResult | null) : ExtractedData {
 
     let nodes = new Map<number, GraphData>()
     let categories = new Map<String, Category>()
-    categories.set("default", { name: "default", index: 0})
+    categories.set("default", { name: "default", index: 0 })
 
     let edges = new Set<GraphLink>()
 
@@ -159,13 +173,13 @@ function extractData(results: GraphResult | null) : ExtractedData {
 
                     // creates a fakeS node for the source and target
                     let source = nodes.get(cell.sourceId)
-                    if(!source) {
+                    if (!source) {
                         source = { id: cell.sourceId.toString(), name: cell.sourceId.toString(), value: "", label: "" }
                         nodes.set(cell.sourceId, source)
                     }
 
                     let destination = nodes.get(cell.destinationId)
-                    if(!destination) {
+                    if (!destination) {
                         destination = { id: cell.destinationId.toString(), name: cell.destinationId.toString(), value: "", label: "" }
                         nodes.set(cell.destinationId, destination)
                     }
@@ -189,5 +203,5 @@ function extractData(results: GraphResult | null) : ExtractedData {
         })
     })
 
-    return { data, columns, categories, nodes, edges}
+    return { data, columns, categories, nodes, edges }
 }
