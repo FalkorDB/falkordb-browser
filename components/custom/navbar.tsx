@@ -2,7 +2,7 @@ import { AirVentIcon } from "lucide-react";
 
 export default function Navbar() {
   return (
-    <nav className="w-64 bg-gray-100 p-5">
+    <nav className="w-full h-full bg-gray-100 p-5">
       <div className="flex items-center space-x-2 border-b pb-4 mb-4">
         <AirVentIcon className="h-6 w-6 text-blue-500" />
         <span className="font-bold">Dashboard</span>

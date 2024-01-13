@@ -5,12 +5,59 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { toast } from "@/components/ui/use-toast";
 import CytoscapeComponent from 'react-cytoscapejs'
-import { useState } from "react";
+import { useRef, useState } from "react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { XCircle, ZoomIn, ZoomOut } from "lucide-react";
+import { Edge, Node, extractData } from "./model";
+
+// The stylesheet for the graph
+const STYLESHEET: cytoscape.Stylesheet[] = [
+    {
+        selector: "node",
+        style: {
+            label: "data(name)",
+            "text-valign": "center",
+            "text-halign": "center",
+            shape: "ellipse",
+            height: 10,
+            width: 10,
+            "background-color": "data(color)",
+            "font-size": "3",
+            "overlay-padding": "2px",
+        },
+    },
+    {
+        selector: "edge",
+        style: {
+            width: 0.5,
+            "line-color": "#ccc",
+            "arrow-scale": 0.3,
+            "target-arrow-shape": "triangle",
+            label: "data(label)",
+            'curve-style': 'straight',
+            "text-background-color": "#ffffff",
+            "text-background-opacity": 1,
+            "font-size": "3",
+            "overlay-padding": "2px",
+
+        },
+    },
+]
+
+const LAYOUT = {
+    name: "cose",
+    fit: true,
+    padding: 30,
+    avoidOverlap: true,
+}
 
 export default function Page() {
     const [query, setQuery] = useState('');
     const [graph, setGraph] = useState('');
     const [elements, setElements] = useState([] as any);
+
+    // A reference to the chart container to allowing zooming and editing
+    const chartRef = useRef<cytoscape.Core | null>(null)
 
     function updateQuery(event: React.ChangeEvent<HTMLInputElement>) {
         setQuery(event.target.value)
@@ -47,16 +94,31 @@ export default function Page() {
                 .then((data) => {
                     let elements: any[] = []
 
-                    data.nodes.forEach((node: GraphData) => {
+                    data.nodes.forEach((node: Node) => {
                         elements.push({ data: node })
                     })
-                    data.edges.forEach((node: GraphLink) => {
+                    data.edges.forEach((node: Edge) => {
                         elements.push({ data: node })
                     })
 
                     setElements(elements)
                 })
         })
+    }
+
+    function handleZoomClick(changefactor: number) {
+        let chart = chartRef.current
+        if (chart) {
+            chart.zoom(chart.zoom() * changefactor)
+        }
+    }
+
+    function handleCenterClick() {
+        let chart = chartRef.current
+        if (chart) {
+            chart.fit()
+            chart.center()
+        }
     }
 
     return (
@@ -70,142 +132,50 @@ export default function Page() {
                 <Button onClick={runQuery}>Run</Button>
             </div>
             {elements.length > 0 &&
-                <div className="m-2 p-2 rounded-lg border border-gray-300 h-5/6">
+                <main className="h-full w-full">
+                    <div className="flex flex-row" >
+                        <TooltipProvider>
+                            <Tooltip>
+                                <TooltipTrigger className="text-gray-600 dark:text-gray-400 rounded-lg border border-gray-300 p-2" onClick={() => handleZoomClick(1.1)}><ZoomIn /></TooltipTrigger>
+                                <TooltipContent>
+                                    <p>Zoom In</p>
+                                </TooltipContent>
+                            </Tooltip>
+                            <Tooltip>
+                                <TooltipTrigger className="text-gray-600 dark:text-gray-400 rounded-lg border border-gray-300 p-2" onClick={() => handleZoomClick(0.9)}><ZoomOut /></TooltipTrigger>
+                                <TooltipContent>
+                                    <p>Zoom Out</p>
+                                </TooltipContent>
+                            </Tooltip>
+                            <Tooltip>
+                                <TooltipTrigger className="text-gray-600 dark:text-gray-400 rounded-lg border border-gray-300 p-2" onClick={handleCenterClick}><XCircle /></TooltipTrigger>
+                                <TooltipContent>
+                                    <p>Center</p>
+                                </TooltipContent>
+                            </Tooltip>
+                        </TooltipProvider>
+                    </div>
                     <CytoscapeComponent
-                        stylesheet={[
-                            {
-                                selector: 'node',
-                                style: {
-                                    label: "data(label)",
-                                    "text-valign": "center",
-                                    "text-halign": "center",
-                                    shape: "ellipse",
-                                    height: 10,
-                                    width: 10,
-                                    "font-size": "5",
-                                },
-                            },
-                            {
-                                selector: "edge",
-                                style: {
-                                    width: 1,
-                                    'line-color': '#ccc',
-                                    "arrow-scale": 0.5,
-                                    "target-arrow-shape": "triangle",
-                                    label: "data(label)",
-                                    'curve-style': 'straight',
-                                    "text-background-color": "#ffffff",
-                                    "text-background-opacity": 1,
-                                    "font-size": "5",
-                                },
-                            },
-                        ]}
-                        elements={elements}
-                        layout={{
-                            name: "cose",
-                            fit: true,
-                            padding: 30,
-                            avoidOverlap: true,
+                        cy={(cy) => {
+                            chartRef.current = cy
+
+                            // Make sure no previous listeners are attached
+                            cy.removeAllListeners();
+
+                            // Listen to the click event on nodes for expanding the node
+                            cy.on('dbltap', 'node', function (evt) {
+                                var node: Node = evt.target.json().data;
+                                // TODO:
+                                // parmas.onFetchNode(node);
+                            });
                         }}
+                        stylesheet={STYLESHEET}
+                        elements={elements}
+                        layout={LAYOUT}
                         className="w-full h-full"
                     />
-                </div>
+                </main>
             }
         </div>
     )
-}
-
-export interface Category {
-    name: string,
-    index: number
-}
-
-export interface GraphData {
-    id: number,
-    name: string,
-    value: string,
-    label: string
-}
-
-export interface GraphLink {
-    id: number,
-    source: string,
-    target: string,
-    label: string
-}
-
-interface GraphResult {
-    data: any[],
-    metadata: any
-}
-
-interface ExtractedData {
-    data: any[][],
-    columns: string[],
-    categories: Map<String, Category>,
-    nodes: Map<number, GraphData>,
-    edges: Map<number,GraphLink>,
-}
-
-function extractData(results: GraphResult | null): ExtractedData {
-    let columns: string[] = []
-    let data: any[][] = []
-    if (results?.data?.length) {
-        if (results.data[0] instanceof Object) {
-            columns = Object.keys(results.data[0])
-        }
-        data = results.data
-    }
-
-    let nodes = new Map<number, GraphData>()
-    let categories = new Map<String, Category>()
-    categories.set("default", { name: "default", index: 0 })
-
-    let edges = new Map<number, GraphLink>()
-
-    data.forEach((row: any[]) => {
-        Object.values(row).forEach((cell: any) => {
-            if (cell instanceof Object) {
-                if (cell.relationshipType) {
-
-                    let edge = edges.get(cell.id)
-                    if(!edge) {
-                        let sourceId = cell.sourceId.toString();
-                        let destinationId = cell.destinationId.toString()
-                        edges.set(cell.id, { id: cell.id, source: sourceId, target: destinationId, label: cell.relationshipType })
-                    
-                        // creates a fakeS node for the source and target
-                        let source = nodes.get(cell.sourceId)
-                        if (!source) {
-                            source = { id: cell.sourceId.toString(), name: cell.sourceId.toString(), value: "", label: "" }
-                            nodes.set(cell.sourceId, source)
-                        }
-
-                        let destination = nodes.get(cell.destinationId)
-                        if (!destination) {
-                            destination = { id: cell.destinationId.toString(), name: cell.destinationId.toString(), value: "", label: "" }
-                            nodes.set(cell.destinationId, destination)
-                        }
-                    }
-                } else if (cell.labels) {
-
-                    // check if category already exists in categories
-                    let category = categories.get(cell.labels[0])
-                    if (!category) {
-                        category = { name: cell.labels[0], index: categories.size }
-                        categories.set(category.name, category)
-                    }
-
-                    // check if node already exists in nodes or fake node was created
-                    let node = nodes.get(cell.id)
-                    if (!node || node.value === "") {
-                        node = { id: cell.id.toString(), name: cell.id.toString(), value: JSON.stringify(cell), label: category.name }
-                        nodes.set(cell.id, node)
-                    }
-                }
-            }
-        })
-    })
-
-    return { data, columns, categories, nodes, edges }
 }
