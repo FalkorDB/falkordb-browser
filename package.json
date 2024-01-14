@@ -21,6 +21,7 @@
     "falkordb": "^5.0.1",
     "lucide-react": "^0.301.0",
     "next": "14.0.4",
+    "next-auth": "^4.24.5",
     "react": "^18",
     "react-cytoscapejs": "^2.0.0",
     "react-dom": "^18",

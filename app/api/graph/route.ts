@@ -1,10 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Graph, RedisClientType, RedisDefaultModules, createClient } from 'falkordb';
+import { getServerSession } from "next-auth/next";
+import authOptions from "../auth/[...nextauth]/options";
+import { cookies } from 'next/headers'
 
 const client = createClient();
 client.connect()
 
 export async function GET(request: NextRequest) {
+
+    const session = await getServerSession(authOptions)
+    console.log(JSON.stringify( session))
 
     const graphID = request.nextUrl.searchParams.get("graph");
     try {

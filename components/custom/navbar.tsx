@@ -1,4 +1,6 @@
 import { AirVentIcon } from "lucide-react";
+import { signOut } from "next-auth/react";
+import Link from "next/link";
 
 export default function Navbar() {
   return (
@@ -33,7 +35,9 @@ export default function Navbar() {
           </li>
           <li className="flex items-center space-x-2">
             <AirVentIcon className="h-6 w-6" />
-            <span>Setting</span>
+            <Link className="text-blue-600 underline underline-offset-2" onClick={() => signOut({ callbackUrl: '/' })} href="/">
+            Sign Out
+          </Link>
           </li>
         </ul>
       </div>
