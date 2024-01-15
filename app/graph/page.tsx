@@ -10,6 +10,8 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { XCircle, ZoomIn, ZoomOut } from "lucide-react";
 import { Node, Graph } from "./model";
 import { signOut } from "next-auth/react";
+import { Toolbar } from "./toolbar";
+import { Query, QueryState } from "./query";
 
 // The stylesheet for the graph
 const STYLESHEET: cytoscape.Stylesheet[] = [
@@ -53,20 +55,14 @@ const LAYOUT = {
 }
 
 export default function Page() {
-    const [query, setQuery] = useState('');
-    const [graphName, setGraphName] = useState('');
+
     const [graph, setGraph] = useState(Graph.empty());
 
     // A reference to the chart container to allowing zooming and editing
     const chartRef = useRef<cytoscape.Core | null>(null)
 
-    function updateQuery(event: React.ChangeEvent<HTMLInputElement>) {
-        setQuery(event.target.value)
-    }
-
-    function updateGraph(event: React.ChangeEvent<HTMLInputElement>) {
-        setGraphName(event.target.value)
-    }
+    // A reference to the query state to allow running the user query
+    const queryState = useRef<QueryState| null>(null)
 
     function prepareArg(arg: string): string {
         return encodeURIComponent(arg.trim())
@@ -74,10 +70,14 @@ export default function Page() {
 
     async function runQuery(event: any) {
         event.preventDefault();
+        let state = queryState.current;
+        if(!state){
+            return
+        }
 
-        let q = query.trim() || "MATCH (n)-[e]-() RETURN n,e limit 100";
+        let q = state.query.trim() || "MATCH (n)-[e]-() RETURN n,e limit 100";
 
-        let result = await fetch(`/api/graph?graph=${prepareArg(graphName)}&query=${prepareArg(q)}`, {
+        let result = await fetch(`/api/graph?graph=${prepareArg(state.graphName)}&query=${prepareArg(q)}`, {
             method: 'GET',
             headers: {
                 'Content-Type': 'application/json'
@@ -106,54 +106,11 @@ export default function Page() {
         }
     }
 
-    function handleZoomClick(changefactor: number) {
-        let chart = chartRef.current
-        if (chart) {
-            chart.zoom(chart.zoom() * changefactor)
-        }
-    }
-
-    function handleCenterClick() {
-        let chart = chartRef.current
-        if (chart) {
-            chart.fit()
-            chart.center()
-        }
-    }
-
     return (
         <div className="flex flex-col h-full">
-            <form onSubmit={runQuery} className="items-center flex flex-row space-x-3 m-2 p-2 rounded-lg border border-gray-300">
-                <Label htmlFor="query" className="text">Query</Label>
-                <Input id="graph" className="border-gray-500 w-2/12"
-                    placeholder="Enter Graph name" type="text" onChange={updateGraph} />
-                <Input id="query" className="border-gray-500 w-8/12"
-                    placeholder="MATCH (n)-[e]-() RETURN n,e limit 100" type="text" onChange={updateQuery} />
-                <Button type="submit">Run</Button>
-            </form>
+            <Query onSubmit={runQuery} query={(state) => queryState.current = state} />
             <main className="h-full w-full">
-                <div className="flex flex-row" >
-                    <TooltipProvider>
-                        <Tooltip>
-                            <TooltipTrigger className="text-gray-600 dark:text-gray-400 rounded-lg border border-gray-300 p-2" onClick={() => handleZoomClick(1.1)}><ZoomIn /></TooltipTrigger>
-                            <TooltipContent>
-                                <p>Zoom In</p>
-                            </TooltipContent>
-                        </Tooltip>
-                        <Tooltip>
-                            <TooltipTrigger className="text-gray-600 dark:text-gray-400 rounded-lg border border-gray-300 p-2" onClick={() => handleZoomClick(0.9)}><ZoomOut /></TooltipTrigger>
-                            <TooltipContent>
-                                <p>Zoom Out</p>
-                            </TooltipContent>
-                        </Tooltip>
-                        <Tooltip>
-                            <TooltipTrigger className="text-gray-600 dark:text-gray-400 rounded-lg border border-gray-300 p-2" onClick={handleCenterClick}><XCircle /></TooltipTrigger>
-                            <TooltipContent>
-                                <p>Center</p>
-                            </TooltipContent>
-                        </Tooltip>
-                    </TooltipProvider>
-                </div>
+                <Toolbar chartRef={chartRef} />
                 <CytoscapeComponent
                     cy={(cy) => {
                         chartRef.current = cy
