@@ -8,7 +8,8 @@ import CytoscapeComponent from 'react-cytoscapejs'
 import { useRef, useState } from "react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { XCircle, ZoomIn, ZoomOut } from "lucide-react";
-import { Edge, Node, Graph } from "./model";
+import { Node, Graph } from "./model";
+import { signOut } from "next-auth/react";
 
 // The stylesheet for the graph
 const STYLESHEET: cytoscape.Stylesheet[] = [
@@ -87,15 +88,20 @@ export default function Page() {
                 title: "Error",
                 description: result.text(),
             })
+            if (result.status >= 400 && result.status < 500) {
+                signOut({ callbackUrl: '/' })
+            }
             return
         }
 
         let json = await result.json()
-        let elements = graph.extend(json.result)
+        let newGraph = Graph.create(json.result)
+        setGraph(newGraph)
 
         let chart = chartRef.current
         if(chart){
-            chart.add(elements)
+            chart.elements().remove()
+            chart.add(newGraph.Elements)
             chart.elements().layout(LAYOUT).run();
         }
     }
