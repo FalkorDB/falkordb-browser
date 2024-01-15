@@ -71,39 +71,37 @@ export default function Page() {
         return encodeURIComponent(arg.trim())
     }
 
-    function runQuery() {
+    async function runQuery() {
 
         let q = query.trim() || "MATCH (n)-[e]-() RETURN n,e limit 100";
 
-        fetch(`/api/graph?graph=${prepareArg(graph)}&query=${prepareArg(q)}`, {
+        let result = await fetch(`/api/graph?graph=${prepareArg(graph)}&query=${prepareArg(q)}`, {
             method: 'GET',
             headers: {
                 'Content-Type': 'application/json'
             }
-        }).then((result) => {
-            if (result.status >= 300) {
-                toast({
-                    title: "Error",
-                    description: result.text(),
-                })
-            }
-            result.json()
-                .then((json) => {
-                    return extractData(json.result)
-                })
-                .then((data) => {
-                    let elements: any[] = []
-
-                    data.nodes.forEach((node: Node) => {
-                        elements.push({ data: node })
-                    })
-                    data.edges.forEach((node: Edge) => {
-                        elements.push({ data: node })
-                    })
-
-                    setElements(elements)
-                })
         })
+        if (result.status >= 300) {
+            toast({
+                title: "Error",
+                description: result.text(),
+            })
+            return
+        }
+     
+        let json = await result.json()  
+        let data = extractData(json.result)
+
+        let elements: any[] = []
+
+        data.nodes.forEach((node: Node) => {
+            elements.push({ data: node })
+        })
+        data.edges.forEach((node: Edge) => {
+            elements.push({ data: node })
+        })
+
+        setElements(elements)
     }
 
     function handleZoomClick(changefactor: number) {

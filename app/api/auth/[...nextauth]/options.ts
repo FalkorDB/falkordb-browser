@@ -1,16 +1,15 @@
-import { createClient } from "falkordb";
+import { RedisClientType, createClient } from "falkordb";
 import CredentialsProvider from "next-auth/providers/credentials"
 import { AuthOptions } from "next-auth"
+
+
+export const connections = new Map<number, RedisClientType>();
+let userId = 1;
 
 const authOptions : AuthOptions = {
     providers: [
         CredentialsProvider({
-            // The name to display on the sign in form (e.g. 'Sign in with...')
             name: 'Credentials',
-            // The credentials is used to generate a suitable form on the sign in page.
-            // You can specify whatever fields you are expecting to be submitted.
-            // e.g. domain, username, password, 2FA token, etc.
-            // You can pass any HTML attribute to the <input> tag through the object.
             credentials: {
                 host: { label: "Host", type: "text", placeholder: "localhost" },
                 port: { label: "Port", type: "number", placeholder: "6379" },
@@ -36,7 +35,11 @@ const authOptions : AuthOptions = {
                     .on('error', err => console.log('FalkorDB Client Error', err))
                     .connect();
 
+                    const id = userId++;
+                    connections.set(id, client as RedisClientType)
+
                     let res : any = {
+                        id: id,
                         host: credentials.host,
                         port: credentials.port,
                         password: credentials.password,
@@ -54,6 +57,7 @@ const authOptions : AuthOptions = {
     callbacks: {
         async jwt({ token, user }) {
             if (user) {
+                token.id = user.id;
                 token.host = user.host;
                 token.port = user.port;
                 token.username = user.username;
@@ -64,6 +68,7 @@ const authOptions : AuthOptions = {
         },
         async session({ session, token, user }) {
             if (session.user) {
+                session.user.id = token.id as number;
                 session.user.host = token.host as string;
                 session.user.port = parseInt(token.port as string);
                 session.user.username = token.username as string;

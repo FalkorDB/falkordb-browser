@@ -1,16 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
-import { Graph, RedisClientType, RedisDefaultModules, createClient } from 'falkordb';
+import { Graph } from 'falkordb';
 import { getServerSession } from "next-auth/next";
-import authOptions from "../auth/[...nextauth]/options";
-import { cookies } from 'next/headers'
-
-const client = createClient();
-client.connect()
+import authOptions, { connections } from "../auth/[...nextauth]/options";
 
 export async function GET(request: NextRequest) {
 
     const session = await getServerSession(authOptions)
-    console.log(JSON.stringify( session))
+    const id = session?.user?.id
+    if(!id) {
+        return NextResponse.json({ message: "Not authenticated" }, { status: 401 })
+    }
+
+    let client = connections.get(id)
+    if(!client) {
+        return NextResponse.json({ message: "Not authenticated" }, { status: 401 })
+    }
 
     const graphID = request.nextUrl.searchParams.get("graph");
     try {
