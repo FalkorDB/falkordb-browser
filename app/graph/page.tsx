@@ -8,10 +8,11 @@ import CytoscapeComponent from 'react-cytoscapejs'
 import { useRef, useState } from "react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { XCircle, ZoomIn, ZoomOut } from "lucide-react";
-import { Node, Graph } from "./model";
+import { Node, Graph, Category, getCategoryColors } from "./model";
 import { signOut } from "next-auth/react";
 import { Toolbar } from "./toolbar";
 import { Query, QueryState } from "./query";
+import { Labels } from "./labels";
 
 // The stylesheet for the graph
 const STYLESHEET: cytoscape.Stylesheet[] = [
@@ -62,7 +63,7 @@ export default function Page() {
     const chartRef = useRef<cytoscape.Core | null>(null)
 
     // A reference to the query state to allow running the user query
-    const queryState = useRef<QueryState| null>(null)
+    const queryState = useRef<QueryState | null>(null)
 
     function prepareArg(arg: string): string {
         return encodeURIComponent(arg.trim())
@@ -71,7 +72,7 @@ export default function Page() {
     async function runQuery(event: any) {
         event.preventDefault();
         let state = queryState.current;
-        if(!state){
+        if (!state) {
             return
         }
 
@@ -95,13 +96,55 @@ export default function Page() {
         }
 
         let json = await result.json()
-        let newGraph = Graph.create(json.result)
+        let newGraph = Graph.create(state.graphName, json.result)
         setGraph(newGraph)
 
         let chart = chartRef.current
-        if(chart){
+        if (chart) {
             chart.elements().remove()
             chart.add(newGraph.Elements)
+            chart.elements().layout(LAYOUT).run();
+        }
+    }
+
+    // Send the user query to the server to expand a node
+    async function onFetchNode(node: Node) {
+        let result = await fetch(`/api/graph/${graph.Id}/${node.id}`, {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        })
+        
+        if (result.status >= 300) {
+            toast({
+                title: "Error",
+                description: result.text(),
+            })
+            if (result.status >= 400 && result.status < 500) {
+                signOut({ callbackUrl: '/' })
+            }
+            return [] as any[]
+        }
+
+        let json = await result.json()
+        let elements = graph.extend(json.result)
+        return elements        
+    }
+
+    function onCategoryClick(category: Category) {
+        let chart = chartRef.current
+        if (chart) {
+            let color = getCategoryColors(category.index)
+            let elements = chart.elements(`[color = "${color}"]`)
+
+            category.show = !category.show
+
+            if (category.show) {
+                elements.style({ display: 'element' })
+            } else {
+                elements.style({ display: 'none' })
+            }
             chart.elements().layout(LAYOUT).run();
         }
     }
@@ -110,7 +153,10 @@ export default function Page() {
         <div className="flex flex-col h-full">
             <Query onSubmit={runQuery} query={(state) => queryState.current = state} />
             <main className="h-full w-full">
-                <Toolbar chartRef={chartRef} />
+                <div className="grid grid-cols-6 gap-4">
+                    <Toolbar className="col-start-1" chartRef={chartRef} />
+                    <Labels className="col-start-3 col-end-4" categories={graph.Categories} onClick={onCategoryClick}/>
+                </div>
                 <CytoscapeComponent
                     cy={(cy) => {
                         chartRef.current = cy
@@ -119,10 +165,15 @@ export default function Page() {
                         cy.removeAllListeners();
 
                         // Listen to the click event on nodes for expanding the node
-                        cy.on('dbltap', 'node', function (evt) {
+                        cy.on('dbltap', 'node', async function (evt) {
                             var node: Node = evt.target.json().data;
-                            // TODO:
-                            // parmas.onFetchNode(node);
+                            let elements = await onFetchNode(node);
+
+                            // adjust entire graph.
+                            if (elements.length > 0) {
+                                cy.add(elements);
+                                cy.elements().layout(LAYOUT).run();
+                            }
                         });
                     }}
                     stylesheet={STYLESHEET}

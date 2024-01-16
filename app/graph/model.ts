@@ -1,7 +1,8 @@
 
 export interface Category {
+    index: number,
     name: string,
-    index: number
+    show: boolean,
 }
 
 export interface Node {
@@ -19,18 +20,21 @@ export interface Edge {
 }
 
 const COLORS = [
-    "#ff0000", // red 
-    "#0000ff", // blue
-    "#00ff00", // green
-    "#ffff00", // yellow
-    "#ff00ff", // magenta
-    "#00ffff", // cyan
-    "#ffffff", // white
-    "#000000", // black
-    "#800000", // maroon
-    "#808000", // olive
+    "red",
+    "blue",
+    "green",
+    "yellow",
+    "purple",
+    "fuchsia",
+    "aqua",
+    "gray",
+    "orange",
 ]
 
+export function getCategoryColors(index: number): string {
+    return index<COLORS.length ? COLORS[index] : COLORS[0]
+}
+ 
 interface GraphResult {
     data: any[],
     metadata: any
@@ -79,10 +83,10 @@ export class Graph {
         return new Graph("", [], [], new Map<String, Category>(), new Map<number, Node>(), new Map<number, Edge>())
     }
 
-    public static create(results: any): Graph {
+    public static create(id: string, results: any): Graph {
         let graph = Graph.empty()
         graph.extend(results)
-        graph.id = results.id
+        graph.id = id
         return graph
     }
 
@@ -130,8 +134,9 @@ export class Graph {
                         // check if category already exists in categories
                         let category = this.categoriesMap.get(cell.labels[0])
                         if (!category) {
-                            category = { name: cell.labels[0], index: this.categoriesMap.size }
+                            category = { name: cell.labels[0], index: this.categoriesMap.size, show: true }
                             this.categoriesMap.set(category.name, category)
+                            this.categories.push(category)
                         }
 
                         // check if node already exists in nodes or fake node was created
@@ -141,7 +146,7 @@ export class Graph {
                                 id: cell.id.toString(),
                                 name: cell.id.toString(),
                                 value: JSON.stringify(cell),
-                                color: category.index < COLORS.length ? COLORS[category.index] : COLORS[0]
+                                color: getCategoryColors(category.index)
                             }
                             this.nodesMap.set(cell.id, node)
                             this.elements.push({data:node})
