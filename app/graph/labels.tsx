@@ -10,10 +10,10 @@ export function Labels(params: { categories: Category[], className?: string, onC
     const [reload, setReload] = useState(false)
 
     return (
-        <div className={cn("flex flex-row gap-x-2", params.className)} >
+        <div className={cn("flex flex-row gap-x-1", params.className)} >
             {params.categories.map((category) => {
                 return (
-                    <div className="flex flex-row gap-x-2 items-center" key={category.index}>
+                    <div className="flex flex-row gap-x-1 items-center" key={category.index}>
                         <Button
                             className={cn(`bg-${getCategoryColorName(category.index)}-500 ${category.show ? "" : "opacity-50"}`, "rounded-lg border border-gray-300 p-2 opac")}
                             onClick={() => {

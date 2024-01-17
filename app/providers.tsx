@@ -12,7 +12,7 @@ type Props = {
 export const NextAuthProvider = ({ children }: Props) => {
   return (
     <SessionProvider>
-      <ResizablePanelGroup direction="horizontal" className='w-full h-full overflow-hidden'>
+      <ResizablePanelGroup direction="horizontal" className='min-h-screen'>
         <ResizablePanel defaultSize={20} maxSize={30} collapsible={true} minSize={10}>
           <Navbar />
         </ResizablePanel>

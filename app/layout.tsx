@@ -21,9 +21,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={inter.className}>
-        <div className="flex h-screen min-h-screen w-full overflow-hidden">
           <NextAuthProvider>{children}</NextAuthProvider>
-        </div>
       </body>
     </html>
   )
