@@ -20,7 +20,7 @@
     "clsx": "^2.0.0",
     "cytoscape": "^3.28.1",
     "falkordb": "^5.0.1",
-    "lucide-react": "^0.301.0",
+    "lucide-react": "^0.311.0",
     "next": "14.0.4",
     "next-auth": "^4.24.5",
     "next-themes": "^0.2.1",
