@@ -22,8 +22,6 @@ export interface Edge {
     value: any,
 }
 
-
-
 const COLORS_ORDER = [
     "rose",
     "yellow",
