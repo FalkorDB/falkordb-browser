@@ -1,14 +1,9 @@
 'use client'
 
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
 import { toast } from "@/components/ui/use-toast";
 import CytoscapeComponent from 'react-cytoscapejs'
 import { useRef, useState } from "react";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { XCircle, ZoomIn, ZoomOut } from "lucide-react";
-import { Node, Graph, Category, getCategoryColors } from "./model";
+import { Node, Graph, Category, getCategoryColorName } from "./model";
 import { signOut } from "next-auth/react";
 import { Toolbar } from "./toolbar";
 import { Query, QueryState } from "./query";
@@ -159,8 +154,7 @@ export default function Page() {
     function onCategoryClick(category: Category) {
         let chart = chartRef.current
         if (chart) {
-            let color = getCategoryColors(category.index)
-            let elements = chart.elements(`[color = "${color}"]`)
+            let elements = chart.elements(`node[category = "${category.name}"]`)
 
             category.show = !category.show
 
