@@ -17,6 +17,22 @@ import { Labels } from "./labels";
 // The stylesheet for the graph
 const STYLESHEET: cytoscape.Stylesheet[] = [
     {
+        selector: "core",
+        style: {
+            'active-bg-size': 0,  // hide gray circle when panning
+            // All of the following styles are meaningless and are specified
+            // to satisfy the linter...
+            'active-bg-color': 'blue',
+            'active-bg-opacity': 0.3,
+            "selection-box-border-color": 'blue',
+            "selection-box-border-width": 0,
+            "selection-box-opacity": 1,
+            "selection-box-color": 'blue',
+            "outside-texture-bg-color": 'blue',
+            "outside-texture-bg-opacity": 1,
+        },
+    },
+    {
         selector: "node",
         style: {
             label: "data(name)",
@@ -25,9 +41,17 @@ const STYLESHEET: cytoscape.Stylesheet[] = [
             shape: "ellipse",
             height: 10,
             width: 10,
+            "border-width": 0.15,
+            "border-opacity": 0.5,
             "background-color": "data(color)",
             "font-size": "3",
-            "overlay-padding": "2px",
+            "overlay-padding": "1px",
+        },
+    },
+    {
+        selector: "node:active",
+        style: {
+            "overlay-opacity": 0,  // hide gray box around active node
         },
     },
     {
