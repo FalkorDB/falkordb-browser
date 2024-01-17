@@ -1,4 +1,6 @@
 
+import twcolors from 'tailwindcss/colors'
+
 export interface Category {
     index: number,
     name: string,
@@ -9,6 +11,7 @@ export interface Node {
     id: string,
     name: string,
     value: any,
+    category: string,
     color: string,
 }
 
@@ -19,21 +22,37 @@ export interface Edge {
     value: any,
 }
 
-const COLORS = [
-    "red",
-    "blue",
-    "green",
+
+
+const COLORS_ORDER = [
+    "rose",
     "yellow",
-    "purple",
+    "teal",
     "fuchsia",
-    "aqua",
-    "gray",
+    "blue",
+    "violet",
+    "slate",
+    "cyan",
     "orange",
+    "red",
+    "green",
+    "pink",
 ]
 
-export function getCategoryColors(index: number): string {
-    return index<COLORS.length ? COLORS[index] : COLORS[0]
+export function getCategoryColorName(index: number): string {
+    index = index<COLORS_ORDER.length ? index : 0
+    return COLORS_ORDER[index]
 }
+
+function getCategoryColorValue(index: number): string {
+    index = index<COLORS_ORDER.length ? index : 0
+    let colorName = COLORS_ORDER[index]
+
+    let colors = twcolors as any
+    let color = colors[colorName]
+    return color["500"]
+}
+
  
 interface GraphResult {
     data: any[],
@@ -146,7 +165,8 @@ export class Graph {
                                 id: cell.id.toString(),
                                 name: cell.id.toString(),
                                 value: JSON.stringify(cell),
-                                color: getCategoryColors(category.index)
+                                category: category.name,
+                                color: getCategoryColorValue(category.index)
                             }
                             this.nodesMap.set(cell.id, node)
                             this.elements.push({data:node})

@@ -1,14 +1,9 @@
 'use client'
 
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
 import { toast } from "@/components/ui/use-toast";
 import CytoscapeComponent from 'react-cytoscapejs'
 import { useRef, useState } from "react";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { XCircle, ZoomIn, ZoomOut } from "lucide-react";
-import { Node, Graph, Category, getCategoryColors } from "./model";
+import { Node, Graph, Category, getCategoryColorName } from "./model";
 import { signOut } from "next-auth/react";
 import { Toolbar } from "./toolbar";
 import { Query, QueryState } from "./query";
@@ -16,6 +11,22 @@ import { Labels } from "./labels";
 
 // The stylesheet for the graph
 const STYLESHEET: cytoscape.Stylesheet[] = [
+    {
+        selector: "core",
+        style: {
+            'active-bg-size': 0,  // hide gray circle when panning
+            // All of the following styles are meaningless and are specified
+            // to satisfy the linter...
+            'active-bg-color': 'blue',
+            'active-bg-opacity': 0.3,
+            "selection-box-border-color": 'blue',
+            "selection-box-border-width": 0,
+            "selection-box-opacity": 1,
+            "selection-box-color": 'blue',
+            "outside-texture-bg-color": 'blue',
+            "outside-texture-bg-opacity": 1,
+        },
+    },
     {
         selector: "node",
         style: {
@@ -25,9 +36,17 @@ const STYLESHEET: cytoscape.Stylesheet[] = [
             shape: "ellipse",
             height: 10,
             width: 10,
+            "border-width": 0.15,
+            "border-opacity": 0.5,
             "background-color": "data(color)",
             "font-size": "3",
-            "overlay-padding": "2px",
+            "overlay-padding": "1px",
+        },
+    },
+    {
+        selector: "node:active",
+        style: {
+            "overlay-opacity": 0,  // hide gray box around active node
         },
     },
     {
@@ -135,8 +154,7 @@ export default function Page() {
     function onCategoryClick(category: Category) {
         let chart = chartRef.current
         if (chart) {
-            let color = getCategoryColors(category.index)
-            let elements = chart.elements(`[color = "${color}"]`)
+            let elements = chart.elements(`node[category = "${category.name}"]`)
 
             category.show = !category.show
 
