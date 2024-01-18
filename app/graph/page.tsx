@@ -2,6 +2,8 @@
 
 import { toast } from "@/components/ui/use-toast";
 import CytoscapeComponent from 'react-cytoscapejs'
+import cytoscape from 'cytoscape';
+import fcose from 'cytoscape-fcose';
 import { useRef, useState } from "react";
 import { Node, Graph, Category, getCategoryColorName } from "./model";
 import { signOut } from "next-auth/react";
@@ -10,6 +12,8 @@ import { Query, QueryState } from "./query";
 import { Labels } from "./labels";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+
+cytoscape.use( fcose );
 
 // The stylesheet for the graph
 const STYLESHEET: cytoscape.Stylesheet[] = [
@@ -70,10 +74,9 @@ const STYLESHEET: cytoscape.Stylesheet[] = [
 ]
 
 const LAYOUT = {
-    name: "cose",
+    name: "fcose",
     fit: true,
     padding: 30,
-    avoidOverlap: true,
 }
 
 export default function Page() {
@@ -203,7 +206,7 @@ export default function Page() {
                                         </TableBody>
                                     </Table>
                                 </TabsContent>
-                                <TabsContent value="graph" className="grow w-full">
+                                                                <TabsContent value="graph" className="grow w-full">
                                     <div className="h-full flex flex-col">
                                         <div className="grid grid-cols-6">
                                             <Toolbar className="col-start-1 justify-start" chartRef={chartRef} />
