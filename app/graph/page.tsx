@@ -203,7 +203,7 @@ export default function Page() {
                                         </TableBody>
                                     </Table>
                                 </TabsContent>
-                                <TabsContent value="graph" className="grow">
+                                <TabsContent value="graph" className="grow w-full">
                                     <div className="h-full flex flex-col">
                                         <div className="grid grid-cols-6">
                                             <Toolbar className="col-start-1 justify-start" chartRef={chartRef} />
