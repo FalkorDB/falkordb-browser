@@ -18,13 +18,11 @@ export default function Home() {
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen py-2">
-      <main className="flex flex-col items-center justify-center flex-1 px-20 text-center">
+      <main className="flex flex-col items-center justify-center flex-1 px-20 text-center space-y-5">
         <h1 className="text-4xl font-bold">
-          Welcome to{' '}
-          <Link className="text-blue-600 underline underline-offset-2" onClick={() => signIn("Credentials", { callbackUrl: '/graph' })} href="/">
-            FalkorDB Browser
-          </Link>
+          Welcome to FalkorDB Browser
         </h1>
+        <Button onClick={() => signIn("Credentials", { callbackUrl: '/graph' })}>Sign In</Button>
       </main>
     </div>
   )
