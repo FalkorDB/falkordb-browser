@@ -1,14 +1,43 @@
 import { LogOut, Menu } from "lucide-react";
 import { signOut, useSession } from "next-auth/react";
 import Link from "next/link";
+import { Switch } from "../ui/switch";
+import { Label } from "../ui/label";
+import { useEffect, useState } from "react";
+import { useTheme } from "next-themes";
 
 export default function Navbar() {
   const { data: session, status } = useSession()
+  const { theme, setTheme, systemTheme} = useTheme()
+  
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  function setDarkMode(val: boolean) {
+    if (val) {
+      setTheme("dark")
+    }
+    else {
+      setTheme("light")
+    }
+  }
+
+  let darkmode = theme=="dark" || (theme=="system" && systemTheme=="dark")
 
   return (
-    <nav className="w-full h-full bg-gray-100 p-5">
-      <div className="flex items-center space-x-2 border-b pb-4 mb-4">
-        <Menu className="h-6 w-6 text-blue-500" />
+    <nav className="w-full h-full bg-gray-100 dark:bg-gray-800 p-5 space-y-4 flex flex-col">
+      {
+        mounted &&
+        <div className="flex items-center space-x-2">
+          <Switch id="dark-mode" checked={darkmode} onCheckedChange={setDarkMode} />
+          <Label htmlFor="dark-mode">{`${theme} mode`}</Label>
+        </div>
+      }
+      <div className="flex items-center space-x-2 border-b">
+        <Menu className="h-6 w-6" />
         <span className="font-bold">FalkorDB Browser</span>
       </div>
       <ul className="space-y-2">
@@ -33,10 +62,10 @@ export default function Navbar() {
             <AirVentIcon className="h-6 w-6" />
             <span>Profile</span>
           </li> */}
-        { status === "authenticated" &&
+        {status === "authenticated" &&
           <li className="flex items-center space-x-2">
             <LogOut className="h-6 w-6" />
-            <Link className="text-blue-600 underline underline-offset-2" onClick={() => signOut({ callbackUrl: '/' })} href="/">
+            <Link className="underline underline-offset-2" onClick={() => signOut({ callbackUrl: '/' })} href="/">
               Sign Out
             </Link>
           </li>
