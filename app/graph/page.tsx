@@ -11,7 +11,7 @@ import { Toolbar } from "./toolbar";
 import { Query, QueryState } from "./query";
 import { Labels } from "./labels";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { TableView } from "./tableview";
 
 cytoscape.use( fcose );
 
@@ -186,25 +186,7 @@ export default function Page() {
                                     <TabsTrigger value="graph">Graph</TabsTrigger>
                                 </TabsList>
                                 <TabsContent value="data" className="grow w-full">
-                                    <Table>
-                                        <TableCaption>A list of results</TableCaption>
-                                        <TableHeader>
-                                            <TableRow>
-                                                {/* <TableHead className="w-[100px]">Invoice</TableHead>
-                                                <TableHead>Status</TableHead>
-                                                <TableHead>Method</TableHead>
-                                                <TableHead className="text-right">Amount</TableHead> */}
-                                            </TableRow>
-                                        </TableHeader>
-                                        <TableBody>
-                                            <TableRow>
-                                                {/* <TableCell className="font-medium">INV001</TableCell>
-                                                <TableCell>Paid</TableCell>
-                                                <TableCell>Credit Card</TableCell>
-                                                <TableCell className="text-right">$250.00</TableCell> */}
-                                            </TableRow>
-                                        </TableBody>
-                                    </Table>
+                                    <TableView graph={graph} />
                                 </TabsContent>
                                                                 <TabsContent value="graph" className="grow w-full">
                                     <div className="h-full flex flex-col">

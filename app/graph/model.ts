@@ -67,6 +67,10 @@ export interface ExtractedData {
 export class Graph {
 
     private id: string;
+
+    private columns: string[];
+    private data: any[];
+
     private categories: Category[];
     private elements: any[];
 
@@ -77,6 +81,8 @@ export class Graph {
     private constructor(id: string, categories: Category[], elements: any[],
         categoriesMap: Map<String, Category>, nodesMap: Map<number, Node>, edgesMap: Map<number, Edge>) {
         this.id = id;
+        this.columns = [];
+        this.data = [];
         this.categories = categories;
         this.elements = elements;
         this.categoriesMap = categoriesMap;
@@ -96,6 +102,14 @@ export class Graph {
         return this.elements;
     }
 
+    get Columns(): string[] {
+        return this.columns;
+    }
+
+    get Data(): any[] {
+        return this.data;
+    }
+    
     public static empty(): Graph {
         return new Graph("", [], [], new Map<String, Category>(), new Map<number, Node>(), new Map<number, Edge>())
     }
@@ -110,17 +124,14 @@ export class Graph {
     public extend(results: any): any[] {
 
         let newElements: any[] = []
-
-        let columns: string[] = []
-        let data: any[][] = []
         if (results?.data?.length) {
             if (results.data[0] instanceof Object) {
-                columns = Object.keys(results.data[0])
+                this.columns = Object.keys(results.data[0])
             }
-            data = results.data
+            this.data = results.data
         }
 
-        data.forEach((row: any[]) => {
+        this.data.forEach((row: any[]) => {
             Object.values(row).forEach((cell: any) => {
                 if (cell instanceof Object) {
                     if (cell.relationshipType) {
