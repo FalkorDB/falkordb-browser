@@ -42,7 +42,7 @@ export function getCategoryColorName(index: number): string {
     return COLORS_ORDER[index]
 }
 
-function getCategoryColorValue(index: number): string {
+function getCategoryColorValue(index=0): string {
     index = index<COLORS_ORDER.length ? index : 0
     let colorName = COLORS_ORDER[index]
 
@@ -133,18 +133,35 @@ export class Graph {
                             this.edgesMap.set(cell.id, edge)
                             this.elements.push({data:edge})
                             newElements.push({data:edge})
-                            // // creates a fakeS node for the source and target
-                            // let source = nodes.get(cell.sourceId)
-                            // if (!source) {
-                            //     source = { id: cell.sourceId.toString(), name: cell.sourceId.toString(), value: "", color: COLORS[0] }
-                            //     nodes.set(cell.sourceId, source)
-                            // }
+                            
+                            // creates a fakeS node for the source and target
+                            let source = this.nodesMap.get(cell.sourceId)
+                            if (!source) {
+                                source = { 
+                                    id: cell.sourceId.toString(), 
+                                    name: cell.sourceId.toString(), 
+                                    value: "", 
+                                    category: "",
+                                    color: getCategoryColorValue() 
+                                }
+                                this.nodesMap.set(cell.sourceId, source)
+                                this.elements.push({data:source})
+                                newElements.push({data:source})
+                            }
 
-                            // let destination = nodes.get(cell.destinationId)
-                            // if (!destination) {
-                            //     destination = { id: cell.destinationId.toString(), name: cell.destinationId.toString(), value: "", color: COLORS[0] }
-                            //     nodes.set(cell.destinationId, destination)
-                            // }
+                            let destination = this.nodesMap.get(cell.destinationId)
+                            if (!destination) {
+                                destination = { 
+                                    id: cell.destinationId.toString(), 
+                                    name: cell.destinationId.toString(), 
+                                    value: "", 
+                                    category: "",
+                                    color: getCategoryColorValue() 
+                                }
+                                this.nodesMap.set(cell.destinationId, destination)
+                                this.elements.push({data:destination})
+                                newElements.push({data:destination})
+                            }
                         }
                     } else if (cell.labels) {
 
@@ -158,7 +175,7 @@ export class Graph {
 
                         // check if node already exists in nodes or fake node was created
                         let node = this.nodesMap.get(cell.id)
-                        if (!node || node.value === "") {
+                        if (!node) {
                             node = {
                                 id: cell.id.toString(),
                                 name: cell.id.toString(),
@@ -168,6 +185,14 @@ export class Graph {
                             }
                             this.nodesMap.set(cell.id, node)
                             this.elements.push({data:node})
+                            newElements.push({data:node})
+                        } else if (node.category === ""){
+                            // set values in a fake node
+                            node.id = cell.id.toString(),
+                            node.name = cell.id.toString(),
+                            node.value = JSON.stringify(cell),
+                            node.category = category.name
+                            node.color = getCategoryColorValue(category.index)
                             newElements.push({data:node})
                         }
                     }
