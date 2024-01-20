@@ -65,7 +65,7 @@ export default function Navbar() {
         {status === "authenticated" &&
           <li className="flex items-center space-x-2">
             <LogOut className="h-6 w-6" />
-            <Link className="underline underline-offset-2" onClick={() => signOut({ callbackUrl: '/' })} href="/">
+            <Link className="underline underline-offset-2" href="/" onClick={() => signOut({ callbackUrl: '/' })}>
               Sign Out
             </Link>
           </li>
