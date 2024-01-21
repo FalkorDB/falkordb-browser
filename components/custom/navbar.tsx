@@ -5,8 +5,7 @@ import { Switch } from "../ui/switch";
 import { Label } from "../ui/label";
 import { useEffect, useState } from "react";
 import { useTheme } from "next-themes";
-import GithubMark from "./github-mark.svg";
-import GithubMarkWhite from "./github-mark-white.svg";
+import { GithubMark } from "./GithubMark";
 
 export default function Navbar() {
   const { data: session, status } = useSession()
@@ -28,7 +27,6 @@ export default function Navbar() {
   }
 
   let darkmode = theme == "dark" || (theme == "system" && systemTheme == "dark")
-
   return (
     <nav className="w-full h-full bg-gray-100 dark:bg-gray-800 p-5 space-y-4 flex flex-col">
       {
@@ -88,10 +86,7 @@ export default function Navbar() {
       }
       <footer className="flex flex-row items-center space-x-1 fixed bottom-1 text-xs">
           <a href="https://github.com/falkordb/falkordb-browser">{
-            darkmode ?
-              <GithubMarkWhite className="h-4 w-4 text-gray-100 dark:text-gray-50" />
-              :
-              <GithubMark className="h-4 w-4 text-gray-100 dark:text-gray-50" />
+              <GithubMark darkMode={darkmode} className="h-4 w-4" />
           }
           </a> 
           <span>Made by</span>

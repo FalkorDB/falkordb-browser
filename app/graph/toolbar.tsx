@@ -25,7 +25,7 @@ export function Toolbar(params: {
         <div className={cn("flex flex-row gap-x-1", params.className)}>
             <TooltipProvider>
                 <Tooltip>
-                    <TooltipTrigger className="text-gray-600 rounded-lg border border-gray-300 p-2" onClick={() => handleZoomClick(1.1)}>
+                    <TooltipTrigger className="text-gray-600 dark:text-gray-400 rounded-lg border border-gray-300 p-2" onClick={() => handleZoomClick(1.1)}>
                         <ZoomIn />
                     </TooltipTrigger>
                     <TooltipContent>
