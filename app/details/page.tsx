@@ -10,7 +10,7 @@ export default function Page() {
  
     return (
         <div className="w-full h-full p-5 flex flex-col space-y-4">
-            <h1 className="text-2xl font-bold">Conenction Details</h1>
+            <h1 className="text-2xl font-bold">Connection Details</h1>
             <ul className="space-y-2 list-disc border rounded-lg border-gray-300 p-2">
                 <li className="flex items-center space-x-2">
                     <span>Host:</span>
