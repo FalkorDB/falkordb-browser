@@ -28,7 +28,7 @@ export function DatabaseLine(props: { label: string, value: string, masked?: str
                 props.value.length > 0 &&
                 <>
                     <Button className="space-x-2 bg-transparent text-gray-600 px-2 hover:text-slate-50 dark:text-gray-50 dark:hover:text-gray-600" onClick={() => copyToClipboard(props.value)}>
-                        <p className="max-w-[10rem] md:max-w-2xl truncate ...">{(showPassword || !props.masked) ? props.value : props.masked}</p>
+                        <p className="max-w-[10rem] md:max-w-2xl truncate">{(showPassword || !props.masked) ? props.value : props.masked}</p>
                         <Copy className="h-3/4" />
                     </Button>
                     {props.masked &&
