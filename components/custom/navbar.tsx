@@ -6,6 +6,7 @@ import { Label } from "../ui/label";
 import { useEffect, useState } from "react";
 import { useTheme } from "next-themes";
 import GithubMark from "./github-mark.svg";
+import GithubMarkWhite from "./github-mark-white.svg";
 
 export default function Navbar() {
   const { data: session, status } = useSession()
@@ -86,7 +87,13 @@ export default function Navbar() {
         </ul>
       }
       <footer className="flex flex-row items-center space-x-1 fixed bottom-1 text-xs">
-          <a href="https://github.com/falkordb/falkordb-browser"><GithubMark className="h-4 w-4" /></a> 
+          <a href="https://github.com/falkordb/falkordb-browser">{
+            darkmode ?
+              <GithubMarkWhite className="h-4 w-4 text-gray-100 dark:text-gray-50" />
+              :
+              <GithubMark className="h-4 w-4 text-gray-100 dark:text-gray-50" />
+          }
+          </a> 
           <span>Made by</span>
           <a className="underline" href="https://www.falkordb.com">FalkorDB</a>
       </footer>
