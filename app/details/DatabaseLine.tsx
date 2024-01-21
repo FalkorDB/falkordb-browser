@@ -10,10 +10,19 @@ export function DatabaseLine(props: { label: string, value: string, masked?: str
 
     function copyToClipboard(value: string) {
         navigator.clipboard.writeText(value)
-        toast({
-            variant: "default",
-            title: "Copied to clipboard",
-            description: "The value has been copied to your clipboard.",
+        .then(() => {
+            toast({
+                variant: "default",
+                title: "Copied to clipboard",
+                description: "The value has been copied to your clipboard.",
+            })
+        })
+        .catch(() => {
+            toast({
+                variant: "destructive",
+                title: "Failed to copy to clipboard",
+                description: "The value could not be copied to your clipboard.",
+            })
         })
     }
 
