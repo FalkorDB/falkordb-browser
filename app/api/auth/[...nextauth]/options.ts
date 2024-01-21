@@ -40,13 +40,16 @@ const authOptions: AuthOptions = {
 
                     await client.on('error', err => {
                         // Close coonection on error and remove from connections map
-                        console.log('FalkorDB Client Error', err)
+                        console.error('FalkorDB Client Error', err)
                         let connection = connections.get(id)
                         if (connection) {
                             connections.delete(id)
                             connection.disconnect()
                         }
                     }).connect();
+                
+                    // Verify connection
+                    await client.ping()
 
                     connections.set(id, client as RedisClientType)
 
@@ -59,7 +62,7 @@ const authOptions: AuthOptions = {
                     }
                     return res
                 } catch (err) {
-                    console.log(err)
+                    console.error('FalkorDB Client Connect Error', err)
                     return null;
                 }
             }
