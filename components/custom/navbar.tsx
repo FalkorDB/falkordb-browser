@@ -1,4 +1,4 @@
-import { LogOut, Menu } from "lucide-react";
+import { Info, LogOut, Menu, Waypoints } from "lucide-react";
 import { signOut, useSession } from "next-auth/react";
 import Link from "next/link";
 import { Switch } from "../ui/switch";
@@ -8,8 +8,8 @@ import { useTheme } from "next-themes";
 
 export default function Navbar() {
   const { data: session, status } = useSession()
-  const { theme, setTheme, systemTheme} = useTheme()
-  
+  const { theme, setTheme, systemTheme } = useTheme()
+
   const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
@@ -25,7 +25,7 @@ export default function Navbar() {
     }
   }
 
-  let darkmode = theme=="dark" || (theme=="system" && systemTheme=="dark")
+  let darkmode = theme == "dark" || (theme == "system" && systemTheme == "dark")
 
   return (
     <nav className="w-full h-full bg-gray-100 dark:bg-gray-800 p-5 space-y-4 flex flex-col">
@@ -40,8 +40,9 @@ export default function Navbar() {
         <Menu className="h-6 w-6" />
         <span className="font-bold">FalkorDB Browser</span>
       </div>
-      <ul className="space-y-2">
-        {/* <li className="flex items-center space-x-2">
+      {status === "authenticated" &&
+        <ul className="space-y-2">
+          {/* <li className="flex items-center space-x-2">
           <AirVentIcon className="h-6 w-6" />
           <span>Employees</span>
         </li>
@@ -58,19 +59,31 @@ export default function Navbar() {
           <span>Calendar</span>
         </li> */}
 
-        {/* <li className="flex items-center space-x-2">
+          {/* <li className="flex items-center space-x-2">
             <AirVentIcon className="h-6 w-6" />
             <span>Profile</span>
           </li> */}
-        {status === "authenticated" &&
+
+          <li className="flex items-center space-x-2">
+            <Info className="h-6 w-6" />
+            <Link className="underline underline-offset-2" href="/details">
+              Connection Details
+            </Link>
+          </li>
+          <li className="flex items-center space-x-2">
+            <Waypoints className="h-6 w-6" />
+            <Link className="underline underline-offset-2" href="/graph">
+              Graph
+            </Link>
+          </li>
           <li className="flex items-center space-x-2">
             <LogOut className="h-6 w-6" />
             <Link className="underline underline-offset-2" href="/" onClick={() => signOut({ callbackUrl: '/' })}>
               Sign Out
             </Link>
           </li>
-        }
-      </ul>
+        </ul>
+      }
     </nav>
   )
 }
