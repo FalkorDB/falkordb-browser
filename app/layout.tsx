@@ -5,6 +5,7 @@ import Navbar from '@/components/custom/navbar'
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable'
 import NextAuth from 'next-auth'
 import { NextAuthProvider } from './providers'
+import { Toaster } from '@/components/ui/toaster'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -22,6 +23,7 @@ export default function RootLayout({
     <html lang="en">
       <body className={inter.className}>
           <NextAuthProvider>{children}</NextAuthProvider>
+          <Toaster />
       </body>
     </html>
   )
