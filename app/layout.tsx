@@ -1,9 +1,6 @@
+import './globals.css'
 import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
-import './globals.css'
-import Navbar from '@/components/custom/navbar'
-import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable'
-import NextAuth from 'next-auth'
 import { NextAuthProvider } from './providers'
 import { Toaster } from '@/components/ui/toaster'
 
@@ -19,8 +16,10 @@ export default function RootLayout({
 }: {
   children: React.ReactNode
 }) {
+  // Setting suppressHydrationWarning on html tag to prevent warning 
+  // caused by mismatched client/server content caused by next-themes
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <body className={inter.className}>
           <NextAuthProvider>{children}</NextAuthProvider>
           <Toaster />
