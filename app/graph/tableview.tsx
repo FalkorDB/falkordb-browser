@@ -20,7 +20,7 @@ export function TableView(params: {graph: Graph}) {
                         return (<TableRow key={index}>
                             {
                                 Object.values(row).map((cell:any, index) => {
-                                    return (<TableCell key={index}>{JSON.stringify(cell)}</TableCell>)
+                                    return (<TableCell key={index} className="max-w-96 truncate">{JSON.stringify(cell)}</TableCell>)
                                 })
                             }
                         </TableRow>)
