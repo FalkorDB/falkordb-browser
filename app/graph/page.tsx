@@ -13,7 +13,7 @@ import { Labels } from "./labels";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { TableView } from "./tableview";
 
-cytoscape.use( fcose );
+cytoscape.use(fcose);
 
 // The stylesheet for the graph
 const STYLESHEET: cytoscape.Stylesheet[] = [
@@ -173,57 +173,53 @@ export default function Page() {
     }
 
     return (
-        <div className="h-full flex">
-            <div className="flex flex-col grow m-2">
-                <div className="h-full flex flex-col gap-y-2">
-                    <Query className="border rounded-lg border-gray-300 p-2" onSubmit={runQuery} query={(state) => queryState.current = state} />
-                    <div className="grow border border-gray-300 rounded-lg p-2">
-                        {
-                            graph.Id &&
-                            <Tabs defaultValue="graph" className="h-full flex flex-col justify-center items-center">
-                                <TabsList className="border w-fit">
-                                    <TabsTrigger value="data">Data</TabsTrigger>
-                                    <TabsTrigger value="graph">Graph</TabsTrigger>
-                                </TabsList>
-                                <TabsContent value="data" className="grow w-full">
-                                    <TableView graph={graph} />
-                                </TabsContent>
-                                                                <TabsContent value="graph" className="grow w-full">
-                                    <div className="h-full flex flex-col">
-                                        <div className="grid grid-cols-6">
-                                            <Toolbar className="col-start-1 justify-start" chartRef={chartRef} />
-                                            <Labels className="col-end-7 justify-end" categories={graph.Categories} onClick={onCategoryClick} />
-                                        </div>
-                                        <CytoscapeComponent
-                                            cy={(cy) => {
-                                                chartRef.current = cy
+        <div className="h-full flex flex-col p-2 gap-y-2">
+            <Query className="border rounded-lg border-gray-300 p-2" onSubmit={runQuery} query={(state) => queryState.current = state} />
+            <div className="flex flex-col grow border border-gray-300 rounded-lg p-2 overflow-auto">
+                {
+                    graph.Id &&
+                    <Tabs defaultValue="graph" className="grow flex flex-col justify-center items-center">
+                        <TabsList className="border w-fit">
+                            <TabsTrigger value="data">Data</TabsTrigger>
+                            <TabsTrigger value="graph">Graph</TabsTrigger>
+                        </TabsList>
+                        <TabsContent value="data" className="grow w-full">
+                            <TableView graph={graph} />
+                        </TabsContent>
+                        <TabsContent value="graph" className="grow w-full">
+                            <div className="h-full flex flex-col">
+                                <div className="grid grid-cols-6">
+                                    <Toolbar className="col-start-1 justify-start" chartRef={chartRef} />
+                                    <Labels className="col-end-7 justify-end" categories={graph.Categories} onClick={onCategoryClick} />
+                                </div>
+                                <CytoscapeComponent
+                                    cy={(cy) => {
+                                        chartRef.current = cy
 
-                                                // Make sure no previous listeners are attached
-                                                cy.removeAllListeners();
+                                        // Make sure no previous listeners are attached
+                                        cy.removeAllListeners();
 
-                                                // Listen to the click event on nodes for expanding the node
-                                                cy.on('dbltap', 'node', async function (evt) {
-                                                    var node: Node = evt.target.json().data;
-                                                    let elements = await onFetchNode(node);
+                                        // Listen to the click event on nodes for expanding the node
+                                        cy.on('dbltap', 'node', async function (evt) {
+                                            var node: Node = evt.target.json().data;
+                                            let elements = await onFetchNode(node);
 
-                                                    // adjust entire graph.
-                                                    if (elements.length > 0) {
-                                                        cy.add(elements);
-                                                        cy.elements().layout(LAYOUT).run();
-                                                    }
-                                                });
-                                            }}
-                                            stylesheet={STYLESHEET}
-                                            elements={graph.Elements}
-                                            layout={LAYOUT}
-                                            className="w-full grow"
-                                        />
-                                    </div>
-                                </TabsContent>
-                            </Tabs>
-                        }
-                    </div>
-                </div>
+                                            // adjust entire graph.
+                                            if (elements.length > 0) {
+                                                cy.add(elements);
+                                                cy.elements().layout(LAYOUT).run();
+                                            }
+                                        });
+                                    }}
+                                    stylesheet={STYLESHEET}
+                                    elements={graph.Elements}
+                                    layout={LAYOUT}
+                                    className="w-full grow"
+                                />
+                            </div>
+                        </TabsContent>
+                    </Tabs>
+                }
             </div>
         </div>
     )
