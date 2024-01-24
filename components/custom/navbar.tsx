@@ -1,5 +1,5 @@
-import { Info, LogOut, Menu, Waypoints } from "lucide-react";
-import { signOut, useSession } from "next-auth/react";
+import { Menu } from "lucide-react";
+import { useSession } from "next-auth/react";
 import Link from "next/link";
 import { Switch } from "../ui/switch";
 import { Label } from "../ui/label";
@@ -7,7 +7,15 @@ import { useEffect, useState } from "react";
 import { useTheme } from "next-themes";
 import { GithubMark } from "./GithubMark";
 
-export default function Navbar() {
+
+export interface LinkDefinition {
+  name: string,
+  href: string,
+  icon: JSX.Element,
+  onClick?: () => void
+}
+
+export default function Navbar(params: { links: LinkDefinition[], collapsed: boolean }) {
   const { data: session, status } = useSession()
   const { theme, setTheme, systemTheme } = useTheme()
 
@@ -33,64 +41,35 @@ export default function Navbar() {
         mounted &&
         <div className="flex items-center space-x-2">
           <Switch id="dark-mode" checked={darkmode} onCheckedChange={setDarkMode} />
-          <Label htmlFor="dark-mode">{`${theme} mode`}</Label>
+          {!params.collapsed && (<Label htmlFor="dark-mode">{`${theme} mode`}</Label>)}
         </div>
       }
       <div className="flex items-center space-x-2 border-b">
         <Menu className="h-6 w-6" />
-        <span className="font-bold">FalkorDB Browser</span>
+        {!params.collapsed && (<span className="font-bold">FalkorDB Browser</span>)}
       </div>
       {status === "authenticated" &&
-        <ul className="space-y-2">
-          {/* <li className="flex items-center space-x-2">
-          <AirVentIcon className="h-6 w-6" />
-          <span>Employees</span>
-        </li>
-        <li className="flex items-center space-x-2">
-          <AirVentIcon className="h-6 w-6" />
-          <span>Company</span>
-        </li>
-        <li className="flex items-center space-x-2">
-          <AirVentIcon className="h-6 w-6" />
-          <span>Candidate</span>
-        </li>
-        <li className="flex items-center space-x-2">
-          <AirVentIcon className="h-6 w-6" />
-          <span>Calendar</span>
-        </li> */}
-
-          {/* <li className="flex items-center space-x-2">
-            <AirVentIcon className="h-6 w-6" />
-            <span>Profile</span>
-          </li> */}
-
-          <li className="flex items-center space-x-2">
-            <Info className="h-6 w-6" />
-            <Link className="underline underline-offset-2" href="/details">
-              Connection Details
-            </Link>
-          </li>
-          <li className="flex items-center space-x-2">
-            <Waypoints className="h-6 w-6" />
-            <Link className="underline underline-offset-2" href="/graph">
-              Graph
-            </Link>
-          </li>
-          <li className="flex items-center space-x-2">
-            <LogOut className="h-6 w-6" />
-            <Link className="underline underline-offset-2" href="/" onClick={() => signOut({ callbackUrl: '/' })}>
-              Sign Out
-            </Link>
-          </li>
+        <ul className="space-y-4">
+          {
+            params.links.map((link, index) => {
+              return (
+                <li key={index} className="flex items-center space-x-2">
+                  <Link className="underline underline-offset-2 flex space-x-2" href={link.href} onClick={link.onClick}>
+                    {link.icon} {!params.collapsed && (<p> {link.name}</p>)}
+                  </Link>
+                </li>
+              )
+            })
+          }
         </ul>
       }
       <footer className="flex flex-row items-center space-x-1 fixed bottom-1 text-xs">
-          <a href="https://github.com/falkordb/falkordb-browser">{
-              <GithubMark darkMode={darkmode} className="h-4 w-4" />
-          }
-          </a> 
-          <span>Made by</span>
-          <a className="underline" href="https://www.falkordb.com">FalkorDB</a>
+        <a href="https://github.com/falkordb/falkordb-browser">{
+          <GithubMark darkMode={darkmode} className="h-4 w-4" />
+        }
+        </a>
+        <span>Made by</span>
+        <a className="underline" href="https://www.falkordb.com">FalkorDB</a>
       </footer>
     </nav>
   )
