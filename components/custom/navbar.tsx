@@ -15,7 +15,7 @@ export interface LinkDefinition {
   onClick?: () => void
 }
 
-export default function Navbar(params: { links: LinkDefinition[], collapsed: boolean }) {
+export default function Navbar(params: { links: LinkDefinition[], collapsed: boolean, onExpand:()=>void }) {
   const { data: session, status } = useSession()
   const { theme, setTheme, systemTheme } = useTheme()
 
@@ -37,6 +37,10 @@ export default function Navbar(params: { links: LinkDefinition[], collapsed: boo
   let darkmode = theme == "dark" || (theme == "system" && systemTheme == "dark")
   return (
     <nav className="w-full h-full bg-gray-100 dark:bg-gray-800 p-5 space-y-4 flex flex-col">
+      <div className="flex items-center space-x-2 border-b">
+        <Link href="" onClick={params.onExpand}><Menu className="h-6 w-6" /></Link>
+        {!params.collapsed && (<span className="font-bold">FalkorDB Browser</span>)}
+      </div>
       {
         mounted &&
         <div className="flex items-center space-x-2">
@@ -44,17 +48,13 @@ export default function Navbar(params: { links: LinkDefinition[], collapsed: boo
           {!params.collapsed && (<Label htmlFor="dark-mode">{`${theme} mode`}</Label>)}
         </div>
       }
-      <div className="flex items-center space-x-2 border-b">
-        <Menu className="h-6 w-6" />
-        {!params.collapsed && (<span className="font-bold">FalkorDB Browser</span>)}
-      </div>
       {status === "authenticated" &&
         <ul className="space-y-4">
           {
             params.links.map((link, index) => {
               return (
                 <li key={index} className="flex items-center space-x-2">
-                  <Link className="underline underline-offset-2 flex space-x-2" href={link.href} onClick={link.onClick}>
+                  <Link title={link.name} className="underline underline-offset-2 flex space-x-2" href={link.href} onClick={link.onClick}>
                     {link.icon} {!params.collapsed && (<p> {link.name}</p>)}
                   </Link>
                 </li>
