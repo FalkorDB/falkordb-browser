@@ -8,7 +8,9 @@ To see a running demo check: https://browser.falkordb.com/
 
 ## Getting Started
 
-It is a [Next.js](https://nextjs.org/) project. First, run the development server:
+First copy the `.env.local.template` as `.env.local`.
+
+Then, it is a [Next.js](https://nextjs.org/) project. To run the development server:
 
 ```bash
 npm run dev
