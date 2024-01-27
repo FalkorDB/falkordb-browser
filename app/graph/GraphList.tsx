@@ -1,14 +1,6 @@
 import { useState, useEffect, Dispatch, SetStateAction } from 'react';
 import { Combobox } from '../components/combobox';
-import { useToast } from "@/components/ui/use-toast"
-import { Examples } from './Example';
-import {
-    Accordion,
-    AccordionContent,
-    AccordionItem,
-    AccordionTrigger,
-} from "@/components/ui/accordion"
-
+import { useToast } from "@/components/ui/use-toast" 
 // A component that renders an input box for Cypher queries
 export function GraphsList(props: { onSelectedGraph: Dispatch<SetStateAction<string>> }) {
 
@@ -53,17 +45,8 @@ export function GraphsList(props: { onSelectedGraph: Dispatch<SetStateAction<str
     }
 
     return (
-        <>
-            <Accordion type="single" collapsible className="w-full">
-                <AccordionItem value="item-1" className="border-b-0">
-                    <AccordionTrigger>
-                        <div className="bg-gray-200 rounded-lg border border-gray-300 p-2 ">Load example Data</div>
-                    </AccordionTrigger>
-                    <AccordionContent>
-                        <Examples onExampleLoaded={addOption} />
-                    </AccordionContent>
-                </AccordionItem>
-            </Accordion>
+        <> 
+        {/* <p> alaminhossen leng {graphs.length} </p> */}
             <Combobox type={"Graph"} options={graphs} addOption={setOptions} selectedValue={selectedGraph} setSelectedValue={setSelectedValue} />
         </>
     )

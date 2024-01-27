@@ -80,27 +80,6 @@ const LAYOUT = {
 }
 
 export default function Page() {
-    useEffect(() => {
-        fetch('/api/graph', {
-            method: 'GET',
-            headers: {
-                'Content-Type': 'application/json'
-            }
-        })
-            .then((result) => {
-                if (result.status < 300) {
-                    return result.json()
-                }
-                toast({
-                    title: "Error",
-                    description: result.text(),
-                })
-                return { result: [] }
-            }).then((result:any) => {
-                console.log("Folker Result", result)
-                // setGraphs(result.result.graphs ?? [])
-            })
-    }, [toast])
     const [graph, setGraph] = useState(Graph.empty());
 
     // A reference to the chart container to allowing zooming and editing
@@ -140,8 +119,7 @@ export default function Page() {
         }
         let json = await result.json()
         let newGraph = Graph.create(state.graphName, json.result)
-        console.log("result is " ,  newGraph)
-
+ 
         setGraph(newGraph)
 
         let chart = chartRef.current
@@ -194,12 +172,7 @@ export default function Page() {
     }
 
     return (
-        <div className="h-full flex flex-col p-2 gap-y-2">
-            {/* <button onClick={e=>{
-                console.log("length : ",  Graph.length )
-                console.log( "graph : ", graph)
-                console.log("Graph:", Graph)
-            }} >Click to log</button> */}
+        <div className="h-full flex flex-col p-2 gap-y-2"> 
             <Query className="border rounded-lg border-gray-300 p-2" onSubmit={runQuery} query={(state) => queryState.current = state} />
             <div className="flex flex-col grow border border-gray-300 rounded-lg p-2 overflow-auto">
                 {
