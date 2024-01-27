@@ -46,7 +46,6 @@ export function GraphsList(props: { onSelectedGraph: Dispatch<SetStateAction<str
 
     return (
         <> 
-        {/* <p> alaminhossen leng {graphs.length} </p> */}
             <Combobox type={"Graph"} options={graphs} addOption={setOptions} selectedValue={selectedGraph} setSelectedValue={setSelectedValue} />
         </>
     )

@@ -53,7 +53,6 @@ export function Combobox( props: {
   const entityType = props.type ?? ""
   return (
     <Popover open={open} onOpenChange={setOpen}>
-      {/* <p>this is alamin</p> */}
       <PopoverTrigger asChild>
         <Button
           variant="outline"
