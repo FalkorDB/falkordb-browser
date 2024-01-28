@@ -1,12 +1,12 @@
 "use client";
 
 import { useSession } from "next-auth/react";
-import { DatabaseLine } from "./DatabaseLine";
+import DatabaseLine from "./DatabaseLine";
 
 // Shows the details of a current database connection 
 export default function Page() {
 
-    const { data: session, status } = useSession()
+    const { data: session } = useSession()
 
     return (
         <div className="w-full h-full p-2 flex flex-col space-y-4">

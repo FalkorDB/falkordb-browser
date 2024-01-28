@@ -3,6 +3,7 @@ import { Graph } from 'falkordb';
 import { getServerSession } from "next-auth/next";
 import authOptions, { connections } from "../auth/[...nextauth]/options";
 
+// eslint-disable-next-line import/prefer-default-export
 export async function GET(request: NextRequest) {
 
     const session = await getServerSession(authOptions)
@@ -11,7 +12,7 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({ message: "Not authenticated" }, { status: 401 })
     }
 
-    let client = connections.get(id)
+    const client = connections.get(id)
     if(!client) {
         return NextResponse.json({ message: "Not authenticated" }, { status: 401 })
     }
@@ -24,14 +25,12 @@ export async function GET(request: NextRequest) {
                 return NextResponse.json({ message: "Missing query parameter 'q'" }, { status: 400 })
             }
             const graph = new Graph(client, graphID);
-            let result = await graph.query(query)
-            return NextResponse.json({ result: result }, { status: 200 })
-        } else {
-
-            let result = await client.graph.list()
-            return NextResponse.json({ result: { graphs: result } }, { status: 200 })
+            const result = await graph.query(query)
+            return NextResponse.json({ result }, { status: 200 })
         }
-    } catch (err: any) {
-        return NextResponse.json({ message: err.message }, { status: 400 })
+        const result = await client.graph.list()
+        return NextResponse.json({ result: { graphs: result } }, { status: 200 })
+    } catch (err: unknown) {
+        return NextResponse.json({ message: (err as Error).message }, { status: 400 })
     }
 }
