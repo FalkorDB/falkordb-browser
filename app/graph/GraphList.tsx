@@ -7,7 +7,6 @@ export function GraphsList(props: { onSelectedGraph: Dispatch<SetStateAction<str
     const [graphs, setGraphs] = useState<string[]>([]);
     const [selectedGraph, setSelectedGraph] = useState("");
     const { toast } = useToast()
-
     useEffect(() => {
         fetch('/api/graph', {
             method: 'GET',
@@ -30,7 +29,7 @@ export function GraphsList(props: { onSelectedGraph: Dispatch<SetStateAction<str
     }, [toast])
 
     function setOptions(newGraphs: SetStateAction<string[]>) {
-        setGraphs(newGraphs)
+        setGraphs((prevGraphs:any) => [...prevGraphs, newGraphs]);
         setSelectedValue(graphs[graphs.length - 1])
     }
 

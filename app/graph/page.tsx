@@ -4,8 +4,8 @@ import { toast } from "@/components/ui/use-toast";
 import CytoscapeComponent from 'react-cytoscapejs'
 import cytoscape from 'cytoscape';
 import fcose from 'cytoscape-fcose';
-import { useEffect, useRef, useState } from "react";
-import { Node, Graph, Category, getCategoryColorName } from "./model";
+import { useRef, useState } from "react";
+import { Node, Graph, Category } from "./model";
 import { signOut } from "next-auth/react";
 import { Toolbar } from "./toolbar";
 import { Query, QueryState } from "./query";

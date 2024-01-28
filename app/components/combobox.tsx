@@ -104,7 +104,7 @@ export function Combobox( props: {
                       <Input type="text" ref={inputRef} id="create" name="create" onKeyDown={handleKeyDown} placeholder={`${entityType} name ...`} />
                     </DialogDescription>
                   </DialogHeader>
-                  <Button className="bg-blue-600 p-4 text-slate-50" type="submit" onClick={onAddOption}>Create</Button>
+                  <Button className="p-4" type="submit" onClick={onAddOption}>Create</Button>
                 </DialogContent>
               </Dialog>
             }
