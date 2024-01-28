@@ -8,11 +8,6 @@ import { ThemeProvider } from 'next-themes'
 import { useRef, useState } from "react";
 import { ImperativePanelHandle } from "react-resizable-panels";
 
-type Props = {
-  children?: React.ReactNode;
-};
-
-
 const LINKS = [
   {
     name: "Connection Details",
@@ -32,12 +27,12 @@ const LINKS = [
   },
 ]
 
-export const NextAuthProvider = ({ children }: Props) => {
+export default function NextAuthProvider({ children }: {children: React.ReactNode}) {
 
   const [isCollapsed, setCollapsed] = useState(false)
-  let navPanel = useRef<ImperativePanelHandle>(null)
+  const navPanel = useRef<ImperativePanelHandle>(null)
 
-  function onExpand(){
+  const onExpand = () => {
     if(navPanel.current){
       if(navPanel.current.isCollapsed()){
         navPanel.current.expand()
@@ -49,9 +44,9 @@ export const NextAuthProvider = ({ children }: Props) => {
 
   return (
     <SessionProvider>
-      <ThemeProvider attribute="class" enableSystem={true}>
+      <ThemeProvider attribute="class" enableSystem>
         <ResizablePanelGroup direction="horizontal" className='min-h-screen'>
-          <ResizablePanel ref={navPanel} defaultSize={20} maxSize={20} collapsedSize={6} collapsible={true} minSize={20} onCollapse={() => { setCollapsed(true) }} onExpand={() => { setCollapsed(false) }}>
+          <ResizablePanel ref={navPanel} defaultSize={20} maxSize={20} collapsedSize={6} collapsible minSize={20} onCollapse={() => { setCollapsed(true) }} onExpand={() => { setCollapsed(false) }}>
             <Navbar links={LINKS} collapsed={isCollapsed} onExpand={onExpand}/>
           </ResizablePanel>
           <ResizableHandle withHandle />
