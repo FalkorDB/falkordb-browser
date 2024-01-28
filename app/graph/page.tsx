@@ -2,16 +2,16 @@
 
 import { toast } from "@/components/ui/use-toast";
 import CytoscapeComponent from 'react-cytoscapejs'
-import cytoscape from 'cytoscape';
+import cytoscape, { ElementDefinition } from 'cytoscape';
 import fcose from 'cytoscape-fcose';
 import { useRef, useState } from "react";
-import { Node, Graph, Category } from "./model";
-import { signOut } from "next-auth/react";
-import { Toolbar } from "./toolbar";
-import { Query, QueryState } from "./query";
-import { Labels } from "./labels";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { signOut } from "next-auth/react";
+import Toolbar from "./toolbar";
+import { Query, QueryState } from "./query";
+import Labels from "./labels";
 import { TableView } from "./tableview";
+import { Node, Graph, Category } from "./model";
 
 cytoscape.use(fcose);
 
@@ -92,16 +92,16 @@ export default function Page() {
         return encodeURIComponent(arg.trim())
     }
 
-    async function runQuery(event: any) {
+    const runQuery = async (event: React.FormEvent<HTMLFormElement>) => {
         event.preventDefault();
-        let state = queryState.current;
+        const state = queryState.current;
         if (!state) {
             return
         }
 
-        let q = state.query.trim() || "MATCH (n)-[e]-() RETURN n,e limit 100";
+        const q = state.query.trim() || "MATCH (n)-[e]-() RETURN n,e limit 100";
 
-        let result = await fetch(`/api/graph?graph=${prepareArg(state.graphName)}&query=${prepareArg(q)}`, {
+        const result = await fetch(`/api/graph?graph=${prepareArg(state.graphName)}&query=${prepareArg(q)}`, {
             method: 'GET',
             headers: {
                 'Content-Type': 'application/json'
@@ -117,12 +117,12 @@ export default function Page() {
             }
             return
         }
-        let json = await result.json()
-        let newGraph = Graph.create(state.graphName, json.result)
- 
+
+        const json = await result.json()
+        const newGraph = Graph.create(state.graphName, json.result)
         setGraph(newGraph)
 
-        let chart = chartRef.current
+        const chart = chartRef.current
         if (chart) {
             chart.elements().remove()
             chart.add(newGraph.Elements)
@@ -132,7 +132,7 @@ export default function Page() {
 
     // Send the user query to the server to expand a node
     async function onFetchNode(node: Node) {
-        let result = await fetch(`/api/graph/${graph.Id}/${node.id}`, {
+        const result = await fetch(`/api/graph/${graph.Id}/${node.id}`, {
             method: 'GET',
             headers: {
                 'Content-Type': 'application/json'
@@ -147,19 +147,20 @@ export default function Page() {
             if (result.status >= 400 && result.status < 500) {
                 signOut({ callbackUrl: '/' })
             }
-            return [] as any[]
+            return [] as ElementDefinition[]
         }
 
-        let json = await result.json()
-        let elements = graph.extend(json.result)
+        const json = await result.json()
+        const elements = graph.extend(json.result)
         return elements
     }
 
-    function onCategoryClick(category: Category) {
-        let chart = chartRef.current
+    const onCategoryClick = (category: Category) => {
+        const chart = chartRef.current
         if (chart) {
-            let elements = chart.elements(`node[category = "${category.name}"]`)
+            const elements = chart.elements(`node[category = "${category.name}"]`)
 
+            // eslint-disable-next-line no-param-reassign
             category.show = !category.show
 
             if (category.show) {
@@ -172,8 +173,8 @@ export default function Page() {
     }
 
     return (
-        <div className="h-full flex flex-col p-2 gap-y-2"> 
-            <Query className="border rounded-lg border-gray-300 p-2" onSubmit={runQuery} query={(state) => queryState.current = state} />
+        <div className="h-full flex flex-col p-2 gap-y-2">
+            <Query className="border rounded-lg border-gray-300 p-2" onSubmit={runQuery} onQueryUpdate={(state) => {queryState.current = state}} />
             <div className="flex flex-col grow border border-gray-300 rounded-lg p-2 overflow-auto">
                 {
                     graph.Id &&
@@ -199,9 +200,9 @@ export default function Page() {
                                         cy.removeAllListeners();
 
                                         // Listen to the click event on nodes for expanding the node
-                                        cy.on('dbltap', 'node', async function (evt) {
-                                            var node: Node = evt.target.json().data;
-                                            let elements = await onFetchNode(node);
+                                        cy.on('dbltap', 'node', async (evt) => {
+                                            const node: Node = evt.target.json().data;
+                                            const elements = await onFetchNode(node);
 
                                             // adjust entire graph.
                                             if (elements.length > 0) {

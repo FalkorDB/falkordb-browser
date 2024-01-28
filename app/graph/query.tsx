@@ -13,31 +13,26 @@ export class QueryState {
     ) { }
 }
 
-export function Query(params: { 
+export function Query({ onSubmit, onQueryUpdate, className = "" }: {
     onSubmit: (event: React.FormEvent<HTMLFormElement>) => void,
-    query: (state: QueryState) => void,
-    className?: string
+    onQueryUpdate: (state: QueryState) => void,
+    className: string
 }) {
     const [selectedGraph, setSelectedGraph] = useState("");
     const [query, setQuery] = useState('');
     const [graphName, setGraphName] = useState('');
 
-    params.query(new QueryState(query, graphName))
+    onQueryUpdate(new QueryState(query, graphName))
 
-    function updateQuery(event: React.ChangeEvent<HTMLInputElement>) {
-        setQuery(event.target.value)
-    }
     return (
-        <div>
-            <form 
-            className={cn("items-center flex flex-row space-x-3", params.className)}
-            onSubmit={params.onSubmit}>
-                <Label htmlFor="query" className="text">Select</Label>
-                <GraphsList onSelectedGraph={setGraphName} />
-                <Input id="query" className="border-gray-500 w-8/12"
-                    placeholder="MATCH (n)-[e]-() RETURN n,e limit 100" type="text" onChange={updateQuery} />
-                <Button type="submit">Run</Button>
-            </form>
-        </div>
+        <form
+            className={cn("items-center flex flex-row space-x-3", className)}
+            onSubmit={onSubmit}>
+            <Label htmlFor="query" className="text">Query</Label>
+            <GraphsList onSelectedGraph={setGraphName} />
+            <Input id="query" className="border-gray-500 w-8/12"
+                placeholder="MATCH (n)-[e]-() RETURN n,e limit 100" type="text" onChange={(event)=>setQuery(event.target.value)} />
+            <Button type="submit">Run</Button>
+        </form>
     )
 }

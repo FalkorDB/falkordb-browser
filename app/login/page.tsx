@@ -1,6 +1,6 @@
 'use client'
 
-import { CardTitle, CardDescription, CardHeader, CardContent, CardFooter, Card } from "@/components/ui/card"
+import { CardTitle, CardDescription } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
@@ -11,7 +11,7 @@ export default function Page() {
         event.preventDefault();
 
         // Read the form data
-        const form: any = event.target;
+        const form = event.target as HTMLFormElement;
         const formData = new FormData(form);
         console.log(formData);
     }
