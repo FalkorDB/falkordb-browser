@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, Dispatch, SetStateAction, createRef } from "react"
+import { useState, Dispatch, createRef } from "react"
 import { Check, ChevronsUpDown } from "lucide-react"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 
@@ -21,36 +21,39 @@ import {
 import { Separator } from "@/components/ui/separator"
 import { Input } from "@/components/ui/input"
 
-export function Combobox( props: {
-  className?:string,
+
+/* eslint-disable react/require-default-props */
+interface ComboboxProps {
+  className?: string,
   type?: string,
   options: string[],
-  addOption?: Dispatch<SetStateAction<string[]>>,
+  addOption?: Dispatch<string>|null,
   selectedValue: string,
-  setSelectedValue: Dispatch<SetStateAction<string>>
-}) {
+  setSelectedValue: Dispatch<string>
+}
+
+export default function Combobox({ className='', type='', options, addOption=null, selectedValue, setSelectedValue }: ComboboxProps) {
   const [open, setOpen] = useState(false)
   const inputRef = createRef<HTMLInputElement>()
 
   // read the text in the create input box and add it to the list of options
-  function onAddOption(event: any) {
+  const onAddOption = () => {
     setOpen(false)
     if (!inputRef.current?.value) {
       return
     }
-    props.options.push(inputRef.current.value)
-    if (props.addOption) {
-      props.addOption(props.options)
+    if (addOption) {
+      addOption(inputRef.current.value)
     }
   }
 
-  function handleKeyDown(event: any) {
+  const handleKeyDown = (event: React.KeyboardEvent) => {
     if (event.key === "Enter") {
-      onAddOption(event);
+      onAddOption();
     }
   }
 
-  const entityType = props.type ?? ""
+  const entityType = type ?? ""
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
@@ -58,10 +61,10 @@ export function Combobox( props: {
           variant="outline"
           role="combobox"
           aria-expanded={open}
-          className={`w-[200px] justify-between ${props.className} `}
+          className={`w-[200px] justify-between ${className} `}
         >
-          {props.selectedValue
-            ? props.options.find((option) => option === props.selectedValue)
+          {selectedValue
+            ? options.find((option) => option === selectedValue)
             : `Select ${entityType}...`}
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
@@ -71,12 +74,12 @@ export function Combobox( props: {
           <CommandInput placeholder="Search framework..." />
           <CommandEmpty>No framework found.</CommandEmpty>
           <CommandGroup>
-            {props.options.map((option) => (
+            {options.map((option) => (
               <CommandItem
                 key={option}
                 onSelect={(currentValue) => {
-                  if (currentValue != props.selectedValue) {
-                    props.setSelectedValue(currentValue)
+                  if (currentValue !== selectedValue) {
+                    setSelectedValue(currentValue)
                   }
                   setOpen(false)
                 }}
@@ -84,7 +87,7 @@ export function Combobox( props: {
                 <Check
                   className={cn(
                     "mr-2 h-4 w-4",
-                    props.selectedValue === option ? "opacity-100" : "opacity-0"
+                    selectedValue === option ? "opacity-100" : "opacity-0"
                   )}
                 />
                 {option}
@@ -92,7 +95,7 @@ export function Combobox( props: {
             ))}
             <Separator orientation="horizontal" />
 
-            { props.addOption &&
+            {addOption &&
               <Dialog>
                 <DialogTrigger>
                   <CommandItem>Create new {entityType}...</CommandItem>

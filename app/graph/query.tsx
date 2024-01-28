@@ -3,7 +3,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
-import { GraphsList } from "./GraphList";
+import GraphsList from "./GraphList";
 
 
 export class QueryState {
@@ -18,7 +18,6 @@ export function Query({ onSubmit, onQueryUpdate, className = "" }: {
     onQueryUpdate: (state: QueryState) => void,
     className: string
 }) {
-    const [selectedGraph, setSelectedGraph] = useState("");
     const [query, setQuery] = useState('');
     const [graphName, setGraphName] = useState('');
 

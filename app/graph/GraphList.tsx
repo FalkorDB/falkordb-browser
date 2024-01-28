@@ -1,8 +1,9 @@
 import { useState, useEffect, Dispatch, SetStateAction } from 'react';
-import { Combobox } from '../components/combobox';
 import { useToast } from "@/components/ui/use-toast" 
+import Combobox from '../components/combobox';
+
 // A component that renders an input box for Cypher queries
-export function GraphsList(props: { onSelectedGraph: Dispatch<SetStateAction<string>> }) {
+export default function GraphsList({onSelectedGraph}: { onSelectedGraph: Dispatch<SetStateAction<string>> }) {
 
     const [graphs, setGraphs] = useState<string[]>([]);
     const [selectedGraph, setSelectedGraph] = useState("");
@@ -28,24 +29,17 @@ export function GraphsList(props: { onSelectedGraph: Dispatch<SetStateAction<str
             })
     }, [toast])
 
-    function setOptions(newGraphs: SetStateAction<string[]>) {
-        setGraphs((prevGraphs:any) => [...prevGraphs, newGraphs]);
+    const setSelectedValue = (graph: string) => {
+        setSelectedGraph(graph)
+        onSelectedGraph(graph)
+    }
+
+    const setOptions = (newGraph: string) => {
+        setGraphs((prevGraphs: string[]) => [...prevGraphs, newGraph]);
         setSelectedValue(graphs[graphs.length - 1])
     }
 
-    function addOption(newGraphs: string) {
-        graphs.push(newGraphs)
-        setOptions(graphs)
-    }
-
-    function setSelectedValue(graph: SetStateAction<string>) {
-        setSelectedGraph(graph)
-        props.onSelectedGraph(graph)
-    }
-
     return (
-        <> 
-            <Combobox type={"Graph"} options={graphs} addOption={setOptions} selectedValue={selectedGraph} setSelectedValue={setSelectedValue} />
-        </>
+        <Combobox type="Graph" options={graphs} addOption={setOptions} selectedValue={selectedGraph} setSelectedValue={setSelectedValue} />
     )
 }
