@@ -80,7 +80,6 @@ const LAYOUT = {
 }
 
 export default function Page() {
-
     const [graph, setGraph] = useState(Graph.empty());
 
     // A reference to the chart container to allowing zooming and editing

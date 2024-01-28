@@ -3,7 +3,14 @@ import { useToast } from "@/components/ui/use-toast"
 import { Copy, Eye, EyeOff } from "lucide-react";
 import { useState } from "react";
 
-export default function DatabaseLine({ label, value, masked }: { label: string, value: string, masked?: string }) {
+/* eslint-disable react/require-default-props */
+interface DatabaseLineProps {
+    label: string,
+    value: string,
+    masked?: string,
+}
+
+export default function DatabaseLine({ label, value, masked='' }: DatabaseLineProps) {
 
     const { toast } = useToast()
     const [showPassword, setShowPassword] = useState(false);
@@ -46,9 +53,4 @@ export default function DatabaseLine({ label, value, masked }: { label: string, 
             }
         </div>
     );
-}
-
-
-DatabaseLine.defaultProps = {
-    masked: ''
 }
