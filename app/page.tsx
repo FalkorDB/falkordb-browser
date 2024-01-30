@@ -1,7 +1,8 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { signIn, useSession } from "next-auth/react";
+import { useSession } from "next-auth/react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 
@@ -22,7 +23,9 @@ export default function Home() {
         <h1 className="text-4xl font-bold">
           Welcome to FalkorDB Browser
         </h1>
-        <Button onClick={() => signIn("Credentials", { callbackUrl: '/graph' })}>Connect</Button>
+        <Link href="/login" passHref>
+          <Button>Connect</Button>
+        </Link>
       </main>
     </div>
   )

@@ -21,9 +21,9 @@ const LINKS = [
   },
   {
     name: "Disconnect",
-    href: "/",
+    href: "",
     icon: (<LogOut className="h-6 w-6" />),
-    onClick: () => { signOut({ callbackUrl: '/' }) }
+    onClick: () => { signOut({ callbackUrl: '/login' }) }
   },
 ]
 
