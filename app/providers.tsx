@@ -20,7 +20,7 @@ const LINKS = [
     icon: (<Waypoints className="h-6 w-6" />),
   },
   {
-    name: "Sign Out",
+    name: "Disconnect",
     href: "/",
     icon: (<LogOut className="h-6 w-6" />),
     onClick: () => { signOut({ callbackUrl: '/' }) }

@@ -22,7 +22,7 @@ export default function Home() {
         <h1 className="text-4xl font-bold">
           Welcome to FalkorDB Browser
         </h1>
-        <Button onClick={() => signIn("Credentials", { callbackUrl: '/graph' })}>Sign In</Button>
+        <Button onClick={() => signIn("Credentials", { callbackUrl: '/graph' })}>Connect</Button>
       </main>
     </div>
   )
