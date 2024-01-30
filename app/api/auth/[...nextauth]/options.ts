@@ -46,13 +46,14 @@ const authOptions: AuthOptions = {
                         if (connection) {
                             connections.delete(id)
                             connection.disconnect()
+                            .catch((e) => {
+                                console.warn('FalkorDB Client Disconnect Error', e)
+                            })
                         }
                     }).connect();
                 
                     // Verify connection
                     await client.ping()
-
-                    connections.set(id, client as RedisClientType)
 
                     const res = {
                         id,
