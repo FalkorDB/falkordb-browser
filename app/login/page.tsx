@@ -1,64 +1,81 @@
 'use client'
 
-import { CardTitle, CardDescription } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
-import { signIn } from "next-auth/react"
+import { SignInOptions, SignInResponse, signIn } from "next-auth/react"
+import { FormEvent, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 
+const DEFAULT_HOST = 'localhost';
+const DEFAULT_PORT = '6379';
+
 export default function Page() {
+
     const router = useRouter()
+    const [error, setError] = useState(false)
+
+    const host = useRef<HTMLInputElement>(null);
+    const port = useRef<HTMLInputElement>(null);
+    const username = useRef<HTMLInputElement>(null);
+    const password = useRef<HTMLInputElement>(null);
+
+    const onSubmit = (e: FormEvent) => {
+        e.preventDefault();
+
+        const params: SignInOptions = {
+            redirect: false,
+            host: host.current?.value ?? DEFAULT_HOST,
+            port: port.current?.value ?? DEFAULT_PORT,
+        }
+        if (username.current) {
+            params.username = username.current.value;
+        }
+        if (password.current) {
+            params.password = password.current.value;
+        }
+
+        signIn(
+            "credentials",
+            params
+        ).then((res?: SignInResponse) => {
+            if (res && res.error) {
+                setError(true)
+            } else {
+                router.push('/graph');
+            }
+
+        })
+    };
+
     return (
         <div className="flex items-center justify-center h-screen">
-            <div
-                className="block max-w-sm p-6 bg-white border border-gray-200 rounded-lg shadow hover:bg-gray-100 dark:bg-gray-800 dark:border-gray-700 dark:hover:bg-gray-700"
-            >
-                <form className="flex flex-col gap-2"
-                    onSubmit={(e) => {
-                        e.preventDefault();
-                        signIn("credentials", { redirect: false }).then((result: any) => {
-                            if (result.error) {
-                                // Handle error, show message to user
-                            } else {
-                                router.push('/graph');
-                            }
-                        });
-                    }}
-                >
-                    <div className=" p-4">
-                        <CardTitle className="text-2xl font-semibold">Login FalkorDB server</CardTitle>
-                        <CardDescription className="text-gray-500">
-                            Fill in the form below to login to your FalkorDB server.
-                        </CardDescription>
+            <form className="p-5 space-y-4 border rounded-lg bg-gray-100 dark:bg-gray-800 flex flex-col" onSubmit={onSubmit}>
+                <div>
+                    <Label htmlFor="server">Server</Label>
+                    <Input ref={host} id="server" placeholder={DEFAULT_HOST} type="text" defaultValue={DEFAULT_HOST} />
+                </div>
+                <div>
+                    <Label htmlFor="port">Port</Label>
+                    <Input ref={port} id="port" placeholder={DEFAULT_PORT} type="number" min={1} max={65535} defaultValue={DEFAULT_PORT} />
+                </div>
+                <div>
+                    <Label htmlFor="username">User Name</Label>
+                    <Input ref={username} id="username" type="text" />
+                </div>
+                <div>
+                    <Label htmlFor="password">Password</Label>
+                    <Input ref={password} id="password" type="password" />
+                </div>
+                <div className="flex justify-center p-4">
+                    <Button type="submit">Connect</Button>
+                </div>
+                {error &&
+                    <div className="bg-red-400 text-center p-2 rounded-lg">
+                        <p>Wrong credentials</p>
                     </div>
-                    <div className="space-y-4 flex flex-col p-4">
-                        <div className="grid grid-cols-1 gap-4">
-                            <div className="space-y-2">
-                                <Label htmlFor="server">Server</Label>
-                                <Input id="server" placeholder="localhost" type="text" defaultValue="localhost" />
-                            </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="port">Port</Label>
-                                <Input id="port" placeholder="6379" type="number" min={1} max={65535} defaultValue={6379} />
-                            </div>
-                        </div>
-                        <div className="grid grid-cols-1 gap-4">
-                            <div className="space-y-2">
-                                <Label htmlFor="username">User Name</Label>
-                                <Input id="username" type="text" />
-                            </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="password">Password</Label>
-                                <Input id="password" type="password" />
-                            </div>
-                        </div>
-                    </div>
-                    <div className="flex justify-center p-4">
-                        <Button type="submit">Connect</Button>
-                    </div>
-                </form>
-            </div>
+                }
+            </form>
         </div>
     )
 }

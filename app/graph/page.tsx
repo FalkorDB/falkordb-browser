@@ -113,7 +113,7 @@ export default function Page() {
                 description: result.text(),
             })
             if (result.status >= 400 && result.status < 500) {
-                signOut({ callbackUrl: '/' })
+                signOut({ callbackUrl: '/login' })
             }
             return
         }
@@ -145,7 +145,7 @@ export default function Page() {
                 description: result.text(),
             })
             if (result.status >= 400 && result.status < 500) {
-                signOut({ callbackUrl: '/' })
+                signOut({ callbackUrl: '/login' })
             }
             return [] as ElementDefinition[]
         }
