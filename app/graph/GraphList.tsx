@@ -34,12 +34,12 @@ export default function GraphsList({onSelectedGraph}: { onSelectedGraph: Dispatc
         onSelectedGraph(graph)
     }
 
-    const setOptions = (newGraph: string) => {
+    const addOption = (newGraph: string) => {
         setGraphs((prevGraphs: string[]) => [...prevGraphs, newGraph]);
-        setSelectedValue(graphs[graphs.length - 1])
+        setSelectedValue(newGraph)
     }
 
     return (
-        <Combobox type="Graph" options={graphs} addOption={setOptions} selectedValue={selectedGraph} setSelectedValue={setSelectedValue} />
+        <Combobox type="Graph" options={graphs} addOption={addOption} selectedValue={selectedGraph} setSelectedValue={setSelectedValue} />
     )
 }
