@@ -99,12 +99,19 @@ export default function Page() {
             return
         }
 
-        if (!state.graphName) {
-            toast({
-                title: "Error",
-                description: "Please select a graph from the list",
-            })
-            return
+        // Proposed abstraction for improved modularity
+        if (!validateGraphSelection(state.graphName)) return;
+
+        // New function outside of runQuery
+        function validateGraphSelection(graphName: string): boolean {
+            if (!graphName) {
+                toast({
+                    title: "Error",
+                    description: "Please select a graph from the list",
+                });
+                return false;
+            }
+            return true;
         }
 
         const q = state.query.trim() || "MATCH (n)-[e]-() RETURN n,e limit 100";
