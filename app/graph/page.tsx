@@ -99,6 +99,14 @@ export default function Page() {
             return
         }
 
+        if (!state.graphName) {
+            toast({
+                title: "Error",
+                description: "Please select a graph from the list",
+            })
+            return
+        }
+
         const q = state.query.trim() || "MATCH (n)-[e]-() RETURN n,e limit 100";
 
         const result = await fetch(`/api/graph?graph=${prepareArg(state.graphName)}&query=${prepareArg(q)}`, {
