@@ -79,6 +79,19 @@ const LAYOUT = {
     padding: 30,
 }
 
+
+// Validate the graph selection is not empty and show an error message if it is
+function validateGraphSelection(graphName: string): boolean {
+    if (!graphName) {
+        toast({
+            title: "Error",
+            description: "Please select a graph from the list",
+        });
+        return false;
+    }
+    return true;
+}
+
 export default function Page() {
     const [graph, setGraph] = useState(Graph.empty());
 
@@ -101,18 +114,6 @@ export default function Page() {
 
         // Proposed abstraction for improved modularity
         if (!validateGraphSelection(state.graphName)) return;
-
-        // New function outside of runQuery
-        function validateGraphSelection(graphName: string): boolean {
-            if (!graphName) {
-                toast({
-                    title: "Error",
-                    description: "Please select a graph from the list",
-                });
-                return false;
-            }
-            return true;
-        }
 
         const q = state.query.trim() || "MATCH (n)-[e]-() RETURN n,e limit 100";
 
@@ -189,7 +190,7 @@ export default function Page() {
 
     return (
         <div className="h-full flex flex-col p-2 gap-y-2">
-            <Query className="border rounded-lg border-gray-300 p-2" onSubmit={runQuery} onQueryUpdate={(state) => {queryState.current = state}} />
+            <Query className="border rounded-lg border-gray-300 p-2" onSubmit={runQuery} onQueryUpdate={(state) => { queryState.current = state }} />
             <div className="flex flex-col grow border border-gray-300 rounded-lg p-2 overflow-auto">
                 {
                     graph.Id &&
