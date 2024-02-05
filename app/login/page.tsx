@@ -50,7 +50,7 @@ export default function Page() {
 
     return (
         <div className="flex items-center justify-center h-screen">
-            <form className="p-5 space-y-4 border rounded-lg bg-gray-100 dark:bg-gray-800 flex flex-col" onSubmit={onSubmit}>
+            <form className="p-5 w-3/6 space-y-4 border rounded-lg bg-gray-100 dark:bg-gray-800 flex flex-col" onSubmit={onSubmit}>
                 <div>
                     <Label htmlFor="server">Server</Label>
                     <Input ref={host} id="server" placeholder={DEFAULT_HOST} type="text" defaultValue={DEFAULT_HOST} />
