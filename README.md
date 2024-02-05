@@ -1,4 +1,4 @@
-FalkorDB-Browser is a vizualization UI for FalkorDB.
+FalkorDB-Browser is a visualization UI for FalkorDB.
 
 To see a running demo check: https://browser.falkordb.com/
 
