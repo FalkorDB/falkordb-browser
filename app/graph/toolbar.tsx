@@ -1,5 +1,5 @@
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { CircleDot, XCircle, ZoomIn, ZoomOut } from "lucide-react";
+import { CircleDot, ZoomIn, ZoomOut } from "lucide-react";
 import { cn } from "@/lib/utils"
 
 export default function Toolbar({chartRef, className=""}: {
