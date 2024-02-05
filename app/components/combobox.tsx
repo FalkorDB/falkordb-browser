@@ -79,7 +79,7 @@ export default function Combobox({ className='', type='', options, addOption=nul
                 key={option}
                 onSelect={(currentValue) => {
                   if (currentValue !== selectedValue) {
-                    setSelectedValue(currentValue)
+                    setSelectedValue(option)
                   }
                   setOpen(false)
                 }}
