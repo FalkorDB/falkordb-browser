@@ -25,13 +25,17 @@ export function Query({ onSubmit, onQueryUpdate, className = "" }: {
 
     return (
         <form
-            className={cn("items-center flex flex-row space-x-3", className)}
+            className={cn("flex flex-col space-y-3 md:flex-row md:space-x-3 md:space-y-0", className)}
             onSubmit={onSubmit}>
-            <Label htmlFor="query" className="text">Query</Label>
-            <GraphsList onSelectedGraph={setGraphName} />
-            <Input id="query" className="border-gray-500 w-8/12"
-                placeholder="MATCH (n)-[e]-() RETURN n,e limit 100" type="text" onChange={(event)=>setQuery(event.target.value)} />
-            <Button type="submit">Run</Button>
+            <div className="items-center flex flex-row space-x-3">
+                <Label htmlFor="query" className="text">Query</Label>
+                <GraphsList onSelectedGraph={setGraphName} />
+            </div>
+            <div className="flex flex-row space-x-3 w-full md:w-8/12">
+                <Input id="query" className="border-gray-500 w-full"
+                    placeholder="MATCH (n)-[e]-() RETURN n,e limit 100" type="text" onChange={(event) => setQuery(event.target.value)} />
+                <Button type="submit">Run</Button>
+            </div>
         </form>
     )
 }
