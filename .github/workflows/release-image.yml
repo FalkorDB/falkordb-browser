@@ -17,9 +17,9 @@ jobs:
       - name: Set tags
         run: |
           if ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/tags') }}; then
-            echo "TAGS=falkordb-browser/falkordb-browser:latest,falkordb-browser/falkordb-browser:${{ github.ref_name }}" >> $GITHUB_ENV
+            echo "TAGS=falkordb/falkordb-browser:latest,falkordb/falkordb-browser:${{ github.ref_name }}" >> $GITHUB_ENV
           else
-            echo "TAGS=falkordb-browser/falkordb-browser:edge" >> $GITHUB_ENV
+            echo "TAGS=falkordb/falkordb-browser:edge" >> $GITHUB_ENV
           fi
 
       - name: Login to DockerHub
