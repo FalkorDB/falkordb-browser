@@ -2,7 +2,7 @@
 
 import { toast } from "@/components/ui/use-toast";
 import CytoscapeComponent from 'react-cytoscapejs'
-import cytoscape, { ElementDefinition } from 'cytoscape';
+import cytoscape, { ElementDefinition, NodeDataDefinition } from 'cytoscape';
 import fcose from 'cytoscape-fcose';
 import { useRef, useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -11,7 +11,7 @@ import Toolbar from "./toolbar";
 import { Query, QueryState } from "./query";
 import Labels from "./labels";
 import { TableView } from "./tableview";
-import { Node, Graph, Category } from "./model";
+import { Graph, Category } from "./model";
 
 cytoscape.use(fcose);
 
@@ -39,14 +39,16 @@ const STYLESHEET: cytoscape.Stylesheet[] = [
             label: "data(name)",
             "text-valign": "center",
             "text-halign": "center",
+            "text-wrap": "ellipsis",
+            "text-max-width": "10rem",            
             shape: "ellipse",
-            height: 10,
-            width: 10,
+            height: "10rem",
+            width: "10rem",
             "border-width": 0.15,
             "border-opacity": 0.5,
             "background-color": "data(color)",
-            "font-size": "3",
-            "overlay-padding": "1px",
+            "font-size": "3rem",
+            "overlay-padding": "1rem",
         },
     },
     {
@@ -66,8 +68,8 @@ const STYLESHEET: cytoscape.Stylesheet[] = [
             'curve-style': 'straight',
             "text-background-color": "#ffffff",
             "text-background-opacity": 1,
-            "font-size": "3",
-            "overlay-padding": "2px",
+            "font-size": "3rem",
+            "overlay-padding": "2rem",
 
         },
     },
@@ -147,7 +149,7 @@ export default function Page() {
     }
 
     // Send the user query to the server to expand a node
-    async function onFetchNode(node: Node) {
+    async function onFetchNode(node: NodeDataDefinition) {
         const result = await fetch(`/api/graph/${graph.Id}/${node.id}`, {
             method: 'GET',
             headers: {
