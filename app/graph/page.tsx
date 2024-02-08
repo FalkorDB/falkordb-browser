@@ -7,6 +7,7 @@ import fcose from 'cytoscape-fcose';
 import { useRef, useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { signOut } from "next-auth/react";
+import { useTheme } from "next-themes";
 import Toolbar from "./toolbar";
 import { Query, QueryState } from "./query";
 import Labels from "./labels";
@@ -16,64 +17,69 @@ import { Graph, Category } from "./model";
 cytoscape.use(fcose);
 
 // The stylesheet for the graph
-const STYLESHEET: cytoscape.Stylesheet[] = [
-    {
-        selector: "core",
-        style: {
-            'active-bg-size': 0,  // hide gray circle when panning
-            // All of the following styles are meaningless and are specified
-            // to satisfy the linter...
-            'active-bg-color': 'blue',
-            'active-bg-opacity': 0.3,
-            "selection-box-border-color": 'blue',
-            "selection-box-border-width": 0,
-            "selection-box-opacity": 1,
-            "selection-box-color": 'blue',
-            "outside-texture-bg-color": 'blue',
-            "outside-texture-bg-opacity": 1,
-        },
-    },
-    {
-        selector: "node",
-        style: {
-            label: "data(name)",
-            "text-valign": "center",
-            "text-halign": "center",
-            "text-wrap": "ellipsis",
-            "text-max-width": "10rem",            
-            shape: "ellipse",
-            height: "10rem",
-            width: "10rem",
-            "border-width": 0.15,
-            "border-opacity": 0.5,
-            "background-color": "data(color)",
-            "font-size": "3rem",
-            "overlay-padding": "1rem",
-        },
-    },
-    {
-        selector: "node:active",
-        style: {
-            "overlay-opacity": 0,  // hide gray box around active node
-        },
-    },
-    {
-        selector: "edge",
-        style: {
-            width: 0.5,
-            "line-color": "#ccc",
-            "arrow-scale": 0.3,
-            "target-arrow-shape": "triangle",
-            label: "data(label)",
-            'curve-style': 'straight',
-            "text-background-color": "#ffffff",
-            "text-background-opacity": 1,
-            "font-size": "3rem",
-            "overlay-padding": "2rem",
+function getStyle(darkmode: boolean) {
 
+    const style: cytoscape.Stylesheet[] = [
+        {
+            selector: "core",
+            style: {
+                'active-bg-size': 0,  // hide gray circle when panning
+                // All of the following styles are meaningless and are specified
+                // to satisfy the linter...
+                'active-bg-color': 'blue',
+                'active-bg-opacity': 0.3,
+                "selection-box-border-color": 'blue',
+                "selection-box-border-width": 0,
+                "selection-box-opacity": 1,
+                "selection-box-color": 'blue',
+                "outside-texture-bg-color": 'blue',
+                "outside-texture-bg-opacity": 1,
+            },
         },
-    },
-]
+        {
+            selector: "node",
+            style: {
+                label: "data(name)",
+                "text-valign": "center",
+                "text-halign": "center",
+                "text-wrap": "ellipsis",
+                "text-max-width": "10rem",
+                shape: "ellipse",
+                height: "10rem",
+                width: "10rem",
+                "border-width": 0.15,
+                "border-opacity": 0.5,
+                "background-color": "data(color)",
+                "font-size": "3rem",
+                "overlay-padding": "1rem",
+            },
+        },
+        {
+            selector: "node:active",
+            style: {
+                "overlay-opacity": 0,  // hide gray box around active node
+            },
+        },
+        {
+            selector: "edge",
+            style: {
+                width: 0.5,
+                "line-color": "#ccc",
+                "arrow-scale": 0.3,
+                "target-arrow-shape": "triangle",
+                label: "data(label)",
+                'curve-style': 'straight',
+                "text-background-color": darkmode? "black": "white",
+                "color": darkmode? "white" : "black",
+                "text-background-opacity": 1,
+                "font-size": "3rem",
+                "overlay-padding": "2rem",
+
+            },
+        },
+    ]
+    return style
+}
 
 const LAYOUT = {
     name: "fcose",
@@ -102,6 +108,9 @@ export default function Page() {
 
     // A reference to the query state to allow running the user query
     const queryState = useRef<QueryState | null>(null)
+
+    const { theme, systemTheme } = useTheme()
+    const darkmode = theme === "dark" || (theme === "system" && systemTheme === "dark")
 
     function prepareArg(arg: string): string {
         return encodeURIComponent(arg.trim())
@@ -229,7 +238,7 @@ export default function Page() {
                                             }
                                         });
                                     }}
-                                    stylesheet={STYLESHEET}
+                                    stylesheet={getStyle(darkmode)}
                                     elements={graph.Elements}
                                     layout={LAYOUT}
                                     className="w-full grow"
