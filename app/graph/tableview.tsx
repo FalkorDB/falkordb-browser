@@ -2,7 +2,7 @@ import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, Tabl
 import { Graph } from "./model";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
-export function TableView(params: { graph: Graph }) {
+export function TableView(params: {graph: Graph}) {
     return (
         <Table>
             <TableCaption>A list of results</TableCaption>
