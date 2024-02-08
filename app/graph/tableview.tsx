@@ -1,7 +1,8 @@
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Graph } from "./model";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
-export function TableView(params: {graph: Graph}) {
+export function TableView(params: { graph: Graph }) {
     return (
         <Table>
             <TableCaption>A list of results</TableCaption>
@@ -19,8 +20,12 @@ export function TableView(params: {graph: Graph}) {
                     params.graph.Data.map((row, index) => {
                         return (<TableRow key={index}>
                             {
-                                Object.values(row).map((cell:any, index) => {
-                                    return (<TableCell key={index} className="max-w-96 truncate">{JSON.stringify(cell)}</TableCell>)
+                                Object.values(row).map((cell: any, index) => {
+                                    return (<TableCell key={index}>
+                                        <TooltipProvider><Tooltip><TooltipTrigger className="max-w-96 truncate">
+                                            {JSON.stringify(cell)}
+                                        </TooltipTrigger><TooltipContent><p>{JSON.stringify(cell)}</p></TooltipContent></Tooltip></TooltipProvider>
+                                    </TableCell>)
                                 })
                             }
                         </TableRow>)
