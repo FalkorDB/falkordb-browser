@@ -69,7 +69,7 @@ function getStyle(darkmode: boolean) {
                 "target-arrow-shape": "triangle",
                 label: "data(label)",
                 'curve-style': 'straight',
-                "text-background-color": darkmode? "black": "white",
+                "text-background-color": darkmode? "#020817": "white",
                 "color": darkmode? "white" : "black",
                 "text-background-opacity": 1,
                 "font-size": "3rem",
