@@ -1,8 +1,7 @@
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Graph } from "./model";
 
-// eslint-disable-next-line import/prefer-default-export
-export function TableView({ graph }: { graph: Graph }) {
+export default function TableView({ graph }: { graph: Graph }) {
     return (
         <Table>
             <TableCaption>A list of results</TableCaption>
