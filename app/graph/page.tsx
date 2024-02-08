@@ -2,7 +2,7 @@
 
 import { toast } from "@/components/ui/use-toast";
 import CytoscapeComponent from 'react-cytoscapejs'
-import cytoscape, { ElementDefinition } from 'cytoscape';
+import cytoscape, { ElementDefinition, NodeDataDefinition } from 'cytoscape';
 import fcose from 'cytoscape-fcose';
 import { useRef, useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -11,7 +11,7 @@ import Toolbar from "./toolbar";
 import { Query, QueryState } from "./query";
 import Labels from "./labels";
 import { TableView } from "./tableview";
-import { Node, Graph, Category } from "./model";
+import { Graph, Category } from "./model";
 
 cytoscape.use(fcose);
 
@@ -39,6 +39,8 @@ const STYLESHEET: cytoscape.Stylesheet[] = [
             label: "data(name)",
             "text-valign": "center",
             "text-halign": "center",
+            "text-wrap": "ellipsis",
+            "text-max-width": "10",            
             shape: "ellipse",
             height: 10,
             width: 10,
@@ -147,7 +149,7 @@ export default function Page() {
     }
 
     // Send the user query to the server to expand a node
-    async function onFetchNode(node: Node) {
+    async function onFetchNode(node: NodeDataDefinition) {
         const result = await fetch(`/api/graph/${graph.Id}/${node.id}`, {
             method: 'GET',
             headers: {
