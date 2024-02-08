@@ -66,7 +66,6 @@ export class Graph {
 
     private edgesMap: Map<number, EdgeDataDefinition>;
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     private constructor(id: string, categories: Category[], elements: ElementDefinition[],
         categoriesMap: Map<string, Category>, nodesMap: Map<number, NodeDataDefinition>, edgesMap: Map<number, EdgeDataDefinition>) {
         this.id = id;
@@ -87,7 +86,6 @@ export class Graph {
         return this.categories;
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     get Elements(): ElementDefinition[] {
         return this.elements;
     }
@@ -102,7 +100,7 @@ export class Graph {
     }
     
     public static empty(): Graph {
-        return new Graph("", [], [], new Map<string, Category>(), new Map<number, Node>(), new Map<number, EdgeDataDefinition>())
+        return new Graph("", [], [], new Map<string, Category>(), new Map<number, NodeDataDefinition>(), new Map<number, EdgeDataDefinition>())
     }
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
