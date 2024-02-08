@@ -1,6 +1,7 @@
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { XCircle, ZoomIn, ZoomOut } from "lucide-react";
+import { X, XCircle, ZoomIn, ZoomOut } from "lucide-react";
 import { cn } from "@/lib/utils"
+import CircleIcon from "@/components/ui/CircleIcon";
 
 export function Toolbar(params: {
     chartRef: React.RefObject<cytoscape.Core>, className?: string
@@ -42,7 +43,7 @@ export function Toolbar(params: {
                 </Tooltip>
                 <Tooltip>
                     <TooltipTrigger className="text-gray-600 dark:text-gray-400 rounded-lg border border-gray-300 p-2" onClick={handleCenterClick}>
-                        <XCircle />
+                        <CircleIcon color="rgb(75, 85, 99)"/>
                     </TooltipTrigger>
                     <TooltipContent>
                         <p>Center</p>
