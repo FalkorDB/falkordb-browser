@@ -23,14 +23,14 @@ export function TableView({ graph }: { graph: Graph }) {
                         // eslint-disable-next-line react/no-array-index-key
                         <TableRow key={index}>
                             {
-                                Object.values(row).map((cell, cellIndex) => {
+                                Object.values(row).map((cell, cellIndex) => (
                                     // eslint-disable-next-line react/no-array-index-key
-                                    return (<TableCell key={cellIndex}>
+                                    <TableCell key={cellIndex}>
                                         <TooltipProvider><Tooltip><TooltipTrigger className="max-w-96 truncate">
                                             {JSON.stringify(cell)}
                                         </TooltipTrigger><TooltipContent><p>{JSON.stringify(cell)}</p></TooltipContent></Tooltip></TooltipProvider>
-                                    </TableCell>)
-                                })
+                                    </TableCell>
+                                ))
                             }
                         </TableRow>
                     ))
