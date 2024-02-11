@@ -7,23 +7,6 @@ export interface Category {
     show: boolean,
 }
 
-// export interface Node {
-//     id: string,
-//     name: string,
-//     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-//     value: any,
-//     category: string,
-//     color: string,
-// }
-
-// export interface Edge {
-//     source: string,
-//     target: string,
-//     label: string,
-//     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-//     value: any,
-// }
-
 const COLORS_ORDER = [
     "rose",
     "yellow",
@@ -105,13 +88,11 @@ export class Graph {
         return this.categories;
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     get Nodes(): GraphNode[] {
         return this.nodes;
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    get Edges(): any[] {
+    get Edges(): GraphEdge[] {
         return this.edges;
     }
 
@@ -167,6 +148,9 @@ export class Graph {
                                 label: cell.relationshipType, 
                                 // value: {} 
                             }
+                            // Object.entries(cell.properties).forEach(([key, value]) => {
+                            //     edge[key] = value as string;
+                            // });
                             this.edgesMap.set(cell.id, edge)
                             this.edges.push(edge)
                             newEdges.push(edge)
@@ -213,13 +197,15 @@ export class Graph {
                         // check if node already exists in nodes or fake node was created
                         const currentNode = this.nodesMap.get(cell.id)
                         if (!currentNode) {
-                            const node = {
+                            const node: GraphNode = {
                                 id: cell.id.toString(),
-                                name: cell.id.toString(),
-                                value: JSON.stringify(cell),
-                                category: category.name,
-                                color: getCategoryColorValue(category.index)
+                                // name: cell.id.toString(),
+                                // category: category.name,
+                                fill: getCategoryColorValue(category.index)
                             }
+                            // Object.entries(cell.properties).forEach(([key, value]) => {
+                            //     node[key] = value as string;
+                            // });
                             this.nodesMap.set(cell.id, node)
                             this.nodes.push(node)
                             newNode.push(node)
