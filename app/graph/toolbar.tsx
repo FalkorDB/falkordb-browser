@@ -1,21 +1,20 @@
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { ZoomIn, ZoomOut } from "lucide-react";
+import { CircleDot, ZoomIn, ZoomOut } from "lucide-react";
 import { cn } from "@/lib/utils"
-import CircleIcon from "@/components/ui/CircleIcon";
 
-export function Toolbar(params: {
-    chartRef: React.RefObject<cytoscape.Core>, className?: string
+export default function Toolbar({chartRef, className=""}: {
+    chartRef: React.RefObject<cytoscape.Core>, className: string
 }) {
 
     function handleZoomClick(changefactor: number) {
-        let chart = params.chartRef.current
+        const chart = chartRef.current
         if (chart) {
             chart.zoom(chart.zoom() * changefactor)
         }
     }
 
-    function handleCenterClick() {
-        let chart = params.chartRef.current
+    const handleCenterClick= () => {
+        const chart = chartRef.current
         if (chart) {
             chart.fit()
             chart.center()
@@ -23,7 +22,7 @@ export function Toolbar(params: {
     }
 
     return (
-        <div className={cn("flex flex-row gap-x-1", params.className)}>
+        <div className={cn("flex flex-row gap-x-1", className)}>
             <TooltipProvider>
                 <Tooltip>
                     <TooltipTrigger className="text-gray-600 dark:text-gray-400 rounded-lg border border-gray-300 p-2" onClick={() => handleZoomClick(1.1)}>
@@ -43,7 +42,7 @@ export function Toolbar(params: {
                 </Tooltip>
                 <Tooltip>
                     <TooltipTrigger className="text-gray-600 dark:text-gray-400 rounded-lg border border-gray-300 p-2" onClick={handleCenterClick}>
-                        <CircleIcon color="rgb(75, 85, 99)"/>
+                        <CircleDot />
                     </TooltipTrigger>
                     <TooltipContent>
                         <p>Center</p>

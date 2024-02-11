@@ -16,19 +16,20 @@ const authOptions: AuthOptions = {
                 username: { label: "Username", type: "text" },
                 password: { label: "Password", type: "password" }
             },
-            async authorize(credentials, req) {
+            async authorize(credentials) {
 
                 if (!credentials) {
                     return null
                 }
 
                 try {
-                    const id = userId++;
+                    const id = userId;
+                    userId += 1;
 
                     const client = await createClient({
                         socket: {
                             host: credentials.host ?? "localhost",
-                            port: credentials.port ? parseInt(credentials.port) : 6379,
+                            port: credentials.port ? parseInt(credentials.port, 10) : 6379,
                             reconnectStrategy: false
                         },
                         password: credentials.password ?? undefined,
@@ -41,22 +42,23 @@ const authOptions: AuthOptions = {
                     await client.on('error', err => {
                         // Close coonection on error and remove from connections map
                         console.error('FalkorDB Client Error', err)
-                        let connection = connections.get(id)
+                        const connection = connections.get(id)
                         if (connection) {
                             connections.delete(id)
                             connection.disconnect()
+                            .catch((e) => {
+                                console.warn('FalkorDB Client Disconnect Error', e)
+                            })
                         }
                     }).connect();
                 
                     // Verify connection
                     await client.ping()
 
-                    connections.set(id, client as RedisClientType)
-
-                    let res: any = {
-                        id: id,
+                    const res = {
+                        id,
                         host: credentials.host,
-                        port: credentials.port,
+                        port: credentials.port ? parseInt(credentials.port, 10) : 6379,
                         password: credentials.password,
                         username: credentials.username,
                     }
@@ -72,23 +74,30 @@ const authOptions: AuthOptions = {
     callbacks: {
         async jwt({ token, user }) {
             if (user) {
-                token.id = user.id;
-                token.host = user.host;
-                token.port = user.port;
-                token.username = user.username;
-                token.password = user.password;
+                return {
+                    ...token,
+                    id: user.id,
+                    host: user.host,
+                    port: user.port,
+                    username: user.username,
+                    password: user.password
+                };
             }
-
             return token;
         },
-        async session({ session, token, user }) {
+        async session({ session, token }) {
             if (session.user) {
-                session.user.id = token.id as number;
-                session.user.host = token.host as string;
-                session.user.port = parseInt(token.port as string);
-                session.user.username = token.username as string;
-                session.user.password = token.password as string;
-
+                return {
+                    ...session,
+                    user: {
+                        ...session.user,
+                        id: token.id as number,
+                        host: token.host as string,
+                        port: parseInt(token.port as string, 10),
+                        username: token.username as string,
+                        password: token.password as string,
+                    },
+                };
             }
             return session;
         }

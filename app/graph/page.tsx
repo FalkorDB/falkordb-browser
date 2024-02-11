@@ -2,76 +2,84 @@
 
 import { toast } from "@/components/ui/use-toast";
 import CytoscapeComponent from 'react-cytoscapejs'
-import cytoscape from 'cytoscape';
+import cytoscape, { ElementDefinition, NodeDataDefinition } from 'cytoscape';
 import fcose from 'cytoscape-fcose';
 import { useRef, useState } from "react";
-import { Node, Graph, Category, getCategoryColorName } from "./model";
-import { signOut } from "next-auth/react";
-import { Toolbar } from "./toolbar";
-import { Query, QueryState } from "./query";
-import { Labels } from "./labels";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { signOut } from "next-auth/react";
+import { useTheme } from "next-themes";
+import Toolbar from "./toolbar";
+import { Query, QueryState } from "./query";
+import Labels from "./labels";
 import { TableView } from "./tableview";
+import { Graph, Category } from "./model";
 
 cytoscape.use(fcose);
 
 // The stylesheet for the graph
-const STYLESHEET: cytoscape.Stylesheet[] = [
-    {
-        selector: "core",
-        style: {
-            'active-bg-size': 0,  // hide gray circle when panning
-            // All of the following styles are meaningless and are specified
-            // to satisfy the linter...
-            'active-bg-color': 'blue',
-            'active-bg-opacity': 0.3,
-            "selection-box-border-color": 'blue',
-            "selection-box-border-width": 0,
-            "selection-box-opacity": 1,
-            "selection-box-color": 'blue',
-            "outside-texture-bg-color": 'blue',
-            "outside-texture-bg-opacity": 1,
-        },
-    },
-    {
-        selector: "node",
-        style: {
-            label: "data(name)",
-            "text-valign": "center",
-            "text-halign": "center",
-            shape: "ellipse",
-            height: 10,
-            width: 10,
-            "border-width": 0.15,
-            "border-opacity": 0.5,
-            "background-color": "data(color)",
-            "font-size": "3",
-            "overlay-padding": "1px",
-        },
-    },
-    {
-        selector: "node:active",
-        style: {
-            "overlay-opacity": 0,  // hide gray box around active node
-        },
-    },
-    {
-        selector: "edge",
-        style: {
-            width: 0.5,
-            "line-color": "#ccc",
-            "arrow-scale": 0.3,
-            "target-arrow-shape": "triangle",
-            label: "data(label)",
-            'curve-style': 'straight',
-            "text-background-color": "#ffffff",
-            "text-background-opacity": 1,
-            "font-size": "3",
-            "overlay-padding": "2px",
+function getStyle(darkmode: boolean) {
 
+    const style: cytoscape.Stylesheet[] = [
+        {
+            selector: "core",
+            style: {
+                'active-bg-size': 0,  // hide gray circle when panning
+                // All of the following styles are meaningless and are specified
+                // to satisfy the linter...
+                'active-bg-color': 'blue',
+                'active-bg-opacity': 0.3,
+                "selection-box-border-color": 'blue',
+                "selection-box-border-width": 0,
+                "selection-box-opacity": 1,
+                "selection-box-color": 'blue',
+                "outside-texture-bg-color": 'blue',
+                "outside-texture-bg-opacity": 1,
+            },
         },
-    },
-]
+        {
+            selector: "node",
+            style: {
+                label: "data(name)",
+                "text-valign": "center",
+                "text-halign": "center",
+                "text-wrap": "ellipsis",
+                "text-max-width": "10rem",
+                shape: "ellipse",
+                height: "10rem",
+                width: "10rem",
+                "border-width": 0.15,
+                "border-opacity": 0.5,
+                "background-color": "data(color)",
+                "font-size": "3rem",
+                "overlay-padding": "1rem",
+            },
+        },
+        {
+            selector: "node:active",
+            style: {
+                "overlay-opacity": 0,  // hide gray box around active node
+            },
+        },
+        {
+            selector: "edge",
+            style: {
+                width: 0.5,
+                "line-color": "#ccc",
+                "arrow-scale": 0.3,
+                "target-arrow-shape": "triangle",
+                label: "data(label)",
+                'curve-style': 'straight',
+                "text-background-color": darkmode? "#020817": "white",
+                "color": darkmode? "white" : "black",
+                "text-background-opacity": 1,
+                "font-size": "3rem",
+                "overlay-padding": "2rem",
+
+            },
+        },
+    ]
+    return style
+}
 
 const LAYOUT = {
     name: "fcose",
@@ -79,8 +87,20 @@ const LAYOUT = {
     padding: 30,
 }
 
-export default function Page() {
 
+// Validate the graph selection is not empty and show an error message if it is
+function validateGraphSelection(graphName: string): boolean {
+    if (!graphName) {
+        toast({
+            title: "Error",
+            description: "Please select a graph from the list",
+        });
+        return false;
+    }
+    return true;
+}
+
+export default function Page() {
     const [graph, setGraph] = useState(Graph.empty());
 
     // A reference to the chart container to allowing zooming and editing
@@ -89,20 +109,26 @@ export default function Page() {
     // A reference to the query state to allow running the user query
     const queryState = useRef<QueryState | null>(null)
 
+    const { theme, systemTheme } = useTheme()
+    const darkmode = theme === "dark" || (theme === "system" && systemTheme === "dark")
+
     function prepareArg(arg: string): string {
         return encodeURIComponent(arg.trim())
     }
 
-    async function runQuery(event: any) {
+    const runQuery = async (event: React.FormEvent<HTMLFormElement>) => {
         event.preventDefault();
-        let state = queryState.current;
+        const state = queryState.current;
         if (!state) {
             return
         }
 
-        let q = state.query.trim() || "MATCH (n)-[e]-() RETURN n,e limit 100";
+        // Proposed abstraction for improved modularity
+        if (!validateGraphSelection(state.graphName)) return;
 
-        let result = await fetch(`/api/graph?graph=${prepareArg(state.graphName)}&query=${prepareArg(q)}`, {
+        const q = state.query.trim() || "MATCH (n)-[e]-() RETURN n,e limit 100";
+
+        const result = await fetch(`/api/graph?graph=${prepareArg(state.graphName)}&query=${prepareArg(q)}`, {
             method: 'GET',
             headers: {
                 'Content-Type': 'application/json'
@@ -114,16 +140,16 @@ export default function Page() {
                 description: result.text(),
             })
             if (result.status >= 400 && result.status < 500) {
-                signOut({ callbackUrl: '/' })
+                signOut({ callbackUrl: '/login' })
             }
             return
         }
 
-        let json = await result.json()
-        let newGraph = Graph.create(state.graphName, json.result)
+        const json = await result.json()
+        const newGraph = Graph.create(state.graphName, json.result)
         setGraph(newGraph)
 
-        let chart = chartRef.current
+        const chart = chartRef.current
         if (chart) {
             chart.elements().remove()
             chart.add(newGraph.Elements)
@@ -132,8 +158,8 @@ export default function Page() {
     }
 
     // Send the user query to the server to expand a node
-    async function onFetchNode(node: Node) {
-        let result = await fetch(`/api/graph/${graph.Id}/${node.id}`, {
+    async function onFetchNode(node: NodeDataDefinition) {
+        const result = await fetch(`/api/graph/${graph.Id}/${node.id}`, {
             method: 'GET',
             headers: {
                 'Content-Type': 'application/json'
@@ -146,21 +172,22 @@ export default function Page() {
                 description: result.text(),
             })
             if (result.status >= 400 && result.status < 500) {
-                signOut({ callbackUrl: '/' })
+                signOut({ callbackUrl: '/login' })
             }
-            return [] as any[]
+            return [] as ElementDefinition[]
         }
 
-        let json = await result.json()
-        let elements = graph.extend(json.result)
+        const json = await result.json()
+        const elements = graph.extend(json.result)
         return elements
     }
 
-    function onCategoryClick(category: Category) {
-        let chart = chartRef.current
+    const onCategoryClick = (category: Category) => {
+        const chart = chartRef.current
         if (chart) {
-            let elements = chart.elements(`node[category = "${category.name}"]`)
+            const elements = chart.elements(`node[category = "${category.name}"]`)
 
+            // eslint-disable-next-line no-param-reassign
             category.show = !category.show
 
             if (category.show) {
@@ -174,7 +201,7 @@ export default function Page() {
 
     return (
         <div className="h-full flex flex-col p-2 gap-y-2">
-            <Query className="border rounded-lg border-gray-300 p-2" onSubmit={runQuery} query={(state) => queryState.current = state} />
+            <Query className="border rounded-lg border-gray-300 p-2" onSubmit={runQuery} onQueryUpdate={(state) => { queryState.current = state }} />
             <div className="flex flex-col grow border border-gray-300 rounded-lg p-2 overflow-auto">
                 {
                     graph.Id &&
@@ -200,9 +227,9 @@ export default function Page() {
                                         cy.removeAllListeners();
 
                                         // Listen to the click event on nodes for expanding the node
-                                        cy.on('dbltap', 'node', async function (evt) {
-                                            var node: Node = evt.target.json().data;
-                                            let elements = await onFetchNode(node);
+                                        cy.on('dbltap', 'node', async (evt) => {
+                                            const node: Node = evt.target.json().data;
+                                            const elements = await onFetchNode(node);
 
                                             // adjust entire graph.
                                             if (elements.length > 0) {
@@ -211,7 +238,7 @@ export default function Page() {
                                             }
                                         });
                                     }}
-                                    stylesheet={STYLESHEET}
+                                    stylesheet={getStyle(darkmode)}
                                     elements={graph.Elements}
                                     layout={LAYOUT}
                                     className="w-full grow"
