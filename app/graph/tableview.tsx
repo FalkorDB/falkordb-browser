@@ -1,6 +1,6 @@
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Graph } from "./model";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Graph } from "./model";
 
 // eslint-disable-next-line import/prefer-default-export
 export function TableView({ graph }: { graph: Graph }) {
