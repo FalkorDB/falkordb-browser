@@ -1,4 +1,5 @@
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Graph } from "./model";
 
 // eslint-disable-next-line import/prefer-default-export
@@ -22,8 +23,14 @@ export function TableView({ graph }: { graph: Graph }) {
                         // eslint-disable-next-line react/no-array-index-key
                         <TableRow key={index}>
                             {
-                                // eslint-disable-next-line react/no-array-index-key
-                                Object.values(row).map((cell, cellIndex) => (<TableCell key={cellIndex} className="max-w-96 truncate">{JSON.stringify(cell)}</TableCell>))
+                                Object.values(row).map((cell, cellIndex) => (
+                                    // eslint-disable-next-line react/no-array-index-key
+                                    <TableCell key={cellIndex}>
+                                        <TooltipProvider><Tooltip><TooltipTrigger className="max-w-96 truncate">
+                                            {JSON.stringify(cell)}
+                                        </TooltipTrigger><TooltipContent><p>{JSON.stringify(cell)}</p></TooltipContent></Tooltip></TooltipProvider>
+                                    </TableCell>
+                                ))
                             }
                         </TableRow>
                     ))
