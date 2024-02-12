@@ -46,7 +46,7 @@ export function Toolbar(params: {
                         <CircleIcon color="rgb(75, 85, 99)"/>
                     </TooltipTrigger>
                     <TooltipContent>
-                        <p>Center</p>
+                        <p> Center</p>
                     </TooltipContent>
                 </Tooltip>
             </TooltipProvider>
