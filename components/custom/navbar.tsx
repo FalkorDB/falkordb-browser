@@ -6,13 +6,14 @@ import { Label } from "../ui/label";
 import { useEffect, useState } from "react";
 import { useTheme } from "next-themes";
 import { GithubMark } from "./GithubMark";
+import { usePathname } from "next/navigation";
 
 export default function Navbar() {
   const { data: session, status } = useSession()
   const { theme, setTheme, systemTheme } = useTheme()
 
   const [mounted, setMounted] = useState(false)
-
+  const pathName = usePathname()
   useEffect(() => {
     setMounted(true)
   }, [])
@@ -26,23 +27,23 @@ export default function Navbar() {
     }
   }
 
-  let darkmode = theme == "dark" || (theme == "system" && systemTheme == "dark")
-  return (
-    <nav className="w-full h-full bg-gray-100 dark:bg-gray-800 p-5 space-y-4 flex flex-col">
-      {
-        mounted &&
-        <div className="flex items-center space-x-2">
-          <Switch id="dark-mode" checked={darkmode} onCheckedChange={setDarkMode} />
-          <Label htmlFor="dark-mode">{`${theme} mode`}</Label>
-        </div>
-      }
-      <div className="flex items-center space-x-2 border-b">
-        <Menu className="h-6 w-6" />
-        <span className="font-bold">FalkorDB Browser</span>
+let darkmode = theme == "dark" || (theme == "system" && systemTheme == "dark")
+return (
+  <nav className="w-full h-full bg-gray-100 dark:bg-gray-800 p-5 space-y-4 flex flex-col">
+    {
+      mounted &&
+      <div className="flex items-center space-x-2">
+        <Switch id="dark-mode" checked={darkmode} onCheckedChange={setDarkMode} />
+        <Label htmlFor="dark-mode">{`${theme} mode`}</Label>
       </div>
-      {status === "authenticated" &&
-        <ul className="space-y-2">
-          {/* <li className="flex items-center space-x-2">
+    }
+    <div className="flex items-center space-x-2 border-b">
+      <Menu className="h-6 w-6" />
+      <span className="font-bold">FalkorDB Browser</span>
+    </div>
+    {status === "authenticated" &&
+      <ul className="space-y-2">
+        {/* <li className="flex items-center space-x-2">
           <AirVentIcon className="h-6 w-6" />
           <span>Employees</span>
         </li>
@@ -59,39 +60,39 @@ export default function Navbar() {
           <span>Calendar</span>
         </li> */}
 
-          {/* <li className="flex items-center space-x-2">
+        {/* <li className="flex items-center space-x-2">
             <AirVentIcon className="h-6 w-6" />
             <span>Profile</span>
           </li> */}
 
-          <li className="flex items-center space-x-2">
-            <Info className="h-6 w-6" />
-            <Link className="underline underline-offset-2" href="/details">
-              Connection Details
-            </Link>
-          </li>
-          <li className="flex items-center space-x-2">
-            <Waypoints className="h-6 w-6" />
-            <Link className="underline underline-offset-2" href="/graph">
-              Graph
-            </Link>
-          </li>
-          <li className="flex items-center space-x-2">
-            <LogOut className="h-6 w-6" />
-            <Link className="underline underline-offset-2" href="/" onClick={() => signOut({ callbackUrl: '/' })}>
-              Sign Out
-            </Link>
-          </li>
-        </ul>
+        <li className="flex items-center space-x-2">
+          <Info className="h-6 w-6" />
+          <Link className={`underline underline-offset-2 ${pathName === '/details' ? 'text-blue-300' : ''}`} href="/details">
+            Connection Details
+          </Link>
+        </li>
+        <li className="flex items-center space-x-2">
+          <Waypoints className="h-6 w-6" />
+          <Link className={`underline underline-offset-2 ${pathName === '/graph' ? 'text-blue-300' : ''}`} href="/graph">
+            Graph
+          </Link>
+        </li>
+        <li className="flex items-center space-x-2">
+          <LogOut className="h-6 w-6" />
+          <Link className={`underline underline-offset-2  ${pathName === '/' ? 'text-blue-300' : ''}`} href="/" onClick={() => signOut({ callbackUrl: '/' })}>
+            Sign Out
+          </Link>
+        </li>
+      </ul>
+    }
+    <footer className="flex flex-row items-center space-x-1 fixed bottom-1 text-xs">
+      <a href="https://github.com/falkordb/falkordb-browser">{
+        <GithubMark darkMode={darkmode} className="h-4 w-4" />
       }
-      <footer className="flex flex-row items-center space-x-1 fixed bottom-1 text-xs">
-          <a href="https://github.com/falkordb/falkordb-browser">{
-              <GithubMark darkMode={darkmode} className="h-4 w-4" />
-          }
-          </a> 
-          <span>Made by</span>
-          <a className="underline" href="https://www.falkordb.com">FalkorDB</a>
-      </footer>
-    </nav>
-  )
+      </a>
+      <span>Made by</span>
+      <a className="underline" href="https://www.falkordb.com">FalkorDB</a>
+    </footer>
+  </nav>
+)
 }
