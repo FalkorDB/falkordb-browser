@@ -1,23 +1,32 @@
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { CircleDot, ZoomIn, ZoomOut } from "lucide-react";
+import { GraphCanvasRef } from "reagraph";
+
 import { cn } from "@/lib/utils"
 
-export default function Toolbar({chartRef, className=""}: {
-    chartRef: React.RefObject<cytoscape.Core>, className: string
+export default function Toolbar({ chartRef, className = "" }: {
+    chartRef: React.RefObject<GraphCanvasRef>, className: string
 }) {
 
-    function handleZoomClick(changefactor: number) {
+    const handleZoomIn = () => {
         const chart = chartRef.current
         if (chart) {
-            chart.zoom(chart.zoom() * changefactor)
+            chart.zoomIn()
         }
     }
 
-    const handleCenterClick= () => {
+    const handleZoomOut = () => {
         const chart = chartRef.current
         if (chart) {
-            chart.fit()
-            chart.center()
+            chart.zoomOut()
+        }
+    }
+
+
+    const handleCenterClick = () => {
+        const chart = chartRef.current
+        if (chart) {
+            chart.centerGraph()
         }
     }
 
@@ -25,7 +34,7 @@ export default function Toolbar({chartRef, className=""}: {
         <div className={cn("flex flex-row gap-x-1", className)}>
             <TooltipProvider>
                 <Tooltip>
-                    <TooltipTrigger className="text-gray-600 dark:text-gray-400 rounded-lg border border-gray-300 p-2" onClick={() => handleZoomClick(1.1)}>
+                    <TooltipTrigger className="text-gray-600 dark:text-gray-400 rounded-lg border border-gray-300 p-2" onClick={handleZoomIn}>
                         <ZoomIn />
                     </TooltipTrigger>
                     <TooltipContent>
@@ -33,7 +42,7 @@ export default function Toolbar({chartRef, className=""}: {
                     </TooltipContent>
                 </Tooltip>
                 <Tooltip>
-                    <TooltipTrigger className="text-gray-600 dark:text-gray-400 rounded-lg border border-gray-300 p-2" onClick={() => handleZoomClick(0.9)}>
+                    <TooltipTrigger className="text-gray-600 dark:text-gray-400 rounded-lg border border-gray-300 p-2" onClick={handleZoomOut}>
                         <ZoomOut />
                     </TooltipTrigger>
                     <TooltipContent>
