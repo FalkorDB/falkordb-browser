@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useTheme } from "next-themes";
 import { usePathname } from "next/navigation";
+import { cn } from "@/lib/utils"
 import { Switch } from "../ui/switch";
 import { Label } from "../ui/label";
 import GithubMark from "./GithubMark";
