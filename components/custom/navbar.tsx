@@ -4,10 +4,11 @@ import { useSession } from "next-auth/react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useTheme } from "next-themes";
+import { usePathname } from "next/navigation";
+import { cn } from "@/lib/utils"
 import { Switch } from "../ui/switch";
 import { Label } from "../ui/label";
 import GithubMark from "./GithubMark";
-
 
 export interface LinkDefinition {
   name: string,
@@ -21,7 +22,7 @@ export default function Navbar({ links, collapsed, onExpand }: { links: LinkDefi
   const { theme, setTheme, systemTheme } = useTheme()
 
   const [mounted, setMounted] = useState(false)
-
+  const pathName = usePathname()
   useEffect(() => {
     setMounted(true)
   }, [])
@@ -57,7 +58,8 @@ export default function Navbar({ links, collapsed, onExpand }: { links: LinkDefi
             links.map((link, index) => (
                 // eslint-disable-next-line react/no-array-index-key
                 <li key={index} className="flex items-center space-x-2">
-                  <Link title={link.name} className="underline underline-offset-2 flex space-x-2" href={link.href} onClick={link.onClick}>
+                  <Link title={link.name} className={cn("underline underline-offset-2 flex space-x-2", pathName === link.href ? 'text-blue-300' : '')}
+                     href={link.href} onClick={link.onClick}>
                     {link.icon} {!collapsed && (<p> {link.name}</p>)}
                   </Link>
                 </li>
