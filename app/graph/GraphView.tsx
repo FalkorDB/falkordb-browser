@@ -1,6 +1,6 @@
 import CytoscapeComponent from "react-cytoscapejs";
 import { toast } from "@/components/ui/use-toast";
-import cytoscape, { ElementDefinition, NodeDataDefinition } from "cytoscape";
+import cytoscape, { ElementDefinition, EventObject, NodeDataDefinition } from "cytoscape";
 import { RefAttributes, useRef, useState, useImperativeHandle } from "react";
 import { signOut } from "next-auth/react";
 import fcose from 'cytoscape-fcose';
@@ -85,7 +85,7 @@ function getStyle(darkmode: boolean) {
 }
 
 export interface GraphViewRef {
-    expand: (elements:  ElementDefinition[] ) => void
+    expand: (elements: ElementDefinition[]) => void
 }
 
 interface GraphViewProps extends RefAttributes<GraphViewRef> {
@@ -154,6 +154,23 @@ export function GraphView({ graph, darkmode, ref }: GraphViewProps) {
         }
     }
 
+    const handleDoubleClick = async (evt: EventObject) => {
+        const node: Node = evt.target.json().data;
+        const elements = await onFetchNode(node);
+
+        // adjust entire graph.
+        if (chartRef.current && elements.length > 0) {
+            chartRef.current.add(elements);
+            chartRef.current.elements().layout(LAYOUT).run();
+        }
+    }
+
+    const handleTap = (evt: EventObject) => {
+        const node: Node = evt.target.json().data;
+        setSelectedNode(node);
+        dataPanel.current?.expand();
+    }
+
     return (
         <ResizablePanelGroup direction="horizontal">
             <ResizablePanel className="h-full flex flex-col">
@@ -169,23 +186,10 @@ export function GraphView({ graph, darkmode, ref }: GraphViewProps) {
                         cy.removeAllListeners();
 
                         // Listen to the double click event on nodes for expanding the node
-                        cy.on('dbltap', 'node', async (evt) => {
-                            const node: Node = evt.target.json().data;
-                            const elements = await onFetchNode(node);
-
-                            // adjust entire graph.
-                            if (elements.length > 0) {
-                                cy.add(elements);
-                                cy.elements().layout(LAYOUT).run();
-                            }
-                        });
+                        cy.on('dbltap', 'node', handleDoubleClick);
 
                         // Listen to the click event on nodes for showing node properties
-                        cy.on('tap', 'node', (evt) => {
-                            const node: Node = evt.target.json().data;
-                            setSelectedNode(node);
-                            dataPanel.current?.expand();
-                        });
+                        cy.on('tap', 'node', handleTap);
                     }}
                     stylesheet={getStyle(darkmode)}
                     elements={graph.Elements}
