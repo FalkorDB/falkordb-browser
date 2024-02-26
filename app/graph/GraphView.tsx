@@ -173,7 +173,7 @@ export function GraphView({ graph, darkmode, ref }: GraphViewProps) {
 
     return (
         <ResizablePanelGroup direction="horizontal">
-            <ResizablePanel className="h-full flex flex-col">
+            <ResizablePanel className="h-full flex flex-col p-2">
                 <div className="grid grid-cols-6">
                     <Toolbar className="col-start-1 justify-start" chartRef={chartRef} />
                     <Labels className="col-end-7 justify-end" categories={graph.Categories} onClick={onCategoryClick} />
@@ -198,7 +198,7 @@ export function GraphView({ graph, darkmode, ref }: GraphViewProps) {
                 />
             </ResizablePanel>
             <ResizableHandle withHandle />
-            <ResizablePanel ref={dataPanel} maxSize={50} minSize={10} collapsible defaultSize={selectedNode ? 20 : 0} className="bg-gray-100 dark:bg-gray-800">
+            <ResizablePanel ref={dataPanel} maxSize={50} minSize={10} collapsible defaultSize={selectedNode ? 20 : 0} className="bg-gray-100 dark:bg-gray-800 border rounded-lg border-gray-300">
                 {selectedNode && <DataPanel node={selectedNode} />}
             </ResizablePanel>
         </ResizablePanelGroup>
