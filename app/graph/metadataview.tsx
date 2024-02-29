@@ -1,7 +1,10 @@
 export function MetaDataView({ metadata }: { metadata: string[] }) {
     return (
         <div>
-            {metadata.map((val, index) => <p key={index}>{val}</p>)}
+            {
+                // eslint-disable-next-line react/no-array-index-key
+                metadata.map((val, index) => <p key={index}>{val}</p>)
+            }
         </div>
     )
 }
