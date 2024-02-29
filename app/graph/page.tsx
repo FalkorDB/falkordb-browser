@@ -7,8 +7,10 @@ import { signOut } from "next-auth/react";
 import { useTheme } from "next-themes";
 import { Query, QueryState } from "./query";
 import { TableView } from "./tableview";
+import MetaDataView from "./metadataview";
 import { Graph } from "./model";
 import { GraphView, GraphViewRef } from "./GraphView";
+
 
 
 // Validate the graph selection is not empty and show an error message if it is
@@ -25,6 +27,8 @@ function validateGraphSelection(graphName: string): boolean {
 
 export default function Page() {
     const [graph, setGraph] = useState(Graph.empty());
+    const [metaData, setMetaData] = useState<string[]>([]);
+    const [showGraph, setShowGraph] = useState<boolean>(true);
 
     const graphView = useRef<GraphViewRef>(null)
 
@@ -71,7 +75,8 @@ export default function Page() {
         const json = await result.json()
         const newGraph = Graph.create(state.graphName, json.result)
         setGraph(newGraph)
-
+        setMetaData(json.result.metadata)
+        setShowGraph((!!json.result.data && json.result.data.length > 0))
 
         graphView.current?.expand(newGraph.Elements)
     }
@@ -84,10 +89,14 @@ export default function Page() {
                     graph.Id &&
                     <Tabs defaultValue="graph" className="grow flex flex-col justify-center items-center">
                         <TabsList className="border w-fit">
-                            <TabsTrigger value="data">Data</TabsTrigger>
-                            <TabsTrigger value="graph">Graph</TabsTrigger>
+                            <TabsTrigger value="metaData">MetaData</TabsTrigger>
+                            {showGraph && <TabsTrigger value="data">Data</TabsTrigger>}
+                            {showGraph && <TabsTrigger value="graph">Graph</TabsTrigger>}
                         </TabsList>
-                        <TabsContent value="data" className="grow w-full">
+                        <TabsContent value="metaData" className="grow w-full">
+                            <MetaDataView metadata={metaData} />
+                        </TabsContent>
+                        <TabsContent value="data" className="grow w-full flex-[1_1_0] overflow-auto">
                             <TableView graph={graph} />
                         </TabsContent>
                         <TabsContent value="graph" className="grow w-full">
