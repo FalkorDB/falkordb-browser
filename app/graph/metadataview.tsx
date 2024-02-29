@@ -1,4 +1,4 @@
-export function MetaDataView({ metadata }: { metadata: string[] }) {
+export default function MetaDataView({ metadata }: { metadata: string[] }) {
     return (
         <div>
             {

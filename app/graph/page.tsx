@@ -7,7 +7,7 @@ import { signOut } from "next-auth/react";
 import { useTheme } from "next-themes";
 import { Query, QueryState } from "./query";
 import { TableView } from "./tableview";
-import { MetaDataView } from "./metadataview";
+import MetaDataView from "./metadataview";
 import { Graph } from "./model";
 import { GraphView, GraphViewRef } from "./GraphView";
 
