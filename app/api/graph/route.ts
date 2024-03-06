@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Graph } from 'falkordb';
 import { getServerSession } from "next-auth/next";
-import authOptions, { connections, getConnection } from "../auth/[...nextauth]/options";
+import authOptions, { getConnection } from "../auth/[...nextauth]/options";
 
 // eslint-disable-next-line import/prefer-default-export
 export async function GET(request: NextRequest) {
