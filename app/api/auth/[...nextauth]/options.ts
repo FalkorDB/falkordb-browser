@@ -1,9 +1,22 @@
 import { RedisClientType, createClient } from "falkordb";
 import CredentialsProvider from "next-auth/providers/credentials"
-import { AuthOptions } from "next-auth"
+import { AuthOptions, User } from "next-auth"
 
 
 export const connections = new Map<number, RedisClientType>();
+
+export async function getConnection(user: User) {
+    return connections.get(user.id) ?? await createClient({
+        socket: {
+            host: user.host ?? "localhost",
+            port: user.port ?? 6379,
+            reconnectStrategy: false
+        },
+        password: user.password ?? undefined,
+        username: user.username ?? undefined
+    })
+}
+
 let userId = 1;
 
 const authOptions: AuthOptions = {
