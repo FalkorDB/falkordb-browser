@@ -34,13 +34,13 @@ async function newClient(credentials: {host: string, port: string, password: str
 
     // Verify connection
     await client.ping()
-    return client
+    return client as RedisClientType
 }
 
 export async function getConnection(user: User) {
     let conn = connections.get(user.id)
     if (!conn) {
-        await newClient({
+        conn = await newClient({
             host: user.host,
             port: user.port.toString() ?? "6379",
             username: user.username,
