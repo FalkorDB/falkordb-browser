@@ -3,18 +3,23 @@ import CredentialsProvider from "next-auth/providers/credentials"
 import { AuthOptions, User } from "next-auth"
 
 
-export const connections = new Map<number, RedisClientType>();
+const connections = new Map<number, RedisClientType>();
 
 export async function getConnection(user: User) {
-    return connections.get(user.id) ?? await createClient({
-        socket: {
-            host: user.host ?? "localhost",
-            port: user.port ?? 6379,
-            reconnectStrategy: false
-        },
-        password: user.password ?? undefined,
-        username: user.username ?? undefined
-    })
+    let conn = connections.get(user.id)
+    if (!conn) {
+        conn = await createClient({
+            socket: {
+                host: user.host ?? "localhost",
+                port: user.port ?? 6379,
+                reconnectStrategy: false
+            },
+            password: user.password ?? undefined,
+            username: user.username ?? undefined
+        })
+        connections.set(user.id, conn)
+    }
+    return conn  
 }
 
 let userId = 1;
