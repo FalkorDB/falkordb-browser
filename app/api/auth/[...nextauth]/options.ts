@@ -5,7 +5,7 @@ import { AuthOptions, User } from "next-auth"
 
 const connections = new Map<number, RedisClientType>();
 
-async function client(credentials: {host: string, port: string, password: string, username: string}, id: number) {
+async function newClient(credentials: {host: string, port: string, password: string, username: string}, id: number) {
     const client = await createClient({
         socket: {
             host: credentials.host ?? "localhost",
@@ -40,7 +40,7 @@ async function client(credentials: {host: string, port: string, password: string
 export async function getConnection(user: User) {
     let conn = connections.get(user.id)
     if (!conn) {
-        await client({
+        await newClient({
             host: user.host,
             port: user.port.toString() ?? "6379",
             username: user.username,
@@ -72,7 +72,7 @@ const authOptions: AuthOptions = {
                     const id = userId;
                     userId += 1;
 
-                    await client(credentials, id)
+                    await newClient(credentials, id)
 
                     const res = {
                         id,
