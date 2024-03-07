@@ -16,10 +16,10 @@ export async function GET() {
         return NextResponse.json({ message: "Not authenticated" }, { status: 401 })
     }
 
-    const data = (await client.info("memory")).split('\r\n').map((data) => {
-        const name = data.split(':')[0]
-        const num = data.split(':')[1]
-        return { name: name, data: num }
+    const data = (await client.info("memory")).split('\r\n').map((item) => {
+        const name = item.split(':')[0]
+        const num = item.split(':')[1]
+        return { name, series: num }
     })
 
     data.splice(0, 1)

@@ -9,7 +9,7 @@ async function newClient(credentials: {host: string, port: string, password: str
     const client = await createClient({
         socket: {
             host: credentials.host ?? "localhost",
-            port: credentials.port ? parseInt(credentials.port) : 6379,
+            port: credentials.port ? parseInt(credentials.port, 10) : 6379,
             reconnectStrategy: false
         },
         password: credentials.password ?? undefined,
