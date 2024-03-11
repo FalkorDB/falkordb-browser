@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth/next";
-import authOptions, { connections } from "../auth/[...nextauth]/options";
+import authOptions, { getConnection } from "../auth/[...nextauth]/options";
 
 const fileds = [
     "used_memory",
@@ -17,7 +17,7 @@ export async function GET() {
         return NextResponse.json({ message: "Not authenticated" }, { status: 401 })
     }
 
-    const client = connections.get(id)
+    const client = await getConnection(session.user)
     if (!client) {
         return NextResponse.json({ message: "Not authenticated" }, { status: 401 })
     }
