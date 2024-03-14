@@ -1,66 +1,77 @@
-"use client"
+import { ECharts } from "echarts";
+import ReactEcharts, { EChartsInstance, EChartsOption } from "echarts-for-react"
+import { useEffect, useRef, useState } from "react"
 
-import React, { useEffect, useRef } from 'react';
-import * as echarts from 'echarts';
-
-interface MonitorViewProps {
-    data: { name: string; series: string[] }[];
-    time: string[];
+interface Props {
+  data: { name: string, series: string }[]
+  time: Date
 }
 
-export default function MonitorView({
-    data,
-    time
-}: MonitorViewProps) {
-    const chartRef = useRef<HTMLDivElement>(null);
+export default function MonitorView({ data, time }: Props) {
 
-    useEffect(() => {
-      if (chartRef.current) {
-        const myChart = echarts.init(chartRef.current);
-  
-        const option: echarts.EChartsOption = {
-          tooltip: {
-            trigger: 'axis',
-            axisPointer: {
-              type: 'cross',
-            },
-          },
-          legend: {
-            data: data.map(item => item.name),
-          },
-          xAxis: {
-            type: 'category',
-            boundaryGap: false,
-            data: time,
-          },
-          yAxis: {
-            type: 'value',
-          },
-          series: data.map(item => ({
-            name: item.name,
-            type: 'line',
-            stack: 'total',
-            areaStyle: {},
-            data: item.series,
-          })),
-        };
-  
-        myChart.setOption(option);
-  
-        // Resize chart when window size changes
-        window.addEventListener('resize', () => {
-          myChart.resize();
-        });
-  
-        return () => {
-          // Cleanup
-          myChart.dispose();
-          window.removeEventListener('resize', () => {
-            myChart.resize();
-          });
-        };
+  const echartRef = useRef<EChartsInstance | null>(null)
+  const [timeArr, setTimeArr] = useState<string[]>([])
+  const [chartReady, setChartReady] = useState<boolean>(false)
+
+  useEffect(() => {
+    debugger
+    if (chartReady && echartRef.current) {
+      const myChart: ECharts = echartRef.current
+      data.forEach((item, index) => {
+        myChart.appendData({
+          seriesIndex: index,
+          data: [item.series]
+        })
+      })
+      timeArr.push(time.toLocaleTimeString().split(" ")[0])
+      myChart.setOption({
+        xAxis: {
+          type: "category",
+          data: timeArr
+        }
+      })
+      console.log(myChart.getOption().series)
+      console.log(timeArr)
+    }
+  }, [data, time])
+
+  const options: EChartsOption = {
+    tooltip: {
+      trigger: 'axis',
+      axisPointer: {
+        type: 'cross',
+      },
+    },
+    legend: {
+      data: data.map(item => item.name)
+    },
+    xAxis: {
+      type: "category",
+      data: timeArr,
+      min: 0
+    },
+    yAxis: {
+      type: "value",
+    },
+    series: data.map(item => ({
+      name: item.name,
+      data: [],
+      type: "line",
+      smooth: true,
+      itemStyle: {
+        opacity: 0
       }
-    }, [data, time]);
-  
-    return <div ref={chartRef} style={{ width: '100%', height: '400px' }} />;
-};
+    }))
+  }
+
+  return (
+    <ReactEcharts
+      className="w-full h-full"
+      option={options}
+      onChartReady={(e) => {
+        echartRef.current = e
+        setChartReady(true)
+      }}
+    />
+  )
+}
