@@ -95,7 +95,7 @@ interface GraphViewProps extends RefAttributes<GraphViewRef> {
 
 export function GraphView({ graph, darkmode, ref }: GraphViewProps) {
 
-    const [selectedNode, setSelectedNode] = useState<Node | null>(null);
+    const [selectedNode, setSelectedNode] = useState<[string, any][] | null>(null);
 
     // A reference to the chart container to allowing zooming and editing
     const chartRef = useRef<cytoscape.Core | null>(null)
@@ -167,7 +167,8 @@ export function GraphView({ graph, darkmode, ref }: GraphViewProps) {
 
     const handleTap = (evt: EventObject) => {
         const node: Node = evt.target.json().data;
-        setSelectedNode(node);
+        const filterNode = Object.entries(node).filter(node => node[0] != "category" && node[0] != "color")
+        setSelectedNode(filterNode);
         dataPanel.current?.expand();
     }
 

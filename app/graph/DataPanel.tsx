@@ -1,7 +1,7 @@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
-export default function DataPanel({ node }: { node: Node }) {
+export default function DataPanel({ node }: { node: [string, any][] }) {
     return (
         <Table>
             <TableHeader>
@@ -12,7 +12,7 @@ export default function DataPanel({ node }: { node: Node }) {
             </TableHeader>
             <TableBody>
                 {
-                    Object.entries(node).map((row, index) => {
+                    node.map((row, index) => {
                         let i = 0;
                         return (
                             // eslint-disable-next-line react/no-array-index-key
