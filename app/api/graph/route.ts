@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { Graph } from 'falkordb';
 import { getServerSession } from "next-auth/next";
 import authOptions, { getConnection } from "../auth/[...nextauth]/options";
 
@@ -24,11 +23,11 @@ export async function GET(request: NextRequest) {
             if (!query) {
                 return NextResponse.json({ message: "Missing query parameter 'q'" }, { status: 400 })
             }
-            const graph = new Graph(client, graphID);
+            const graph = client.selectGraph(graphID);
             const result = await graph.query(query)
             return NextResponse.json({ result }, { status: 200 })
         }
-        const result = await client.graph.list()
+        const result = await client.list()
         return NextResponse.json({ result: { graphs: result } }, { status: 200 })
     } catch (err: unknown) {
         return NextResponse.json({ message: (err as Error).message }, { status: 400 })

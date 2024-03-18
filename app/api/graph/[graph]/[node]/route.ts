@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { Graph } from 'falkordb';
 import { getServerSession } from "next-auth/next";
 import authOptions, { getConnection } from "../../../auth/[...nextauth]/options";
 
@@ -20,7 +19,7 @@ export async function GET(request: NextRequest, { params }: { params: { graph: s
     const nodeId = parseInt(params.node, 10);
     const graphId = params.graph;
 
-    const graph = new Graph(client, graphId);
+    const graph = client.selectGraph(graphId);
 
     // Get node's neighbors    
     const query = `MATCH (src)-[e]-(n)
