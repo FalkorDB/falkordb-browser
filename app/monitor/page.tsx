@@ -23,16 +23,15 @@ export default function Page() {
         })
     }
 
-    const { data } = useSWR(`/api/monitor/`, fetcher, { refreshInterval: 1000, onSuccess: (data) => console.log(data.memory) })
-
+    const { data } = useSWR(`/api/monitor/`, fetcher, { refreshInterval: 1000, onSuccess: (data) => console.log(data) })
     return (
-        <div className='flex flex-col items-center gap-y-20 w-full h-full'>
-            <h1 className='pt-10 text-6xl'>Monitor</h1>
+        <div className='flex flex-col items-center w-full h-full'>
+            <h1 className='p-5 text-6xl'>Monitor</h1>
             <div className='w-10/12 h-full'>
-            {(data?.memory && time) && <MonitorView data={data?.memory} time={time} />}
+                {(data?.memory && time) && <MonitorView data={data?.memory} time={time} />}
             </div>
             <div className='w-10/12 h-full'>
-            {/* {(data.graph && time) && <MonitorView data={data.grph} time={time} />} */}
+                {(data?.graph && time) && <MonitorView data={data?.graph} time={time} />}
             </div>
         </div>
     )

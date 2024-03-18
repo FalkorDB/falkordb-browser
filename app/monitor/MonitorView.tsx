@@ -10,7 +10,7 @@ interface Props {
 export default function MonitorView({ data, time }: Props) {
 
   const echartRef = useRef<EChartsInstance | null>(null)
-  const [timeArr, setTimeArr] = useState<string[]>([])
+  const [timeArr] = useState<string[]>([])
   const [chartReady, setChartReady] = useState<boolean>(false)
 
   useEffect(() => {
