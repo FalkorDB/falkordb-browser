@@ -19,7 +19,6 @@ export default function DataPanel({ node }: { node: [string, any][] }) {
                             <TableRow key={index}>
                                 {
                                     Object.values(row).map((cell, cellIndex) => {
-                                        debugger
                                         let text = "";
                                         if (i == 0) {
                                             text = JSON.stringify(cell)

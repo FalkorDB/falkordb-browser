@@ -1,10 +1,14 @@
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Graph } from "./model";
+import ReactJson from "react-json-view";
+import { useTheme } from "next-themes";
+import { transparent } from "tailwindcss/colors";
 
 // eslint-disable-next-line import/prefer-default-export
 export function TableView({ graph }: { graph: Graph }) {
-    console.log(Object.values(graph.Data[0]).map((cell) => cell));
+    const { theme, systemTheme } = useTheme()
+    const darkmode = theme === "dark" || (theme === "system" && systemTheme === "dark")
     return (
         <Table>
             <TableCaption>A list of results</TableCaption>
@@ -13,7 +17,7 @@ export function TableView({ graph }: { graph: Graph }) {
                     {
                         graph.Columns.map((column, index) => {
                             // eslint-disable-next-line react/no-array-index-key
-                            return <TableHead key={index}>{column}</TableHead>
+                            return <TableHead key={index}>{column.replace(/'/g, '')}</TableHead>
                         })
                     }
                 </TableRow>
@@ -25,6 +29,8 @@ export function TableView({ graph }: { graph: Graph }) {
                         <TableRow key={index}>
                             {
                                 Object.values(row).map((cell, cellIndex) => {
+                                    console.log(cellIndex);
+                                    const columnName = graph.Columns[cellIndex];
                                     const text = JSON.stringify(cell)
                                         .replace(/[{}\[\]":]/g, (match) => {
                                             switch (match) {
@@ -36,7 +42,7 @@ export function TableView({ graph }: { graph: Graph }) {
                                                     return '';
                                                 case ':':
                                                     return ': ';
-                                                case ',':
+                                                default:
                                                     return ', ';
                                             }
                                         })
@@ -46,7 +52,19 @@ export function TableView({ graph }: { graph: Graph }) {
                                             <TooltipProvider>
                                                 <Tooltip>
                                                     <TooltipTrigger className="max-w-96 truncate">
-                                                        {text}
+                                                        {typeof cell == "object" ? (
+                                                            <ReactJson
+                                                                src={cell as object}
+                                                                name={columnName == "n" ? "node" : columnName == "e" ? "edge" : columnName}
+                                                                collapsed={true}
+                                                                style={{ backgroundColor: transparent }}
+                                                                theme={darkmode ? "grayscale" : "grayscale:inverted"}
+                                                                displayDataTypes={false}
+                                                                displayObjectSize={false}
+                                                                collapseStringsAfterLength={10}
+                                                            />
+                                                        ) : ( text )
+                                                        }
                                                     </TooltipTrigger>
                                                     <TooltipContent>
                                                         <p>{text}</p>
