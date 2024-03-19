@@ -29,7 +29,6 @@ export function TableView({ graph }: { graph: Graph }) {
                         <TableRow key={index}>
                             {
                                 Object.values(row).map((cell, cellIndex) => {
-                                    console.log(cellIndex);
                                     const columnName = graph.Columns[cellIndex];
                                     const text = JSON.stringify(cell)
                                         .replace(/[{}\[\]":]/g, (match) => {
