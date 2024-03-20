@@ -1,7 +1,12 @@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
-export default function DataPanel({ node }: { node: [string, any][] }) {
+interface Props {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    node: [string, any][] 
+}
+
+export default function DataPanel({ node }: Props) {
     return (
         <Table>
             <TableHeader>
@@ -20,12 +25,12 @@ export default function DataPanel({ node }: { node: [string, any][] }) {
                                 {
                                     Object.values(row).map((cell, cellIndex) => {
                                         let text = "";
-                                        if (i == 0) {
+                                        if (i === 0) {
                                             text = JSON.stringify(cell)
-                                            i++
+                                            i += 1
                                         } else {
                                             text = JSON.stringify(cell).replace(/"/g, '')
-                                            i--
+                                            i -= 1
                                         }
 
                                         return (

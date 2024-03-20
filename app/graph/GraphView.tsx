@@ -96,6 +96,7 @@ interface GraphViewProps {
 
 export function GraphView({ graph, darkmode, ref }: GraphViewProps) {
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const [selectedNode, setSelectedNode] = useState<[string, any][] | null>(null);
 
     // A reference to the chart container to allowing zooming and editing
@@ -168,7 +169,7 @@ export function GraphView({ graph, darkmode, ref }: GraphViewProps) {
 
     const handleTap = (evt: EventObject) => {
         const node: Node = evt.target.json().data;
-        const filterNode = Object.entries(node).filter(node => node[0] != "category" && node[0] != "color")
+        const filterNode = Object.entries(node).filter(row => row[0] !== "category" && row[0] !== "color")
         setSelectedNode(filterNode);
         dataPanel.current?.expand();
     }

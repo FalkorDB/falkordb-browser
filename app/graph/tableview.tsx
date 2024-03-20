@@ -1,9 +1,9 @@
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Graph } from "./model";
 import ReactJson from "react-json-view";
 import { useTheme } from "next-themes";
 import { transparent } from "tailwindcss/colors";
+import { Graph } from "./model";
 
 // eslint-disable-next-line import/prefer-default-export
 export function TableView({ graph }: { graph: Graph }) {
@@ -15,6 +15,7 @@ export function TableView({ graph }: { graph: Graph }) {
             <TableHeader>
                 <TableRow>
                     {
+                        // eslint-disable-next-line arrow-body-style
                         graph.Columns.map((column, index) => {
                             // eslint-disable-next-line react/no-array-index-key
                             return <TableHead key={index}>{column.replace(/'/g, '')}</TableHead>
@@ -30,8 +31,16 @@ export function TableView({ graph }: { graph: Graph }) {
                             {
                                 Object.values(row).map((cell, cellIndex) => {
                                     const columnName = graph.Columns[cellIndex];
+                                    let jsonName = ""
+                                    if (columnName === "n") {
+                                        jsonName = "node"
+                                    }else if(columnName === "e") {
+                                        jsonName = "edge"
+                                    }else {
+                                        jsonName = columnName
+                                    }
                                     const text = JSON.stringify(cell)
-                                        .replace(/[{}\[\]":]/g, (match) => {
+                                        .replace(/[{}\]":]/g, (match) => {
                                             switch (match) {
                                                 case '{':
                                                 case '}':
@@ -51,11 +60,11 @@ export function TableView({ graph }: { graph: Graph }) {
                                             <TooltipProvider>
                                                 <Tooltip>
                                                     <TooltipTrigger className="max-w-96 truncate">
-                                                        {typeof cell == "object" ? (
+                                                        {typeof cell === "object" ? (
                                                             <ReactJson
                                                                 src={cell as object}
-                                                                name={columnName == "n" ? "node" : columnName == "e" ? "edge" : columnName}
-                                                                collapsed={true}
+                                                                name={jsonName}
+                                                                collapsed={0}
                                                                 style={{ backgroundColor: transparent }}
                                                                 theme={darkmode ? "grayscale" : "grayscale:inverted"}
                                                                 displayDataTypes={false}

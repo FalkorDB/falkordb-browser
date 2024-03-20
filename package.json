@@ -52,6 +52,12 @@
     "tailwindcss-animate": "^1.0.7",
     "zod": "^3.22.4"
   },
+  "overrides": {
+    "react-json-view": {
+      "react": "$react",
+      "react-dom": "$react-dom"
+    }
+  },
   "devDependencies": {
     "@svgr/webpack": "^8.1.0",
     "@types/cytoscape-fcose": "^2.2.4",
