@@ -1,7 +1,7 @@
 import CytoscapeComponent from "react-cytoscapejs";
 import { toast } from "@/components/ui/use-toast";
 import cytoscape, { ElementDefinition, EventObject, NodeDataDefinition } from "cytoscape";
-import { RefAttributes, useRef, useState, useImperativeHandle } from "react";
+import { useRef, useState, useImperativeHandle, Ref } from "react";
 import { signOut } from "next-auth/react";
 import fcose from 'cytoscape-fcose';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
@@ -88,7 +88,8 @@ export interface GraphViewRef {
     expand: (elements: ElementDefinition[]) => void
 }
 
-interface GraphViewProps extends RefAttributes<GraphViewRef> {
+interface GraphViewProps {
+    ref: Ref<GraphViewRef>,
     graph: Graph,
     darkmode: boolean
 }
