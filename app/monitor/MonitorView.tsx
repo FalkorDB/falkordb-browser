@@ -14,7 +14,6 @@ export default function MonitorView({ data, time }: Props) {
   const [chartReady, setChartReady] = useState<boolean>(false)
 
   useEffect(() => {
-    debugger
     if (chartReady && echartRef.current) {
       const myChart: ECharts = echartRef.current
       data.forEach((item, index) => {
