@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { Graph } from 'falkordb';
 import { getServerSession } from "next-auth/next";
-import authOptions, { connections } from "../../../auth/[...nextauth]/options";
+import authOptions, { getConnection } from "../../../auth/[...nextauth]/options";
 
 // eslint-disable-next-line import/prefer-default-export
 export async function GET(request: NextRequest, { params }: { params: { graph: string, node: string } }) {
@@ -12,7 +11,7 @@ export async function GET(request: NextRequest, { params }: { params: { graph: s
         return NextResponse.json({ message: "Not authenticated" }, { status: 401 })
     }
 
-    const client = connections.get(id)
+    const client = await getConnection(session.user)
     if (!client) {
         return NextResponse.json({ message: "Not authenticated" }, { status: 401 })
     }
@@ -20,7 +19,7 @@ export async function GET(request: NextRequest, { params }: { params: { graph: s
     const nodeId = parseInt(params.node, 10);
     const graphId = params.graph;
 
-    const graph = new Graph(client, graphId);
+    const graph = client.selectGraph(graphId);
 
     // Get node's neighbors    
     const query = `MATCH (src)-[e]-(n)
