@@ -6,7 +6,7 @@ import React, { useState } from 'react'
 
 export default function Page() {
 
-    const [time, setTime] = useState<Date>(null)
+    const [time, setTime] = useState<Date | null>(null)
 
     const fetcher = (url: string) => {
         return fetch(url, {
