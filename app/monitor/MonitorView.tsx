@@ -29,10 +29,8 @@ export default function MonitorView({ data, time }: Props) {
           data: timeArr
         }
       })
-      console.log(myChart.getOption().series)
-      console.log(timeArr)
     }
-  }, [data, time])
+  }, [data, time, timeArr, chartReady])
 
   const options: EChartsOption = {
     tooltip: {

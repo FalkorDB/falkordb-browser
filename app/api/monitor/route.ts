@@ -26,15 +26,13 @@ export async function GET() {
     const dataMemory = infoMemory.split('\r\n').map((item: string) => {
         const name = item.split(':')[0]
         const series = item.split(':')[1]
-        return { name, series: series }
-    }).filter((item: {name: string, series: string}) => {
-        return fileds.find(filed => filed == item.name)
-    })
+        return { name, series }
+    }).filter((item: {name: string, series: string}) => fileds.find(filed => filed === item.name))
     const dataGraph: {name: string, series: number}[] = []
     for (let i = 0; i < infoGraph.length; i += 2) {
         const name = (infoGraph[i] as string).substring(2)
-        const series = infoGraph[i + 1] as string[]
-        dataGraph.push({name, series: series.length})
+        const series = (infoGraph[i + 1] as string[]).length
+        dataGraph.push({name, series})
     }
         
     return NextResponse.json({ memory: dataMemory, graph: dataGraph }, { status: 200 })
