@@ -87,7 +87,7 @@ export default function Page() {
             <div className="flex flex-col grow border border-gray-300 rounded-lg p-2 overflow-auto">
                 {
                     graph.Id &&
-                    <Tabs defaultValue="graph" className="grow flex flex-col justify-center items-center">
+                    <Tabs defaultValue={showGraph ? "graph" : "metaData"} className="grow flex flex-col justify-center items-center">
                         <TabsList className="border w-fit">
                             <TabsTrigger value="metaData">MetaData</TabsTrigger>
                             {showGraph && <TabsTrigger value="data">Data</TabsTrigger>}
