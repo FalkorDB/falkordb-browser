@@ -16,14 +16,21 @@ export async function GET() {
         return NextResponse.json({ message: "Not authenticated" }, { status: 401 })
     }
 
-    const data = (await client.info("memory")).split('\r\n').map((item) => {
-        const name = item.split(':')[0]
-        const num = item.split(':')[1]
-        return { name, series: num }
-    })
 
-    data.splice(0, 1)
+    const info = await client.info("memory")
+    
+    if(typeof info === 'string') {
 
-    return NextResponse.json(data, { status: 200 })
+        const data = (info as string).split('\r\n').map((item) => {
+            const name = item.split(':')[0]
+            const num = item.split(':')[1]
+            return { name, series: num }
+        })
+
+        data.splice(0, 1)
+        return NextResponse.json(data, { status: 200 })
+    } 
+
+    return NextResponse.json({message: "Failed to retrive info"}, { status: 500 })
 
 }
