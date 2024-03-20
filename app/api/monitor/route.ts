@@ -23,11 +23,11 @@ export async function GET() {
     const infoMemory = await client.connection.info("memory")
     const infoGraph = await client.info()
 
-    const dataMemory = infoMemory.split('\r\n').map((item) => {
+    const dataMemory = infoMemory.split('\r\n').map((item: string) => {
         const name = item.split(':')[0]
         const series = item.split(':')[1]
         return { name, series: series }
-    }).filter(item => {
+    }).filter((item: {name: string, series: string}) => {
         return fileds.find(filed => filed == item.name)
     })
     const dataGraph: {name: string, series: number}[] = []
