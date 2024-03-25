@@ -23,6 +23,29 @@ const COLORS_ORDER = [
     "pink",
 ]
 
+
+const NODE_RESERVED_KEYS = ["parent", "id", "position"]
+const NODE_ALTERNATIVE_RESERVED_KEYS = ["_parent_", "_id_", "_position_"]
+// Used to avoid using reserved words in cytoscape `NodeDataDefinition`
+function nodeSafeKey(key: string): string {
+    const index = NODE_RESERVED_KEYS.indexOf(key);
+    if (index === -1) {
+        return key;
+    } 
+    return NODE_ALTERNATIVE_RESERVED_KEYS[index];
+}
+
+const EDGE_RESERVED_KEYS = ["source", "target", "id", "position"]
+const EDGE_ALTERNATIVE_RESERVED_KEYS = ["_source_", "_target_", "_parent_", "_id_", "_position_"]
+// Used to avoid using reserved words in cytoscape `EdgeDataDefinition`
+function edgeSafeKey(key: string): string {
+    const index = EDGE_RESERVED_KEYS.indexOf(key);
+    if (index === -1) {
+        return key;
+    } 
+    return EDGE_ALTERNATIVE_RESERVED_KEYS[index];
+}
+
 export function getCategoryColorName(index: number): string {
     const colorIndex = index<COLORS_ORDER.length ? index : 0
     return COLORS_ORDER[colorIndex]
@@ -137,7 +160,7 @@ export class Graph {
 
                             const edge: EdgeDataDefinition = { source: sourceId, target: destinationId, label: cell.relationshipType }
                             Object.entries(cell.properties).forEach(([key, value]) => {
-                                edge[key] = value as string;
+                                edge[edgeSafeKey(key)] = value as string;
                             });
                             this.edgesMap.set(cell.id, edge)
                             this.elements.push({data:edge})
@@ -192,7 +215,7 @@ export class Graph {
                                 color: getCategoryColorValue(category.index)
                             }
                             Object.entries(cell.properties).forEach(([key, value]) => {
-                                node[key] = value as string;
+                                node[nodeSafeKey(key)] = value as string;
                             });
                             this.nodesMap.set(cell.id, node)
                             this.elements.push({data:node})
@@ -204,7 +227,7 @@ export class Graph {
                             currentNode.category = category.name;
                             currentNode.color = getCategoryColorValue(category.index)
                             Object.entries(cell.properties).forEach(([key, value]) => {
-                                currentNode[key] = value as string;
+                                currentNode[nodeSafeKey(key)] = value as string;
                             });
                             newElements.push({data:currentNode})
                         }
