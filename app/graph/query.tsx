@@ -3,8 +3,8 @@ import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { useEffect, useRef, useState } from "react";
 import GraphsList from "./GraphList";
-import Editor from "@monaco-editor/react"
-import * as monaco from "monaco-editor"
+import Editor, { Monaco } from "@monaco-editor/react"
+import { editor, languages } from "monaco-editor";
 
 export class QueryState {
     constructor(
@@ -52,9 +52,7 @@ export function Query({ onSubmit, onQueryUpdate, className = "" }: {
     const [nodeLK, setNodeLK] = useState<{ lable: string, keys: string[] } | null>(null);
     const [edgeLK, setEdgeLK] = useState<{ lable: string, keys: string[] } | null>(null);
 
-
-    const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null);
-    const suggestions = [...cypherKeywords.map(keyword => ({ label: keyword, kind: monaco.languages.CompletionItemKind.Keyword, insertText: keyword}))]
+    const suggestions = [...cypherKeywords.map(keyword => ({ label: keyword, kind: languages.CompletionItemKind.Keyword, insertText: keyword}))]
     
     useEffect(() => {
         if (graphName) {
@@ -66,12 +64,11 @@ export function Query({ onSubmit, onQueryUpdate, className = "" }: {
             run()
         }
     }, [graphName])
-    
-    const handleEditorOnMount = (editor: monaco.editor.IStandaloneCodeEditor) => {
+
+    function handleEditorWillMount(monaco: Monaco) {
         console.log(suggestions);
-        editorRef.current = editor;
-        monaco.languages.register({ id: 'cypher' });
-        monaco.languages.setMonarchTokensProvider('cypher', {
+        monaco.languages.register({ id: 'cypherX' });
+        monaco.languages.setMonarchTokensProvider('cypherX', {
             tokenizer: {
                 root: [
                     [/\/\/.*$/, 'comment'],
@@ -89,14 +86,14 @@ export function Query({ onSubmit, onQueryUpdate, className = "" }: {
             }
         });
 
-        monaco.languages.registerCompletionItemProvider('cypher', {
+        monaco.languages.registerCompletionItemProvider('cypherX', {
             provideCompletionItems: (model, position) => {
                 return { 
                     suggestions,
-                 } as monaco.languages.CompletionList;
+                 } as languages.CompletionList;
             },
         });
-    };
+      }
 
     const getSchema = async () => {
         const result = await fetch(`/api/graph/${encodeURIComponent(graphName.trim())}/schema`, {
@@ -120,16 +117,20 @@ export function Query({ onSubmit, onQueryUpdate, className = "" }: {
             </div>
             <div className="flex flex-row space-x-3 w-full md:w-8/12">
                 <Editor
-                    language="cypher"
+                    defaultLanguage="cypherX"
+                    language="cypherX"
                     onChange={(val) => val && setQuery(val)}
                     theme="vs-dark"
                     options={{
+                        suggest: {
+                            showKeywords: true,
+                        },
                         minimap: { enabled: false },
                         lineNumbers: "off",
                         wordWrap: "on",
                         automaticLayout: true,
                     }}
-                    onMount={handleEditorOnMount}
+                    beforeMount={handleEditorWillMount}
                 />
                 <Button type="submit">Run</Button>
             </div>
