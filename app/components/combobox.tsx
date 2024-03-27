@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/popover"
 import { Separator } from "@/components/ui/separator"
 import { Input } from "@/components/ui/input"
+import { Label } from "@radix-ui/react-label"
 
 
 /* eslint-disable react/require-default-props */
@@ -27,14 +28,22 @@ interface ComboboxProps {
   className?: string,
   type?: string,
   options: string[],
-  addOption?: Dispatch<string>|null,
+  addOption?: (value: string, file?: File) => void,
   selectedValue: string,
   setSelectedValue: Dispatch<string>
 }
 
-export default function Combobox({ className='', type='', options, addOption=null, selectedValue, setSelectedValue }: ComboboxProps) {
+export default function Combobox({
+  className = '',
+  type = undefined,
+  options,
+  addOption = undefined,
+  selectedValue, setSelectedValue
+}: ComboboxProps) {
+
   const [open, setOpen] = useState(false)
   const inputRef = createRef<HTMLInputElement>()
+  const inputFile = createRef<HTMLInputElement>()
 
   // read the text in the create input box and add it to the list of options
   const onAddOption = () => {
@@ -42,8 +51,11 @@ export default function Combobox({ className='', type='', options, addOption=nul
     if (!inputRef.current?.value) {
       return
     }
+
+    const file = inputFile.current?.files?.length ? inputFile.current?.files[0] : undefined;
+
     if (addOption) {
-      addOption(inputRef.current.value)
+      addOption(inputRef.current.value, file)
     }
   }
 
@@ -61,7 +73,7 @@ export default function Combobox({ className='', type='', options, addOption=nul
           variant="outline"
           role="combobox"
           aria-expanded={open}
-          className={`w-[200px] justify-between ${className} `}
+          className={cn("w-[200px] justify-between", className)}
         >
           {selectedValue
             ? options.find((option) => option === selectedValue)
@@ -103,8 +115,12 @@ export default function Combobox({ className='', type='', options, addOption=nul
                 <DialogContent>
                   <DialogHeader>
                     <DialogTitle>Create a new {entityType}?</DialogTitle>
-                    <DialogDescription>
+                    <DialogDescription className="flex flex-col space-y-4">
                       <Input type="text" ref={inputRef} id="create" name="create" onKeyDown={handleKeyDown} placeholder={`${entityType} name ...`} />
+                      <div className="flex flex-row space-x-2 items-center">
+                        <Label className="w-1/3" htmlFor="file">Import {entityType} data:</Label>
+                        <Input className="w-2/3" ref={inputFile} type="file" id="file" name="file" accept=".rdb" />
+                      </div>
                     </DialogDescription>
                   </DialogHeader>
                   <Button className="p-4" type="submit" onClick={onAddOption}>Create</Button>
