@@ -30,7 +30,7 @@ export function Query({ onSubmit, onQueryUpdate, className = "" }: {
 
     onQueryUpdate(new QueryState(query, graphName))
 
-    const handelDelete = () => {
+    const handleDelete = () => {
         fetch(`/api/graph/${encodeURIComponent(graphName)}`, {
             method: 'DELETE',
         }).then(res => res.json()).then((data) => {
@@ -98,7 +98,7 @@ export function Query({ onSubmit, onQueryUpdate, className = "" }: {
                     </AlertDialogHeader>
                     <AlertDialogFooter>
                         <AlertDialogCancel>Cancel</AlertDialogCancel>
-                        <AlertDialogAction onClick={() => handelDelete()}>Delete</AlertDialogAction>
+                        <AlertDialogAction onClick={() => handleDelete()}>Delete</AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
