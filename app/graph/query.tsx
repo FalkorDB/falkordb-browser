@@ -4,6 +4,8 @@ import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
 import GraphsList from "./GraphList";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { Trash2 } from "lucide-react";
 
 
 export class QueryState {
@@ -36,6 +38,23 @@ export function Query({ onSubmit, onQueryUpdate, className = "" }: {
                     placeholder="MATCH (n)-[e]-() RETURN n,e limit 100" type="text" onChange={(event) => setQuery(event.target.value)} />
                 <Button type="submit">Run</Button>
             </div>
+            {graphName &&
+                <AlertDialog>
+                    <AlertDialogTrigger><Trash2 /></AlertDialogTrigger>
+                    <AlertDialogContent>
+                        <AlertDialogHeader>
+                            <AlertDialogTitle>Are you absolutely sure you?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                                Are you absolutely sure you want to delete {graphName}?
+                            </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction>Delete</AlertDialogAction>
+                        </AlertDialogFooter>
+                    </AlertDialogContent>
+                </AlertDialog>
+            }
         </form>
     )
 }
