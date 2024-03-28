@@ -4,9 +4,11 @@ import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { Trash2 } from "lucide-react";
+import { Menu, Search, Trash2 } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import GraphsList from "./GraphList";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 
 export class QueryState {
@@ -56,25 +58,50 @@ export function Query({ onSubmit, onQueryUpdate, className = "" }: {
             <div className="flex flex-row space-x-3 w-full md:w-8/12 items-center">
                 <Input id="query" className="border-gray-500 w-full"
                     placeholder="MATCH (n)-[e]-() RETURN n,e limit 100" type="text" onChange={(event) => setQuery(event.target.value)} />
-                <Button type="submit" className="mr-16">Run</Button>
+                <TooltipProvider>
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <Button type="submit" className="mr-16"><Search /></Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                            <span>Search</span>
+                        </TooltipContent>
+                    </Tooltip>
+                </TooltipProvider>
             </div>
-            {graphName &&
-                <AlertDialog>
-                    <AlertDialogTrigger><Trash2 /></AlertDialogTrigger>
-                    <AlertDialogContent>
-                        <AlertDialogHeader>
-                            <AlertDialogTitle>Are you absolutely sure you?</AlertDialogTitle>
-                            <AlertDialogDescription>
-                                Are you absolutely sure you want to delete {graphName}?
-                            </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                            <AlertDialogCancel>Cancel</AlertDialogCancel>
-                            <AlertDialogAction onClick={() => handelDelete()}>Delete</AlertDialogAction>
-                        </AlertDialogFooter>
-                    </AlertDialogContent>
-                </AlertDialog>
-            }
+            <AlertDialog>
+                <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                        <Button>
+                            <Menu />
+                        </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent>
+                        <DropdownMenuLabel className="flex justify-around">Actions</DropdownMenuLabel>
+                        <DropdownMenuSeparator />
+                        {graphName &&
+                            <DropdownMenuItem className="flex justify-around">
+                                <AlertDialogTrigger className="flex flex-row items-center gap-x-2">
+                                    <Trash2 />
+                                    <span>Delete graph</span>
+                                </AlertDialogTrigger>
+                            </DropdownMenuItem>
+                        }
+                    </DropdownMenuContent>
+                </DropdownMenu>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Are you absolutely sure you?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            Are you absolutely sure you want to delete {graphName}?
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={() => handelDelete()}>Delete</AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </form>
     )
 }
