@@ -23,9 +23,9 @@ export async function DELETE(request: NextRequest, { params }: { params: { graph
             
             const graph = client.selectGraph(graphId);
 
-            const del = graph.delete()
+            graph.delete()
             
-            return NextResponse.json({ success: del }, { status: 200 })
+            return NextResponse.json({ message: `${graphId} graph deleted` })
         }
     } catch (err: unknown) {
         return NextResponse.json({ message: (err as Error).message }, { status: 400 })
