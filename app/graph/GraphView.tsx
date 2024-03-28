@@ -95,7 +95,8 @@ interface GraphViewProps {
 
 const GraphView = forwardRef(({ graph, darkmode }: GraphViewProps, ref) => {
 
-    const [selectedNode, setSelectedNode] = useState<Node | null>(null);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const [selectedNode, setSelectedNode] = useState<[string, any][] | null>(null);
 
     // A reference to the chart container to allowing zooming and editing
     const chartRef = useRef<cytoscape.Core | null>(null)
@@ -167,7 +168,8 @@ const GraphView = forwardRef(({ graph, darkmode }: GraphViewProps, ref) => {
 
     const handleTap = (evt: EventObject) => {
         const node: Node = evt.target.json().data;
-        setSelectedNode(node);
+        const filterNode = Object.entries(node).filter(row => row[0] !== "category" && row[0] !== "color")
+        setSelectedNode(filterNode);
         dataPanel.current?.expand();
     }
     
