@@ -1,7 +1,7 @@
 import CytoscapeComponent from "react-cytoscapejs";
 import { toast } from "@/components/ui/use-toast";
 import cytoscape, { ElementDefinition, EventObject, NodeDataDefinition } from "cytoscape";
-import { useRef, useState, useImperativeHandle, Ref } from "react";
+import { useRef, useState, useImperativeHandle, forwardRef } from "react";
 import { signOut } from "next-auth/react";
 import fcose from 'cytoscape-fcose';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
@@ -89,12 +89,11 @@ export interface GraphViewRef {
 }
 
 interface GraphViewProps {
-    ref: Ref<GraphViewRef>,
     graph: Graph,
     darkmode: boolean
 }
 
-export function GraphView({ graph, darkmode, ref }: GraphViewProps) {
+const GraphView = forwardRef(({ graph, darkmode }: GraphViewProps, ref) => {
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const [selectedNode, setSelectedNode] = useState<[string, any][] | null>(null);
@@ -104,7 +103,7 @@ export function GraphView({ graph, darkmode, ref }: GraphViewProps) {
     const dataPanel = useRef<ImperativePanelHandle>(null)
 
     useImperativeHandle(ref, () => ({
-        expand: (elements) => {
+        expand: (elements: ElementDefinition[]) => {
             const chart = chartRef.current
             if (chart) {
                 chart.elements().remove()
@@ -173,7 +172,7 @@ export function GraphView({ graph, darkmode, ref }: GraphViewProps) {
         setSelectedNode(filterNode);
         dataPanel.current?.expand();
     }
-
+    
     return (
         <ResizablePanelGroup direction="horizontal">
             <ResizablePanel className="h-full flex flex-col">
@@ -208,4 +207,8 @@ export function GraphView({ graph, darkmode, ref }: GraphViewProps) {
 
 
     )
-}
+});
+
+GraphView.displayName = "GraphView";
+
+export default GraphView;
