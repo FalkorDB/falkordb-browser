@@ -1,7 +1,7 @@
 'use client'
 
 import { toast } from "@/components/ui/use-toast";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { signOut } from "next-auth/react";
 import { useTheme } from "next-themes";
@@ -28,7 +28,9 @@ function validateGraphSelection(graphName: string): boolean {
 export default function Page() {
     const [graph, setGraph] = useState(Graph.empty());
     const [metaData, setMetaData] = useState<string[]>([]);
+    const [showData, setShowData] = useState<boolean>(true);
     const [showGraph, setShowGraph] = useState<boolean>(true);
+    const [value, setValue] = useState("graph");
 
     const graphView = useRef<GraphViewRef>(null)
 
@@ -38,6 +40,15 @@ export default function Page() {
 
     const { theme, systemTheme } = useTheme()
     const darkmode = theme === "dark" || (theme === "system" && systemTheme === "dark")
+
+    useEffect(() => {
+        if (showGraph) {
+            setValue("graph")
+        }else if(showData){
+            setValue("data")            
+        }else setValue("metadata")
+
+    }, [showGraph, showData])
 
     function prepareArg(arg: string): string {
         return encodeURIComponent(arg.trim())
@@ -76,7 +87,10 @@ export default function Page() {
         const newGraph = Graph.create(state.graphName, json.result)
         setGraph(newGraph)
         setMetaData(json.result.metadata)
-        setShowGraph((!!json.result.data && json.result.data.length > 0))
+        console.log(json.result.data);
+            
+            setShowGraph(!!json.result.data && typeof Object.values(json.result.data[0])[0] === "object")
+            setShowData((!!json.result.data && json.result.data.length > 0))
 
         graphView.current?.expand(newGraph.Elements)
     }
@@ -87,13 +101,13 @@ export default function Page() {
             <div className="flex flex-col grow border border-gray-300 rounded-lg p-2 overflow-auto">
                 {
                     graph.Id &&
-                    <Tabs defaultValue={showGraph ? "graph" : "metaData"} className="grow flex flex-col justify-center items-center">
+                    <Tabs value={value} className="grow flex flex-col justify-center items-center">
                         <TabsList className="border w-fit">
-                            <TabsTrigger value="metaData">MetaData</TabsTrigger>
-                            {showGraph && <TabsTrigger value="data">Data</TabsTrigger>}
-                            {showGraph && <TabsTrigger value="graph">Graph</TabsTrigger>}
+                            <TabsTrigger onClick={() => setValue("metadata")} value="metadata">MetaData</TabsTrigger>
+                            {showData && <TabsTrigger onClick={() => setValue("data")} value="data">Data</TabsTrigger>}
+                            {showGraph && <TabsTrigger value="graph" onClick={() => setValue("graph")}>Graph</TabsTrigger>}
                         </TabsList>
-                        <TabsContent value="metaData" className="grow w-full">
+                        <TabsContent value="metadata" className="grow w-full">
                             <MetaDataView metadata={metaData} />
                         </TabsContent>
                         <TabsContent value="data" className="grow w-full flex-[1_1_0] overflow-auto">
