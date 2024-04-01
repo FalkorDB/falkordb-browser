@@ -23,7 +23,7 @@ export async function DELETE(request: NextRequest, { params }: { params: { graph
             
             const graph = client.selectGraph(graphId);
 
-            graph.delete()
+            await graph.delete()
             
             return NextResponse.json({ message: `${graphId} graph deleted` })
         }

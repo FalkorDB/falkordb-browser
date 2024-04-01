@@ -61,11 +61,11 @@ export default function Page() {
                 </div>
                 <div>
                     <Label htmlFor="username">User Name</Label>
-                    <Input ref={username} id="username" type="text" />
+                    <Input ref={username} id="username" type="text" placeholder="(Optional)" />
                 </div>
                 <div>
                     <Label htmlFor="password">Password</Label>
-                    <Input ref={password} id="password" type="password" />
+                    <Input ref={password} id="password" type="password" placeholder="(Optional)" />
                 </div>
                 <div className="flex justify-center p-4">
                     <Button type="submit">Connect</Button>
