@@ -39,6 +39,7 @@ export function Query({ onSubmit, onQueryUpdate, className = "" }: {
                 description: data.message,
             })
             setOnDelete(prev => !prev)
+            setGraphName('')
         }).catch(err => {
             toast({
                 title: "Error",
@@ -64,7 +65,7 @@ export function Query({ onSubmit, onQueryUpdate, className = "" }: {
                             <Button type="submit" className="mr-16"><Search /></Button>
                         </TooltipTrigger>
                         <TooltipContent>
-                            <span>Search</span>
+                            <p>Query</p>
                         </TooltipContent>
                     </Tooltip>
                 </TooltipProvider>
