@@ -9,7 +9,7 @@ import { Query, QueryState } from "./query";
 import { TableView } from "./tableview";
 import MetaDataView from "./metadataview";
 import { Graph } from "./model";
-import { GraphView, GraphViewRef } from "./GraphView";
+import GraphView,  { GraphViewRef } from "./GraphView";
 
 
 
@@ -105,7 +105,7 @@ export default function Page() {
                         <TabsList className="border w-fit">
                             <TabsTrigger onClick={() => setValue("metadata")} value="metadata">MetaData</TabsTrigger>
                             {showData && <TabsTrigger onClick={() => setValue("data")} value="data">Data</TabsTrigger>}
-                            {showGraph && <TabsTrigger value="graph" onClick={() => setValue("graph")}>Graph</TabsTrigger>}
+                            {showGraph && <TabsTrigger onClick={() => setValue("graph")} value="graph">Graph</TabsTrigger>}
                         </TabsList>
                         <TabsContent value="metadata" className="grow w-full">
                             <MetaDataView metadata={metaData} />
