@@ -2,8 +2,12 @@ import { useState, useEffect, Dispatch, SetStateAction } from 'react';
 import { useToast } from "@/components/ui/use-toast" 
 import Combobox from '../components/combobox';
 
+interface Props {
+    onSelectedGraph: Dispatch<SetStateAction<string>>,
+    onDelete: boolean,
+}
 // A component that renders an input box for Cypher queries
-export default function GraphsList({onSelectedGraph}: { onSelectedGraph: Dispatch<SetStateAction<string>> }) {
+export default function GraphsList({onSelectedGraph, onDelete}: Props) {
 
     const [graphs, setGraphs] = useState<string[]>([]);
     const [selectedGraph, setSelectedGraph] = useState("");
@@ -28,6 +32,11 @@ export default function GraphsList({onSelectedGraph}: { onSelectedGraph: Dispatc
                 setGraphs(result.result.graphs ?? [])
             })
     }, [toast])
+
+    useEffect(() => {
+        setGraphs((prevGraphs: string[]) => [...prevGraphs.filter((graph) => graph !== selectedGraph)])
+        setSelectedGraph('')
+    }, [onDelete])
 
     const setSelectedValue = (graph: string) => {
         setSelectedGraph(graph)
