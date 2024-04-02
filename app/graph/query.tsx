@@ -2,13 +2,16 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Menu, Search, Trash2 } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import Editor, { Monaco } from "@monaco-editor/react";
+import { languages, editor } from "monaco-editor";
 import GraphsList from "./GraphList";
+import { before } from "lodash";
 
 
 export class QueryState {
@@ -18,15 +21,104 @@ export class QueryState {
     ) { }
 }
 
+const cypherKeywords = [
+    "CALL",
+    "CREATE",
+    "DELETE",
+    "DETACH",
+    "FOREACH",
+    "LOAD",
+    "MATCH",
+    "MERGE",
+    "OPTIONAL",
+    "REMOVE",
+    "RETURN",
+    "SET",
+    "START",
+    "UNION",
+    "UNWIND",
+    "WITH",
+    "LIMIT",
+    "ORDER",
+    "SKIP",
+    "WHERE",
+    "YIELD",
+    "ASC",
+    "ASCENDING",
+    "ASSERT",
+    "BY",
+    "CSV",
+    "DESC",
+    "DESCENDING",
+    "ON",
+    "ALL",
+    "CASE",
+    "COUNT",
+    "ELSE",
+    "END",
+    "EXISTS",
+    "THEN",
+    "WHEN",
+    "AND",
+    "AS",
+    "CONTAIN",
+    "DISTINCT",
+    "ENDS",
+    "IN",
+    "IS",
+    "NOT",
+    "OR",
+    "STARTS",
+    "XOR",
+    "CONSTRAINT",
+    "DROP",
+    "INDEX",
+    "NODE",
+    "UNIQUE",
+    "JOIN",
+    "SCAN",
+    "ADD",
+    "DO",
+    "FOR",
+    "MANDATORY",
+    "OF",
+    "REQUIRE",
+    "SCALAR",
+    "false",
+    "null",
+    "true"
+]
+
 export function Query({ onSubmit, onQueryUpdate, className = "" }: {
-    onSubmit: (event: React.FormEvent<HTMLFormElement>) => void,
+    onSubmit: (event: React.FormEvent<HTMLFormElement>) => Promise<boolean>,
     onQueryUpdate: (state: QueryState) => void,
     className: string
 }) {
     const [query, setQuery] = useState('');
     const [graphName, setGraphName] = useState('');
     const [onDelete, setOnDelete] = useState<boolean>(false);
+    const Monaco = useRef<Monaco | null>();
     const { toast } = useToast();
+
+    useEffect(() => {
+        const monaco = Monaco.current
+        if (monaco) {
+            monaco.languages.register({ id: "cypher" })
+            monaco.languages.registerCompletionItemProvider("cypher", {
+                provideCompletionItems: () => {
+                    return {
+                        suggestions: cypherKeywords.map(keyword => {
+                            return {
+                                label: keyword,
+                                kind: monaco.languages.CompletionItemKind.Keyword,
+                                insertText: keyword,
+                            }
+                        })
+                    } as languages.ProviderResult<languages.CompletionList>
+                }
+            })
+        }
+    }, [Monaco.current])
 
     onQueryUpdate(new QueryState(query, graphName))
 
@@ -51,14 +143,29 @@ export function Query({ onSubmit, onQueryUpdate, className = "" }: {
     return (
         <form
             className={cn("flex flex-col space-y-3 md:flex-row md:space-x-3 md:space-y-0", className)}
-            onSubmit={onSubmit}>
+            onSubmit={ async (e) => {
+                await onSubmit(e) && setQuery('')
+            }}>
             <div className="items-center flex flex-row space-x-3">
                 <Label htmlFor="query" className="text">Query</Label>
                 <GraphsList onDelete={onDelete} onSelectedGraph={setGraphName} />
             </div>
             <div className="flex flex-row space-x-3 w-full md:w-8/12 items-center">
-                <Input id="query" className="border-gray-500 w-full"
-                    placeholder="MATCH (n)-[e]-() RETURN n,e limit 100" type="text" onChange={(event) => setQuery(event.target.value)} />
+                <Editor
+                    value={query}
+                    onChange={(val) => val && setQuery(val)}
+                    theme="vs-dark"
+                    language="cypher"
+                    options={{
+                        suggest: {
+                            showKeywords: true,
+                        },
+                        minimap: { enabled: false },
+                        wordWrap: "on",
+                        lineNumbers: "off",
+                    }}
+                    beforeMount={(monaco) => Monaco.current = monaco}
+                />
                 <TooltipProvider>
                     <Tooltip>
                         <TooltipTrigger asChild>
