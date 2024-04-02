@@ -8,10 +8,9 @@ import { Menu, Search, Trash2 } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import Editor, { Monaco } from "@monaco-editor/react";
-import { languages, editor } from "monaco-editor";
+import Editor from "@monaco-editor/react";
 import GraphsList from "./GraphList";
-import { before } from "lodash";
+import { find } from "lodash";
 
 
 export class QueryState {
@@ -21,74 +20,6 @@ export class QueryState {
     ) { }
 }
 
-const cypherKeywords = [
-    "CALL",
-    "CREATE",
-    "DELETE",
-    "DETACH",
-    "FOREACH",
-    "LOAD",
-    "MATCH",
-    "MERGE",
-    "OPTIONAL",
-    "REMOVE",
-    "RETURN",
-    "SET",
-    "START",
-    "UNION",
-    "UNWIND",
-    "WITH",
-    "LIMIT",
-    "ORDER",
-    "SKIP",
-    "WHERE",
-    "YIELD",
-    "ASC",
-    "ASCENDING",
-    "ASSERT",
-    "BY",
-    "CSV",
-    "DESC",
-    "DESCENDING",
-    "ON",
-    "ALL",
-    "CASE",
-    "COUNT",
-    "ELSE",
-    "END",
-    "EXISTS",
-    "THEN",
-    "WHEN",
-    "AND",
-    "AS",
-    "CONTAIN",
-    "DISTINCT",
-    "ENDS",
-    "IN",
-    "IS",
-    "NOT",
-    "OR",
-    "STARTS",
-    "XOR",
-    "CONSTRAINT",
-    "DROP",
-    "INDEX",
-    "NODE",
-    "UNIQUE",
-    "JOIN",
-    "SCAN",
-    "ADD",
-    "DO",
-    "FOR",
-    "MANDATORY",
-    "OF",
-    "REQUIRE",
-    "SCALAR",
-    "false",
-    "null",
-    "true"
-]
-
 export function Query({ onSubmit, onQueryUpdate, className = "" }: {
     onSubmit: (event: React.FormEvent<HTMLFormElement>) => Promise<boolean>,
     onQueryUpdate: (state: QueryState) => void,
@@ -97,28 +28,7 @@ export function Query({ onSubmit, onQueryUpdate, className = "" }: {
     const [query, setQuery] = useState('');
     const [graphName, setGraphName] = useState('');
     const [onDelete, setOnDelete] = useState<boolean>(false);
-    const Monaco = useRef<Monaco | null>();
     const { toast } = useToast();
-
-    useEffect(() => {
-        const monaco = Monaco.current
-        if (monaco) {
-            monaco.languages.register({ id: "cypher" })
-            monaco.languages.registerCompletionItemProvider("cypher", {
-                provideCompletionItems: () => {
-                    return {
-                        suggestions: cypherKeywords.map(keyword => {
-                            return {
-                                label: keyword,
-                                kind: monaco.languages.CompletionItemKind.Keyword,
-                                insertText: keyword,
-                            }
-                        })
-                    } as languages.ProviderResult<languages.CompletionList>
-                }
-            })
-        }
-    }, [Monaco.current])
 
     onQueryUpdate(new QueryState(query, graphName))
 
@@ -143,7 +53,7 @@ export function Query({ onSubmit, onQueryUpdate, className = "" }: {
     return (
         <form
             className={cn("flex flex-col space-y-3 md:flex-row md:space-x-3 md:space-y-0", className)}
-            onSubmit={ async (e) => {
+            onSubmit={async (e) => {
                 await onSubmit(e) && setQuery('')
             }}>
             <div className="items-center flex flex-row space-x-3">
@@ -163,8 +73,9 @@ export function Query({ onSubmit, onQueryUpdate, className = "" }: {
                         minimap: { enabled: false },
                         wordWrap: "on",
                         lineNumbers: "off",
+                        lineHeight: 40,
+                        fontSize: 30,
                     }}
-                    beforeMount={(monaco) => Monaco.current = monaco}
                 />
                 <TooltipProvider>
                     <Tooltip>
