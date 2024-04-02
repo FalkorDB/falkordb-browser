@@ -1,5 +1,4 @@
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { useEffect, useRef, useState } from "react";
@@ -8,10 +7,9 @@ import { Menu, Search, Trash2 } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import Editor from "@monaco-editor/react";
+import Editor, { Monaco } from "@monaco-editor/react";
+import { languages, editor } from "monaco-editor";
 import GraphsList from "./GraphList";
-import { find } from "lodash";
-
 
 export class QueryState {
     constructor(
@@ -19,6 +17,79 @@ export class QueryState {
         public graphName: string,
     ) { }
 }
+
+const cypherKeywords = [
+    "CALL",
+    "CREATE",
+    "DELETE",
+    "DETACH",
+    "FOREACH",
+    "LOAD",
+    "MATCH",
+    "MERGE",
+    "OPTIONAL",
+    "REMOVE",
+    "RETURN",
+    "SET",
+    "START",
+    "UNION",
+    "UNWIND",
+    "WITH",
+    "LIMIT",
+    "ORDER",
+    "SKIP",
+    "WHERE",
+    "YIELD",
+    "]ASC",
+    "ASCENDING",
+    "ASSERT",
+    "BY",
+    "ALL",
+    "CASE",
+    "COUNT",
+    "ELSE",
+    "END",
+    "EXISTS",
+    "THEN",
+    "AND",
+    "AS",
+    "CONTAINS",
+    "DISTINCT",
+    "ENDS",
+    "IN",
+    "IS",
+    "NOT",
+    "OR",
+    "CONSTRAINT",
+    "CREATE",
+    "DROP",
+    "EXISTS",
+    "INDEX",
+    "NODE",
+    "KEY",
+    "UNIQUE",
+    "STARTS",
+    "XOR",
+    "WHEN",
+    "CSV",
+    "DESC",
+    "DESCENDING",
+    "ADD",
+    "DO",
+    "FOR",
+    "MANDATORY",
+    "OF",
+    "REQUIRE",
+    "SCALAR",
+    "ON",
+    "INDEX",
+    "JOIN",
+    "false",
+    "null",
+    "true",
+    "SCAN",
+    "USING"
+]
 
 export function Query({ onSubmit, onQueryUpdate, className = "" }: {
     onSubmit: (event: React.FormEvent<HTMLFormElement>) => Promise<boolean>,
@@ -28,7 +99,76 @@ export function Query({ onSubmit, onQueryUpdate, className = "" }: {
     const [query, setQuery] = useState('');
     const [graphName, setGraphName] = useState('');
     const [onDelete, setOnDelete] = useState<boolean>(false);
+    const Monaco = useRef<Monaco | null>();
+    const monacoEditor = useRef<editor.IStandaloneCodeEditor | null>();
     const { toast } = useToast();
+
+    useEffect(() => {
+        const monaco = Monaco.current
+        let editor = monacoEditor.current
+
+        if (monaco && editor) {
+            const run = async () => {
+                const suggestions: languages.CompletionItem[] = []
+                const schema = await getSchema()
+                suggestions.push(
+                    ...schema.labels.map((label: string) => ({
+                        label: label,
+                        kind: monaco.languages.CompletionItemKind.Class,
+                        insertText: label,
+                    })),
+                    ...schema.props.map((prop: string) => ({
+                        label: prop,
+                        kind: monaco.languages.CompletionItemKind.Property,
+                        insertText: prop,
+                    })),
+                    ...schema.relationships.map((relationship: string) => ({
+                        label: relationship,
+                        kind: monaco.languages.CompletionItemKind.Keyword,
+                        insertText: relationship,
+                    }))
+                )
+
+                monaco.languages.registerCompletionItemProvider("cypher", {
+                    provideCompletionItems: () => {
+                        return {
+                            suggestions
+                        } as languages.ProviderResult<languages.CompletionList>
+                    }
+                })
+            }
+            run()
+        }
+    }, [graphName])
+
+    const getSchema = async () => {
+        debugger
+        const data = await fetch(`/api/graph/${encodeURIComponent(graphName)}`, {
+            method: "GET"
+        })
+        if (!data.ok) {
+            return
+        }
+        return await data.json()
+    }
+
+    const handelEditorWillMounted = (monaco: Monaco) => {
+        monaco.languages.register({ id: "cypher" })
+        monaco.languages.registerCompletionItemProvider("cypher", {
+            provideCompletionItems: () => {
+                return {
+                    suggestions: cypherKeywords.map(keyword => {
+                        return {
+                            label: keyword,
+                            kind: monaco.languages.CompletionItemKind.Keyword,
+                            insertText: keyword,
+                        }
+                    })
+                } as languages.ProviderResult<languages.CompletionList>
+            }
+        })
+        monaco.languages.typescript.javascriptDefaults.setEagerModelSync(true);
+    }
 
     onQueryUpdate(new QueryState(query, graphName))
 
@@ -69,6 +209,7 @@ export function Query({ onSubmit, onQueryUpdate, className = "" }: {
                     options={{
                         suggest: {
                             showKeywords: true,
+                            
                         },
                         minimap: { enabled: false },
                         wordWrap: "on",
@@ -76,6 +217,11 @@ export function Query({ onSubmit, onQueryUpdate, className = "" }: {
                         lineHeight: 40,
                         fontSize: 30,
                     }}
+                    onMount={(editor, monaco) => {
+                        Monaco.current = monaco
+                        monacoEditor.current = editor
+                    }}
+                    beforeMount={handelEditorWillMounted}
                 />
                 <TooltipProvider>
                     <Tooltip>

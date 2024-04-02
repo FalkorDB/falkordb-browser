@@ -55,7 +55,7 @@ export default function Page() {
 
         const q = state.query.trim() || "MATCH (n)-[e]-() RETURN n,e limit 100";
 
-        const result = await fetch(`/api/graph?graph=${prepareArg(state.graphName)}&query=${prepareArg(q)}`, {
+        const result = await fetch(`/api/graph/${prepareArg(state.graphName)}?query=${prepareArg(q)}`, {
             method: 'GET',
             headers: {
                 'Content-Type': 'application/json'
