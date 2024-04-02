@@ -58,7 +58,7 @@ export function Query({ onSubmit, onQueryUpdate, className = "" }: {
             </div>
             <div className="flex flex-row space-x-3 w-full md:w-8/12 items-center">
                 <Input id="query" className="border-gray-500 w-full"
-                    placeholder="MATCH (n)-[e]-() RETURN n,e limit 100" type="text" onChange={(event) => setQuery(event.target.value)} />
+                    placeholder="MATCH (n) OPTIONAL MATCH (n)-[e]->(m) RETURN n,e,m limit 100" type="text" onChange={(event) => setQuery(event.target.value)} />
                 <TooltipProvider>
                     <Tooltip>
                         <TooltipTrigger asChild>
