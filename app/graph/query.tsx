@@ -18,9 +18,10 @@ export class QueryState {
     ) { }
 }
 
-export function Query({ onSubmit, onQueryUpdate, className = "" }: {
+export function Query({ onSubmit, onQueryUpdate, deleteGraph, className = "" }: {
     onSubmit: (event: React.FormEvent<HTMLFormElement>) => void,
     onQueryUpdate: (state: QueryState) => void,
+    deleteGraph: () => void,
     className: string
 }) {
     const [query, setQuery] = useState('');

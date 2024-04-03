@@ -83,7 +83,7 @@ export default function Page() {
 
     return (
         <div className="h-full flex flex-col p-2 gap-y-2">
-            <Query className="border rounded-lg border-gray-300 p-2" onSubmit={runQuery} onQueryUpdate={(state) => { queryState.current = state }} />
+            <Query className="border rounded-lg border-gray-300 p-2" onSubmit={runQuery} onQueryUpdate={(state) => { queryState.current = state }} deleteGraph={() => setGraph(Graph.empty())}/>
             <div className="flex flex-col grow border border-gray-300 rounded-lg p-2 overflow-auto">
                 {
                     graph.Id &&
