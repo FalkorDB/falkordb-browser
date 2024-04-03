@@ -5,7 +5,7 @@ export default function DataPanel({node}: {node: Node}) {
     return (
         <Table>
             <TableHeader>
-                <TableRow>
+                <TableRow className="dark:hover:bg-slate-700 hover:bg-gray-400">
                     <TableHead>Field</TableHead>
                     <TableHead>Value</TableHead>
                 </TableRow>
@@ -14,7 +14,7 @@ export default function DataPanel({node}: {node: Node}) {
                 {
                     Object.entries(node).map((row, index) => (
                         // eslint-disable-next-line react/no-array-index-key
-                        <TableRow key={index}>
+                        <TableRow className="dark:hover:bg-slate-700 hover:bg-gray-400 border-y-[1px] border-y-gray-700" key={index}>
                             {
                                 Object.values(row).map((cell, cellIndex) => (
                                     // eslint-disable-next-line react/no-array-index-key
