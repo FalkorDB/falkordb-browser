@@ -3,6 +3,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 
 export default function DataPanel({node}: {node: Node}) {
     const rowClass = "dark:hover:bg-slate-700 hover:bg-gray-400 border-y-[1px] border-y-gray-700"
+
     return (
         <Table>
             <TableHeader>
@@ -13,25 +14,30 @@ export default function DataPanel({node}: {node: Node}) {
             </TableHeader>
             <TableBody>
                 {
-                    Object.entries(node).map((row, index) => (
+                    Object.entries(node).filter((row) => Object.values(row)[0] !== "category" && Object.values(row)[0] !== "color").map((row, index) => (
                         // eslint-disable-next-line react/no-array-index-key
                         <TableRow className={rowClass} key={index}>
                             {
-                                Object.values(row).map((cell, cellIndex) => (
-                                    // eslint-disable-next-line react/no-array-index-key
-                                    <TableCell key={cellIndex}>
-                                        <TooltipProvider>
-                                            <Tooltip>
-                                                <TooltipTrigger className="max-w-96 truncate">
-                                                    {JSON.stringify(cell)}
-                                                </TooltipTrigger>
-                                                <TooltipContent>
-                                                    <p>{JSON.stringify(cell)}</p>
-                                                </TooltipContent>
-                                            </Tooltip>
-                                        </TooltipProvider>
-                                    </TableCell>
-                                ))
+                                Object.values(row).map((cell, cellIndex) => {
+
+                                    const strCell = JSON.stringify(cell)
+                                    const text = cellIndex === 1 ? JSON.parse(strCell) : strCell
+                                    return (
+                                        // eslint-disable-next-line react/no-array-index-key
+                                        <TableCell key={cellIndex}>
+                                            <TooltipProvider>
+                                                <Tooltip>
+                                                    <TooltipTrigger className="max-w-96 truncate">
+                                                        {text}
+                                                    </TooltipTrigger>
+                                                    <TooltipContent>
+                                                        <p>{text}</p>
+                                                    </TooltipContent>
+                                                </Tooltip>
+                                            </TooltipProvider>
+                                        </TableCell>
+                                    )
+                                })
                             }
                         </TableRow>
                     ))

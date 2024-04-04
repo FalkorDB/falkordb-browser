@@ -18,9 +18,10 @@ export class QueryState {
     ) { }
 }
 
-export function Query({ onSubmit, onQueryUpdate, className = "" }: {
+export function Query({ onSubmit, onQueryUpdate, onDeleteGraph, className = "" }: {
     onSubmit: (event: React.FormEvent<HTMLFormElement>) => void,
     onQueryUpdate: (state: QueryState) => void,
+    onDeleteGraph: () => void,
     className: string
 }) {
     const [query, setQuery] = useState('');
@@ -40,6 +41,7 @@ export function Query({ onSubmit, onQueryUpdate, className = "" }: {
             })
             setOnDelete(prev => !prev)
             setGraphName('')
+            onDeleteGraph()
         }).catch(err => {
             toast({
                 title: "Error",
@@ -57,8 +59,13 @@ export function Query({ onSubmit, onQueryUpdate, className = "" }: {
                 <GraphsList onDelete={onDelete} onSelectedGraph={setGraphName} />
             </div>
             <div className="flex flex-row space-x-3 w-full md:w-8/12 items-center">
-                <Input id="query" className="border-gray-500 w-full"
-                    placeholder="MATCH (n)-[e]-() RETURN n,e limit 100" type="text" onChange={(event) => setQuery(event.target.value)} />
+                <Input
+                    id="query"
+                    className="border-gray-500 w-full"
+                    placeholder="MATCH (n) OPTIONAL MATCH (n)-[e]-(m) RETURN n,e,m limit 100"
+                    type="text"
+                    onChange={(event) => setQuery(event.target.value)}
+                />
                 <TooltipProvider>
                     <Tooltip>
                         <TooltipTrigger asChild>
