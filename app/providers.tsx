@@ -2,7 +2,7 @@
 
 import Navbar from "@/components/custom/navbar";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
-import { Info, LogOut, Waypoints } from "lucide-react";
+import { Activity, Info, LogOut, Waypoints } from "lucide-react";
 import { SessionProvider, signOut } from "next-auth/react";
 import { ThemeProvider } from 'next-themes'
 import { useEffect, useRef, useState } from "react";
@@ -21,6 +21,12 @@ const LINKS = [
     icon: (<Waypoints className="h-6 w-6" />),
   },
   {
+    name: "Monitor",
+    // href: "/api/monitor",
+    href: "/monitor",
+    icon: (<Activity className="h-6 w-6" />),
+  },
+  {
     name: "Disconnect",
     href: "",
     icon: (<LogOut className="h-6 w-6" />),
@@ -32,12 +38,12 @@ export default function NextAuthProvider({ children }: { children: React.ReactNo
 
   const { screenSize } = useScreenSize();
   const isSmallScreen = screenSize === 'sm' || screenSize === 'xs'
-  
+
   const [isCollapsed, setCollapsed] = useState(isSmallScreen)
   const navPanel = useRef<ImperativePanelHandle>(null)
 
   useEffect(() => {
-    if (isSmallScreen){
+    if (isSmallScreen) {
       setCollapsed(true)
       if (navPanel.current) {
         navPanel.current.collapse()
@@ -74,7 +80,7 @@ export default function NextAuthProvider({ children }: { children: React.ReactNo
             <Navbar links={LINKS} collapsed={isCollapsed} onExpand={onExpand} />
           </ResizablePanel>
           <ResizableHandle withHandle />
-          <ResizablePanel defaultSize={100-panelSize}>{children}</ResizablePanel>
+          <ResizablePanel defaultSize={100 - panelSize}>{children}</ResizablePanel>
         </ResizablePanelGroup>
       </ThemeProvider>
     </SessionProvider>
