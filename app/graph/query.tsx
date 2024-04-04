@@ -41,7 +41,6 @@ export function Query({ onSubmit, onQueryUpdate, onDeleteGraph, className = "" }
             })
             setOnDelete(prev => !prev)
             setGraphName('')
-            setQuery('')
             onDeleteGraph()
         }).catch(err => {
             toast({
@@ -66,7 +65,6 @@ export function Query({ onSubmit, onQueryUpdate, onDeleteGraph, className = "" }
                     placeholder="MATCH (n) OPTIONAL MATCH (n)-[e]-(m) RETURN n,e,m limit 100"
                     type="text"
                     onChange={(event) => setQuery(event.target.value)}
-                    value={query}
                 />
                 <TooltipProvider>
                     <Tooltip>
