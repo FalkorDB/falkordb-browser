@@ -4,8 +4,8 @@ import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, Tabl
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { JSONTree } from "react-json-tree"
 import { transparent } from "tailwindcss/colors";
-import { Graph } from "./model";
 import { useTheme } from "next-themes";
+import { Graph } from "./model";
 
 // eslint-disable-next-line import/prefer-default-export
 export function TableView({ graph }: { graph: Graph }) {
