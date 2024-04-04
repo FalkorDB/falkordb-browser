@@ -1,7 +1,6 @@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export default function DataPanel({ node }: { node: Node }) {
     return (
         <Table>

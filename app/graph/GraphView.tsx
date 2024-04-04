@@ -95,7 +95,6 @@ interface GraphViewProps {
 
 const GraphView = forwardRef(({ graph, darkmode }: GraphViewProps, ref) => {
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const [selectedNode, setSelectedNode] = useState<Node | null>(null);
 
     // A reference to the chart container to allowing zooming and editing
