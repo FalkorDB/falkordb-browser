@@ -4,17 +4,19 @@ import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, Tabl
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { JSONTree } from "react-json-tree"
 import { transparent } from "tailwindcss/colors";
+import { useTheme } from "next-themes";
 import { Graph } from "./model";
 
 // eslint-disable-next-line import/prefer-default-export
 export function TableView({ graph }: { graph: Graph }) {
-
-
+    const { theme, systemTheme} = useTheme()
+    const dark = theme === "dark" || (theme === "system" && systemTheme === "dark")
+    const rowClass = !dark ? "hover:bg-gray-400" : undefined
     return (
         <Table>
             <TableCaption>A list of results</TableCaption>
             <TableHeader>
-                <TableRow>
+                <TableRow className={rowClass}>
                     {
                         graph.Columns.map((column, index) => (
                             // eslint-disable-next-line react/no-array-index-key
@@ -27,7 +29,7 @@ export function TableView({ graph }: { graph: Graph }) {
                 {
                     graph.Data.map((row, index) => (
                         // eslint-disable-next-line react/no-array-index-key
-                        <TableRow key={index}>
+                        <TableRow className={rowClass} key={index}>
                             {
                                 Object.values(row).map((cell, cellIndex) => {
                                     // eslint-disable-next-line no-useless-escape

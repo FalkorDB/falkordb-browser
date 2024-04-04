@@ -1,11 +1,13 @@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
-export default function DataPanel({ node }: { node: Node }) {
+export default function DataPanel({node}: {node: Node}) {
+    const rowClass = "dark:hover:bg-slate-700 hover:bg-gray-400 border-y-[1px] border-y-gray-700"
+
     return (
         <Table>
             <TableHeader>
-                <TableRow>
+                <TableRow className={rowClass}>
                     <TableHead>Field</TableHead>
                     <TableHead>Value</TableHead>
                 </TableRow>
@@ -14,7 +16,7 @@ export default function DataPanel({ node }: { node: Node }) {
                 {
                     Object.entries(node).filter((row) => Object.values(row)[0] !== "category" && Object.values(row)[0] !== "color").map((row, index) => (
                         // eslint-disable-next-line react/no-array-index-key
-                        <TableRow key={index}>
+                        <TableRow className={rowClass} key={index}>
                             {
                                 Object.values(row).map((cell, cellIndex) => {
 
