@@ -5,6 +5,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { JSONTree } from "react-json-tree"
 import { transparent } from "tailwindcss/colors";
 import { Graph } from "./model";
+import { useTheme } from "next-themes";
 
 // eslint-disable-next-line import/prefer-default-export
 export function TableView({ graph }: { graph: Graph }) {
