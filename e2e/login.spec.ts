@@ -1,12 +1,11 @@
-import { test } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 
 test.beforeEach(async ({ page }) => {
-  await page.goto('http://localhost:3000/');
+  await page.goto('http://localhost:3000/login');
 });
 
-test('connect', async ({ page }) => {
+test('login', async ({ page }) => {
   await page.getByRole('button', { name: 'Connect' }).click();
-  await page.getByRole('button', { name: 'Connect' }).click();
-
-  await page.getByText('Select Graph...').click();
+  await page.waitForURL("http://localhost:3000/graph");
+  expect(page.url()).toBe("http://localhost:3000/graph");
 });
