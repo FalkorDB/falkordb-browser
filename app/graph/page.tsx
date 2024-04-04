@@ -1,7 +1,7 @@
 'use client'
 
 import { toast } from "@/components/ui/use-toast";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { signOut } from "next-auth/react";
 import { useTheme } from "next-themes";
@@ -27,9 +27,20 @@ function validateGraphSelection(graphName: string): boolean {
 
 export default function Page() {
     const [graph, setGraph] = useState(Graph.empty());
+    const [value, setValue] = useState<string>("");
     const [metaData, setMetaData] = useState<string[]>([]);
     const [showGraph, setShowGraph] = useState<boolean>(true);
+    const [showData, setShowData] = useState<boolean>(true);
 
+    useEffect(() => {
+        if (showGraph) {
+            setValue("graph")
+        }else if(showData) {
+            setValue("data")
+        }else {
+            setValue("metadata")
+        }
+    }, [showData, showGraph])
     const graphView = useRef<GraphViewRef>(null)
 
 
@@ -53,7 +64,7 @@ export default function Page() {
         // Proposed abstraction for improved modularity
         if (!validateGraphSelection(state.graphName)) return;
 
-        const q = state.query.trim() || "MATCH (n)-[e]-() RETURN n,e limit 100";
+        const q = state.query.trim() || "MATCH (n) OPTIONAL MATCH (n)-[e]-(m) RETURN n,e,m limit 100";
 
         const result = await fetch(`/api/graph?graph=${prepareArg(state.graphName)}&query=${prepareArg(q)}`, {
             method: 'GET',
@@ -73,11 +84,11 @@ export default function Page() {
         }
 
         const json = await result.json()
+        setMetaData(json.result.metadata)
         const newGraph = Graph.create(state.graphName, json.result)
         setGraph(newGraph)
-        setMetaData(json.result.metadata)
-        setShowGraph((!!json.result.data && json.result.data.length > 0))
-
+        setShowGraph(!!newGraph.Categories && newGraph.Categories.length > 0)
+        setShowData(!!newGraph.Data && newGraph.Data.length > 0)
         graphView.current?.expand(newGraph.Elements)
     }
 
@@ -92,13 +103,13 @@ export default function Page() {
             <div className="flex flex-col grow border border-gray-300 rounded-lg p-2 overflow-auto">
                 {
                     graph.Id &&
-                    <Tabs defaultValue={showGraph ? "graph" : "metaData"} className="grow flex flex-col justify-center items-center">
+                    <Tabs value={value} className="grow flex flex-col justify-center items-center">
                         <TabsList className="border w-fit">
-                            <TabsTrigger value="metaData">MetaData</TabsTrigger>
-                            {showGraph && <TabsTrigger value="data">Data</TabsTrigger>}
-                            {showGraph && <TabsTrigger value="graph">Graph</TabsTrigger>}
+                            <TabsTrigger value="metadata" onClick={() => setValue("metadata")}>Metadata</TabsTrigger>
+                            {showData  && <TabsTrigger value="data" onClick={() => setValue("data")}>Data</TabsTrigger>}
+                            {showGraph && <TabsTrigger value="graph" onClick={() => setValue("graph")}>Graph</TabsTrigger>}
                         </TabsList>
-                        <TabsContent value="metaData" className="grow w-full">
+                        <TabsContent value="metadata" className="grow w-full">
                             <MetaDataView metadata={metaData} />
                         </TabsContent>
                         <TabsContent value="data" className="grow w-full flex-[1_1_0] overflow-auto">

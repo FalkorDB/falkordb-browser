@@ -63,7 +63,7 @@ export function Query({ onSubmit, onQueryUpdate, deleteGraph, className = "" }: 
                 <Input
                     id="query"
                     className="border-gray-500 w-full"
-                    placeholder="MATCH (n)-[e]-() RETURN n,e limit 100"
+                    placeholder="MATCH (n) OPTIONAL MATCH (n)-[e]-(m) RETURN n,e,m limit 100"
                     type="text"
                     onChange={(event) => setQuery(event.target.value)}
                     value={query}
