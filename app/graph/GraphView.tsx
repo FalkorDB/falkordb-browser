@@ -170,7 +170,7 @@ const GraphView = forwardRef(({ graph, darkmode }: GraphViewProps, ref) => {
         setSelectedNode(node);
         dataPanel.current?.expand();
     }
-    
+
     return (
         <ResizablePanelGroup direction="horizontal">
             <ResizablePanel className="h-full flex flex-col">
