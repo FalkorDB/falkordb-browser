@@ -7,12 +7,12 @@ import { Graph } from "./model";
 export function TableView({ graph }: { graph: Graph }) {
     const { theme, systemTheme} = useTheme()
     const dark = theme === "dark" || (theme === "system" && systemTheme === "dark")
-    
+    const rowClass = !dark ? "hover:bg-gray-400" : undefined
     return (
         <Table>
             <TableCaption>A list of results</TableCaption>
             <TableHeader>
-                <TableRow className={!dark ? "hover:bg-gray-400" : undefined}>
+                <TableRow className={rowClass}>
                     {
                         graph.Columns.map((column, index) => (
                             // eslint-disable-next-line react/no-array-index-key
@@ -25,7 +25,7 @@ export function TableView({ graph }: { graph: Graph }) {
                 {
                     graph.Data.map((row, index) => (
                         // eslint-disable-next-line react/no-array-index-key
-                        <TableRow className={!dark ? "hover:bg-gray-400" : undefined} key={index}>
+                        <TableRow className={rowClass} key={index}>
                             {
                                 Object.values(row).map((cell, cellIndex) => (
                                     // eslint-disable-next-line react/no-array-index-key
