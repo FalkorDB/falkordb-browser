@@ -20,8 +20,7 @@ export default function DataPanel({ node }: { node: [string, any][] }) {
                                 Object.values(row).map((cell, cellIndex) => {
 
                                     const strCell = JSON.stringify(cell)
-                                    const text = cellIndex === 1 ? strCell.replace(/"/g, '') : strCell
-                                    
+                                    const text = cellIndex === 1 ? JSON.parse(strCell) : strCell
                                     return (
                                         // eslint-disable-next-line react/no-array-index-key
                                         <TableCell key={cellIndex}>
