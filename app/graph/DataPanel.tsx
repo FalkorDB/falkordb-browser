@@ -2,7 +2,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export default function DataPanel({ node }: { node: [string, any][] }) {
+export default function DataPanel({ node }: { node: Node }) {
     return (
         <Table>
             <TableHeader>
@@ -13,7 +13,7 @@ export default function DataPanel({ node }: { node: [string, any][] }) {
             </TableHeader>
             <TableBody>
                 {
-                    node.map((row, index) => (
+                    Object.entries(node).filter((row) => Object.values(row)[0] !== "category" && Object.values(row)[0] !== "color").map((row, index) => (
                         // eslint-disable-next-line react/no-array-index-key
                         <TableRow key={index}>
                             {
