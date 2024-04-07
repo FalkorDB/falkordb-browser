@@ -10,8 +10,6 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import Editor from "@monaco-editor/react";
 import GraphsList from "./GraphList";
-import { find } from "lodash";
-
 
 export class QueryState {
     constructor(
@@ -20,9 +18,10 @@ export class QueryState {
     ) { }
 }
 
-export function Query({ onSubmit, onQueryUpdate, className = "" }: {
+export function Query({ onSubmit, onQueryUpdate, onDeleteGraph, className = "" }: {
     onSubmit: (event: React.FormEvent<HTMLFormElement>) => Promise<boolean>,
     onQueryUpdate: (state: QueryState) => void,
+    onDeleteGraph: () => void,
     className: string
 }) {
     const [query, setQuery] = useState('');
@@ -42,6 +41,7 @@ export function Query({ onSubmit, onQueryUpdate, className = "" }: {
             })
             setOnDelete(prev => !prev)
             setGraphName('')
+            onDeleteGraph()
         }).catch(err => {
             toast({
                 title: "Error",
@@ -63,7 +63,7 @@ export function Query({ onSubmit, onQueryUpdate, className = "" }: {
             <div className="flex flex-row space-x-3 w-full md:w-8/12 items-center">
                 <Editor
                     value={query}
-                    onChange={(val) => val && setQuery(val)}
+                    onChange={(val: string) => val && setQuery(val)}
                     theme="vs-dark"
                     language="cypher"
                     options={{
