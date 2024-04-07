@@ -67,7 +67,7 @@ export default function Navbar({ collapsed, onExpand }: { collapsed: boolean, on
   const darkmode = theme === "dark" || (theme === "system" && systemTheme === "dark")
   return (
     <>
-      <nav className="w-full h-full bg-gray-100 dark:bg-gray-800 p-5 flex flex-col space-y-96 ">
+      <nav className="w-full h-full bg-gray-100 dark:bg-gray-800 p-5 pb-16 flex flex-col justify-between ">
         <div>
           <div className="flex items-center space-x-2">
             <Link href="" onClick={onExpand}>
