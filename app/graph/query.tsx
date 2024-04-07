@@ -4,7 +4,7 @@ import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { Menu, Search, Trash2 } from "lucide-react";
+import { Menu, Play, Search, Trash2 } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -52,7 +52,7 @@ export function Query({ onSubmit, onQueryUpdate, onDeleteGraph, className = "" }
 
     return (
         <form
-            className={cn("flex flex-col space-y-3 md:flex-row md:space-x-3 md:space-y-0", className)}
+            className={cn("flex flex-col space-y-3 md:flex-row md:space-x-3 md:space-y-0 p-2 px-10", className)}
             onSubmit={onSubmit}>
             <div className="items-center flex flex-row space-x-3">
                 <Label htmlFor="query" className="text">Query</Label>
@@ -69,10 +69,10 @@ export function Query({ onSubmit, onQueryUpdate, onDeleteGraph, className = "" }
                 <TooltipProvider>
                     <Tooltip>
                         <TooltipTrigger asChild>
-                            <Button type="submit" className="mr-16"><Search /></Button>
+                            <Button type="submit" className="mr-16"><Play/></Button>
                         </TooltipTrigger>
                         <TooltipContent>
-                            <p>Query</p>
+                            <p>Run Query</p>
                         </TooltipContent>
                     </Tooltip>
                 </TooltipProvider>
