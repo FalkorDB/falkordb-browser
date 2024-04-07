@@ -58,7 +58,7 @@ export function Query({ onSubmit, onQueryUpdate, onDeleteGraph, className = "" }
                 <Label htmlFor="query" className="text">Query</Label>
                 <GraphsList onDelete={onDelete} onSelectedGraph={setGraphName} />
             </div>
-            <div className="flex flex-row space-x-3 w-full md:w-8/12 items-center">
+            <div className="flex flex-grow flex-row space-x-3 w-full md:w-8/12 items-center">
                 <Input
                     id="query"
                     className="border-gray-500 w-full"
