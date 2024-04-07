@@ -1,6 +1,6 @@
 import CytoscapeComponent from "react-cytoscapejs";
 import { toast } from "@/components/ui/use-toast";
-import cytoscape, { ElementDefinition, EventObject, NodeDataDefinition } from "cytoscape";
+import cytoscape, { EdgeCollection, ElementDefinition, EventObject, NodeDataDefinition } from "cytoscape";
 import { useRef, useState, useImperativeHandle, forwardRef } from "react";
 import { signOut } from "next-auth/react";
 import fcose from 'cytoscape-fcose';
@@ -155,7 +155,7 @@ const GraphView = forwardRef(({ graph, darkmode }: GraphViewProps, ref) => {
     }
 
     const handleDoubleClick = async (evt: EventObject) => {
-        const node: Node = evt.target.json().data;
+        const node = evt.target.json().data;
         const elements = await onFetchNode(node);
 
         // adjust entire graph.
@@ -165,9 +165,15 @@ const GraphView = forwardRef(({ graph, darkmode }: GraphViewProps, ref) => {
         }
     }
 
-    const handleTap = (evt: EventObject) => {
-        const node: Node = evt.target.json().data;
+    const handleTapNode = (evt: EventObject) => {
+        const node = evt.target.json().data;
         setSelectedNode(node);
+        dataPanel.current?.expand();
+    }
+    
+    const handleTapEdge = (evt: EventObject) => {
+        const edge = evt.target.json().data;
+        setSelectedNode(edge);
         dataPanel.current?.expand();
     }
 
@@ -189,7 +195,10 @@ const GraphView = forwardRef(({ graph, darkmode }: GraphViewProps, ref) => {
                         cy.on('dbltap', 'node', handleDoubleClick);
 
                         // Listen to the click event on nodes for showing node properties
-                        cy.on('tap', 'node', handleTap);
+                        cy.on('tap', 'node', handleTapNode);
+                        
+                        // Listen to the click event on edges for showing edge properties
+                        cy.on('tap', 'edge', handleTapEdge);
                     }}
                     stylesheet={getStyle(darkmode)}
                     elements={graph.Elements}
