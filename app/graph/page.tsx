@@ -35,9 +35,9 @@ export default function Page() {
     useEffect(() => {
         if (showGraph) {
             setValue("graph")
-        }else if(showData) {
+        } else if (showData) {
             setValue("data")
-        }else {
+        } else {
             setValue("metadata")
         }
     }, [showData, showGraph])
@@ -100,18 +100,19 @@ export default function Page() {
                 onQueryUpdate={(state) => { queryState.current = state }}
                 onDeleteGraph={() => setGraph(Graph.empty())}
             />
-            <div className="flex flex-col grow border border-gray-300 rounded-lg p-2 overflow-auto">
+            <div className="flex grow border border-gray-300 rounded-lg p-2 overflow-auto">
                 {
                     graph.Id &&
-                    <Tabs value={value} className="grow flex flex-col justify-center items-center">
-                        <TabsList className="border w-fit">
-                            <TabsTrigger value="metadata" onClick={() => setValue("metadata")}>Metadata</TabsTrigger>
-                            {showData  && <TabsTrigger value="data" onClick={() => setValue("data")}>Data</TabsTrigger>}
-                            {showGraph && <TabsTrigger value="graph" onClick={() => setValue("graph")}>Graph</TabsTrigger>}
-                        </TabsList>
-                        <TabsContent value="metadata" className="grow w-full">
-                            <MetaDataView metadata={metaData} />
-                        </TabsContent>
+                    <Tabs value={value} className="grow flex flex-row">
+                        <div className="h-full flex items-center">
+                            {
+                                (showData || showGraph) &&
+                                <TabsList className="border h-fit flex flex-col gap-6">
+                                    {showData && <TabsTrigger value="data" onClick={() => setValue("data")}>Data</TabsTrigger>}
+                                    {showGraph && <TabsTrigger value="graph" onClick={() => setValue("graph")}>Graph</TabsTrigger>}
+                                </TabsList>
+                            }
+                        </div>
                         <TabsContent value="data" className="grow w-full flex-[1_1_0] overflow-auto">
                             <TableView graph={graph} />
                         </TabsContent>
@@ -120,6 +121,9 @@ export default function Page() {
                         </TabsContent>
                     </Tabs>
                 }
+            </div>
+            <div className="border rounded-md border-gray-300 p-2">
+                <MetaDataView metadata={metaData} />
             </div>
         </div>
     )
