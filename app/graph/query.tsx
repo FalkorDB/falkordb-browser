@@ -52,7 +52,7 @@ export function Query({ onSubmit, onQueryUpdate, onDeleteGraph, className = "" }
     return (
         <form
             className={cn("flex flex-col space-y-3 md:flex-row md:space-x-3 md:space-y-0", className)}
-            onSubmit={async (e) => await onSubmit(e) && setQuery('')}>
+            onSubmit={(e) => onSubmit(e)}>
             <div className="items-center flex flex-row space-x-3">
                 <Label htmlFor="query" className="text">Query</Label>
                 <GraphsList onDelete={onDelete} onSelectedGraph={setGraphName} />
