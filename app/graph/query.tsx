@@ -1,8 +1,7 @@
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Menu, Search, Trash2 } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
@@ -63,7 +62,7 @@ export function Query({ onSubmit, onQueryUpdate, onDeleteGraph, className = "" }
             <div className="flex flex-row space-x-3 w-full md:w-8/12 items-center">
                 <Editor
                     value={query}
-                    onChange={(val: string) => val && setQuery(val)}
+                    onChange={(val) => val && setQuery(val)}
                     theme="vs-dark"
                     language="cypher"
                     options={{
