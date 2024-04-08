@@ -1,5 +1,6 @@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { cn } from "@/lib/utils";
 
 const unusedProperties = [
     "category",
@@ -10,12 +11,13 @@ const unusedProperties = [
     "value",
 ]
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export default function DataPanel({ object }: { object: any }) {
     const rowClass = "dark:hover:bg-slate-700 hover:bg-gray-400 border-y-[1px] border-y-gray-700"
 
     return (
         <div>
-            <p className={rowClass + " text-center p-2"}>
+            <p className={cn(" text-center p-2", rowClass)}>
                 {object.source ? "edge properties" : "node properties"}
             </p>
             <Table>

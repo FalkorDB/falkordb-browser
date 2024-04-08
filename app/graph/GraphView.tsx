@@ -1,16 +1,16 @@
 import CytoscapeComponent from "react-cytoscapejs";
 import { toast } from "@/components/ui/use-toast";
-import cytoscape, { EdgeCollection, ElementDefinition, EventObject, NodeDataDefinition } from "cytoscape";
+import cytoscape, { ElementDefinition, EventObject, NodeDataDefinition } from "cytoscape";
 import { useRef, useState, useImperativeHandle, forwardRef } from "react";
 import { signOut } from "next-auth/react";
 import fcose from 'cytoscape-fcose';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { ImperativePanelHandle } from "react-resizable-panels";
+import { ChevronLeft, ChevronRight } from "lucide-react"
 import Labels from "./labels";
 import Toolbar from "./toolbar";
 import { Category, Graph } from "./model";
 import DataPanel from "./DataPanel";
-import { ChevronLeft, ChevronRight } from "lucide-react"
 
 const LAYOUT = {
     name: "fcose",
@@ -176,7 +176,6 @@ const GraphView = forwardRef(({ graph, darkmode }: GraphViewProps, ref) => {
 
     const handleTapEdge = (evt: EventObject) => {
         const edge = evt.target.json().data;
-        console.log(edge);
         setSelectedObject(edge);
         dataPanel.current?.expand();
     }
@@ -213,9 +212,9 @@ const GraphView = forwardRef(({ graph, darkmode }: GraphViewProps, ref) => {
             <ResizableHandle />
             {
                 selectedObject &&
-                <div onClick={() => setIsOpen(prev => !prev)} className="fixed right-5 top-80">
+                <button type="button" onClick={() => setIsOpen(prev => !prev)} className="fixed right-5 top-80">
                     {isOpen ? <ChevronRight /> : <ChevronLeft />}
-                </div>
+                </button>
             }
             {
                 isOpen &&
