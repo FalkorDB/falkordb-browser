@@ -77,7 +77,7 @@ export default function NextAuthProvider({ children }: { children: React.ReactNo
             minSize={panelSize}
             onCollapse={() => { setCollapsed(true) }}
             onExpand={() => { setCollapsed(false) }}>
-            <Navbar collapsed={isCollapsed} onExpand={onExpand} />
+            <Navbar links={LINKS} collapsed={isCollapsed} onExpand={onExpand} />
           </ResizablePanel>
           <ResizableHandle withHandle />
           <ResizablePanel defaultSize={100 - panelSize}>{children}</ResizablePanel>
