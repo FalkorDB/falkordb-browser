@@ -155,7 +155,7 @@ const GraphView = forwardRef(({ graph, darkmode }: GraphViewProps, ref) => {
     }
 
     const handleDoubleClick = async (evt: EventObject) => {
-        const node = evt.target.json().data;
+        const node: Node = evt.target.json().data;
         const elements = await onFetchNode(node);
 
         // adjust entire graph.
@@ -170,7 +170,7 @@ const GraphView = forwardRef(({ graph, darkmode }: GraphViewProps, ref) => {
         setSelectedNode(node);
         dataPanel.current?.expand();
     }
-    
+
     return (
         <ResizablePanelGroup direction="horizontal">
             <ResizablePanel className="h-full flex flex-col">
