@@ -68,21 +68,19 @@ export default function Navbar({ collapsed, onExpand }: { collapsed: boolean, on
   const darkmode = theme === "dark" || (theme === "system" && systemTheme === "dark")
   return (
     <>
-      <nav className={"w-full h-full bg-gray-100 dark:bg-gray-800 py-7 flex flex-col justify-between items-center"}>
-        <div className="flex fixed left-3 top-4 items-center space-x-2">
-          <Link href="" onClick={onExpand}>
-            <Menu className="h-6 w-6" />
-          </Link>
-        </div>
-        <div>
+      <nav className={`w-full h-full bg-gray-100 dark:bg-gray-800 py-7 flex flex-col justify-between ${collapsed ? "items-center" : "justify-start"}`}>
+        <div className="pl-2">
+            <Link href="" onClick={onExpand}>
+              <Menu className="h-6 w-6" />
+            </Link>
           {status === "authenticated" &&
-            <ul className="flex flex-col gap-5 pt-10">
+            <ul className="flex flex-col gap-5 pt-5">
               {
                 linksUp.map((link, index) => (
                   // eslint-disable-next-line react/no-array-index-key
-                  <li key={index} className="flex items-center space-x-2">
+                  <li key={index}>
                     <Link
-                      className={cn("underline underline-offset-2 flex space-x-2", pathName === link.href ? 'text-blue-300' : '')}
+                      className={cn("underline underline-offset-2 flex gap-2", pathName === link.href ? 'text-blue-300' : '')}
                       href={link.href} onClick={link.onClick}
                     >
                       {link.icon}
@@ -98,8 +96,8 @@ export default function Navbar({ collapsed, onExpand }: { collapsed: boolean, on
             </ul>
           }
         </div>
-        <div>
-          <ul className="flex flex-col gap-5 items-center">
+        <div className="pl-2">
+          <ul className="flex flex-col gap-5">
             <li key={0}>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -107,14 +105,14 @@ export default function Navbar({ collapsed, onExpand }: { collapsed: boolean, on
                     <Settings />
                     {
                       !collapsed &&
-                      <p >Settings</p>
+                      <p className="underline underline-offset-2">Settings</p>
                     }
                   </div>
                 </DropdownMenuTrigger>
                 {
                   mounted &&
                   <DropdownMenuContent side="right" className="flex flex-col justify-center p-3">
-                    <div className="flex items-center space-x-2">
+                    <div className="flex items-center gap-2">
                       <Switch id="dark-mode" checked={darkmode} onCheckedChange={setDarkMode} />
                       <Label htmlFor="dark-mode">{`${theme} mode`}</Label>
                     </div>
@@ -125,10 +123,10 @@ export default function Navbar({ collapsed, onExpand }: { collapsed: boolean, on
             {
               linksDown.map((link, index) => (
                 // eslint-disable-next-line react/no-array-index-key
-                <li key={index + 1} className="flex items-center space-x-2">
+                <li key={index + 1}>
                   <Link
                     title={link.name}
-                    className={cn("underline underline-offset-2 flex space-x-2", pathName === link.href ? 'text-blue-300' : '')}
+                    className={cn("underline underline-offset-2 flex gap-2", pathName === link.href ? 'text-blue-300' : '')}
                     href={link.href} onClick={link.onClick}
                   >
                     {link.icon}
