@@ -2,37 +2,11 @@
 
 import Navbar from "@/components/custom/navbar";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
-import { Activity, Info, LogOut, Waypoints } from "lucide-react";
-import { SessionProvider, signOut } from "next-auth/react";
+import { SessionProvider } from "next-auth/react";
 import { ThemeProvider } from 'next-themes'
 import { useEffect, useRef, useState } from "react";
 import { ImperativePanelHandle } from "react-resizable-panels";
 import useScreenSize from "./useScreenSize";
-
-const LINKS = [
-  {
-    name: "Connection Details",
-    href: "/details",
-    icon: (<Info className="h-6 w-6" />),
-  },
-  {
-    name: "Graph",
-    href: "/graph",
-    icon: (<Waypoints className="h-6 w-6" />),
-  },
-  {
-    name: "Monitor",
-    // href: "/api/monitor",
-    href: "/monitor",
-    icon: (<Activity className="h-6 w-6" />),
-  },
-  {
-    name: "Disconnect",
-    href: "",
-    icon: (<LogOut className="h-6 w-6" />),
-    onClick: () => { signOut({ callbackUrl: '/login' }) }
-  },
-]
 
 export default function NextAuthProvider({ children }: { children: React.ReactNode }) {
 
