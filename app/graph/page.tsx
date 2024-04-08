@@ -100,31 +100,34 @@ export default function Page() {
                 onQueryUpdate={(state) => { queryState.current = state }}
                 onDeleteGraph={() => setGraph(Graph.empty())}
             />
-            <div className="flex grow border border-gray-300 rounded-lg p-2 overflow-auto">
+            <div className="flex grow border border-gray-300 rounded-lg p-2 flex-[1_1_0] overflow-auto">
                 {
                     graph.Id &&
                     <Tabs value={value} className="grow flex flex-row">
-                        <div className="h-full flex items-center">
+                        <div className="h-full w-20">
                             {
                                 (showData || showGraph) &&
-                                <TabsList className="border h-fit flex flex-col gap-6">
-                                    {showData && <TabsTrigger value="data" onClick={() => setValue("data")}>Data</TabsTrigger>}
-                                    {showGraph && <TabsTrigger value="graph" onClick={() => setValue("graph")}>Graph</TabsTrigger>}
+                                <TabsList className="border h-fit fixed top-72 flex flex-col p-0">
+                                    {showGraph && <TabsTrigger className="w-full" value="graph" onClick={() => setValue("graph")}>Graph </TabsTrigger>}
+                                    {showData && <TabsTrigger className="w-full" value="table" onClick={() => setValue("table")}> Table </TabsTrigger>}
                                 </TabsList>
                             }
                         </div>
-                        <TabsContent value="data" className="grow w-full flex-[1_1_0] overflow-auto">
-                            <TableView graph={graph} />
-                        </TabsContent>
-                        <TabsContent value="graph" className="grow w-full">
+                            <TabsContent value="table" className="grow w-full">
+                                <TableView graph={graph} />
+                            </TabsContent>
+                        <TabsContent value="graph" className="grow w-full max-w-[1267px]">
                             <GraphView ref={graphView} graph={graph} darkmode={darkmode} />
                         </TabsContent>
                     </Tabs>
                 }
             </div>
-            <div className="border rounded-md border-gray-300 p-2">
-                <MetaDataView metadata={metaData} />
-            </div>
+            {
+                graph.Id &&
+                <div className="border rounded-md border-gray-300 p-2">
+                    <MetaDataView metadata={metaData} />
+                </div>
+            }
         </div>
     )
 }

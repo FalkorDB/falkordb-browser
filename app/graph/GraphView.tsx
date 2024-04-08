@@ -10,6 +10,7 @@ import Labels from "./labels";
 import Toolbar from "./toolbar";
 import { Category, Graph } from "./model";
 import DataPanel from "./DataPanel";
+import { ChevronLeft, ChevronRight } from "lucide-react"
 
 const LAYOUT = {
     name: "fcose",
@@ -95,7 +96,8 @@ interface GraphViewProps {
 
 const GraphView = forwardRef(({ graph, darkmode }: GraphViewProps, ref) => {
 
-    const [selectedNode, setSelectedNode] = useState<Node | null>(null);
+    const [selectedObject, setSelectedObject] = useState(null);
+    const [isOpen, setIsOpen] = useState<boolean>(true);
 
     // A reference to the chart container to allowing zooming and editing
     const chartRef = useRef<cytoscape.Core | null>(null)
@@ -167,22 +169,24 @@ const GraphView = forwardRef(({ graph, darkmode }: GraphViewProps, ref) => {
 
     const handleTapNode = (evt: EventObject) => {
         const node = evt.target.json().data;
-        setSelectedNode(node);
+        setIsOpen(true);
+        setSelectedObject(node);
         dataPanel.current?.expand();
     }
-    
+
     const handleTapEdge = (evt: EventObject) => {
         const edge = evt.target.json().data;
-        setSelectedNode(edge);
+        console.log(edge);
+        setSelectedObject(edge);
         dataPanel.current?.expand();
     }
 
     return (
         <ResizablePanelGroup direction="horizontal">
             <ResizablePanel className="h-full flex flex-col">
-                <div className="grid grid-cols-6">
-                    <Toolbar className="col-start-1 justify-start" chartRef={chartRef} />
-                    <Labels className="col-end-7 justify-end" categories={graph.Categories} onClick={onCategoryClick} />
+                <div className="flex flex-row justify-between">
+                    <Toolbar className="" chartRef={chartRef} />
+                    <Labels className="pr-16" categories={graph.Categories} onClick={onCategoryClick} />
                 </div>
                 <CytoscapeComponent
                     cy={(cy) => {
@@ -196,7 +200,7 @@ const GraphView = forwardRef(({ graph, darkmode }: GraphViewProps, ref) => {
 
                         // Listen to the click event on nodes for showing node properties
                         cy.on('tap', 'node', handleTapNode);
-                        
+
                         // Listen to the click event on edges for showing edge properties
                         cy.on('tap', 'edge', handleTapEdge);
                     }}
@@ -206,10 +210,19 @@ const GraphView = forwardRef(({ graph, darkmode }: GraphViewProps, ref) => {
                     className="w-full grow"
                 />
             </ResizablePanel>
-            <ResizableHandle withHandle />
-            <ResizablePanel ref={dataPanel} maxSize={50} minSize={17} collapsible defaultSize={selectedNode ? 20 : 0} className="bg-gray-100 dark:bg-gray-800">
-                {selectedNode && <DataPanel node={selectedNode} />}
-            </ResizablePanel>
+            <ResizableHandle />
+            {
+                selectedObject &&
+                <div onClick={() => setIsOpen(prev => !prev)} className="fixed right-5 top-80">
+                    {isOpen ? <ChevronRight /> : <ChevronLeft />}
+                </div>
+            }
+            {
+                isOpen &&
+                <ResizablePanel id="panel" ref={dataPanel} maxSize={50} minSize={20} collapsible defaultSize={selectedObject ? 20 : 0} className="bg-gray-100 dark:bg-gray-800">
+                    {selectedObject && <DataPanel object={selectedObject} />}
+                </ResizablePanel>
+            }
         </ResizablePanelGroup>
 
 
