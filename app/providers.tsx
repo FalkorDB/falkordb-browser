@@ -1,11 +1,11 @@
 "use client";
 
-import Navbar from "@/components/custom/navbar";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { SessionProvider } from "next-auth/react";
 import { ThemeProvider } from 'next-themes'
 import { useEffect, useRef, useState } from "react";
 import { ImperativePanelHandle } from "react-resizable-panels";
+import Navbar from "@/components/custom/navbar";
 import useScreenSize from "./useScreenSize";
 
 export default function NextAuthProvider({ children }: { children: React.ReactNode }) {
