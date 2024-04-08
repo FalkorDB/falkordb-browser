@@ -14,12 +14,7 @@ export default function DataPanel({ node }: { node: Node }) {
             </TableHeader>
             <TableBody>
                 {
-                    Object.entries(node).filter((row) =>
-                        Object.values(row)[0] !== "category"
-                        && Object.values(row)[0] !== "color"
-                        && Object.values(row)[0] !== "label"
-                        && Object.values(row)[0] !== "target"
-                        && Object.values(row)[0] !== "source").map((row, index) => (
+                    Object.entries(node).filter((row) => Object.values(row)[0] !== "category" && Object.values(row)[0] !== "color").map((row, index) => (
                             // eslint-disable-next-line react/no-array-index-key
                             <TableRow className={rowClass} key={index}>
                                 {
