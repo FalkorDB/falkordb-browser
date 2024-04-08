@@ -6,8 +6,8 @@ test.beforeEach(async ({ page }) => {
 
 test('connect', async ({ page }) => {
     await page.getByRole('button').click();
-    await page.waitForURL('http://localhost:3000');
-    expect(page.url()).toBe('http://localhost:3000');
+    await page.waitForURL('http://localhost:3000/login');
+    expect(page.url()).toBe('http://localhost:3000/login');
   
 });
 
