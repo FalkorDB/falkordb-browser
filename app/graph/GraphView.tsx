@@ -1,6 +1,6 @@
 import CytoscapeComponent from "react-cytoscapejs";
 import { toast } from "@/components/ui/use-toast";
-import cytoscape, { EdgeCollection, ElementDefinition, EventObject, NodeDataDefinition } from "cytoscape";
+import cytoscape, { ElementDefinition, EventObject, NodeDataDefinition } from "cytoscape";
 import { useRef, useState, useImperativeHandle, forwardRef } from "react";
 import { signOut } from "next-auth/react";
 import fcose from 'cytoscape-fcose';
