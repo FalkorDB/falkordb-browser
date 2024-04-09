@@ -1,6 +1,10 @@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
+interface Props {
+    object: any;
+}
+
 const excludedProperties = new Set([
     "category",
     "color",
@@ -9,7 +13,8 @@ const excludedProperties = new Set([
     "source"
 ]);
 
-export default function DataPanel({ node }: { node: Node }) {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export default function DataPanel({ object }: Props) {
     const rowClass = "dark:hover:bg-slate-700 hover:bg-gray-400 border-y-[1px] border-y-gray-700"
 
     return (
@@ -22,7 +27,7 @@ export default function DataPanel({ node }: { node: Node }) {
             </TableHeader>
             <TableBody>
                 {
-                    Object.entries(node).filter((row) => !excludedProperties.has(row[0])).map((row, index) => (
+                    Object.entries(object).filter((row) => !excludedProperties.has(row[0])).map((row, index) => (
                         // eslint-disable-next-line react/no-array-index-key
                         <TableRow className={rowClass} key={index}>
                             {
