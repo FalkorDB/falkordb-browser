@@ -10,4 +10,5 @@ test('create graph', async ({ page }) => {
     await page.getByPlaceholder('MATCH (n) OPTIONAL MATCH (n').fill('CREATE (:Rider {name:\'Valentino Rossi\'})-[:rides]->(:Team {name:\'Yamaha\'}), (:Rider {name:\'Dani Pedrosa\'})-[:rides]->(:Team {name:\'Honda\'}), (:Rider {name:\'Andrea Dovizioso\'})-[:rides]->(:Team {name:\'Ducati\'})');
     await page.getByRole('button').first().click();
     await page.getByText('falkorDB').first().click();
-});
+
+    
