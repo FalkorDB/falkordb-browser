@@ -1,5 +1,4 @@
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
@@ -8,8 +7,8 @@ import { Menu, Search, Trash2 } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import Editor from "@monaco-editor/react";
 import GraphsList from "./GraphList";
-
 
 export class QueryState {
     constructor(
@@ -19,7 +18,7 @@ export class QueryState {
 }
 
 export function Query({ onSubmit, onQueryUpdate, onDeleteGraph, className = "" }: {
-    onSubmit: (event: React.FormEvent<HTMLFormElement>) => void,
+    onSubmit: (event: React.FormEvent<HTMLFormElement>) => Promise<boolean>,
     onQueryUpdate: (state: QueryState) => void,
     onDeleteGraph: () => void,
     className: string
@@ -53,18 +52,27 @@ export function Query({ onSubmit, onQueryUpdate, onDeleteGraph, className = "" }
     return (
         <form
             className={cn("flex flex-col space-y-3 md:flex-row md:space-x-3 md:space-y-0", className)}
-            onSubmit={onSubmit}>
+            onSubmit={(e) => onSubmit(e)}>
             <div className="items-center flex flex-row space-x-3">
                 <Label htmlFor="query" className="text">Query</Label>
                 <GraphsList onDelete={onDelete} onSelectedGraph={setGraphName} />
             </div>
             <div className="flex flex-row space-x-3 w-full md:w-8/12 items-center">
-                <Input
-                    id="query"
-                    className="border-gray-500 w-full"
-                    placeholder="MATCH (n) OPTIONAL MATCH (n)-[e]-(m) RETURN n,e,m limit 100"
-                    type="text"
-                    onChange={(event) => setQuery(event.target.value)}
+                <Editor
+                    value={query}
+                    onChange={(val) => val && setQuery(val)}
+                    theme="vs-dark"
+                    language="cypher"
+                    options={{
+                        suggest: {
+                            showKeywords: true,
+                        },
+                        minimap: { enabled: false },
+                        wordWrap: "on",
+                        lineNumbers: "off",
+                        lineHeight: 40,
+                        fontSize: 30,
+                    }}
                 />
                 <TooltipProvider>
                     <Tooltip>
