@@ -1,15 +1,14 @@
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { Menu, Search, Trash2 } from "lucide-react";
+import { Menu, Play, Trash2 } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import Editor from "@monaco-editor/react";
 import GraphsList from "./GraphList";
-
 
 export class QueryState {
     constructor(
@@ -19,7 +18,7 @@ export class QueryState {
 }
 
 export function Query({ onSubmit, onQueryUpdate, onDeleteGraph, className = "" }: {
-    onSubmit: (event: React.FormEvent<HTMLFormElement>) => void,
+    onSubmit: (event: React.FormEvent<HTMLFormElement>) => Promise<boolean>,
     onQueryUpdate: (state: QueryState) => void,
     onDeleteGraph: () => void,
     className: string
@@ -59,20 +58,29 @@ export function Query({ onSubmit, onQueryUpdate, onDeleteGraph, className = "" }
                 <GraphsList onDelete={onDelete} onSelectedGraph={setGraphName} />
             </div>
             <div className="flex flex-row space-x-3 w-full md:w-8/12 items-center">
-                <Input
-                    id="query"
-                    className="border-gray-500 w-full"
-                    placeholder="MATCH (n) OPTIONAL MATCH (n)-[e]-(m) RETURN n,e,m limit 100"
-                    type="text"
-                    onChange={(event) => setQuery(event.target.value)}
+                <Editor
+                    value={query}
+                    onChange={(val) => val && setQuery(val)}
+                    theme="vs-dark"
+                    language="cypher"
+                    options={{
+                        suggest: {
+                            showKeywords: true,
+                        },
+                        minimap: { enabled: false },
+                        wordWrap: "on",
+                        lineNumbers: "off",
+                        lineHeight: 40,
+                        fontSize: 30,
+                    }}
                 />
                 <TooltipProvider>
                     <Tooltip>
                         <TooltipTrigger asChild>
-                            <Button type="submit" className="mr-16"><Search /></Button>
+                            <Button type="submit" className="mr-16"><Play/></Button>
                         </TooltipTrigger>
                         <TooltipContent>
-                            <p>Query</p>
+                            <p>Run Query</p>
                         </TooltipContent>
                     </Tooltip>
                 </TooltipProvider>
