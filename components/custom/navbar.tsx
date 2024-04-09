@@ -66,7 +66,7 @@ export default function Navbar({ collapsed, onExpand }: { collapsed: boolean, on
   const darkmode = theme === "dark" || (theme === "system" && systemTheme === "dark")
   return (
     <nav className={`w-full h-full bg-gray-100 dark:bg-gray-800 py-7 flex flex-col justify-between ${collapsed ? "items-center" : "justify-start"}`}>
-      <div className="pl-2">
+      <div className={`${!collapsed && pl-2}`}>
         <Link href="" onClick={onExpand}>
           <Menu className="h-6 w-6" />
         </Link>
@@ -94,7 +94,7 @@ export default function Navbar({ collapsed, onExpand }: { collapsed: boolean, on
           </ul>
         }
       </div>
-      <div className="pl-2">
+      <div className={`${!collapsed && pl-2}`}>
         <ul className="flex flex-col gap-5">
           <li key={0}>
             <DropdownMenu>
