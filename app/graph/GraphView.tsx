@@ -95,7 +95,7 @@ interface GraphViewProps {
 
 const GraphView = forwardRef(({ graph, darkmode }: GraphViewProps, ref) => {
 
-    const [selectedNode, setSelectedNode] = useState<Node | null>(null);
+    const [selectedNode, setSelectedObject] = useState(null);
 
     // A reference to the chart container to allowing zooming and editing
     const chartRef = useRef<cytoscape.Core | null>(null)
@@ -165,15 +165,9 @@ const GraphView = forwardRef(({ graph, darkmode }: GraphViewProps, ref) => {
         }
     }
 
-    const handleTapNode = (evt: EventObject) => {
-        const node = evt.target.json().data;
-        setSelectedNode(node);
-        dataPanel.current?.expand();
-    }
-    
-    const handleTapEdge = (evt: EventObject) => {
-        const edge = evt.target.json().data;
-        setSelectedNode(edge);
+    const handleTap = (evt: EventObject) => {
+        const object = evt.target.json().data;
+        setSelectedObject(object);
         dataPanel.current?.expand();
     }
 
@@ -195,10 +189,10 @@ const GraphView = forwardRef(({ graph, darkmode }: GraphViewProps, ref) => {
                         cy.on('dbltap', 'node', handleDoubleClick);
 
                         // Listen to the click event on nodes for showing node properties
-                        cy.on('tap', 'node', handleTapNode);
+                        cy.on('tap', 'node', handleTap);
                         
                         // Listen to the click event on edges for showing edge properties
-                        cy.on('tap', 'edge', handleTapEdge);
+                        cy.on('tap', 'edge', handleTap);
                     }}
                     stylesheet={getStyle(darkmode)}
                     elements={graph.Elements}
