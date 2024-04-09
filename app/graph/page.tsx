@@ -58,11 +58,11 @@ export default function Page() {
         event.preventDefault();
         const state = queryState.current;
         if (!state) {
-            return
+            return false
         }
 
         // Proposed abstraction for improved modularity
-        if (!validateGraphSelection(state.graphName)) return;
+        if (!validateGraphSelection(state.graphName)) return false;
 
         const q = state.query.trim() || "MATCH (n) OPTIONAL MATCH (n)-[e]-(m) RETURN n,e,m limit 100";
 
@@ -80,7 +80,7 @@ export default function Page() {
             if (result.status >= 400 && result.status < 500) {
                 signOut({ callbackUrl: '/login' })
             }
-            return
+            return false
         }
 
         const json = await result.json()
@@ -90,6 +90,7 @@ export default function Page() {
         setShowGraph(!!newGraph.Categories && newGraph.Categories.length > 0)
         setShowData(!!newGraph.Data && newGraph.Data.length > 0)
         graphView.current?.expand(newGraph.Elements)
+        return true
     }
 
     return (
