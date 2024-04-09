@@ -27,7 +27,7 @@ export default function DataPanel({ node }: { node: Node }) {
                         <TableRow className={rowClass} key={index}>
                             {
                                 Object.values(row).map((cell, cellIndex) => {
- 
+
                                     const strCell = JSON.stringify(cell)
                                     const text = cellIndex === 1 ? JSON.parse(strCell) : strCell
                                     return (
