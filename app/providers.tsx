@@ -35,8 +35,8 @@ export default function NextAuthProvider({ children }: { children: React.ReactNo
       }
     }
   }
-  const panelSize = isSmallScreen ? 40 : 9
-  const collapsedSize = isSmallScreen ? 20 : 3
+  const panelSize = 9
+  const collapsedSize = 3
 
   return (
     <SessionProvider>
