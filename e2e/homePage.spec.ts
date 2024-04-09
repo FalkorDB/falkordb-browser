@@ -14,5 +14,5 @@ test('connect', async ({ page }) => {
 test('themes', async ({ page }) => {
   await page.getByLabel('system mode').click();
   await page.getByLabel('dark mode').click();
-  expect(page.getByLabel('light mode')).toBeVisible();
+  await page.getByLabel('light mode').click();
 });

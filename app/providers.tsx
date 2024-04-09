@@ -22,7 +22,6 @@ const LINKS = [
   },
   {
     name: "Monitor",
-    // href: "/api/monitor",
     href: "/monitor",
     icon: (<Activity className="h-6 w-6" />),
   },
