@@ -8,8 +8,8 @@ import { useToast } from "@/components/ui/use-toast";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import Editor from "@monaco-editor/react";
-import GraphsList from "./GraphList";
 import { useTheme } from "next-themes";
+import GraphsList from "./GraphList";
 
 export class QueryState {
     constructor(
