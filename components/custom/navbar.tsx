@@ -26,7 +26,6 @@ export default function Navbar({ links, collapsed, onExpand }: { links: LinkDefi
   useEffect(() => {
     setMounted(true)
   }, [])
-
   const setDarkMode = (val: boolean) => {
     if (val) {
       setTheme("dark")
