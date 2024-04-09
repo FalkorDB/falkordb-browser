@@ -138,8 +138,8 @@ export default function Navbar({ collapsed, onExpand }: { collapsed: boolean, on
               </li>
             ))
           }
-          <li key={linksDown.length + 1} className="flex flex-row items-center gap-1">
-            <a href="https://github.com/falkordb/falkordb-browser" title="Github repository" aria-label="Github repository">
+          <li key={linksDown.length + 1} className={`${!collapsed ? "flex flex-row items-center gap-1" : "flex justify-center"}`}>
+            <a href="https://github.com/falkordb/falkordb-browser" className="flex justify-center" title="Github repository" aria-label="Github repository">
               <GithubMark darkMode={darkmode} className="h-4 w-4" />
             </a>
             {
