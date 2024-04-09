@@ -155,7 +155,7 @@ const GraphView = forwardRef(({ graph, darkmode }: GraphViewProps, ref) => {
     }
 
     const handleDoubleClick = async (evt: EventObject) => {
-        const node: Node = evt.target.json().data;
+        const node = evt.target.json().data;
         const elements = await onFetchNode(node);
 
         // adjust entire graph.
