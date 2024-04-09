@@ -55,7 +55,6 @@ export default function Navbar({ collapsed, onExpand }: { collapsed: boolean, on
   useEffect(() => {
     setMounted(true)
   }, [])
-
   const setDarkMode = (val: boolean) => {
     if (val) {
       setTheme("dark")
