@@ -9,6 +9,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import Editor from "@monaco-editor/react";
 import GraphsList from "./GraphList";
+import { useTheme } from "next-themes";
 
 export class QueryState {
     constructor(
@@ -26,6 +27,8 @@ export function Query({ onSubmit, onQueryUpdate, onDeleteGraph, className = "" }
     const [query, setQuery] = useState('');
     const [graphName, setGraphName] = useState('');
     const [onDelete, setOnDelete] = useState<boolean>(false);
+    const { theme, systemTheme } = useTheme()
+    const darkmode = theme === "dark" || (theme === "system" && systemTheme === "dark")
     const { toast } = useToast();
 
     onQueryUpdate(new QueryState(query, graphName))
@@ -51,17 +54,18 @@ export function Query({ onSubmit, onQueryUpdate, onDeleteGraph, className = "" }
 
     return (
         <form
-            className={cn("flex flex-col space-y-3 md:flex-row md:space-x-3 md:space-y-0", className)}
-            onSubmit={onSubmit}>
-            <div className="items-center flex flex-row space-x-3">
+            className={cn("flex flex-col gap-3 md:flex-row", className)}
+            onSubmit={onSubmit}
+        >
+            <div className="items-center flex flex-row gap-3">
                 <Label htmlFor="query" className="text">Query</Label>
                 <GraphsList onDelete={onDelete} onSelectedGraph={setGraphName} />
             </div>
-            <div className="flex flex-row space-x-3 w-full md:w-8/12 items-center">
+            <div className="flex flex-row gap-3 w-full">
                 <Editor
                     value={query}
                     onChange={(val) => val && setQuery(val)}
-                    theme="vs-dark"
+                    theme={`${darkmode ? "vs-dark" : "light"}`}
                     language="cypher"
                     options={{
                         suggest: {
@@ -77,7 +81,7 @@ export function Query({ onSubmit, onQueryUpdate, onDeleteGraph, className = "" }
                 <TooltipProvider>
                     <Tooltip>
                         <TooltipTrigger asChild>
-                            <Button type="submit" className="mr-16"><Play/></Button>
+                            <Button type="submit"><Play /></Button>
                         </TooltipTrigger>
                         <TooltipContent>
                             <p>Run Query</p>
@@ -97,7 +101,7 @@ export function Query({ onSubmit, onQueryUpdate, onDeleteGraph, className = "" }
                         <DropdownMenuSeparator />
                         {graphName &&
                             <DropdownMenuItem className="flex justify-around">
-                                <AlertDialogTrigger className="flex flex-row items-center gap-x-2">
+                                <AlertDialogTrigger className="flex flex-row items-center gap-2">
                                     <Trash2 />
                                     <span>Delete graph</span>
                                 </AlertDialogTrigger>
