@@ -35,10 +35,8 @@ export default function Page() {
     useEffect(() => {
         if (showGraph) {
             setValue("graph")
-        }else if(showData) {
+        } else if (showData) {
             setValue("data")
-        }else {
-            setValue("metadata")
         }
     }, [showData, showGraph])
     const graphView = useRef<GraphViewRef>(null)
@@ -101,25 +99,31 @@ export default function Page() {
                 onQueryUpdate={(state) => { queryState.current = state }}
                 onDeleteGraph={() => setGraph(Graph.empty())}
             />
-            <div className="flex flex-col grow border border-gray-300 rounded-lg p-2 overflow-auto">
+            <div className="h-1 grow border flex flex-col gap-2 border-gray-300 rounded-lg p-2">
                 {
                     graph.Id &&
-                    <Tabs value={value} className="grow flex flex-col justify-center items-center">
-                        <TabsList className="border w-fit">
-                            <TabsTrigger value="metadata" onClick={() => setValue("metadata")}>Metadata</TabsTrigger>
-                            {showData  && <TabsTrigger value="data" onClick={() => setValue("data")}>Data</TabsTrigger>}
-                            {showGraph && <TabsTrigger value="graph" onClick={() => setValue("graph")}>Graph</TabsTrigger>}
-                        </TabsList>
-                        <TabsContent value="metadata" className="grow w-full">
+                    <>
+                        <Tabs value={value} className="h-1 grow flex flex-row">
+                            <div className="w-20 flex flex-row items-center">
+                                {
+                                    (showData || showGraph) &&
+                                    <TabsList className="h-fit flex flex-col p-0">
+                                        {showGraph && <TabsTrigger value="graph" onClick={() => setValue("graph")}>Graph</TabsTrigger>}
+                                        {showData && <TabsTrigger value="table" onClick={() => setValue("table")}>Table</TabsTrigger>}
+                                    </TabsList>
+                                }
+                            </div>
+                            <TabsContent value="table" className="w-1 grow overflow-auto">
+                                <TableView graph={graph} />
+                            </TabsContent>
+                            <TabsContent value="graph" className="w-1 grow">
+                                <GraphView ref={graphView} graph={graph} darkmode={darkmode} />
+                            </TabsContent>
+                        </Tabs>
+                        <div className="border rounded-md border-gray-300 p-2">
                             <MetaDataView metadata={metaData} />
-                        </TabsContent>
-                        <TabsContent value="data" className="grow w-full flex-[1_1_0] overflow-auto">
-                            <TableView graph={graph} />
-                        </TabsContent>
-                        <TabsContent value="graph" className="grow w-full">
-                            <GraphView ref={graphView} graph={graph} darkmode={darkmode} />
-                        </TabsContent>
-                    </Tabs>
+                        </div>
+                    </>
                 }
             </div>
         </div>
