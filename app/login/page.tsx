@@ -14,15 +14,18 @@ export default function Page() {
   const router = useRouter();
   const [error, setError] = useState(false);
 
-  const url = new URL(window.location.href);
-
   const [host, setHost] = useState(DEFAULT_HOST);
   const [port, setPort] = useState(DEFAULT_PORT);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
 
   useEffect(() => {
-    // Get initial data from query params
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const url = new URL(window.location.href);
+
     const hostParam = url.searchParams.get("host");
     const portParam = url.searchParams.get("port");
     const usernameParam = url.searchParams.get("username");
@@ -30,7 +33,7 @@ export default function Page() {
     setHost(hostParam ?? DEFAULT_HOST);
     setPort(portParam ?? DEFAULT_PORT);
     setUsername(usernameParam ?? "");
-  }, [url.searchParams]);
+  }, []);
 
   const onSubmit = (e: FormEvent) => {
     e.preventDefault();
