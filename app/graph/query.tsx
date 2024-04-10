@@ -8,6 +8,7 @@ import { useToast } from "@/components/ui/use-toast";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import Editor from "@monaco-editor/react";
+import { useTheme } from "next-themes";
 import GraphsList from "./GraphList";
 
 export class QueryState {
@@ -26,6 +27,8 @@ export function Query({ onSubmit, onQueryUpdate, onDeleteGraph, className = "" }
     const [query, setQuery] = useState('');
     const [graphName, setGraphName] = useState('');
     const [onDelete, setOnDelete] = useState<boolean>(false);
+    const { theme, systemTheme } = useTheme()
+    const darkmode = theme === "dark" || (theme === "system" && systemTheme === "dark")
     const { toast } = useToast();
 
     onQueryUpdate(new QueryState(query, graphName))
@@ -51,17 +54,18 @@ export function Query({ onSubmit, onQueryUpdate, onDeleteGraph, className = "" }
 
     return (
         <form
-            className={cn("flex flex-col space-y-3 md:flex-row md:space-x-3 md:space-y-0", className)}
-            onSubmit={onSubmit}>
-            <div className="items-center flex flex-row space-x-3">
+            className={cn("w-full flex xl:flex-row md:flex-col gap-2 justify-center", className)}
+            onSubmit={onSubmit}
+        >
+            <div className="flex flex-row gap-2 items-center">
                 <Label htmlFor="query" className="text">Query</Label>
                 <GraphsList onDelete={onDelete} onSelectedGraph={setGraphName} />
             </div>
-            <div className="flex flex-row space-x-3 w-full md:w-8/12 items-center">
+            <div className="flex flex-row gap-2 w-3/4">
                 <Editor
                     value={query}
-                    onChange={(val) => val && setQuery(val)}
-                    theme="vs-dark"
+                    onChange={(val) => (val || val === "") && setQuery(val)}
+                    theme={`${darkmode ? "vs-dark" : "light"}`}
                     language="cypher"
                     options={{
                         suggest: {
@@ -77,47 +81,47 @@ export function Query({ onSubmit, onQueryUpdate, onDeleteGraph, className = "" }
                 <TooltipProvider>
                     <Tooltip>
                         <TooltipTrigger asChild>
-                            <Button type="submit" className="mr-16"><Play/></Button>
+                            <Button type="submit"><Play /></Button>
                         </TooltipTrigger>
                         <TooltipContent>
                             <p>Run Query</p>
                         </TooltipContent>
                     </Tooltip>
                 </TooltipProvider>
+                <AlertDialog>
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button>
+                                <Menu />
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent>
+                            <DropdownMenuLabel className="flex justify-around">Actions</DropdownMenuLabel>
+                            <DropdownMenuSeparator />
+                            {graphName &&
+                                <DropdownMenuItem className="flex justify-around">
+                                    <AlertDialogTrigger className="flex flex-row items-center gap-2">
+                                        <Trash2 />
+                                        <span>Delete graph</span>
+                                    </AlertDialogTrigger>
+                                </DropdownMenuItem>
+                            }
+                        </DropdownMenuContent>
+                    </DropdownMenu>
+                    <AlertDialogContent>
+                        <AlertDialogHeader>
+                            <AlertDialogTitle>Are you absolutely sure you?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                                Are you absolutely sure you want to delete {graphName}?
+                            </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction onClick={() => handleDelete()}>Delete</AlertDialogAction>
+                        </AlertDialogFooter>
+                    </AlertDialogContent>
+                </AlertDialog>
             </div>
-            <AlertDialog>
-                <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                        <Button>
-                            <Menu />
-                        </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent>
-                        <DropdownMenuLabel className="flex justify-around">Actions</DropdownMenuLabel>
-                        <DropdownMenuSeparator />
-                        {graphName &&
-                            <DropdownMenuItem className="flex justify-around">
-                                <AlertDialogTrigger className="flex flex-row items-center gap-x-2">
-                                    <Trash2 />
-                                    <span>Delete graph</span>
-                                </AlertDialogTrigger>
-                            </DropdownMenuItem>
-                        }
-                    </DropdownMenuContent>
-                </DropdownMenu>
-                <AlertDialogContent>
-                    <AlertDialogHeader>
-                        <AlertDialogTitle>Are you absolutely sure you?</AlertDialogTitle>
-                        <AlertDialogDescription>
-                            Are you absolutely sure you want to delete {graphName}?
-                        </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                        <AlertDialogAction onClick={() => handleDelete()}>Delete</AlertDialogAction>
-                    </AlertDialogFooter>
-                </AlertDialogContent>
-            </AlertDialog>
         </form>
     )
 }
