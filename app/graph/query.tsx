@@ -54,17 +54,20 @@ export function Query({ onSubmit, onQueryUpdate, onDeleteGraph, className = "" }
 
     return (
         <form
-            className={cn("flex flex-col gap-3 md:flex-row", className)}
+            className={cn("w-full flex xl:flex-row md:flex-col gap-2 justify-center", className)}
             onSubmit={onSubmit}
         >
-            <div className="items-center flex flex-row gap-3">
+            <div className="flex flex-row gap-2 items-center">
                 <Label htmlFor="query" className="text">Query</Label>
                 <GraphsList onDelete={onDelete} onSelectedGraph={setGraphName} />
             </div>
-            <div className="flex flex-row gap-3 w-full">
+            <div className="flex flex-row gap-2 w-3/4">
                 <Editor
                     value={query}
-                    onChange={(val) => val && setQuery(val)}
+                    onChange={(val) => {
+                        debugger
+                        (val || val === "") && setQuery(val)
+                    }}
                     theme={`${darkmode ? "vs-dark" : "light"}`}
                     language="cypher"
                     options={{
@@ -88,40 +91,40 @@ export function Query({ onSubmit, onQueryUpdate, onDeleteGraph, className = "" }
                         </TooltipContent>
                     </Tooltip>
                 </TooltipProvider>
+                <AlertDialog>
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button>
+                                <Menu />
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent>
+                            <DropdownMenuLabel className="flex justify-around">Actions</DropdownMenuLabel>
+                            <DropdownMenuSeparator />
+                            {graphName &&
+                                <DropdownMenuItem className="flex justify-around">
+                                    <AlertDialogTrigger className="flex flex-row items-center gap-2">
+                                        <Trash2 />
+                                        <span>Delete graph</span>
+                                    </AlertDialogTrigger>
+                                </DropdownMenuItem>
+                            }
+                        </DropdownMenuContent>
+                    </DropdownMenu>
+                    <AlertDialogContent>
+                        <AlertDialogHeader>
+                            <AlertDialogTitle>Are you absolutely sure you?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                                Are you absolutely sure you want to delete {graphName}?
+                            </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction onClick={() => handleDelete()}>Delete</AlertDialogAction>
+                        </AlertDialogFooter>
+                    </AlertDialogContent>
+                </AlertDialog>
             </div>
-            <AlertDialog>
-                <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                        <Button>
-                            <Menu />
-                        </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent>
-                        <DropdownMenuLabel className="flex justify-around">Actions</DropdownMenuLabel>
-                        <DropdownMenuSeparator />
-                        {graphName &&
-                            <DropdownMenuItem className="flex justify-around">
-                                <AlertDialogTrigger className="flex flex-row items-center gap-2">
-                                    <Trash2 />
-                                    <span>Delete graph</span>
-                                </AlertDialogTrigger>
-                            </DropdownMenuItem>
-                        }
-                    </DropdownMenuContent>
-                </DropdownMenu>
-                <AlertDialogContent>
-                    <AlertDialogHeader>
-                        <AlertDialogTitle>Are you absolutely sure you?</AlertDialogTitle>
-                        <AlertDialogDescription>
-                            Are you absolutely sure you want to delete {graphName}?
-                        </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                        <AlertDialogAction onClick={() => handleDelete()}>Delete</AlertDialogAction>
-                    </AlertDialogFooter>
-                </AlertDialogContent>
-            </AlertDialog>
         </form>
     )
 }
