@@ -41,7 +41,7 @@ export default function NextAuthProvider({ children }: { children: React.ReactNo
   return (
     <SessionProvider>
       <ThemeProvider attribute="class" enableSystem>
-        <ResizablePanelGroup direction="horizontal" className='min-h-screen'>
+        <ResizablePanelGroup direction="horizontal" className='h-screen'>
           <ResizablePanel
             ref={navPanel}
             maxSize={panelSize}
