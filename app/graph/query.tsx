@@ -64,10 +64,7 @@ export function Query({ onSubmit, onQueryUpdate, onDeleteGraph, className = "" }
             <div className="flex flex-row gap-2 w-3/4">
                 <Editor
                     value={query}
-                    onChange={(val) => {
-                        debugger
-                        (val || val === "") && setQuery(val)
-                    }}
+                    onChange={(val) => (val || val === "") && setQuery(val)}
                     theme={`${darkmode ? "vs-dark" : "light"}`}
                     language="cypher"
                     options={{
