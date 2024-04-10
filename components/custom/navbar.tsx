@@ -67,8 +67,11 @@ export default function Navbar({ collapsed, onExpand }: { collapsed: boolean, on
   return (
     <nav className={`w-full h-full bg-gray-100 dark:bg-gray-800 py-7 flex flex-col justify-between ${collapsed ? "items-center" : "justify-start"}`}>
       <div className={`${!collapsed && "pl-2"}`}>
-        <Link href="" onClick={onExpand}>
+        <Link className="flex flex-row gap-2 underline underline-offset-2" href="" onClick={onExpand}>
           <Menu className="h-6 w-6" />
+          {!collapsed && (
+            <p>FalkorDB</p>
+          )}
         </Link>
         {status === "authenticated" &&
           <ul className="flex flex-col gap-5 pt-5">
