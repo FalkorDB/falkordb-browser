@@ -108,8 +108,8 @@ export default function Page() {
                                 {
                                     (showData || showGraph) &&
                                     <TabsList className="h-fit flex flex-col p-0">
-                                        {showGraph && <TabsTrigger value="graph" onClick={() => setValue("graph")}>Graph</TabsTrigger>}
-                                        {showData && <TabsTrigger value="table" onClick={() => setValue("table")}>Table</TabsTrigger>}
+                                        {showGraph && <TabsTrigger className="w-full" value="graph" onClick={() => setValue("graph")}>Graph</TabsTrigger>}
+                                        {showData && <TabsTrigger className="w-full" value="table" onClick={() => setValue("table")}>Table</TabsTrigger>}
                                     </TabsList>
                                 }
                             </div>
