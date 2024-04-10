@@ -3,7 +3,7 @@ export default function MetaDataView({ metadata }: { metadata: string[] }) {
         <div>
             {
                 // eslint-disable-next-line react/no-array-index-key
-                metadata.map((val, index) => <p key={index}>{val}</p>)
+                <p> {metadata.join(", ")} </p>
             }
         </div>
     )
