@@ -1,11 +1,12 @@
 import CytoscapeComponent from "react-cytoscapejs";
 import { toast } from "@/components/ui/use-toast";
 import cytoscape, { ElementDefinition, EventObject, NodeDataDefinition } from "cytoscape";
-import { useRef, useState, useImperativeHandle, forwardRef } from "react";
+import { useRef, useState, useImperativeHandle, forwardRef, useEffect } from "react";
 import { signOut } from "next-auth/react";
 import fcose from 'cytoscape-fcose';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { ImperativePanelHandle } from "react-resizable-panels";
+import { ChevronLeft, ChevronRight } from "lucide-react"
 import Labels from "./labels";
 import Toolbar from "./toolbar";
 import { Category, Graph } from "./model";
@@ -95,11 +96,19 @@ interface GraphViewProps {
 
 const GraphView = forwardRef(({ graph, darkmode }: GraphViewProps, ref) => {
 
-    const [selectedNode, setSelectedObject] = useState(null);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const [selectedObject, setSelectedObject] = useState<any | null>(null);
+    const [isOpen, setIsOpen] = useState<boolean>(false);
 
     // A reference to the chart container to allowing zooming and editing
     const chartRef = useRef<cytoscape.Core | null>(null)
     const dataPanel = useRef<ImperativePanelHandle>(null)
+
+    useEffect(() => {
+        if (isOpen) {
+            dataPanel.current?.expand()
+        } else dataPanel.current?.collapse()
+    }, [isOpen])
 
     useImperativeHandle(ref, () => ({
         expand: (elements: ElementDefinition[]) => {
@@ -168,15 +177,15 @@ const GraphView = forwardRef(({ graph, darkmode }: GraphViewProps, ref) => {
     const handleTap = (evt: EventObject) => {
         const object = evt.target.json().data;
         setSelectedObject(object);
-        dataPanel.current?.expand();
+        setIsOpen(true);
     }
 
     return (
         <ResizablePanelGroup direction="horizontal">
-            <ResizablePanel className="h-full flex flex-col">
-                <div className="grid grid-cols-6">
-                    <Toolbar className="col-start-1 justify-start" chartRef={chartRef} />
-                    <Labels className="col-end-7 justify-end" categories={graph.Categories} onClick={onCategoryClick} />
+            <ResizablePanel defaultSize={selectedObject ? 80 : 100} className="h-full flex flex-col">
+                <div className="flex flex-row justify-between">
+                    <Toolbar className="" chartRef={chartRef} />
+                    <Labels className="pr-16" categories={graph.Categories} onClick={onCategoryClick} />
                 </div>
                 <CytoscapeComponent
                     cy={(cy) => {
@@ -190,7 +199,7 @@ const GraphView = forwardRef(({ graph, darkmode }: GraphViewProps, ref) => {
 
                         // Listen to the click event on nodes for showing node properties
                         cy.on('tap', 'node', handleTap);
-                        
+
                         // Listen to the click event on edges for showing edge properties
                         cy.on('tap', 'edge', handleTap);
                     }}
@@ -200,13 +209,20 @@ const GraphView = forwardRef(({ graph, darkmode }: GraphViewProps, ref) => {
                     className="w-full grow"
                 />
             </ResizablePanel>
-            <ResizableHandle withHandle />
-            <ResizablePanel ref={dataPanel} maxSize={50} minSize={17} collapsible defaultSize={selectedNode ? 20 : 0} className="bg-gray-100 dark:bg-gray-800">
-                {selectedNode && <DataPanel node={selectedNode} />}
-            </ResizablePanel>
+            <ResizableHandle />
+            {
+                selectedObject &&
+                <button type="button" onClick={() => setIsOpen(prev => !prev)} className="fixed right-5 top-[50%]">
+                    {isOpen ? <ChevronRight /> : <ChevronLeft />}
+                </button>
+            }
+            {
+                isOpen &&
+                <ResizablePanel id="panel" ref={dataPanel} maxSize={50} minSize={20} collapsible defaultSize={selectedObject ? 20 : 0} className="bg-gray-100 dark:bg-gray-800">
+                    {selectedObject && <DataPanel object={selectedObject} />}
+                </ResizablePanel>
+            }
         </ResizablePanelGroup>
-
-
     )
 });
 

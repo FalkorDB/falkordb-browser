@@ -2,7 +2,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { CircleDot, ZoomIn, ZoomOut } from "lucide-react";
 import { cn } from "@/lib/utils"
 
-export default function Toolbar({chartRef, className=""}: {
+export default function Toolbar({ chartRef, className = "" }: {
     chartRef: React.RefObject<cytoscape.Core>, className: string
 }) {
 
@@ -13,7 +13,7 @@ export default function Toolbar({chartRef, className=""}: {
         }
     }
 
-    const handleCenterClick= () => {
+    const handleCenterClick = () => {
         const chart = chartRef.current
         if (chart) {
             chart.fit()
@@ -22,33 +22,39 @@ export default function Toolbar({chartRef, className=""}: {
     }
 
     return (
-        <div className={cn("flex flex-row gap-x-1", className)}>
-            <TooltipProvider>
-                <Tooltip>
-                    <TooltipTrigger className="text-gray-600 dark:text-gray-400 rounded-lg border border-gray-300 p-2" onClick={() => handleZoomClick(1.1)}>
-                        <ZoomIn />
-                    </TooltipTrigger>
-                    <TooltipContent>
-                        <p>Zoom In</p>
-                    </TooltipContent>
-                </Tooltip>
-                <Tooltip>
-                    <TooltipTrigger className="text-gray-600 dark:text-gray-400 rounded-lg border border-gray-300 p-2" onClick={() => handleZoomClick(0.9)}>
-                        <ZoomOut />
-                    </TooltipTrigger>
-                    <TooltipContent>
-                        <p>Zoom Out</p>
-                    </TooltipContent>
-                </Tooltip>
-                <Tooltip>
-                    <TooltipTrigger className="text-gray-600 dark:text-gray-400 rounded-lg border border-gray-300 p-2" onClick={handleCenterClick}>
-                        <CircleDot />
-                    </TooltipTrigger>
-                    <TooltipContent>
-                        <p>Center</p>
-                    </TooltipContent>
-                </Tooltip>
-            </TooltipProvider>
-        </div>
+        <TooltipProvider>
+            <ul className={cn("flex flex-row gap-2", className)}>
+                <li>
+                    <Tooltip>
+                        <TooltipTrigger className="text-gray-600 dark:text-gray-400 rounded-lg border border-gray-300 p-2" onClick={() => handleZoomClick(1.1)}>
+                            <ZoomIn />
+                        </TooltipTrigger>
+                        <TooltipContent>
+                            <p>Zoom In</p>
+                        </TooltipContent>
+                    </Tooltip>
+                </li>
+                <li>
+                    <Tooltip>
+                        <TooltipTrigger className="text-gray-600 dark:text-gray-400 rounded-lg border border-gray-300 p-2" onClick={() => handleZoomClick(0.9)}>
+                            <ZoomOut />
+                        </TooltipTrigger>
+                        <TooltipContent>
+                            <p>Zoom Out</p>
+                        </TooltipContent>
+                    </Tooltip>
+                </li>
+                <li>
+                    <Tooltip>
+                        <TooltipTrigger className="text-gray-600 dark:text-gray-400 rounded-lg border border-gray-300 p-2" onClick={handleCenterClick}>
+                            <CircleDot />
+                        </TooltipTrigger>
+                        <TooltipContent>
+                            <p>Center</p>
+                        </TooltipContent>
+                    </Tooltip>
+                </li>
+            </ul>
+        </TooltipProvider>
     )
 }
