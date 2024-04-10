@@ -37,8 +37,6 @@ export default function Page() {
             setValue("graph")
         } else if (showData) {
             setValue("data")
-        } else {
-            setValue("metadata")
         }
     }, [showData, showGraph])
     const graphView = useRef<GraphViewRef>(null)
@@ -101,34 +99,33 @@ export default function Page() {
                 onQueryUpdate={(state) => { queryState.current = state }}
                 onDeleteGraph={() => setGraph(Graph.empty())}
             />
-            <div className="flex grow border border-gray-300 rounded-lg p-2 flex-[1_1_0] overflow-auto">
+            <div className="h-1 grow border flex flex-col gap-2 border-gray-300 rounded-lg p-2">
                 {
                     graph.Id &&
-                    <Tabs value={value} className="grow flex flex-row">
-                        <div className="h-full w-20">
-                            {
-                                (showData || showGraph) &&
-                                <TabsList className="border h-fit fixed top-72 flex flex-col p-0">
-                                    {showGraph && <TabsTrigger className="w-full" value="graph" onClick={() => setValue("graph")}>Graph </TabsTrigger>}
-                                    {showData && <TabsTrigger className="w-full" value="table" onClick={() => setValue("table")}> Table </TabsTrigger>}
-                                </TabsList>
-                            }
-                        </div>
-                            <TabsContent value="table" className="grow w-full">
+                    <>
+                        <Tabs value={value} className="h-1 grow flex flex-row">
+                            <div className="w-20 flex flex-row items-center">
+                                {
+                                    (showData || showGraph) &&
+                                    <TabsList className="h-fit flex flex-col p-0">
+                                        {showGraph && <TabsTrigger value="graph" onClick={() => setValue("graph")}>Graph</TabsTrigger>}
+                                        {showData && <TabsTrigger value="table" onClick={() => setValue("table")}>Table</TabsTrigger>}
+                                    </TabsList>
+                                }
+                            </div>
+                            <TabsContent value="table" className="w-1 grow overflow-auto">
                                 <TableView graph={graph} />
                             </TabsContent>
-                        <TabsContent value="graph" className="grow w-full max-w-[1267px]">
-                            <GraphView ref={graphView} graph={graph} darkmode={darkmode} />
-                        </TabsContent>
-                    </Tabs>
+                            <TabsContent value="graph" className="w-1 grow">
+                                <GraphView ref={graphView} graph={graph} darkmode={darkmode} />
+                            </TabsContent>
+                        </Tabs>
+                        <div className="border rounded-md border-gray-300 p-2">
+                            <MetaDataView metadata={metaData} />
+                        </div>
+                    </>
                 }
             </div>
-            {
-                graph.Id &&
-                <div className="border rounded-md border-gray-300 p-2">
-                    <MetaDataView metadata={metaData} />
-                </div>
-            }
         </div>
     )
 }

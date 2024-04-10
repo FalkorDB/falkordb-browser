@@ -2,6 +2,7 @@ import './globals.css'
 import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
 import { Toaster } from '@/components/ui/toaster'
+import { cn } from '@/lib/utils'
 import NextAuthProvider from './providers'
 
 const inter = Inter({ subsets: ['latin'] })
@@ -20,7 +21,7 @@ export default function RootLayout({
   // caused by mismatched client/server content caused by next-themes
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={inter.className}>
+      <body className={cn("h-screen w-screen", inter.className)}>
           <NextAuthProvider>{children}</NextAuthProvider>
           <Toaster />
       </body>
