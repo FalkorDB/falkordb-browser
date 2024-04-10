@@ -4,8 +4,8 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { SignInOptions, SignInResponse, signIn } from "next-auth/react";
-import { FormEvent, useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { FormEvent, use, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 
 const DEFAULT_HOST = "localhost";
 const DEFAULT_PORT = "6379";
@@ -19,21 +19,17 @@ export default function Page() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
 
+  const searchParams = useSearchParams();
+
   useEffect(() => {
-    if (typeof window === "undefined") {
-      return;
-    }
-
-    const url = new URL(window.location.href);
-
-    const hostParam = url.searchParams.get("host");
-    const portParam = url.searchParams.get("port");
-    const usernameParam = url.searchParams.get("username");
+    const hostParam = searchParams.get("host");
+    const portParam = searchParams.get("port");
+    const usernameParam = searchParams.get("username");
 
     setHost(hostParam ?? DEFAULT_HOST);
     setPort(portParam ?? DEFAULT_PORT);
     setUsername(usernameParam ?? "");
-  }, []);
+  }, [searchParams]);
 
   const onSubmit = (e: FormEvent) => {
     e.preventDefault();
