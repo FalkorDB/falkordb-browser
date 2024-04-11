@@ -26,9 +26,9 @@ export default function LoginForm() {
     const portParam = searchParams.get("port");
     const usernameParam = searchParams.get("username");
 
-    setHost(hostParam ?? DEFAULT_HOST);
-    setPort(portParam ?? DEFAULT_PORT);
-    setUsername(usernameParam ?? "");
+    setHost(decodeURIComponent(hostParam ?? DEFAULT_HOST));
+    setPort(decodeURIComponent(portParam ?? DEFAULT_PORT));
+    setUsername(decodeURIComponent(usernameParam ?? ""));
   }, [searchParams]);
 
   const onSubmit = (e: FormEvent) => {
