@@ -3,7 +3,6 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import { Toaster } from "@/components/ui/toaster";
 import { cn } from "@/lib/utils";
-import { Suspense } from "react";
 import NextAuthProvider from "./providers";
 
 const inter = Inter({ subsets: ["latin"] });
@@ -23,9 +22,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={cn("h-screen w-screen", inter.className)}>
-        <NextAuthProvider>
-          <Suspense>{children}</Suspense>
-        </NextAuthProvider>
+        <NextAuthProvider>{children}</NextAuthProvider>
         <Toaster />
       </body>
     </html>
