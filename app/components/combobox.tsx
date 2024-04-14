@@ -102,7 +102,7 @@ export default function Combobox({ className = '', type = '', options, addOption
             <CommandGroup>
               {options.map((option) => (
                 <CommandItem
-                  className="w-full flex flex-row justify-around"
+                  className="w-full flex flex-row justify-between px-6"
                   key={option}
                   onSelect={(currentValue) => {
                     if (currentValue !== selectedValue) {
