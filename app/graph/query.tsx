@@ -31,22 +31,24 @@ export function Query({ onSubmit, onQueryUpdate, className = "" }: {
             onSubmit={onSubmit}
         >
             <GraphsList onSelectedGraph={setGraphName} />
-            <Editor
-                value={query}
-                onChange={(val) => (val || val === "") && setQuery(val)}
-                theme={`${darkmode ? "vs-dark" : "light"}`}
-                language="cypher"
-                options={{
-                    suggest: {
-                        showKeywords: true,
-                    },
-                    minimap: { enabled: false },
-                    wordWrap: "on",
-                    lineHeight: 40,
-                    fontSize: 30,
-                    automaticLayout: true,
-                }}
-            />
+            <div className="w-1 h-full grow">
+                <Editor
+                    value={query}
+                    onChange={(val) => (val || val === "") && setQuery(val)}
+                    theme={`${darkmode ? "vs-dark" : "light"}`}
+                    language="cypher"
+                    options={{
+                        suggest: {
+                            showKeywords: true,
+                        },
+                        minimap: { enabled: false },
+                        wordWrap: "on",
+                        lineHeight: 40,
+                        fontSize: 30,
+                        automaticLayout: true,
+                    }}
+                />
+            </div>
             <TooltipProvider>
                 <Tooltip>
                     <TooltipTrigger>

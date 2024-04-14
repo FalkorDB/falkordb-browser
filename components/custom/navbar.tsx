@@ -1,12 +1,11 @@
 /* eslint-disable jsx-a11y/anchor-is-valid */
-import { Activity, Info, LogOut, Waypoints } from "lucide-react";
+import { Activity, Info, LogOut, Moon, Sun, Waypoints } from "lucide-react";
 import { signOut, useSession } from "next-auth/react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useTheme } from "next-themes";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils"
-import { Switch } from "../ui/switch";
 import { Label } from "../ui/label";
 import GithubMark from "./GithubMark";
 
@@ -49,19 +48,12 @@ export default function Navbar({ collapsed }: { collapsed: boolean }) {
   const { theme, setTheme, systemTheme } = useTheme()
   const [mounted, setMounted] = useState(false)
   const pathName = usePathname()
+  const darkmode = theme === "dark" || (theme === "system" && systemTheme === "dark")
+  
   useEffect(() => {
     setMounted(true)
   }, [])
-  const setDarkMode = (val: boolean) => {
-    if (val) {
-      setTheme("dark")
-    }
-    else {
-      setTheme("light")
-    }
-  }
 
-  const darkmode = theme === "dark" || (theme === "system" && systemTheme === "dark")
   return (
     <nav className='w-full h-full bg-gray-100 dark:bg-gray-800 py-5 flex flex-col justify-between'>
       <ul className={`flex flex-col gap-5 ${collapsed ? "items-center" : "justify-start pl-2"}`}>
@@ -89,13 +81,15 @@ export default function Navbar({ collapsed }: { collapsed: boolean }) {
         <li key={0}>
           {
             mounted &&
-            <div className="flex items-center gap-2">
-              <Switch id="dark-mode" checked={darkmode} onCheckedChange={setDarkMode} />
+            <button type="button" className="flex flex-row items-center gap-2 underline underline-offset-2 text-blue-300" onClick={() => setTheme(darkmode ? "light" : "dark")}>
+              {
+                darkmode ? <Sun /> : <Moon />
+              }
               {
                 !collapsed &&
-                <Label htmlFor="dark-mode">{`${theme} mode`}</Label>
+                <Label className="cursor-pointer text-md" htmlFor="dark-mode">{`${theme === "dark" ? "light" : "dark"} mode`}</Label>
               }
-            </div>
+            </button>
           }
         </li>
         {
