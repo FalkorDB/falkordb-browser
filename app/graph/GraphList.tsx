@@ -1,7 +1,6 @@
 import { useState, useEffect, Dispatch, SetStateAction } from 'react';
 import { useToast } from "@/components/ui/use-toast"
 import Combobox from '../components/combobox';
-import { on } from 'events';
 
 interface Props {
     onSelectedGraph: Dispatch<SetStateAction<string>>,
