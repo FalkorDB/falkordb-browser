@@ -62,7 +62,7 @@ export default function Page() {
         // Proposed abstraction for improved modularity
         if (!validateGraphSelection(state.graphName)) return false;
 
-        const q = state.query.trim() || "MATCH (n) OPTIONAL MATCH (n)-[e]-(m) RETURN n,e,m limit 100";
+        const q = state.query?.trim() || "MATCH (n) OPTIONAL MATCH (n)-[e]-(m) RETURN n,e,m limit 100";
 
         const result = await fetch(`/api/graph?graph=${prepareArg(state.graphName)}&query=${prepareArg(q)}`, {
             method: 'GET',
