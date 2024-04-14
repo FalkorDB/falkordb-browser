@@ -54,74 +54,36 @@ export function Query({ onSubmit, onQueryUpdate, onDeleteGraph, className = "" }
 
     return (
         <form
-            className={cn("w-full flex xl:flex-row md:flex-col gap-2 justify-center", className)}
+            className={cn("w-full flex xl:flex-row md:flex-col gap-2 items-center justify-center", className)}
             onSubmit={onSubmit}
         >
-            <div className="flex flex-row gap-2 items-center">
-                <Label htmlFor="query" className="text">Query</Label>
-                <GraphsList onDelete={onDelete} onSelectedGraph={setGraphName} />
-            </div>
-            <div className="flex flex-row gap-2 w-3/4">
-                <Editor
-                    value={query}
-                    onChange={(val) => (val || val === "") && setQuery(val)}
-                    theme={`${darkmode ? "vs-dark" : "light"}`}
-                    language="cypher"
-                    options={{
-                        suggest: {
-                            showKeywords: true,
-                        },
-                        minimap: { enabled: false },
-                        wordWrap: "on",
-                        lineNumbers: "off",
-                        lineHeight: 40,
-                        fontSize: 30,
-                    }}
-                />
-                <TooltipProvider>
-                    <Tooltip>
-                        <TooltipTrigger asChild>
-                            <Button type="submit"><Play /></Button>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                            <p>Run Query</p>
-                        </TooltipContent>
-                    </Tooltip>
-                </TooltipProvider>
-                <AlertDialog>
-                    <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                            <Button>
-                                <Menu />
-                            </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent>
-                            <DropdownMenuLabel className="flex justify-around">Actions</DropdownMenuLabel>
-                            <DropdownMenuSeparator />
-                            {graphName &&
-                                <DropdownMenuItem className="flex justify-around">
-                                    <AlertDialogTrigger className="flex flex-row items-center gap-2">
-                                        <Trash2 />
-                                        <span>Delete graph</span>
-                                    </AlertDialogTrigger>
-                                </DropdownMenuItem>
-                            }
-                        </DropdownMenuContent>
-                    </DropdownMenu>
-                    <AlertDialogContent>
-                        <AlertDialogHeader>
-                            <AlertDialogTitle>Are you absolutely sure you?</AlertDialogTitle>
-                            <AlertDialogDescription>
-                                Are you absolutely sure you want to delete {graphName}?
-                            </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                            <AlertDialogCancel>Cancel</AlertDialogCancel>
-                            <AlertDialogAction onClick={() => handleDelete()}>Delete</AlertDialogAction>
-                        </AlertDialogFooter>
-                    </AlertDialogContent>
-                </AlertDialog>
-            </div>
+            <GraphsList onDelete={onDelete} onSelectedGraph={setGraphName} />
+            <Editor
+                value={query}
+                onChange={(val) => (val || val === "") && setQuery(val)}
+                theme={`${darkmode ? "vs-dark" : "light"}`}
+                language="cypher"
+                options={{
+                    suggest: {
+                        showKeywords: true,
+                    },
+                    minimap: { enabled: false },
+                    wordWrap: "on",
+                    lineNumbers: "off",
+                    lineHeight: 40,
+                    fontSize: 30,
+                }}
+            />
+            <TooltipProvider>
+                <Tooltip>
+                    <TooltipTrigger asChild>
+                        <button type="submit"><Play /></button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                        <p>Run Query</p>
+                    </TooltipContent>
+                </Tooltip>
+            </TooltipProvider>
         </form>
     )
 }

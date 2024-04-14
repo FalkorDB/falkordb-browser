@@ -46,7 +46,7 @@ const linksDown: LinkDefinition[] = [
   },
 ]
 
-export default function Navbar({ collapsed, onExpand }: { collapsed: boolean, onExpand: () => void }) {
+export default function Navbar({ collapsed }: { collapsed: boolean }) {
   const { status } = useSession()
   const { theme, setTheme, systemTheme } = useTheme()
   const [mounted, setMounted] = useState(false)
@@ -65,97 +65,72 @@ export default function Navbar({ collapsed, onExpand }: { collapsed: boolean, on
 
   const darkmode = theme === "dark" || (theme === "system" && systemTheme === "dark")
   return (
-    <nav className={`w-full h-full bg-gray-100 dark:bg-gray-800 py-7 flex flex-col justify-between ${collapsed ? "items-center" : "justify-start"}`}>
-      <div className={`${!collapsed && "pl-2"}`}>
-        <Link className="flex flex-row gap-2 underline underline-offset-2" href="" onClick={onExpand}>
-          <Menu className="h-6 w-6" />
-          {!collapsed && (
-            <p>FalkorDB</p>
-          )}
-        </Link>
+    <nav className={`w-full h-full bg-gray-100 dark:bg-gray-800 py-5 flex flex-col justify-between`}>
+      <ul className={`flex flex-col gap-5 ${collapsed ? "items-center" : "justify-start pl-2"}`}>
         {status === "authenticated" &&
-          <ul className="flex flex-col gap-5 pt-5">
-            {
-              linksUp.map((link, index) => (
-                // eslint-disable-next-line react/no-array-index-key
-                <li key={index}>
-                  <Link
-                    className={cn("underline underline-offset-2 flex gap-2", pathName === link.href ? 'text-blue-300' : '')}
-                    href={link.href} onClick={link.onClick}
-                  >
-                    {link.icon}
-                    {
-                      !collapsed &&
-                      <div className="flex flex-col">
-                        {/* eslint-disable-next-line react/no-array-index-key */}
-                        {link.name.split(" ").map((str, strIndex) => <p key={strIndex}>{str}</p>)}
-                      </div>}
-                  </Link>
-                </li>
-              ))
-            }
-          </ul>
+          linksUp.map((link, index) => (
+            // eslint-disable-next-line react/no-array-index-key
+            <li key={index}>
+              <Link
+                className={cn("underline underline-offset-2 flex gap-2", pathName === link.href ? '' : 'text-blue-300')}
+                href={link.href} onClick={link.onClick}
+              >
+                {link.icon}
+                {
+                  !collapsed &&
+                  <div className="flex flex-col">
+                    {/* eslint-disable-next-line react/no-array-index-key */}
+                    {link.name.split(" ").map((str, strIndex) => <p key={strIndex}>{str}</p>)}
+                  </div>}
+              </Link>
+            </li>
+          ))
         }
-      </div>
-      <div className={`${!collapsed && "pl-2"}`}>
-        <ul className="flex flex-col gap-5">
-          <li key={0}>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <div className="flex flex-row gap-2">
-                  <Settings />
-                  {
-                    !collapsed &&
-                    <p className="underline underline-offset-2">Settings</p>
-                  }
-                </div>
-              </DropdownMenuTrigger>
-              {
-                mounted &&
-                <DropdownMenuContent side="right" className="flex flex-col justify-center p-3">
-                  <div className="flex items-center gap-2">
-                    <Switch id="dark-mode" checked={darkmode} onCheckedChange={setDarkMode} />
-                    <Label htmlFor="dark-mode">{`${theme} mode`}</Label>
-                  </div>
-                </DropdownMenuContent>
-              }
-            </DropdownMenu>
-          </li>
-          {
-            linksDown.map((link, index) => (
-              // eslint-disable-next-line react/no-array-index-key
-              <li key={index + 1}>
-                <Link
-                  title={link.name}
-                  className={cn("underline underline-offset-2 flex gap-2", pathName === link.href ? 'text-blue-300' : '')}
-                  href={link.href} onClick={link.onClick}
-                >
-                  {link.icon}
-                  {
-                    !collapsed &&
-                    <div className="flex flex-col">
-                      {/* eslint-disable-next-line react/no-array-index-key */}
-                      {link.name.split(" ").map((str, strIndex) => <p key={strIndex}>{str}</p>)}
-                    </div>}
-                </Link>
-              </li>
-            ))
-          }
-          <li key={linksDown.length + 1} className={`${!collapsed ? "flex flex-row items-center gap-1" : "flex justify-center"}`}>
-            <a href="https://github.com/falkordb/falkordb-browser" className="flex justify-center" title="Github repository" aria-label="Github repository">
-              <GithubMark darkMode={darkmode} className="h-4 w-4" />
-            </a>
+      </ul>
+      <ul className={`flex flex-col gap-5 ${collapsed ? "items-center" : "justify-start pl-2"}`}>
+        <li key={0}>
+          <div className="flex items-center gap-2">
+            <Switch id="dark-mode" checked={darkmode} onCheckedChange={setDarkMode} />
             {
-              !collapsed && (
-                <>
-                  <p className="text-xs">Made by</p>
-                  <a className="underline text-xs" href="https://www.falkordb.com">FalkorDB</a>
-                </>
-              )
+              !collapsed &&
+              <Label htmlFor="dark-mode">{`${theme} mode`}</Label>
             }
-          </ li>
-        </ul>
-      </div>
+          </div>
+        </li>
+        {
+          linksDown.map((link, index) => (
+            // eslint-disable-next-line react/no-array-index-key
+            <li key={index + 1}>
+              <Link
+                title={link.name}
+                className={cn("underline underline-offset-2 flex gap-2", pathName === link.href ? '' : 'text-blue-300')}
+                href={link.href} onClick={link.onClick}
+              >
+                {link.icon}
+                {
+                  !collapsed &&
+                  <div className="flex flex-col">
+                    {/* eslint-disable-next-line react/no-array-index-key */}
+                    {link.name.split(" ").map((str, strIndex) => <p key={strIndex}>{str}</p>)}
+                  </div>}
+              </Link>
+            </li>
+          ))
+        }
+        <li key={linksDown.length + 1} className={`${!collapsed ? "flex flex-row items-center gap-1" : "flex justify-center"}`}>
+          <a href="https://github.com/falkordb/falkordb-browser" className="flex justify-center" title="Github repository" aria-label="Github repository">
+            <GithubMark darkMode={darkmode} className="h-4 w-4" />
+          </a>
+          {
+            !collapsed && (
+              <>
+                <p className="text-xs">Made by</p>
+                <a className="underline text-xs" href="https://www.falkordb.com">FalkorDB</a>
+              </>
+            )
+          }
+        </ li>
+      </ul>
     </nav>
   )
 }
