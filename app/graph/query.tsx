@@ -91,7 +91,7 @@ export function Query({ onSubmit, onQueryUpdate, onDelete, className = "" }: {
                     <DialogTrigger>
                         <Maximize />
                     </DialogTrigger>
-                    <DialogContent className="h-[80%]">
+                    <DialogContent className="h-[80%] max-w-[80%]">
                         <Editor
                             value={query}
                             onChange={setQuery}
