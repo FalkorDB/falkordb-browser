@@ -1,12 +1,14 @@
 import { useState, useEffect, Dispatch, SetStateAction } from 'react';
 import { useToast } from "@/components/ui/use-toast"
 import Combobox from '../components/combobox';
+import { on } from 'events';
 
 interface Props {
     onSelectedGraph: Dispatch<SetStateAction<string>>,
+    onDelete: () => void,
 }
 // A component that renders an input box for Cypher queries
-export default function GraphsList({ onSelectedGraph }: Props) {
+export default function GraphsList({ onSelectedGraph, onDelete }: Props) {
 
     const [graphs, setGraphs] = useState<string[]>([]);
     const [selectedGraph, setSelectedGraph] = useState("");
@@ -32,6 +34,22 @@ export default function GraphsList({ onSelectedGraph }: Props) {
             })
     }, [toast])
 
+    const handelDelete = (graphName: string) => {
+        fetch(`/api/graph/${encodeURIComponent(graphName)}`, {
+            method: 'DELETE',
+        }).then(() => 
+            toast({
+                title: 'Graph Deleted',
+                description: `Graph ${graphName} deleted`,
+            })
+        ).catch((error) => {
+            toast({
+                title: "Error",
+                description: error.message,
+            })
+        })
+    }
+
     const setSelectedValue = (graph: string) => {
         setSelectedGraph(graph)
         onSelectedGraph(graph)
@@ -42,7 +60,14 @@ export default function GraphsList({ onSelectedGraph }: Props) {
         setSelectedValue(newGraph)
     }
 
+    const deleteOption = (graphName: string) => {
+        setGraphs((prevGraphs: string[]) => [...prevGraphs.filter(graph => graph !== graphName)]);
+        setSelectedValue("")
+        handelDelete(graphName)
+        onDelete()
+    }
+
     return (
-        <Combobox type="Graph" options={graphs} addOption={addOption} selectedValue={selectedGraph} setSelectedValue={setSelectedValue} />
+        <Combobox type="Graph" options={graphs} addOption={addOption} deleteOption={deleteOption} selectedValue={selectedGraph} setSelectedValue={setSelectedValue} />
     )
 }

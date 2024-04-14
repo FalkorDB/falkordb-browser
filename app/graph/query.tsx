@@ -15,9 +15,10 @@ export class QueryState {
     ) { }
 }
 
-export function Query({ onSubmit, onQueryUpdate, className = "" }: {
+export function Query({ onSubmit, onQueryUpdate, onDelete, className = "" }: {
     onSubmit: (event: React.FormEvent<HTMLFormElement>) => Promise<boolean>,
     onQueryUpdate: (state: QueryState) => void,
+    onDelete: () => void,
     className: string
 }) {
     const lineHeight = 40
@@ -54,7 +55,7 @@ export function Query({ onSubmit, onQueryUpdate, className = "" }: {
                 className={cn("w-full flex xl:flex-row md:flex-col gap-2 items-start", className)}
                 onSubmit={onSubmit}
             >
-                <GraphsList onSelectedGraph={setGraphName} />
+                <GraphsList onDelete={onDelete} onSelectedGraph={setGraphName} />
                 <div className="w-1 h-fit grow">
                     <Editor
                         className="border rounded-lg overflow-hidden"
