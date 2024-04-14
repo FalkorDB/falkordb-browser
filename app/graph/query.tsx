@@ -31,33 +31,32 @@ export function Query({ onSubmit, onQueryUpdate, className = "" }: {
             onSubmit={onSubmit}
         >
             <GraphsList onSelectedGraph={setGraphName} />
-            <div className="w-full grow flex flex-row gep-2">
-                <Editor
-                    value={query}
-                    onChange={(val) => (val || val === "") && setQuery(val)}
-                    theme={`${darkmode ? "vs-dark" : "light"}`}
-                    language="cypher"
-                    options={{
-                        suggest: {
-                            showKeywords: true,
-                        },
-                        minimap: { enabled: false },
-                        wordWrap: "on",
-                        lineHeight: 40,
-                        fontSize: 30,
-                    }}
-                />
-                <TooltipProvider>
-                    <Tooltip>
-                        <TooltipTrigger>
-                            <Play />
-                        </TooltipTrigger>
-                        <TooltipContent>
-                            <p>Run Query</p>
-                        </TooltipContent>
-                    </Tooltip>
-                </TooltipProvider>
-            </div>
+            <Editor
+                value={query}
+                onChange={(val) => (val || val === "") && setQuery(val)}
+                theme={`${darkmode ? "vs-dark" : "light"}`}
+                language="cypher"
+                options={{
+                    suggest: {
+                        showKeywords: true,
+                    },
+                    minimap: { enabled: false },
+                    wordWrap: "on",
+                    lineHeight: 40,
+                    fontSize: 30,
+                    automaticLayout: true,
+                }}
+            />
+            <TooltipProvider>
+                <Tooltip>
+                    <TooltipTrigger>
+                        <Play />
+                    </TooltipTrigger>
+                    <TooltipContent>
+                        <p>Run Query</p>
+                    </TooltipContent>
+                </Tooltip>
+            </TooltipProvider>
         </form>
     )
 }
