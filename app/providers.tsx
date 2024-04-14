@@ -6,8 +6,8 @@ import { ThemeProvider } from 'next-themes'
 import { useEffect, useRef, useState } from "react";
 import { ImperativePanelHandle } from "react-resizable-panels";
 import Navbar from "@/components/custom/navbar";
-import useScreenSize from "./useScreenSize";
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import useScreenSize from "./useScreenSize";
 
 export default function NextAuthProvider({ children }: { children: React.ReactNode }) {
 
@@ -51,7 +51,7 @@ export default function NextAuthProvider({ children }: { children: React.ReactNo
             minSize={panelSize}
             onCollapse={() => { setCollapsed(true) }}
             onExpand={() => { setCollapsed(false) }}>
-            <button className="fixed top-[50%] left-2" onClick={() => onExpand()}>
+            <button type="button" className="fixed top-[50%] left-2" onClick={() => onExpand()}>
               {isCollapsed ? <ChevronRight /> : <ChevronLeft />}
             </button>
             <Navbar collapsed={isCollapsed} />

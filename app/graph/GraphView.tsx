@@ -224,21 +224,19 @@ const GraphView = forwardRef(({ graph, darkmode }: GraphViewProps, ref) => {
                     {!isCollapsed ? <ChevronRight /> : <ChevronLeft />}
                 </button>
             }
-            {
-                <ResizablePanel
-                    id="panel"
-                    ref={dataPanel}
-                    maxSize={50}
-                    minSize={20}
-                    onCollapse={() => { setIsCollapsed(true) }}
-                    onExpand={() => { setIsCollapsed(false) }}
-                    collapsible
-                    defaultSize={selectedObject ? 20 : 0}
-                    className="bg-gray-100 dark:bg-gray-800"
-                >
-                    {selectedObject && <DataPanel object={selectedObject} />}
-                </ResizablePanel>
-            }
+            <ResizablePanel
+                id="panel"
+                ref={dataPanel}
+                maxSize={50}
+                minSize={20}
+                onCollapse={() => { setIsCollapsed(true) }}
+                onExpand={() => { setIsCollapsed(false) }}
+                collapsible
+                defaultSize={selectedObject ? 20 : 0}
+                className="bg-gray-100 dark:bg-gray-800"
+            >
+                {selectedObject && <DataPanel object={selectedObject} />}
+            </ResizablePanel>
         </ResizablePanelGroup>
     )
 });

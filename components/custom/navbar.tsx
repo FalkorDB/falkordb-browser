@@ -1,16 +1,14 @@
 /* eslint-disable jsx-a11y/anchor-is-valid */
-import { Activity, Info, LogOut, Menu, Settings, Waypoints } from "lucide-react";
+import { Activity, Info, LogOut, Waypoints } from "lucide-react";
 import { signOut, useSession } from "next-auth/react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useTheme } from "next-themes";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils"
-import { DropdownMenuTrigger } from "@radix-ui/react-dropdown-menu";
 import { Switch } from "../ui/switch";
 import { Label } from "../ui/label";
 import GithubMark from "./GithubMark";
-import { DropdownMenu, DropdownMenuContent } from "../ui/dropdown-menu";
 
 export interface LinkDefinition {
   name: string,
@@ -65,7 +63,7 @@ export default function Navbar({ collapsed }: { collapsed: boolean }) {
 
   const darkmode = theme === "dark" || (theme === "system" && systemTheme === "dark")
   return (
-    <nav className={`w-full h-full bg-gray-100 dark:bg-gray-800 py-5 flex flex-col justify-between`}>
+    <nav className='w-full h-full bg-gray-100 dark:bg-gray-800 py-5 flex flex-col justify-between'>
       <ul className={`flex flex-col gap-5 ${collapsed ? "items-center" : "justify-start pl-2"}`}>
         {status === "authenticated" &&
           linksUp.map((link, index) => (
@@ -89,13 +87,16 @@ export default function Navbar({ collapsed }: { collapsed: boolean }) {
       </ul>
       <ul className={`flex flex-col gap-5 ${collapsed ? "items-center" : "justify-start pl-2"}`}>
         <li key={0}>
-          <div className="flex items-center gap-2">
-            <Switch id="dark-mode" checked={darkmode} onCheckedChange={setDarkMode} />
-            {
-              !collapsed &&
-              <Label htmlFor="dark-mode">{`${theme} mode`}</Label>
-            }
-          </div>
+          {
+            mounted &&
+            <div className="flex items-center gap-2">
+              <Switch id="dark-mode" checked={darkmode} onCheckedChange={setDarkMode} />
+              {
+                !collapsed &&
+                <Label htmlFor="dark-mode">{`${theme} mode`}</Label>
+              }
+            </div>
+          }
         </li>
         {
           linksDown.map((link, index) => (

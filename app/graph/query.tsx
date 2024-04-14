@@ -1,11 +1,7 @@
-import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { Menu, Play, Trash2 } from "lucide-react";
+import { Play } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import Editor from "@monaco-editor/react";
 import { useTheme } from "next-themes";
@@ -32,25 +28,6 @@ export function Query({ onSubmit, onQueryUpdate, onDeleteGraph, className = "" }
     const { toast } = useToast();
 
     onQueryUpdate(new QueryState(query, graphName))
-
-    const handleDelete = () => {
-        fetch(`/api/graph/${encodeURIComponent(graphName)}`, {
-            method: 'DELETE',
-        }).then(res => res.json()).then((data) => {
-            toast({
-                title: "Delete graph",
-                description: data.message,
-            })
-            setOnDelete(prev => !prev)
-            setGraphName('')
-            onDeleteGraph()
-        }).catch(err => {
-            toast({
-                title: "Error",
-                description: (err as Error).message,
-            })
-        })
-    }
 
     return (
         <form
