@@ -104,10 +104,6 @@ const GraphView = forwardRef(({ graph, darkmode }: GraphViewProps, ref) => {
     const chartRef = useRef<cytoscape.Core | null>(null)
     const dataPanel = useRef<ImperativePanelHandle>(null)
 
-    useEffect(() => {
-        chartRef.current?.maxZoom()
-    }, [chartRef.current])
-
     useImperativeHandle(ref, () => ({
         expand: (elements: ElementDefinition[]) => {
             const chart = chartRef.current
