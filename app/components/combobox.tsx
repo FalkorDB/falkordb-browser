@@ -151,9 +151,9 @@ export default function Combobox({ className = '', type = '', options, addOption
       </Popover>
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>Are you absolutely sure you?</AlertDialogTitle>
+          <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
           <AlertDialogDescription>
-            Are you absolutely sure you want to delete {deleteGraph}?
+            Are you sure you want to delete {deleteGraph}?
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
