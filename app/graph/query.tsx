@@ -1,7 +1,6 @@
 import { cn } from "@/lib/utils";
 import { useEffect, useState } from "react";
 import { Maximize, Play } from "lucide-react";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import Editor from "@monaco-editor/react";
 import { useTheme } from "next-themes";
 import { editor } from "monaco-editor";
@@ -90,6 +89,7 @@ export function Query({ onSubmit, onQueryUpdate, onDelete, className = "" }: {
                 <div className="h-10 flex justify-center gap-2">
                     <DialogTrigger asChild>
                         <button title="Maximize" type="button">
+                            { /* eslint-disable jsx-a11y/control-has-associated-label */}
                             <Maximize />
                         </button>
                     </DialogTrigger>
@@ -102,6 +102,7 @@ export function Query({ onSubmit, onQueryUpdate, onDelete, className = "" }: {
                         />
                     </DialogContent>
                     <button title="Run Query" type="submit">
+                        { /* eslint-disable jsx-a11y/control-has-associated-label */}
                         <Play />
                     </button>
                 </div>
