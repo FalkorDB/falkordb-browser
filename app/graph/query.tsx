@@ -39,13 +39,6 @@ export function Query({ onSubmit, onQueryUpdate, onDelete, className = "" }: {
 
     const height = getHeight();
 
-    useEffect(() => {
-        if (monacoEditor) {
-            const scrollLine = query?.split("\n").length || lineHeight
-            monacoEditor.setScrollPosition({ scrollTop: scrollLine });
-        }
-    }, [height])
-
     onQueryUpdate(new QueryState(query, graphName))
 
     return (
