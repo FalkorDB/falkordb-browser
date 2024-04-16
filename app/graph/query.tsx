@@ -1,9 +1,8 @@
 import { cn } from "@/lib/utils";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Maximize, Play } from "lucide-react";
 import Editor from "@monaco-editor/react";
 import { useTheme } from "next-themes";
-import { editor } from "monaco-editor";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import GraphsList from "./GraphList";
 
@@ -24,7 +23,6 @@ export function Query({ onSubmit, onQueryUpdate, onDelete, className = "" }: {
     const [query, setQuery] = useState<string | undefined>();
     const [graphName, setGraphName] = useState('');
     const { theme, systemTheme } = useTheme()
-    const [monacoEditor, setMonacoEditor] = useState<editor.IStandaloneCodeEditor | null>(null)
     const darkmode = theme === "dark" || (theme === "system" && systemTheme === "dark")
 
     const getHeight = () => {
@@ -54,7 +52,6 @@ export function Query({ onSubmit, onQueryUpdate, onDelete, className = "" }: {
                         height={height}
                         value={query}
                         onChange={setQuery}
-                        onMount={setMonacoEditor}
                         theme={`${darkmode ? "vs-dark" : "light"}`}
                         language="cypher"
                         options={{
