@@ -49,7 +49,7 @@ export default function Navbar({ collapsed }: { collapsed: boolean }) {
   const [mounted, setMounted] = useState(false)
   const pathName = usePathname()
   const darkmode = theme === "dark" || (theme === "system" && systemTheme === "dark")
-  
+
   useEffect(() => {
     setMounted(true)
   }, [])
@@ -62,6 +62,7 @@ export default function Navbar({ collapsed }: { collapsed: boolean }) {
             // eslint-disable-next-line react/no-array-index-key
             <li key={index}>
               <Link
+                title={link.name}
                 className={cn("underline underline-offset-2 flex gap-2", pathName === link.href ? '' : 'text-blue-300')}
                 href={link.href} onClick={link.onClick}
               >
@@ -81,7 +82,7 @@ export default function Navbar({ collapsed }: { collapsed: boolean }) {
         <li key={0}>
           {
             mounted &&
-            <button type="button" className="flex flex-row items-center gap-2 underline underline-offset-2 text-blue-300" onClick={() => setTheme(darkmode ? "light" : "dark")}>
+            <button title="Theme" type="button" className="flex flex-row items-center gap-2 underline underline-offset-2 text-blue-300" onClick={() => setTheme(darkmode ? "light" : "dark")}>
               {
                 darkmode ? <Sun /> : <Moon />
               }

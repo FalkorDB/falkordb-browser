@@ -1,4 +1,4 @@
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface Props {
@@ -17,9 +17,10 @@ const excludedProperties = new Set([
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export default function DataPanel({ object }: Props) {
     const rowClass = "dark:hover:bg-slate-700 hover:bg-gray-400 border-y-[1px] border-y-gray-700"
-
+    const type = object.sucre ? "edge" : "node"
     return (
         <Table>
+            <TableCaption>{type} properties</TableCaption>
             <TableHeader>
                 <TableRow className={rowClass}>
                     <TableHead>Field</TableHead>
@@ -38,10 +39,10 @@ export default function DataPanel({ object }: Props) {
                                     const text = cellIndex === 1 ? JSON.parse(strCell) : strCell
                                     return (
                                         // eslint-disable-next-line react/no-array-index-key
-                                        <TableCell key={cellIndex}>
+                                        <TableCell className="max-w-10" key={cellIndex}>
                                             <TooltipProvider>
                                                 <Tooltip>
-                                                    <TooltipTrigger className="max-w-96 truncate">
+                                                    <TooltipTrigger className="w-full truncate" >
                                                         {text}
                                                     </TooltipTrigger>
                                                     <TooltipContent>

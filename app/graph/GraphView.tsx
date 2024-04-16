@@ -216,7 +216,7 @@ const GraphView = forwardRef(({ graph, darkmode }: GraphViewProps, ref) => {
             <ResizableHandle />
             {
                 selectedObject &&
-                <button type="button" onClick={() => onExpand()} className="fixed right-5 top-[50%]">
+                <button title={isCollapsed ? "open" : "close"} type="button" onClick={() => onExpand()} className="fixed right-5 top-[50%]">
                     {!isCollapsed ? <ChevronRight /> : <ChevronLeft />}
                 </button>
             }

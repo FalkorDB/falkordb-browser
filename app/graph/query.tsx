@@ -88,8 +88,10 @@ export function Query({ onSubmit, onQueryUpdate, onDelete, className = "" }: {
                     />
                 </div>
                 <div className="h-10 flex justify-center gap-2">
-                    <DialogTrigger>
-                        <Maximize />
+                    <DialogTrigger asChild>
+                        <button title="Maximize" type="button">
+                            <Maximize />
+                        </button>
                     </DialogTrigger>
                     <DialogContent className="h-[80%] max-w-[80%]">
                         <Editor
@@ -99,16 +101,9 @@ export function Query({ onSubmit, onQueryUpdate, onDelete, className = "" }: {
                             language="cypher"
                         />
                     </DialogContent>
-                    <TooltipProvider>
-                        <Tooltip>
-                            <TooltipTrigger>
-                                <Play />
-                            </TooltipTrigger>
-                            <TooltipContent>
-                                <p>Run Query</p>
-                            </TooltipContent>
-                        </Tooltip>
-                    </TooltipProvider>
+                    <button title="Run Query" type="submit">
+                        <Play />
+                    </button>
                 </div>
             </form>
         </Dialog>
