@@ -3,25 +3,11 @@
 import { toast } from "@/components/ui/use-toast";
 import React, { useState } from "react";
 import { signOut } from "next-auth/react";
-import { Query } from "./query";
-import { QuerySection } from "./QuerySection";
-import { Maximize2, X } from "lucide-react";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
-
-export class QueryState {
-
-    public static count: number = 0;
-
-    public id: number;
-
-    constructor(
-        public graphName: string,
-        public query: string | undefined,
-        public data?: any,
-    ) {
-        this.id = QueryState.count++;
-    }
-}
+import { Maximize2, X } from "lucide-react";
+import Query from "./mainQuery";
+import GraphSection from "./graphSection";
+import { GraphState } from "./sectionQuery";
 
 // Validate the graph selection is not empty and show an error message if it is
 function validateGraphSelection(graphName: string): boolean {
@@ -37,31 +23,25 @@ function validateGraphSelection(graphName: string): boolean {
 
 export default function Page() {
 
-    const [queryStates, setQueryStates] = useState<QueryState[]>([])
-    const [mainQueryState, setMainQueryState] = useState<QueryState | null>(null);
+    const [queryStates, setQueryStates] = useState<GraphState[]>([])
     const iconSize = 15
 
     function prepareArg(arg: string): string {
         return encodeURIComponent(arg.trim())
     }
 
-    const runMainQuery = async (event: React.FormEvent<HTMLElement>) => {
-        event.preventDefault()
-        if (!mainQueryState) return
-        const data = await runQuery(event, mainQueryState)
-        if (!data) return
-        const q = mainQueryState.query?.trim() || "MATCH (n) OPTIONAL MATCH (n)-[e]-(m) RETURN n,e,m limit 100";
-        setQueryStates(prev => [new QueryState(mainQueryState.graphName, q, data), ...prev])
-    }
-
-    const runQuery = async (event: React.FormEvent<HTMLElement>, queryState: QueryState) => {
+    const defaultQuery = (q: string) => 
+        q.trim() || "MATCH (n) OPTIONAL MATCH (n)-[e]-(m) RETURN n,e,m limit 100";
+    
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const runQuery = async (event: React.FormEvent<HTMLElement>, graphName: string, query: string): Promise<any | null> => {
         event.preventDefault()
         // Proposed abstraction for improved modularity
-        if (!validateGraphSelection(queryState.graphName)) return
+        if (!validateGraphSelection(graphName)) return null
 
-        const q = queryState.query?.trim() || "MATCH (n) OPTIONAL MATCH (n)-[e]-(m) RETURN n,e,m limit 100";
+        const q = defaultQuery(query)
 
-        const result = await fetch(`/api/graph?graph=${prepareArg(queryState.graphName)}&query=${prepareArg(q)}`, {
+        const result = await fetch(`/api/graph?graph=${prepareArg(graphName)}&query=${prepareArg(q)}`, {
             method: 'GET',
             headers: {
                 'Content-Type': 'application/json'
@@ -75,65 +55,70 @@ export default function Page() {
             if (result.status >= 400 && result.status < 500) {
                 signOut({ callbackUrl: '/login' })
             }
-            return
+            return null
         }
 
         const json = await result.json()
         return json.result
     }
+    
+    const runMainQuery = async (event: React.FormEvent<HTMLElement>, graphName: string, query: string) => {
+        event.preventDefault()
+        const data = await runQuery(event, graphName, query)
+        if (!data) return
+        const q = defaultQuery(query)
+        setQueryStates(prev => [new GraphState(graphName, q, data), ...prev])
+    }
 
     const onDelete = (graphName: string) => {
-        setQueryStates((prev: QueryState[]) => prev.filter(state => state.graphName !== graphName))
+        setQueryStates((prev: GraphState[]) => prev.filter(state => state.graphName !== graphName))
     }
 
     const closeState = (id: number) => {
-        setQueryStates((prev: QueryState[]) => prev.filter(state => state.id !== id))
+        setQueryStates((prev: GraphState[]) => prev.filter(state => state.id !== id))
     }
     return (
         <div className="h-full flex flex-col p-2 gap-y-2">
             <Query
-                onMainSubmit={runMainQuery}
-                setMainQueryState={setMainQueryState}
+                onSubmit={runMainQuery}
                 onDelete={onDelete}
                 className="border rounded-lg border-gray-300 p-2"
             />
             <ul className="grow space-y-4 overflow-auto">
                 {
                     queryStates.length > 0 &&
-                    queryStates.map((state) => {
-                        return (
-                            <li key={state.id} className="h-full flex flex-col border rounded-lg border-gray-300 p-2">
-                                <div className="p-2 pt-0 flex flex-row justify-between">
-                                    <div>
-                                        <Dialog>
-                                            <DialogTrigger asChild>
-                                                <button title="Fullscreen" type="button">
-                                                    <Maximize2 size={iconSize} />
-                                                </button>
-                                            </DialogTrigger>
-                                            <DialogContent className="max-w-full h-full p-3 pt-10">
-                                                <QuerySection
-                                                    onSubmit={runQuery}
-                                                    onDelete={onDelete}
-                                                    queryState={state}
-                                                />
-                                            </DialogContent>
-                                        </Dialog>
-                                    </div>
-                                    <button title="close" type="button" onClick={() => closeState(state.id)}>
-                                        <X size={iconSize} />
-                                    </button>
+                    queryStates.map((state) => (
+                        <li key={state.id} className="h-full flex flex-col border rounded-lg border-gray-300 p-2">
+                            <div className="p-2 pt-0 flex flex-row justify-between">
+                                <div>
+                                    <Dialog>
+                                        <DialogTrigger asChild>
+                                            <button title="Fullscreen" type="button">
+                                                {/* eslint-disable-next-line jsx-a11y/control-has-associated-label */}
+                                                <Maximize2 size={iconSize} />
+                                            </button>
+                                        </DialogTrigger>
+                                        <DialogContent className="max-w-full h-full p-3 pt-10">
+                                            <GraphSection
+                                                onSubmit={runQuery}
+                                                queryState={state}
+                                            />
+                                        </DialogContent>
+                                    </Dialog>
                                 </div>
-                                <div className="grow">
-                                    <QuerySection
-                                        onSubmit={runQuery}
-                                        onDelete={onDelete}
-                                        queryState={state}
-                                    />
-                                </div>
-                            </li>
-                        )
-                    })
+                                <button title="close" type="button" onClick={() => closeState(state.id)}>
+                                    {/* eslint-disable-next-line jsx-a11y/control-has-associated-label */}
+                                    <X size={iconSize} />
+                                </button>
+                            </div>
+                            <div className="grow">
+                                <GraphSection
+                                    onSubmit={runQuery}
+                                    queryState={state}
+                                />
+                            </div>
+                        </li>
+                    ))
                 }
             </ul>
         </div>

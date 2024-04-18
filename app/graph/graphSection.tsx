@@ -1,18 +1,17 @@
-import { Query } from "./query"
-import { QueryState } from "./page"
+import { useTheme } from "next-themes"
+import { useEffect, useRef, useState } from "react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import SectionQuery, { GraphState } from "./sectionQuery"
 import MetaDataView from "./metadataview"
 import GraphView, { GraphViewRef } from "./GraphView"
 import { TableView } from "./tableview"
-import { useEffect, useRef, useState } from "react"
 import { Graph } from "./model"
-import { useTheme } from "next-themes"
 
-export const QuerySection = ({ onSubmit, onDelete, queryState }: {
-    onSubmit: (e: React.FormEvent<HTMLElement>, queryState: QueryState) => Promise<any>,
-    onDelete: (graphName: string) => void,
-    queryState: QueryState,
-}) => {
+export default function GraphSection({ onSubmit, queryState }: {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    onSubmit: (e: React.FormEvent<HTMLElement>, graphName: string, query: string) => Promise<any>,
+    queryState: GraphState,
+}) {
 
     const [graph, setGraph] = useState<Graph>(Graph.create(queryState.graphName, queryState.data))
     const [value, setValue] = useState<string>()
@@ -22,6 +21,7 @@ export const QuerySection = ({ onSubmit, onDelete, queryState }: {
     const showTable = graph.Data && graph.Data.length > 0
     const { theme, systemTheme } = useTheme()
     const darkmode = theme === "dark" || (theme === "system" && systemTheme === "dark")
+    
     useEffect(() => {
         if (showGraph) {
             setValue("graph")
@@ -30,19 +30,18 @@ export const QuerySection = ({ onSubmit, onDelete, queryState }: {
         }
     }, [showTable, showGraph])
 
-    const handelSubmit = async (e: React.FormEvent<HTMLElement>, state: QueryState) => {
-        const data = await onSubmit(e, state)
-        setGraph(Graph.create(state.graphName, data))
+    const handelSubmit = async (e: React.FormEvent<HTMLElement>, graphName: string, query: string) => {
+        const data = await onSubmit(e, graphName, query)
+        setGraph(Graph.create(graphName, data))
         setMetadata(data.metadata)
         graphView.current?.expand(graph.Elements)
     }
 
     return (
         <div className="h-full flex flex-col gap-y-2">
-            <Query
+            <SectionQuery
                 queryState={queryState}
                 onSubmit={handelSubmit}
-                onDelete={onDelete}
                 className="border rounded-lg border-gray-300 p-2"
             />
             {
