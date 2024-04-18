@@ -1,19 +1,21 @@
 import { cn } from "@/lib/utils";
-import { FormEvent, useEffect, useState } from "react";
-import { Maximize, Menu, Play, Trash2 } from "lucide-react";
+import { FormEvent, useEffect, useRef, useState } from "react";
+import { Copy, Edit, Maximize, Menu, Play, Trash2 } from "lucide-react";
 import Editor from "@monaco-editor/react";
 import { useTheme } from "next-themes";
-import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogTitle, AlertDialogTrigger, AlertDialogHeader, AlertDialogFooter } from "@/components/ui/alert-dialog";
+import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useToast } from "@/components/ui/use-toast";
-import { QueryState } from "./page";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuItem } from "@/components/ui/dropdown-menu";
+import { QueryState } from "./page"
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import Combobox from "../components/combobox";
 
-export function Query({ onSubmit, onMainSubmit, setMainQueryState, queryState, onDelete, className = "" }: {
-    onSubmit?: (e: FormEvent<HTMLFormElement>, queryState: QueryState) => Promise<any>,
-    onMainSubmit?: (e: FormEvent<HTMLFormElement>, queryState: QueryState) => Promise<any>,
+export default function Query({ onSubmit, onMainSubmit, setMainQueryState, queryState, onDelete, className = "" }: {
+    onMainSubmit?: (e: FormEvent<HTMLFormElement>, queryState: QueryState) => Promise<void>,
     setMainQueryState?: (queryState: QueryState) => void,
+    onSubmit?: (e: FormEvent<HTMLFormElement>, queryState: QueryState) => Promise<any>,
     queryState?: QueryState,
     onDelete: (graphName: string) => void,
     className: string,
@@ -23,8 +25,11 @@ export function Query({ onSubmit, onMainSubmit, setMainQueryState, queryState, o
     const [graphName, setGraphName] = useState(queryState?.graphName || '');
     const { theme, systemTheme } = useTheme()
     const [graphs, setGraphs] = useState<string[]>([]);
-    const { toast } = useToast()
     const darkmode = theme === "dark" || (theme === "system" && systemTheme === "dark")
+    const inputCopyRef = useRef<HTMLInputElement>(null)
+    const inputRenameRef = useRef<HTMLInputElement>(null)
+    const { toast } = useToast()
+    const iconSize = 22
 
     const getHeight = () => {
         if (!query) return lineHeight
@@ -37,6 +42,7 @@ export function Query({ onSubmit, onMainSubmit, setMainQueryState, queryState, o
     }
 
     const height = getHeight();
+
     useEffect(() => {
         fetch('/api/graph', {
             method: 'GET',
@@ -59,7 +65,9 @@ export function Query({ onSubmit, onMainSubmit, setMainQueryState, queryState, o
     }, [toast])
 
     useEffect(() => {
-        setMainQueryState && setMainQueryState({ id: 0, graphName, query })
+        if (setMainQueryState) {
+            setMainQueryState({ id: 0, graphName, query })
+        }
     }, [query, graphName])
 
     const handelDelete = (graphName: string) => {
@@ -78,6 +86,45 @@ export function Query({ onSubmit, onMainSubmit, setMainQueryState, queryState, o
                 title: "Error",
                 description: error.message,
             })
+        })
+    }
+
+    const handelCopy = async () => {
+        const newName = inputCopyRef.current?.value
+        if (!newName) return
+        const response = await fetch(`/api/graph/${encodeURIComponent(graphName)}?newName=${newName}`, {
+            method: 'POST',
+        })
+        const json = await response.json()
+        if (response.status >= 300) {
+            toast({
+                title: "Error",
+                description: json.message,
+            })
+            return
+        }
+        setGraphs(prev => [...prev, newName])
+    }
+
+    const handelRename = async () => {
+        const newName = inputRenameRef.current?.value
+        if (!newName) return
+        const response = await fetch(`/api/graph/${encodeURIComponent(graphName)}?newName=${newName}`, {
+            method: 'PATCH',
+        })
+        const json = await response.json()
+        if (response.status >= 300) {
+            toast({
+                title: "Error",
+                description: json.message,
+            })
+            return
+        }
+        setGraphName(newName)
+        setGraphs(prev => [...prev.filter(name => name !== graphName), newName])
+        toast({
+            title: "Rename",
+            description: `Graph ${graphName} Rename to ${newName}`,
         })
     }
 
@@ -137,6 +184,7 @@ export function Query({ onSubmit, onMainSubmit, setMainQueryState, queryState, o
                     <Dialog>
                         <DialogTrigger asChild>
                             <button title="Maximize" className="absolute top-2 right-2" type="button">
+                                {/* eslint-disable-next-line jsx-a11y/control-has-associated-label */}
                                 <Maximize />
                             </button>
                         </DialogTrigger>
@@ -152,44 +200,90 @@ export function Query({ onSubmit, onMainSubmit, setMainQueryState, queryState, o
                 }
             </div>
             <button title="Run Query" className="pt-2" type="submit">
+                {/* eslint-disable-next-line jsx-a11y/control-has-associated-label */}
                 <Play />
             </button>
             {
-                !queryState &&
-                <AlertDialog>
-                    <DropdownMenu>
-                        <DropdownMenuTrigger title="menu" className="pt-2 focus-visible:outline-none">
-                            <Menu />
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent>
-                            <DropdownMenuLabel className="text-center">
-                                <h1>Actions</h1>
-                            </DropdownMenuLabel>
-                            <DropdownMenuSeparator />
-                            {
-                                graphName &&
-                                <DropdownMenuItem>
-                                    <AlertDialogTrigger className="w-full flex flex-row justify-around gap-4">
-                                        <span>Delete</span>
-                                        <Trash2 />
-                                    </AlertDialogTrigger>
-                                    <AlertDialogContent>
-                                        <AlertDialogHeader>
-                                            <AlertDialogTitle>Are you absolutely sure you?</AlertDialogTitle>
-                                            <AlertDialogDescription>
-                                                Are you absolutely sure you want to delete {graphName}?
-                                            </AlertDialogDescription>
-                                        </AlertDialogHeader>
-                                        <AlertDialogFooter>
-                                            <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                            <AlertDialogAction onClick={() => handelDelete(graphName)}>Delete</AlertDialogAction>
-                                        </AlertDialogFooter>
-                                    </AlertDialogContent>
+                !queryState && graphName &&
+                <DropdownMenu>
+                    <DropdownMenuTrigger title="menu" className="pt-2 focus-visible:outline-none">
+                        <Menu />
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent>
+                        <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                                <DropdownMenuItem onSelect={(e) => e.preventDefault()} title="Delete">
+                                    <Trash2 size={iconSize} />
+                                    <DropdownMenuLabel>Delete</DropdownMenuLabel>
                                 </DropdownMenuItem>
-                            }
-                        </DropdownMenuContent>
-                    </DropdownMenu>
-                </AlertDialog>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                                <AlertDialogHeader>
+                                    <AlertDialogTitle>Are you absolutely sure you?</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                        Are you absolutely sure you want to delete {graphName}?
+                                    </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                    <AlertDialogAction onClick={() => handelDelete(graphName)}>Delete</AlertDialogAction>
+                                </AlertDialogFooter>
+                            </AlertDialogContent>
+                        </AlertDialog>
+                        <DropdownMenuSeparator />
+                        <Dialog>
+                            <DialogTrigger asChild>
+                                <DropdownMenuItem onSelect={(e) => e.preventDefault()} title="Rename">
+                                    <Copy size={iconSize} />
+                                    <DropdownMenuLabel>Rename</DropdownMenuLabel>
+                                </DropdownMenuItem>
+                            </DialogTrigger>
+                            <DialogContent>
+                                <DialogHeader>
+                                    <DialogTitle>
+                                        <h1>Rename Graph</h1>
+                                    </DialogTitle>
+                                    <DialogDescription>
+                                        <Input required ref={inputRenameRef} placeholder="Enter Graph Name..." />
+                                    </DialogDescription>
+                                </DialogHeader>
+                                <DialogFooter>
+                                    <DialogClose asChild>
+                                        <Button onClick={() => handelRename()}>
+                                            <span>Rename</span>
+                                        </Button>
+                                    </DialogClose>
+                                </DialogFooter>
+                            </DialogContent>
+                        </Dialog>
+                        <DropdownMenuSeparator />
+                        <Dialog>
+                            <DialogTrigger>
+                                <DropdownMenuItem onSelect={(e) => e.preventDefault()} title="Copy">
+                                    <Edit size={iconSize} />
+                                    <DropdownMenuLabel>Copy</DropdownMenuLabel>
+                                </DropdownMenuItem>
+                            </DialogTrigger>
+                            <DialogContent>
+                                <DialogHeader>
+                                    <DialogTitle>
+                                        <h1>Copy Graph</h1>
+                                    </DialogTitle>
+                                    <DialogDescription>
+                                        <Input required ref={inputCopyRef} placeholder="Enter Copied Graph Name..." />
+                                    </DialogDescription>
+                                </DialogHeader>
+                                <DialogFooter>
+                                    <DialogClose asChild>
+                                        <Button onClick={() => handelCopy()}>
+                                            <span>Copy</span>
+                                        </Button>
+                                    </DialogClose>
+                                </DialogFooter>
+                            </DialogContent>
+                        </Dialog>
+                    </DropdownMenuContent>
+                </DropdownMenu>
             }
         </form >
     )
