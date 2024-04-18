@@ -7,29 +7,26 @@ import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, Di
 import { useToast } from "@/components/ui/use-toast";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuItem } from "@/components/ui/dropdown-menu";
-import { QueryState } from "./page"
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import Combobox from "../components/combobox";
 
-export default function Query({ onSubmit, onMainSubmit, setMainQueryState, queryState, onDelete, className = "" }: {
-    onMainSubmit?: (e: FormEvent<HTMLFormElement>, queryState: QueryState) => Promise<void>,
-    setMainQueryState?: (queryState: QueryState) => void,
-    onSubmit?: (e: FormEvent<HTMLFormElement>, queryState: QueryState) => Promise<any>,
-    queryState?: QueryState,
+export default function MainQuery({ onSubmit, onDelete, className = "" }: {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    onSubmit: (e: FormEvent<HTMLFormElement>, graphName: string, query: string) => Promise<any>,
     onDelete: (graphName: string) => void,
     className: string,
 }) {
     const lineHeight = 40
-    const [query, setQuery] = useState<string | undefined>(queryState?.query);
-    const [graphName, setGraphName] = useState(queryState?.graphName || '');
+    const iconSize = 22
+    const [query, setQuery] = useState<string>("");
+    const [graphName, setGraphName] = useState("");
     const { theme, systemTheme } = useTheme()
-    const [graphs, setGraphs] = useState<string[]>([]);
     const darkmode = theme === "dark" || (theme === "system" && systemTheme === "dark")
+    const [graphs, setGraphs] = useState<string[]>([]);
     const inputCopyRef = useRef<HTMLInputElement>(null)
     const inputRenameRef = useRef<HTMLInputElement>(null)
     const { toast } = useToast()
-    const iconSize = 22
 
     const getHeight = () => {
         if (!query) return lineHeight
@@ -49,37 +46,30 @@ export default function Query({ onSubmit, onMainSubmit, setMainQueryState, query
             headers: {
                 'Content-Type': 'application/json'
             }
-        })
-            .then((result) => {
-                if (result.status < 300) {
-                    return result.json()
-                }
-                toast({
-                    title: "Error",
-                    description: result.text(),
-                })
-                return { result: [] }
-            }).then((result) => {
-                setGraphs(result.result.graphs ?? [])
+        }).then((result) => {
+            if (result.status < 300) {
+                return result.json()
+            }
+            toast({
+                title: "Error",
+                description: result.text(),
             })
+            return { result: [] }
+        }).then((result) => {
+            setGraphs(result.result.graphs ?? [])
+        })
     }, [toast])
 
-    useEffect(() => {
-        if (setMainQueryState) {
-            setMainQueryState({ id: 0, graphName, query })
-        }
-    }, [query, graphName])
-
-    const handelDelete = (graphName: string) => {
+    const handelDelete = (name: string) => {
         setGraphName('')
-        onDelete(graphName)
-        setGraphs((prevGraphs: string[]) => [...prevGraphs.filter(graph => graph !== graphName)]);
-        fetch(`/api/graph/${encodeURIComponent(graphName)}`, {
+        onDelete(name)
+        setGraphs((prevGraphs: string[]) => [...prevGraphs.filter(graph => graph !== name)]);
+        fetch(`/api/graph/${encodeURIComponent(name)}`, {
             method: 'DELETE',
         }).then(() =>
             toast({
                 title: 'Graph Deleted',
-                description: `Graph ${graphName} deleted`,
+                description: `Graph ${name} deleted`,
             })
         ).catch((error) => {
             toast({
@@ -137,25 +127,17 @@ export default function Query({ onSubmit, onMainSubmit, setMainQueryState, query
         <form
             className={cn("w-full flex xl:flex-row md:flex-col gap-2 items-start", className)}
             onSubmit={async (e: FormEvent<HTMLFormElement>) => {
-                if (onSubmit) {
-                    await onSubmit(e, { id: 0, graphName, query })
-                } else if (onMainSubmit) {
-                    await onMainSubmit(e, { id: 0, graphName, query })
-                    setQuery("")
-                }
+                await onSubmit(e, graphName, query)
+                setQuery("")
             }}
         >
-            {
-                queryState ?
-                    <p className="text-xl pt-1">{graphName}</p>
-                    : <Combobox addOption={addOption} options={graphs} selectedValue={graphName} setSelectedValue={setGraphName} />
-            }
+            <Combobox addOption={addOption} options={graphs} selectedValue={graphName} setSelectedValue={setGraphName} />
             <div className="w-1 grow relative">
                 <Editor
                     className="border rounded-lg overflow-hidden"
                     height={height}
                     value={query}
-                    onChange={setQuery}
+                    onChange={(val) => val && setQuery(val)}
                     theme={`${darkmode ? "vs-dark" : "light"}`}
                     language="cypher"
                     options={{
@@ -179,32 +161,29 @@ export default function Query({ onSubmit, onMainSubmit, setMainQueryState, query
                         },
                     }}
                 />
-                {
-                    !queryState &&
-                    <Dialog>
-                        <DialogTrigger asChild>
-                            <button title="Maximize" className="absolute top-2 right-2" type="button">
-                                {/* eslint-disable-next-line jsx-a11y/control-has-associated-label */}
-                                <Maximize />
-                            </button>
-                        </DialogTrigger>
-                        <DialogContent className="h-4/5 max-w-[80%]">
-                            <Editor
-                                value={query}
-                                onChange={setQuery}
-                                theme={`${darkmode ? "vs-dark" : "light"}`}
-                                language="cypher"
-                            />
-                        </DialogContent>
-                    </Dialog >
-                }
+                <Dialog>
+                    <DialogTrigger asChild>
+                        <button title="Maximize" className="absolute top-2 right-2" type="button">
+                            {/* eslint-disable-next-line jsx-a11y/control-has-associated-label */}
+                            <Maximize />
+                        </button>
+                    </DialogTrigger>
+                    <DialogContent className="h-4/5 max-w-[80%]">
+                        <Editor
+                            value={query}
+                            onChange={(val) => val && setQuery(val)}
+                            theme={`${darkmode ? "vs-dark" : "light"}`}
+                            language="cypher"
+                        />
+                    </DialogContent>
+                </Dialog >
             </div>
             <button title="Run Query" className="pt-2" type="submit">
                 {/* eslint-disable-next-line jsx-a11y/control-has-associated-label */}
                 <Play />
             </button>
             {
-                !queryState && graphName &&
+                graphName &&
                 <DropdownMenu>
                     <DropdownMenuTrigger title="menu" className="pt-2 focus-visible:outline-none">
                         <Menu />

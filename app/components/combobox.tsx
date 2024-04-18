@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, Dispatch, createRef } from "react"
-import { Check, ChevronsUpDown, Trash2 } from "lucide-react"
+import { Check, ChevronsUpDown } from "lucide-react"
 import {
   Dialog,
   DialogContent,
@@ -26,17 +26,6 @@ import {
 } from "@/components/ui/popover"
 import { Separator } from "@/components/ui/separator"
 import { Input } from "@/components/ui/input"
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-  AlertDialogFooter
-} from "@/components/ui/alert-dialog"
 
 /* eslint-disable react/require-default-props */
 interface ComboboxProps {
