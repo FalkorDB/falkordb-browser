@@ -119,6 +119,10 @@ export default function MainQuery({ onSubmit, onDelete, className = "" }: {
     }
 
     const addOption = (newGraph: string) => {
+        const q = "return 1"
+        fetch(`api/graph?graph=${encodeURIComponent(newGraph)}&query=${encodeURIComponent(q)}`, {
+            method: "GET",
+        })
         setGraphs((prevGraphs: string[]) => [...prevGraphs, newGraph]);
         setGraphName(newGraph)
     }
