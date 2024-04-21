@@ -1,17 +1,18 @@
 "use client";
 
-import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
+import { ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { SessionProvider } from "next-auth/react";
 import { ThemeProvider } from 'next-themes'
 import { useEffect, useRef, useState } from "react";
 import { ImperativePanelHandle } from "react-resizable-panels";
 import Navbar from "@/components/custom/navbar";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import useScreenSize from "./useScreenSize";
 
 export default function NextAuthProvider({ children }: { children: React.ReactNode }) {
 
   const { screenSize } = useScreenSize();
-  const isSmallScreen = screenSize === 'sm' || screenSize === 'xs'
+  const isSmallScreen = screenSize === 'sm' || screenSize === 'xs' || screenSize === 'md'
 
   const [isCollapsed, setCollapsed] = useState(isSmallScreen)
   const navPanel = useRef<ImperativePanelHandle>(null)
@@ -25,7 +26,6 @@ export default function NextAuthProvider({ children }: { children: React.ReactNo
     }
   }, [isSmallScreen])
 
-
   const onExpand = () => {
     if (navPanel.current) {
       if (navPanel.current.isCollapsed()) {
@@ -35,8 +35,8 @@ export default function NextAuthProvider({ children }: { children: React.ReactNo
       }
     }
   }
-  const panelSize = 9
-  const collapsedSize = 3
+  const panelSize = isSmallScreen ? 7 : 9 
+  const collapsedSize = isSmallScreen ? 7 : 3
 
   return (
     <SessionProvider>
@@ -51,9 +51,11 @@ export default function NextAuthProvider({ children }: { children: React.ReactNo
             minSize={panelSize}
             onCollapse={() => { setCollapsed(true) }}
             onExpand={() => { setCollapsed(false) }}>
-            <Navbar collapsed={isCollapsed} onExpand={onExpand} />
+            <button title={isCollapsed ? "open" : "close"} type="button" className="fixed top-[50%] left-2" onClick={() => onExpand()}>
+              {isCollapsed ? <ChevronRight /> : <ChevronLeft />}
+            </button>
+            <Navbar collapsed={isCollapsed} />
           </ResizablePanel>
-          <ResizableHandle withHandle />
           <ResizablePanel defaultSize={100 - panelSize}>{children}</ResizablePanel>
         </ResizablePanelGroup>
       </ThemeProvider>

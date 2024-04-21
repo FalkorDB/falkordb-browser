@@ -1,7 +1,7 @@
 import CytoscapeComponent from "react-cytoscapejs";
 import { toast } from "@/components/ui/use-toast";
 import cytoscape, { ElementDefinition, EventObject, NodeDataDefinition } from "cytoscape";
-import { useRef, useState, useImperativeHandle, forwardRef, useEffect } from "react";
+import { useRef, useState, useImperativeHandle, forwardRef } from "react";
 import { signOut } from "next-auth/react";
 import fcose from 'cytoscape-fcose';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
@@ -98,17 +98,11 @@ const GraphView = forwardRef(({ graph, darkmode }: GraphViewProps, ref) => {
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const [selectedObject, setSelectedObject] = useState<any | null>(null);
-    const [isOpen, setIsOpen] = useState<boolean>(false);
+    const [isCollapsed, setIsCollapsed] = useState<boolean>(true);
 
     // A reference to the chart container to allowing zooming and editing
     const chartRef = useRef<cytoscape.Core | null>(null)
     const dataPanel = useRef<ImperativePanelHandle>(null)
-
-    useEffect(() => {
-        if (isOpen) {
-            dataPanel.current?.expand()
-        } else dataPanel.current?.collapse()
-    }, [isOpen])
 
     useImperativeHandle(ref, () => ({
         expand: (elements: ElementDefinition[]) => {
@@ -120,6 +114,16 @@ const GraphView = forwardRef(({ graph, darkmode }: GraphViewProps, ref) => {
             }
         }
     }))
+
+    const onExpand = () => {
+        if (dataPanel.current) {
+            if (dataPanel.current.isCollapsed()) {
+                dataPanel.current.expand()
+            } else {
+                dataPanel.current.collapse()
+            }
+        }
+    }
 
     // Send the user query to the server to expand a node
     async function onFetchNode(node: NodeDataDefinition) {
@@ -177,7 +181,7 @@ const GraphView = forwardRef(({ graph, darkmode }: GraphViewProps, ref) => {
     const handleTap = (evt: EventObject) => {
         const object = evt.target.json().data;
         setSelectedObject(object);
-        setIsOpen(true);
+        dataPanel.current?.expand()
     }
 
     return (
@@ -212,16 +216,23 @@ const GraphView = forwardRef(({ graph, darkmode }: GraphViewProps, ref) => {
             <ResizableHandle />
             {
                 selectedObject &&
-                <button type="button" onClick={() => setIsOpen(prev => !prev)} className="fixed right-5 top-[50%]">
-                    {isOpen ? <ChevronRight /> : <ChevronLeft />}
+                <button title={isCollapsed ? "open" : "close"} type="button" onClick={() => onExpand()} className="fixed right-5 top-[50%]">
+                    {!isCollapsed ? <ChevronRight /> : <ChevronLeft />}
                 </button>
             }
-            {
-                isOpen &&
-                <ResizablePanel id="panel" ref={dataPanel} maxSize={50} minSize={20} collapsible defaultSize={selectedObject ? 20 : 0} className="bg-gray-100 dark:bg-gray-800">
-                    {selectedObject && <DataPanel object={selectedObject} />}
-                </ResizablePanel>
-            }
+            <ResizablePanel
+                id="panel"
+                ref={dataPanel}
+                maxSize={50}
+                minSize={20}
+                onCollapse={() => { setIsCollapsed(true) }}
+                onExpand={() => { setIsCollapsed(false) }}
+                collapsible
+                defaultSize={selectedObject ? 20 : 0}
+                className="bg-gray-100 dark:bg-gray-800"
+            >
+                {selectedObject && <DataPanel object={selectedObject} />}
+            </ResizablePanel>
         </ResizablePanelGroup>
     )
 });

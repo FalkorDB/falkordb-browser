@@ -62,7 +62,7 @@ export default function Page() {
         // Proposed abstraction for improved modularity
         if (!validateGraphSelection(state.graphName)) return false;
 
-        const q = state.query.trim() || "MATCH (n) OPTIONAL MATCH (n)-[e]-(m) RETURN n,e,m limit 100";
+        const q = state.query?.trim() || "MATCH (n) OPTIONAL MATCH (n)-[e]-(m) RETURN n,e,m limit 100";
 
         const result = await fetch(`/api/graph?graph=${prepareArg(state.graphName)}&query=${prepareArg(q)}`, {
             method: 'GET',
@@ -97,7 +97,7 @@ export default function Page() {
                 className="border rounded-lg border-gray-300 p-2"
                 onSubmit={runQuery}
                 onQueryUpdate={(state) => { queryState.current = state }}
-                onDeleteGraph={() => setGraph(Graph.empty())}
+                onDelete={() => setGraph(Graph.empty())}
             />
             <div className="h-1 grow border flex flex-col gap-2 border-gray-300 rounded-lg p-2">
                 {
