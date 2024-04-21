@@ -185,7 +185,7 @@ const GraphView = forwardRef(({ graph, darkmode }: GraphViewProps, ref) => {
     }
 
     return (
-        <ResizablePanelGroup direction="horizontal">
+        <ResizablePanelGroup className="relative" direction="horizontal">
             <ResizablePanel defaultSize={selectedObject ? 80 : 100} className="h-full flex flex-col">
                 <div className="flex flex-row justify-between">
                     <Toolbar className="" chartRef={chartRef} />
@@ -216,7 +216,7 @@ const GraphView = forwardRef(({ graph, darkmode }: GraphViewProps, ref) => {
             <ResizableHandle />
             {
                 selectedObject &&
-                <button title={isCollapsed ? "open" : "close"} type="button" onClick={() => onExpand()} className="fixed right-5 top-[50%]">
+                <button title={isCollapsed ? "open" : "close"} type="button" onClick={() => onExpand()} className="absolute top-1/2 right-0 transform -translate-y-1/2">
                     {!isCollapsed ? <ChevronRight /> : <ChevronLeft />}
                 </button>
             }
