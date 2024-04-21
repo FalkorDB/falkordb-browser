@@ -5,7 +5,7 @@ import React, { useState } from "react";
 import { signOut } from "next-auth/react";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import { Maximize2, X } from "lucide-react";
-import Query from "./mainQuery";
+import MainQuery from "./mainQuery";
 import GraphSection from "./graphSection";
 import { GraphState } from "./sectionQuery";
 
@@ -79,7 +79,7 @@ export default function Page() {
     }
     return (
         <div className="h-full flex flex-col p-2 gap-y-2">
-            <Query
+            <MainQuery
                 onSubmit={runMainQuery}
                 onDelete={onDelete}
                 className="border rounded-lg border-gray-300 p-2"
