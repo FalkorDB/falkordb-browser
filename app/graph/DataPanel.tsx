@@ -17,7 +17,7 @@ const excludedProperties = new Set([
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export default function DataPanel({ object }: Props) {
     const rowClass = "dark:hover:bg-slate-700 hover:bg-gray-400 border-y-[1px] border-y-gray-700"
-    const type = object.sucre ? "edge" : "node"
+    const type = object.source ? "edge" : "node"
     return (
         <Table>
             <TableCaption>{type} properties</TableCaption>
