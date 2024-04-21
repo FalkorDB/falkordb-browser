@@ -8,7 +8,7 @@
 
 FalkorDB-Browser is a visualization UI for FalkorDB.
 
-To see a running demo check: https://browser.falkordb.com/
+To see a running demo, check: https://browser.falkordb.com/
 
 ![image](https://github.com/FalkorDB/falkordb-browser/assets/753206/51a81ef9-6bb2-40ce-ad9b-6381978c7562)
 
