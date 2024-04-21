@@ -83,7 +83,6 @@ export async function PATCH(request: NextRequest, { params }: { params: { graph:
         if (!newName) throw (new Error("Missing parameter 'newName'"))
 
         const data = await client.connection.renameNX(graphId, newName);
-        console.log(data);
 
         if (!data) throw (new Error(`${newName} already exists`))
 
