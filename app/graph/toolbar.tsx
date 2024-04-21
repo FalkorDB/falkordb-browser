@@ -1,4 +1,3 @@
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { CircleDot, ZoomIn, ZoomOut } from "lucide-react";
 import { cn } from "@/lib/utils"
 
@@ -22,39 +21,25 @@ export default function Toolbar({ chartRef, className = "" }: {
     }
 
     return (
-        <TooltipProvider>
-            <ul className={cn("flex flex-row gap-2", className)}>
-                <li>
-                    <Tooltip>
-                        <TooltipTrigger className="text-gray-600 dark:text-gray-400 rounded-lg border border-gray-300 p-2" onClick={() => handleZoomClick(1.1)}>
-                            <ZoomIn />
-                        </TooltipTrigger>
-                        <TooltipContent>
-                            <p>Zoom In</p>
-                        </TooltipContent>
-                    </Tooltip>
-                </li>
-                <li>
-                    <Tooltip>
-                        <TooltipTrigger className="text-gray-600 dark:text-gray-400 rounded-lg border border-gray-300 p-2" onClick={() => handleZoomClick(0.9)}>
-                            <ZoomOut />
-                        </TooltipTrigger>
-                        <TooltipContent>
-                            <p>Zoom Out</p>
-                        </TooltipContent>
-                    </Tooltip>
-                </li>
-                <li>
-                    <Tooltip>
-                        <TooltipTrigger className="text-gray-600 dark:text-gray-400 rounded-lg border border-gray-300 p-2" onClick={handleCenterClick}>
-                            <CircleDot />
-                        </TooltipTrigger>
-                        <TooltipContent>
-                            <p>Center</p>
-                        </TooltipContent>
-                    </Tooltip>
-                </li>
-            </ul>
-        </TooltipProvider>
+        <ul className={cn("flex flex-row gap-2", className)}>
+            <li>
+                <button title="Zoom In" type="button" className="text-gray-600 dark:text-gray-400 rounded-lg border border-gray-300 p-2" onClick={() => handleZoomClick(1.1)}>
+                    { /* eslint-disable jsx-a11y/control-has-associated-label */}
+                    < ZoomIn />
+                </button>
+            </li>
+            <li>
+                <button title="Zoom Out" type="button" className="text-gray-600 dark:text-gray-400 rounded-lg border border-gray-300 p-2" onClick={() => handleZoomClick(0.9)}>
+                    { /* eslint-disable jsx-a11y/control-has-associated-label */}
+                    <ZoomOut />
+                </button>
+            </li>
+            <li>
+                <button title="Center" type="button" className="text-gray-600 dark:text-gray-400 rounded-lg border border-gray-300 p-2" onClick={() => handleCenterClick()}>
+                    { /* eslint-disable jsx-a11y/control-has-associated-label */}
+                    <CircleDot />
+                </button>
+            </li>
+        </ul>
     )
 }
