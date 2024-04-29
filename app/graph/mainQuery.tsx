@@ -1,4 +1,4 @@
-import { cn } from "@/lib/utils";
+import { cn, securedFetch } from "@/lib/utils";
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { Copy, Edit, Maximize, Menu, Play, Trash2 } from "lucide-react";
 import Editor from "@monaco-editor/react";
@@ -64,7 +64,7 @@ export default function MainQuery({ onSubmit, onDelete, className = "" }: {
         setGraphName('')
         onDelete(name)
         setGraphs((prevGraphs: string[]) => [...prevGraphs.filter(graph => graph !== name)]);
-        fetch(`/api/graph/${encodeURIComponent(name)}`, {
+        securedFetch(`/api/graph/${encodeURIComponent(name)}`, {
             method: 'DELETE',
         }).then(() =>
             toast({
@@ -82,49 +82,39 @@ export default function MainQuery({ onSubmit, onDelete, className = "" }: {
     const handelCopy = async () => {
         const newName = inputCopyRef.current?.value
         if (!newName) return
-        const response = await fetch(`/api/graph/${encodeURIComponent(graphName)}?newName=${newName}`, {
+        const response = await securedFetch(`/api/graph/${encodeURIComponent(graphName)}?newName=${newName}`, {
             method: 'POST',
         })
-        const json = await response.json()
-        if (response.status >= 300) {
-            toast({
-                title: "Error",
-                description: json.message,
-            })
-            return
+        if (response.ok) {
+            setGraphs(prev => [...prev, newName])
         }
-        setGraphs(prev => [...prev, newName])
     }
 
     const handelRename = async () => {
         const newName = inputRenameRef.current?.value
         if (!newName) return
-        const response = await fetch(`/api/graph/${encodeURIComponent(graphName)}?newName=${newName}`, {
+        const response = await securedFetch(`/api/graph/${encodeURIComponent(graphName)}?newName=${newName}`, {
             method: 'PATCH',
         })
-        const json = await response.json()
-        if (response.status >= 300) {
+        if(response.ok){
+            setGraphName(newName)
+            setGraphs(prev => [...prev.filter(name => name !== graphName), newName])
             toast({
-                title: "Error",
-                description: json.message,
+                title: "Rename",
+                description: `Graph ${graphName} Rename to ${newName}`,
             })
-            return
-        }
-        setGraphName(newName)
-        setGraphs(prev => [...prev.filter(name => name !== graphName), newName])
-        toast({
-            title: "Rename",
-            description: `Graph ${graphName} Rename to ${newName}`,
-        })
+        }        
     }
 
-    const addOption = (newGraph: string) => {
+    const addOption = async (newGraph: string) => {
         const q = "return 1"
-        fetch(`api/graph?graph=${encodeURIComponent(newGraph)}&query=${encodeURIComponent(q)}`, {
+        const response = await securedFetch(`api/graph?graph=${encodeURIComponent(newGraph)}&query=${encodeURIComponent(q)}`, {
             method: "GET",
         })
-        setGraphs((prevGraphs: string[]) => [...prevGraphs, newGraph]);
-        setGraphName(newGraph)
+        if(response.ok){
+            setGraphs((prevGraphs: string[]) => [...prevGraphs, newGraph]);
+            setGraphName(newGraph)
+        }
     }
 
     return (
