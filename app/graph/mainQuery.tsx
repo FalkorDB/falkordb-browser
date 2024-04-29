@@ -90,7 +90,7 @@ export default function MainQuery({ onSubmit, onDelete, className = "" }: {
         }
     }
 
-    const handelRename = async () => {
+    const handleRename = async () => {
         const newName = inputRenameRef.current?.value
         if (!newName) return
         const response = await securedFetch(`/api/graph/${encodeURIComponent(graphName)}?newName=${newName}`, {
@@ -222,7 +222,7 @@ export default function MainQuery({ onSubmit, onDelete, className = "" }: {
                                 </DialogHeader>
                                 <DialogFooter>
                                     <DialogClose asChild>
-                                        <Button onClick={() => handelRename()}>
+                                        <Button onClick={() => handleRename()}>
                                             <span>Rename</span>
                                         </Button>
                                     </DialogClose>
