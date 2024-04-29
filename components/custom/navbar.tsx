@@ -1,5 +1,5 @@
 /* eslint-disable jsx-a11y/anchor-is-valid */
-import { Activity, Info, LogOut, Moon, Sun, Waypoints } from "lucide-react";
+import { Activity, Info, LogOut, Moon, Sun, Users, Waypoints } from "lucide-react";
 import { signOut, useSession } from "next-auth/react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
@@ -27,6 +27,12 @@ const linksUp: LinkDefinition[] = [
     href: "/monitor",
     icon: (<Activity className="h-6 w-6" />),
   },
+  {
+    name: "Users",
+    href: "/users",
+    icon: (<Users className="h-6 w-6" />),
+  },
+
 ]
 
 const linksDown: LinkDefinition[] = [
