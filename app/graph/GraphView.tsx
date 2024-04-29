@@ -139,7 +139,7 @@ const GraphView = forwardRef(({ graph, darkmode }: GraphViewProps, ref) => {
                 title: "Error",
                 description: result.text(),
             })
-            if (result.status >= 400 && result.status < 500) {
+            if (result.status === 401 || result.status >= 500) {
                 signOut({ callbackUrl: '/login' })
             }
             return [] as ElementDefinition[]

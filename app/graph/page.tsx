@@ -52,7 +52,7 @@ export default function Page() {
                 title: "Error",
                 description: result.text(),
             })
-            if (result.status >= 400 && result.status < 500) {
+            if (result.status === 401 || result.status >= 500) {
                 signOut({ callbackUrl: '/login' })
             }
             return null
