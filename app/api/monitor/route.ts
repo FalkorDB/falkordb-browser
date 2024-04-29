@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth/next";
-import authOptions, { getConnection } from "../auth/[...nextauth]/options";
+import { getClient } from "../auth/[...nextauth]/options";
 
 const fileds = [
     "used_memory",
@@ -9,15 +8,9 @@ const fileds = [
 // eslint-disable-next-line import/prefer-default-export
 export async function GET() {
 
-    const session = await getServerSession(authOptions)
-    const id = session?.user?.id
-    if (!id) {
-        return NextResponse.json({ message: "Not authenticated" }, { status: 401 })
-    }
-
-    const client = await getConnection(session.user)
-    if (!client) {
-        return NextResponse.json({ message: "Not authenticated" }, { status: 401 })
+    const client = await getClient()
+    if (client instanceof NextResponse) {
+        return client
     }
 
     const infoMemory = await client.connection.info("memory")
