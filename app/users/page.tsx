@@ -79,6 +79,7 @@ export default function Page() {
                                 <Checkbox id="select-all" onCheckedChange={onSelectAll} />
                             </TableHead>
                             <TableHead>Username</TableHead>
+                            <TableHead>Role</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -86,11 +87,11 @@ export default function Page() {
                             <TableRow key={user}>
                                 <TableCell>
                                     <Checkbox
-                                        id={`user-${user}`}
                                         checked={selectedRows[index]}
                                         onCheckedChange={(checked) => onSelect(checked, index)} />
                                 </TableCell>
                                 <TableCell>{user}</TableCell>
+                                {/* <TableCell>{role}</TableCell> */}
                             </TableRow>
                         ))}
                     </TableBody>

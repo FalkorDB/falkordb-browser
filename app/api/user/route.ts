@@ -1,6 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getClient } from "../auth/[...nextauth]/options";
 
+const ROLE = new Map<string, string[]>(
+    [
+        ["Admin", ["on", "allkeys", "+@all"]],
+        ["Read-Write", ["on", "allkeys", "+GRAPH.QUERY", "+GRAPH.PROFILE", "+GRAPH.EXPLAIN", "+GRAPH.LIST", "+PING"]],
+        ["Read-Only", ["on", "allkeys", "+GRAPH.RO_QUERY", "+GRAPH.EXPLAIN", "+GRAPH.LIST", "+PING"]]
+    ]
+)
+
+interface User {
+    username: string
+    password: string
+    role: string
+}
+
 // eslint-disable-next-line import/prefer-default-export
 export async function GET() {
 
@@ -24,9 +38,13 @@ export async function POST(req: NextRequest) {
         return client
     }
 
-    const { username, password } = await req.json()
+    const { username, password, role } = await req.json() as User
+
+    const roleValue = ROLE.get(role)
     try {
-        await client.connection.aclSetUser(username, ["on", "allkeys", "+@all", `>${password}`])
+        if (!username || !password || !roleValue) throw (new Error("Missing parameters"))
+        
+        await client.connection.aclSetUser(username, roleValue.concat(`>${password}`))
         return NextResponse.json(
             { message: "User created" },
             {
