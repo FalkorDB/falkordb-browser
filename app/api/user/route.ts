@@ -3,9 +3,9 @@ import { getClient } from "@/app/api/auth/[...nextauth]/options";
 
 const ROLE = new Map<string, string[]>(
     [
-        ["Admin", ["on", "allkeys", "+@all"]],
-        ["Read-Write", ["on", "allkeys", "+GRAPH.QUERY", "+GRAPH.PROFILE", "+GRAPH.EXPLAIN", "+GRAPH.LIST", "+PING"]],
-        ["Read-Only", ["on", "allkeys", "+GRAPH.RO_QUERY", "+GRAPH.EXPLAIN", "+GRAPH.LIST", "+PING"]]
+        ["Admin", ["on", "~*", "&*", "+@all"]],
+        ["Read-Write", ["on", "~*", "resetchannels", "-@all", "+graph.query", "+graph.profile", "+graph.explain", "+graph.list", "+ping"]],
+        ["Read-Only", ["on", "~*", "resetchannels", "-@all", "+graph.ro_query", "+graph.explain", "+graph.list", "+ping"]]
     ]
 )
 
@@ -23,7 +23,25 @@ export async function GET() {
         return client
     }
     try {
-        const users = await client.connection.aclUsers()
+        const list = await client.connection.aclList()
+        const users = list
+            .map((userACL: string) => userACL.split(" "))
+            .filter((userDetails: string[]) => userDetails.length > 1 && userDetails[0] === "user")
+            .map((userDetails: string[]) => {
+                // find key in ROLE that has a value equals to userDetails by comaring each array
+                const role = Array
+                    .from(ROLE.entries())
+                    .find(([, value]) => {
+                        const reversed = value.slice(1).reverse()
+                        return reversed.every((val, index) => userDetails[userDetails.length - 1 - index] === val)
+                    })
+
+                return {
+                    username: userDetails[1],
+                    role: role ? role[0] : "Unknown"
+                }
+            })
+
         return NextResponse.json({ result: { users } }, { status: 200 })
     } catch (err: unknown) {
         return NextResponse.json({ message: (err as Error).message }, { status: 400 })
@@ -43,7 +61,14 @@ export async function POST(req: NextRequest) {
     const roleValue = ROLE.get(role)
     try {
         if (!username || !password || !roleValue) throw (new Error("Missing parameters"))
-        
+
+        try {
+            const user = await client.connection.aclGetUser(username)
+            if (user) throw (new Error("User already exists"))
+        } catch (err: unknown) {
+            // Just a workaround for https://github.com/redis/node-redis/issues/2745
+        }
+
         await client.connection.aclSetUser(username, roleValue.concat(`>${password}`))
         return NextResponse.json(
             { message: "User created" },

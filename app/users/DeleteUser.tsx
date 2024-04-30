@@ -1,16 +1,17 @@
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/use-toast";
+import { User } from "@/app/api/user/model";
 
 interface DeleteUserProps {
-    users: string[]
+    users: User[]
     selectedRows: boolean[]
 }
 
 export default function DeleteUser({ users, selectedRows} : DeleteUserProps) {
 
     const deleteSelected = () => {
-        const selected = users.filter((_: string, index: number) => selectedRows[index])
+        const selected = users.filter((_: User, index: number) => selectedRows[index])
         if (selected.length === 0) {
             return
         }
@@ -46,13 +47,12 @@ export default function DeleteUser({ users, selectedRows} : DeleteUserProps) {
                 <AlertDialogHeader>
                     <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
                     <AlertDialogDescription>
-                        This action cannot be undone. This will permanently delete your
-                        account and remove your data from our servers.
+                        This action cannot be undone. This will permanently delete the selected users.
                     </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
                     <AlertDialogCancel>Cancel</AlertDialogCancel>
-                    <AlertDialogAction onClick={deleteSelected}>Continue</AlertDialogAction>
+                    <AlertDialogAction onClick={deleteSelected} >Continue</AlertDialogAction>
                 </AlertDialogFooter>
             </AlertDialogContent>
         </AlertDialog>

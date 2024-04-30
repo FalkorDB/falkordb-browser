@@ -7,6 +7,7 @@ import useSWR from "swr";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
 import { CheckedState } from "@radix-ui/react-checkbox";
+import { User } from "@/app/api/user/model";
 import DeleteUser from "./DeleteUser";
 import AddUser from "./AddUser";
 
@@ -41,7 +42,7 @@ export default function Page() {
     const { data } = useSWR(`/api/user/`, fetcher, { refreshInterval: 1000 })
     const [selectedRows, setSelectedRows] = React.useState<boolean[]>([])
 
-    const users = data && data.users || [] as string[]
+    const users : User[] = (data && data.users) || []
     if (users.length !== selectedRows.length) {
         setSelectedRows(new Array(users.length).fill(false))
     }
@@ -74,15 +75,15 @@ export default function Page() {
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {users.map((user: string, index: number) => (
-                            <TableRow key={user}>
+                        {users.map((user: User, index: number) => (
+                            <TableRow key={user.username}>
                                 <TableCell>
                                     <Checkbox
                                         checked={selectedRows[index]}
                                         onCheckedChange={(checked) => onSelect(checked, index)} />
                                 </TableCell>
-                                <TableCell>{user}</TableCell>
-                                {/* <TableCell>{role}</TableCell> */}
+                                <TableCell>{user.username}</TableCell>
+                                <TableCell>{user.role}</TableCell> 
                             </TableRow>
                         ))}
                     </TableBody>

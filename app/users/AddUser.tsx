@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { createRef, useState } from "react"
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "@/components/ui/use-toast";
@@ -75,7 +75,9 @@ export default function AddUser() {
                         </div>
                     </div>
                     <DialogFooter>
-                        <Button type="submit">Add</Button>
+                        <DialogClose asChild>
+                            <Button type="submit" variant="secondary">Add</Button>
+                        </DialogClose>
                     </DialogFooter>
                 </form>
             </DialogContent>
