@@ -46,15 +46,6 @@ export default function Page() {
         setSelectedRows(new Array(users.length).fill(false))
     }
 
-    // Handle the select/unselect all checkboxs
-    const onSelectAll = (checked: CheckedState) => {
-        if (checked === true) {
-            setSelectedRows(new Array(users.length).fill(true))
-        } else {
-            setSelectedRows(new Array(users.length).fill(false))
-        }
-    }
-
     // Handle the select/unselect a checkbox
     const onSelect = (checked: CheckedState, index: number) => {
         setSelectedRows((prev) => {
@@ -76,7 +67,7 @@ export default function Page() {
                     <TableHeader>
                         <TableRow>
                             <TableHead className="w-[32px]">
-                                <Checkbox id="select-all" onCheckedChange={onSelectAll} />
+                                <Checkbox id="select-all" onCheckedChange={(checked: CheckedState) => setSelectedRows(new Array(users.length).fill(checked))} />
                             </TableHead>
                             <TableHead>Username</TableHead>
                             <TableHead>Role</TableHead>
