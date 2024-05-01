@@ -41,24 +41,20 @@ export default function MainQuery({ onSubmit, onDelete, className = "" }: {
     const height = getHeight();
 
     useEffect(() => {
-        fetch('/api/graph', {
+        securedFetch('/api/graph', {
             method: 'GET',
             headers: {
                 'Content-Type': 'application/json'
             }
         }).then((result) => {
-            if (result.status < 300) {
+            if (result.ok) {
                 return result.json()
             }
-            toast({
-                title: "Error",
-                description: result.text(),
-            })
             return { result: [] }
         }).then((result) => {
             setGraphs(result.result.graphs ?? [])
         })
-    }, [toast])
+    }, [])
 
     const handelDelete = (name: string) => {
         setGraphName('')

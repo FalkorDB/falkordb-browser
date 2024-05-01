@@ -2,6 +2,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/use-toast";
 import { User } from "@/app/api/user/model";
+import { securedFetch } from "@/lib/utils";
 
 interface DeleteUserProps {
     users: User[]
@@ -12,30 +13,23 @@ export default function DeleteUser({ users, selectedRows} : DeleteUserProps) {
 
     const selected = users.filter((_: User, index: number) => selectedRows[index])
     
-    const deleteSelected = () => {
+    const deleteSelected = async () => {
         if (selected.length === 0) return
         
-        fetch(`/api/user/`, {
+        const response = await securedFetch(`/api/user/`, {
             method: 'DELETE',
             headers: {
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({ users: selected })
-        }).then((response) => {
-            if (response.status === 200) {
-                toast({
-                    title: "Success",
-                    description: "Users deleted",
-                })
-            } else {
-                response.text().then((message) => {
-                    toast({
-                        title: "Error",
-                        description: message,
-                    })
-                })
-            }
         })
+
+        if (response.ok) {
+            toast({
+                title: "Success",
+                description: "Users deleted",
+            })
+        } 
     }
 
     return (

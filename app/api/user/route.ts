@@ -94,8 +94,8 @@ export async function DELETE(req: NextRequest) {
 
     const { users } = await req.json()
     try {
-        await Promise.all(users.map(async (username: string) => {
-            await client.connection.aclDelUser(username)
+        await Promise.all(users.map(async (user: User) => {
+            await client.connection.aclDelUser(user.username)
         }))
         return NextResponse.json({ message: "Users deleted" }, { status: 200 })
     } catch (err: unknown) {

@@ -1,40 +1,29 @@
 "use client";
 
-import { toast } from "@/components/ui/use-toast";
-import { signOut } from "next-auth/react";
 import React from "react";
 import useSWR from "swr";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
 import { CheckedState } from "@radix-ui/react-checkbox";
 import { User } from "@/app/api/user/model";
+import { securedFetch } from "@/lib/utils";
 import DeleteUser from "./DeleteUser";
 import AddUser from "./AddUser";
 
-const fetcher = (url: string) => fetch(url, {
-    method: 'GET',
-    headers: {
-        'Content-Type': 'application/json'
-    }
-}).then((response) => {
-    const { status } = response
+const fetcher = async (url: string) => {
+    const response = await securedFetch(url, {
+        method: 'GET',
+        headers: {
+            'Content-Type': 'application/json'
+        }
+    })
 
-    if (status >= 300) {
-        response.text().then((message) => {
-            toast({
-                title: "Error",
-                description: message,
-            })
-        }).then(() => {
-            if (status === 401 || status >= 500) {
-                signOut({ callbackUrl: '/login' })
-            }
-        })
-        return { users: [] }
+    if (response.ok) {
+        const data = await response.json()
+        return data.result
     }
-    return response.json()
-}).then((data) => data.result)
-
+    return { users: [] }
+}
 
 // Shows the details of a current database connection 
 export default function Page() {
@@ -42,7 +31,7 @@ export default function Page() {
     const { data } = useSWR(`/api/user/`, fetcher, { refreshInterval: 1000 })
     const [selectedRows, setSelectedRows] = React.useState<boolean[]>([])
 
-    const users : User[] = (data && data.users) || []
+    const users: User[] = (data && data.users) || []
     if (users.length !== selectedRows.length) {
         setSelectedRows(new Array(users.length).fill(false))
     }
@@ -83,7 +72,7 @@ export default function Page() {
                                         onCheckedChange={(checked) => onSelect(checked, index)} />
                                 </TableCell>
                                 <TableCell>{user.username}</TableCell>
-                                <TableCell>{user.role}</TableCell> 
+                                <TableCell>{user.role}</TableCell>
                             </TableRow>
                         ))}
                     </TableBody>

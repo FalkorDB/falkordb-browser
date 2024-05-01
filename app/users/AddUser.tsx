@@ -4,6 +4,7 @@ import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, Di
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "@/components/ui/use-toast";
+import { securedFetch } from "@/lib/utils";
 import Combobox from "../components/combobox";
 
 
@@ -12,34 +13,27 @@ export default function AddUser() {
     const passwordInputRef = createRef<HTMLInputElement>()
     const [selectedValue, setSelectedValue] = useState("Read-Only")
 
-    const addUser = (event: React.FormEvent<HTMLFormElement>) => {
+    const addUser = async (event: React.FormEvent<HTMLFormElement>) => {
         event.preventDefault();
         const username = usernameInputRef.current?.value;
         const password = passwordInputRef.current?.value;
         if (!username || !password) {
             return;
         }
-        fetch(`/api/user/`, {
+        const response = await securedFetch('/api/user/', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({ username, password, role: selectedValue})
-        }).then((response: Response) => {
-            if (response.status === 201) {
-                toast({
-                    title: "Success",
-                    description: "User created",
-                });
-            } else {
-                response.text().then((message: string) => {
-                    toast({
-                        title: "Error",
-                        description: message,
-                    });
-                });
-            }
-        });
+        })        
+
+        if (response.ok) {
+            toast({
+                title: "Success",
+                description: "User created",
+            });
+        }
     };
     return (
         <Dialog>
