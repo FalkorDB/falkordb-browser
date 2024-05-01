@@ -2,9 +2,9 @@
 
 import { toast } from "@/components/ui/use-toast";
 import React, { useState } from "react";
-import { signOut } from "next-auth/react";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import { Maximize2, X } from "lucide-react";
+import { securedFetch } from "@/lib/utils";
 import MainQuery from "./mainQuery";
 import GraphSection from "./graphSection";
 import { GraphState } from "./sectionQuery";
@@ -41,25 +41,17 @@ export default function Page() {
 
         const q = defaultQuery(query)
 
-        const result = await fetch(`/api/graph?graph=${prepareArg(graphName)}&query=${prepareArg(q)}`, {
+        const result = await securedFetch(`/api/graph?graph=${prepareArg(graphName)}&query=${prepareArg(q)}`, {
             method: 'GET',
             headers: {
                 'Content-Type': 'application/json'
             }
         })
-        if (result.status >= 300) {
-            toast({
-                title: "Error",
-                description: result.text(),
-            })
-            if (result.status >= 400 && result.status < 500) {
-                signOut({ callbackUrl: '/login' })
-            }
-            return null
+        if (result.ok) {
+            const json = await result.json()
+            return json.result
         }
-
-        const json = await result.json()
-        return json.result
+        return null
     }
     
     const runMainQuery = async (event: React.FormEvent<HTMLElement>, graphName: string, query: string) => {

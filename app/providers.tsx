@@ -8,6 +8,7 @@ import { ImperativePanelHandle } from "react-resizable-panels";
 import Navbar from "@/components/custom/navbar";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import useScreenSize from "./useScreenSize";
+import LoginVerification from "./loginVerification";
 
 export default function NextAuthProvider({ children }: { children: React.ReactNode }) {
 
@@ -56,7 +57,7 @@ export default function NextAuthProvider({ children }: { children: React.ReactNo
             </button>
             <Navbar collapsed={isCollapsed} />
           </ResizablePanel>
-          <ResizablePanel defaultSize={100 - panelSize}>{children}</ResizablePanel>
+          <ResizablePanel defaultSize={100 - panelSize}><LoginVerification>{children}</LoginVerification></ResizablePanel>
         </ResizablePanelGroup>
       </ThemeProvider>
     </SessionProvider>
