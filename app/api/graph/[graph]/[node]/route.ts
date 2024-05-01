@@ -1,19 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth/next";
-import authOptions, { getConnection } from "../../../auth/[...nextauth]/options";
+import { getClient } from "../../../auth/[...nextauth]/options";
 
 // eslint-disable-next-line import/prefer-default-export
 export async function GET(request: NextRequest, { params }: { params: { graph: string, node: string } }) {
 
-    const session = await getServerSession(authOptions)
-    const id = session?.user?.id
-    if (!id) {
-        return NextResponse.json({ message: "Not authenticated" }, { status: 401 })
-    }
-
-    const client = await getConnection(session.user)
-    if (!client) {
-        return NextResponse.json({ message: "Not authenticated" }, { status: 401 })
+    const client = await getClient()
+    if (client instanceof NextResponse) {
+        return client
     }
 
     const nodeId = parseInt(params.node, 10);

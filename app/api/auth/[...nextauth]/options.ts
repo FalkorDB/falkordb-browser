@@ -1,6 +1,7 @@
 import { FalkorDB } from "falkordb";
 import CredentialsProvider from "next-auth/providers/credentials"
-import { AuthOptions, User } from "next-auth"
+import { AuthOptions, getServerSession } from "next-auth"
+import { NextResponse } from "next/server";
 
 const connections = new Map<number, FalkorDB>();
 
@@ -33,19 +34,6 @@ async function newClient(credentials: {host: string, port: string, password: str
     // Verify connection
     await client.connection.ping()
     return client
-}
-
-export async function getConnection(user: User) : Promise<FalkorDB> {
-    let conn = connections.get(user.id)
-    if (!conn) {
-        conn = await newClient({
-            host: user.host,
-            port: user.port.toString() ?? "6379",
-            username: user.username,
-            password: user.password,
-        }, user.id)
-    }
-    return conn  
 }
 
 let userId = 1;
@@ -121,6 +109,30 @@ const authOptions: AuthOptions = {
     }
 }
 
+export async function getClient() {
+    const session = await getServerSession(authOptions)
+    const id = session?.user?.id
+    if(!id) {
+        return NextResponse.json({ message: "Not authenticated" }, { status: 401 })
+    }
 
+    const { user } = session;
+    let client = connections.get(user.id)
+
+    // If client is not found, create a new one
+    if (!client) {
+        client = await newClient({
+            host: user.host,
+            port: user.port.toString() ?? "6379",
+            username: user.username,
+            password: user.password,
+        }, user.id)
+    }
+
+    if(!client) {
+        return NextResponse.json({ message: "Not authenticated" }, { status: 401 })
+    }
+    return client
+}
 
 export default authOptions
