@@ -1,12 +1,11 @@
 import CytoscapeComponent from "react-cytoscapejs";
-import { toast } from "@/components/ui/use-toast";
 import cytoscape, { ElementDefinition, EventObject, NodeDataDefinition } from "cytoscape";
 import { useRef, useState, useImperativeHandle, forwardRef } from "react";
-import { signOut } from "next-auth/react";
 import fcose from 'cytoscape-fcose';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { ImperativePanelHandle } from "react-resizable-panels";
 import { ChevronLeft, ChevronRight } from "lucide-react"
+import { securedFetch } from "@/lib/utils";
 import Labels from "./labels";
 import Toolbar from "./toolbar";
 import { Category, Graph } from "./model";
@@ -127,27 +126,22 @@ const GraphView = forwardRef(({ graph, darkmode }: GraphViewProps, ref) => {
 
     // Send the user query to the server to expand a node
     async function onFetchNode(node: NodeDataDefinition) {
-        const result = await fetch(`/api/graph/${graph.Id}/${node.id}`, {
+        const result = await securedFetch(`/api/graph/${graph.Id}/${node.id}`, {
             method: 'GET',
             headers: {
                 'Content-Type': 'application/json'
             }
-        })
+        });
 
-        if (result.status >= 300) {
-            toast({
-                title: "Error",
-                description: result.text(),
-            })
-            if (result.status >= 400 && result.status < 500) {
-                signOut({ callbackUrl: '/login' })
-            }
-            return [] as ElementDefinition[]
+        if (result.ok) {
+            const json = await result.json()
+            const elements = graph.extend(json.result)
+            return elements
+            
         }
+        return [] as ElementDefinition[]
 
-        const json = await result.json()
-        const elements = graph.extend(json.result)
-        return elements
+        
     }
 
     const onCategoryClick = (category: Category) => {
