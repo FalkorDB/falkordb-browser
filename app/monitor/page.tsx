@@ -2,19 +2,20 @@
 
 import useSWR from 'swr'
 import React, { useState } from 'react'
+import { securedFetch } from '@/lib/utils'
 import MonitorView from './MonitorView'
 
 export default function Page() {
 
     const [time, setTime] = useState<Date | null>(null)
 
-    const fetcher = (url: string) => fetch(url, {
+    const fetcher = (url: string) => securedFetch(url, {
         method: 'GET',
         headers: {
             'Content-Type': 'application/json'
         }
     }).then((result) => {
-        if (result.status < 300) {
+        if (result.ok) {
             setTime(new Date())
             return result.json()
         }
