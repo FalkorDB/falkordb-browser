@@ -10,11 +10,11 @@ interface DeleteUserProps {
 
 export default function DeleteUser({ users, selectedRows} : DeleteUserProps) {
 
+    const selected = users.filter((_: User, index: number) => selectedRows[index])
+    
     const deleteSelected = () => {
-        const selected = users.filter((_: User, index: number) => selectedRows[index])
-        if (selected.length === 0) {
-            return
-        }
+        if (selected.length === 0) return
+        
         fetch(`/api/user/`, {
             method: 'DELETE',
             headers: {
@@ -40,7 +40,7 @@ export default function DeleteUser({ users, selectedRows} : DeleteUserProps) {
 
     return (
         <AlertDialog>
-            <AlertDialogTrigger asChild>
+            <AlertDialogTrigger disabled={selected.length === 0} asChild>
                 <Button variant="outline">Delete selected users</Button>
             </AlertDialogTrigger>
             <AlertDialogContent>
