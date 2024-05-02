@@ -1,27 +1,36 @@
-import { useTheme } from "next-themes"
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useState } from "react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import SectionQuery, { GraphState } from "./sectionQuery"
+// eslint-disable-next-line import/no-extraneous-dependencies
+import { GraphEdge, GraphNode } from "reagraph"
+import SectionQuery, { QueryState } from "./sectionQuery"
 import MetaDataView from "./metadataview"
-import GraphView, { GraphViewRef } from "./GraphView"
+// eslint-disable-next-line import/no-cycle
+import GraphView from "./GraphView"
+// eslint-disable-next-line import/no-cycle
 import { TableView } from "./tableview"
-import { Graph } from "./model"
 
-export default function GraphSection({ onSubmit, queryState }: {
+export interface GraphState extends QueryState{
+    id: number,
+    nodes: GraphNode[],
+    edges: GraphEdge[],
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    onSubmit: (e: React.FormEvent<HTMLElement>, graphName: string, query: string) => Promise<any>,
-    queryState: GraphState,
+    data: any
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    metadata: any
+}
+
+export default function GraphSection({ onSubmit, graphState }: {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    onSubmit: (e: React.FormEvent<HTMLElement>, graphName: string, query: string) => Promise<GraphState>,
+    graphState: GraphState,
 }) {
 
-    const [graph, setGraph] = useState<Graph>(Graph.create(queryState.graphName, queryState.data))
+    const [graph, setGraph] = useState<GraphState>(graphState)
     const [value, setValue] = useState<string>()
-    const [metadata, setMetadata] = useState<string[]>(queryState.data.metadata)
-    const graphView = useRef<GraphViewRef>(null)
-    const showGraph = graph.Elements && graph.Elements.length > 0
-    const showTable = graph.Data && graph.Data.length > 0
-    const { theme, systemTheme } = useTheme()
-    const darkmode = theme === "dark" || (theme === "system" && systemTheme === "dark")
-    
+    const [metadata, setMetadata] = useState<string[]>(graphState.data.metadata)
+    const showGraph = graph.nodes && graph.edges
+    const showTable = graph.data && graph.data.length > 0
+
     useEffect(() => {
         if (showGraph) {
             setValue("graph")
@@ -31,21 +40,20 @@ export default function GraphSection({ onSubmit, queryState }: {
     }, [showTable, showGraph])
 
     const handelSubmit = async (e: React.FormEvent<HTMLElement>, graphName: string, query: string) => {
-        const data = await onSubmit(e, graphName, query)
-        setGraph(Graph.create(graphName, data))
-        setMetadata(data.metadata)
-        graphView.current?.expand(graph.Elements)
+        const result = await onSubmit(e, graphName, query)
+        setGraph(result)
+        setMetadata(result.data.metadata)
     }
 
     return (
         <div className="h-full flex flex-col gap-y-2">
             <SectionQuery
-                queryState={queryState}
+                queryState={graphState}
                 onSubmit={handelSubmit}
                 className="border rounded-lg border-gray-300 p-2"
             />
-            {
-                graph.Id &&
+             {
+                graph.id &&
                 <>
                     <div className="grow border flex flex-col border-gray-300 rounded-lg p-2">
                         {
@@ -58,10 +66,10 @@ export default function GraphSection({ onSubmit, queryState }: {
                                     </TabsList>
                                 </div>
                                 <TabsContent value="table" className="w-1 grow overflow-auto">
-                                    <TableView graph={graph} />
+                                    <TableView data={graph.data} />
                                 </TabsContent>
                                 <TabsContent value="graph" className="w-1 grow">
-                                    <GraphView ref={graphView} graph={graph} darkmode={darkmode} />
+                                <GraphView graph={graph} />
                                 </TabsContent>
                             </Tabs>
                         }

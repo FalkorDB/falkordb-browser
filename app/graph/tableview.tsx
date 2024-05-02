@@ -5,10 +5,9 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { JSONTree } from "react-json-tree"
 import { transparent } from "tailwindcss/colors";
 import { useTheme } from "next-themes";
-import { Graph } from "./model";
+import { GraphState } from "./graphSection";
 
-// eslint-disable-next-line import/prefer-default-export
-export function TableView({ graph }: { graph: Graph }) {
+export default function TableView(graph: GraphState) {
     const { theme, systemTheme} = useTheme()
     const dark = theme === "dark" || (theme === "system" && systemTheme === "dark")
     const rowClass = !dark ? "hover:bg-gray-400" : undefined
@@ -18,10 +17,11 @@ export function TableView({ graph }: { graph: Graph }) {
             <TableHeader>
                 <TableRow className={rowClass}>
                     {
-                        graph.Columns.map((column, index) => (
+                        graph.
+                        //  .map((column, index) => (
                             // eslint-disable-next-line react/no-array-index-key
-                            <TableHead key={index}>{column}</TableHead>
-                        ))
+                            // <TableHead key={index}>{column}</TableHead>
+                        // ))
                     }
                 </TableRow>
             </TableHeader>

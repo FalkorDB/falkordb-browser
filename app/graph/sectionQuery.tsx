@@ -4,27 +4,17 @@ import { Play } from "lucide-react";
 import Editor from "@monaco-editor/react";
 import { useTheme } from "next-themes";
 
-export class GraphState {
-
-    public static count: number = 0;
-
-    public id: number;
-
-    constructor(
-        public graphName: string,
-        public query: string,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        public data?: any,
-    ) {
-        this.id = GraphState.count;
-        GraphState.count += 1;
-    }
+export interface QueryState {
+    graphName: string,
+    query: string,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    data?: any,
 }
 
 export default function SectionQuery({ onSubmit, queryState, className = "" }: {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     onSubmit: (e: FormEvent<HTMLFormElement>, graphName: string, query: string) => Promise<any>,
-    queryState: GraphState,
+    queryState: QueryState,
     className: string,
 }) {
     const lineHeight = 40
