@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getClient } from "../auth/[...nextauth]/options";
+import { getClient } from "@/app/api/auth/[...nextauth]/options";
 
 const fileds = [
     "used_memory",

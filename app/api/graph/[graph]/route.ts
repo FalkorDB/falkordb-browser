@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getClient } from "../../auth/[...nextauth]/options";
+import { getClient } from "@/app/api/auth/[...nextauth]/options";
 
 // eslint-disable-next-line import/prefer-default-export
 export async function DELETE(request: NextRequest, { params }: { params: { graph: string } }) {
