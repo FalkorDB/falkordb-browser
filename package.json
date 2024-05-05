@@ -62,7 +62,7 @@
     "zod": "^3.22.4"
   },
   "devDependencies": {
-    "@playwright/test": "^1.42.1",
+    "@playwright/test": "^1.43.1",
     "@svgr/webpack": "^8.1.0",
     "@types/cytoscape-fcose": "^2.2.4",
     "@types/lodash": "^4.14.202",
