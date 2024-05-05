@@ -6,9 +6,12 @@ import { useEffect, useState } from "react";
 import { useTheme } from "next-themes";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils"
+import Image from "next/image";
 import { Label } from "../ui/label";
 import GithubMark from "./GithubMark";
 
+
+const TEXT_COLOR = "text-blue-600 dark:text-blue-300"
 export interface LinkDefinition {
   name: string,
   href: string,
@@ -63,13 +66,18 @@ export default function Navbar({ collapsed }: { collapsed: boolean }) {
   return (
     <nav className='w-full h-full bg-gray-100 dark:bg-gray-800 py-5 flex flex-col justify-between'>
       <ul className={`flex flex-col gap-5 ${collapsed ? "items-center" : "justify-start pl-2"}`}>
+        <li>
+          <Link href="https://www.falkordb.com" target="_blank">
+            <Image src="/falkordb.svg" alt="FalkorDB Logo" width={100} height={100} />
+          </Link>
+        </li>
         {status === "authenticated" &&
           linksUp.map((link, index) => (
             // eslint-disable-next-line react/no-array-index-key
             <li key={index}>
               <Link
                 title={link.name}
-                className={cn("underline underline-offset-2 flex gap-2", pathName === link.href ? '' : 'text-blue-300')}
+                className={cn("underline underline-offset-2 flex gap-2", pathName === link.href ? '' : TEXT_COLOR)}
                 href={link.href} onClick={link.onClick}
               >
                 {link.icon}
@@ -88,7 +96,7 @@ export default function Navbar({ collapsed }: { collapsed: boolean }) {
         <li key={0}>
           {
             mounted &&
-            <button title="Theme" type="button" className="flex flex-row items-center gap-2 underline underline-offset-2 text-blue-300" onClick={() => setTheme(darkmode ? "light" : "dark")}>
+            <button title="Theme" type="button" className={cn("flex flex-row items-center gap-2 underline underline-offset-2", TEXT_COLOR)} onClick={() => setTheme(darkmode ? "light" : "dark")}>
               {
                 darkmode ? <Sun /> : <Moon />
               }
@@ -105,7 +113,7 @@ export default function Navbar({ collapsed }: { collapsed: boolean }) {
             <li key={index + 1}>
               <Link
                 title={link.name}
-                className={cn("underline underline-offset-2 flex gap-2", pathName === link.href ? '' : 'text-blue-300')}
+                className={cn("underline underline-offset-2 flex gap-2", pathName === link.href ? '' : TEXT_COLOR)}
                 href={link.href} onClick={link.onClick}
               >
                 {link.icon}
