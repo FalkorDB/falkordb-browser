@@ -1,9 +1,10 @@
 import { useTheme } from "next-themes"
 import { useEffect, useRef, useState } from "react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { GraphCanvasRef } from "reagraph"
 import SectionQuery, { GraphState } from "./sectionQuery"
 import MetaDataView from "./metadataview"
-import GraphView, { GraphViewRef } from "./GraphView"
+import GraphView from "./GraphView"
 import { TableView } from "./tableview"
 import { Graph } from "./model"
 
@@ -16,12 +17,12 @@ export default function GraphSection({ onSubmit, queryState }: {
     const [graph, setGraph] = useState<Graph>(Graph.create(queryState.graphName, queryState.data))
     const [value, setValue] = useState<string>()
     const [metadata, setMetadata] = useState<string[]>(queryState.data.metadata)
-    const graphView = useRef<GraphViewRef>(null)
-    const showGraph = graph.Elements && graph.Elements.length > 0
+    const graphView = useRef<GraphCanvasRef>(null)
+    const showGraph = graph.Elements && graph.Elements[0].length > 0
     const showTable = graph.Data && graph.Data.length > 0
     const { theme, systemTheme } = useTheme()
     const darkmode = theme === "dark" || (theme === "system" && systemTheme === "dark")
-    
+
     useEffect(() => {
         if (showGraph) {
             setValue("graph")
@@ -34,7 +35,6 @@ export default function GraphSection({ onSubmit, queryState }: {
         const data = await onSubmit(e, graphName, query)
         setGraph(Graph.create(graphName, data))
         setMetadata(data.metadata)
-        graphView.current?.expand(graph.Elements)
     }
 
     return (
