@@ -1,4 +1,4 @@
-import NextAuth, { DefaultUser } from "next-auth";
+import { DefaultUser } from "next-auth";
 
 declare module "next-auth" {
 
@@ -6,6 +6,7 @@ declare module "next-auth" {
         id: number;
         host: string;
         port: number;
+        tls: boolean;
         username: string;
         password: string;
     }

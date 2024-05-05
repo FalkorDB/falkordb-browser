@@ -6,16 +6,18 @@ import { Button } from "@/components/ui/button";
 import { SignInOptions, SignInResponse, signIn } from "next-auth/react";
 import { FormEvent, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { Checkbox } from "@/components/ui/checkbox";
 
 const DEFAULT_HOST = "localhost";
 const DEFAULT_PORT = "6379";
 
 export default function LoginForm() {
   const router = useRouter();
-  const [error, setError] = useState(false);
+  const [error, setError] = useState<boolean>();
 
   const [host, setHost] = useState(DEFAULT_HOST);
   const [port, setPort] = useState(DEFAULT_PORT);
+  const [tls, setTLS] = useState(false);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
 
@@ -38,6 +40,7 @@ export default function LoginForm() {
       redirect: false,
       host: host ?? DEFAULT_HOST,
       port: port ?? DEFAULT_PORT,
+      tls: tls,
     };
     if (username) {
       params.username = username;
@@ -45,7 +48,6 @@ export default function LoginForm() {
     if (password) {
       params.password = password;
     }
-
     signIn("credentials", params).then((res?: SignInResponse) => {
       if (res && res.error) {
         setError(true);
@@ -101,6 +103,14 @@ export default function LoginForm() {
           onChange={(e) => setPassword(e.target.value)}
           value={password}
         />
+      </div>
+      <div className="space-x-2">
+        <Checkbox
+          defaultChecked={false}
+          checked={tls}
+          onCheckedChange={(checked) => setTLS(checked as boolean)}
+        />
+        <Label htmlFor="tls">tls</Label>
       </div>
       <div className="flex justify-center p-4">
         <Button type="submit">Connect</Button>

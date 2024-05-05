@@ -5,11 +5,12 @@ import { NextResponse } from "next/server";
 
 const connections = new Map<number, FalkorDB>();
 
-async function newClient(credentials: {host: string, port: string, password: string, username: string}, id: number) {
+async function newClient(credentials: { host: string, port: string, password: string, username: string, tls: string }, id: number) {
     const client = await FalkorDB.connect({
         socket: {
             host: credentials.host ?? "localhost",
-            port: credentials.port ? parseInt(credentials.port, 10) : 6379
+            port: credentials.port ? parseInt(credentials.port, 10) : 6379,
+            tls: credentials.tls === "true"
         },
         password: credentials.password ?? undefined,
         username: credentials.username ?? undefined
@@ -25,9 +26,9 @@ async function newClient(credentials: {host: string, port: string, password: str
         if (connection) {
             connections.delete(id)
             connection.close()
-            .catch((e) => {
-                console.warn('FalkorDB Client Disconnect Error', e)
-            })
+                .catch((e) => {
+                    console.warn('FalkorDB Client Disconnect Error', e)
+                })
         }
     });
 
@@ -46,10 +47,11 @@ const authOptions: AuthOptions = {
                 host: { label: "Host", type: "text", placeholder: "localhost" },
                 port: { label: "Port", type: "number", placeholder: "6379" },
                 username: { label: "Username", type: "text" },
-                password: { label: "Password", type: "password" }
+                password: { label: "Password", type: "password" },
+                tls: { label: "tls", type: "boolean" }
             },
             async authorize(credentials) {
-
+                
                 if (!credentials) {
                     return null
                 }
@@ -66,6 +68,7 @@ const authOptions: AuthOptions = {
                         port: credentials.port ? parseInt(credentials.port, 10) : 6379,
                         password: credentials.password,
                         username: credentials.username,
+                        tls: credentials.tls === "true"
                     }
                     return res
                 } catch (err) {
@@ -85,7 +88,8 @@ const authOptions: AuthOptions = {
                     host: user.host,
                     port: user.port,
                     username: user.username,
-                    password: user.password
+                    password: user.password,
+                    tls: user.tls
                 };
             }
             return token;
@@ -101,6 +105,7 @@ const authOptions: AuthOptions = {
                         port: parseInt(token.port as string, 10),
                         username: token.username as string,
                         password: token.password as string,
+                        tls: token.tls as boolean,
                     },
                 };
             }
@@ -112,7 +117,7 @@ const authOptions: AuthOptions = {
 export async function getClient() {
     const session = await getServerSession(authOptions)
     const id = session?.user?.id
-    if(!id) {
+    if (!id) {
         return NextResponse.json({ message: "Not authenticated" }, { status: 401 })
     }
 
@@ -126,10 +131,11 @@ export async function getClient() {
             port: user.port.toString() ?? "6379",
             username: user.username,
             password: user.password,
+            tls: String(user.tls)
         }, user.id)
     }
 
-    if(!client) {
+    if (!client) {
         return NextResponse.json({ message: "Not authenticated" }, { status: 401 })
     }
     return client
