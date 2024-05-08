@@ -6,13 +6,21 @@ import { NextResponse } from "next/server";
 const connections = new Map<number, FalkorDB>();
 
 async function newClient(credentials: { host: string, port: string, password: string, username: string, tls: string, ca: string }, id: number) {
-    const client = await FalkorDB.connect({
+    const client = credentials.ca === "undefined" ? await FalkorDB.connect({
         socket: {
             host: credentials.host ?? "localhost",
             port: credentials.port ? parseInt(credentials.port, 10) : 6379,
             tls: credentials.tls === "true",
             checkServerIdentity: () => undefined,
             ca: credentials.ca && [Buffer.from(credentials.ca, "base64").toString("utf8")]
+        },
+        password: credentials.password ?? undefined,
+        username: credentials.username ?? undefined
+    })
+    : await FalkorDB.connect({
+        socket: {
+            host: credentials.host ?? "localhost",
+            port: credentials.port ? parseInt(credentials.port, 10) : 6379,
         },
         password: credentials.password ?? undefined,
         username: credentials.username ?? undefined

@@ -12,7 +12,7 @@ export default function Dropzone({ onFileDrop, disabled }: DropzoneProps) {
             const reader = new FileReader
 
             reader.onload = () => {
-                onFileDrop((reader.result as string).split(",").pop())                
+                onFileDrop((reader.result as string).split(",").pop())
             }
 
             reader.readAsDataURL(file)
@@ -23,10 +23,10 @@ export default function Dropzone({ onFileDrop, disabled }: DropzoneProps) {
 
     return (
         // eslint-disable-next-line react/jsx-props-no-spreading
-        <div {...getRootProps()}>
+        <div {...getRootProps({className: "w-fit"})}>
             {/* eslint-disable-next-line react/jsx-props-no-spreading */}
             <input {...getInputProps()} />
-            <p>Drop file here</p>
-        </div>
+            <p className='underline underline-offset-2'> Drop file here</p >
+        </div >
     )
 }
