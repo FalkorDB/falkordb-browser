@@ -87,7 +87,9 @@ export default function NextAuthProvider({ children }: { children: React.ReactNo
                 <iframe className="h-full w-full" title="docs" src="https://docs.falkordb.com/" />
               </ResizablePanel>
               <ResizableHandle />
-              <ResizablePanel>
+              <ResizablePanel
+                defaultSize={100 - docsSize}
+              >
                 <LoginVerification>{children}</LoginVerification>
               </ResizablePanel>
             </ResizablePanelGroup>
