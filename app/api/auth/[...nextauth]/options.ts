@@ -5,12 +5,14 @@ import { NextResponse } from "next/server";
 
 const connections = new Map<number, FalkorDB>();
 
-async function newClient(credentials: { host: string, port: string, password: string, username: string, tls: string }, id: number) {
+async function newClient(credentials: { host: string, port: string, password: string, username: string, tls: string, ca: string }, id: number) {
     const client = await FalkorDB.connect({
         socket: {
             host: credentials.host ?? "localhost",
             port: credentials.port ? parseInt(credentials.port, 10) : 6379,
-            tls: credentials.tls === "true"
+            tls: credentials.tls === "true",
+            checkServerIdentity: () => undefined,
+            ca: credentials.ca && [Buffer.from(credentials.ca, "base64").toString("utf8")]
         },
         password: credentials.password ?? undefined,
         username: credentials.username ?? undefined
@@ -48,10 +50,11 @@ const authOptions: AuthOptions = {
                 port: { label: "Port", type: "number", placeholder: "6379" },
                 username: { label: "Username", type: "text" },
                 password: { label: "Password", type: "password" },
-                tls: { label: "tls", type: "boolean" }
+                tls: { label: "tls", type: "boolean" },
+                ca: { label: "ca", type: "string" }
             },
             async authorize(credentials) {
-                
+
                 if (!credentials) {
                     return null
                 }
@@ -68,7 +71,8 @@ const authOptions: AuthOptions = {
                         port: credentials.port ? parseInt(credentials.port, 10) : 6379,
                         password: credentials.password,
                         username: credentials.username,
-                        tls: credentials.tls === "true"
+                        tls: credentials.tls === "true",
+                        ca: credentials.ca
                     }
                     return res
                 } catch (err) {
@@ -89,7 +93,8 @@ const authOptions: AuthOptions = {
                     port: user.port,
                     username: user.username,
                     password: user.password,
-                    tls: user.tls
+                    tls: user.tls,
+                    ca: user.ca
                 };
             }
             return token;
@@ -106,6 +111,7 @@ const authOptions: AuthOptions = {
                         username: token.username as string,
                         password: token.password as string,
                         tls: token.tls as boolean,
+                        ca: token.ca
                     },
                 };
             }
@@ -131,7 +137,8 @@ export async function getClient() {
             port: user.port.toString() ?? "6379",
             username: user.username,
             password: user.password,
-            tls: String(user.tls)
+            tls: String(user.tls),
+            ca: user.ca
         }, user.id)
     }
 
