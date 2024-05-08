@@ -1,6 +1,6 @@
 "use client";
 
-import { ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
+import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { SessionProvider } from "next-auth/react";
 import { ThemeProvider } from 'next-themes'
 import { useEffect, useRef, useState } from "react";
@@ -17,6 +17,12 @@ export default function NextAuthProvider({ children }: { children: React.ReactNo
 
   const [isCollapsed, setCollapsed] = useState(isSmallScreen)
   const navPanel = useRef<ImperativePanelHandle>(null)
+  const docsPanel = useRef<ImperativePanelHandle>(null)
+
+  useEffect(() => {
+    if (!docsPanel.current) return
+    docsPanel.current.collapse()
+  }, [])
 
   useEffect(() => {
     if (isSmallScreen) {
@@ -27,7 +33,7 @@ export default function NextAuthProvider({ children }: { children: React.ReactNo
     }
   }, [isSmallScreen])
 
-  const onExpand = () => {
+  const onNavExpand = () => {
     if (navPanel.current) {
       if (navPanel.current.isCollapsed()) {
         navPanel.current.expand()
@@ -36,8 +42,21 @@ export default function NextAuthProvider({ children }: { children: React.ReactNo
       }
     }
   }
-  const panelSize = isSmallScreen ? 7 : 9 
-  const collapsedSize = isSmallScreen ? 7 : 3
+
+  const onDocsExpand = () => {
+    if (docsPanel.current) {
+      if (docsPanel.current.isCollapsed()) {
+        docsPanel.current.expand()
+      } else {
+        docsPanel.current.collapse()
+      }
+    }
+  }
+  const navSize = isSmallScreen ? 7 : 9
+  const navCollapsedSize = isSmallScreen ? 7 : 3
+
+  const docsSize = 15
+  const docsCollapsedSize = 0
 
   return (
     <SessionProvider>
@@ -45,19 +64,34 @@ export default function NextAuthProvider({ children }: { children: React.ReactNo
         <ResizablePanelGroup direction="horizontal" className='h-screen'>
           <ResizablePanel
             ref={navPanel}
-            maxSize={panelSize}
-            defaultSize={panelSize}
-            collapsedSize={collapsedSize}
+            defaultSize={navSize}
+            collapsedSize={navCollapsedSize}
             collapsible
-            minSize={panelSize}
             onCollapse={() => { setCollapsed(true) }}
             onExpand={() => { setCollapsed(false) }}>
-            <button title={isCollapsed ? "open" : "close"} type="button" className="fixed top-[50%] left-2" onClick={() => onExpand()}>
+            <button title={isCollapsed ? "open" : "close"} type="button" className="fixed top-[50%] left-2" onClick={() => onNavExpand()}>
               {isCollapsed ? <ChevronRight /> : <ChevronLeft />}
             </button>
-            <Navbar collapsed={isCollapsed} />
+            <Navbar isCollapsed={isCollapsed} onDocsExpand={onDocsExpand} />
           </ResizablePanel>
-          <ResizablePanel defaultSize={100 - panelSize}><LoginVerification>{children}</LoginVerification></ResizablePanel>
+          <ResizablePanel defaultSize={100 - navSize}>
+            <ResizablePanelGroup direction="horizontal">
+              <ResizablePanel
+                ref={docsPanel}
+                defaultSize={docsSize}
+                collapsedSize={docsCollapsedSize}
+                maxSize={docsSize * 2}
+                minSize={docsSize}
+                collapsible
+              >
+                <iframe className="h-full w-full" title="docs" src="https://docs.falkordb.com/" />
+              </ResizablePanel>
+              <ResizableHandle />
+              <ResizablePanel>
+                <LoginVerification>{children}</LoginVerification>
+              </ResizablePanel>
+            </ResizablePanelGroup>
+          </ResizablePanel>
         </ResizablePanelGroup>
       </ThemeProvider>
     </SessionProvider>

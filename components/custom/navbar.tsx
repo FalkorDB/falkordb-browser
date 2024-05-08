@@ -1,5 +1,5 @@
 /* eslint-disable jsx-a11y/anchor-is-valid */
-import { Activity, Info, LogOut, Moon, Sun, Users, Waypoints } from "lucide-react";
+import { Activity, BookOpenText, Info, LogOut, Moon, Sun, Users, Waypoints } from "lucide-react";
 import { signOut, useSession } from "next-auth/react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
@@ -9,7 +9,6 @@ import { cn } from "@/lib/utils"
 import Image from "next/image";
 import { Label } from "../ui/label";
 import GithubMark from "./GithubMark";
-
 
 const TEXT_COLOR = "text-blue-600 dark:text-blue-300"
 export interface LinkDefinition {
@@ -52,7 +51,7 @@ const linksDown: LinkDefinition[] = [
   },
 ]
 
-export default function Navbar({ collapsed }: { collapsed: boolean }) {
+export default function Navbar({ isCollapsed, onDocsExpand }: { isCollapsed: boolean, onDocsExpand: () => void }) {
   const { status } = useSession()
   const { theme, setTheme, systemTheme } = useTheme()
   const [mounted, setMounted] = useState(false)
@@ -65,7 +64,7 @@ export default function Navbar({ collapsed }: { collapsed: boolean }) {
 
   return (
     <nav className='w-full h-full bg-gray-100 dark:bg-gray-800 py-5 flex flex-col justify-between'>
-      <ul className={`flex flex-col gap-5 ${collapsed ? "items-center" : "justify-start pl-2"}`}>
+      <ul className={`flex flex-col gap-5 ${isCollapsed ? "items-center" : "justify-start pl-2"}`}>
         <li>
           <Link href="https://www.falkordb.com" target="_blank">
             <Image src="/falkordb.svg" alt="FalkorDB Logo" width={100} height={100} />
@@ -82,7 +81,7 @@ export default function Navbar({ collapsed }: { collapsed: boolean }) {
               >
                 {link.icon}
                 {
-                  !collapsed &&
+                  !isCollapsed &&
                   <div className="flex flex-col">
                     {/* eslint-disable-next-line react/no-array-index-key */}
                     {link.name.split(" ").map((str, strIndex) => <p key={strIndex}>{str}</p>)}
@@ -92,19 +91,19 @@ export default function Navbar({ collapsed }: { collapsed: boolean }) {
           ))
         }
       </ul>
-      <ul className={`flex flex-col gap-5 ${collapsed ? "items-center" : "justify-start pl-2"}`}>
+      <ul className={`flex flex-col gap-5 ${isCollapsed ? "items-center" : "justify-start pl-2"}`}>
         <li key={0}>
           {
             mounted &&
-            <button title="Theme" type="button" className={cn("flex flex-row items-center gap-2 underline underline-offset-2", TEXT_COLOR)} onClick={() => setTheme(darkmode ? "light" : "dark")}>
+            <Link title="Theme" type="button" className={cn("flex flex-row items-center gap-2 underline underline-offset-2", TEXT_COLOR)} onClick={() => setTheme(darkmode ? "light" : "dark")} href="">
               {
                 darkmode ? <Sun /> : <Moon />
               }
               {
-                !collapsed &&
+                !isCollapsed &&
                 <Label className="cursor-pointer text-md" htmlFor="dark-mode">{`${theme === "dark" ? "light" : "dark"} mode`}</Label>
               }
-            </button>
+            </Link>
           }
         </li>
         {
@@ -118,7 +117,7 @@ export default function Navbar({ collapsed }: { collapsed: boolean }) {
               >
                 {link.icon}
                 {
-                  !collapsed &&
+                  !isCollapsed &&
                   <div className="flex flex-col">
                     {/* eslint-disable-next-line react/no-array-index-key */}
                     {link.name.split(" ").map((str, strIndex) => <p key={strIndex}>{str}</p>)}
@@ -127,12 +126,21 @@ export default function Navbar({ collapsed }: { collapsed: boolean }) {
             </li>
           ))
         }
-        <li key={linksDown.length + 1} className={`${!collapsed ? "flex flex-row items-center gap-1" : "flex justify-center"}`}>
+        <li key={linksDown.length + 1} className={`${!isCollapsed ? "flex flex-row items-center gap-1" : "flex justify-center"}`}>
+          <Link title="Documentation" type="button" className={cn("flex flex-row items-center gap-2 underline underline-offset-2", TEXT_COLOR)} onClick={() => onDocsExpand()} href="">
+            <BookOpenText/>
+            {
+              !isCollapsed &&
+              <p >Documentation</p>
+            }
+          </Link>
+        </ li>
+        <li key={linksDown.length + 2} className={`${!isCollapsed ? "flex flex-row items-center gap-1" : "flex justify-center"}`}>
           <a href="https://github.com/falkordb/falkordb-browser" className="flex justify-center" title="Github repository" aria-label="Github repository">
             <GithubMark darkMode={darkmode} className="h-4 w-4" />
           </a>
           {
-            !collapsed && (
+            !isCollapsed && (
               <>
                 <p className="text-xs">Made by</p>
                 <a className="underline text-xs" href="https://www.falkordb.com">FalkorDB</a>
