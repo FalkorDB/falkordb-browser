@@ -1,32 +1,35 @@
 import { cn } from "@/lib/utils";
-import { Minus, Plus } from "lucide-react";
 import { useState } from "react";
-import { Button } from "@/components/ui/button";
 import { Category, getCategoryColorName } from "./model";
 
-export default function Labels({ categories, className = "", onClick }: { categories: Category[], className: string, onClick: (category: Category) => void }) {
+export default function Labels({ categories, onClick, className="" }: { categories: Category[], onClick: (category: Category) => void, className: string }) {
 
     // fake stae to force reload
     const [reload, setReload] = useState(false)
 
     return (
-        <div className={cn("flex flex-row gap-x-1", className)} >
-            {
-                categories.map((category) => (
-                    <div className="flex flex-row gap-x-1 items-center" key={category.index}>
-                        <Button
-                            className={cn(`bg-${getCategoryColorName(category.index)}-500 ${category.show ? "" : "opacity-50"}`, "rounded-lg border border-gray-300 p-2 opac")}
-                            onClick={() => {
-                                onClick(category)
-                                setReload(!reload)
-                            }}
-                        >
-                            {category.show ? <Minus /> : <Plus />}
-                        </Button>
-                        <p>{category.name}</p>
-                    </div>
-                ))
-            }
+        <div className={className}>
+            <h1>Legend</h1>
+            <ul className={cn("flex flex-row gap-x-1")} >
+                {
+                    categories.map((category) => (
+                        <li key={category.index}>
+                            <button
+                                className="flex flex-row gap-2 items-center"
+                                title={category.name}
+                                type="button"
+                                onClick={() => {
+                                    onClick(category)
+                                    setReload(!reload)
+                                }}
+                            >
+                                <div className={`w-4 h-4 rounded-full bg-${getCategoryColorName(category.index)}-500`} />
+                                <p>{category.name}</p>
+                            </button>
+                        </li>
+                    ))
+                }
+            </ul>
         </div>
     )
 }

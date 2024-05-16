@@ -1,14 +1,13 @@
-import { CircleDot, ZoomIn, ZoomOut } from "lucide-react";
-import { cn } from "@/lib/utils"
+import { Circle, X, ZoomIn, ZoomOut } from "lucide-react";
 
-export default function Toolbar({ chartRef, className = "" }: {
-    chartRef: React.RefObject<cytoscape.Core>, className: string
+export default function Toolbar({ chartRef }: {
+    chartRef: React.RefObject<cytoscape.Core>,
 }) {
 
-    function handleZoomClick(changefactor: number) {
+    function handleZoomClick(changeFactor: number) {
         const chart = chartRef.current
         if (chart) {
-            chart.zoom(chart.zoom() * changefactor)
+            chart.zoom(chart.zoom() * changeFactor)
         }
     }
 
@@ -21,25 +20,63 @@ export default function Toolbar({ chartRef, className = "" }: {
     }
 
     return (
-        <ul className={cn("flex flex-row gap-2", className)}>
-            <li>
-                <button title="Zoom In" type="button" className="text-gray-600 dark:text-gray-400 rounded-lg border border-gray-300 p-2" onClick={() => handleZoomClick(1.1)}>
-                    { /* eslint-disable jsx-a11y/control-has-associated-label */}
-                    < ZoomIn />
+        <div className="flex flex-row items-center gap-6">
+            <p>Edit Graph: </p>
+            <div className="flex flex-row gap-12">
+                <button
+                    className="flex flex-row items-center gap-2"
+                    title="Add Entity"
+                    type="button"
+                >
+                    <Circle size={30} />
+                    <p>Add Entity</p>
                 </button>
-            </li>
-            <li>
-                <button title="Zoom Out" type="button" className="text-gray-600 dark:text-gray-400 rounded-lg border border-gray-300 p-2" onClick={() => handleZoomClick(0.9)}>
-                    { /* eslint-disable jsx-a11y/control-has-associated-label */}
-                    <ZoomOut />
+                <button
+                    className="flex flex-row gap-2"
+                    title="Add Relation"
+                    type="button"
+                >
+                    <p>Add Relation</p>
                 </button>
-            </li>
-            <li>
-                <button title="Center" type="button" className="text-gray-600 dark:text-gray-400 rounded-lg border border-gray-300 p-2" onClick={() => handleCenterClick()}>
-                    { /* eslint-disable jsx-a11y/control-has-associated-label */}
-                    <CircleDot />
+                <button
+                    className="flex flex-row items-center gap-2"
+                    title="Delete"
+                    type="button"
+                >
+                    <X size={30} />
+                    <p>Delete</p>
                 </button>
-            </li>
-        </ul>
+                <p>|</p>
+                <div className="flex flex-row items-center gap-6">
+                    <button
+                        className="flex flex-row items-center gap-2"
+                        title="Zoom In"
+                        type="button"
+                        onClick={() => handleZoomClick(0.9)}
+                    >
+                        <ZoomIn size={30} />
+                        <p>Zoom In</p>
+                    </button>
+                    <button
+                        className="flex flex-row gap-2"
+                        title="Zoom Out"
+                        type="button"
+                        onClick={() => handleZoomClick(-0.9)}
+                    >
+                        <ZoomOut size={30} />
+                        <p>Zoom Out</p>
+                    </button>
+                    <button
+                        className="flex flex-row items-center gap-2"
+                        title="Fit To Size"
+                        type="button"
+                        onClick={() => handleCenterClick}
+                    >
+                        <X size={30} />
+                        <p>Fit To Size</p>
+                    </button>
+                </div>
+            </div>
+        </div>
     )
 }

@@ -1,15 +1,16 @@
 import CytoscapeComponent from "react-cytoscapejs";
 import cytoscape, { ElementDefinition, EventObject, NodeDataDefinition } from "cytoscape";
-import { useRef, useState, useImperativeHandle, forwardRef } from "react";
+import { useRef, useState, useImperativeHandle, forwardRef, useEffect } from "react";
 import fcose from 'cytoscape-fcose';
-import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
+import { ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { ImperativePanelHandle } from "react-resizable-panels";
-import { ChevronLeft, ChevronRight } from "lucide-react"
-import { securedFetch } from "@/lib/utils";
-import Labels from "./labels";
-import Toolbar from "./toolbar";
+import { ChevronLeft } from "lucide-react"
+import { cn, securedFetch } from "@/lib/utils";
+import { useToast } from "@/components/ui/use-toast";
 import { Category, Graph } from "./model";
 import DataPanel from "./DataPanel";
+import Labels from "./labels";
+import Toolbar from "./toolbar";
 
 const LAYOUT = {
     name: "fcose",
@@ -20,83 +21,22 @@ const LAYOUT = {
 cytoscape.use(fcose);
 
 // The stylesheet for the graph
-function getStyle(darkmode: boolean) {
-
-    const style: cytoscape.Stylesheet[] = [
-        {
-            selector: "core",
-            style: {
-                'active-bg-size': 0,  // hide gray circle when panning
-                // All of the following styles are meaningless and are specified
-                // to satisfy the linter...
-                'active-bg-color': 'blue',
-                'active-bg-opacity': 0.3,
-                "selection-box-border-color": 'blue',
-                "selection-box-border-width": 0,
-                "selection-box-opacity": 1,
-                "selection-box-color": 'blue',
-                "outside-texture-bg-color": 'blue',
-                "outside-texture-bg-opacity": 1,
-            },
-        },
-        {
-            selector: "node",
-            style: {
-                label: "data(name)",
-                "text-valign": "center",
-                "text-halign": "center",
-                "text-wrap": "ellipsis",
-                "text-max-width": "10rem",
-                shape: "ellipse",
-                height: "10rem",
-                width: "10rem",
-                "border-width": 0.15,
-                "border-opacity": 0.5,
-                "background-color": "data(color)",
-                "font-size": "3rem",
-                "overlay-padding": "1rem",
-            },
-        },
-        {
-            selector: "node:active",
-            style: {
-                "overlay-opacity": 0,  // hide gray box around active node
-            },
-        },
-        {
-            selector: "edge",
-            style: {
-                width: 0.5,
-                "line-color": "#ccc",
-                "arrow-scale": 0.3,
-                "target-arrow-shape": "triangle",
-                label: "data(label)",
-                'curve-style': 'straight',
-                "text-background-color": darkmode ? "#020817" : "white",
-                "color": darkmode ? "white" : "black",
-                "text-background-opacity": 1,
-                "font-size": "3rem",
-                "overlay-padding": "2rem",
-
-            },
-        },
-    ]
-    return style
-}
 
 export interface GraphViewRef {
     expand: (elements: ElementDefinition[]) => void
 }
 
-interface GraphViewProps {
-    graph: Graph,
-    darkmode: boolean
-}
+const GraphView = forwardRef(({ graphName, className }: {
+    graphName: string,
+    // eslint-disable-next-line react/require-default-props
+    className?: string
+}, ref) => {
 
-const GraphView = forwardRef(({ graph, darkmode }: GraphViewProps, ref) => {
-
+    const { toast } = useToast()
+    const [graph, setGraph] = useState<Graph>(Graph.empty())
+    const [query, setQuery] = useState<string>("")
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const [selectedObject, setSelectedObject] = useState<any | null>(null);
+    const [selectedObject, setSelectedObject] = useState<ElementDefinition>();
     const [isCollapsed, setIsCollapsed] = useState<boolean>(true);
 
     // A reference to the chart container to allowing zooming and editing
@@ -114,18 +54,39 @@ const GraphView = forwardRef(({ graph, darkmode }: GraphViewProps, ref) => {
         }
     }))
 
+    useEffect(() => {
+        dataPanel.current?.collapse()
+    }, [])
+
+    const runQuery = async () => {
+        const result = await fetch(`api/graph/${encodeURIComponent(graphName)}?query=${query.trim()}`, {
+            method: "GET"
+        })
+
+        if (!result.ok) {
+            toast({
+                title: "Error",
+                description: "Something went wrong"
+            })
+        }
+
+        const json = await result.json()
+        setGraph(Graph.create(graphName, json.result))
+    }
+
     const onExpand = () => {
         if (dataPanel.current) {
-            if (dataPanel.current.isCollapsed()) {
-                dataPanel.current.expand()
+            const panel = dataPanel.current
+            if (panel.isCollapsed()) {
+                panel.expand()
             } else {
-                dataPanel.current.collapse()
+                panel.collapse()
             }
         }
     }
 
     // Send the user query to the server to expand a node
-    async function onFetchNode(node: NodeDataDefinition) {
+    const onFetchNode = async (node: NodeDataDefinition) => {
         const result = await securedFetch(`/api/graph/${graph.Id}/${node.id}`, {
             method: 'GET',
             headers: {
@@ -137,11 +98,11 @@ const GraphView = forwardRef(({ graph, darkmode }: GraphViewProps, ref) => {
             const json = await result.json()
             const elements = graph.extend(json.result)
             return elements
-            
+
         }
         return [] as ElementDefinition[]
 
-        
+
     }
 
     const onCategoryClick = (category: Category) => {
@@ -161,7 +122,7 @@ const GraphView = forwardRef(({ graph, darkmode }: GraphViewProps, ref) => {
         }
     }
 
-    const handleDoubleClick = async (evt: EventObject) => {
+    const handleDoubleTap = async (evt: EventObject) => {
         const node = evt.target.json().data;
         const elements = await onFetchNode(node);
 
@@ -179,53 +140,73 @@ const GraphView = forwardRef(({ graph, darkmode }: GraphViewProps, ref) => {
     }
 
     return (
-        <ResizablePanelGroup className="relative" direction="horizontal">
-            <ResizablePanel defaultSize={selectedObject ? 80 : 100} className="h-full flex flex-col">
-                <div className="flex flex-row justify-between">
-                    <Toolbar className="" chartRef={chartRef} />
-                    <Labels className="pr-16" categories={graph.Categories} onClick={onCategoryClick} />
-                </div>
-                <CytoscapeComponent
-                    cy={(cy) => {
-                        chartRef.current = cy
-
-                        // Make sure no previous listeners are attached
-                        cy.removeAllListeners();
-
-                        // Listen to the double click event on nodes for expanding the node
-                        cy.on('dbltap', 'node', handleDoubleClick);
-
-                        // Listen to the click event on nodes for showing node properties
-                        cy.on('tap', 'node', handleTap);
-
-                        // Listen to the click event on edges for showing edge properties
-                        cy.on('tap', 'edge', handleTap);
-                    }}
-                    stylesheet={getStyle(darkmode)}
-                    elements={graph.Elements}
-                    layout={LAYOUT}
-                    className="w-full grow"
-                />
-            </ResizablePanel>
-            <ResizableHandle />
-            {
-                selectedObject &&
-                <button title={isCollapsed ? "open" : "close"} type="button" onClick={() => onExpand()} className="absolute top-1/2 right-0 transform -translate-y-1/2">
-                    {!isCollapsed ? <ChevronRight /> : <ChevronLeft />}
-                </button>
-            }
+        <ResizablePanelGroup className={cn("shadow-xl rounded-xl ring-offset-white", className)} direction="horizontal">
             <ResizablePanel
-                id="panel"
-                ref={dataPanel}
-                maxSize={50}
-                minSize={20}
-                onCollapse={() => { setIsCollapsed(true) }}
-                onExpand={() => { setIsCollapsed(false) }}
-                collapsible
-                defaultSize={selectedObject ? 20 : 0}
-                className="bg-gray-100 dark:bg-gray-800"
+                className="relative p-8 ring-4 ring-white flex flex-col gap-10 rounded-xl"
+                defaultSize={100}
             >
-                {selectedObject && <DataPanel object={selectedObject} />}
+                <Toolbar chartRef={chartRef} />
+                <div className="w-full flex flex-row items-center gap-8">
+                    <p>Query</p>
+                    <form action={runQuery} className="grow flex flex-row">
+                        <input
+                            className="grow border border-[#0000001A] p-2"
+                            title="Query"
+                            type="text"
+                            placeholder="Use Cypher Or Free Language"
+                            value={query}
+                            onChange={(e) => setQuery(e.target.value)}
+                        />
+                        <button
+                            className="border border-[#0000001A] text-[#47556999] p-2"
+                            title="Run"
+                            type="submit"
+                        >
+                            <p>Run</p>
+                        </button>
+                    </form>
+                </div>
+                {
+                    graph.Id &&
+                    <div className="relative grow">
+                        <CytoscapeComponent
+                            cy={(cy) => {
+
+                                chartRef.current = cy
+
+                                cy.removeAllListeners()
+
+                                cy.on('tap', handleTap)
+                                cy.on('dbltap', 'node', handleDoubleTap)
+                            }}
+                            elements={graph.Elements}
+                            layout={LAYOUT}
+                        />
+                        <Labels className="absolute left-0 bottom-0" categories={graph.Categories} onClick={onCategoryClick} />
+                    </div>
+                }
+                {
+                    isCollapsed &&
+                    <button
+                        className="absolute top-0 right-0 p-4 px-6 bg-blue-800 rounded-se-xl"
+                        title="Open"
+                        type="button"
+                        onClick={() => onExpand()}
+                        aria-label="Open"
+                    >
+                        <ChevronLeft className="border border-white" size={20} color="white" />
+                    </button>
+                }
+            </ResizablePanel>
+            <ResizablePanel
+                className="shadow-xl"
+                ref={dataPanel}
+                defaultSize={0}
+                collapsedSize={0}
+                onCollapse={() => setIsCollapsed(true)}
+                onExpand={() => setIsCollapsed(false)}
+            >
+                {selectedObject && <DataPanel object={selectedObject} onExpand={onExpand} />}
             </ResizablePanel>
         </ResizablePanelGroup>
     )

@@ -1,9 +1,12 @@
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { EdgeDataDefinition, NodeDataDefinition } from "cytoscape";
+import { ChevronRight } from "lucide-react";
 
 interface Props {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    object: any;
+    object: NodeDataDefinition | EdgeDataDefinition;
+    onExpand: () => void;
 }
 
 const excludedProperties = new Set([
@@ -15,11 +18,20 @@ const excludedProperties = new Set([
 ]);
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export default function DataPanel({ object }: Props) {
+export default function DataPanel({ object, onExpand }: Props) {
     const rowClass = "dark:hover:bg-slate-700 hover:bg-gray-400 border-y-[1px] border-y-gray-700"
-    const type = object.source ? "edge" : "node"
+    const type = object?.source ? "edge" : "node"
     return (
-        <Table>
+        <Table className="relative">
+            <button
+                className="absolute top-0 left-0"
+                title="Close"
+                type="button"
+                onClick={() => onExpand()}
+                aria-label="Close"
+            >
+                <ChevronRight />
+            </button>
             <TableCaption>{type} properties</TableCaption>
             <TableHeader>
                 <TableRow className={rowClass}>

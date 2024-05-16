@@ -1,124 +1,54 @@
 "use client"
 
-import { useState, Dispatch, createRef } from "react"
-import { Check, ChevronsUpDown } from "lucide-react"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger
-} from "@/components/ui/dialog"
-import { cn } from "@/lib/utils"
-import { Button } from "@/components/ui/button"
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-} from "@/components/ui/command"
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover"
-import { Separator } from "@/components/ui/separator"
-import { Input } from "@/components/ui/input"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { ChevronDown, ChevronUp } from "lucide-react"
+import { useState } from "react"
 
 /* eslint-disable react/require-default-props */
 interface ComboboxProps {
-  className?: string,
-  type?: string,
   options: string[],
-  addOption?: Dispatch<string> | null,
   selectedValue: string,
-  setSelectedValue: Dispatch<string>
+  setSelectedValue: (value: string) => void
 }
 
-export default function Combobox({ className = '', type = 'Graph', options, addOption = null, selectedValue, setSelectedValue }: ComboboxProps) {
-  const [open, setOpen] = useState(false)
-  const inputRef = createRef<HTMLInputElement>()
+export default function Combobox({ options, selectedValue, setSelectedValue }: ComboboxProps) {
 
-  // read the text in the create input box and add it to the list of options
-  const onAddOption = () => {
-    setOpen(false)
-    if (!inputRef.current?.value) {
-      return
-    }
-    if (addOption) {
-      addOption(inputRef.current.value)
-    }
-  }
+  const [open, setOpen] = useState<boolean>(false)
 
-  const handleKeyDown = (event: React.KeyboardEvent) => {
-    if (event.key === "Enter") {
-      onAddOption();
-    }
-  }
-
-  const entityType = type ?? ""
   return (
-      <Popover open={open} onOpenChange={setOpen}>
-        <PopoverTrigger asChild>
-          <Button
-            variant="outline"
-            role="combobox"
-            aria-expanded={open}
-            className={`w-[200px] justify-between ${className} `}
-          >
-            {selectedValue
-              ? options.find((option) => option === selectedValue)
-              : `Select ${entityType}...`}
-            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-          </Button>
-        </PopoverTrigger>
-        <PopoverContent className="w-[200px] p-0">
-          <Command>
-            <CommandInput placeholder="Search framework..." />
-            <CommandEmpty>No framework found.</CommandEmpty>
-            <CommandGroup>
-              {options.map((option) => (
-                <CommandItem
-                  className="w-full flex flex-row gap-2"
-                  key={option}
-                  onSelect={(currentValue) => {
-                    if (currentValue !== selectedValue) {
-                      setSelectedValue(option)
-                    }
-                    setOpen(false)
-                  }}
-                >
-                    <Check
-                      className={cn(
-                        "mr-2 h-4 w-4",
-                        selectedValue === option ? "opacity-100" : "opacity-0"
-                      )}
-                    />
-                    {option}
-                </CommandItem>
-              ))}
-              <Separator orientation="horizontal" />
-              {addOption &&
-                <Dialog>
-                  <DialogTrigger>
-                    <CommandItem>Create new {entityType}...</CommandItem>
-                  </DialogTrigger>
-                  <DialogContent>
-                    <DialogHeader>
-                      <DialogTitle>Create a new {entityType}?</DialogTitle>
-                      <DialogDescription>
-                        <Input type="text" ref={inputRef} id="create" name="create" onKeyDown={handleKeyDown} placeholder={`${entityType} name ...`} />
-                      </DialogDescription>
-                    </DialogHeader>
-                    <Button className="p-4" type="submit" onClick={onAddOption}>Create</Button>
-                  </DialogContent>
-                </Dialog>
-              }
-            </CommandGroup>
-          </Command>
-        </PopoverContent>
-      </Popover>
+    <DropdownMenu onOpenChange={setOpen}>
+      <DropdownMenuTrigger asChild>
+        <button
+          className="flex flex-row items-center gap-2 focus-visible:outline-none"
+          title={selectedValue || "Select Graph"}
+          type="button"
+        >
+          <p className="text-2xl">{selectedValue || "Select Graph..."}</p>
+          {
+            open ?
+              <ChevronUp size={40} strokeWidth={0.5} />
+              : <ChevronDown size={40} strokeWidth={0.5} />
+          }
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent className="min-w-52 bg-white">
+        {
+          options.length > 0 &&
+          options.map((option, index) => (
+            // eslint-disable-next-line react/no-array-index-key
+            <DropdownMenuItem asChild key={index}>
+              <button
+                className=""
+                title={option}
+                type="button"
+                onClick={() => setSelectedValue(option)}
+              >
+                {option}
+              </button>
+            </DropdownMenuItem>
+          ))
+        }
+      </DropdownMenuContent>
+    </DropdownMenu>
   )
 }

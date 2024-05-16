@@ -2,11 +2,17 @@ import * as React from "react"
 
 import { cn } from "@/lib/utils"
 
+interface TableProps 
+extends React.HTMLAttributes<HTMLTableElement> {
+  isGrow?: boolean
+} 
+
 const Table = React.forwardRef<
   HTMLTableElement,
-  React.HTMLAttributes<HTMLTableElement>
->(({ className, ...props }, ref) => (
-  <div className="relative w-full overflow-auto">
+  TableProps
+>(({ className, isGrow, ...props }, ref) => (
+  <div className={cn("relative w-fit overflow-auto", isGrow && "grow")}>
+
     <table
       ref={ref}
       className={cn("w-full caption-bottom text-sm", className)}
