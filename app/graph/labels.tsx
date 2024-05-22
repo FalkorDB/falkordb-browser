@@ -1,4 +1,3 @@
-import { cn } from "@/lib/utils";
 import { useState } from "react";
 import { Category, getCategoryColorName } from "./model";
 
@@ -10,12 +9,12 @@ export default function Labels({ categories, onClick, className="" }: { categori
     return (
         <div className={className}>
             <h1>Legend</h1>
-            <ul className={cn("flex flex-row gap-x-1")} >
+            <ul className="flex flex-col gap-2 p-4" >
                 {
                     categories.map((category) => (
                         <li key={category.index}>
                             <button
-                                className="flex flex-row gap-2 items-center"
+                                className="flex flex-row gap-8 items-center"
                                 title={category.name}
                                 type="button"
                                 onClick={() => {

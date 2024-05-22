@@ -21,7 +21,7 @@ export default function RootLayout({
   // caused by mismatched client/server content caused by next-themes
   return (
     <html className="w-screen h-screen" lang="en" suppressHydrationWarning>
-      <body className={cn("h-full w-full", inter.className)}>
+      <body className={cn("w-full h-full", inter.className)}>
         <NextAuthProvider>{children}</NextAuthProvider>
         <Toaster />
       </body>

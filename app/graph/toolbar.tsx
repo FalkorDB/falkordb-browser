@@ -1,7 +1,9 @@
 import { Circle, X, ZoomIn, ZoomOut } from "lucide-react";
 
-export default function Toolbar({ chartRef }: {
+export default function Toolbar({ chartRef, onDelete, deleteDisable }: {
     chartRef: React.RefObject<cytoscape.Core>,
+    onDelete: () => Promise<void>,
+    deleteDisable: boolean
 }) {
 
     function handleZoomClick(changeFactor: number) {
@@ -42,6 +44,8 @@ export default function Toolbar({ chartRef }: {
                     className="flex flex-row items-center gap-2"
                     title="Delete"
                     type="button"
+                    onClick={onDelete}
+                    disabled={deleteDisable}
                 >
                     <X size={30} />
                     <p>Delete</p>
@@ -52,7 +56,7 @@ export default function Toolbar({ chartRef }: {
                         className="flex flex-row items-center gap-2"
                         title="Zoom In"
                         type="button"
-                        onClick={() => handleZoomClick(0.9)}
+                        onClick={() => handleZoomClick(1.1)}
                     >
                         <ZoomIn size={30} />
                         <p>Zoom In</p>
@@ -61,7 +65,7 @@ export default function Toolbar({ chartRef }: {
                         className="flex flex-row gap-2"
                         title="Zoom Out"
                         type="button"
-                        onClick={() => handleZoomClick(-0.9)}
+                        onClick={() => handleZoomClick(0.9)}
                     >
                         <ZoomOut size={30} />
                         <p>Zoom Out</p>
@@ -70,7 +74,7 @@ export default function Toolbar({ chartRef }: {
                         className="flex flex-row items-center gap-2"
                         title="Fit To Size"
                         type="button"
-                        onClick={() => handleCenterClick}
+                        onClick={() => handleCenterClick()}
                     >
                         <X size={30} />
                         <p>Fit To Size</p>

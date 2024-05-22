@@ -1,20 +1,92 @@
-import { useEffect, useRef, useState } from "react";
-import { Dialog, DialogClose, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { AlertCircle, ChevronLeft, Circle, X } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Dialog, DialogClose, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { X } from "lucide-react";
 import CytoscapeComponent from "react-cytoscapejs";
-import { ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
-import { ImperativePanelHandle } from "react-resizable-panels";
-import { EdgeDataDefinition, EventObject, NodeDataDefinition } from "cytoscape";
+import fcose from "cytoscape-fcose";
+import cytoscape from "cytoscape";
 import Combobox from "../components/combobox";
-import DataPanel from "./DataPanel";
 
-export default function Selector({ onChange }: { onChange: (graphName: string) => void }) {
+const LAYOUT = {
+    name: "fcose",
+    fit: true,
+    padding: 30,
+}
+
+cytoscape.use(fcose);
+
+function getStyle() {
+
+    const style: cytoscape.Stylesheet[] = [
+        {
+            selector: "core",
+            style: {
+                'active-bg-size': 0,  // hide gray circle when panning
+                // All of the following styles are meaningless and are specified
+                // to satisfy the linter...
+                'active-bg-color': 'blue',
+                'active-bg-opacity': 0.3,
+                "selection-box-border-color": 'blue',
+                "selection-box-border-width": 0,
+                "selection-box-opacity": 1,
+                "selection-box-color": 'blue',
+                "outside-texture-bg-color": 'blue',
+                "outside-texture-bg-opacity": 1,
+            },
+        },
+        {
+            selector: "node",
+            style: {
+                label: "data(name)",
+                content: "adz;uhlgn",
+                "text-valign": "center",
+                "text-halign": "center",
+                "text-wrap": "ellipsis",
+                // "text-max-width": "10rem",
+                shape: "rectangle",
+                height: "30rem",
+                width: "30rem",
+                "border-width": 0.15,
+                "border-opacity": 0.5,
+                "background-color": "data(color)",
+                "font-size": "3rem",
+                "overlay-padding": "1rem",
+            },
+        },
+        {
+            selector: "node:active",
+            style: {
+                "overlay-opacity": 0,  // hide gray box around active node
+            },
+        },
+        {
+            selector: "edge",
+            style: {
+                width: 0.5,
+                "line-color": "#ccc",
+                "arrow-scale": 0.3,
+                "target-arrow-shape": "triangle",
+                label: "data(label)",
+                'curve-style': 'straight',
+                "text-background-color": "white",
+                "color": "black",
+                "text-background-opacity": 1,
+                "font-size": "3rem",
+                "overlay-padding": "2rem",
+
+            },
+        },
+    ]
+    return style
+}
+
+export default function Selector({ graphName, onChange }: {
+    graphName: string
+    onChange: (graphName: string) => void
+}) {
 
     const [options, setOptions] = useState<string[]>([]);
     const [selectedValue, setSelectedValue] = useState<string>("");
-    const [selectedObject, setSelectedObject] = useState<NodeDataDefinition | EdgeDataDefinition>();
-    const [isCollapsed, setIsCollapsed] = useState<boolean>(true);
-    const dataPanel = useRef<ImperativePanelHandle>(null);
+    const [reload, setReload] = useState<number>(1);
 
     useEffect(() => {
         const run = async () => {
@@ -26,61 +98,39 @@ export default function Selector({ onChange }: { onChange: (graphName: string) =
             setOptions(json.result)
         }
         run()
-        dataPanel.current?.collapse()
-    }, [])
+    }, [reload])
 
-    const handelOnChange = (graphName: string) => {
-        setSelectedValue(graphName)
-        onChange(graphName)
+    const handelOnChange = (name: string) => {
+        setSelectedValue(name)
+        onChange(name)
     }
 
     const onDuplicate = async () => {
-        // const result = await fetch(`api/graph/${selectedValue}/?newName=${}`)
-    }
-
-    const onExpand = () => {
-        if (dataPanel.current) {
-            const panel = dataPanel.current
-            if (panel.isCollapsed()) {
-                panel.expand()
-            } else {
-                panel.collapse()
-            }
-        }
-    }
-
-    const handleTap = (evt: EventObject) => {
-        const object = evt.target.json().data;
-        setSelectedObject(object);
-        dataPanel.current?.expand()
+        fetch(`api/graph/${selectedValue}/?newName=${graphName + reload}`)
+        setReload(reload + 1)
     }
 
     return (
         <div className="flex flex-col gap-4">
             <div className="flex flex-row justify-between items-center">
                 <Combobox options={options} selectedValue={selectedValue} setSelectedValue={handelOnChange} />
-                <div className="flex flex-row gap-16">
+                <div className="flex flex-row gap-16 text-indigo-600">
+                    <p>Versions()</p>
                     <button
-                        className=""
-                        title=""
-                        type="button"
-                    >
-                        <p className="text-blue-700">Versions(4)</p>
-                    </button>
-                    <button
-                        className=""
+                        className="disabled:text-gray-400 disabled:text-opacity-70"
                         title="Duplicate"
                         type="button"
                         onClick={onDuplicate}
+                        disabled={!graphName}
                     >
-                        <p className="text-blue-700">Duplicate</p>
+                        <p>Duplicate</p>
                     </button>
                 </div>
             </div>
-            <div className="flex flex-row gap-4 justify-between items-center shadow-xl ring-offset-white p-4 rounded-xl">
+            <div className="flex flex-row gap-4 justify-between items-center shadow-lg p-4 rounded-xl">
                 <div className="space-x-12">
-                    <span className="text-[#CDCDCD]">Created on 2/2 24</span>
-                    <span className="text-[#47556980]">12 Data sources &nbsp;&nbsp;&nbsp; | &nbsp;&nbsp;&nbsp; 2,542 Nodes &nbsp;&nbsp;&nbsp; | &nbsp;&nbsp;&nbsp; 1,600 connections</span>
+                    <span className="text-gray-400 opacity-70">Created on 2/2 24</span>
+                    <span className="text-slate-700 opacity-60">12 Data sources &nbsp;&nbsp;&nbsp; | &nbsp;&nbsp;&nbsp; 2,542 Nodes &nbsp;&nbsp;&nbsp; | &nbsp;&nbsp;&nbsp; 1,600 connections</span>
                 </div>
                 <Dialog>
                     <DialogTrigger asChild>
@@ -91,8 +141,8 @@ export default function Selector({ onChange }: { onChange: (graphName: string) =
                             <p>View Schema</p>
                         </button>
                     </DialogTrigger>
-                    <DialogContent displayClose={false} className="w-[90%] h-[90%] flex flex-col p-0 shadow-xl ring-offset-white bg-white rounded-xl">
-                        <DialogHeader className="h-[10%] p-4 bg-blue-800 flex flex-row justify-between rounded-t-xl">
+                    <DialogContent displayClose={false} className="w-[90%] h-[90%] flex flex-col p-0 shadow-lg bg-white rounded-xl">
+                        <DialogHeader className="h-[10%] p-4 bg-indigo-600 flex flex-row justify-between rounded-t-xl">
                             <DialogTitle className="flex flex-row items-center text-white">
                                 {selectedValue} Schema
                             </DialogTitle>
@@ -106,69 +156,39 @@ export default function Selector({ onChange }: { onChange: (graphName: string) =
                                 </button>
                             </DialogClose>
                         </DialogHeader>
-                        <DialogDescription className="flex flex-row gap-8 px-8 items-center">
-                            <p>Edit Schema: </p>
-                            <div className="flex flex-row gap-12">
-                                <button
-                                    className="flex flex-row items-center gap-2"
-                                    title="Add Entity"
-                                    type="button"
-                                >
-                                    <Circle />
-                                    <p>Add Entity</p>
-                                </button>
-                                <button
-                                    className="flex flex-row items-center gap-2"
-                                    title="Add Relation"
-                                    type="button"
-                                >
-                                    <p>Add Relation</p>
-                                </button>
-                                <button
-                                    className="flex flex-row items-center gap-2"
-                                    title="Add Relation"
-                                    type="button"
-                                >
-                                    <AlertCircle />
-                                    <p>Create index</p>
-                                </button>
-                            </div>
-                        </DialogDescription>
-                        <ResizablePanelGroup className="relative grow px-8" direction="horizontal">
-                            <ResizablePanel
-                                defaultSize={100}
-                            >
-                                <CytoscapeComponent
-                                    elements={[]}
-                                    cy={(cy) => {
-                                        cy.on("tap", handleTap)
-                                    }}
-                                />
+                        <CytoscapeComponent
+                            className="w-full h-full"
+                            layout={LAYOUT}
+                            stylesheet={getStyle()}
+                            elements={[
                                 {
-                                    isCollapsed &&
-                                    <button
-                                        className="absolute top-8 right-8 p-4 bg-blue-800 rounded-se-xl"
-                                        title="Close"
-                                        type="button"
-                                        aria-label="Close"
-                                    >
-                                        <ChevronLeft className="border border-white" color="white" />
-                                    </button>
+                                    data: {
+                                        id: '0',
+                                        name: 'anchel',
+                                        age: 20,
+                                        color: "red"
+                                    }
+                                },
+                                {
+                                    data: {
+                                        id: 'ujfiuol',
+                                        source: '0',
+                                        target: '1',
+                                    }
+                                },
+                                {
+                                    data: {
+                                        id: '1',
+                                        name: 'guy',
+                                        age: 30,
+                                        color: "blue"
+                                    }
                                 }
-                            </ResizablePanel>
-                            <ResizablePanel
-                                ref={dataPanel}
-                                onCollapse={() => setIsCollapsed(true)}
-                                onExpand={() => setIsCollapsed(false)}
-                                defaultSize={20}
-                                collapsedSize={0}
-                            >
-                                {selectedObject && <DataPanel object={selectedObject} onExpand={onExpand} />}
-                            </ResizablePanel>
-                        </ResizablePanelGroup>
+                            ]}
+                        />
                     </DialogContent>
                 </Dialog>
             </div>
-        </div>
+        </div >
     )
 }

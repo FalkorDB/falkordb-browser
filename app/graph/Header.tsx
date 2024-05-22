@@ -1,8 +1,8 @@
 'use client'
 
-import { Dialog, DialogClose, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+// import { Dialog, DialogClose, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
-import { BadgeHelp, ChevronDown, ChevronUp, Settings, X } from "lucide-react";
+import { BadgeHelp, ChevronDown, ChevronUp, Settings } from "lucide-react";
 import Image from "next/image";
 import { useState } from "react";
 
@@ -10,14 +10,21 @@ export default function Header({ inCreate }: {
     // eslint-disable-next-line react/require-default-props
     inCreate?: boolean
 }) {
-
-    const iconColor = "#C0C0D0"
-    const iconSize = 20
     const [open, setOpen] = useState<boolean>(false)
-    const [newName, setNewName] = useState<string>("")
+    // const [newName, setNewName] = useState<string>("")
 
-    const createGraph = async () => {
-        const result = await fetch(`api/graph/${newName}`)
+    // const createGraph = async () => {
+    //     const result = await fetch(`api/graph/${newName}`)
+    // }
+
+    const run = () => {
+        const query = `CREATE
+            (:Rider {name:'Valentino Rossi'})-[:rides]->(:Team {name:'Yamaha'}),
+            (:Rider {name:'Dani Pedrosa'})-[:rides]->(:Team {name:'Honda'}),
+            (:Rider {name:'Andrea Dovizioso'})-[:rides]->(:Team {name:'Ducati'})`
+        fetch(`api/graph/FalkorDB/?query=${query.trim()}`, {
+            method: "GET"
+        })
     }
 
     return (
@@ -27,26 +34,27 @@ export default function Header({ inCreate }: {
                 {
                     !inCreate &&
                     <>
-                        <Dialog>
+                        <button
+                            className="border rounded-lg border-indigo-600 p-2"
+                            title="Add Graph"
+                            type="button"
+                            onClick={() => run()}
+                        >
+                            <p className="text-xs text-indigo-600">+ NEW GRAPH</p>
+                        </button>
+                        {/* <Dialog>
                             <DialogTrigger asChild>
-                                <button
-                                    className="border rounded-lg border-[#5D5FEF] p-2"
-                                    title="Add Graph"
-                                    type="button"
-                                >
-                                    <p className="text-xs text-[#5D5FEF]">+ NEW GRAPH</p>
-                                </button>
                             </DialogTrigger>
                             <DialogContent displayClose={false} className="flex flex-col gap-6">
                                 <DialogHeader className="flex flex-row justify-between items-center">
                                     <DialogTitle>Create New Graph</DialogTitle>
                                     <DialogClose asChild>
                                         <button
-                                            title="close"
+                                            title="Close"
                                             type="button"
                                             aria-label="close"
                                         >
-                                            <X/>
+                                            <X />
                                         </button>
                                     </DialogClose>
                                 </DialogHeader>
@@ -56,7 +64,7 @@ export default function Header({ inCreate }: {
                                 <div className="flex flex-row justify-center gap-4">
                                     <DialogClose asChild>
                                         <a
-                                            className="bg-blue-800 text-white p-4"
+                                            className="bg-indigo-600 text-white p-4"
                                             href="/create"
                                             title="Upload Data"
                                         >
@@ -65,17 +73,17 @@ export default function Header({ inCreate }: {
                                     </DialogClose>
                                     <DialogClose asChild>
                                         <button
-                                            className="bg-blue-800 text-white p-4"
+                                            className="bg-indigo-600 text-white p-4"
                                             title="Empty Graph"
                                             type="button"
-                                            onClick={() => createGraph()}
+                                        // onClick={() => createGraph()}
                                         >
                                             <p>Empty Graph</p>
                                         </button>
                                     </DialogClose>
                                 </div>
                             </DialogContent>
-                        </Dialog>
+                        </Dialog> */}
 
                         <DropdownMenu onOpenChange={setOpen}>
                             <DropdownMenuTrigger asChild>
@@ -84,12 +92,12 @@ export default function Header({ inCreate }: {
                                     title="help"
                                     type="button"
                                 >
-                                    <BadgeHelp color={iconColor} size={iconSize} />
-                                    <p className="text-[#C0C0D0]">help</p>
+                                    <BadgeHelp className="text-gray-400 text-opacity-70" size={20} />
+                                    <p className="text-gray-400 text-opacity-70" >help</p>
                                     {
                                         open ?
-                                            <ChevronUp color={iconColor} size={iconSize} />
-                                            : <ChevronDown color={iconColor} size={iconSize} />
+                                            <ChevronUp className="text-gray-400 text-opacity-70" size={20} />
+                                            : <ChevronDown className="text-gray-400 text-opacity-70" size={20} />
                                     }
                                 </button>
                             </DropdownMenuTrigger>
@@ -99,7 +107,7 @@ export default function Header({ inCreate }: {
                                         title="Tutorial"
                                         type="button"
                                     >
-                                        <p className="text-[#C0C0D0]">Tutorial</p>
+                                        <p className="text-gray-700 text-opacity-60">Tutorial</p>
                                     </button>
                                 </DropdownMenuItem>
                                 <DropdownMenuItem asChild>
@@ -107,7 +115,7 @@ export default function Header({ inCreate }: {
                                         title="Documentation"
                                         type="button"
                                     >
-                                        <p className="text-[#C0C0D0]">Documentation</p>
+                                        <p className="text-gray-700 text-opacity-60">Documentation</p>
                                     </button>
                                 </DropdownMenuItem>
                                 <DropdownMenuItem asChild>
@@ -115,7 +123,7 @@ export default function Header({ inCreate }: {
                                         title="Support"
                                         type="button"
                                     >
-                                        <p className="text-[#C0C0D0]">Support</p>
+                                        <p className="text-gray-700 text-opacity-60">Support</p>
                                     </button>
                                 </DropdownMenuItem>
                             </DropdownMenuContent>
@@ -128,7 +136,7 @@ export default function Header({ inCreate }: {
                         type="button"
                         aria-label="Settings"
                     >
-                        <Settings color={iconColor} size={iconSize + 5} />
+                        <Settings className="text-gray-400 text-opacity-70" size={25} />
                     </button>
                 </div>
                 <div className="flex flex-row gap-4 items-center">

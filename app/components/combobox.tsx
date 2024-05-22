@@ -20,7 +20,7 @@ export default function Combobox({ options, selectedValue, setSelectedValue }: C
       <DropdownMenuTrigger asChild>
         <button
           className="flex flex-row items-center gap-2 focus-visible:outline-none"
-          title={selectedValue || "Select Graph"}
+          title="Select Graph"
           type="button"
         >
           <p className="text-2xl">{selectedValue || "Select Graph..."}</p>
@@ -36,9 +36,9 @@ export default function Combobox({ options, selectedValue, setSelectedValue }: C
           options.length > 0 &&
           options.map((option, index) => (
             // eslint-disable-next-line react/no-array-index-key
-            <DropdownMenuItem asChild key={index}>
+            <DropdownMenuItem className="justify-center" asChild key={index}>
               <button
-                className=""
+                className="w-full"
                 title={option}
                 type="button"
                 onClick={() => setSelectedValue(option)}

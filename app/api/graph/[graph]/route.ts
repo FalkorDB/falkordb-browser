@@ -72,3 +72,29 @@ export async function PATCH(request: NextRequest, { params }: { params: { graph:
         return NextResponse.json({ message: (err as Error).message }, { status: 400 })
     }
 }
+
+export async function GET(request: NextRequest, { params }: { params: { graph: string } }) {
+
+    const client = await getClient()
+    if (client instanceof NextResponse) {
+        return client
+    }
+
+    const graphId = params.graph
+    const query = request.nextUrl.searchParams.get("query")
+
+    try {
+
+        if (!graphId) throw new Error("graphId missing")
+        if (!query) throw new Error("query missing")
+
+        const graph = client.selectGraph(graphId)
+        const result = await graph.query(query)
+
+        if (!result) throw new Error("something went wrong")
+
+        return NextResponse.json({ result }, { status: 200 })
+    } catch (err: unknown) {
+        return NextResponse.json({ message: (err as Error).message }, { status: 400 })
+    }
+}

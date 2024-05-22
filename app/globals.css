@@ -4,15 +4,15 @@
 
 @layer base {
     :root {
-        @apply text-black;
-        @apply bg-white;
+        @apply text-black bg-white;
     }
 
     input {
         @apply bg-white;
     }
 
-    input:focus-visible {
+    :focus-visible {
         @apply outline-none;
     }
+
 }

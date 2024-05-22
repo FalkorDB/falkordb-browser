@@ -72,7 +72,7 @@ export interface ExtractedData {
 export class Graph {
 
     private id: string;
-
+    
     private columns: string[];
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any    
@@ -111,6 +111,10 @@ export class Graph {
 
     get Elements(): ElementDefinition[] {
         return this.elements;
+    }
+
+    set Elements(elements: ElementDefinition[]) {
+        this.elements = elements
     }
 
     get Columns(): string[] {
@@ -179,8 +183,7 @@ export class Graph {
         if (!currentEdge) {
             const sourceId = cell.sourceId.toString();
             const destinationId = cell.destinationId.toString()
-
-            const edge: EdgeDataDefinition = { source: sourceId, target: destinationId, label: cell.relationshipType }
+            const edge: EdgeDataDefinition = { _id: cell.id, source: sourceId, target: destinationId, label: cell.relationshipType }
             Object.entries(cell.properties).forEach(([key, value]) => {
                 edge[edgeSafeKey(key)] = value as string;
             });
@@ -194,7 +197,6 @@ export class Graph {
                 source = {
                     id: cell.sourceId.toString(),
                     name: cell.sourceId.toString(),
-                    value: "",
                     category: "",
                     color: getCategoryColorValue()
                 }
@@ -208,7 +210,6 @@ export class Graph {
                 destination = {
                     id: cell.destinationId.toString(),
                     name: cell.destinationId.toString(),
-                    value: "",
                     category: "",
                     color: getCategoryColorValue()
                 }
