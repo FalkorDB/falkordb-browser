@@ -29,7 +29,7 @@ export default function DataPanel({ obj, onExpand, setProperty, removeProperty, 
     const [labelEditable, setLabelEditable] = useState<boolean>(false)
     const [val, setVal] = useState<string>("")
     const [key, setKey] = useState<string>("")
-    const cellRef = useRef<HTMLDivElement>(null)
+    const cellRef = useRef<HTMLTableCellElement>(null)
     const labelRef = useRef<HTMLDivElement>(null)
     const label = obj?.category ? obj.category : obj?.label || "label"
 
