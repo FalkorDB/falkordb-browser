@@ -112,66 +112,72 @@ export default function DataPanel({ obj, onExpand, setProperty, removeProperty, 
                     </TableCaption>
                     <TableBody>
                         {
-                            Object.entries(obj).filter((row) => !excludedProperties.has(row[0])).map((row, index) => (
-                                <TableRow
-                                    // eslint-disable-next-line react/no-array-index-key
-                                    key={index}
-                                    className="border-none"
-                                    onMouseEnter={() => {
-                                        setHover(row[0])
-                                    }}
-                                    onMouseLeave={() => {
-                                        setHover("")
-                                    }}
-                                >
-                                    {
-                                        Object.values(row).map((cell, cellIndex) => {
-                                            const strCell = JSON.parse(JSON.stringify(cell))
-                                            const strKey = JSON.parse(JSON.stringify(row[0]))
-                                            const isEditable = editable === strCell && !!setProperty && cellIndex === 1 && strKey !== "id"
-                                            const text: string = cellIndex === 0 ?
-                                                `${strCell}:`
-                                                : strCell
-                                            if (isEditable) {
-                                                cellRef.current?.focus()
-                                            }
-                                            return (
-                                                <TableCell
-                                                    ref={cellRef}
-                                                    onKeyDown={onKeyDown}
-                                                    // eslint-disable-next-line react/no-array-index-key
-                                                    key={cellIndex}
-                                                    onInput={(e) => {
-                                                        setKey(strKey)
-                                                        setVal(e.currentTarget.textContent || "")
-                                                    }}
-                                                    onClick={() => cellIndex === 1 && setEditable(strCell)}
-                                                    onBlur={() => cellIndex === 1 && setVal("")}
-                                                    contentEditable={isEditable}
-                                                    className={cn(
-                                                        " w-1/2",
-                                                        cellIndex === 0 && "text-gray-800 opacity-75 flex flex-row gap-2 items-center",
-                                                        isEditable && "border border-gray-200"
-                                                    )}
+                            Object.entries(obj).filter((row) => !excludedProperties.has(row[0])).map((row, index) => {
+                                const strKey = JSON.parse(JSON.stringify(row[0]))
+                                const strCell = JSON.parse(JSON.stringify(row[1]))
+                                const isEditable = editable === strCell && strKey !== "id"
+                                return (
+                                    <TableRow
+                                        // eslint-disable-next-line react/no-array-index-key
+                                        key={index}
+                                        className="border-none"
+                                        onMouseEnter={() => {
+                                            setHover(row[0])
+                                        }}
+                                        onMouseLeave={() => {
+                                            setHover("")
+                                        }}
+                                    >
+                                        <TableCell
+                                            onKeyDown={onKeyDown}
+                                            // eslint-disable-next-line react/no-array-index-key
+                                            key={index}
+                                            className={cn(
+                                                " w-1/2",
+                                                "text-gray-800 opacity-75 flex flex-row gap-2 items-center"
+                                            )}
+                                        >
+                                            {
+                                                strKey !== "id" && hover === strKey &&
+                                                <button
+                                                    title="Delete"
+                                                    type="button"
+                                                    aria-label="delete"
+                                                    onClick={() => onDelete(strCell)}
                                                 >
-                                                    {
-                                                        strCell !== "id" && hover === strCell && cellIndex === 0 &&
-                                                        <button
-                                                            title="Delete"
-                                                            type="button"
-                                                            aria-label="delete"
-                                                            onClick={() => onDelete(strCell)}
-                                                        >
-                                                            <X size={15} color="black" />
-                                                        </button>
-                                                    }
-                                                    {text}
-                                                </TableCell>
-                                            )
-                                        })
-                                    }
-                                </TableRow>
-                            ))
+                                                    <X size={15} color="black" />
+                                                </button>
+                                            }
+                                            {strKey}:
+                                        </TableCell>
+                                        <TableCell
+                                            ref={element => {
+                                                if(element?.isContentEditable) {
+                                                    element.focus()
+                                                }
+                                            }}
+                                            onKeyDown={onKeyDown}
+                                            // eslint-disable-next-line react/no-array-index-key
+                                            key={index}
+                                            onInput={(e) => {
+                                                setKey(strKey)
+                                                setVal(e.currentTarget.textContent || "")
+                                            }}
+                                            onClick={e => {
+                                                setEditable(strCell)
+                                            }}
+                                            onBlur={() => setVal("")}
+                                            contentEditable={isEditable}
+                                            className={cn(
+                                                " w-1/2",
+                                                isEditable && "border border-gray-200"
+                                            )}
+                                        >
+                                            {strCell}
+                                        </TableCell>
+                                    </TableRow>
+                                )
+                            })
                         }
                         {
                             isAddValue &&
