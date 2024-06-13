@@ -153,6 +153,7 @@ export async function getClient() {
     if (!client) {
         return NextResponse.json({ message: "Not authenticated" }, { status: 401 })
     }
+    
     return client
 }
 

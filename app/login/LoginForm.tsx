@@ -3,17 +3,17 @@
 import { SignInOptions, SignInResponse, signIn } from "next-auth/react";
 import { FormEvent, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import Image from "next/image";
-import Dropzone from "@/components/custom/Dropzone";
-import { Checkbox } from "@radix-ui/react-checkbox";
+import Dropzone from "@/app/components/Dropzone";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Eye } from "lucide-react";
+import Input from "@/app/components/Input";
+import Button from "@/app/components/Button";
+import Image from "next/image";
 
 const DEFAULT_HOST = "localhost";
 const DEFAULT_PORT = "6379";
 
 export default function LoginForm() {
-  const inputCN = "p-2 border border-gray-300 rounded-lg"
-  const pCN = "text-indigo-300 opacity-75"
   const router = useRouter();
   const [error, setError] = useState(false);
   const [host, setHost] = useState(DEFAULT_HOST);
@@ -32,8 +32,8 @@ export default function LoginForm() {
     const usernameParam = searchParams.get("username");
     const tls = searchParams.get("tls");
 
-    setHost(decodeURIComponent(hostParam ?? DEFAULT_HOST));
-    setPort(decodeURIComponent(portParam ?? DEFAULT_PORT));
+    setHost(decodeURIComponent(hostParam || DEFAULT_HOST));
+    setPort(decodeURIComponent(portParam || DEFAULT_PORT));
     setUsername(decodeURIComponent(usernameParam ?? ""));
     setTLS(tls === "true")
   }, [searchParams]);
@@ -74,43 +74,43 @@ export default function LoginForm() {
   }
 
   return (
-    <div className="w-full h-full bg-[#191A39] flex flex-row justify-center items-center gap-40">
-      <div>
-        <Image width={218} height={62} src="FalkorDBLogin.png" alt="" />
-      </div>
-      <div className="w-[1px] h-full bg-gradient-to-b from-transparent to-transparent via-gray-500" />
+    <div className="w-full h-full flex flex-row items-center justify-center gap-80 LoginForm">
+      <Image src="/Logo.svg" alt="" width={451} height={126} />
       <form
-        className="w-1/3 flex flex-col gap-4 p-8"
+        className="flex flex-col gap-4 p-2"
         onSubmit={onSubmit}
       >
-        <p className="text-xl text-white" title="Connect">Connect</p>
+        <p className="text-4xl text-white border-b border-slate-200 border-opacity-25 pb-6" title="Connect">Connect</p>
         <div className="flex flex-col gap-8">
-          <div className="flex flex-col gap-2">
-            <p title="Host" className={pCN} >host</p>
-            <input
-              className={inputCN}
-              id="server"
-              type="text"
-              onChange={(e) => setHost(e.target.value)}
-              value={host}
-            />
+          <div className="flex flex-row gap-6">
+            <div className="grow flex flex-col gap-2">
+              <p title="Host">* Host</p>
+              <Input
+                variant="Default"
+                id="server"
+                placeholder={DEFAULT_HOST}
+                type="text"
+                onChange={(e) => setHost(e.target.value)}
+                value={host}
+              />
+            </div>
+            <div className="w-1/3 flex flex-col gap-2">
+              <p title="Port" >* Port</p>
+              <Input
+                variant="Default"
+                id="port"
+                placeholder={DEFAULT_PORT}
+                min={1}
+                max={65535}
+                onChange={(e) => setPort(e.target.value)}
+                value={port}
+              />
+            </div>
           </div>
           <div className="flex flex-col gap-2">
-            <p title="Port" className={pCN} >Port</p>
-            <input
-              className={inputCN}
-              id="port"
-              placeholder={DEFAULT_PORT}
-              min={1}
-              max={65535}
-              onChange={(e) => setPort(e.target.value)}
-              value={port}
-            />
-          </div>
-          <div className="flex flex-col gap-2">
-            <p title="User Name" className={pCN} >User Name</p>
-            <input
-              className={inputCN}
+            <p title="User Name" >{host !== DEFAULT_HOST && "* "} User Name</p>
+            <Input
+              variant="Default"
               id="username"
               type="text"
               onChange={(e) => setUsername(e.target.value)}
@@ -118,7 +118,7 @@ export default function LoginForm() {
             />
           </div>
           <div className="relative flex flex-col gap-2">
-            <p title="Password" className={pCN} >Password</p>
+            <p title="Password">{host !== DEFAULT_HOST && "* "}Password</p>
             <button
               className="absolute top-10 right-2 p-0"
               title="Show Password"
@@ -126,11 +126,11 @@ export default function LoginForm() {
               aria-label="Show Password"
               onClick={() => setShowPassword(prev => !prev)}
             >
-              <Eye strokeWidth={0.5} />
+              <Eye strokeWidth={0.5} color="black" />
             </button>
-            <input
-              className={inputCN}
+            <Input
               id="password"
+              variant="Default"
               type={showPassword ? "text" : "password"}
               onChange={(e) => setPassword(e.target.value)}
               value={password}
@@ -139,22 +139,20 @@ export default function LoginForm() {
           <div className="flex flex-row gap-8">
             <div className="flex flex-row gap-2">
               <Checkbox
-                className="w-6 h-6 rounded-lg bg-white"
+                className="w-6 h-6 rounded-lg"
                 defaultChecked={false}
                 checked={TLS}
                 onCheckedChange={(checked) => setTLS(checked as boolean)}
               />
-              <p className={pCN} >TLS Secured Connection</p>
+              <p >TLS Secured Connection</p>
             </div>
             <Dropzone onFileDrop={onFileDrop} disabled={!TLS} />
           </div>
-          <button
-            className="w-full bg-indigo-600 p-4 rounded-lg mt-14"
-            title="Connect"
+          <Button
+            label="Connect"
+            variant="Large"
             type="submit"
-          >
-            <p className="text-white">CONNECT</p>
-          </button>
+          />
           {error && (
             <div className="bg-red-400 text-center p-2 rounded-lg">
               <p>Wrong credentials</p>

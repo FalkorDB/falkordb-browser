@@ -4,15 +4,38 @@
 
 @layer base {
     :root {
-        @apply text-black bg-white;
-    }
-
-    input {
-        @apply bg-white;
+        --background: 240 28% 21%;
+        --popover: 240 28% 21%;
+        --radius: 0.5rem;
     }
 
     :focus-visible {
         @apply outline-none;
     }
 
+}
+
+@layer base {
+    body {
+        @apply bg-background text-white;
+    }
+}
+
+@layer components {
+    .LoginForm {
+        background: linear-gradient(180deg, #EC806C 0%, #B66EBD 43.41%, #7568F2 100%);
+        color: white;
+    }
+    .Top {
+        background: linear-gradient(90deg, #EC806C 0%, #B66EBD 43.41%, #7568F2 100%);
+    }
+    .Header {
+        @apply bg-white text-black
+    }
+    .DataPanel {
+        background-color: #434366;
+    }
+    .Canvas {
+        background-color: #434366;
+    }
 }

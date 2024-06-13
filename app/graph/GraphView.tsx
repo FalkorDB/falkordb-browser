@@ -1,12 +1,14 @@
+'use client'
+
 import CytoscapeComponent from "react-cytoscapejs";
-import cytoscape, { EdgeDataDefinition, ElementDefinition, EventObject, NodeDataDefinition } from "cytoscape";
-import { useRef, useState, useImperativeHandle, forwardRef, useEffect } from "react";
+import cytoscape, { EdgeDefinition, ElementDefinition, EventObject, NodeDataDefinition, NodeDefinition } from "cytoscape";
+import { useRef, useState, useImperativeHandle, forwardRef, useEffect, Dispatch, SetStateAction } from "react";
 import fcose from 'cytoscape-fcose';
-import Editor from "@monaco-editor/react";
+import Editor, { Monaco } from "@monaco-editor/react";
 import { editor } from "monaco-editor";
 import { ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { ImperativePanelHandle } from "react-resizable-panels";
-import { ChevronLeft, Maximize2 } from "lucide-react"
+import { ChevronDown, ChevronLeft, Maximize2 } from "lucide-react"
 import { securedFetch } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
@@ -14,6 +16,9 @@ import { Category, Graph } from "./model";
 import DataPanel from "./DataPanel";
 import Labels from "./labels";
 import Toolbar from "./toolbar";
+import { Query } from "./Selector";
+
+const prepareArg = (arg: string) => encodeURIComponent(arg.trim())
 
 const monacoOptions: editor.IStandaloneEditorConstructionOptions = {
     renderLineHighlight: "none",
@@ -43,7 +48,7 @@ const monacoOptions: editor.IStandaloneEditorConstructionOptions = {
     fontSize: 30,
     fontWeight: "normal",
     wordWrap: "off",
-    lineHeight: 40,
+    lineHeight: 42,
     lineNumbers: "off",
     lineNumbersMinChars: 0,
     overviewRulerLanes: 0,
@@ -89,15 +94,17 @@ function getStyle() {
             selector: "node",
             style: {
                 label: "data(name)",
+                "color": "white",
                 "text-valign": "center",
                 "text-halign": "center",
                 "text-wrap": "ellipsis",
                 "text-max-width": "10rem",
                 shape: "ellipse",
-                height: "10rem",
-                width: "10rem",
-                "border-width": 0.15,
-                "border-opacity": 0.5,
+                height: "15rem",
+                width: "15rem",
+                "border-width": 0.5,
+                "border-color": "white",
+                "border-opacity": 1,
                 "background-color": "data(color)",
                 "font-size": "3rem",
                 "overlay-padding": "1rem",
@@ -110,20 +117,26 @@ function getStyle() {
             },
         },
         {
+            selector: "node:selected",
+            style: {
+                "border-width": 1,
+            }
+        },
+        {
             selector: "edge",
             style: {
                 width: 0.5,
-                "line-color": "#ccc",
+                "line-color": "data(color)",
                 "arrow-scale": 0.3,
+                "target-arrow-color": "data(color)",
                 "target-arrow-shape": "triangle",
-                label: "data(label)",
                 'curve-style': 'straight',
-                "text-background-color": "white",
-                "color": "black",
-                "text-background-opacity": 1,
-                "font-size": "3rem",
-                "overlay-padding": "2rem",
-
+            },
+        },
+        {
+            selector: "edge:active",
+            style: {
+                "overlay-opacity": 0,
             },
         },
     ]
@@ -134,20 +147,23 @@ export interface GraphViewRef {
     expand: (elements: ElementDefinition[]) => void
 }
 
-const GraphView = forwardRef(({ graphName }: {
+const GraphView = forwardRef(({ graphName, setQueries }: {
     graphName: string,
     // eslint-disable-next-line react/require-default-props
+    setQueries?: Dispatch<SetStateAction<Query[]>>,
 }, ref) => {
 
     const { toast } = useToast()
     const [graph, setGraph] = useState<Graph>(Graph.empty())
+    const [schema, setSchema] = useState<Graph>(Graph.empty())
     const [query, setQuery] = useState<string>("")
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const [selectedElement, setSelectedElement] = useState<NodeDataDefinition | EdgeDataDefinition>();
+    const [selectedElement, setSelectedElement] = useState<NodeDefinition | EdgeDefinition>();
     const [isCollapsed, setIsCollapsed] = useState<boolean>(true);
 
     // A reference to the chart container to allowing zooming and editing
     const chartRef = useRef<cytoscape.Core | null>(null)
+    const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null)
     const dataPanel = useRef<ImperativePanelHandle>(null)
 
     useImperativeHandle(ref, () => ({
@@ -161,20 +177,55 @@ const GraphView = forwardRef(({ graphName }: {
         }
     }))
 
+    const handleEditorWillMount = (monaco: Monaco) => {
+        monaco.editor.defineTheme('custom-theme', {
+            base: 'vs-dark',
+            inherit: true,
+            rules: [
+                { token: '', foreground: 'ffffff' },
+                { token: 'keyword', foreground: '0000ff' },
+            ],
+            colors: {
+                'editor.background': '#1F1F3D',
+                'editor.foreground': 'ffffff',
+            },
+        });
+    };
+
+    const handelEditorDidMount = (e: editor.IStandaloneCodeEditor) => {
+        editorRef.current = e
+    }
+
+    useEffect(() => {
+        if (!editorRef.current) return
+        editorRef.current.layout();
+    }, [isCollapsed])
+
+    useEffect(() => {
+        if (!graphName) return
+        const run = async () => {
+            const result = await fetch(`api/schema/${graphName}-schema`)
+            if (!result.ok) return
+            const json = await result.json()
+            setSchema(Graph.create(`${graphName}-schema`, json.result))
+        }
+        run()
+    }, [graphName])
+
     useEffect(() => {
         dataPanel.current?.collapse()
     }, [])
 
-    const prepareArg = (arg: string) => encodeURIComponent(arg.trim())
-
     const defaultQuery = () => query || "MATCH (n) OPTIONAL MATCH (n)-[e]-(m) return n,e,m LIMIT 100"
 
     const runQuery = async () => {
+
         if (!graphName) {
             toast({
                 title: "Error",
                 description: "Select a graph first"
             })
+            return
         }
 
         const result = await fetch(`api/graph/${prepareArg(graphName)}/?query=${prepareArg(defaultQuery())}`, {
@@ -187,8 +238,10 @@ const GraphView = forwardRef(({ graphName }: {
                 title: "Error",
                 description: json.message || "Something went wrong"
             })
+            return
         }
-
+        if (!setQueries) return
+        setQueries(prev => [...prev, { text: defaultQuery(), metadata: json.result.metadata }])
         setGraph(Graph.create(graphName, json.result))
     }
 
@@ -218,8 +271,6 @@ const GraphView = forwardRef(({ graphName }: {
 
         }
         return [] as ElementDefinition[]
-
-
     }
 
     const onCategoryClick = (category: Category) => {
@@ -231,6 +282,23 @@ const GraphView = forwardRef(({ graphName }: {
             category.show = !category.show
 
             if (category.show) {
+                elements.style({ display: 'element' })
+            } else {
+                elements.style({ display: 'none' })
+            }
+            chart.elements().layout(LAYOUT).run();
+        }
+    }
+
+    const onLabelClick = (label: Category) => {
+        const chart = chartRef.current
+        if (chart) {
+            const elements = chart.elements(`edge[label = "${label.name}"]`)
+
+            // eslint-disable-next-line no-param-reassign
+            label.show = !label.show
+
+            if (label.show) {
                 elements.style({ display: 'element' })
             } else {
                 elements.style({ display: 'none' })
@@ -251,18 +319,24 @@ const GraphView = forwardRef(({ graphName }: {
     }
 
     const handleTap = (evt: EventObject) => {
-        const obj = evt.target.json().data;
+        if (selectedElement) {
+            selectedElement.selected = false
+        }
+        const obj: NodeDefinition | EdgeDefinition = evt.target.json();
+        obj.selected = true
         setSelectedElement(obj);
         dataPanel.current?.expand()
     }
 
     const setProperty = async (key: string, newVal: string) => {
-        const id = selectedElement?.id
+        const id = selectedElement?.data.id
         const q = `MATCH (e) WHERE id(e) = ${id} SET e.${key} = '${newVal}'`
-        const success = (await fetch(`api/graph/${prepareArg(graphName)}/?query=${prepareArg(q)}`)).ok
+        const success = (await fetch(`api/graph/${prepareArg(graphName)}/?query=${prepareArg(q)}`, {
+            method: "GET"
+        })).ok
         if (success)
-            graph.Elements.forEach(element => {
-                const el = element
+            graph.Elements.forEach(e => {
+                const el = e
                 if (el.data.id !== id) return
                 el.data[key] = newVal
             })
@@ -270,9 +344,11 @@ const GraphView = forwardRef(({ graphName }: {
     }
 
     const removeProperty = async (key: string) => {
-        const id = selectedElement?.id
+        const id = selectedElement?.data.id
         const q = `MATCH (e) WHERE id(e) = ${id} SET e.${key} = NULL`
-        const success = (await fetch(`api/graph/${prepareArg(graphName)}/?query=${prepareArg(q)}`)).ok
+        const success = (await fetch(`api/graph/${prepareArg(graphName)}/?query=${prepareArg(q)}`, {
+            method: "GET"
+        })).ok
         if (success)
             graph.Elements.forEach(element => {
                 if (element.data.id !== id) return
@@ -283,75 +359,152 @@ const GraphView = forwardRef(({ graphName }: {
     }
 
     const onDeleteElement = async () => {
-        const id = selectedElement?.id
+        const id = selectedElement?.data.id
         const q = `MATCH (e) WHERE id(e) = ${id} DELETE e`
-        const success = (await fetch(`api/graph/${prepareArg(graphName)}/?query=${prepareArg(q)}`)).ok
+        const success = (await fetch(`api/graph/${prepareArg(graphName)}/?query=${prepareArg(q)}`, {
+            method: "GET"
+        })).ok
         if (!success) return
         graph.Elements = graph.Elements.filter(element => element.data.id !== id)
         setSelectedElement(undefined)
     }
 
+    const onSetLabel = async (label: string) => {
+        const isNode = !!selectedElement?.data.category
+        const id = selectedElement?.data.id
+        const q = `MATCH (e) WHERE id(e) = ${id} `
+        const success = (await fetch(`api/graph/${prepareArg(graphName)}/?query=${prepareArg(q)}`, {
+            method: "GET"
+        })).ok
+        if (success)
+            graph.Elements.forEach(element => {
+                if (element.data.id !== id) return
+                const e = element
+                if (isNode) {
+                    e.data.category = label
+                } else e.data.label = label
+            })
+        return success
+    }
+
+    const onAddEntity = async (entityAttributes: string[][]) => {
+        const category = entityAttributes.find(row => row[0] === "category")
+        const filteredAttributes = entityAttributes.filter(row => row[0] !== "category")
+        if (!category) {
+            toast({
+                title: "Error",
+                description: "Missing Category"
+            })
+            return
+        }
+        const q = `CREATE (n:${category[1]} {${filteredAttributes.map(([k, v]) => `${k}: '${v}'`)}}) return n`
+        const result = await fetch(`api/graph/${prepareArg(graphName)}/?query=${prepareArg(q)}`, {
+            method: "GET"
+        })
+        if (!result.ok) return
+        const node = (await result.json()).result.data[0].n
+        graph.Elements = graph.extendNode(node, graph.Elements)
+    }
+
+    const onAddRelation = async (relationAttributes: string[][]) => {
+        const label = relationAttributes.find(row => row[0] === "label")
+        const filteredAttributes = relationAttributes.filter(row => row[0] !== "label")
+        if (!label) {
+            toast({
+                title: "Error",
+                description: "Missing Category"
+            })
+            return
+        }
+        const q = `CREATE (e:${label[1]} {${filteredAttributes.map(([k, v]) => `${k}: '${v}'`)}}) return e`
+        const result = await fetch(`api/graph/${prepareArg(graphName)}/?query=${prepareArg(q)}`, {
+            method: "GET"
+        })
+        if (!result.ok) return
+        const edge = (await result.json()).result.data[0].e
+        graph.Elements = graph.extendEdge(edge, graph.Elements)
+    }
+
     return (
-        <ResizablePanelGroup className="grow shadow-lg rounded-xl" direction="horizontal">
+        <ResizablePanelGroup className="grow gap-8" direction="horizontal">
             <ResizablePanel
-                className="relative p-8 flex flex-col gap-10"
+                className="w-1 grow relative pt-8 flex flex-col gap-10"
                 defaultSize={100}
             >
-                <Toolbar deleteDisable={!selectedElement?.id} onDelete={onDeleteElement} chartRef={chartRef} />
                 <div className="w-full flex flex-row items-center gap-8">
                     <p>Query</p>
-                    <form action={runQuery} className="grow flex flex-row">
-                        {/* <input
-                            className="grow border border-gray-700 border-opacity-10 p-2"
-                            title="Query"
-                            type="text"
-                            placeholder="Use Cypher Or Free Language"
-                        /> */}
-                        <div className="flex flex-row grow">
+                    <form action={runQuery} className="w-1 grow flex flex-row border border-[#343459]">
+                        <div className="flex flex-row grow w-1">
                             <Editor
+                                width="100%"
                                 height="100%"
-                                width={isCollapsed ? "100%" : "99.99%"}
-                                className="grow border border-gray-700 border-opacity-10"
                                 language="cypher"
                                 options={monacoOptions}
                                 value={query}
                                 onChange={(val) => setQuery(val || "")}
+                                theme="custom-theme"
+                                beforeMount={handleEditorWillMount}
+                                onMount={handelEditorDidMount}
                             />
                         </div>
                         <button
-                            className="border border-l-gray-700 border-opacity-15 text-gray-700 text-opacity-60 p-2"
+                            className="flex flex-row gap-8 bg-[#59597C] border border-[#737392] p-2 rounded-r-lg"
                             title="Run"
                             type="submit"
                         >
                             <p>Run</p>
+                            <ChevronDown />
                         </button>
-                        <Dialog>
-                            <DialogTrigger asChild>
-                                <button
-                                    className="p-2"
-                                    title="Maximize"
-                                    type="button"
-                                    aria-label="Maximize"
-                                >
-                                    <Maximize2 size={20} className="text-gray-400 text-opacity-70" />
-                                </button>
-                            </DialogTrigger>
-                            <DialogContent className="w-full h-full">
-                                <Editor
-                                    className="w-full h-full"
-                                    value={query}
-                                    onChange={(val) => setQuery(val || "")}
-                                    language="cypher"
-                                />
-                            </DialogContent>
-                        </Dialog>
                     </form>
+                    <Dialog>
+                        <DialogTrigger asChild>
+                            <button
+                                className="p-2"
+                                title="Maximize"
+                                type="button"
+                                aria-label="Maximize"
+                            >
+                                <Maximize2 size={20} />
+                            </button>
+                        </DialogTrigger>
+                        <DialogContent closeSize={30} className="w-full h-full">
+                            <Editor
+                                width={isCollapsed ? "100%" : "99.99%"}
+                                className="w-full h-full"
+                                beforeMount={handleEditorWillMount}
+                                theme="custom-theme"
+                                options={{
+                                    lineHeight: 30,
+                                    fontSize: 25
+                                }}
+                                value={query}
+                                onChange={(val) => setQuery(val || "")}
+                                language="cypher"
+                            />
+                        </DialogContent>
+                    </Dialog>
+                </div>
+                <div className="relative">
+                    <Toolbar schema={schema} deleteDisable={!selectedElement?.data.id} onDeleteElementGraph={onDeleteElement} onAddEntityGraph={onAddEntity} onAddRelationGraph={onAddRelation} chartRef={chartRef} />
+                    {
+                        isCollapsed && graph.Id &&
+                        <button
+                            className="absolute top-0 right-0 p-4 bg-indigo-600 rounded-lg"
+                            title="Open"
+                            type="button"
+                            onClick={() => onExpand()}
+                            disabled={!selectedElement}
+                            aria-label="Open"
+                        >
+                            <ChevronLeft />
+                        </button>
+                    }
                 </div>
                 {
                     graph.Id &&
                     <div className="flex relative grow">
                         <CytoscapeComponent
-                            className="w-full grow bg-slate-100 bg-opacity-20"
+                            className="w-full grow Canvas"
                             cy={(cy) => {
 
                                 chartRef.current = cy
@@ -362,29 +515,13 @@ const GraphView = forwardRef(({ graphName }: {
                                 cy.on('tap', 'edge', handleTap)
                                 cy.on('dbltap', 'node', handleDoubleTap)
                             }}
-                            elements={[{
-                                data: {
-                                    name: "moshes"
-                                }
-                            }]}
+                            elements={graph.Elements}
                             layout={LAYOUT}
                             stylesheet={getStyle()}
                         />
-                        <Labels className="absolute left-0 bottom-0" categories={graph.Categories} onClick={onCategoryClick} />
+                        <Labels className="absolute left-2 bottom-2" categories={graph.Categories} onClick={onCategoryClick} label="Categories" />
+                        <Labels className="absolute right-2 bottom-2" categories={graph.Labels} onClick={onLabelClick} label="Labels" />
                     </div>
-                }
-                {
-                    isCollapsed && graph.Id &&
-                    <button
-                        className="absolute top-0 right-0 p-4 px-6 bg-indigo-600 rounded-se-xl"
-                        title="Open"
-                        type="button"
-                        onClick={() => onExpand()}
-                        disabled={!selectedElement}
-                        aria-label="Open"
-                    >
-                        <ChevronLeft className="border border-white" size={20} color="white" />
-                    </button>
                 }
             </ResizablePanel>
             <ResizablePanel
@@ -398,9 +535,10 @@ const GraphView = forwardRef(({ graphName }: {
                 {
                     selectedElement &&
                     <DataPanel
+                        setLabel={onSetLabel}
                         removeProperty={removeProperty}
                         setProperty={setProperty}
-                        obj={selectedElement}
+                        obj={selectedElement.data}
                         onExpand={onExpand}
                         onDeleteElement={onDeleteElement}
                     />

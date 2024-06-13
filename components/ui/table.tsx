@@ -2,16 +2,16 @@ import * as React from "react"
 
 import { cn } from "@/lib/utils"
 
-interface TableProps 
-extends React.HTMLAttributes<HTMLTableElement> {
+
+interface TableProps extends React.HTMLAttributes<HTMLTableElement> {
   parentClassName?: string
-} 
+}
 
 const Table = React.forwardRef<
   HTMLTableElement,
   TableProps
 >(({ className, parentClassName, ...props }, ref) => (
-  <div className={cn("relative w-fit overflow-auto", parentClassName)}>
+  <div className={cn("relative w-full overflow-auto", parentClassName)}>
     <table
       ref={ref}
       className={cn("w-full caption-bottom text-sm", className)}

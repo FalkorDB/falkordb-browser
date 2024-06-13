@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getClient } from "@/app/api/auth/[...nextauth]/options";
+import { User } from "./model"
 
 const ROLE = new Map<string, string[]>(
     [
@@ -9,7 +10,7 @@ const ROLE = new Map<string, string[]>(
     ]
 )
 
-interface User {
+interface CreateUser {
     username: string
     password: string
     role: string
@@ -24,7 +25,7 @@ export async function GET() {
     }
     try {
         const list = await client.connection.aclList()
-        const users = list
+        const result: User[] = list
             .map((userACL: string) => userACL.split(" "))
             .filter((userDetails: string[]) => userDetails.length > 1 && userDetails[0] === "user")
             .map((userDetails: string[]) => {
@@ -38,11 +39,12 @@ export async function GET() {
 
                 return {
                     username: userDetails[1],
-                    role: role ? role[0] : "Unknown"
+                    role: role ? role[0] : "Unknown",
+                    checked: false
                 }
             })
 
-        return NextResponse.json({ result: { users } }, { status: 200 })
+        return NextResponse.json({ result }, { status: 200 })
     } catch (err: unknown) {
         return NextResponse.json({ message: (err as Error).message }, { status: 400 })
     }
@@ -56,21 +58,21 @@ export async function POST(req: NextRequest) {
         return client
     }
 
-    const { username, password, role } = await req.json() as User
+    const { username, password, role } = await req.json() as CreateUser
 
     const roleValue = ROLE.get(role)
     try {
         if (!username || !password || !roleValue) throw (new Error("Missing parameters"))
 
-        try {
-            const user = await client.connection.aclGetUser(username)
-            
-            if (user) {
-                return NextResponse.json({ message: `User ${username} already exists` }, { status: 409 })
+            try {
+                const user = await client.connection.aclGetUser(username)
+                
+                if (user) {
+                    return NextResponse.json({ message: `User ${username} already exists` }, { status: 409 })
+                }
+            } catch (err: unknown) {
+                // Just a workaround for https://github.com/redis/node-redis/issues/2745
             }
-        } catch (err: unknown) {
-            // Just a workaround for https://github.com/redis/node-redis/issues/2745
-        }
 
         await client.connection.aclSetUser(username, roleValue.concat(`>${password}`))
         return NextResponse.json(
@@ -97,7 +99,7 @@ export async function DELETE(req: NextRequest) {
 
     const { users } = await req.json()
     try {
-        await Promise.all(users.map(async (user: User) => {
+        await Promise.all(users.map(async (user: CreateUser) => {
             await client.connection.aclDelUser(user.username)
         }))
         return NextResponse.json({ message: "Users deleted" }, { status: 200 })
