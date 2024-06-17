@@ -68,7 +68,7 @@ export default function Selector({ onChange, queries }: {
             })
             if (!result.ok) return
             const res = (await result.json()).result as string[]
-            setOptions(res.filter(name => !name.includes("-schema")))
+            setOptions(res.filter(name => !name.includes("_schema")))
         }
         run()
     }, [])
@@ -159,12 +159,13 @@ export default function Selector({ onChange, queries }: {
             <div className="flex flex-row justify-between items-center">
                 <Combobox isSelectGraph options={options} setOptions={setOptions} selectedValue={selectedValue} setSelectedValue={handelOnChange} />
                 <div className="flex flex-row gap-16 text-[#9192FD]">
-                    <p>Versions</p>
+                    <p className={cn(!selectedValue && "text-[#57577B]")}>Versions</p>
                     <button
                         className="disabled:text-[#57577B]"
                         title="Upload Data"
                         type="button"
                         onClick={() => setIsUploadOpen(true)}
+                        disabled={!selectedValue}
                     >
                         <p>Upload Data</p>
                     </button>
@@ -217,7 +218,7 @@ export default function Selector({ onChange, queries }: {
                                 </DropdownMenuItem>
                             </DropdownMenuContent>
                         </DropdownMenu>
-                        <DialogContent className="h-[30%] w-[20%] flex flex-col p-0">
+                        <DialogContent displayClose className="h-[30%] w-[20%] flex flex-col p-0">
                             <DialogHeader className="h-[20%] bg-indigo-600 flex flex-row justify-between p-4 items-center">
                                 <DialogTitle className="text-white">Duplicate Graph</DialogTitle>
                                 <DialogClose asChild>
@@ -248,24 +249,28 @@ export default function Selector({ onChange, queries }: {
                     </Dialog>
                 </div>
             </div>
-            <div className="bg-[#2C2C4C] flex flex-row gap-4 justify-between items-center p-4 rounded-xl">
-                <div className="flex flex-row gap-6">
-                    <p>Created on 2/2 24</p>
-                    <span><span className="text-[#7167F6]">{nodesCount}</span>&ensp;Nodes</span>
-                    <p className="text-[#57577B]">|</p>
-                    <span><span className="text-[#7167F6]">{edgesCount}</span>&ensp;Edges</span>
-                </div>
+            <div className={cn("bg-[#2C2C4C] flex flex-row gap-4 justify-between items-center p-4 rounded-xl", !selectedValue && "justify-end")}>
+                {
+                    selectedValue &&
+                    <div className="flex flex-row gap-6">
+                        <p>Created on 2/2 24</p>
+                        <span><span className="text-[#7167F6]">{nodesCount}</span>&ensp;Nodes</span>
+                        <p className="text-[#57577B]">|</p>
+                        <span><span className="text-[#7167F6]">{edgesCount}</span>&ensp;Edges</span>
+                    </div>
+                }
                 <div className="flex flex-row gap-4 items-center">
                     <Dialog>
-                        <DialogTrigger asChild>
+                        <DialogTrigger disabled={!selectedValue} asChild>
                             <button
+                                className="disabled:text-[#57577B]"
                                 title="Query History"
                                 type="button"
                             >
                                 <p>Query History</p>
                             </button>
                         </DialogTrigger>
-                        <DialogContent className="w-[70%] h-[70%] flex flex-col p-0 shadow-lg rounded-xl">
+                        <DialogContent displayClose className="w-[70%] h-[70%] flex flex-col p-0 shadow-lg rounded-xl">
                             <DialogHeader className="h-[10%] p-4 bg-indigo-600 flex flex-row justify-between items-center rounded-t-xl">
                                 <DialogTitle className="text-white">
                                     Query History
@@ -375,15 +380,16 @@ export default function Selector({ onChange, queries }: {
                         </DialogContent>
                     </Dialog>
                     <Dialog>
-                        <DialogTrigger asChild>
+                        <DialogTrigger disabled={!selectedValue} asChild>
                             <button
+                                className="disabled:text-[#57577B]"
                                 title="View Schema"
                                 type="button"
                             >
                                 <p>View Schema</p>
                             </button>
                         </DialogTrigger>
-                        <DialogContent className="w-[90%] h-[90%] flex flex-col p-0 rounded-lg">
+                        <DialogContent displayClose className="w-[90%] h-[90%] flex flex-col p-0 rounded-lg">
                             <DialogHeader className="h-[10%] p-4 bg-indigo-600 flex flex-row justify-between items-center rounded-t-xl">
                                 <DialogTitle className="text-white">
                                     {selectedValue} Schema
@@ -398,7 +404,9 @@ export default function Selector({ onChange, queries }: {
                                     </button>
                                 </DialogClose>
                             </DialogHeader>
-                            <SchemaView schema={schema} />
+                            <div className="grow flex p-8">
+                                <SchemaView schema={schema} />
+                            </div>
                         </DialogContent>
                     </Dialog>
                 </div>

@@ -9,9 +9,9 @@ export default function Input({ variant, className, ...props }: Props) {
     return (
         <input
             className={cn(
-                "text-white p-4",
-                variant === "Default" && "bg-white text-black px-4 py-2 focus:border focus:border-[#5D5FEF] rounded-lg",
-                variant === "Small" && "bg-[#272746] hover:bg-[#2E2E51] focus:border focus:border-[#5D5FEF] rounded-lg",
+                "text-white p-2",
+                variant === "Default" && "bg-white text-black focus:border focus:border-[#5D5FEF] rounded-lg",
+                variant === "Small" && " min-w-72 bg-[#1F1F3D] hover:bg-[#2E2E51] focus:border focus:border-[#5D5FEF] rounded-lg",
                 className
             )}
             type="text"

@@ -5,7 +5,11 @@
 @layer base {
     :root {
         --background: 240 28% 21%;
+        --foreground: 0 0% 100%;
         --popover: 240 28% 21%;
+        --popover-foreground: 0 0% 100%;
+        --secondary: 240 17% 41%;
+        --primary: 244 89% 68%;
         --radius: 0.5rem;
     }
 
@@ -36,6 +40,9 @@
         background-color: #434366;
     }
     .Canvas {
+        padding: 1rem;
+        width: 100%;
+        height: 100%;
         background-color: #434366;
     }
 }

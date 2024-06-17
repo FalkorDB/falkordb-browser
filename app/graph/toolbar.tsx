@@ -81,7 +81,7 @@ export default function Toolbar({ schema, chartRef, onDeleteElementGraph, onDele
                     onAddEntityGraph && onAddRelationGraph && onDeleteElementGraph ?
                         <div className="flex flex-row gap-4">
                             <Dialog>
-                                <DialogTrigger disabled={!schema} asChild>
+                                <DialogTrigger disabled={!schema?.Id} asChild>
                                     <Button
                                         variant="Secondary"
                                         label="Add Entity"
@@ -89,7 +89,7 @@ export default function Toolbar({ schema, chartRef, onDeleteElementGraph, onDele
                                         icon={<PlusCircle />}
                                     />
                                 </DialogTrigger>
-                                <DialogContent className="w-[25%] min-h-[40%] flex flex-col gap-4 p-0" displayClose={false}>
+                                <DialogContent className="w-[25%] min-h-[40%] flex flex-col gap-4 p-0" displayClose>
                                     <DialogHeader className="h-[10%] flex flex-row justify-between items-center bg-[#272746] text-white p-8">
                                         <DialogTitle>Add Entity</DialogTitle>
                                         <DialogClose asChild>
@@ -151,7 +151,7 @@ export default function Toolbar({ schema, chartRef, onDeleteElementGraph, onDele
                                 </DialogContent>
                             </Dialog>
                             <Dialog>
-                                <DialogTrigger disabled={!schema} asChild>
+                                <DialogTrigger disabled={!schema?.Id} asChild>
                                     <Button
                                         variant="Secondary"
                                         className="flex flex-row items-center gap-2"
@@ -161,7 +161,7 @@ export default function Toolbar({ schema, chartRef, onDeleteElementGraph, onDele
                                         icon={<Link />}
                                     />
                                 </DialogTrigger>
-                                <DialogContent className="w-[25%] min-h-[40%] flex flex-col p-0" displayClose={false}>
+                                <DialogContent className="w-[25%] min-h-[40%] flex flex-col p-0" displayClose>
                                     <DialogHeader className="h-[10%] flex flex-row justify-between items-center border-b border-gray-200 bg-[#272746] text-white p-8">
                                         <DialogTitle>Add Relation</DialogTitle>
                                         <DialogClose asChild>
@@ -234,26 +234,26 @@ export default function Toolbar({ schema, chartRef, onDeleteElementGraph, onDele
                         : onAddEntitySchema && onAddRelationSchema && onDeleteElementSchema &&
                         <div className="flex flex-row gap-4">
                             <Button
-                                disabled={!schema}
+                                disabled={!chartRef}
                                 variant="Secondary"
                                 label="Add Entity"
                                 icon={<PlusCircle />}
-                                onClick={() => onAddEntitySchema}
+                                onClick={onAddEntitySchema}
                             />
                             <Button
-                                disabled={!schema}
+                                disabled={!chartRef}
                                 variant="Secondary"
                                 label="Add Relation"
                                 // eslint-disable-next-line jsx-a11y/anchor-is-valid
                                 icon={<Link />}
-                                onClick={() => onAddRelationSchema}
+                                onClick={onAddRelationSchema}
                             />
                             <Button
-                                disabled={!schema}
+                                disabled={!chartRef}
                                 variant="Secondary"
                                 label="Delete"
                                 icon={<Trash2 />}
-                                onClick={() => onDeleteElementSchema}
+                                onClick={onDeleteElementSchema}
                             />
                         </div>
                 }
@@ -263,18 +263,21 @@ export default function Toolbar({ schema, chartRef, onDeleteElementGraph, onDele
                 }
                 <div className="flex flex-row items-center gap-4">
                     <Button
+                        disabled={!chartRef}
                         variant="Secondary"
                         label="Zoom In"
                         icon={<ZoomIn />}
                         onClick={() => handleZoomClick(1.1)}
                     />
                     <Button
+                        disabled={!chartRef}
                         variant="Secondary"
                         label="Zoom Out"
                         icon={<ZoomOut />}
                         onClick={() => handleZoomClick(0.9)}
                     />
                     <Button
+                        disabled={!chartRef}
                         variant="Secondary"
                         label="Fit To Size"
                         icon={<Shrink />}

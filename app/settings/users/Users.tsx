@@ -61,17 +61,17 @@ export default function Users() {
                     }}
                 />
             </div>
-            <div className="border border-gray-200 rounded-xl">
+            <div className="border border-[#57577B] rounded-lg">
                 <Table>
                     <TableHeader>
-                        <TableRow>
+                        <TableRow className="border-none">
                             <TableHead className="w-[5%]">
                                 <Checkbox
                                     checked={checked}
-                                    className="border-gray-400 rounded-lg"
+                                    className="border-[#57577B] rounded-lg"
                                     id="select-all"
                                     onCheckedChange={(check: CheckedState) => {
-                                        setChecked(true)
+                                        setChecked(check === true)
                                         setUsers(prev => prev.map(user => {
                                             const u = user
                                             u.selected = check === true
@@ -80,8 +80,8 @@ export default function Users() {
                                     }}
                                 />
                             </TableHead>
-                            <TableHead className="font-medium text-gray-400">USERNAME</TableHead>
-                            <TableHead className="font-medium text-gray-400">ROLE</TableHead>
+                            <TableHead className="font-medium">USERNAME</TableHead>
+                            <TableHead className="font-medium">ROLE</TableHead>
                             <TableHead className="w-[5%]" />
                         </TableRow>
                     </TableHeader>
@@ -89,7 +89,7 @@ export default function Users() {
                         {
                             users.map((user: User, index: number) => (
                                 <TableRow
-                                    className={cn(!(index % 2) && "bg-gray-50 hover:bg-gray-50")}
+                                    className={cn("border-none last:rounded-b-lg", !(index % 2) && "bg-[#57577B] hover:bg-[#57577B]")}
                                     // eslint-disable-next-line react/no-array-index-key
                                     key={index}
                                     onMouseEnter={() => setIsHover(index)}
@@ -97,7 +97,7 @@ export default function Users() {
                                 >
                                     <TableCell>
                                         <Checkbox
-                                            className="border-gray-400 rounded-lg"
+                                            className={cn(!(index % 2) && "border-[#57577B]", "border-[#272746] rounded-lg")}
                                             checked={user.selected}
                                             onCheckedChange={(check) => {
                                                 setUsers(prev => prev.map(currentUser => {
@@ -108,7 +108,7 @@ export default function Users() {
                                                 }))
                                             }} />
                                     </TableCell>
-                                    <TableCell className="font-light text-gray-500">{user.username}</TableCell>
+                                    <TableCell className="font-light">{user.username}</TableCell>
                                     <TableCell>
                                         <Combobox
                                             inTable

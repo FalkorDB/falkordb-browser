@@ -3,6 +3,7 @@ import { toast } from "@/components/ui/use-toast";
 import { User } from "@/app/api/user/model";
 import { Trash2 } from "lucide-react";
 import { Dispatch, SetStateAction } from "react";
+import Button from "@/app/components/Button";
 
 interface DeleteUserProps {
     // eslint-disable-next-line react/require-default-props
@@ -38,13 +39,12 @@ export default function DeleteUser({ isDeleteSelected, users, setUsers }: Delete
             <AlertDialogTrigger disabled={users.length === 0} asChild>
                 {
                     isDeleteSelected ?
-                        <button
-                            className="w-[10%] p-2 border-2 border-indigo-600 rounded-xl text-indigo-600 disabled:text-gray-300 disabled:border-gray-300"
-                            title="Delete User"
-                            type="button"
-                        >
-                            <p>DELETE USER</p>
-                        </button>
+                        <Button
+                            disabled={users.length === 0}
+                            variant="Primary"
+                            icon={<Trash2/>}
+                            label="Delete User"
+                        />
                         : <button
                             title="Delete"
                             type="button"

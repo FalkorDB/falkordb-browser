@@ -16,7 +16,7 @@ export default function Upload({ isOpen, onOpen}: {
 
     return (
         <Dialog open={isOpen} onOpenChange={onOpen}>
-            <DialogContent className="h-[80%] w-fit flex flex-col p-0">
+            <DialogContent displayClose className="h-[80%] w-fit flex flex-col p-0">
                 <DialogHeader className="h-[10%] bg-indigo-600 flex flex-row justify-between p-4 items-center">
                     <DialogTitle className="text-white">Upload Data</DialogTitle>
                     <DialogClose asChild>

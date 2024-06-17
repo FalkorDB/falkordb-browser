@@ -3,8 +3,8 @@
 import { Table, TableBody, TableCaption, TableCell, TableRow } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 import { EdgeDataDefinition, NodeDataDefinition } from "cytoscape";
-import { ChevronRight, PlusCircle, Trash2 } from "lucide-react";
-import { KeyboardEvent, useState } from "react";
+import { ChevronRight, MinusCircle, PlusCircle, Trash2 } from "lucide-react";
+import { KeyboardEvent, useEffect, useRef, useState } from "react";
 import { useToast } from "@/components/ui/use-toast";
 import Button from "../components/Button";
 
@@ -38,8 +38,13 @@ export default function DataPanel({ obj, onExpand, setProperty, removeProperty, 
     const [key, setKey] = useState<string>("")
     const type = obj.source ? "edge" : "node"
     const label = (type === "edge" ? obj.label : obj.category) || "label"
+    const addValueRef = useRef<HTMLDivElement>(null)
     const { toast } = useToast()
 
+    useEffect(() => {
+        if (!isAddValue) return
+        addValueRef.current?.focus()
+    }, [isAddValue])
 
     const onKeyDown = async (e: KeyboardEvent<HTMLTableCellElement>) => {
         if (!setProperty) return
@@ -130,7 +135,7 @@ export default function DataPanel({ obj, onExpand, setProperty, removeProperty, 
                 </div>
                 <p className="flex flex-row text-white">{Object.keys(obj).filter((v) => !excludedProperties.has(v)).length} Attributes</p>
             </div>
-            <div className="grow flex flex-col justify-between items-start">
+            <div className="h-1 grow flex flex-col justify-between items-start overflow-auto">
                 <Table>
                     {
                         setProperty &&
@@ -139,7 +144,7 @@ export default function DataPanel({ obj, onExpand, setProperty, removeProperty, 
                                 className="border border-[#232341]"
                                 variant="Secondary"
                                 label="Add Attribute"
-                                icon={<PlusCircle />}
+                                icon={isAddValue ? <MinusCircle/> : <PlusCircle />}
                                 type="button"
                                 onClick={() => setIsAddValue(prev => !prev)}
                             />
@@ -220,6 +225,7 @@ export default function DataPanel({ obj, onExpand, setProperty, removeProperty, 
                                 <TableCell className="w-1/2 p-4">
                                     {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions */}
                                     <div
+                                        ref={addValueRef}
                                         className="p-4 rounded-lg bg-slate-800 focus:border focus:border-indigo-500"
                                         contentEditable
                                         onInput={(e) => setKey(e.currentTarget.textContent || "")}

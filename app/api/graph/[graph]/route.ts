@@ -33,12 +33,11 @@ export async function POST(request: NextRequest, { params }: { params: { graph: 
         return client
     }
 
-    console.log("hi");
-
     const graphId = params.graph;
     const sourceName = request.nextUrl.searchParams.get("sourceName")
     const type = request.nextUrl.searchParams.get("type")
     const key = request.nextUrl.searchParams.get("key")
+    const srcs = await request.json()
 
     try {
         if (sourceName) {
@@ -48,23 +47,27 @@ export async function POST(request: NextRequest, { params }: { params: { graph: 
             return NextResponse.json({ success }, { status: 200 })
         }
 
+
         if (!key) console.error("Missing parameter 'key'")
+
+        if (!srcs) console.error("Missing parameter 'srcs'")
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const socket = client.connection.options?.socket as any
-        if (!socket) console.error("Socket not found")
+
+        if (!socket) console.error("socket not found")
 
         const data = {
-            host: [socket.host],
-            port: [socket.port],
-            name: [graphId],
-            sources: await request.json(),
-            key,
+            host: socket.host,
+            port: socket.port,
+            name: graphId,
+            srcs,
+            openaikey: key,
         }
 
         if (!type) console.error("Missing parameter 'type'")
 
-        const res = await fetch(`http://localhost:8000/create${type}`, {
+        const res = await fetch(`http://localhost:5000/${type}`, {
             method: "POST",
             headers: {
                 'Content-Type': 'application/json'
@@ -74,7 +77,7 @@ export async function POST(request: NextRequest, { params }: { params: { graph: 
 
         const result = await res.json()
 
-        if (!res.ok) throw new Error(res.statusText) 
+        if (!res.ok) throw new Error(res.statusText)
 
         return NextResponse.json({ result }, { status: 200 })
     } catch (err: unknown) {
@@ -98,9 +101,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { graph:
 
         const data = await client.connection.renameNX(sourceName, graphId);
 
-        console.log(data);
-
-        if (!data) throw (new Error(`${graphId} already exists`))
+        if (!data) throw new Error(`${graphId} already exists`)
 
         return NextResponse.json({ data })
     } catch (err: unknown) {
@@ -118,8 +119,18 @@ export async function GET(request: NextRequest, { params }: { params: { graph: s
     const graphId = params.graph
     const query = request.nextUrl.searchParams.get("query")
 
+    if (!query) {
+        const ID = request.nextUrl.searchParams.get("ID")
+        if (!ID) throw new Error("Missing parameter 'ID'")
+        // const result = await fetch(`https://localhost:5000/progress/?ID=${ID}`, {
+        //     method: "GET"
+        // })
+        // if (!result.ok) throw new Error("something went wrong")
+        // const json = await result.json()
+        return NextResponse.json({ progress: 10 }, { status: 200 })
+    }
+
     try {
-        if (!query) throw new Error("Missing Query")
         const graph = client.selectGraph(graphId)
         const result = await graph.query(query)
 

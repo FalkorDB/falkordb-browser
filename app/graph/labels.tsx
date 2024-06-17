@@ -6,7 +6,7 @@ interface Props {
     categories: Category[],
     onClick: (category: Category) => void,
     label?: string,
-    className: string
+    className?: string
 }
 
 export default function Labels({ categories, onClick, label, className = "" }: Props) {

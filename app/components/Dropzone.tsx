@@ -44,19 +44,18 @@ function Dropzone({ filesCount = false, className = "", withTable = false, disab
     const { getRootProps, getInputProps } = useDropzone({ onDrop, disabled })
 
     return (
-        <div className={cn('flex flex-row gap-20', className)}>
+        <div className={cn('flex flex-row gap-8', className)}>
             {/* eslint-disable-next-line react/jsx-props-no-spreading */}
-            <div {...getRootProps(withTable ? { className: "border border-dashed border-gray-300 flex flex-col px-52 py-28 gap-8 items-center dropzone" } : {})}>
+            <div {...getRootProps(withTable ? { className: "flex-1 bg-[#434366] flex items-center justify-center p-36" }: {})}>
                 {/* eslint-disable-next-line react/jsx-props-no-spreading */}
                 <input {...getInputProps()} />
                 {
                     withTable ?
-                        <>
-                            <p className='text-[#57577B]'>Drag & Drop file here</p>
+                        <div className='flex flex-col gap-7 items-center font-medium'>
+                            <p>Drag & Drop File Here</p>
                             <ArrowDownToLine color='#57577B' />
-                            <div className='text-[#57577B] text-xl'>Or <span className='text-[#57577B] underline underline-offset-2'>Browse...</span></div>
-                            <p className='text-[#57577B] text-xs'>Formats: Text, Pdf, CSV, Word</p>
-                        </>
+                            <span>Or <span className='text-[#7167F6]'>Browse</span></span>
+                        </div>
                         : <p className={cn('underline underline-offset-2 text-[#99E4E5]', disabled && "opacity-30")}>Upload Certificate</p>
                 }
             </div>
@@ -65,28 +64,29 @@ function Dropzone({ filesCount = false, className = "", withTable = false, disab
             }
             {
                 withTable &&
-                <div className='grow overflow-auto'>
-                    <Table>
-                        <TableHeader className='border-b'>
+                <div className='flex-1 bg-[#272746] border border-[#5E5E7D] overflow-auto flex flex-col gap-8 p-36 justify-center'>
+                    <p className='font-semibold'>Uploaded Files</p>
+                    <Table parentClassName='grow'>
+                        <TableHeader className='border-b border-[#7E7E9B]'>
                             <TableRow className='border-none'>
                                 {
                                     FileProps.map((cell) => (
-                                        <TableHead key={cell} className={cn("text-center", cell === "Name" && "underline underline-offset-2")}>
+                                        <TableHead key={cell} className="text-center">
                                             {cell}
                                         </TableHead>
                                     ))
                                 }
                             </TableRow>
                         </TableHeader>
-                        <TableBody className='overflow-auto'>
+                        <TableBody className={cn('overflow-auto', files.length > 0 && "border-b border-[#57577B]")}>
                             {
                                 files.length > 0 ?
                                     files.map((row, index) => (
                                         // eslint-disable-next-line react/no-array-index-key
-                                        <TableRow className='border-none' key={index}>
+                                        <TableRow className='border-[#57577B]' key={index}>
                                             {
                                                 Object.values(row).map((cell) => (
-                                                    <TableCell className='text-center' key={cell}>
+                                                    <TableCell className='text-center font-medium' key={cell}>
                                                         {cell}
                                                     </TableCell>
                                                 ))

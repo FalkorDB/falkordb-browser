@@ -1,3 +1,5 @@
+'use client'
+
 import { ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable"
 import CytoscapeComponent from "react-cytoscapejs"
 import { ChevronLeft } from "lucide-react"
@@ -5,10 +7,19 @@ import cytoscape, { EdgeDataDefinition, EventObject, NodeDataDefinition } from "
 import { ImperativePanelHandle } from "react-resizable-panels"
 import { useEffect, useRef, useState } from "react"
 import fcose from "cytoscape-fcose";
+import { cn } from "@/lib/utils"
 import Toolbar from "./toolbar"
 import DataPanel from "./DataPanel"
 import Labels from "./labels"
 import { Category, Graph } from "./model"
+
+/* eslint-disable react/require-default-props */
+interface Props {
+    schema: Graph,
+    onAddEntity?: () => void,
+    onAddRelation?: () => void,
+    onDelete?: () => void
+}
 
 const LAYOUT = {
     name: "fcose",
@@ -90,7 +101,7 @@ function getStyle() {
     return style
 }
 
-export default function SchemaView({ schema }: { schema: Graph }) {
+export default function SchemaView({ schema, onAddEntity, onAddRelation, onDelete }: Props) {
 
     const [selectedElement, setSelectedElement] = useState<NodeDataDefinition | EdgeDataDefinition>();
     const [isCollapsed, setIsCollapsed] = useState<boolean>(false);
@@ -152,34 +163,28 @@ export default function SchemaView({ schema }: { schema: Graph }) {
         }
     }
 
-    const onAddEntitySchema = () => { 
-        schema.Elements.push({
-            data: {
-                id: "number",
-            }
-        })
-    }
-    
-    const onAddRelationSchema = () => { 
-        schema.Elements.push({
-            data: {
-                id: "number",
-            }
-        })
-    }
-
-    const onDelete = () => {
-        const s = schema
-        s.Elements = s.Elements.filter((element) => element.data.id !== selectedElement?.id)
-    }
-
     return (
-        <ResizablePanelGroup className="grow" direction="horizontal">
-            <ResizablePanel defaultSize={100} className="relative grow flex flex-col gap-4 p-8">
-                <Toolbar onAddEntitySchema={onAddEntitySchema} onAddRelationSchema={onAddRelationSchema} onDeleteElementSchema={onDelete} chartRef={chartRef} />
-                <div className="grow relative">
+        <ResizablePanelGroup className={cn("grow", !isCollapsed && "gap-8")} direction="horizontal">
+            <ResizablePanel defaultSize={100} className="w-1 grow flex flex-col gap-10">
+                <div className="relative">
+                    <Toolbar onAddEntitySchema={onAddEntity} onAddRelationSchema={onAddRelation} onDeleteElementSchema={onDelete} chartRef={chartRef} />
+                    {
+                        isCollapsed &&
+                        <button
+                            className="absolute top-0 right-0 p-4 bg-[#7167F6] rounded-lg"
+                            title="Open"
+                            type="button"
+                            onClick={() => onExpand()}
+                            disabled={!selectedElement}
+                            aria-label="Open"
+                        >
+                            <ChevronLeft />
+                        </button>
+                    }
+                </div>
+                <div className="grow relative flex">
                     <CytoscapeComponent
-                        className="w-full h-full"
+                        className="Canvas"
                         layout={LAYOUT}
                         stylesheet={getStyle()}
                         elements={schema.Elements}
@@ -192,22 +197,14 @@ export default function SchemaView({ schema }: { schema: Graph }) {
                             cy.on('tap', 'edge', handelTap)
                         }}
                     />
-                    <Labels className="absolute left-0 bottom-0" categories={schema.Categories} onClick={onCategoryClick} />
-                    <Labels className="absolute right-0 bottom-0" categories={schema.Labels} onClick={onLabelClick} />
+                    {
+                        schema.Elements.length > 0 &&
+                        <>
+                            <Labels label="Categories" className="absolute left-0 bottom-0" categories={schema.Categories} onClick={onCategoryClick} />
+                            <Labels label="Labels" className="absolute right-0 bottom-0" categories={schema.Labels} onClick={onLabelClick} />
+                        </>
+                    }
                 </div>
-                {
-                    isCollapsed &&
-                    <button
-                        className="absolute top-2 right-4 p-4 bg-indigo-600 rounded-lg"
-                        title="Open"
-                        type="button"
-                        onClick={() => onExpand()}
-                        disabled={!selectedElement}
-                        aria-label="Open"
-                    >
-                        <ChevronLeft />
-                    </button>
-                }
             </ResizablePanel>
             <ResizablePanel
                 className="rounded-lg"

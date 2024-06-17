@@ -41,7 +41,7 @@ def detect_schema():
     print(f"srcs: {srcs}")
     print(f"key : {key}")
 
-    set_openai_key(key)
+    # set_openai_key(key)
 
     sources = [Source(s) for s in srcs]
     s = Schema.auto_detect(sources)
@@ -76,7 +76,7 @@ def populate_kg():
     print(f"srcs: {srcs}")
     print(f"key : {key}")
 
-    set_openai_key(key)
+    # set_openai_key(key)
 
     sources = [Source(s) for s in srcs]
 

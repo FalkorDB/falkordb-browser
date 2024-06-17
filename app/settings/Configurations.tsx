@@ -101,13 +101,13 @@ export default function Configurations({ graphName }: {
 
     return (
         <div className="w-full h-full flex flex-col space-y-4">
-            <div className="border border-gray-200 rounded-xl">
+            <div className="border border-[#57577B] rounded-lg">
                 <Table>
                     <TableHeader>
-                        <TableRow>
-                            <TableHead className="font-medium text-gray-400">NAME</TableHead>
-                            <TableHead className="font-medium text-gray-400">DESCRIPTION</TableHead>
-                            <TableHead className="font-medium text-gray-400">VALUE</TableHead>
+                        <TableRow className="border-none">
+                            <TableHead className="font-medium">NAME</TableHead>
+                            <TableHead className="font-medium">DESCRIPTION</TableHead>
+                            <TableHead className="font-medium">VALUE</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -115,13 +115,13 @@ export default function Configurations({ graphName }: {
                             Configs.length > 0 ?
                             Configs.map((config, index) => (
                                 <TableRow
-                                    className={cn(!(index % 2) && "bg-gray-50 hover:bg-gray-50")}
+                                    className={cn("border-none last:rounded-b-lg", !(index % 2) && "bg-[#57577B] hover:bg-[#57577B]")}
                                     // eslint-disable-next-line react/no-array-index-key
                                     key={config.name}
                                 >
-                                    <TableCell className="font-light text-gray-500">{config.name}</TableCell>
-                                    <TableCell className="font-light text-gray-500">{config.description}</TableCell>
-                                    <TableCell className="font-light text-gray-500">{config.value}</TableCell>
+                                    <TableCell title={config.name} className="font-light w-1/3">{config.name}</TableCell>
+                                    <TableCell title={config.description} className="font-light w-1/3">{config.description}</TableCell>
+                                    <TableCell title={config.value} className="font-light w-1/3">{config.value}</TableCell>
                                 </TableRow>
                             ))
                             : <TableRow>

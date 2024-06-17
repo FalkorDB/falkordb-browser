@@ -9,7 +9,7 @@ import { editor } from "monaco-editor";
 import { ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { ImperativePanelHandle } from "react-resizable-panels";
 import { ChevronDown, ChevronLeft, Maximize2 } from "lucide-react"
-import { securedFetch } from "@/lib/utils";
+import { cn, securedFetch } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import { Category, Graph } from "./model";
@@ -426,9 +426,9 @@ const GraphView = forwardRef(({ graphName, setQueries }: {
     }
 
     return (
-        <ResizablePanelGroup className="grow gap-8" direction="horizontal">
+        <ResizablePanelGroup className={cn("grow", !isCollapsed && "gap-8")} direction="horizontal">
             <ResizablePanel
-                className="w-1 grow relative pt-8 flex flex-col gap-10"
+                className="w-1 grow pt-8 flex flex-col gap-10"
                 defaultSize={100}
             >
                 <div className="w-full flex flex-row items-center gap-8">
@@ -489,7 +489,7 @@ const GraphView = forwardRef(({ graphName, setQueries }: {
                     {
                         isCollapsed && graph.Id &&
                         <button
-                            className="absolute top-0 right-0 p-4 bg-indigo-600 rounded-lg"
+                            className="absolute top-0 right-0 p-4 bg-[#7167F6] rounded-lg"
                             title="Open"
                             type="button"
                             onClick={() => onExpand()}
@@ -500,32 +500,34 @@ const GraphView = forwardRef(({ graphName, setQueries }: {
                         </button>
                     }
                 </div>
-                {
-                    graph.Id &&
-                    <div className="flex relative grow">
-                        <CytoscapeComponent
-                            className="w-full grow Canvas"
-                            cy={(cy) => {
+                <div className="flex relative grow">
+                    <CytoscapeComponent
+                        className="Canvas"
+                        cy={(cy) => {
 
-                                chartRef.current = cy
+                            chartRef.current = cy
 
-                                cy.removeAllListeners()
+                            cy.removeAllListeners()
 
-                                cy.on('tap', 'node', handleTap)
-                                cy.on('tap', 'edge', handleTap)
-                                cy.on('dbltap', 'node', handleDoubleTap)
-                            }}
-                            elements={graph.Elements}
-                            layout={LAYOUT}
-                            stylesheet={getStyle()}
-                        />
-                        <Labels className="absolute left-2 bottom-2" categories={graph.Categories} onClick={onCategoryClick} label="Categories" />
-                        <Labels className="absolute right-2 bottom-2" categories={graph.Labels} onClick={onLabelClick} label="Labels" />
-                    </div>
-                }
+                            cy.on('tap', 'node', handleTap)
+                            cy.on('tap', 'edge', handleTap)
+                            cy.on('dbltap', 'node', handleDoubleTap)
+                        }}
+                        elements={graph.Elements}
+                        layout={LAYOUT}
+                        stylesheet={getStyle()}
+                    />
+                    {
+                        graph.Id &&
+                        <div className="absolute w-full bottom-2 flex flex-row justify-between">
+                            <Labels categories={graph.Categories} onClick={onCategoryClick} label="Categories" />
+                            <Labels categories={graph.Labels} onClick={onLabelClick} label="Labels" />
+                        </div>
+                    }
+                </div>
             </ResizablePanel>
             <ResizablePanel
-                className="rounded-xl shadow-lg"
+                className="rounded-lg"
                 collapsible
                 ref={dataPanel}
                 defaultSize={30}

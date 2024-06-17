@@ -5,15 +5,24 @@ import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuIte
 import { ChevronDown, ChevronUp, LifeBuoy, PlusCircle, Settings } from "lucide-react";
 import { useState } from "react";
 import Image from "next/image";
+import { cn } from "@/lib/utils";
+import { useToast } from "@/components/ui/use-toast";
+import { useRouter } from "next/navigation";
 import Button from "../components/Button";
 
-export default function Header({ inCreate = false, inSettings = false }: {
-    // eslint-disable-next-line react/require-default-props
+/* eslint-disable react/require-default-props */
+interface Props {
+    graphName?: string
     inCreate?: boolean
-    // eslint-disable-next-line react/require-default-props
     inSettings?: boolean
-}) {
+}
+
+const prepareArg = (arg: string) => encodeURIComponent(arg.trim())
+
+export default function Header({ graphName, inCreate = false, inSettings = false }: Props) {
     const [open, setOpen] = useState<boolean>(false)
+    const router = useRouter()
+    const { toast } = useToast()
     // const [newName, setNewName] = useState<string>("")
 
     // const createGraph = async () => {
@@ -30,17 +39,28 @@ export default function Header({ inCreate = false, inSettings = false }: {
         })
         const query2 = `CREATE
             (:Rider {name:'string'})-[:rides]->(:Team {name:'string'})`
-        fetch(`api/graph/FalkorDB-schema/?query=${query2.trim()}`, {
+        fetch(`api/graph/FalkorDB_schema/?query=${query2.trim()}`, {
             method: "GET"
         })
     }
 
+    const handelSettings = () => {
+        if (!graphName) {
+            toast({
+                title: "Error",
+                description: "Select a graph first"
+            })
+            return
+        }
+        router.push(`/settings/?graphName=${prepareArg(graphName)}`)
+    }
+
     return (
-        <div className="h-[10%] flex flex-col">
-            <div className="h-2 rounded-t-lg Top" />
-            <div className="grow py-6 px-11 flex flex-row justify-between items-center Header">
+        <div className="h-[6%] flex flex-col">
+            <div className="p-2 rounded-t-lg Top" />
+            <div className="py-6 px-11 flex flex-row justify-between items-center Header">
                 <div className="flex flex-row gap-4 items-center">
-                    <Image width={103} height={29} src="/ColorLogo.svg" alt=""/>
+                    <Image width={103} height={29} src="/ColorLogo.svg" alt="" />
                     <p className="text-neutral-200" >|</p>
                     <div className="flex flex-row gap-6">
                         <p>Knowledge Graphs</p>
@@ -61,7 +81,7 @@ export default function Header({ inCreate = false, inSettings = false }: {
                             {/* <Dialog>
                             <DialogTrigger asChild>
                             </DialogTrigger>
-                            <DialogContent className="flex flex-col gap-6">
+                            <DialogContent displayClose className="flex flex-col gap-6">
                                 <DialogHeader className="flex flex-row justify-between items-center">
                                 <DialogTitle>Create New Graph</DialogTitle>
                                 <DialogClose asChild>
@@ -145,15 +165,16 @@ export default function Header({ inCreate = false, inSettings = false }: {
                         </>
                     }
                     <div>
-                        <a
-                        className="flex flex-row gap-2"
-                            href="/settings"
+                        <button
+                            className={cn("flex flex-row gap-2", !graphName && "text-[#57577B]")}
                             title="Settings"
+                            type="button"
+                            onClick={handelSettings}
                             aria-label="Settings"
                         >
                             <p>Settings</p>
                             <Settings size={25} />
-                        </a>
+                        </button>
                     </div>
                     <div className="flex flex-row gap-4 items-center">
                         <span>user.name</span>

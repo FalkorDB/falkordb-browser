@@ -101,7 +101,8 @@ export default function Combobox({ isSelectGraph, disabled = false, inTable, typ
       <DropdownMenu onOpenChange={setOpen}>
         <DropdownMenuTrigger disabled={disabled} className="w-fit" asChild>
           <button
-            className={cn(inTable ? "text-sm font-light text-gray-500" : "text-2xl", "w-fit flex flex-row items-center gap-4 disabled:", disabled && "text-gray-300")}
+            disabled={disabled}
+            className={cn(inTable ? "text-sm font-light" : "text-2xl", "w-fit flex flex-row items-center gap-4 disabled:text-gray-300")}
             title="Select Graph"
             type="button"
           >
