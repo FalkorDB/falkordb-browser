@@ -57,7 +57,7 @@ export default function Create() {
             setEdgesCount(data.edges)
         }
         run()
-    }, [graphName])
+    }, [graphName, toast])
 
     useEffect(() => {
         if (!filesPath) return
@@ -86,7 +86,7 @@ export default function Create() {
         }
 
         run()
-    }, [filesPath])
+    }, [filesPath, toast])
 
     useEffect(() => {
         if (progress !== 100) return
@@ -125,7 +125,7 @@ export default function Create() {
             setCurrentTab("schema")
         }
         run()
-    }, [progress])
+    }, [progress, toast])
 
     const fetcher = async (url: string) => {
 
@@ -144,7 +144,6 @@ export default function Create() {
         const json = await result.json()
 
         setProgress(prev => prev + json.progress)
-        console.log(progress);
     }
 
     useSWR((currentTab === "loadSchema" && progress < 100) && `api/graph/${graphName}/?ID=${ID}`, fetcher, { refreshInterval: 2500 })
@@ -180,12 +179,7 @@ export default function Create() {
             return json.path
         }))
 
-        console.log(newFilesPath);
-
         setFilesPath(newFilesPath)
-
-        console.log(filesPath);
-
 
     }
 
