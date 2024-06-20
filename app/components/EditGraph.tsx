@@ -1,8 +1,7 @@
 import { Dialog, DialogClose, DialogContent, DialogHeader, DialogTrigger } from "@/components/ui/dialog";
 import { EditIcon, X } from "lucide-react";
 import { useState } from "react";
-import { useToast } from "@/components/ui/use-toast";
-import { securedFetch } from "@/lib/utils";
+import { Toast, prepareArg, securedFetch } from "@/lib/utils";
 
 
 export default function EditGraph({ graphName }: { 
@@ -11,20 +10,14 @@ export default function EditGraph({ graphName }: {
     
     const [name, setName] = useState<string>("");
     const [open, setOpen] = useState<boolean>(false);
-    const { toast } = useToast()
     
-    const prepareArg = (arg: string) => encodeURIComponent(arg.trim())
-    
-    const handelSubmit = async () => {
+    const handleSubmit = async () => {
         const result = await securedFetch(`/api/graph/${prepareArg(name)}/?${prepareArg(graphName)}`, {
             method: "PATCH",
         })
 
         if (!result.ok) {
-            toast({
-                title: "Error",
-                description: "Failed to edit graph",
-            })
+            Toast("Failed to edit graph")
         }
         setOpen(false)
     }
@@ -53,7 +46,7 @@ export default function EditGraph({ graphName }: {
                         </button>
                     </DialogClose>
                 </DialogHeader>
-                <form className="flex flex-col gap-4 p-4" onSubmit={handelSubmit}>
+                <form className="flex flex-col gap-4 p-4" onSubmit={handleSubmit}>
                     <div className="flex flex-col gap-4">
                         <p>Graph Name</p>
                         <input className="border border-gray-200 rounded-md p-2" type="text" required onChange={(e) => setName(e.target.value)} />

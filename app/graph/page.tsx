@@ -13,7 +13,7 @@ export default function Page() {
     const [queries, setQueries] = useState<Query[]>([])
     const [schema, setSchema] = useState<Graph>(Graph.empty())
 
-    const handelGraphChange = (selectedGraphName: string, selectedSchema: Graph) => {
+    const handleGraphChange = (selectedGraphName: string, selectedSchema: Graph) => {
         setGraphName(selectedGraphName)
         setSchema(selectedSchema)
     }
@@ -22,7 +22,7 @@ export default function Page() {
         <div className="h-full w-full flex flex-col gap-6">
             <Header graphName={graphName}/>            
             <div className="h-1 grow px-12 pb-12 pt-6 flex flex-col gap-4">
-                <Selector queries={queries} onChange={handelGraphChange}/>
+                <Selector queries={queries} onChange={handleGraphChange}/>
                 <GraphView setQueries={setQueries} schema={schema} graphName={graphName}/>
             </div>
         </div>

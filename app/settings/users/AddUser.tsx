@@ -1,7 +1,6 @@
 import { Dispatch, FormEvent, SetStateAction, useState } from "react"
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { toast } from "@/components/ui/use-toast";
-import { securedFetch } from "@/lib/utils";
+import { Toast, securedFetch } from "@/lib/utils";
 import { PlusCircle, X } from "lucide-react";
 import { User } from "@/app/api/user/model";
 import Button from "@/app/components/Button";
@@ -31,10 +30,7 @@ export default function AddUser({ setUsers }: {
         })
 
         if (response.ok) {
-            toast({
-                title: "Success",
-                description: "User created",
-            });
+            Toast("Success", "User added successfully")
             setUsers(prev => [...prev, { username, role, selected: false }])
         }
         setOpen(false)

@@ -1,6 +1,5 @@
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { useToast } from "@/components/ui/use-toast";
-import { securedFetch } from "@/lib/utils";
+import { Toast, securedFetch } from "@/lib/utils";
 
 export default function DeleteGraph({ graphName, isOpen, onOpen }: {
     graphName: string
@@ -8,18 +7,13 @@ export default function DeleteGraph({ graphName, isOpen, onOpen }: {
     onOpen: (open: boolean) => void
 }) {
 
-    const { toast } = useToast()
-
     const deleteGraph = async () => {
         const result = await securedFetch(`/api/graph/${graphName}`, {
             method: "DELETE",
         });
 
         if (result.ok) {
-            toast({
-                title: "Success",
-                description: "Graph Deleted",
-            })
+            Toast("Success", "Graph deleted")
         }
     }
 

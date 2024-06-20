@@ -51,7 +51,7 @@ export default function Toolbar({ schema, chartRef, onDeleteElementGraph, onDele
             find(element => element.data?.category === category)?.data || {}).
             filter((key) => !excludedProperties.has(key)).map(k => [k, ""]))
     }, [category])
-
+    
     useEffect(() => {
         if (!schema) return
         setRelationAttributes(Object.keys(schema.Elements.

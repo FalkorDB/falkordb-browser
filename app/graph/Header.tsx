@@ -5,8 +5,7 @@ import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuIte
 import { ChevronDown, ChevronUp, LifeBuoy, PlusCircle, Settings } from "lucide-react";
 import { useState } from "react";
 import Image from "next/image";
-import { cn, securedFetch } from "@/lib/utils";
-import { useToast } from "@/components/ui/use-toast";
+import { Toast, cn, prepareArg, securedFetch } from "@/lib/utils";
 import { useRouter } from "next/navigation";
 import Button from "../components/Button";
 
@@ -17,12 +16,9 @@ interface Props {
     inSettings?: boolean
 }
 
-const prepareArg = (arg: string) => encodeURIComponent(arg.trim())
-
 export default function Header({ graphName, inCreate = false, inSettings = false }: Props) {
     const [open, setOpen] = useState<boolean>(false)
     const router = useRouter()
-    const { toast } = useToast()
     // const [newName, setNewName] = useState<string>("")
 
     // const createGraph = async () => {
@@ -34,22 +30,19 @@ export default function Header({ graphName, inCreate = false, inSettings = false
             (:Rider {name:'Valentino Rossi'})-[:rides]->(:Team {name:'Yamaha'}),
             (:Rider {name:'Dani Pedrosa'})-[:rides]->(:Team {name:'Honda'}),
             (:Rider {name:'Andrea Dovizioso'})-[:rides]->(:Team {name:'Ducati'})`
-            securedFetch(`api/graph/FalkorDB/?query=${query1.trim()}`, {
+            securedFetch(`api/graph/FalkorDB/?query=${prepareArg(query1)}`, {
             method: "GET"
         })
         const query2 = `CREATE
             (:Rider {name:'string'})-[:rides]->(:Team {name:'string'})`
-        securedFetch(`api/graph/FalkorDB_schema/?query=${query2.trim()}`, {
+        securedFetch(`api/graph/FalkorDB_schema/?query=${prepareArg(query2)}`, {
             method: "GET"
         })
     }
 
-    const handelSettings = () => {
+    const handleSettings = () => {
         if (!graphName) {
-            toast({
-                title: "Error",
-                description: "Select a graph first"
-            })
+            Toast("Select a graph first")
             return
         }
         router.push(`/settings/?graphName=${prepareArg(graphName)}`)
@@ -169,7 +162,7 @@ export default function Header({ graphName, inCreate = false, inSettings = false
                             className={cn("flex flex-row gap-2", !graphName && "text-[#57577B]")}
                             title="Settings"
                             type="button"
-                            onClick={handelSettings}
+                            onClick={handleSettings}
                             aria-label="Settings"
                         >
                             <p>Settings</p>

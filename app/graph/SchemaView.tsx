@@ -149,7 +149,7 @@ export default function SchemaView({ schema, onAddEntity, onAddRelation, onDelet
         }
     }
 
-    const handelTap = (e: EventObject) => {
+    const handleTap = (e: EventObject) => {
         const element = e.target.json().data
         setSelectedElement(element)
         dataPanel.current?.expand()
@@ -195,8 +195,8 @@ export default function SchemaView({ schema, onAddEntity, onAddRelation, onDelet
 
                             cy.removeAllListeners()
 
-                            cy.on('tap', 'node', handelTap)
-                            cy.on('tap', 'edge', handelTap)
+                            cy.on('tap', 'node', handleTap)
+                            cy.on('tap', 'edge', handleTap)
                         }}
                     />
                     {

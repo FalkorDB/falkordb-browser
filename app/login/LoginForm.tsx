@@ -55,7 +55,7 @@ export default function LoginForm() {
       params.password = password;
     }
     signIn("credentials", params).then((res?: SignInResponse) => {
-      if (res && res.error) {
+      if (res?.error) {
         setError(true);
       } else {
         router.push("/graph");

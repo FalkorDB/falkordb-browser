@@ -3,10 +3,9 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { cn, securedFetch } from "@/lib/utils"
+import { Toast, cn, prepareArg, securedFetch } from "@/lib/utils"
 import { ChevronDown, ChevronUp, Download, Trash2, UploadIcon } from "lucide-react"
 import { Dispatch, KeyboardEvent, SetStateAction, useState } from "react"
-import { useToast } from "@/components/ui/use-toast"
 import DeleteGraph from "./DeleteGraph"
 import Upload from "./Upload"
 
@@ -29,9 +28,6 @@ export default function Combobox({ isSelectGraph, disabled = false, inTable, typ
   const [editName, setEditName] = useState<string>("")
   const [isUploadOpen, setIsUploadOpen] = useState<boolean>(false)
   const [isDeleteOpen, setIsDeleteOpen] = useState<boolean>(false)
-  const { toast } = useToast()
-
-  const prepareArg = (arg: string) => encodeURIComponent(arg.trim())
 
   const onExport = async () => {
     const result = await securedFetch(`api/graph/${prepareArg(selectedValue)}/export`, {
@@ -40,10 +36,7 @@ export default function Combobox({ isSelectGraph, disabled = false, inTable, typ
 
     if (!result.ok) {
       const json = await result.json()
-      toast({
-        title: "Error",
-        description: json.message || "Something went wrong"
-      })
+      Toast(json.message)
       return
     }
 
@@ -58,10 +51,7 @@ export default function Combobox({ isSelectGraph, disabled = false, inTable, typ
       link.parentNode?.removeChild(link)
       window.URL.revokeObjectURL(url)
     } catch (e) {
-      toast({
-        title: "Error",
-        description: (e as Error).message || "Something went wrong"
-      })
+      Toast((e as Error).message)
     }
   }
 
@@ -81,10 +71,7 @@ export default function Combobox({ isSelectGraph, disabled = false, inTable, typ
     })
 
     if (!result.ok) {
-      toast({
-        title: "Error",
-        description: "Failed to edit graph",
-      })
+      Toast("Failed to edit graph")
       return
     }
     setEditable("")

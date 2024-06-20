@@ -9,16 +9,13 @@ import { editor } from "monaco-editor";
 import { ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { ImperativePanelHandle } from "react-resizable-panels";
 import { ChevronDown, ChevronLeft, Maximize2 } from "lucide-react"
-import { cn, securedFetch } from "@/lib/utils";
-import { useToast } from "@/components/ui/use-toast";
+import { Toast, cn, prepareArg, securedFetch } from "@/lib/utils";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import { Category, Graph } from "./model";
 import DataPanel from "./DataPanel";
 import Labels from "./labels";
 import Toolbar from "./toolbar";
 import { Query } from "./Selector";
-
-const prepareArg = (arg: string) => encodeURIComponent(arg.trim())
 
 const monacoOptions: editor.IStandaloneEditorConstructionOptions = {
     renderLineHighlight: "none",
@@ -150,7 +147,6 @@ const GraphView = forwardRef(({ graphName, setQueries, schema }: {
     setQueries?: Dispatch<SetStateAction<Query[]>>,
 }, ref) => {
 
-    const { toast } = useToast()
     const [graph, setGraph] = useState<Graph>(Graph.empty())
     const [query, setQuery] = useState<string>("")
     const [selectedElement, setSelectedElement] = useState<NodeDefinition | EdgeDefinition>();
@@ -185,7 +181,7 @@ const GraphView = forwardRef(({ graphName, setQueries, schema }: {
         });
     };
 
-    const handelEditorDidMount = (e: editor.IStandaloneCodeEditor) => {
+    const handleEditorDidMount = (e: editor.IStandaloneCodeEditor) => {
         editorRef.current = e
     }
 
@@ -203,10 +199,7 @@ const GraphView = forwardRef(({ graphName, setQueries, schema }: {
     const runQuery = async () => {
 
         if (!graphName) {
-            toast({
-                title: "Error",
-                description: "Select a graph first"
-            })
+            Toast("Select a graph first")
             return
         }
 
@@ -216,10 +209,7 @@ const GraphView = forwardRef(({ graphName, setQueries, schema }: {
         const json = await result.json()
 
         if (!result.ok) {
-            toast({
-                title: "Error",
-                description: json.message || "Something went wrong"
-            })
+            Toast(json.message)
             return
         }
         if (!setQueries) return
@@ -373,10 +363,7 @@ const GraphView = forwardRef(({ graphName, setQueries, schema }: {
         const category = entityAttributes.find(row => row[0] === "category")
         const filteredAttributes = entityAttributes.filter(row => row[0] !== "category")
         if (!category) {
-            toast({
-                title: "Error",
-                description: "Missing Category"
-            })
+            Toast("Missing Category")
             return
         }
         const q = `CREATE (n:${category[1]} {${filteredAttributes.map(([k, v]) => `${k}: '${v}'`)}}) return n`
@@ -392,10 +379,7 @@ const GraphView = forwardRef(({ graphName, setQueries, schema }: {
         const label = relationAttributes.find(row => row[0] === "label")
         const filteredAttributes = relationAttributes.filter(row => row[0] !== "label")
         if (!label) {
-            toast({
-                title: "Error",
-                description: "Missing Category"
-            })
+            Toast("Missing Label")
             return
         }
         const q = `CREATE (e:${label[1]} {${filteredAttributes.map(([k, v]) => `${k}: '${v}'`)}}) return e`
@@ -426,7 +410,7 @@ const GraphView = forwardRef(({ graphName, setQueries, schema }: {
                                 onChange={(val) => setQuery(val || "")}
                                 theme="custom-theme"
                                 beforeMount={handleEditorWillMount}
-                                onMount={handelEditorDidMount}
+                                onMount={handleEditorDidMount}
                             />
                         </div>
                         <button
