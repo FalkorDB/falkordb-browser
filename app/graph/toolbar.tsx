@@ -16,6 +16,8 @@ const excludedProperties = new Set([
     "id",
     "_id",
     "color",
+    "category",
+    "label",
 ])
 
 export default function Toolbar({ schema, chartRef, onDeleteElementGraph, onDeleteElementSchema, onAddEntityGraph, onAddRelationGraph, onAddEntitySchema, onAddRelationSchema, deleteDisable }: {
@@ -74,13 +76,20 @@ export default function Toolbar({ schema, chartRef, onDeleteElementGraph, onDele
         }
     }
 
+    const handelCloseDialog = () => {
+        setEntityAttributes([])
+        setRelationAttributes([])
+        setCategory("")
+        setRelation("")
+    }
+
     return (
         <div className="flex flex-row items-center gap-6">
             <div className="flex flex-row gap-8 items-center">
                 {
                     onAddEntityGraph && onAddRelationGraph && onDeleteElementGraph ?
                         <div className="flex flex-row gap-4">
-                            <Dialog>
+                            <Dialog onOpenChange={(open) => !open && handelCloseDialog()}>
                                 <DialogTrigger disabled={!schema?.Id} asChild>
                                     <Button
                                         variant="Secondary"
@@ -150,7 +159,7 @@ export default function Toolbar({ schema, chartRef, onDeleteElementGraph, onDele
                                     </form>
                                 </DialogContent>
                             </Dialog>
-                            <Dialog>
+                            <Dialog onOpenChange={(open) => !open && handelCloseDialog()}>
                                 <DialogTrigger disabled={!schema?.Id} asChild>
                                     <Button
                                         variant="Secondary"

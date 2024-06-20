@@ -186,6 +186,13 @@ const GraphView = forwardRef(({ graphName, setQueries, schema }: {
     }
 
     useEffect(() => {
+        if (chartRef.current) {
+            const layout = chartRef.current.layout(LAYOUT);
+            layout.run();
+        }
+    }, [graph.Elements]);
+
+    useEffect(() => {
         if (!editorRef.current) return
         editorRef.current.layout();
     }, [isCollapsed])

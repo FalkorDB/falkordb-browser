@@ -115,6 +115,13 @@ export default function SchemaView({ schema, onAddEntity, onAddRelation, onDelet
         dataPanel.current?.collapse()
     }, [])
 
+    useEffect(() => {
+        if (chartRef.current) {
+            const layout = chartRef.current.layout(LAYOUT);
+            layout.run();
+        }
+    }, [schema.Elements]);
+
     const onCategoryClick = (category: Category) => {
         const chart = chartRef.current
         if (chart) {
