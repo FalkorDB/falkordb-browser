@@ -99,7 +99,7 @@ export default function Toolbar({ schema, chartRef, onDeleteElementGraph, onDele
                                     />
                                 </DialogTrigger>
                                 <DialogContent className="w-[25%] min-h-[40%] flex flex-col gap-4 p-0" displayClose>
-                                    <DialogHeader className="h-[10%] flex flex-row justify-between items-center bg-[#272746] text-white p-8">
+                                    <DialogHeader className="h-[10%] flex flex-row justify-between items-center bg-[#272746] text-white p-8 border-b-2">
                                         <DialogTitle>Add Entity</DialogTitle>
                                         <DialogClose asChild>
                                             <button
@@ -171,7 +171,7 @@ export default function Toolbar({ schema, chartRef, onDeleteElementGraph, onDele
                                     />
                                 </DialogTrigger>
                                 <DialogContent className="w-[25%] min-h-[40%] flex flex-col p-0" displayClose>
-                                    <DialogHeader className="h-[10%] flex flex-row justify-between items-center border-b border-gray-200 bg-[#272746] text-white p-8">
+                                    <DialogHeader className="h-[10%] flex flex-row justify-between items-center border-b-2 bg-[#272746] text-white p-8">
                                         <DialogTitle>Add Relation</DialogTitle>
                                         <DialogClose asChild>
                                             <button
