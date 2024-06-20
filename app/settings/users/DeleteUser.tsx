@@ -1,10 +1,9 @@
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { toast } from "@/components/ui/use-toast";
 import { User } from "@/app/api/user/model";
 import { Trash2 } from "lucide-react";
 import { Dispatch, SetStateAction } from "react";
 import Button from "@/app/components/Button";
-import { securedFetch } from "@/lib/utils";
+import { Toast, securedFetch } from "@/lib/utils";
 
 interface DeleteUserProps {
     // eslint-disable-next-line react/require-default-props
@@ -27,10 +26,7 @@ export default function DeleteUser({ isDeleteSelected, users, setUsers }: Delete
         })
 
         if (response.ok) {
-            toast({
-                title: "Success",
-                description: "Users deleted",
-            })
+            Toast("Success", "User deleted successfully")
             setUsers(prev => prev.filter(user => !users.find(u => user.username === u.username)))
         }
     }

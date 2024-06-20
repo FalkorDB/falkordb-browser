@@ -4,10 +4,9 @@ import { FormEvent, useEffect, useRef, useState } from "react";
 import { Dialog, DialogClose, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { ChevronDown, ChevronUp, X } from "lucide-react";
 import { Editor } from "@monaco-editor/react";
-import { useToast } from "@/components/ui/use-toast";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { editor } from "monaco-editor";
-import { cn, securedFetch } from "@/lib/utils";
+import { Toast, cn, prepareArg, securedFetch } from "@/lib/utils";
 import Combobox from "../components/combobox";
 import { Graph } from "./model";
 import SchemaView from "./SchemaView";
@@ -35,11 +34,8 @@ export default function Selector({ onChange, queries }: {
     const [nodesCount, setNodesCount] = useState<boolean>(false);
     const [query, setQuery] = useState<Query>();
     const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null)
-    const { toast } = useToast();
 
-    const prepareArg = (arg: string) => encodeURIComponent(arg.trim())
-
-    const handelViewSchema = async () => {
+    const handleViewSchema = async () => {
 
     }
 
@@ -75,11 +71,11 @@ export default function Selector({ onChange, queries }: {
         run()
     }, [selectedValue])
 
-    const handelEditorDidMount = (e: editor.IStandaloneCodeEditor) => {
+    const handleEditorDidMount = (e: editor.IStandaloneCodeEditor) => {
         editorRef.current = e
     }
 
-    const handelOnChange = async (name: string) => {
+    const handleOnChange = async (name: string) => {
         const q = 'MATCH (n)-[e]-(m) return n,e,m'
         const result = await securedFetch(`api/graph/${name}_schema/?query=${q}`, {
             method: "GET"
@@ -88,10 +84,7 @@ export default function Selector({ onChange, queries }: {
         const json = await result.json()
 
         if (!result.ok) {
-            toast({
-                title: "Error",
-                description: json.message || "Schema not found"
-            })
+            Toast(json.message)
             return
         }
 
@@ -107,10 +100,7 @@ export default function Selector({ onChange, queries }: {
         })
 
         if (!result.ok) {
-            toast({
-                title: "Error",
-                description: "Something went wrong"
-            })
+           Toast()
         }
 
         setDialogOpen(false)
@@ -124,11 +114,7 @@ export default function Selector({ onChange, queries }: {
         })
 
         if (!result.ok) {
-            const json = await result.json()
-            toast({
-                title: "Error",
-                description: json.message || "Something went wrong"
-            })
+            Toast("Error while exporting data")
             return
         }
 
@@ -143,10 +129,7 @@ export default function Selector({ onChange, queries }: {
             link.parentNode?.removeChild(link)
             window.URL.revokeObjectURL(url)
         } catch (e) {
-            toast({
-                title: "Error",
-                description: (e as Error).message || "Something went wrong"
-            })
+            Toast("Error while exporting data")
         }
     }
 
@@ -155,7 +138,7 @@ export default function Selector({ onChange, queries }: {
     return (
         <div className="flex flex-col gap-4">
             <div className="flex flex-row justify-between items-center">
-                <Combobox isSelectGraph options={options} setOptions={setOptions} selectedValue={selectedValue} setSelectedValue={handelOnChange} />
+                <Combobox isSelectGraph options={options} setOptions={setOptions} selectedValue={selectedValue} setSelectedValue={handleOnChange} />
                 <div className="flex flex-row gap-16 text-[#9192FD]">
                     <p className={cn(!selectedValue && "text-[#57577B]")}>Versions</p>
                     <button
@@ -327,7 +310,7 @@ export default function Selector({ onChange, queries }: {
                                                     }}
                                                     value={query?.text}
                                                     onChange={(q) => setQuery(({ text: q || "", metadata: query?.metadata || [] }))}
-                                                    onMount={handelEditorDidMount}
+                                                    onMount={handleEditorDidMount}
                                                 />
                                             </div>
                                         }
@@ -383,7 +366,7 @@ export default function Selector({ onChange, queries }: {
                                 className="disabled:text-[#57577B]"
                                 title="View Schema"
                                 type="button"
-                                onClick={handelViewSchema}
+                                onClick={handleViewSchema}
                             >
                                 <p>View Schema</p>
                             </button>

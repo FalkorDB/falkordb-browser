@@ -8,17 +8,22 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
-export function securedFetch(  input: string | URL | globalThis.Request,  init?: RequestInit): Promise<Response> {    
+// eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/default-param-last
+export function Toast(message?: string, type?: string) {
+  toast({
+    title: type || "Error",
+    description: message || "Something Went Wrong",
+  })
+}
+
+export function securedFetch(input: string | URL | globalThis.Request, init?: RequestInit): Promise<Response> {
   return fetch(input, init).then((response) => {
 
     const { status } = response;
 
-    if (status >= 300) {     
+    if (status >= 300) {
       response.text().then((message) => {
-        toast({
-          title: "Error",
-          description: message,
-        })
+        Toast(message)
       }).then(() => {
         if (status === 401 || status >= 500) {
           signOut({ callbackUrl: '/login' })
@@ -30,4 +35,6 @@ export function securedFetch(  input: string | URL | globalThis.Request,  init?:
   })
 }
 
-
+export function prepareArg(arg: string) {
+  return encodeURIComponent(arg.trim())
+}

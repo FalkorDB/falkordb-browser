@@ -19,8 +19,7 @@ export async function GET(request: NextRequest, { params } : { params : { graph:
             graphId
         )
 
-        if (!result) throw new Error("something went wrong")
-
+        if (!result) throw new Error(`Failed to retrieve graph data for ID: ${graphId}`)
 
         return NextResponse.json({ result }, { status: 200 })
     } catch (err) {

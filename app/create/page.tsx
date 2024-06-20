@@ -2,12 +2,11 @@
 
 import { AlertCircle, ChevronLeft, ChevronRight, PlusCircle } from "lucide-react";
 import { FormEvent, useEffect, useState } from "react";
-import { useToast } from "@/components/ui/use-toast";
 import { useRouter } from "next/navigation";
 import { Progress } from "@/components/ui/progress";
 import useSWR from "swr";
 import { EdgeDataDefinition, NodeDataDefinition } from "cytoscape";
-import { securedFetch } from "@/lib/utils";
+import { Toast, prepareArg, securedFetch } from "@/lib/utils";
 import Header from "../graph/Header";
 import { Graph } from "../graph/model";
 import Input from "../components/Input";
@@ -15,8 +14,6 @@ import Button from "../components/Button";
 import GraphView from "../graph/GraphView";
 import SchemaView from "../graph/SchemaView";
 import Dropzone from "../components/Dropzone";
-
-const prepareArg = (arg: string) => encodeURIComponent(arg.trim())
 
 type CurrentTab = "loadSchema" | "schema" | "graph"
 
@@ -34,17 +31,42 @@ export default function Create() {
     const [graphName, setGraphName] = useState<string>("")
     const [progress, setProgress] = useState<number>(0)
     const [openaiKey, setOpenaiKey] = useState<string>("")
-    const { toast } = useToast()
     const router = useRouter()
 
     useEffect(() => {
         if (progress !== 100) return
-
+        debugger
         const run = async () => {
+            const q = "MATCH (n)-[e]-(m) RETURN n,e,m"
 
+            const res = await securedFetch(`api/graph/${prepareArg(graphName)}_schema/?query=${prepareArg(q)}`, {
+                method: "GET"
+            })
+
+            if (!res.ok) {
+                Toast()
+                setProgress(0)
+                setCurrentTab(null)
+                setFilesPath([])
+                return
+            }
+
+            const j = await res.json()
+
+            if (!j.result.data.length) {
+                Toast()
+                setProgress(0)
+                setCurrentTab(null)
+                setFilesPath([])
+                return
+            }
+
+            setProgress(0)
+            setSchema(Graph.create(`${graphName}_schema`, j.result))
+            setCurrentTab("schema")
         }
         run()
-    }, [progress, toast])
+    }, [progress])
 
     const fetcher = async (url: string) => {
 
@@ -53,51 +75,13 @@ export default function Create() {
         })
 
         if (!result.ok) {
-            toast({
-                title: "Error",
-                description: "Something went wrong"
-            })
+            Toast()
             return
         }
 
-        if (progress === 100) {
-            const q = "MATCH (n)-[e]-(m) RETURN n,e,m"
-
-            const res = await securedFetch(`api/graph/${prepareArg(graphName)}_schema/?query=${prepareArg(q)}`, {
-                method: "GET"
-            })
-
-            if (!res.ok) {
-                toast({
-                    title: "Error",
-                    description: "Something went wrong"
-                })
-                setProgress(0)
-                setCurrentTab(null)
-                setFilesPath([])
-                return
-            }
-
-            const json = await result.json()
-
-            if (!json.result.data.length) {
-                toast({
-                    title: "Error",
-                    description: "Something went wrong"
-                })
-                setProgress(0)
-                setCurrentTab(null)
-                setFilesPath([])
-                return
-            }
-
-            setProgress(0)
-            setSchema(Graph.create(`${graphName}_schema`, json.result))
-            setCurrentTab("schema")
-        }
-
         const json = await result.json()
-        setProgress(prev => prev + json.progress)
+
+        setProgress(prev => json.progress + prev)
     }
 
     useSWR((currentTab === "loadSchema" && progress < 100) && `api/graph/${graphName}/?ID=${ID}`, fetcher, { refreshInterval: 2500 })
@@ -121,14 +105,11 @@ export default function Create() {
             });
 
             if (!result.ok) {
-                toast({
-                    title: "Error",
-                    description: "Something went wrong"
-                });
-                return "";
+                Toast()
+                return ""
             }
 
-            const json = await result.json();
+            const json = await result.json()
 
             return json.path
         }))
@@ -145,13 +126,11 @@ export default function Create() {
 
 
         if (!result.ok) {
-            toast({
-                title: "Error",
-                description: "Create Schema Failed"
-            })
+            Toast()
             setFilesPath([])
             setProgress(0)
             setCurrentTab(null)
+            return
         }
 
         const json = await result.json()
@@ -167,16 +146,13 @@ export default function Create() {
         })
 
         if (!result.ok) {
-            toast({
-                title: "Error",
-                description: "Something went wrong"
-            })
+            Toast()
             return
         }
         setCurrentTab("graph")
     }
 
-    const handelGoToMain = () => {
+    const handleGoToMain = () => {
         router.push("/graph")
     }
 
@@ -188,10 +164,7 @@ export default function Create() {
         })
 
         if (!result.ok) {
-            toast({
-                title: "Error",
-                description: "Something went wrong"
-            })
+            Toast("Faild to delete")
             return
         }
         schema.Elements = schema.Elements.filter(e => e.data.id !== id)
@@ -214,10 +187,7 @@ export default function Create() {
         })
 
         if (!ok) {
-            toast({
-                title: "Error",
-                description: "Something went wrong"
-            })
+            Toast("Failed to set label")
             return ok
         }
 
@@ -245,10 +215,7 @@ export default function Create() {
         })
 
         if (!ok) {
-            toast({
-                title: "Error",
-                description: "Something went wrong"
-            })
+            Toast("Failed to set property")
             return ok
         }
 
@@ -274,10 +241,7 @@ export default function Create() {
         const json = await result.json()
 
         if (!result.ok) {
-            toast({
-                title: "Error",
-                description: json.message || "Something went wrong"
-            })
+            Toast(json.message || "Failed to remove property")
             return result.ok
         }
 
@@ -293,7 +257,7 @@ export default function Create() {
         return result.ok
     }
 
-    const getCurrentTab = async () => {
+    const getCurrentTab = () => {
         switch (currentTab) {
             case "loadSchema":
                 return (
@@ -338,12 +302,9 @@ export default function Create() {
                     setNodesCount(data.nodes)
                     setEdgesCount(data.edges)
                 }).catch(() => {
-                    toast({
-                        title: "Error",
-                        description: "Something went wrong"
-                    })
+                    Toast("Failed to get graph metadata")
                 })
-                
+
                 return (
                     <div className="grow flex flex-col gap-8">
                         <div className="p-4 bg-[#2C2C4C] text-[#FFFFFF] flex flex-row gap-12 items-center rounded-lg">
@@ -368,7 +329,7 @@ export default function Create() {
                                 variant="Large"
                                 label="Go To Main Screen"
                                 type="button"
-                                onClick={handelGoToMain}
+                                onClick={handleGoToMain}
                             />
                         </div>
                     </div>

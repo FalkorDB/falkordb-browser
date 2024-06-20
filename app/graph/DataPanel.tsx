@@ -1,11 +1,10 @@
 'use client'
 
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { cn } from "@/lib/utils";
+import { Toast, cn } from "@/lib/utils";
 import { EdgeDataDefinition, NodeDataDefinition } from "cytoscape";
 import { ChevronRight, MinusCircle, PlusCircle, Trash2 } from "lucide-react";
 import { KeyboardEvent, useEffect, useRef, useState } from "react";
-import { useToast } from "@/components/ui/use-toast";
 import Button from "../components/Button";
 
 /* eslint-disable react/require-default-props */
@@ -39,67 +38,73 @@ export default function DataPanel({ obj, onExpand, setProperty, setPropertySchem
     const [schemaVal, setSchemaVal] = useState<string[]>([])
     const [newLabel, setNewLabel] = useState<string>("")
     const [key, setKey] = useState<string>("")
+    const addValueRef = useRef<HTMLDivElement>(null)
     const type = obj.source ? "edge" : "node"
     const label = (type === "edge" ? obj.label : obj.category) || "label"
-    const addValueRef = useRef<HTMLDivElement>(null)
     const isHeader = Object.entries(obj).filter((row) => Array.isArray(row[1])).length > 0
-    const { toast } = useToast()
 
     useEffect(() => {
         if (!isAddValue) return
         addValueRef.current?.focus()
     }, [isAddValue])
 
-    const onKeyDownSchema = async (e: KeyboardEvent<HTMLTableCellElement>) => {
-
-        e.preventDefault()
+    const onKeyDownSchema = async (e: KeyboardEvent<HTMLDivElement>) => {
 
         if (!setPropertySchema) return
 
-        if (e.code === "Escape") {
-            setIsAddValue(false)
-        }
-
-        if (e.code !== "Enter") return
-
-
-        if (schemaVal.length === 4 || !key) {
-            toast({
-                title: "Error",
-                description: `${!key ? "Key" : "Value"} cannot be empty`
-            })
-        }
-        const success = await setPropertySchema(key, schemaVal)
-        if (success) {
-            const ob = obj
-            ob[key] = schemaVal
-        }
-        setSchemaVal([])
-        setKey("")
-        setIsAddValue(false)
-    }
-
-    const onKeyDown = async (e: KeyboardEvent<HTMLTableCellElement>) => {
-        if (!setProperty) return
         if (e.code === "Escape") {
             e.preventDefault()
             setEditable("")
             setIsAddValue(false)
         }
+
         if (e.code !== "Enter") return
+
         e.preventDefault()
-        if (!val || !key) {
-            toast({
-                title: "Error",
-                description: `${!key ? "Key" : "Value"} cannot be empty`
-            })
+
+        if (schemaVal.length === 4 || !key) {
+            Toast("Error",  `${!key ? "Key" : "Value"} cannot be empty`)
             return
         }
+        const success = await setPropertySchema(key, schemaVal)
+
+        if (success) {
+            const ob = obj
+            ob[key] = schemaVal
+        }
+
+        setSchemaVal([])
+        setEditable("")
+        setKey("")
+        setIsAddValue(false)
+    }
+
+    const onKeyDown = async (e: KeyboardEvent<HTMLDivElement>) => {
+
+        if (!setProperty) return
+
+        if (e.code === "Escape") {
+            e.preventDefault()
+            setEditable("")
+            setIsAddValue(false)
+        }
+
+        if (e.code !== "Enter") return
+
+        e.preventDefault()
+
+        if (!val || !key) {
+            Toast("Error",  `${!key ? "Key" : "Value"} cannot be empty`)
+            return
+        }
+
         const success = await setProperty(key, val)
+
         if (success) {
             const ob = obj
             ob[key] = val
         }
+
         setVal("")
         setKey("")
         setEditable("")
@@ -162,10 +167,10 @@ export default function DataPanel({ obj, onExpand, setProperty, setPropertySchem
                 </div>
                 <p className="flex flex-row text-white">{Object.keys(obj).filter((v) => !excludedProperties.has(v)).length} Attributes</p>
             </div>
-            <div className="h-1 grow flex flex-col justify-between items-start font-medium overflow-auto">
+            <div className="h-1 grow flex flex-col justify-between items-start font-medium overflow-auto overflow-y-hidden">
                 <Table>
                     {
-                        setProperty &&
+                        (setProperty || setPropertySchema) &&
                         <TableCaption className="mt-11 py-2.5 px-6 text-start">
                             <Button
                                 className="border border-[#232341]"
@@ -247,13 +252,15 @@ export default function DataPanel({ obj, onExpand, setProperty, setPropertySchem
                                                                         ref.focus()
                                                                     }
                                                                 }}
-                                                                onKeyDown={onKeyDown}
-                                                                onInput={(e) => {
+                                                                onKeyDown={(e) => {
                                                                     setKey(strKey)
-                                                                    setVal(e.currentTarget.textContent || "")
+                                                                    onKeyDownSchema(e)
+                                                                }}
+                                                                onInput={(e) => {
+                                                                    schemaVal[i] = e.currentTarget.textContent || ""
                                                                 }}
                                                                 onClick={() => {
-                                                                    if (!setProperty) return
+                                                                    if (!setPropertySchema) return
                                                                     setEditable(`${index}-${i}`)
                                                                 }}
                                                                 onBlur={() => setEditable("")}
@@ -276,9 +283,11 @@ export default function DataPanel({ obj, onExpand, setProperty, setPropertySchem
                                                                 ref.focus()
                                                             }
                                                         }}
-                                                        onKeyDown={onKeyDown}
-                                                        onInput={(e) => {
+                                                        onKeyDown={(e) => {
                                                             setKey(strKey)
+                                                            onKeyDown(e)
+                                                        }}
+                                                        onInput={(e) => {
                                                             setVal(e.currentTarget.textContent || "")
                                                         }}
                                                         onClick={() => {
@@ -316,56 +325,40 @@ export default function DataPanel({ obj, onExpand, setProperty, setPropertySchem
                                         <div
                                             className="p-4 rounded-lg bg-[#1F1F3D] hover:bg-[#2E2E51] focus:border focus:border-[#5D5FEF]"
                                             contentEditable
-                                            onInput={(e) => setSchemaVal(prev => {
-                                                const p = prev
-                                                p[0] = e.currentTarget.textContent || ""
-                                                return prev
-                                            })}
+                                            onInput={(e) => { schemaVal[0] = e.currentTarget.textContent || "" }}
                                             onKeyDown={onKeyDownSchema}
-                                        />
+                                            />
                                     </TableCell>
                                     <TableCell
                                         className="p-4"
-                                    >
+                                        >
                                         {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions */}
                                         <div
                                             className="p-4 rounded-lg bg-[#1F1F3D] hover:bg-[#2E2E51] focus:border focus:border-[#5D5FEF]"
                                             contentEditable
-                                            onInput={(e) => setSchemaVal(prev => {
-                                                const p = prev
-                                                p[1] = e.currentTarget.textContent || ""
-                                                return prev
-                                            })}
+                                            onInput={(e) => { schemaVal[1] = e.currentTarget.textContent || "" }}
                                             onKeyDown={onKeyDownSchema}
-                                        />
+                                            />
                                     </TableCell>
                                     <TableCell
                                         className="p-4"
-                                    >
+                                        >
                                         {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions */}
                                         <div
                                             className="p-4 rounded-lg bg-[#1F1F3D] hover:bg-[#2E2E51] focus:border focus:border-[#5D5FEF]"
                                             contentEditable
-                                            onInput={(e) => setSchemaVal(prev => {
-                                                const p = prev
-                                                p[2] = e.currentTarget.textContent || ""
-                                                return prev
-                                            })}
+                                            onInput={(e) => { schemaVal[2] = e.currentTarget.textContent || "" }}
                                             onKeyDown={onKeyDownSchema}
-                                        />
+                                            />
                                     </TableCell>
                                     <TableCell
                                         className="p-4"
-                                    >
+                                        >
                                         {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions */}
                                         <div
                                             className="p-4 rounded-lg bg-[#1F1F3D] hover:bg-[#2E2E51] focus:border focus:border-[#5D5FEF]"
                                             contentEditable
-                                            onInput={(e) => setSchemaVal(prev => {
-                                                const p = prev
-                                                p[3] = e.currentTarget.textContent || ""
-                                                return prev
-                                            })}
+                                            onInput={(e) => { schemaVal[3] = e.currentTarget.textContent || "" }}
                                             onKeyDown={onKeyDownSchema}
                                         />
                                     </TableCell>
