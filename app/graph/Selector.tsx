@@ -20,7 +20,7 @@ export interface Query {
 }
 
 export default function Selector({ onChange, queries }: {
-    onChange: (graphName: string) => void
+    onChange: (selectedGraphName: string, selectedSchema: Graph) => void
     queries: Query[]
 }) {
 
@@ -39,27 +39,9 @@ export default function Selector({ onChange, queries }: {
 
     const prepareArg = (arg: string) => encodeURIComponent(arg.trim())
 
-    useEffect(() => {
-        const run = async () => {
-            const schemaName = `${selectedValue}-schema`
-            const q = 'MATCH (n)-[e]-(m) return n,e,m'
-            const result = await fetch(`api/graph/${schemaName}/?query=${q}`, {
-                method: "GET"
-            })
+    const handelViewSchema = async () => {
 
-            const json = await result.json()
-
-            if (!result.ok) {
-                toast({
-                    title: "Error",
-                    description: json.message || "Schema not found"
-                })
-                return
-            }
-            setSchema(Graph.create(schemaName, json.result))
-        }
-        run()
-    }, [selectedValue, toast])
+    }
 
     useEffect(() => {
         const run = async () => {
@@ -97,9 +79,25 @@ export default function Selector({ onChange, queries }: {
         editorRef.current = e
     }
 
-    const handelOnChange = (name: string) => {
+    const handelOnChange = async (name: string) => {
+        const q = 'MATCH (n)-[e]-(m) return n,e,m'
+        const result = await fetch(`api/graph/${name}_schema/?query=${q}`, {
+            method: "GET"
+        })
+
+        const json = await result.json()
+
+        if (!result.ok) {
+            toast({
+                title: "Error",
+                description: json.message || "Schema not found"
+            })
+            return
+        }
+
         setSelectedValue(name)
-        onChange(name)
+        setSchema(Graph.create(name, json.result))
+        onChange(name, Graph.create(name, json.result))
     }
 
     const onDuplicate = async (e: FormEvent) => {
@@ -385,6 +383,7 @@ export default function Selector({ onChange, queries }: {
                                 className="disabled:text-[#57577B]"
                                 title="View Schema"
                                 type="button"
+                                onClick={handelViewSchema}
                             >
                                 <p>View Schema</p>
                             </button>

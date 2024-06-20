@@ -143,25 +143,18 @@ function getStyle() {
     return style
 }
 
-export interface GraphViewRef {
-    expand: (elements: ElementDefinition[]) => void
-}
-
-const GraphView = forwardRef(({ graphName, setQueries }: {
+const GraphView = forwardRef(({ graphName, setQueries, schema }: {
     graphName: string,
+    schema: Graph,
     // eslint-disable-next-line react/require-default-props
     setQueries?: Dispatch<SetStateAction<Query[]>>,
 }, ref) => {
 
     const { toast } = useToast()
     const [graph, setGraph] = useState<Graph>(Graph.empty())
-    const [schema, setSchema] = useState<Graph>(Graph.empty())
     const [query, setQuery] = useState<string>("")
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const [selectedElement, setSelectedElement] = useState<NodeDefinition | EdgeDefinition>();
     const [isCollapsed, setIsCollapsed] = useState<boolean>(true);
-
-    // A reference to the chart container to allowing zooming and editing
     const chartRef = useRef<cytoscape.Core | null>(null)
     const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null)
     const dataPanel = useRef<ImperativePanelHandle>(null)
@@ -200,17 +193,6 @@ const GraphView = forwardRef(({ graphName, setQueries }: {
         if (!editorRef.current) return
         editorRef.current.layout();
     }, [isCollapsed])
-
-    useEffect(() => {
-        if (!graphName) return
-        const run = async () => {
-            const result = await fetch(`api/schema/${graphName}-schema`)
-            if (!result.ok) return
-            const json = await result.json()
-            setSchema(Graph.create(`${graphName}-schema`, json.result))
-        }
-        run()
-    }, [graphName])
 
     useEffect(() => {
         dataPanel.current?.collapse()
@@ -372,7 +354,7 @@ const GraphView = forwardRef(({ graphName, setQueries }: {
     const onSetLabel = async (label: string) => {
         const isNode = !!selectedElement?.data.category
         const id = selectedElement?.data.id
-        const q = `MATCH (e) WHERE id(e) = ${id} `
+        const q = `MATCH (n) WHERE id(n) = ${id} `
         const success = (await fetch(`api/graph/${prepareArg(graphName)}/?query=${prepareArg(q)}`, {
             method: "GET"
         })).ok

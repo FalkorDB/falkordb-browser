@@ -6,6 +6,7 @@ import { useToast } from "@/components/ui/use-toast";
 import { useRouter } from "next/navigation";
 import { Progress } from "@/components/ui/progress";
 import useSWR from "swr";
+import { EdgeDataDefinition, NodeDataDefinition } from "cytoscape";
 import Header from "../graph/Header";
 import { Graph } from "../graph/model";
 import Input from "../components/Input";
@@ -18,9 +19,11 @@ const prepareArg = (arg: string) => encodeURIComponent(arg.trim())
 
 type CurrentTab = "loadSchema" | "schema" | "graph"
 
+type ElementDataDefinition = NodeDataDefinition | EdgeDataDefinition
+
 export default function Create() {
 
-    const [currentTab, setCurrentTab] = useState<CurrentTab | null>("schema")
+    const [currentTab, setCurrentTab] = useState<CurrentTab | null>()
     const [schema, setSchema] = useState<Graph>(Graph.empty())
     const [ID, setID] = useState()
     const [files, setFiles] = useState<File[]>([])
@@ -60,35 +63,6 @@ export default function Create() {
     }, [graphName, toast])
 
     useEffect(() => {
-        if (!filesPath) return
-
-        const run = async () => {
-            const result = await fetch(`api/graph/${prepareArg(graphName)}/?type=detect_schema&key=${prepareArg(openaiKey)}`, {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json"
-                },
-                body: JSON.stringify(filesPath)
-            })
-
-
-            if (!result.ok) {
-                toast({
-                    title: "Error",
-                    description: "Create Schema Failed"
-                })
-                setProgress(0)
-                setCurrentTab(null)
-            }
-            const json = await result.json()
-
-            setID(json.ID)
-        }
-
-        run()
-    }, [filesPath, toast])
-
-    useEffect(() => {
         if (progress !== 100) return
 
         const run = async () => {
@@ -105,6 +79,7 @@ export default function Create() {
                 })
                 setProgress(0)
                 setCurrentTab(null)
+                setFilesPath([])
                 return
             }
 
@@ -117,11 +92,12 @@ export default function Create() {
                 })
                 setProgress(0)
                 setCurrentTab(null)
+                setFilesPath([])
                 return
             }
 
             setProgress(0)
-            setSchema(Graph.create(`${graphName}-schema`, json.result))
+            setSchema(Graph.create(`${graphName}_schema`, json.result))
             setCurrentTab("schema")
         }
         run()
@@ -142,7 +118,6 @@ export default function Create() {
         }
 
         const json = await result.json()
-
         setProgress(prev => prev + json.progress)
     }
 
@@ -181,6 +156,28 @@ export default function Create() {
 
         setFilesPath(newFilesPath)
 
+        const result = await fetch(`api/graph/${prepareArg(graphName)}/?type=detect_schema&key=${prepareArg(openaiKey)}`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify(newFilesPath)
+        })
+
+
+        if (!result.ok) {
+            toast({
+                title: "Error",
+                description: "Create Schema Failed"
+            })
+            setFilesPath([])
+            setProgress(0)
+            setCurrentTab(null)
+        }
+
+        const json = await result.json()
+
+        setID(json.ID)
     }
 
     const handleCreateGraph = async () => {
@@ -204,20 +201,117 @@ export default function Create() {
         router.push("/graph")
     }
 
-    const onDelete = () => {
+    const onDelete = async (selectedValue: ElementDataDefinition) => {
+        const { id } = selectedValue
+        const q = `MATCH (n) WHERE ID(n) = ${id} delete n`
+        const result = await fetch(`api/graph/${prepareArg(graphName)}_schema/?query=${prepareArg(q)}`, {
+            method: "GET"
+        })
 
+        if (!result.ok) {
+            toast({
+                title: "Error",
+                description: "Something went wrong"
+            })
+            return
+        }
+        schema.Elements = schema.Elements.filter(e => e.data.id !== id)
     }
 
     const onAddEntity = () => {
-        setSchema(prev => {
-            const p = prev
-            p.Elements = [...p.Elements, { data: { id: "-1" } }]
-            return p
-        })
+        schema.Elements = [...schema.Elements, { data: { id: "number" } }]
     }
 
     const onAddRelation = () => {
         schema.Elements = [...schema.Elements, { data: { id: "number" } }]
+    }
+
+    const setLabel = async (selectedElement: ElementDataDefinition, label: string) => {
+
+        const { id } = selectedElement
+        const q = `MATCH (n) WHERE ID(n) = ${id} SET n:${label} WITH n REMOVE n:${selectedElement.category || selectedElement.label}`
+        const { ok } = await fetch(`api/graph/${prepareArg(graphName)}_schema/?query=${prepareArg(q)}`, {
+            method: "GET"
+        })
+
+        if (!ok) {
+            toast({
+                title: "Error",
+                description: "Something went wrong"
+            })
+            return ok
+        }
+
+        schema.Elements = schema.Elements.map(e => {
+            if (e.data.id === id) {
+                const updatedElement = { ...e }
+                if (updatedElement.data.label) {
+                    updatedElement.data.label = label
+                } else {
+                    updatedElement.data.category = label
+                }
+                return updatedElement
+            }
+            return e
+        })
+
+        return ok
+    }
+
+    const setProperty = async (selectedElement: ElementDataDefinition, key: string, newVal: string[]) => {
+        const { id } = selectedElement
+        const q = `MATCH (n) WHERE ID(n) = ${id} SET n.${key} = "${newVal}"`
+        const { ok } = await fetch(`api/graph/${prepareArg(graphName)}_schema/?query=${prepareArg(q)}`, {
+            method: "GET"
+        })
+
+        if (!ok) {
+            toast({
+                title: "Error",
+                description: "Something went wrong"
+            })
+            return ok
+        }
+
+        schema.Elements = schema.Elements.map(e => {
+            if (e.data.id === id) {
+                const updatedElement = e
+                updatedElement.data[key] = newVal
+                return updatedElement
+            }
+            return e
+        })
+
+        return ok
+    }
+
+    const removeProperty = async (selectedElement: ElementDataDefinition, key: string) => {
+        const { id } = selectedElement
+        const q = `MATCH (n) WHERE ID(n) = ${id} SET n.${key} = null`
+        const result = await fetch(`api/graph/${prepareArg(graphName)}_schema/?query=${prepareArg(q)}`, {
+            method: "GET"
+        })
+
+        const json = await result.json()
+
+        if (!result.ok) {
+            toast({
+                title: "Error",
+                description: json.message || "Something went wrong"
+            })
+            return result.ok
+        }
+
+        schema.Elements = schema.Elements.map(e => {
+            if (e.data.id === id) {
+                const updatedElement = e
+                delete updatedElement.data[key]
+                return updatedElement
+            }
+            return e
+        })
+
+        return result.ok
     }
 
     const getCurrentTab = () => {
@@ -234,7 +328,7 @@ export default function Create() {
             case "schema":
                 return (
                     <div className="grow flex flex-col gap-10">
-                        <SchemaView schema={schema} onAddEntity={onAddEntity} onAddRelation={onAddRelation} onDelete={onDelete} />
+                        <SchemaView schema={schema} onAddEntity={onAddEntity} onAddRelation={onAddRelation} onDelete={onDelete} removeProperty={removeProperty} setLabel={setLabel} setProperty={setProperty} />
                         <div className="flex flex-row justify-end gap-16">
                             <button
                                 className="flex flex-row gap-1 items-center text-[#7167F6]"
@@ -263,7 +357,7 @@ export default function Create() {
                             <p className="text-[#57577B]">|</p>
                             <span><span>{edgesCount}</span>&emsp;Edges</span>
                         </div>
-                        <GraphView graphName={graphName} />
+                        <GraphView schema={schema} graphName={graphName} />
                         <div className="flex flex-row justify-end gap-16">
                             <button
                                 className="flex flex-row gap-1 items-center text-[#7167F6]"
@@ -286,7 +380,7 @@ export default function Create() {
                 )
             default:
                 return (
-                    <form onSubmit={(e) => handleCreateSchema(e)} className="grow flex flex-col gap-8">
+                    <form onSubmit={async (e) => { await handleCreateSchema(e) }} className="grow flex flex-col gap-8">
                         <div className="grow flex flex-col gap-6">
                             <div className="flex flex-row gap-8">
                                 <div className="flex flex-row gap-4">

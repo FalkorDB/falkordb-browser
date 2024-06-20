@@ -263,21 +263,21 @@ export default function Toolbar({ schema, chartRef, onDeleteElementGraph, onDele
                 }
                 <div className="flex flex-row items-center gap-4">
                     <Button
-                        disabled={!chartRef}
+                        disabled={!schema?.Id}
                         variant="Secondary"
                         label="Zoom In"
                         icon={<ZoomIn />}
                         onClick={() => handleZoomClick(1.1)}
                     />
                     <Button
-                        disabled={!chartRef}
+                        disabled={!schema?.Id}
                         variant="Secondary"
                         label="Zoom Out"
                         icon={<ZoomOut />}
                         onClick={() => handleZoomClick(0.9)}
                     />
                     <Button
-                        disabled={!chartRef}
+                        disabled={!schema?.Id}
                         variant="Secondary"
                         label="Fit To Size"
                         icon={<Shrink />}

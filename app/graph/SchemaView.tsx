@@ -1,6 +1,6 @@
 'use client'
 
-import { ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable"
+import { ResizablePanel, ResizablePanelGroup, ResizableHandle } from "@/components/ui/resizable"
 import CytoscapeComponent from "react-cytoscapejs"
 import { ChevronLeft } from "lucide-react"
 import cytoscape, { EdgeDataDefinition, EventObject, NodeDataDefinition } from "cytoscape"
@@ -15,10 +15,13 @@ import { Category, Graph } from "./model"
 
 /* eslint-disable react/require-default-props */
 interface Props {
-    schema: Graph,
-    onAddEntity?: () => void,
-    onAddRelation?: () => void,
-    onDelete?: () => void
+    schema: Graph
+    onAddEntity?: () => void
+    onAddRelation?: () => void
+    onDelete?: (selectedValue: NodeDataDefinition | EdgeDataDefinition) => Promise<void>
+    removeProperty?: (selectedValue: NodeDataDefinition | EdgeDataDefinition, key: string) => Promise<boolean>
+    setLabel?: (selectedValue: NodeDataDefinition | EdgeDataDefinition, label: string) => Promise<boolean>
+    setProperty?: (selectedValue: NodeDataDefinition | EdgeDataDefinition, key: string, newVal: string[]) => Promise<boolean>
 }
 
 const LAYOUT = {
@@ -51,7 +54,7 @@ function getStyle() {
         {
             selector: "node",
             style: {
-                label: "data(name)",
+                label: "data(category)",
                 "color": "white",
                 "text-valign": "center",
                 "text-halign": "center",
@@ -101,7 +104,7 @@ function getStyle() {
     return style
 }
 
-export default function SchemaView({ schema, onAddEntity, onAddRelation, onDelete }: Props) {
+export default function SchemaView({ schema, onAddEntity, onAddRelation, onDelete, removeProperty, setLabel, setProperty}: Props) {
 
     const [selectedElement, setSelectedElement] = useState<NodeDataDefinition | EdgeDataDefinition>();
     const [isCollapsed, setIsCollapsed] = useState<boolean>(false);
@@ -148,7 +151,6 @@ export default function SchemaView({ schema, onAddEntity, onAddRelation, onDelet
 
     const handelTap = (e: EventObject) => {
         const element = e.target.json().data
-        element.id = "number"
         setSelectedElement(element)
         dataPanel.current?.expand()
     }
@@ -164,10 +166,10 @@ export default function SchemaView({ schema, onAddEntity, onAddRelation, onDelet
     }
 
     return (
-        <ResizablePanelGroup className={cn("grow", !isCollapsed && "gap-8")} direction="horizontal">
-            <ResizablePanel defaultSize={100} className="w-1 grow flex flex-col gap-10">
+        <ResizablePanelGroup className="grow" direction="horizontal">
+            <ResizablePanel defaultSize={100} className={cn("w-1 grow flex flex-col gap-10", !isCollapsed && "mr-8")}>
                 <div className="relative">
-                    <Toolbar onAddEntitySchema={onAddEntity} onAddRelationSchema={onAddRelation} onDeleteElementSchema={onDelete} chartRef={chartRef} />
+                    <Toolbar schema={schema} onAddEntitySchema={onAddEntity} onAddRelationSchema={onAddRelation} onDeleteElementSchema={async () => onDelete && selectedElement && await onDelete(selectedElement)} chartRef={chartRef} />
                     {
                         isCollapsed &&
                         <button
@@ -206,11 +208,14 @@ export default function SchemaView({ schema, onAddEntity, onAddRelation, onDelet
                     }
                 </div>
             </ResizablePanel>
+            <ResizableHandle className="w-3" />
             <ResizablePanel
                 className="rounded-lg"
                 collapsible
                 ref={dataPanel}
                 defaultSize={25}
+                minSize={25}
+                maxSize={50}
                 onCollapse={() => setIsCollapsed(true)}
                 onExpand={() => setIsCollapsed(false)}
             >
@@ -219,6 +224,10 @@ export default function SchemaView({ schema, onAddEntity, onAddRelation, onDelet
                     <DataPanel
                         obj={selectedElement}
                         onExpand={onExpand}
+                        onDeleteElement={onDelete ? () => onDelete(selectedElement) : undefined}
+                        removeProperty={removeProperty  ? async (key:string) => removeProperty(selectedElement, key) : undefined}
+                        setLabel={setLabel ? async (label: string) => setLabel(selectedElement, label) : undefined}
+                        setPropertySchema={setProperty ? async (key: string, newVal: string[]) => setProperty(selectedElement, key, newVal) : undefined}
                     />
                 }
             </ResizablePanel>

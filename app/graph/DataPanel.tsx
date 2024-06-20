@@ -1,6 +1,6 @@
 'use client'
 
-import { Table, TableBody, TableCaption, TableCell, TableRow } from "@/components/ui/table";
+import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 import { EdgeDataDefinition, NodeDataDefinition } from "cytoscape";
 import { ChevronRight, MinusCircle, PlusCircle, Trash2 } from "lucide-react";
@@ -13,6 +13,7 @@ interface Props {
     obj: NodeDataDefinition | EdgeDataDefinition;
     onExpand: () => void;
     setProperty?: (key: string, newVal: string) => Promise<boolean>;
+    setPropertySchema?: (key: string, newVal: string[]) => Promise<boolean>;
     removeProperty?: (key: string) => Promise<boolean>;
     setLabel?: (label: string) => Promise<boolean>;
     onDeleteElement?: () => Promise<void>;
@@ -22,29 +23,61 @@ const excludedProperties = new Set([
     "category",
     "color",
     "_id",
+    "id",
     "label",
     "target",
-    "source"
+    "source",
 ]);
 
-export default function DataPanel({ obj, onExpand, setProperty, removeProperty, onDeleteElement, setLabel }: Props) {
+export default function DataPanel({ obj, onExpand, setProperty, setPropertySchema, removeProperty, onDeleteElement, setLabel }: Props) {
 
     const [isAddValue, setIsAddValue] = useState<boolean>(false)
     const [hover, setHover] = useState<string>("")
     const [editable, setEditable] = useState<string>("")
     const [labelEditable, setLabelEditable] = useState<boolean>(false)
     const [val, setVal] = useState<string>("")
+    const [schemaVal, setSchemaVal] = useState<string[]>([])
     const [newLabel, setNewLabel] = useState<string>("")
     const [key, setKey] = useState<string>("")
     const type = obj.source ? "edge" : "node"
     const label = (type === "edge" ? obj.label : obj.category) || "label"
     const addValueRef = useRef<HTMLDivElement>(null)
+    const isHeader = Object.entries(obj).filter((row) => Array.isArray(row[1])).length > 0
     const { toast } = useToast()
 
     useEffect(() => {
         if (!isAddValue) return
         addValueRef.current?.focus()
     }, [isAddValue])
+
+    const onKeyDownSchema = async (e: KeyboardEvent<HTMLTableCellElement>) => {
+
+        e.preventDefault()
+
+        if (!setPropertySchema) return
+
+        if (e.code === "Escape") {
+            setIsAddValue(false)
+        }
+
+        if (e.code !== "Enter") return
+
+
+        if (schemaVal.length === 4 || !key) {
+            toast({
+                title: "Error",
+                description: `${!key ? "Key" : "Value"} cannot be empty`
+            })
+        }
+        const success = await setPropertySchema(key, schemaVal)
+        if (success) {
+            const ob = obj
+            ob[key] = schemaVal
+        }
+        setSchemaVal([])
+        setKey("")
+        setIsAddValue(false)
+    }
 
     const onKeyDown = async (e: KeyboardEvent<HTMLTableCellElement>) => {
         if (!setProperty) return
@@ -56,17 +89,11 @@ export default function DataPanel({ obj, onExpand, setProperty, removeProperty, 
         if (e.code !== "Enter") return
         e.preventDefault()
         if (!val || !key) {
-            if (e.currentTarget.textContent) {
-                setVal(e.currentTarget.textContent)
-            } else {
-                setEditable("")
-                setIsAddValue(false)
-                toast({
-                    title: "Error",
-                    description:  `${!key ? "Key" : "Value"} cannot be empty`
-                })
-                return
-            }
+            toast({
+                title: "Error",
+                description: `${!key ? "Key" : "Value"} cannot be empty`
+            })
+            return
         }
         const success = await setProperty(key, val)
         if (success) {
@@ -135,7 +162,7 @@ export default function DataPanel({ obj, onExpand, setProperty, removeProperty, 
                 </div>
                 <p className="flex flex-row text-white">{Object.keys(obj).filter((v) => !excludedProperties.has(v)).length} Attributes</p>
             </div>
-            <div className="h-1 grow flex flex-col justify-between items-start overflow-auto">
+            <div className="h-1 grow flex flex-col justify-between items-start font-medium overflow-auto">
                 <Table>
                     {
                         setProperty &&
@@ -144,18 +171,32 @@ export default function DataPanel({ obj, onExpand, setProperty, removeProperty, 
                                 className="border border-[#232341]"
                                 variant="Secondary"
                                 label="Add Attribute"
-                                icon={isAddValue ? <MinusCircle/> : <PlusCircle />}
+                                icon={isAddValue ? <MinusCircle /> : <PlusCircle />}
                                 type="button"
                                 onClick={() => setIsAddValue(prev => !prev)}
                             />
                         </TableCaption>
                     }
+                    {
+                        isHeader &&
+                        <TableHeader>
+                            <TableRow className="border-[#57577B] text-[#ACACC2] text-lg font-black">
+                                <TableHead className="p-8">Name</TableHead>
+                                <TableHead className="p-8">Type</TableHead>
+                                <TableHead className="p-8">Description</TableHead>
+                                <TableHead className="p-8">Unique</TableHead>
+                                <TableHead className="p-8">aaa</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                    }
                     <TableBody>
                         {
-                            Object.entries(obj).filter((row) => !excludedProperties.has(row[0])).map((row, index) => {
+                            Object.entries(obj).filter((row) => !excludedProperties.has(row[0]) && !(row[0] === "name" && row[1] === obj.id)).map((row, index) => {
                                 const strKey = JSON.parse(JSON.stringify(row[0]))
                                 const strCell = JSON.parse(JSON.stringify(row[1]))
-                                const isEditable = editable === strCell && strKey !== "id"
+                                const isArr = Array.isArray(strCell)
+                                const isEditable = !isArr && editable === `${index}`
+
                                 return (
                                     <TableRow
                                         // eslint-disable-next-line react/no-array-index-key
@@ -171,9 +212,9 @@ export default function DataPanel({ obj, onExpand, setProperty, removeProperty, 
                                     >
                                         <TableCell
                                             key={row[0]}
-                                            className="w-1/2 p-8"
+                                            className={cn("p-8", !isArr && "w-1/2")}
                                         >
-                                            <div className="text-gray-200 opacity-75 flex flex-row gap-2 items-center">
+                                            <div className="text-[#ACACC2] flex flex-row gap-2 items-center">
                                                 {
                                                     hover === strKey &&
                                                     <button
@@ -188,62 +229,172 @@ export default function DataPanel({ obj, onExpand, setProperty, removeProperty, 
                                                 {strKey}:
                                             </div>
                                         </TableCell>
-                                        <TableCell
-                                            key={row[1]}
-                                            className="w-1/2 p-4"
-                                        >
-                                            {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions */}
-                                            <div
-                                                className={cn("p-4", isEditable && "bg-slate-800 rounded-lg border border-indigo-500")}
-                                                ref={ref => {
-                                                    if (ref?.isContentEditable) {
-                                                        ref.focus()
-                                                    }
-                                                }}
-                                                onKeyDown={onKeyDown}
-                                                onInput={(e) => {
-                                                    setKey(strKey)
-                                                    setVal(e.currentTarget.textContent || "")
-                                                }}
-                                                onClick={() => {
-                                                    if (!setProperty) return
-                                                    setEditable(strCell)
-                                                }}
-                                                onBlur={() => setEditable("")}
-                                                contentEditable={isEditable}
-                                            >
-                                                {strCell}
-                                            </div>
-                                        </TableCell>
+                                        {
+                                            isArr ?
+                                                strCell.map((cell: string | boolean, i: number) => {
+                                                    const isEdit = editable === `${index}-${i}`
+                                                    return (
+                                                        <TableCell
+                                                            // eslint-disable-next-line react/no-array-index-key
+                                                            key={i}
+                                                            className="p-4"
+                                                        >
+                                                            {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions */}
+                                                            <div
+                                                                className={cn("p-4", isEdit && "bg-[#1F1F3D] hover:bg-[#2E2E51] focus:border focus:border-[#5D5FEF] rounded-lg")}
+                                                                ref={ref => {
+                                                                    if (ref?.isContentEditable) {
+                                                                        ref.focus()
+                                                                    }
+                                                                }}
+                                                                onKeyDown={onKeyDown}
+                                                                onInput={(e) => {
+                                                                    setKey(strKey)
+                                                                    setVal(e.currentTarget.textContent || "")
+                                                                }}
+                                                                onClick={() => {
+                                                                    if (!setProperty) return
+                                                                    setEditable(`${index}-${i}`)
+                                                                }}
+                                                                onBlur={() => setEditable("")}
+                                                                contentEditable={isEdit}
+                                                            >
+                                                                {typeof cell === "boolean" ? cell.toString() : cell}
+                                                            </div>
+                                                        </TableCell>
+                                                    )
+                                                })
+                                                : <TableCell
+                                                    key={row[1]}
+                                                    className="w-1/2 p-4"
+                                                >
+                                                    {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions */}
+                                                    <div
+                                                        className={cn("p-4", isEditable && "bg-[#1F1F3D] hover:bg-[#2E2E51] focus:border focus:border-[#5D5FEF] rounded-lg")}
+                                                        ref={ref => {
+                                                            if (ref?.isContentEditable) {
+                                                                ref.focus()
+                                                            }
+                                                        }}
+                                                        onKeyDown={onKeyDown}
+                                                        onInput={(e) => {
+                                                            setKey(strKey)
+                                                            setVal(e.currentTarget.textContent || "")
+                                                        }}
+                                                        onClick={() => {
+                                                            if (!setProperty) return
+                                                            setEditable(`${index}`)
+                                                        }}
+                                                        onBlur={() => setEditable("")}
+                                                        contentEditable={isEditable}
+                                                    >
+                                                        {strCell}
+                                                    </div>
+                                                </TableCell>
+                                        }
                                     </TableRow>
                                 )
                             })
                         }
                         {
-                            isAddValue &&
-                            <TableRow>
-                                <TableCell className="w-1/2 p-4">
-                                    {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions */}
-                                    <div
-                                        ref={addValueRef}
-                                        className="p-4 rounded-lg bg-slate-800 focus:border focus:border-indigo-500"
-                                        contentEditable
-                                        onInput={(e) => setKey(e.currentTarget.textContent || "")}
-                                        onKeyDown={onKeyDown}
-                                    />
-                                </TableCell>
-                                <TableCell
-                                    className="w-1/2 p-4"
-                                >
-                                    {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions */}
-                                    <div
-                                        className="p-4 rounded-lg bg-slate-800 focus:border focus:border-indigo-500"
-                                        contentEditable
-                                        onInput={(e) => setVal(e.currentTarget.textContent || "")}
-                                        onKeyDown={onKeyDown}
-                                    />
-                                </TableCell>
-                            </TableRow>
+                            isAddValue && isHeader ?
+                                <TableRow className="border-none">
+                                    <TableCell className="p-4">
+                                        {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions */}
+                                        <div
+                                            ref={addValueRef}
+                                            className="p-4 rounded-lg bg-[#1F1F3D] hover:bg-[#2E2E51] focus:border focus:border-[#5D5FEF]"
+                                            contentEditable
+                                            onInput={(e) => setKey(e.currentTarget.textContent || "")}
+                                            onKeyDown={onKeyDownSchema}
+                                        />
+                                    </TableCell>
+                                    <TableCell
+                                        className="p-4"
+                                    >
+                                        {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions */}
+                                        <div
+                                            className="p-4 rounded-lg bg-[#1F1F3D] hover:bg-[#2E2E51] focus:border focus:border-[#5D5FEF]"
+                                            contentEditable
+                                            onInput={(e) => setSchemaVal(prev => {
+                                                const p = prev
+                                                p[0] = e.currentTarget.textContent || ""
+                                                return prev
+                                            })}
+                                            onKeyDown={onKeyDownSchema}
+                                        />
+                                    </TableCell>
+                                    <TableCell
+                                        className="p-4"
+                                    >
+                                        {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions */}
+                                        <div
+                                            className="p-4 rounded-lg bg-[#1F1F3D] hover:bg-[#2E2E51] focus:border focus:border-[#5D5FEF]"
+                                            contentEditable
+                                            onInput={(e) => setSchemaVal(prev => {
+                                                const p = prev
+                                                p[1] = e.currentTarget.textContent || ""
+                                                return prev
+                                            })}
+                                            onKeyDown={onKeyDownSchema}
+                                        />
+                                    </TableCell>
+                                    <TableCell
+                                        className="p-4"
+                                    >
+                                        {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions */}
+                                        <div
+                                            className="p-4 rounded-lg bg-[#1F1F3D] hover:bg-[#2E2E51] focus:border focus:border-[#5D5FEF]"
+                                            contentEditable
+                                            onInput={(e) => setSchemaVal(prev => {
+                                                const p = prev
+                                                p[2] = e.currentTarget.textContent || ""
+                                                return prev
+                                            })}
+                                            onKeyDown={onKeyDownSchema}
+                                        />
+                                    </TableCell>
+                                    <TableCell
+                                        className="p-4"
+                                    >
+                                        {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions */}
+                                        <div
+                                            className="p-4 rounded-lg bg-[#1F1F3D] hover:bg-[#2E2E51] focus:border focus:border-[#5D5FEF]"
+                                            contentEditable
+                                            onInput={(e) => setSchemaVal(prev => {
+                                                const p = prev
+                                                p[3] = e.currentTarget.textContent || ""
+                                                return prev
+                                            })}
+                                            onKeyDown={onKeyDownSchema}
+                                        />
+                                    </TableCell>
+                                </TableRow>
+
+                                : isAddValue &&
+                                <TableRow>
+                                    <TableCell className="w-1/2 p-4">
+                                        {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions */}
+                                        <div
+                                            ref={addValueRef}
+                                            className="p-4 rounded-lg bg-[#1F1F3D] hover:bg-[#2E2E51] focus:border focus:border-[#5D5FEF]"
+                                            contentEditable
+                                            onInput={(e) => setKey(e.currentTarget.textContent || "")}
+                                            onKeyDown={onKeyDown}
+                                        />
+                                    </TableCell>
+                                    <TableCell
+                                        className="w-1/2 p-4"
+                                    >
+                                        {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions */}
+                                        <div
+                                            className="p-4 rounded-lg bg-[#1F1F3D] hover:bg-[#2E2E51] focus:border focus:border-[#5D5FEF]"
+                                            contentEditable
+                                            onInput={(e) => setVal(e.currentTarget.textContent || "")}
+                                            onKeyDown={onKeyDown}
+                                        />
+                                    </TableCell>
+                                </TableRow>
                         }
                     </TableBody>
                 </Table>
