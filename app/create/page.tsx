@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { Progress } from "@/components/ui/progress";
 import useSWR from "swr";
 import { EdgeDataDefinition, NodeDataDefinition } from "cytoscape";
+import { securedFetch } from "@/lib/utils";
 import Header from "../graph/Header";
 import { Graph } from "../graph/model";
 import Input from "../components/Input";
@@ -37,42 +38,36 @@ export default function Create() {
     const router = useRouter()
 
     useEffect(() => {
-        const run = async () => {
-
-            if (currentTab !== "graph") return
-            const q = "MATCH (n) WITH Count(n) as nodes MATCH ()-[e]-() return nodes, Count(e) as edges"
-            const result = await fetch(`api/graph/${prepareArg(graphName)}/?query=${prepareArg(q)}`, {
-                method: "GET",
-            })
-
-            if (!result.ok) {
-                toast({
-                    title: "Error",
-                    description: "Something went wrong"
-                })
-                return
-            }
-
-            const json = await result.json()
-
-            const data = json.result.data[0]
-            setNodesCount(data.nodes)
-            setEdgesCount(data.edges)
-        }
-        run()
-    }, [graphName, toast])
-
-    useEffect(() => {
         if (progress !== 100) return
 
         const run = async () => {
+
+        }
+        run()
+    }, [progress, toast])
+
+    const fetcher = async (url: string) => {
+
+        const result = await securedFetch(url, {
+            method: "GET",
+        })
+
+        if (!result.ok) {
+            toast({
+                title: "Error",
+                description: "Something went wrong"
+            })
+            return
+        }
+
+        if (progress === 100) {
             const q = "MATCH (n)-[e]-(m) RETURN n,e,m"
 
-            const result = await fetch(`api/graph/${prepareArg(graphName)}_schema/?query=${prepareArg(q)}`, {
+            const res = await securedFetch(`api/graph/${prepareArg(graphName)}_schema/?query=${prepareArg(q)}`, {
                 method: "GET"
             })
 
-            if (!result.ok) {
+            if (!res.ok) {
                 toast({
                     title: "Error",
                     description: "Something went wrong"
@@ -100,22 +95,6 @@ export default function Create() {
             setSchema(Graph.create(`${graphName}_schema`, json.result))
             setCurrentTab("schema")
         }
-        run()
-    }, [progress, toast])
-
-    const fetcher = async (url: string) => {
-
-        const result = await fetch(url, {
-            method: "GET",
-        })
-
-        if (!result.ok) {
-            toast({
-                title: "Error",
-                description: "Something went wrong"
-            })
-            return
-        }
 
         const json = await result.json()
         setProgress(prev => prev + json.progress)
@@ -136,7 +115,7 @@ export default function Create() {
 
             formData.append("file", file);
 
-            const result = await fetch(`api/upload`, {
+            const result = await securedFetch(`api/upload`, {
                 method: "POST",
                 body: formData
             });
@@ -156,7 +135,7 @@ export default function Create() {
 
         setFilesPath(newFilesPath)
 
-        const result = await fetch(`api/graph/${prepareArg(graphName)}/?type=detect_schema&key=${prepareArg(openaiKey)}`, {
+        const result = await securedFetch(`api/graph/${prepareArg(graphName)}/?type=detect_schema&key=${prepareArg(openaiKey)}`, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json"
@@ -182,7 +161,7 @@ export default function Create() {
 
     const handleCreateGraph = async () => {
 
-        const result = await fetch(`api/graph/${prepareArg(graphName)}/?type=populate_kg/?key=${openaiKey}`, {
+        const result = await securedFetch(`api/graph/${prepareArg(graphName)}/?type=populate_kg/?key=${openaiKey}`, {
             method: "POST",
             body: JSON.stringify(filesPath)
         })
@@ -204,7 +183,7 @@ export default function Create() {
     const onDelete = async (selectedValue: ElementDataDefinition) => {
         const { id } = selectedValue
         const q = `MATCH (n) WHERE ID(n) = ${id} delete n`
-        const result = await fetch(`api/graph/${prepareArg(graphName)}_schema/?query=${prepareArg(q)}`, {
+        const result = await securedFetch(`api/graph/${prepareArg(graphName)}_schema/?query=${prepareArg(q)}`, {
             method: "GET"
         })
 
@@ -230,7 +209,7 @@ export default function Create() {
 
         const { id } = selectedElement
         const q = `MATCH (n) WHERE ID(n) = ${id} SET n:${label} WITH n REMOVE n:${selectedElement.category || selectedElement.label}`
-        const { ok } = await fetch(`api/graph/${prepareArg(graphName)}_schema/?query=${prepareArg(q)}`, {
+        const { ok } = await securedFetch(`api/graph/${prepareArg(graphName)}_schema/?query=${prepareArg(q)}`, {
             method: "GET"
         })
 
@@ -261,7 +240,7 @@ export default function Create() {
     const setProperty = async (selectedElement: ElementDataDefinition, key: string, newVal: string[]) => {
         const { id } = selectedElement
         const q = `MATCH (n) WHERE ID(n) = ${id} SET n.${key} = "${newVal}"`
-        const { ok } = await fetch(`api/graph/${prepareArg(graphName)}_schema/?query=${prepareArg(q)}`, {
+        const { ok } = await securedFetch(`api/graph/${prepareArg(graphName)}_schema/?query=${prepareArg(q)}`, {
             method: "GET"
         })
 
@@ -288,7 +267,7 @@ export default function Create() {
     const removeProperty = async (selectedElement: ElementDataDefinition, key: string) => {
         const { id } = selectedElement
         const q = `MATCH (n) WHERE ID(n) = ${id} SET n.${key} = null`
-        const result = await fetch(`api/graph/${prepareArg(graphName)}_schema/?query=${prepareArg(q)}`, {
+        const result = await securedFetch(`api/graph/${prepareArg(graphName)}_schema/?query=${prepareArg(q)}`, {
             method: "GET"
         })
 
@@ -314,7 +293,7 @@ export default function Create() {
         return result.ok
     }
 
-    const getCurrentTab = () => {
+    const getCurrentTab = async () => {
         switch (currentTab) {
             case "loadSchema":
                 return (
@@ -348,7 +327,23 @@ export default function Create() {
                         </div>
                     </div>
                 )
-            case "graph":
+            case "graph": {
+
+                const q = "MATCH (n) WITH Count(n) as nodes MATCH ()-[e]-() return nodes, Count(e) as edges"
+
+                securedFetch(`api/graph/${prepareArg(graphName)}/?query=${prepareArg(q)}`, {
+                    method: "GET",
+                }).then((response) => response.json()).then((json) => {
+                    const data = json.result.data[0]
+                    setNodesCount(data.nodes)
+                    setEdgesCount(data.edges)
+                }).catch(() => {
+                    toast({
+                        title: "Error",
+                        description: "Something went wrong"
+                    })
+                })
+                
                 return (
                     <div className="grow flex flex-col gap-8">
                         <div className="p-4 bg-[#2C2C4C] text-[#FFFFFF] flex flex-row gap-12 items-center rounded-lg">
@@ -378,6 +373,7 @@ export default function Create() {
                         </div>
                     </div>
                 )
+            }
             default:
                 return (
                     <form onSubmit={async (e) => { await handleCreateSchema(e) }} className="grow flex flex-col gap-8">

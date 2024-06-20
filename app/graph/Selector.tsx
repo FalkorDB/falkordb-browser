@@ -7,7 +7,7 @@ import { Editor } from "@monaco-editor/react";
 import { useToast } from "@/components/ui/use-toast";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { editor } from "monaco-editor";
-import { cn } from "@/lib/utils";
+import { cn, securedFetch } from "@/lib/utils";
 import Combobox from "../components/combobox";
 import { Graph } from "./model";
 import SchemaView from "./SchemaView";
@@ -45,7 +45,7 @@ export default function Selector({ onChange, queries }: {
 
     useEffect(() => {
         const run = async () => {
-            const result = await fetch("api/graph", {
+            const result = await securedFetch("api/graph", {
                 method: "GET"
             })
             if (!result.ok) return
@@ -59,7 +59,7 @@ export default function Selector({ onChange, queries }: {
         if (!selectedValue) return
         const run = async () => {
             const q = "MATCH (n) WITH COUNT(n) as nodes MATCH ()-[e]-() RETURN nodes, COUNT(e) as edges"
-            const result = await fetch(`api/graph/${prepareArg(selectedValue)}/?query=${prepareArg(q)}`, {
+            const result = await securedFetch(`api/graph/${prepareArg(selectedValue)}/?query=${prepareArg(q)}`, {
                 method: "GET"
             })
 
@@ -81,7 +81,7 @@ export default function Selector({ onChange, queries }: {
 
     const handelOnChange = async (name: string) => {
         const q = 'MATCH (n)-[e]-(m) return n,e,m'
-        const result = await fetch(`api/graph/${name}_schema/?query=${q}`, {
+        const result = await securedFetch(`api/graph/${name}_schema/?query=${q}`, {
             method: "GET"
         })
 
@@ -102,7 +102,7 @@ export default function Selector({ onChange, queries }: {
 
     const onDuplicate = async (e: FormEvent) => {
         e.preventDefault()
-        const result = await fetch(`api/graph/${duplicateName}/?sourceName=${selectedValue}`, {
+        const result = await securedFetch(`api/graph/${duplicateName}/?sourceName=${selectedValue}`, {
             method: "POST"
         })
 
@@ -119,7 +119,7 @@ export default function Selector({ onChange, queries }: {
     }
 
     const onExport = async () => {
-        const result = await fetch(`api/graph/${selectedValue}/export`, {
+        const result = await securedFetch(`api/graph/${selectedValue}/export`, {
             method: "GET"
         })
 

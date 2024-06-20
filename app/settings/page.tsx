@@ -1,8 +1,7 @@
 'use client'
 
-import { useEffect, useState } from "react"
+import { useState } from "react"
 import { cn } from "@/lib/utils"
-import { useSearchParams } from "next/navigation"
 import Header from "../graph/Header"
 import Users from "./users/Users"
 import Configurations from "./Configurations"
@@ -10,22 +9,13 @@ import Configurations from "./Configurations"
 export default function Settings() {
 
     const [current, setCurrent] = useState('DB')
-    const [graphName, setGraphName] = useState<string | undefined>()
-    const searchParams = useSearchParams()
-
-
-    useEffect(() => {
-        const graphParam = searchParams.get("graphName")
-        if (!graphParam) return
-        setGraphName(graphParam)
-    }, [searchParams]);
 
     const getCurrentTab = () => {
         switch (current) {
             case 'Users':
                 return <Users />
             default:
-                return typeof graphName === "string" ? <Configurations graphName={graphName} /> : <div className="w-full h-full items-center"><p>Need to pick a graph to see DB Configurations</p></div>
+                return <Configurations />
         }
     }
 

@@ -3,7 +3,7 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { cn } from "@/lib/utils"
+import { cn, securedFetch } from "@/lib/utils"
 import { ChevronDown, ChevronUp, Download, Trash2, UploadIcon } from "lucide-react"
 import { Dispatch, KeyboardEvent, SetStateAction, useState } from "react"
 import { useToast } from "@/components/ui/use-toast"
@@ -34,7 +34,7 @@ export default function Combobox({ isSelectGraph, disabled = false, inTable, typ
   const prepareArg = (arg: string) => encodeURIComponent(arg.trim())
 
   const onExport = async () => {
-    const result = await fetch(`api/graph/${prepareArg(selectedValue)}/export`, {
+    const result = await securedFetch(`api/graph/${prepareArg(selectedValue)}/export`, {
       method: "GET"
     })
 
@@ -76,7 +76,7 @@ export default function Combobox({ isSelectGraph, disabled = false, inTable, typ
     if (e.key !== "Enter") return
     e.preventDefault()
 
-    const result = await fetch(`/api/graph/${prepareArg(editName)}/?sourceName=${prepareArg(option)}`, {
+    const result = await securedFetch(`/api/graph/${prepareArg(editName)}/?sourceName=${prepareArg(option)}`, {
       method: "PATCH",
     })
 

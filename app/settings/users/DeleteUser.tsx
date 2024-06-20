@@ -4,6 +4,7 @@ import { User } from "@/app/api/user/model";
 import { Trash2 } from "lucide-react";
 import { Dispatch, SetStateAction } from "react";
 import Button from "@/app/components/Button";
+import { securedFetch } from "@/lib/utils";
 
 interface DeleteUserProps {
     // eslint-disable-next-line react/require-default-props
@@ -17,7 +18,7 @@ export default function DeleteUser({ isDeleteSelected, users, setUsers }: Delete
     const deleteSelected = async () => {
         if (!users) return
 
-        const response = await fetch(`/api/user/`, {
+        const response = await securedFetch(`/api/user/`, {
             method: 'DELETE',
             headers: {
                 'Content-Type': 'application/json'

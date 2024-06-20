@@ -78,13 +78,11 @@ const Configs = [
 ]
 
 // Shows the details of a current database connection 
-export default function Configurations({ graphName }: {
-    graphName: string
-}) {
+export default function Configurations() {
 
     useEffect(() => {
         const run = async () => {
-            const result = await securedFetch(`api/graph/${graphName}`, {
+            const result = await securedFetch(`api/graph/`, {
                 method: 'GET',
             })
 

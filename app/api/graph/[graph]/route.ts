@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getClient } from "@/app/api/auth/[...nextauth]/options";
+import { securedFetch } from "@/lib/utils";
 
 // eslint-disable-next-line import/prefer-default-export
 export async function DELETE(request: NextRequest, { params }: { params: { graph: string } }) {
@@ -67,7 +68,7 @@ export async function POST(request: NextRequest, { params }: { params: { graph: 
 
         if (!type) console.error("Missing parameter 'type'")
 
-        const res = await fetch(`http://localhost:5000/${type}`, {
+        const res = await securedFetch(`http://localhost:5000/${type}`, {
             method: "POST",
             headers: {
                 'Content-Type': 'application/json'
@@ -122,7 +123,7 @@ export async function GET(request: NextRequest, { params }: { params: { graph: s
     if (!query) {
         const ID = request.nextUrl.searchParams.get("ID")
         if (!ID) throw new Error("Missing parameter 'ID'")
-        // const result = await fetch(`https://localhost:5000/progress/?ID=${ID}`, {
+        // const result = await securedFetch(`https://localhost:5000/progress/?ID=${ID}`, {
         //     method: "GET"
         // })
         // if (!result.ok) throw new Error("something went wrong")

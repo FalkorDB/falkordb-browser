@@ -5,7 +5,7 @@ import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuIte
 import { ChevronDown, ChevronUp, LifeBuoy, PlusCircle, Settings } from "lucide-react";
 import { useState } from "react";
 import Image from "next/image";
-import { cn } from "@/lib/utils";
+import { cn, securedFetch } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
 import { useRouter } from "next/navigation";
 import Button from "../components/Button";
@@ -26,7 +26,7 @@ export default function Header({ graphName, inCreate = false, inSettings = false
     // const [newName, setNewName] = useState<string>("")
 
     // const createGraph = async () => {
-    //     const result = await fetch(`api/graph/${newName}`)
+    //     const result = await securedFetch(`api/graph/${newName}`)
     // }
 
     const run = () => {
@@ -34,12 +34,12 @@ export default function Header({ graphName, inCreate = false, inSettings = false
             (:Rider {name:'Valentino Rossi'})-[:rides]->(:Team {name:'Yamaha'}),
             (:Rider {name:'Dani Pedrosa'})-[:rides]->(:Team {name:'Honda'}),
             (:Rider {name:'Andrea Dovizioso'})-[:rides]->(:Team {name:'Ducati'})`
-        fetch(`api/graph/FalkorDB/?query=${query1.trim()}`, {
+            securedFetch(`api/graph/FalkorDB/?query=${query1.trim()}`, {
             method: "GET"
         })
         const query2 = `CREATE
             (:Rider {name:'string'})-[:rides]->(:Team {name:'string'})`
-        fetch(`api/graph/FalkorDB_schema/?query=${query2.trim()}`, {
+        securedFetch(`api/graph/FalkorDB_schema/?query=${query2.trim()}`, {
             method: "GET"
         })
     }

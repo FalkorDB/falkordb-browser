@@ -210,7 +210,7 @@ const GraphView = forwardRef(({ graphName, setQueries, schema }: {
             return
         }
 
-        const result = await fetch(`api/graph/${prepareArg(graphName)}/?query=${prepareArg(defaultQuery())}`, {
+        const result = await securedFetch(`api/graph/${prepareArg(graphName)}/?query=${prepareArg(defaultQuery())}`, {
             method: "GET"
         })
         const json = await result.json()
@@ -313,7 +313,7 @@ const GraphView = forwardRef(({ graphName, setQueries, schema }: {
     const setProperty = async (key: string, newVal: string) => {
         const id = selectedElement?.data.id
         const q = `MATCH (e) WHERE id(e) = ${id} SET e.${key} = '${newVal}'`
-        const success = (await fetch(`api/graph/${prepareArg(graphName)}/?query=${prepareArg(q)}`, {
+        const success = (await securedFetch(`api/graph/${prepareArg(graphName)}/?query=${prepareArg(q)}`, {
             method: "GET"
         })).ok
         if (success)
@@ -328,7 +328,7 @@ const GraphView = forwardRef(({ graphName, setQueries, schema }: {
     const removeProperty = async (key: string) => {
         const id = selectedElement?.data.id
         const q = `MATCH (e) WHERE id(e) = ${id} SET e.${key} = NULL`
-        const success = (await fetch(`api/graph/${prepareArg(graphName)}/?query=${prepareArg(q)}`, {
+        const success = (await securedFetch(`api/graph/${prepareArg(graphName)}/?query=${prepareArg(q)}`, {
             method: "GET"
         })).ok
         if (success)
@@ -343,7 +343,7 @@ const GraphView = forwardRef(({ graphName, setQueries, schema }: {
     const onDeleteElement = async () => {
         const id = selectedElement?.data.id
         const q = `MATCH (e) WHERE id(e) = ${id} DELETE e`
-        const success = (await fetch(`api/graph/${prepareArg(graphName)}/?query=${prepareArg(q)}`, {
+        const success = (await securedFetch(`api/graph/${prepareArg(graphName)}/?query=${prepareArg(q)}`, {
             method: "GET"
         })).ok
         if (!success) return
@@ -355,7 +355,7 @@ const GraphView = forwardRef(({ graphName, setQueries, schema }: {
         const isNode = !!selectedElement?.data.category
         const id = selectedElement?.data.id
         const q = `MATCH (n) WHERE id(n) = ${id} `
-        const success = (await fetch(`api/graph/${prepareArg(graphName)}/?query=${prepareArg(q)}`, {
+        const success = (await securedFetch(`api/graph/${prepareArg(graphName)}/?query=${prepareArg(q)}`, {
             method: "GET"
         })).ok
         if (success)
@@ -380,7 +380,7 @@ const GraphView = forwardRef(({ graphName, setQueries, schema }: {
             return
         }
         const q = `CREATE (n:${category[1]} {${filteredAttributes.map(([k, v]) => `${k}: '${v}'`)}}) return n`
-        const result = await fetch(`api/graph/${prepareArg(graphName)}/?query=${prepareArg(q)}`, {
+        const result = await securedFetch(`api/graph/${prepareArg(graphName)}/?query=${prepareArg(q)}`, {
             method: "GET"
         })
         if (!result.ok) return
@@ -399,7 +399,7 @@ const GraphView = forwardRef(({ graphName, setQueries, schema }: {
             return
         }
         const q = `CREATE (e:${label[1]} {${filteredAttributes.map(([k, v]) => `${k}: '${v}'`)}}) return e`
-        const result = await fetch(`api/graph/${prepareArg(graphName)}/?query=${prepareArg(q)}`, {
+        const result = await securedFetch(`api/graph/${prepareArg(graphName)}/?query=${prepareArg(q)}`, {
             method: "GET"
         })
         if (!result.ok) return

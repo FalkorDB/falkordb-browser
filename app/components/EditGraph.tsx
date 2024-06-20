@@ -2,6 +2,7 @@ import { Dialog, DialogClose, DialogContent, DialogHeader, DialogTrigger } from 
 import { EditIcon, X } from "lucide-react";
 import { useState } from "react";
 import { useToast } from "@/components/ui/use-toast";
+import { securedFetch } from "@/lib/utils";
 
 
 export default function EditGraph({ graphName }: { 
@@ -15,7 +16,7 @@ export default function EditGraph({ graphName }: {
     const prepareArg = (arg: string) => encodeURIComponent(arg.trim())
     
     const handelSubmit = async () => {
-        const result = await fetch(`/api/graph/${prepareArg(name)}/?${prepareArg(graphName)}`, {
+        const result = await securedFetch(`/api/graph/${prepareArg(name)}/?${prepareArg(graphName)}`, {
             method: "PATCH",
         })
 
