@@ -2,6 +2,12 @@
 import { EdgeDataDefinition, ElementDefinition, NodeDataDefinition } from 'cytoscape';
 import twcolors from 'tailwindcss/colors'
 
+export interface Query {
+    text: string
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    metadata: string[]
+}
+
 export interface Category {
     index: number,
     name: string,

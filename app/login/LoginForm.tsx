@@ -2,13 +2,14 @@
 
 import { SignInOptions, SignInResponse, signIn } from "next-auth/react";
 import { FormEvent, useEffect, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import Dropzone from "@/app/components/Dropzone";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Eye } from "lucide-react";
 import Input from "@/app/components/Input";
 import Button from "@/app/components/Button";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 
 const DEFAULT_HOST = "localhost";
 const DEFAULT_PORT = "6379";

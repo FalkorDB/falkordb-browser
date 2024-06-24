@@ -2,9 +2,9 @@
 
 import { useState } from "react";
 import GraphView from "./GraphView";
-import Selector, { Query } from "./Selector";
-import Header from "./Header";
-import { Graph } from "./model";
+import Selector from "./Selector";
+import Header from "../components/Header";
+import { Graph, Query } from "./model";
 
 
 export default function Page() {
@@ -19,9 +19,9 @@ export default function Page() {
     }
 
     return (
-        <div className="h-full w-full flex flex-col gap-6">
+        <div className="h-full w-full flex flex-col">
             <Header graphName={graphName}/>            
-            <div className="h-1 grow px-12 pb-12 pt-6 flex flex-col gap-4">
+            <div className="h-1 grow p-12 flex flex-col gap-4">
                 <Selector queries={queries} onChange={handleGraphChange}/>
                 <GraphView setQueries={setQueries} schema={schema} graphName={graphName}/>
             </div>

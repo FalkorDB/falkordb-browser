@@ -8,19 +8,15 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { editor } from "monaco-editor";
 import { Toast, cn, prepareArg, securedFetch } from "@/lib/utils";
 import Combobox from "../components/combobox";
-import { Graph } from "./model";
-import SchemaView from "./SchemaView";
+import { Graph, Query } from "./model";
+import SchemaView from "../schema/SchemaView";
 import Upload from "../components/Upload";
 
-export interface Query {
-    text: string
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    metadata: string[]
-}
-
-export default function Selector({ onChange, queries }: {
+export default function Selector({ onChange, queries, inSchema = false }: {
+    /* eslint-disable react/require-default-props */
     onChange: (selectedGraphName: string, selectedSchema: Graph) => void
-    queries: Query[]
+    queries?: Query[]
+    inSchema?: boolean
 }) {
 
     const [options, setOptions] = useState<string[]>([]);
@@ -46,10 +42,10 @@ export default function Selector({ onChange, queries }: {
             })
             if (!result.ok) return
             const res = (await result.json()).result as string[]
-            setOptions(res.filter(name => !name.includes("_schema")))
+            setOptions(inSchema ? res.filter(name => name.includes("_schema")) : res.filter(name => !name.includes("_schema")))
         }
         run()
-    }, [])
+    }, [inSchema])
 
     useEffect(() => {
         if (!selectedValue) return
@@ -100,7 +96,7 @@ export default function Selector({ onChange, queries }: {
         })
 
         if (!result.ok) {
-           Toast()
+            Toast()
         }
 
         setDialogOpen(false)
@@ -140,7 +136,10 @@ export default function Selector({ onChange, queries }: {
             <div className="flex flex-row justify-between items-center">
                 <Combobox isSelectGraph options={options} setOptions={setOptions} selectedValue={selectedValue} setSelectedValue={handleOnChange} />
                 <div className="flex flex-row gap-16 text-[#9192FD]">
-                    <p className={cn(!selectedValue && "text-[#57577B]")}>Versions</p>
+                    {
+                        !inSchema &&
+                        <p className={cn(!selectedValue && "text-[#57577B]")}>Versions</p>
+                    }
                     <button
                         className="disabled:text-[#57577B]"
                         title="Upload Data"
@@ -240,158 +239,161 @@ export default function Selector({ onChange, queries }: {
                         <span><span className="text-[#7167F6]">{edgesCount}</span>&ensp;Edges</span>
                     </div>
                 }
-                <div className="flex flex-row gap-4 items-center">
-                    <Dialog>
-                        <DialogTrigger disabled={!selectedValue} asChild>
-                            <button
-                                className="disabled:text-[#57577B]"
-                                title="Query History"
-                                type="button"
-                            >
-                                <p>Query History</p>
-                            </button>
-                        </DialogTrigger>
-                        <DialogContent displayClose className="w-[70%] h-[70%] flex flex-col p-0 shadow-lg rounded-xl">
-                            <DialogHeader className="h-[10%] p-4 bg-indigo-600 flex flex-row justify-between items-center rounded-t-xl">
-                                <DialogTitle className="text-white">
-                                    Query History
-                                </DialogTitle>
-                                <DialogClose asChild>
-                                    <button
-                                        title="Close"
-                                        type="button"
-                                        aria-label="Close"
-                                    >
-                                        <X color="white" size={30} />
-                                    </button>
-                                </DialogClose>
-                            </DialogHeader>
-                            <div className="h-1 grow flex flex-col p-8 gap-8">
-                                <DialogTitle>Queries</DialogTitle>
-                                <div className="h-1 grow w-full flex flex-row">
-                                    {
-                                        queries.length > 0 &&
-                                        <ul className="flex-col border overflow-auto">
-                                            {
-                                                queries.map((q, index) => (
-                                                    // eslint-disable-next-line react/no-array-index-key
-                                                    <li key={index} className="w-full text-sm border-b py-3 px-12">
-                                                        <button
-                                                            className="w-full truncate"
-                                                            title={`Query ${index + 1}`}
-                                                            type="button"
-                                                            onClick={() => setQuery(q)}
-                                                        >
-                                                            <p>{q.text}</p>
-                                                        </button>
-                                                    </li>
-                                                ))
-                                            }
-                                        </ul>
-                                    }
-                                    <div className="w-1 grow flex flex-col gap-2 p-4 border">
+                {
+                    !inSchema &&
+                    <div className="flex flex-row gap-4 items-center">
+                        <Dialog>
+                            <DialogTrigger disabled={!selectedValue} asChild>
+                                <button
+                                    className="disabled:text-[#57577B]"
+                                    title="Query History"
+                                    type="button"
+                                >
+                                    <p>Query History</p>
+                                </button>
+                            </DialogTrigger>
+                            <DialogContent displayClose className="w-[70%] h-[70%] flex flex-col p-0 shadow-lg rounded-xl">
+                                <DialogHeader className="h-[10%] p-4 bg-indigo-600 flex flex-row justify-between items-center rounded-t-xl">
+                                    <DialogTitle className="text-white">
+                                        Query History
+                                    </DialogTitle>
+                                    <DialogClose asChild>
+                                        <button
+                                            title="Close"
+                                            type="button"
+                                            aria-label="Close"
+                                        >
+                                            <X color="white" size={30} />
+                                        </button>
+                                    </DialogClose>
+                                </DialogHeader>
+                                <div className="h-1 grow flex flex-col p-8 gap-8">
+                                    <DialogTitle>Queries</DialogTitle>
+                                    <div className="h-1 grow w-full flex flex-row">
                                         {
-                                            schema.Id &&
-                                            <div className="h-1 grow flex flex-row">
-                                                <Editor
-                                                    width="100%"
-                                                    height="100%"
-                                                    language="cypher"
-                                                    theme="custom-theme"
-                                                    options={{
-                                                        lineHeight: 30,
-                                                        fontSize: 25,
-                                                        scrollbar: {
-                                                            horizontal: "hidden"
-                                                        },
-                                                        wordWrap: "on",
-                                                        scrollBeyondLastLine: false,
-                                                        renderWhitespace: "none"
-                                                    }}
-                                                    value={query?.text}
-                                                    onChange={(q) => setQuery(({ text: q || "", metadata: query?.metadata || [] }))}
-                                                    onMount={handleEditorDidMount}
-                                                />
-                                            </div>
+                                            queries && queries.length > 0 &&
+                                            <ul className="flex-col border overflow-auto">
+                                                {
+                                                    queries.map((q, index) => (
+                                                        // eslint-disable-next-line react/no-array-index-key
+                                                        <li key={index} className="w-full text-sm border-b py-3 px-12">
+                                                            <button
+                                                                className="w-full truncate"
+                                                                title={`Query ${index + 1}`}
+                                                                type="button"
+                                                                onClick={() => setQuery(q)}
+                                                            >
+                                                                <p>{q.text}</p>
+                                                            </button>
+                                                        </li>
+                                                    ))
+                                                }
+                                            </ul>
                                         }
-                                        <ul className="flex flex-col gap-2">
+                                        <div className="w-1 grow flex flex-col gap-2 p-4 border">
                                             {
-                                                query?.metadata &&
-                                                query.metadata.map((line, index) => (
-                                                    // eslint-disable-next-line react/no-array-index-key
-                                                    <li key={index}>
-                                                        <p>{line}</p>
-                                                    </li>
-                                                ))
+                                                schema.Id &&
+                                                <div className="h-1 grow flex flex-row">
+                                                    <Editor
+                                                        width="100%"
+                                                        height="100%"
+                                                        language="cypher"
+                                                        theme="custom-theme"
+                                                        options={{
+                                                            lineHeight: 30,
+                                                            fontSize: 25,
+                                                            scrollbar: {
+                                                                horizontal: "hidden"
+                                                            },
+                                                            wordWrap: "on",
+                                                            scrollBeyondLastLine: false,
+                                                            renderWhitespace: "none"
+                                                        }}
+                                                        value={query?.text}
+                                                        onChange={(q) => setQuery(({ text: q || "", metadata: query?.metadata || [] }))}
+                                                        onMount={handleEditorDidMount}
+                                                    />
+                                                </div>
                                             }
-                                        </ul>
+                                            <ul className="flex flex-col gap-2">
+                                                {
+                                                    query?.metadata &&
+                                                    query.metadata.map((line, index) => (
+                                                        // eslint-disable-next-line react/no-array-index-key
+                                                        <li key={index}>
+                                                            <p>{line}</p>
+                                                        </li>
+                                                    ))
+                                                }
+                                            </ul>
+                                        </div>
+                                    </div>
+                                    <div className="flex flex-row justify-end items-center gap-12">
+                                        <button
+                                            className="text-indigo-600"
+                                            title="Profile"
+                                            type="button"
+                                        >
+                                            <p>Profile</p>
+                                        </button>
+                                        <button
+                                            className="text-indigo-600"
+                                            title="Explain"
+                                            type="button"
+                                        >
+                                            <p>Explain</p>
+                                        </button>
+                                        <button
+                                            className="text-indigo-600"
+                                            title="Profile"
+                                            type="button"
+                                        >
+                                            <p>Translate to Cypher</p>
+                                        </button>
+                                        <button
+                                            className="w-1/6 bg-indigo-600 text-white p-4"
+                                            title="Run"
+                                            type="button"
+                                        >
+                                            <p>RUN</p>
+                                        </button>
                                     </div>
                                 </div>
-                                <div className="flex flex-row justify-end items-center gap-12">
-                                    <button
-                                        className="text-indigo-600"
-                                        title="Profile"
-                                        type="button"
-                                    >
-                                        <p>Profile</p>
-                                    </button>
-                                    <button
-                                        className="text-indigo-600"
-                                        title="Explain"
-                                        type="button"
-                                    >
-                                        <p>Explain</p>
-                                    </button>
-                                    <button
-                                        className="text-indigo-600"
-                                        title="Profile"
-                                        type="button"
-                                    >
-                                        <p>Translate to Cypher</p>
-                                    </button>
-                                    <button
-                                        className="w-1/6 bg-indigo-600 text-white p-4"
-                                        title="Run"
-                                        type="button"
-                                    >
-                                        <p>RUN</p>
-                                    </button>
+                            </DialogContent>
+                        </Dialog>
+                        <Dialog>
+                            <DialogTrigger disabled={!selectedValue} asChild>
+                                <button
+                                    className="disabled:text-[#57577B]"
+                                    title="View Schema"
+                                    type="button"
+                                    onClick={handleViewSchema}
+                                >
+                                    <p>View Schema</p>
+                                </button>
+                            </DialogTrigger>
+                            <DialogContent displayClose className="w-[90%] h-[90%] flex flex-col p-0 rounded-lg">
+                                <DialogHeader className="h-[10%] p-4 bg-indigo-600 flex flex-row justify-between items-center rounded-t-xl">
+                                    <DialogTitle className="text-white">
+                                        {selectedValue} Schema
+                                    </DialogTitle>
+                                    <DialogClose asChild>
+                                        <button
+                                            title="Close"
+                                            type="button"
+                                            aria-label="Close"
+                                        >
+                                            <X color="white" size={30} />
+                                        </button>
+                                    </DialogClose>
+                                </DialogHeader>
+                                <div className="grow flex p-8">
+                                    <SchemaView schema={schema} />
                                 </div>
-                            </div>
-                        </DialogContent>
-                    </Dialog>
-                    <Dialog>
-                        <DialogTrigger disabled={!selectedValue} asChild>
-                            <button
-                                className="disabled:text-[#57577B]"
-                                title="View Schema"
-                                type="button"
-                                onClick={handleViewSchema}
-                            >
-                                <p>View Schema</p>
-                            </button>
-                        </DialogTrigger>
-                        <DialogContent displayClose className="w-[90%] h-[90%] flex flex-col p-0 rounded-lg">
-                            <DialogHeader className="h-[10%] p-4 bg-indigo-600 flex flex-row justify-between items-center rounded-t-xl">
-                                <DialogTitle className="text-white">
-                                    {selectedValue} Schema
-                                </DialogTitle>
-                                <DialogClose asChild>
-                                    <button
-                                        title="Close"
-                                        type="button"
-                                        aria-label="Close"
-                                    >
-                                        <X color="white" size={30} />
-                                    </button>
-                                </DialogClose>
-                            </DialogHeader>
-                            <div className="grow flex p-8">
-                                <SchemaView schema={schema} />
-                            </div>
-                        </DialogContent>
-                    </Dialog>
-                </div>
+                            </DialogContent>
+                        </Dialog>
+                    </div>
+                }
             </div>
         </div >
     )

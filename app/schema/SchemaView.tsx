@@ -8,10 +8,10 @@ import { ImperativePanelHandle } from "react-resizable-panels"
 import { useEffect, useRef, useState } from "react"
 import fcose from "cytoscape-fcose";
 import { cn } from "@/lib/utils"
-import Toolbar from "./toolbar"
-import DataPanel from "./DataPanel"
-import Labels from "./labels"
-import { Category, Graph } from "./model"
+import Toolbar from "../graph/toolbar"
+import DataPanel from "../graph/DataPanel"
+import Labels from "../graph/labels"
+import { Category, Graph } from "../graph/model"
 
 /* eslint-disable react/require-default-props */
 interface Props {
@@ -173,7 +173,7 @@ export default function SchemaView({ schema, onAddEntity, onAddRelation, onDelet
     }
 
     return (
-        <ResizablePanelGroup className="grow" direction="horizontal">
+        <ResizablePanelGroup className="" direction="horizontal">
             <ResizablePanel defaultSize={100} className={cn("w-1 grow flex flex-col gap-10", !isCollapsed && "mr-8")}>
                 <div className="relative">
                     <Toolbar schema={schema} onAddEntitySchema={onAddEntity} onAddRelationSchema={onAddRelation} onDeleteElementSchema={async () => onDelete && selectedElement && await onDelete(selectedElement)} chartRef={chartRef} />
