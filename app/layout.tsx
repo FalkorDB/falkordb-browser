@@ -20,8 +20,8 @@ export default function RootLayout({
   // Setting suppressHydrationWarning on html tag to prevent warning
   // caused by mismatched client/server content caused by next-themes
   return (
-    <html lang="en" suppressHydrationWarning>
-      <body className={cn("h-screen w-screen", inter.className)}>
+    <html className="w-screen h-screen" lang="en" suppressHydrationWarning>
+      <body className={cn("w-full h-full", inter.className)}>
         <NextAuthProvider>{children}</NextAuthProvider>
         <Toaster />
       </body>
