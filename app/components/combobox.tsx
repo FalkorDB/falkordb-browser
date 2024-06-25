@@ -180,7 +180,9 @@ export default function Combobox({ isSelectGraph, disabled = false, inTable, typ
           editableCells={[{
             index: 0,
             setState: setNewOptionName
-          }]} />
+          }]}
+          onHoverCells={[]} 
+          />
       </DialogContent>
     </Dialog>
   )
