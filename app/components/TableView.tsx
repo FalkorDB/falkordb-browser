@@ -12,14 +12,17 @@ type EditableCell = {
 }
 
 interface Props {
-    tableHeaders: string[]
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    tableHeaders: any[]
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     tableRows: any[][]
     editableCells: EditableCell[]
+    onHoverCells: number[]
 }
 
-export default function TableView({ tableHeaders, tableRows, editableCells }: Props) {
+export default function TableView({ tableHeaders, tableRows, editableCells, onHoverCells }: Props) {
 
+    const [hover, setHover] = useState(-1)
     const [editable, setEditable] = useState("")
     const [val, setVal] = useState("")
 
@@ -43,51 +46,65 @@ export default function TableView({ tableHeaders, tableRows, editableCells }: Pr
     }
 
     return (
-        <Table className="border border-gray-200 rounded-lg">
-            <TableHeader className="rounded-t-lg">
-                <TableRow className="border-none">
+        <div className="border border-[#57577B] rounded-lg overflow-hidden">
+            <Table>
+                <TableHeader>
+                    <TableRow className="border-none">
+                        {
+                            tableHeaders.map((header, index) => (
+                                <TableHead key={index} className={cn("font-semibold", editableCells.length > 0 && "p-8")}>{header}</TableHead>
+                            ))
+                        }
+                    </TableRow>
+                </TableHeader>
+                <TableBody>
                     {
-                        tableHeaders.map((header, index) => (
-                            <TableHead key={index} className="font-semibold">{header}</TableHead>
+                        tableRows.map((row, index) => (
+                            <TableRow
+                                className={cn("border-none", !(index % 2) && "bg-[#57577B] hover:bg-[#57577B]")}
+                                onMouseEnter={() => setHover(index)}
+                                onMouseLeave={() => setHover(-1)} key={index}
+                            >
+                                {
+                                    row.length > 0 ?
+                                        row.map((cell, cellIndex) => {
+                                            const editableCell = editableCells.find(e => e.index === cellIndex)
+                                            const isEditable = editable === `${cellIndex}-${cellIndex}`
+                                            const isOnHover = onHoverCells.includes(cellIndex)
+                                            const isHover = hover === index
+                                            return (
+                                                <TableCell key={cellIndex}>
+                                                    {
+                                                        // eslint-disable-next-line no-nested-ternary
+                                                        !isOnHover ?
+                                                            editableCell ?
+                                                                // eslint-disable-next-line jsx-a11y/no-static-element-interactions
+                                                                <div
+                                                                    ref={(ref) => {
+                                                                        if (!ref?.isContentEditable) return
+                                                                        ref?.focus()
+                                                                    }}
+                                                                    className={cn("p-4", isEditable && "bg-[#1F1F3D] hover:bg-[#2E2E51] focus:border focus:border-[#5D5FEF] rounded-lg")}
+                                                                    contentEditable={isEditable}
+                                                                    onBlur={() => setEditable("")}
+                                                                    onKeyDown={(e) => onKeyDown(e, editableCell.setState)}
+                                                                    onClick={() => setEditable(`${index}-${cellIndex}`)}
+                                                                    onInput={(e) => setVal(e.currentTarget.textContent || "")}
+                                                                >
+                                                                    {cell}
+                                                                </div>
+                                                                : cell
+                                                            : isHover ? cell : ""
+                                                    }
+                                                </TableCell>
+                                            )
+                                        }) : <TableCell />
+                                }
+                            </TableRow>
                         ))
                     }
-                </TableRow>
-            </TableHeader>
-            <TableBody>
-                {
-                    tableRows.map((row, index) => (
-                        <TableRow key={index} className={cn("border-none", !(index % 2) && "bg-[#57577B] hover:bg-[#57577B]", (index + 1) === tableRows.length && "rounded-b-lg")}>
-                            {
-                                row.length > 0 ?
-                                    row.map((cell, cellIndex) => {
-                                        const editableCell = editableCells.find(e => e.index === cellIndex)
-                                        const isEditable = editable === `${cellIndex}-${cellIndex}`
-                                        return (
-                                            <TableCell key={cellIndex}>
-                                                {
-                                                    editableCell ?
-                                                        // eslint-disable-next-line jsx-a11y/no-static-element-interactions
-                                                        <div
-                                                        className={cn("p-4", isEditable && "bg-[#1F1F3D] hover:bg-[#2E2E51] focus:border focus:border-[#5D5FEF] rounded-lg")}
-                                                            contentEditable={isEditable}
-                                                            onBlur={() => setEditable("")}
-                                                            onKeyDown={(e) => onKeyDown(e, editableCell.setState)}
-                                                            onClick={() => setEditable(`${index}-${cellIndex}`)}
-                                                            onInput={(e) => setVal(e.currentTarget.textContent || "")}
-                                                        >
-                                                            {cell}
-                                                        </div>
-                                                        : cell
-
-                                                }
-                                            </TableCell>
-                                        )
-                                    }) : <TableCell />
-                            }
-                        </TableRow>
-                    ))
-                }
-            </TableBody>
-        </Table>
+                </TableBody>
+            </Table>
+        </div>
     )
 }
