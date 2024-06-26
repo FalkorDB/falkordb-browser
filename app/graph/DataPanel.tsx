@@ -9,6 +9,7 @@ import Button from "../components/Button";
 
 /* eslint-disable react/require-default-props */
 interface Props {
+    inSchema?: boolean;
     obj: NodeDataDefinition | EdgeDataDefinition;
     onExpand: () => void;
     setProperty?: (key: string, newVal: string) => Promise<boolean>;
@@ -28,7 +29,7 @@ const excludedProperties = new Set([
     "source",
 ]);
 
-export default function DataPanel({ obj, onExpand, setProperty, setPropertySchema, removeProperty, onDeleteElement, setLabel }: Props) {
+export default function DataPanel({ inSchema, obj, onExpand, setProperty, setPropertySchema, removeProperty, onDeleteElement, setLabel }: Props) {
 
     const [isAddValue, setIsAddValue] = useState<boolean>(false)
     const [hover, setHover] = useState<string>("")
@@ -41,7 +42,6 @@ export default function DataPanel({ obj, onExpand, setProperty, setPropertySchem
     const addValueRef = useRef<HTMLDivElement>(null)
     const type = obj.source ? "edge" : "node"
     const label = (type === "edge" ? obj.label : obj.category) || "label"
-    const isHeader = Object.entries(obj).filter((row) => Array.isArray(row[1])).length > 0
 
     useEffect(() => {
         if (!isAddValue) return
@@ -63,7 +63,7 @@ export default function DataPanel({ obj, onExpand, setProperty, setPropertySchem
         e.preventDefault()
 
         if (schemaVal.length === 4 || !key) {
-            Toast("Error",  `${!key ? "Key" : "Value"} cannot be empty`)
+            Toast("Error", `${!key ? "Key" : "Value"} cannot be empty`)
             return
         }
         const success = await setPropertySchema(key, schemaVal)
@@ -94,7 +94,7 @@ export default function DataPanel({ obj, onExpand, setProperty, setPropertySchem
         e.preventDefault()
 
         if (!val || !key) {
-            Toast("Error",  `${!key ? "Key" : "Value"} cannot be empty`)
+            Toast("Error", `${!key ? "Key" : "Value"} cannot be empty`)
             return
         }
 
@@ -126,6 +126,7 @@ export default function DataPanel({ obj, onExpand, setProperty, setPropertySchem
             setLabelEditable(false)
         }
         if (e.code !== "Enter") return
+        e.preventDefault()
         const success = await setLabel(newLabel)
         if (!success) return
         const ob = obj
@@ -183,7 +184,7 @@ export default function DataPanel({ obj, onExpand, setProperty, setPropertySchem
                         </TableCaption>
                     }
                     {
-                        isHeader &&
+                        inSchema &&
                         <TableHeader>
                             <TableRow className="border-[#57577B] text-[#ACACC2] text-lg font-black">
                                 <TableHead className="p-8">Name</TableHead>
@@ -199,9 +200,7 @@ export default function DataPanel({ obj, onExpand, setProperty, setPropertySchem
                             Object.entries(obj).filter((row) => !excludedProperties.has(row[0]) && !(row[0] === "name" && row[1] === obj.id)).map((row, index) => {
                                 const strKey = JSON.parse(JSON.stringify(row[0]))
                                 const strCell = JSON.parse(JSON.stringify(row[1]))
-                                const isArr = Array.isArray(strCell)
-                                const isEditable = !isArr && editable === `${index}`
-
+                                const isEditable = !inSchema && editable === `${index}`
                                 return (
                                     <TableRow
                                         // eslint-disable-next-line react/no-array-index-key
@@ -217,7 +216,7 @@ export default function DataPanel({ obj, onExpand, setProperty, setPropertySchem
                                     >
                                         <TableCell
                                             key={row[0]}
-                                            className={cn("p-8", !isArr && "w-1/2")}
+                                            className={cn("p-8", !inSchema && "w-1/2")}
                                         >
                                             <div className="text-[#ACACC2] flex flex-row gap-2 items-center">
                                                 {
@@ -235,7 +234,7 @@ export default function DataPanel({ obj, onExpand, setProperty, setPropertySchem
                                             </div>
                                         </TableCell>
                                         {
-                                            isArr ?
+                                            inSchema ?
                                                 strCell.map((cell: string | boolean, i: number) => {
                                                     const isEdit = editable === `${index}-${i}`
                                                     return (
@@ -266,7 +265,7 @@ export default function DataPanel({ obj, onExpand, setProperty, setPropertySchem
                                                                 onBlur={() => setEditable("")}
                                                                 contentEditable={isEdit}
                                                             >
-                                                                {typeof cell === "boolean" ? cell.toString() : cell}
+                                                                {cell.toString()}
                                                             </div>
                                                         </TableCell>
                                                     )
@@ -297,7 +296,7 @@ export default function DataPanel({ obj, onExpand, setProperty, setPropertySchem
                                                         onBlur={() => setEditable("")}
                                                         contentEditable={isEditable}
                                                     >
-                                                        {strCell}
+                                                        {strCell.toString()}
                                                     </div>
                                                 </TableCell>
                                         }
@@ -306,7 +305,7 @@ export default function DataPanel({ obj, onExpand, setProperty, setPropertySchem
                             })
                         }
                         {
-                            isAddValue && isHeader ?
+                            isAddValue && inSchema ?
                                 <TableRow className="border-none">
                                     <TableCell className="p-4">
                                         {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions */}
@@ -327,33 +326,33 @@ export default function DataPanel({ obj, onExpand, setProperty, setPropertySchem
                                             contentEditable
                                             onInput={(e) => { schemaVal[0] = e.currentTarget.textContent || "" }}
                                             onKeyDown={onKeyDownSchema}
-                                            />
+                                        />
                                     </TableCell>
                                     <TableCell
                                         className="p-4"
-                                        >
+                                    >
                                         {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions */}
                                         <div
                                             className="p-4 rounded-lg bg-[#1F1F3D] hover:bg-[#2E2E51] focus:border focus:border-[#5D5FEF]"
                                             contentEditable
                                             onInput={(e) => { schemaVal[1] = e.currentTarget.textContent || "" }}
                                             onKeyDown={onKeyDownSchema}
-                                            />
+                                        />
                                     </TableCell>
                                     <TableCell
                                         className="p-4"
-                                        >
+                                    >
                                         {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions */}
                                         <div
                                             className="p-4 rounded-lg bg-[#1F1F3D] hover:bg-[#2E2E51] focus:border focus:border-[#5D5FEF]"
                                             contentEditable
                                             onInput={(e) => { schemaVal[2] = e.currentTarget.textContent || "" }}
                                             onKeyDown={onKeyDownSchema}
-                                            />
+                                        />
                                     </TableCell>
                                     <TableCell
                                         className="p-4"
-                                        >
+                                    >
                                         {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions */}
                                         <div
                                             className="p-4 rounded-lg bg-[#1F1F3D] hover:bg-[#2E2E51] focus:border focus:border-[#5D5FEF]"
@@ -363,7 +362,6 @@ export default function DataPanel({ obj, onExpand, setProperty, setPropertySchem
                                         />
                                     </TableCell>
                                 </TableRow>
-
                                 : isAddValue &&
                                 <TableRow>
                                     <TableCell className="w-1/2 p-4">
