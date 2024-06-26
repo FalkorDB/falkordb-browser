@@ -2,12 +2,12 @@
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Toast, cn, prepareArg, securedFetch } from "@/lib/utils"
-import { ChevronDown, ChevronUp, Download, Trash2, UploadIcon } from "lucide-react"
-import { Dispatch, KeyboardEvent, SetStateAction, useState } from "react"
-import DeleteGraph from "./DeleteGraph"
+import { ChevronDown, ChevronUp, Trash2, UploadIcon } from "lucide-react"
+import { Dispatch, SetStateAction, useEffect, useState } from "react"
+import TableView from "./TableView"
 import Upload from "./Upload"
+import DeleteGraph from "./DeleteGraph"
 
 /* eslint-disable react/require-default-props */
 interface ComboboxProps {
@@ -24,13 +24,11 @@ interface ComboboxProps {
 export default function Combobox({ isSelectGraph, disabled = false, inTable, type, options, setOptions, selectedValue = "", setSelectedValue }: ComboboxProps) {
 
   const [open, setOpen] = useState<boolean>(false)
-  const [editable, setEditable] = useState<string>("")
-  const [editName, setEditName] = useState<string>("")
+  const [optionName, setNewOptionName] = useState<string[]>([])
   const [isUploadOpen, setIsUploadOpen] = useState<boolean>(false)
   const [isDeleteOpen, setIsDeleteOpen] = useState<boolean>(false)
-
-  const onExport = async () => {
-    const result = await securedFetch(`api/graph/${prepareArg(selectedValue)}/export`, {
+  const onExport = async (graphName: string) => {
+    const result = await securedFetch(`api/graph/${prepareArg(graphName)}/export`, {
       method: "GET"
     })
 
@@ -54,34 +52,69 @@ export default function Combobox({ isSelectGraph, disabled = false, inTable, typ
       Toast((e as Error).message)
     }
   }
+  const tableRows = options.map(option => [
+    option,
+    <button
+      key="export"
+      onClick={() => onExport(option)}
+      type="button"
+    >Export</button>,
+    <div key="menu">
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <button
+            className="font-bold rotate-90"
+            title="More"
+            type="button"
+          >
+            <p>...</p>
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent side="right" className="flex flex-row min-w-fit">
+          <DropdownMenuItem className="justify-center">
+            <button
+              className="disabled:text-gray-400 disabled:text-opacity-70"
+              title="Upload Data"
+              type="button"
+              aria-label="Upload Data"
+              onClick={() => setIsUploadOpen(true)}
+            >
+              <p><UploadIcon /></p>
+            </button>
+          </DropdownMenuItem>
+          <DropdownMenuItem className="justify-center">
+            <button
+              className="disabled:text-gray-400 disabled:text-opacity-70"
+              title="Delete"
+              type="button"
+              aria-label="Delete"
+              onClick={() => setIsDeleteOpen(true)}
+            >
+              <p><Trash2 /></p>
+            </button>
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <Upload isOpen={isUploadOpen} onOpen={setIsUploadOpen} />
+      <DeleteGraph graphName={option} isOpen={isDeleteOpen} onOpen={setIsDeleteOpen} />
+    </div>
+  ])
 
-  const onEdit = async (e: KeyboardEvent<HTMLTableCellElement>, option: string) => {
-    if (!setOptions) return
-    if (e.key === "Escape") {
-      e.preventDefault()
-      setEditable("")
-      return
+  useEffect(() => {
+    if (!setOptions || optionName.length === 0) return
+    const run = async () => {
+      const result = await fetch(`api/graph/${prepareArg(optionName[1])}/?sourceName=${optionName[0]}`, {
+        method: "PUT",
+      })
+      if (!result.ok) {
+        const json = await result.json()
+        Toast(json.message || "Failed to rename graph")
+        return
+      }
+      setOptions(prev => prev.filter(option => option !== optionName[0]).concat(optionName[1]))
     }
-
-    if (e.key !== "Enter") return
-    e.preventDefault()
-
-    const result = await securedFetch(`/api/graph/${prepareArg(editName)}/?sourceName=${prepareArg(option)}`, {
-      method: "PATCH",
-    })
-
-    if (!result.ok) {
-      Toast("Failed to edit graph")
-      return
-    }
-    setEditable("")
-    setOptions(prev => prev.map(opt => {
-      if (opt !== option) return opt
-      return editName
-    }))
-    if (option !== selectedValue) return
-    setSelectedValue(editName)
-  }
+    run()
+  }, [optionName, setOptions])
 
   return (
     <Dialog>
@@ -137,100 +170,19 @@ export default function Combobox({ isSelectGraph, disabled = false, inTable, typ
           }
         </DropdownMenuContent>
       </DropdownMenu>
-      <DialogContent>
+      <DialogContent className="w-1/4">
         <DialogHeader>
           <DialogTitle>Manage Graphs</DialogTitle>
         </DialogHeader>
-        <div className="border border-gray-200 rounded-xl">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="font-medium text-gray-400">GRAPH NAME</TableHead>
-                <TableHead className="font-medium text-gray-400">EXPORT</TableHead>
-                <TableHead className="w-[5%]" />
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {
-                options.length > 0 ?
-                  options.map((option: string, index: number) => (
-                    <TableRow
-                      className={cn(!(index % 2) && "bg-gray-50 hover:bg-gray-50")}
-                      // eslint-disable-next-line react/no-array-index-key
-                      key={index}
-                    // onMouseEnter={() => setIsHover(index)}
-                    // onMouseLeave={() => setIsHover(null)}
-                    >
-                      <TableCell
-                        ref={(ref) => {
-                          if (!ref?.isContentEditable) return
-                          ref.focus()
-                        }}
-                        className={cn("flex font-light text-gray-500 h-full", editable === option && "border border-gray-200")}
-                        onClick={() => setEditable(option)}
-                        contentEditable={editable === option}
-                        onBlur={() => setEditable("")}
-                        onKeyDown={(e) => onEdit(e, option)}
-                        onInput={(e) => setEditName(e.currentTarget.textContent || "")}
-                      >{option}</TableCell>
-                      <TableCell className="font-light text-gray-500">
-                        <button
-                          title="Export"
-                          type="button"
-                          aria-label="Export"
-                          onClick={onExport}
-                        >
-                          <p><Download /></p>
-                        </button>
-                      </TableCell>
-                      <TableCell className="font-light text-gray-500">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <button
-                              className="font-bold rotate-90"
-                              title="More"
-                              type="button"
-                            >
-                              <p>...</p>
-                            </button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent side="right" className="flex flex-row min-w-fit">
-                            <DropdownMenuItem className="justify-center">
-                              <button
-                                className="disabled:text-gray-400 disabled:text-opacity-70"
-                                title="Upload Data"
-                                type="button"
-                                aria-label="Upload Data"
-                                onClick={() => setIsUploadOpen(true)}
-                              >
-                                <p><UploadIcon /></p>
-                              </button>
-                            </DropdownMenuItem>
-                            <DropdownMenuItem className="justify-center">
-                              <button
-                                className="disabled:text-gray-400 disabled:text-opacity-70"
-                                title="Delete"
-                                type="button"
-                                aria-label="Delete"
-                                onClick={() => setIsDeleteOpen(true)}
-                              >
-                                <p><Trash2 /></p>
-                              </button>
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                        <Upload isOpen={isUploadOpen} onOpen={setIsUploadOpen} />
-                        <DeleteGraph graphName={option} isOpen={isDeleteOpen} onOpen={setIsDeleteOpen} />
-                      </TableCell>
-                    </TableRow>
-                  ))
-                  : <TableRow>
-                    <TableCell />
-                  </TableRow>
-              }
-            </TableBody>
-          </Table>
-        </div>
+        <TableView
+          tableHeaders={["GRAPH NAME", "EXPORT", ""]}
+          tableRows={tableRows}
+          editableCells={[{
+            index: 0,
+            setState: setNewOptionName
+          }]}
+          onHoverCells={[]} 
+          />
       </DialogContent>
     </Dialog>
   )

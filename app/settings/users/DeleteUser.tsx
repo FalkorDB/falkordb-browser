@@ -39,7 +39,7 @@ export default function DeleteUser({ isDeleteSelected, users, setUsers }: Delete
                         <Button
                             disabled={users.length === 0}
                             variant="Primary"
-                            icon={<Trash2/>}
+                            icon={<Trash2 />}
                             label="Delete User"
                         />
                         : <button
@@ -47,11 +47,11 @@ export default function DeleteUser({ isDeleteSelected, users, setUsers }: Delete
                             type="button"
                             aria-label="Delete"
                         >
-                            <Trash2 size={20} />
+                            <Trash2 size={15} />
                         </button>
                 }
             </AlertDialogTrigger>
-            <AlertDialogContent  className="flex flex-col gap-10 p-4">
+            <AlertDialogContent className="flex flex-col gap-10 p-4">
                 <AlertDialogHeader className="">
                     <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
                 </AlertDialogHeader>
