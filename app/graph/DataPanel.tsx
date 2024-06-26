@@ -124,9 +124,9 @@ export default function DataPanel({ inSchema, obj, onExpand, setProperty, setPro
         if (e.code === "Escape") {
             e.preventDefault()
             setLabelEditable(false)
-            }
-            if (e.code !== "Enter") return
-            e.preventDefault()
+        }
+        if (e.code !== "Enter") return
+        e.preventDefault()
         const success = await setLabel(newLabel)
         if (!success) return
         const ob = obj
@@ -265,7 +265,7 @@ export default function DataPanel({ inSchema, obj, onExpand, setProperty, setPro
                                                                 onBlur={() => setEditable("")}
                                                                 contentEditable={isEdit}
                                                             >
-                                                                {typeof cell !== "string" ? cell.toString() : cell}
+                                                                {cell.toString()}
                                                             </div>
                                                         </TableCell>
                                                     )
@@ -296,7 +296,7 @@ export default function DataPanel({ inSchema, obj, onExpand, setProperty, setPro
                                                         onBlur={() => setEditable("")}
                                                         contentEditable={isEditable}
                                                     >
-                                                        {typeof strCell !== "string" ? strCell.toString() : strCell}
+                                                        {strCell.toString()}
                                                     </div>
                                                 </TableCell>
                                         }
