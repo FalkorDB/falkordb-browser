@@ -13,7 +13,7 @@ import Upload from "./Upload"
 interface ComboboxProps {
   isSelectGraph?: boolean,
   disabled?: boolean,
-  inTable?: boolean,
+  Small?: boolean,
   type?: string | undefined,
   options: string[],
   setOptions?: Dispatch<SetStateAction<string[]>>,
@@ -21,7 +21,7 @@ interface ComboboxProps {
   setSelectedValue: (value: string) => void,
 }
 
-export default function Combobox({ isSelectGraph, disabled = false, inTable, type, options, setOptions, selectedValue = "", setSelectedValue }: ComboboxProps) {
+export default function Combobox({ isSelectGraph, disabled = false, Small, type, options, setOptions, selectedValue = "", setSelectedValue }: ComboboxProps) {
 
   const [open, setOpen] = useState<boolean>(false)
   const [editable, setEditable] = useState<string>("")
@@ -89,15 +89,15 @@ export default function Combobox({ isSelectGraph, disabled = false, inTable, typ
         <DropdownMenuTrigger disabled={disabled} className="w-fit" asChild>
           <button
             disabled={disabled}
-            className={cn(inTable ? "text-sm font-light" : "text-2xl", "w-fit flex flex-row items-center gap-4 disabled:text-gray-300")}
+            className={cn(Small ? "text-sm font-light" : "text-2xl", "w-fit flex flex-row items-center gap-4 disabled:text-gray-300")}
             title="Select Graph"
             type="button"
           >
             <p>{selectedValue || `Select ${type || "Graph"}...`}</p>
             {
               open ?
-                <ChevronUp size={inTable ? 20 : 15} />
-                : <ChevronDown size={inTable ? 20 : 15} />
+                <ChevronUp size={Small ? 20 : 15} />
+                : <ChevronDown size={Small ? 20 : 15} />
             }
           </button>
         </DropdownMenuTrigger>

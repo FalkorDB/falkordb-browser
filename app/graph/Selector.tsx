@@ -76,7 +76,7 @@ export default function Selector({ onChange, queries }: {
     }
 
     const handleOnChange = async (name: string) => {
-        const q = 'MATCH (n)-[e]-(m) return n,e,m'
+        const q = 'MATCH (n) OPTIONAL MATCH (n)-[e]-(m) RETURN *'
         const result = await securedFetch(`api/graph/${name}_schema/?query=${q}`, {
             method: "GET"
         })

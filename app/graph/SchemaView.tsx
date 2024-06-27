@@ -104,7 +104,7 @@ function getStyle() {
     return style
 }
 
-export default function SchemaView({ schema, onAddEntity, onAddRelation, onDelete, removeProperty, setLabel, setProperty}: Props) {
+export default function SchemaView({ schema, onAddEntity, onAddRelation, onDelete, removeProperty, setLabel, setProperty }: Props) {
 
     const [selectedElement, setSelectedElement] = useState<NodeDataDefinition | EdgeDataDefinition>();
     const [isCollapsed, setIsCollapsed] = useState<boolean>(false);
@@ -176,7 +176,7 @@ export default function SchemaView({ schema, onAddEntity, onAddRelation, onDelet
         <ResizablePanelGroup className="grow" direction="horizontal">
             <ResizablePanel defaultSize={100} className={cn("w-1 grow flex flex-col gap-10", !isCollapsed && "mr-8")}>
                 <div className="relative">
-                    <Toolbar schema={schema} onAddEntitySchema={onAddEntity} onAddRelationSchema={onAddRelation} onDeleteElementSchema={async () => onDelete && selectedElement && await onDelete(selectedElement)} chartRef={chartRef} />
+                    <Toolbar onDeleteElementSchema={async () => onDelete && selectedElement && await onDelete(selectedElement)} chartRef={chartRef} />
                     {
                         isCollapsed &&
                         <button
@@ -232,7 +232,7 @@ export default function SchemaView({ schema, onAddEntity, onAddRelation, onDelet
                         obj={selectedElement}
                         onExpand={onExpand}
                         onDeleteElement={onDelete ? () => onDelete(selectedElement) : undefined}
-                        removeProperty={removeProperty  ? async (key:string) => removeProperty(selectedElement, key) : undefined}
+                        removeProperty={removeProperty ? async (key: string) => removeProperty(selectedElement, key) : undefined}
                         setLabel={setLabel ? async (label: string) => setLabel(selectedElement, label) : undefined}
                         setPropertySchema={setProperty ? async (key: string, newVal: string[]) => setProperty(selectedElement, key, newVal) : undefined}
                     />

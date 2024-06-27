@@ -15,7 +15,7 @@ export async function GET(_request: NextRequest, { params }: { params: {schema: 
 
         const graph = client.selectGraph(schemaId);
 
-        const query = `MATCh (n)-[e]-(m) return n,e,m`
+        const query = `MATCH (n) OPTIONAL MATCH (n)-[e]-(m) RETURN *`
 
         const result = await graph.query(query)
 

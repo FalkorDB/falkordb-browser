@@ -138,7 +138,7 @@ export default function DataPanel({ inSchema, obj, onExpand, setProperty, setPro
     }
 
     return (
-        <div className="h-full w-full flex flex-col shadow-lg DataPanel">
+        <div className="flex flex-col Panel">
             <div className="w-full flex flex-row justify-between items-center bg-[#7167F6] p-4">
                 <div className="flex flex-row gap-4 items-center">
                     <button

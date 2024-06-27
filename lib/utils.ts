@@ -1,3 +1,4 @@
+import { Graph } from "@/app/graph/model"
 import { toast } from "@/components/ui/use-toast"
 import { type ClassValue, clsx } from "clsx"
 import { signOut } from "next-auth/react"
@@ -37,4 +38,11 @@ export function securedFetch(input: string | URL | globalThis.Request, init?: Re
 
 export function prepareArg(arg: string) {
   return encodeURIComponent(arg.trim())
+}
+
+export const getGraph = async (graphName: string) => {
+  const q = "MATCH (n) OPTIONAL MATCH (n)-[e]->(m) RETURN n, e, m"
+  const result = await securedFetch(`api/graph/${graphName}/?query=${q}`)
+  const json = await result.json()
+  return Graph.create(graphName, json.result)
 }

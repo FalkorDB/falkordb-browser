@@ -7,6 +7,7 @@ import { useState } from "react";
 import Image from "next/image";
 import { Toast, cn, prepareArg, securedFetch } from "@/lib/utils";
 import { useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
 import Button from "../components/Button";
 
 /* eslint-disable react/require-default-props */
@@ -27,14 +28,14 @@ export default function Header({ graphName, inCreate = false, inSettings = false
 
     const run = () => {
         const query1 = `CREATE
-            (:Rider {name:'Valentino Rossi'})-[:rides]->(:Team {name:'Yamaha'}),
-            (:Rider {name:'Dani Pedrosa'})-[:rides]->(:Team {name:'Honda'}),
-            (:Rider {name:'Andrea Dovizioso'})-[:rides]->(:Team {name:'Ducati'})`
+            (:Rider {name:'Valentino Rossi', age: 20})-[:rides]->(:Team {name:'Yamaha'}),
+            (:Rider {name:'Dani Pedrosa', age: 38})-[:rides]->(:Team {name:'Honda'}),
+            (:Rider {name:'Andrea Dovizioso', age: 31})-[:rides]->(:Team {name:'Ducati'})`
             securedFetch(`api/graph/FalkorDB/?query=${prepareArg(query1)}`, {
             method: "GET"
         })
         const query2 = `CREATE
-            (:Rider {name:'string'})-[:rides]->(:Team {name:'string'})`
+            (:Rider {name:['str', 'the name of the rider', 'true', 'false'], age: ['int','the age of a rider', 'false', 'false']})-[:rides]->(:Team {name:['str', 'the name of the team', 'true', 'false']})`
         securedFetch(`api/graph/FalkorDB_schema/?query=${prepareArg(query2)}`, {
             method: "GET"
         })

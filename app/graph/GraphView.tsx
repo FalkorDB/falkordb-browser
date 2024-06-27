@@ -1,7 +1,7 @@
 'use client'
 
 import CytoscapeComponent from "react-cytoscapejs";
-import cytoscape, { EdgeDefinition, ElementDefinition, EventObject, NodeDataDefinition, NodeDefinition } from "cytoscape";
+import cytoscape, { EdgeDataDefinition, EdgeDefinition, ElementDefinition, EventObject, NodeDataDefinition, NodeDefinition } from "cytoscape";
 import { useRef, useState, useImperativeHandle, forwardRef, useEffect, Dispatch, SetStateAction } from "react";
 import fcose from 'cytoscape-fcose';
 import Editor, { Monaco } from "@monaco-editor/react";
@@ -16,6 +16,7 @@ import DataPanel from "./DataPanel";
 import Labels from "./labels";
 import Toolbar from "./toolbar";
 import { Query } from "./Selector";
+import CreateElement from "../components/CreateElement";
 
 const monacoOptions: editor.IStandaloneEditorConstructionOptions = {
     renderLineHighlight: "none",
@@ -140,15 +141,15 @@ function getStyle() {
     return style
 }
 
-const GraphView = forwardRef(({ graphName, setQueries, schema }: {
+const GraphView = forwardRef(({ graphName, setQueries }: {
     graphName: string,
-    schema: Graph,
     // eslint-disable-next-line react/require-default-props
     setQueries?: Dispatch<SetStateAction<Query[]>>,
 }, ref) => {
 
     const [graph, setGraph] = useState<Graph>(Graph.empty())
     const [query, setQuery] = useState<string>("")
+    const [isAdd, setIsAdd] = useState<"node" | "edge" | null>(null)
     const [selectedElement, setSelectedElement] = useState<NodeDefinition | EdgeDefinition>();
     const [isCollapsed, setIsCollapsed] = useState<boolean>(true);
     const chartRef = useRef<cytoscape.Core | null>(null)
@@ -186,10 +187,7 @@ const GraphView = forwardRef(({ graphName, setQueries, schema }: {
     }
 
     useEffect(() => {
-        if (chartRef.current) {
-            const layout = chartRef.current.layout(LAYOUT);
-            layout.run();
-        }
+        chartRef?.current?.layout(LAYOUT).run();
     }, [graph.Elements]);
 
     useEffect(() => {
@@ -201,7 +199,7 @@ const GraphView = forwardRef(({ graphName, setQueries, schema }: {
         dataPanel.current?.collapse()
     }, [])
 
-    const defaultQuery = () => query || "MATCH (n) OPTIONAL MATCH (n)-[e]-(m) return n,e,m LIMIT 100"
+    const defaultQuery = () => query || "MATCH (n) OPTIONAL MATCH (n) OPTIONAL MATCH (n)-[e]-(m) RETURN * LIMIT 100"
 
     const runQuery = async () => {
 
@@ -298,6 +296,7 @@ const GraphView = forwardRef(({ graphName, setQueries, schema }: {
     }
 
     const handleTap = (evt: EventObject) => {
+        setIsAdd(null)
         if (selectedElement) {
             selectedElement.selected = false
         }
@@ -366,36 +365,28 @@ const GraphView = forwardRef(({ graphName, setQueries, schema }: {
         return success
     }
 
-    const onAddEntity = async (entityAttributes: string[][]) => {
-        const category = entityAttributes.find(row => row[0] === "category")
-        const filteredAttributes = entityAttributes.filter(row => row[0] !== "category")
-        if (!category) {
-            Toast("Missing Category")
-            return
-        }
-        const q = `CREATE (n:${category[1]} {${filteredAttributes.map(([k, v]) => `${k}: '${v}'`)}}) return n`
+    const onAddElement = async (obj: NodeDataDefinition | EdgeDataDefinition) => {
+        const category = obj.category || obj.label
+
+        const filteredAttributes = Object.entries(obj).filter(row => row[0] !== "category" && row[0] !== "label")
+        const q = `CREATE (n:${category} {${filteredAttributes.map(([k, v]) => `${k}: '${v}'`)}}) return n`
         const result = await securedFetch(`api/graph/${prepareArg(graphName)}/?query=${prepareArg(q)}`, {
             method: "GET"
         })
+
         if (!result.ok) return
+
         const node = (await result.json()).result.data[0].n
         graph.Elements = graph.extendNode(node, graph.Elements)
-    }
-
-    const onAddRelation = async (relationAttributes: string[][]) => {
-        const label = relationAttributes.find(row => row[0] === "label")
-        const filteredAttributes = relationAttributes.filter(row => row[0] !== "label")
-        if (!label) {
-            Toast("Missing Label")
-            return
+        const nodeElement = graph.Elements.find(e => e.data.id === node.id.toString())
+        if (nodeElement) {
+            chartRef.current?.add(nodeElement)
+            chartRef.current?.layout(LAYOUT).run()
+        } else {
+            Toast("Failed to add node")
         }
-        const q = `CREATE (e:${label[1]} {${filteredAttributes.map(([k, v]) => `${k}: '${v}'`)}}) return e`
-        const result = await securedFetch(`api/graph/${prepareArg(graphName)}/?query=${prepareArg(q)}`, {
-            method: "GET"
-        })
-        if (!result.ok) return
-        const edge = (await result.json()).result.data[0].e
-        graph.Elements = graph.extendEdge(edge, graph.Elements)
+        setIsAdd(null)
+        dataPanel.current?.collapse()
     }
 
     return (
@@ -458,7 +449,7 @@ const GraphView = forwardRef(({ graphName, setQueries, schema }: {
                     </Dialog>
                 </div>
                 <div className="relative">
-                    <Toolbar schema={schema} deleteDisable={!selectedElement?.data.id} onDeleteElementGraph={onDeleteElement} onAddEntityGraph={onAddEntity} onAddRelationGraph={onAddRelation} chartRef={chartRef} />
+                    <Toolbar dataPanel={graphName ? dataPanel : undefined} deleteDisable={!selectedElement?.data.id} onDeleteElementGraph={onDeleteElement} setIsAdd={setIsAdd} chartRef={chartRef} />
                     {
                         isCollapsed && graph.Id &&
                         <button
@@ -466,7 +457,7 @@ const GraphView = forwardRef(({ graphName, setQueries, schema }: {
                             title="Open"
                             type="button"
                             onClick={() => onExpand()}
-                            disabled={!selectedElement}
+                            disabled={!selectedElement && !isAdd}
                             aria-label="Open"
                         >
                             <ChevronLeft />
@@ -508,15 +499,22 @@ const GraphView = forwardRef(({ graphName, setQueries, schema }: {
                 onExpand={() => setIsCollapsed(false)}
             >
                 {
-                    selectedElement &&
-                    <DataPanel
-                        setLabel={onSetLabel}
-                        removeProperty={removeProperty}
-                        setProperty={setProperty}
-                        obj={selectedElement.data}
-                        onExpand={onExpand}
-                        onDeleteElement={onDeleteElement}
-                    />
+                    graphName && isAdd ?
+                        <CreateElement
+                            graphName={graphName}
+                            type={isAdd}
+                            onExpand={onExpand}
+                            onCreateElement={onAddElement}
+                        />
+                        : selectedElement &&
+                        <DataPanel
+                            setLabel={onSetLabel}
+                            removeProperty={removeProperty}
+                            setProperty={setProperty}
+                            obj={selectedElement.data}
+                            onExpand={onExpand}
+                            onDeleteElement={onDeleteElement}
+                        />
                 }
             </ResizablePanel>
         </ResizablePanelGroup>

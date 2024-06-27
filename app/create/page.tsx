@@ -36,7 +36,7 @@ export default function Create() {
     useEffect(() => {
         if (progress !== 100) return
         const run = async () => {
-            const q = "MATCH (n)-[e]-(m) RETURN n,e,m"
+            const q = "MATCH (n) OPTIONAL MATCH (n)-[e]-(m) RETURN *"
 
             const res = await securedFetch(`api/graph/${prepareArg(graphName)}_schema/?query=${prepareArg(q)}`, {
                 method: "GET"
@@ -312,7 +312,7 @@ export default function Create() {
                             <p className="text-[#57577B]">|</p>
                             <span><span>{edgesCount}</span>&emsp;Edges</span>
                         </div>
-                        <GraphView schema={schema} graphName={graphName} />
+                        <GraphView graphName={graphName} />
                         <div className="flex flex-row justify-end gap-16">
                             <button
                                 className="flex flex-row gap-1 items-center text-[#7167F6]"
