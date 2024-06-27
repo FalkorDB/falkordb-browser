@@ -8,6 +8,7 @@ import Image from "next/image";
 import { cn, prepareArg, securedFetch } from "@/lib/utils";
 import { useRouter, usePathname } from "next/navigation";
 import Button from "./Button";
+import Avatar from "./Avatar";
 
 /* eslint-disable react/require-default-props */
 interface Props {
@@ -43,8 +44,8 @@ export default function Header({ graphName, inCreate = false, inSettings = false
     }
 
     return (
-        <div className="h-[6%] flex flex-col">
-            <div className="p-2 rounded-t-lg Top" />
+        <div className="h-[10%] flex flex-col">
+            <div className="h-2 rounded-t-lg Top" />
             <div className="py-6 px-11 flex flex-row justify-between items-center Header">
                 <div className="flex flex-row gap-4 items-center">
                     <Image width={103} height={29} src="/ColorLogo.svg" alt="" />
@@ -177,10 +178,7 @@ export default function Header({ graphName, inCreate = false, inSettings = false
                             <Settings size={25} />
                         </button>
                     </div>
-                    <div className="flex flex-row gap-4 items-center">
-                        <span>user.name</span>
-                        <div className="w-8 h-8 bg-red-800 rounded-full" />
-                    </div>
+                    <Avatar />
                 </div>
             </div>
         </div>

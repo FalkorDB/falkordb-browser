@@ -191,7 +191,7 @@ export default function SchemaView({ schema, onAddEntity, onAddRelation, onDelet
                         </button>
                     }
                 </div>
-                <div className="grow relative flex">
+                <div className="h-1 grow relative flex">
                     <CytoscapeComponent
                         className="Canvas"
                         layout={LAYOUT}
