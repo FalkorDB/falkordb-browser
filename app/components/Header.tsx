@@ -7,6 +7,7 @@ import { useState } from "react";
 import Image from "next/image";
 import { cn, prepareArg, securedFetch } from "@/lib/utils";
 import { useRouter, usePathname } from "next/navigation";
+import { Role } from "next-auth";
 import Button from "./Button";
 import Avatar from "./Avatar";
 
@@ -21,6 +22,7 @@ export default function Header({ graphName, inCreate = false, inSettings = false
     const [open, setOpen] = useState<boolean>(false)
     const router = useRouter()
     const pathname = usePathname()
+    const [userStatus, setUserStatus] = useState<Role>()
 
     // const [newName, setNewName] = useState<string>("")
 
@@ -168,6 +170,7 @@ export default function Header({ graphName, inCreate = false, inSettings = false
                     }
                     <div>
                         <button
+                            disabled={userStatus !== "Admin"}
                             className={cn("flex flex-row gap-2", !graphName && "text-[#57577B]")}
                             title="Settings"
                             type="button"
@@ -178,7 +181,7 @@ export default function Header({ graphName, inCreate = false, inSettings = false
                             <Settings size={25} />
                         </button>
                     </div>
-                    <Avatar />
+                    <Avatar setUserStatus={setUserStatus}/>
                 </div>
             </div>
         </div>

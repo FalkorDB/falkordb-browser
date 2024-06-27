@@ -1,11 +1,11 @@
 import { FalkorDB } from "falkordb";
 import CredentialsProvider from "next-auth/providers/credentials"
-import { AuthOptions, getServerSession } from "next-auth"
+import { AuthOptions, Role, getServerSession } from "next-auth"
 import { NextResponse } from "next/server";
 
 const connections = new Map<number, FalkorDB>();
 
-async function newClient(credentials: { host: string, port: string, password: string, username: string, tls: string, ca: string }, id: number) {
+async function newClient(credentials: { host: string, port: string, password: string, username: string, tls: string, ca: string }, id: number): Promise<{ role: Role, client: FalkorDB }> {
     const client = credentials.ca === "undefined" ? await FalkorDB.connect({
         socket: {
             host: credentials.host ?? "localhost",
@@ -17,14 +17,14 @@ async function newClient(credentials: { host: string, port: string, password: st
         password: credentials.password ?? undefined,
         username: credentials.username ?? undefined
     })
-    : await FalkorDB.connect({
-        socket: {
-            host: credentials.host ?? "localhost",
-            port: credentials.port ? parseInt(credentials.port, 10) : 6379,
-        },
-        password: credentials.password ?? undefined,
-        username: credentials.username ?? undefined
-    })
+        : await FalkorDB.connect({
+            socket: {
+                host: credentials.host ?? "localhost",
+                port: credentials.port ? parseInt(credentials.port, 10) : 6379,
+            },
+            password: credentials.password ?? undefined,
+            username: credentials.username ?? undefined
+        })
 
     // Save connection in connections map for later use
     connections.set(id, client)
@@ -42,9 +42,17 @@ async function newClient(credentials: { host: string, port: string, password: st
         }
     });
 
-    // Verify connection
-    await client.connection.ping()
-    return client
+    // Verify connection and Role
+    const admin = await client.connection.aclGetUser(credentials.username || "default")
+
+    if (admin) return { role: "Admin", client }
+
+    try {
+        await client.connection.sendCommand(["GRAPH.QUERY"])
+        return { role: "Read-Write", client }
+    } catch (error) {
+        return { role: "Read-Only", client }
+    }
 }
 
 let userId = 1;
@@ -71,7 +79,7 @@ const authOptions: AuthOptions = {
                     const id = userId;
                     userId += 1;
 
-                    await newClient(credentials, id)
+                    const { role } = await newClient(credentials, id)
 
                     const res = {
                         id,
@@ -80,7 +88,8 @@ const authOptions: AuthOptions = {
                         password: credentials.password,
                         username: credentials.username,
                         tls: credentials.tls === "true",
-                        ca: credentials.ca
+                        ca: credentials.ca,
+                        role
                     }
                     return res
                 } catch (err) {
@@ -140,20 +149,20 @@ export async function getClient() {
 
     // If client is not found, create a new one
     if (!client) {
-        client = await newClient({
+        client = (await newClient({
             host: user.host,
             port: user.port.toString() ?? "6379",
             username: user.username,
             password: user.password,
             tls: String(user.tls),
             ca: user.ca
-        }, user.id)
+        }, user.id)).client
     }
 
     if (!client) {
         return NextResponse.json({ message: "Not authenticated" }, { status: 401 })
     }
-    
+
     return client
 }
 
