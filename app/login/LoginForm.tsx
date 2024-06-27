@@ -9,6 +9,7 @@ import { Eye } from "lucide-react";
 import Input from "@/app/components/Input";
 import Button from "@/app/components/Button";
 import Image from "next/image";
+import { cn } from "@/lib/utils";
 
 const DEFAULT_HOST = "localhost";
 const DEFAULT_PORT = "6379";
@@ -139,7 +140,7 @@ export default function LoginForm() {
           <div className="flex flex-row gap-8">
             <div className="flex flex-row gap-2">
               <Checkbox
-                className="w-6 h-6 rounded-lg"
+                className={cn("w-6 h-6 rounded-lg", !TLS && "border-white")}
                 defaultChecked={false}
                 checked={TLS}
                 onCheckedChange={(checked) => setTLS(checked as boolean)}
