@@ -62,10 +62,9 @@ function Dropzone({ filesCount = false, className = "", withTable = false, disab
             {
                 withTable &&
                 <div className='flex-1 bg-[#272746] overflow-auto flex flex-col gap-10 justify-center'>
-                    {
-                        filesCount ? <div className='text-lg'>Uploaded {files.length < 2 ? "File" : "Files"} ({files.length})</div>
-                            : <p className='font-semibold'>Uploaded Files</p>
-                    }
+                    <div className='text-lg'>
+                        {`Uploaded Files ${filesCount ? `(${files.length})`: ''}`}
+                    </div>
                     <Table parentClassName='grow'>
                         <TableHeader className='border-b border-[#7E7E9B]'>
                             <TableRow className='border-none'>
