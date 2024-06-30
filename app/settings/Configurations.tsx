@@ -1,10 +1,16 @@
 "use client";
 
-import React, { useEffect } from "react";
-import { securedFetch } from "@/lib/utils";
+import React, { useEffect, useState } from "react";
+import { Toast, securedFetch } from "@/lib/utils";
 import TableView from "../components/TableView";
 
-const Configs = [
+type Config = {
+    name: string,
+    description: string,
+    value: string | number
+}
+
+const Configs: Config[] = [
     {
         name: "THREAD_COUNT",
         description: `The number of threads in FalkorDB’s thread pool.
@@ -104,10 +110,33 @@ const Configs = [
 // Shows the details of a current database connection 
 export default function Configurations() {
 
-    const tableRows = Configs.map((config) => [
-        config.name,
-        config.description,
-        config.value
+    const [configs, setConfigs] = useState<Config[]>(Configs)
+
+    useEffect(() => {
+        const run = async () => {
+            const result = await securedFetch(`api/graph/?type=config`, {
+                method: 'GET',
+            })
+
+            if (!result.ok) {
+                Toast(`Failed to fetch configurations value`)
+                return
+            }
+            const newConfigs = (await result.json()).config
+            setConfigs(Configs.map((config: Config) => {
+                const c = config
+                const [,value] = newConfigs.find(([name,]: [string, string | number]) => name === c.name);
+                c.value = value;
+                return c
+            }))
+        }
+        run()
+    })
+
+    const tableRows = configs.map(({ name, description, value }) => [
+        name,
+        description,
+        value
     ])
 
     useEffect(() => {
@@ -129,7 +158,7 @@ export default function Configurations() {
 
     return (
         <div className="w-full h-full flex flex-col space-y-4">
-            <TableView editableCells={[]} onHoverCells={[]} tableHeaders={["NAME", "DESCRIPTION", "VALUE"]} tableRows={tableRows} />
+            <TableView editableCells={[]} onHoverCells={[]} tableHeaders={[["NAME", "w-[15%]"], ["DESCRIPTION", "w-[75%]"], ["VALUE", "w-[10%]"]]} tableRows={tableRows} />
         </div>
     );
 }

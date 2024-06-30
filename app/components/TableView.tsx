@@ -46,13 +46,13 @@ export default function TableView({ tableHeaders, tableRows, editableCells, onHo
     }
 
     return (
-        <div className="border border-[#57577B] rounded-lg overflow-hidden">
+        <div className="border border-[#57577B] rounded-lg overflow-auto">
             <Table>
                 <TableHeader>
                     <TableRow className="border-none">
                         {
                             tableHeaders.map((header, index) => (
-                                <TableHead key={index} className={cn("font-semibold", editableCells.length > 0 && "p-8")}>{header}</TableHead>
+                                <TableHead key={index} className={cn("font-semibold", editableCells.length > 0 && "p-8")}>{Array.isArray(header) ? header[0] : header}</TableHead>
                             ))
                         }
                     </TableRow>
@@ -73,7 +73,7 @@ export default function TableView({ tableHeaders, tableRows, editableCells, onHo
                                             const isOnHover = onHoverCells.includes(cellIndex)
                                             const isHover = hover === index
                                             return (
-                                                <TableCell key={cellIndex}>
+                                                <TableCell className={`text-wrap ${tableHeaders[cellIndex][1]}`} w- key={cellIndex}>
                                                     {
                                                         // eslint-disable-next-line no-nested-ternary
                                                         !isOnHover ?
