@@ -1,8 +1,8 @@
 'use client'
 
 import { FormEvent, useEffect, useRef, useState } from "react";
-import { Dialog, DialogClose, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { ChevronDown, ChevronUp, X } from "lucide-react";
+import { Dialog, DialogClose, DialogTrigger } from "@/components/ui/dialog";
+import { ChevronDown, ChevronUp } from "lucide-react";
 import { Editor } from "@monaco-editor/react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { editor } from "monaco-editor";
@@ -11,6 +11,9 @@ import Combobox from "../components/combobox";
 import { Graph } from "./model";
 import SchemaView from "./SchemaView";
 import Upload from "../components/Upload";
+import DialogComponent from "../components/DialogComponent";
+import Button from "../components/Button";
+import Input from "../components/Input";
 
 export interface Query {
     text: string
@@ -100,7 +103,7 @@ export default function Selector({ onChange, queries }: {
         })
 
         if (!result.ok) {
-           Toast()
+            Toast()
         }
 
         setDialogOpen(false)
@@ -199,34 +202,23 @@ export default function Selector({ onChange, queries }: {
                                 </DropdownMenuItem>
                             </DropdownMenuContent>
                         </DropdownMenu>
-                        <DialogContent displayClose className="h-[30%] w-[20%] flex flex-col p-0">
-                            <DialogHeader className="h-[20%] bg-indigo-600 flex flex-row justify-between p-4 items-center">
-                                <DialogTitle className="text-white">Duplicate Graph</DialogTitle>
-                                <DialogClose asChild>
-                                    <button
-                                        title="Close"
-                                        type="button"
-                                        aria-label="Close"
-                                    >
-                                        <X color="white" size={30} />
-                                    </button>
-                                </DialogClose>
-                            </DialogHeader>
-                            <form onSubmit={onDuplicate} className="grow p-8 flex flex-col gap-8">
+                        <DialogComponent className="h-[30%]" description="Enter a new graph name" title="Duplicate Graph">
+                            <form onSubmit={onDuplicate} className="grow flex flex-col gap-8">
                                 <div className="flex flex-col gap-2">
                                     <p className="font-medium text-xl">Graph Name</p>
-                                    <input className="border" type="text" value={duplicateName} onChange={(e) => setDuplicateName(e.target.value)} />
+                                    <Input variant="Small" onChange={(e) => setDuplicateName(e.target.value)} required />
                                 </div>
                                 <div className="flex flex-row justify-end">
-                                    <button
-                                        className="bg-indigo-600 p-4 text-white w-[30%]"
-                                        type="submit"
-                                    >
-                                        <p>OK</p>
-                                    </button>
+                                    <DialogClose asChild>
+                                        <Button
+                                            className="px-8"
+                                            variant="Primary"
+                                            label="OK"
+                                        />
+                                    </DialogClose>
                                 </div>
                             </form>
-                        </DialogContent>
+                        </DialogComponent>
                     </Dialog>
                 </div>
             </div>
@@ -251,23 +243,8 @@ export default function Selector({ onChange, queries }: {
                                 <p>Query History</p>
                             </button>
                         </DialogTrigger>
-                        <DialogContent displayClose className="w-[70%] h-[70%] flex flex-col p-0 shadow-lg rounded-xl">
-                            <DialogHeader className="h-[10%] p-4 bg-indigo-600 flex flex-row justify-between items-center rounded-t-xl">
-                                <DialogTitle className="text-white">
-                                    Query History
-                                </DialogTitle>
-                                <DialogClose asChild>
-                                    <button
-                                        title="Close"
-                                        type="button"
-                                        aria-label="Close"
-                                    >
-                                        <X color="white" size={30} />
-                                    </button>
-                                </DialogClose>
-                            </DialogHeader>
+                        <DialogComponent className="h-[80%] w-[70%]" title="Query History">
                             <div className="h-1 grow flex flex-col p-8 gap-8">
-                                <DialogTitle>Queries</DialogTitle>
                                 <div className="h-1 grow w-full flex flex-row">
                                     {
                                         queries.length > 0 &&
@@ -358,7 +335,7 @@ export default function Selector({ onChange, queries }: {
                                     </button>
                                 </div>
                             </div>
-                        </DialogContent>
+                        </DialogComponent>
                     </Dialog>
                     <Dialog>
                         <DialogTrigger disabled={!selectedValue} asChild>
@@ -371,25 +348,11 @@ export default function Selector({ onChange, queries }: {
                                 <p>View Schema</p>
                             </button>
                         </DialogTrigger>
-                        <DialogContent displayClose className="w-[90%] h-[90%] flex flex-col p-0 rounded-lg">
-                            <DialogHeader className="h-[10%] p-4 bg-indigo-600 flex flex-row justify-between items-center rounded-t-xl">
-                                <DialogTitle className="text-white">
-                                    {selectedValue} Schema
-                                </DialogTitle>
-                                <DialogClose asChild>
-                                    <button
-                                        title="Close"
-                                        type="button"
-                                        aria-label="Close"
-                                    >
-                                        <X color="white" size={30} />
-                                    </button>
-                                </DialogClose>
-                            </DialogHeader>
-                            <div className="grow flex p-8">
+                        <DialogComponent className="h-[90%] w-[90%]" title={`${selectedValue} Schema`}>
+                            <div className="grow flex">
                                 <SchemaView schema={schema} />
                             </div>
-                        </DialogContent>
+                        </DialogComponent>
                     </Dialog>
                 </div>
             </div>

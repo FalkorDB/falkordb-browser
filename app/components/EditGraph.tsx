@@ -2,15 +2,16 @@ import { Dialog, DialogClose, DialogContent, DialogHeader, DialogTrigger } from 
 import { EditIcon, X } from "lucide-react";
 import { useState } from "react";
 import { Toast, prepareArg, securedFetch } from "@/lib/utils";
+import DialogComponent from "./DialogComponent";
 
 
-export default function EditGraph({ graphName }: { 
+export default function EditGraph({ graphName }: {
     graphName: string
 }) {
-    
+
     const [name, setName] = useState<string>("");
     const [open, setOpen] = useState<boolean>(false);
-    
+
     const handleSubmit = async () => {
         const result = await securedFetch(`/api/graph/${prepareArg(name)}/?${prepareArg(graphName)}`, {
             method: "PATCH",
@@ -33,19 +34,10 @@ export default function EditGraph({ graphName }: {
                     <p><EditIcon /></p>
                 </button>
             </DialogTrigger>
-            <DialogContent displayClose className="flex flex-col gap-4 p-0">
-                <DialogHeader className="h-[10%] bg-indigo-600 text-white p-4 flex flex-row justify-between items-center">
-                    <p className="text-xl font-medium">Edit Graph</p>
-                    <DialogClose asChild>
-                        <button
-                            title="Close"
-                            type="button"
-                            aria-label="Close"
-                        >
-                            <p><X /></p>
-                        </button>
-                    </DialogClose>
-                </DialogHeader>
+            <DialogComponent
+                title="Edit Graph"
+                description="Enter new graph name"
+            >
                 <form className="flex flex-col gap-4 p-4" onSubmit={handleSubmit}>
                     <div className="flex flex-col gap-4">
                         <p>Graph Name</p>
@@ -61,6 +53,21 @@ export default function EditGraph({ graphName }: {
                         </button>
                     </div>
                 </form>
+            </DialogComponent>
+            <DialogContent displayClose className="flex flex-col gap-4 p-0">
+                <DialogHeader className="h-[10%] bg-indigo-600 text-white p-4 flex flex-row justify-between items-center">
+                    <p className="text-xl font-medium">Edit Graph</p>
+                    <DialogClose asChild>
+                        <button
+                            title="Close"
+                            type="button"
+                            aria-label="Close"
+                        >
+                            <p><X /></p>
+                        </button>
+                    </DialogClose>
+                </DialogHeader>
+
             </DialogContent>
         </Dialog>
     )
