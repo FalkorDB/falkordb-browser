@@ -202,7 +202,7 @@ export default function Selector({ onChange, queries }: {
                                 </DropdownMenuItem>
                             </DropdownMenuContent>
                         </DropdownMenu>
-                        <DialogComponent className="h-[30%]" description="Enter a new graph name" title="Duplicate Graph">
+                        <DialogComponent description="Enter a new graph name" title="Duplicate Graph">
                             <form onSubmit={onDuplicate} className="grow flex flex-col gap-8">
                                 <div className="flex flex-col gap-2">
                                     <p className="font-medium text-xl">Graph Name</p>

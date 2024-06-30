@@ -54,7 +54,7 @@ export default function EditGraph({ graphName }: {
                     </div>
                 </form>
             </DialogComponent>
-            <DialogContent displayClose className="flex flex-col gap-4 p-0">
+            <DialogContent className="flex flex-col gap-4 p-0">
                 <DialogHeader className="h-[10%] bg-indigo-600 text-white p-4 flex flex-row justify-between items-center">
                     <p className="text-xl font-medium">Edit Graph</p>
                     <DialogClose asChild>
