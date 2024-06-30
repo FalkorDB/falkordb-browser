@@ -367,7 +367,7 @@ export default function Create() {
                                 <p>URLs</p>
                                 <p>Amazon S3/GCP</p>
                             </div>
-                            <Dropzone filesCount={false} className="grow" withTable onFileDrop={setFiles} />
+                            <Dropzone filesCount={false} withTable onFileDrop={setFiles} />
                         </div>
                         <div className="flex flex-row justify-end">
                             <Button

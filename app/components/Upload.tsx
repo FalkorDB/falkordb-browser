@@ -17,8 +17,8 @@ export default function Upload({ isOpen, onOpen }: {
     return (
         <Dialog open={isOpen} onOpenChange={onOpen}>
             <DialogComponent className="h-[90%]" title="Upload Data">
-                <form onSubmit={onUploadData} className="grow p-8 flex flex-col gap-6 overflow-auto">
-                    <Dropzone filesCount className="grow overflow-auto flex-col gap-10" withTable onFileDrop={setFiles} />
+                <form onSubmit={onUploadData} className="grow p-8 flex flex-col gap-6">
+                    <Dropzone filesCount className="flex-col gap-10" withTable onFileDrop={setFiles} />
                     <div className="flex flex-row-reverse gap-6 justify-start">
                         <DialogClose asChild>
                             <button

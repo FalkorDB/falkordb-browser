@@ -44,9 +44,9 @@ function Dropzone({ filesCount = false, className = "", withTable = false, disab
     const { getRootProps, getInputProps } = useDropzone({ onDrop, disabled })
 
     return (
-        <div className={cn('flex flex-row gap-8', className)}>
+        <div className={cn('flex flex-row gap-8 h-1 grow', className)}>
             {/* eslint-disable-next-line react/jsx-props-no-spreading */}
-            <div {...getRootProps(withTable ? { className: "flex-1 bg-[#434366] flex items-center justify-center p-36" } : {})}>
+            <div {...getRootProps(withTable ? { className: cn("Dropzone", filesCount && "p-36") } : {})}>
                 {/* eslint-disable-next-line react/jsx-props-no-spreading */}
                 <input {...getInputProps()} />
                 {
