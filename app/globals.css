@@ -30,19 +30,31 @@
         background: linear-gradient(180deg, #EC806C 0%, #B66EBD 43.41%, #7568F2 100%);
         color: white;
     }
+
     .Top {
         background: linear-gradient(90deg, #EC806C 0%, #B66EBD 43.41%, #7568F2 100%);
     }
+
     .Header {
         @apply bg-white text-black
     }
+
     .DataPanel {
         background-color: #434366;
     }
+
     .Canvas {
         padding: 1rem;
         width: 100%;
         height: 100%;
         background-color: #434366;
+    }
+
+    .Dropzone {
+        display: flex;
+        flex: 1 1 0%;
+        background-color: #434366;
+        align-items: center;
+        justify-content: center;
     }
 }
