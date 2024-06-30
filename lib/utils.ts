@@ -38,3 +38,5 @@ export function securedFetch(input: string | URL | globalThis.Request, init?: Re
 export function prepareArg(arg: string) {
   return encodeURIComponent(arg.trim())
 }
+
+export const defaultQuery = (q: string) => q || "MATCH (n) OPTIONAL MATCH (n)-[e]-(m) return n,e,m LIMIT 100"

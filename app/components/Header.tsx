@@ -5,9 +5,11 @@ import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuIte
 import { ChevronDown, ChevronUp, LifeBuoy, PlusCircle, Settings } from "lucide-react";
 import { useState } from "react";
 import Image from "next/image";
-import { Toast, cn, prepareArg, securedFetch } from "@/lib/utils";
-import { useRouter } from "next/navigation";
-import Button from "../components/Button";
+import { cn, prepareArg, securedFetch } from "@/lib/utils";
+import { useRouter, usePathname } from "next/navigation";
+import { Role } from "next-auth";
+import Button from "./Button";
+import Avatar from "./Avatar";
 
 /* eslint-disable react/require-default-props */
 interface Props {
@@ -19,6 +21,9 @@ interface Props {
 export default function Header({ graphName, inCreate = false, inSettings = false }: Props) {
     const [open, setOpen] = useState<boolean>(false)
     const router = useRouter()
+    const pathname = usePathname()
+    const [userStatus, setUserStatus] = useState<Role>()
+
     // const [newName, setNewName] = useState<string>("")
 
     // const createGraph = async () => {
@@ -30,7 +35,7 @@ export default function Header({ graphName, inCreate = false, inSettings = false
             (:Rider {name:'Valentino Rossi'})-[:rides]->(:Team {name:'Yamaha'}),
             (:Rider {name:'Dani Pedrosa'})-[:rides]->(:Team {name:'Honda'}),
             (:Rider {name:'Andrea Dovizioso'})-[:rides]->(:Team {name:'Ducati'})`
-            securedFetch(`api/graph/FalkorDB/?query=${prepareArg(query1)}`, {
+        securedFetch(`api/graph/FalkorDB/?query=${prepareArg(query1)}`, {
             method: "GET"
         })
         const query2 = `CREATE
@@ -40,24 +45,30 @@ export default function Header({ graphName, inCreate = false, inSettings = false
         })
     }
 
-    const handleSettings = () => {
-        if (!graphName) {
-            Toast("Select a graph first")
-            return
-        }
-        router.push(`/settings/?graphName=${prepareArg(graphName)}`)
-    }
-
     return (
-        <div className="h-[6%] flex flex-col">
-            <div className="p-2 rounded-t-lg Top" />
+        <div className="h-[10%] flex flex-col">
+            <div className="h-2 rounded-t-lg Top" />
             <div className="py-6 px-11 flex flex-row justify-between items-center Header">
                 <div className="flex flex-row gap-4 items-center">
                     <Image width={103} height={29} src="/ColorLogo.svg" alt="" />
                     <p className="text-neutral-200" >|</p>
                     <div className="flex flex-row gap-6">
-                        <p>Knowledge Graphs</p>
-                        <p>Schemas</p>
+                        <button
+                            className={cn(pathname.includes("/graph") && "text-[#7167F6]")}
+                            onClick={() => router.push("/graph")}
+                            type="button"
+                            title="Graphs"
+                        >
+                            <p>Graphs</p>
+                        </button>
+                        <button
+                            className={cn(pathname.includes("/schema") && "text-[#7167F6]")}
+                            onClick={() => router.push("/schema")}
+                            type="button"
+                            title="Schemas"
+                        >
+                            <p>Schemas</p>
+                        </button>
                     </div>
                 </div>
                 <div className="flex flex-row items-center gap-8">
@@ -159,20 +170,18 @@ export default function Header({ graphName, inCreate = false, inSettings = false
                     }
                     <div>
                         <button
+                            disabled={userStatus !== "Admin"}
                             className={cn("flex flex-row gap-2", !graphName && "text-[#57577B]")}
                             title="Settings"
                             type="button"
-                            onClick={handleSettings}
+                            onClick={() => router.push("/settings")}
                             aria-label="Settings"
                         >
                             <p>Settings</p>
                             <Settings size={25} />
                         </button>
                     </div>
-                    <div className="flex flex-row gap-4 items-center">
-                        <span>user.name</span>
-                        <div className="w-8 h-8 bg-red-800 rounded-full" />
-                    </div>
+                    <Avatar setUserStatus={setUserStatus}/>
                 </div>
             </div>
         </div>

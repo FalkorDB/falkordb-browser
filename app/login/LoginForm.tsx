@@ -2,7 +2,7 @@
 
 import { SignInOptions, SignInResponse, signIn } from "next-auth/react";
 import { FormEvent, useEffect, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import Dropzone from "@/app/components/Dropzone";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Eye } from "lucide-react";

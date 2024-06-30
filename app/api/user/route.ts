@@ -5,7 +5,7 @@ import { User } from "./model"
 const ROLE = new Map<string, string[]>(
     [
         ["Admin", ["on", "~*", "&*", "+@all"]],
-        ["Read-Write", ["on", "~*", "resetchannels", "-@all", "+graph.query", "+graph.profile", "+graph.explain", "+graph.list", "+ping"]],
+        ["Read-Write", ["on", "~*", "resetchannels", "-@all", "+graph.query", "+graph.explain", "+graph.list", "+ping", "+graph.profile",]],
         ["Read-Only", ["on", "~*", "resetchannels", "-@all", "+graph.ro_query", "+graph.explain", "+graph.list", "+ping"]]
     ]
 )
