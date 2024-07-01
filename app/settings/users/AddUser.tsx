@@ -25,10 +25,11 @@ export default function AddUser({ setUsers }: {
     const addUser = async (e: FormEvent) => {
         e.preventDefault();
 
-        if (!username || !password) {
-            Toast("User name and password are required")
+        if (!role) {
+            Toast("selected role is required")
             return
         }
+
         if (password !== confirmPassword) {
             Toast("Passwords do not match")
             return
@@ -55,7 +56,7 @@ export default function AddUser({ setUsers }: {
                 <Button
                     variant="Primary"
                     icon={<PlusCircle />}
-                    label="ADD USER"
+                    label="Add User"
                 />
             </DialogTrigger>
             <DialogComponent
