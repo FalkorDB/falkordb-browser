@@ -138,7 +138,7 @@ export default function DataPanel({ inSchema, obj, onExpand, setProperty, setPro
     }
 
     return (
-        <div className="flex flex-col Panel">
+        <div className="Panel">
             <div className="w-full flex flex-row justify-between items-center bg-[#7167F6] p-4">
                 <div className="flex flex-row gap-4 items-center">
                     <button
@@ -168,7 +168,7 @@ export default function DataPanel({ inSchema, obj, onExpand, setProperty, setPro
                 </div>
                 <p className="flex flex-row text-white">{Object.keys(obj).filter((v) => !excludedProperties.has(v)).length} Attributes</p>
             </div>
-            <div className="h-1 grow flex flex-col justify-between items-start font-medium overflow-auto overflow-y-hidden">
+            <div className="h-1 grow flex flex-col justify-between items-start font-medium overflow-auto">
                 <Table>
                     {
                         (setProperty || setPropertySchema) &&

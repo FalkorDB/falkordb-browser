@@ -6,7 +6,7 @@ import { useRef, useState, useImperativeHandle, forwardRef, useEffect, Dispatch,
 import fcose from 'cytoscape-fcose';
 import Editor, { Monaco } from "@monaco-editor/react";
 import { editor } from "monaco-editor";
-import { ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
+import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { ImperativePanelHandle } from "react-resizable-panels";
 import { ChevronDown, ChevronLeft, Maximize2 } from "lucide-react"
 import { Toast, cn, prepareArg, securedFetch } from "@/lib/utils";
@@ -366,13 +366,18 @@ const GraphView = forwardRef(({ graphName, setQueries }: {
     }
 
     const onAddElement = async (obj: NodeDataDefinition | EdgeDataDefinition) => {
-        const category = obj.category || obj.label
-
-        const filteredAttributes = Object.entries(obj).filter(row => row[0] !== "category" && row[0] !== "label")
-        const q = `CREATE (n:${category} {${filteredAttributes.map(([k, v]) => `${k}: '${v}'`)}}) return n`
-        const result = await securedFetch(`api/graph/${prepareArg(graphName)}/?query=${prepareArg(q)}`, {
-            method: "GET"
-        })
+        const type = obj.category && "node"
+        let q = ""
+        if (type === "node") {
+            const filteredAttributes = Object.entries(obj).filter(row => row[0] !== "category")
+            q = `CREATE (n:${obj.category} {${filteredAttributes.map(([k, v]) => `${k}: '${v}'`)}}) return n`
+        } else {
+            const filteredAttributes = Object.entries(obj).filter(row => row[0] !== "label")
+            q = `MATCH (a), (b) WHERE ID(a) = ${obj.source} AND ID(b) = ${obj.target} CREATE (a)-[r:${obj.label} {${filteredAttributes.map(([k, v]) => `${k}: '${v}'`)}}]->(b) return r`
+        }
+            const result = await securedFetch(`api/graph/${prepareArg(graphName)}/?query=${prepareArg(q)}`, {
+                method: "GET"
+            })
 
         if (!result.ok) return
 
@@ -490,6 +495,7 @@ const GraphView = forwardRef(({ graphName, setQueries }: {
                     }
                 </div>
             </ResizablePanel>
+            <ResizableHandle className="w-3"/>
             <ResizablePanel
                 className="rounded-lg"
                 collapsible

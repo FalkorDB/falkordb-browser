@@ -7,7 +7,6 @@ import { useState } from "react";
 import Image from "next/image";
 import { Toast, cn, prepareArg, securedFetch } from "@/lib/utils";
 import { useRouter } from "next/navigation";
-import { useSession } from "next-auth/react";
 import Button from "../components/Button";
 
 /* eslint-disable react/require-default-props */
