@@ -9,7 +9,7 @@ import { Dialog, DialogTrigger } from "@/components/ui/dialog";
 import Combobox from "../../components/combobox";
 
 // eslint-disable-next-line no-useless-escape
-const PATTERN = "^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&#+])[A-Za-z\d@$!%*?&#+]{8,}$"
+const PATTERN = "^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d)(?=.*[@$!%*?&])[A-Za-z\\d@$!%*?&#+]{8,}$"
 
 export default function AddUser({ setUsers }: {
     setUsers: Dispatch<SetStateAction<User[]>>
@@ -26,7 +26,7 @@ export default function AddUser({ setUsers }: {
         e.preventDefault();
 
         if (!role) {
-            Toast("selected role is required")
+            Toast("select role is required")
             return
         }
 
@@ -148,15 +148,50 @@ export default function AddUser({ setUsers }: {
                             pattern={PATTERN}
                             variant="Small"
                             type={showConfirmPassword ? "text" : "password"}
-                            onChange={(e) => setConfirmPassword(e.target.value)}
+                            onChange={(e) => {
+                                setConfirmPassword(e.target.value)
+                                e.currentTarget.setCustomValidity("")
+                                if (!e.target.checkValidity()) {
+                                    if (!e.target.value) {
+                                        e.currentTarget.setCustomValidity("Password is required");
+                                    } else if (e.target.validity.patternMismatch) {
+                                        e.currentTarget.setCustomValidity(`
+                                            Password must contain:
+                                            - At least one lowercase letter
+                                            - At least one uppercase letter
+                                            - At least one digit
+                                            - At least one special character (@$!%*?&#+)
+                                            - At least 8 characters
+                                            `);
+                                    }
+                                } else {
+                                    // If the value is valid or the input is empty, clear the custom validity message
+                                    e.currentTarget.setCustomValidity("");
+                                }
+                            }}
                             value={confirmPassword}
+                            onInvalid={(e) => {
+                                if (!e.currentTarget.value) {
+                                    e.currentTarget.setCustomValidity("Confirm Password is required");
+                                } else if (e.currentTarget.validity.patternMismatch) {
+                                    e.currentTarget.setCustomValidity(`
+                                            password must contain:
+                                            - At least one lowercase letter
+                                            - At least one uppercase letter
+                                            - At least one digit
+                                            - At least one special (@$!%*?&)
+                                            - At least 8 characters
+                                            `);
+                                }
+                                e.currentTarget.reportValidity();
+                            }}
                             required
                         />
                     </div>
                     <div className="flex flex-row justify-end">
                         <Button
                             variant="Primary"
-                            label="ADD USER"
+                            label="Add User"
                             icon={<PlusCircle />}
                             type="submit"
                         />
