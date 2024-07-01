@@ -73,7 +73,7 @@ export default function TableView({ tableHeaders, tableRows, editableCells, onHo
                                             const isOnHover = onHoverCells.includes(cellIndex)
                                             const isHover = hover === index
                                             return (
-                                                <TableCell className={`text-wrap ${tableHeaders[cellIndex][1]}`} w- key={cellIndex}>
+                                                <TableCell className={cn(`text-wrap`, Array.isArray(tableHeaders[cellIndex]) && tableHeaders[cellIndex][1])} key={cellIndex}>
                                                     {
                                                         // eslint-disable-next-line no-nested-ternary
                                                         !isOnHover ?

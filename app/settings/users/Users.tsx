@@ -22,7 +22,7 @@ export default function Users() {
     const [users, setUsers] = useState<User[]>([])
     const [checked, setChecked] = useState<boolean>(false)
     const tableHeaders = [
-        <Checkbox
+        [<Checkbox
             key="checkbox"
             checked={checked}
             className="data-[state=checked]:text-[#57577B] border-[#57577B] data-[state=checked]:bg-[#272746] rounded-lg w-5 h-5"
@@ -35,10 +35,10 @@ export default function Users() {
                     return u
                 }))
             }}
-        />,
-        "USERNAME",
-        "ROLE",
-        ""
+        />, "w-[10%]"],
+        ["USERNAME", "w-[40%]"],
+        ["ROLE", "w-[40%]"],
+        ["", "w-[10%]"]
     ]
     const tableRows = users.map((user, index) => [
         <Checkbox
