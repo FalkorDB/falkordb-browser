@@ -8,8 +8,6 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { editor } from "monaco-editor";
 import { Toast, cn, prepareArg, securedFetch } from "@/lib/utils";
 import Combobox from "../components/combobox";
-import { Graph } from "./model";
-import SchemaView from "./SchemaView";
 import Upload from "../components/Upload";
 import DialogComponent from "../components/DialogComponent";
 import Button from "../components/Button";
@@ -22,13 +20,12 @@ export interface Query {
 }
 
 export default function Selector({ onChange, queries }: {
-    onChange: (selectedGraphName: string, selectedSchema: Graph) => void
+    onChange: (graphName: string) => void
     queries: Query[]
 }) {
 
     const [options, setOptions] = useState<string[]>([]);
     const [isUploadOpen, setIsUploadOpen] = useState<boolean>(false);
-    const [schema, setSchema] = useState<Graph>(Graph.empty());
     const [duplicateName, setDuplicateName] = useState("");
     const [selectedValue, setSelectedValue] = useState<string>("");
     const [dropOpen, setDropOpen] = useState<boolean>(false);
@@ -37,10 +34,6 @@ export default function Selector({ onChange, queries }: {
     const [nodesCount, setNodesCount] = useState<boolean>(false);
     const [query, setQuery] = useState<Query>();
     const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null)
-
-    const handleViewSchema = async () => {
-
-    }
 
     useEffect(() => {
         const run = async () => {
@@ -76,24 +69,6 @@ export default function Selector({ onChange, queries }: {
 
     const handleEditorDidMount = (e: editor.IStandaloneCodeEditor) => {
         editorRef.current = e
-    }
-
-    const handleOnChange = async (name: string) => {
-        const q = 'MATCH (n)-[e]-(m) return n,e,m'
-        const result = await securedFetch(`api/graph/${name}_schema/?query=${q}`, {
-            method: "GET"
-        })
-
-        const json = await result.json()
-
-        if (!result.ok) {
-            Toast(json.message)
-            return
-        }
-
-        setSelectedValue(name)
-        setSchema(Graph.create(name, json.result))
-        onChange(name, Graph.create(name, json.result))
     }
 
     const onDuplicate = async (e: FormEvent) => {
@@ -136,12 +111,15 @@ export default function Selector({ onChange, queries }: {
         }
     }
 
-
+    const handelSelectedValue = (value: string) => {
+        setSelectedValue(value)
+        onChange(value)
+    }
 
     return (
         <div className="flex flex-col gap-4">
             <div className="flex flex-row justify-between items-center">
-                <Combobox isSelectGraph options={options} setOptions={setOptions} selectedValue={selectedValue} setSelectedValue={handleOnChange} />
+                <Combobox isSelectGraph options={options} setOptions={setOptions} selectedValue={selectedValue} setSelectedValue={handelSelectedValue} />
                 <div className="flex flex-row gap-16 text-[#9192FD]">
                     <p className={cn(!selectedValue && "text-[#57577B]")}>Versions</p>
                     <button
@@ -267,30 +245,27 @@ export default function Selector({ onChange, queries }: {
                                         </ul>
                                     }
                                     <div className="w-1 grow flex flex-col gap-2 p-4 border">
-                                        {
-                                            schema.Id &&
-                                            <div className="h-1 grow flex flex-row">
-                                                <Editor
-                                                    width="100%"
-                                                    height="100%"
-                                                    language="cypher"
-                                                    theme="custom-theme"
-                                                    options={{
-                                                        lineHeight: 30,
-                                                        fontSize: 25,
-                                                        scrollbar: {
-                                                            horizontal: "hidden"
-                                                        },
-                                                        wordWrap: "on",
-                                                        scrollBeyondLastLine: false,
-                                                        renderWhitespace: "none"
-                                                    }}
-                                                    value={query?.text}
-                                                    onChange={(q) => setQuery(({ text: q || "", metadata: query?.metadata || [] }))}
-                                                    onMount={handleEditorDidMount}
-                                                />
-                                            </div>
-                                        }
+                                        <div className="h-1 grow flex flex-row">
+                                            <Editor
+                                                width="100%"
+                                                height="100%"
+                                                language="cypher"
+                                                theme="custom-theme"
+                                                options={{
+                                                    lineHeight: 30,
+                                                    fontSize: 25,
+                                                    scrollbar: {
+                                                        horizontal: "hidden"
+                                                    },
+                                                    wordWrap: "on",
+                                                    scrollBeyondLastLine: false,
+                                                    renderWhitespace: "none"
+                                                }}
+                                                value={query?.text}
+                                                onChange={(q) => setQuery(({ text: q || "", metadata: query?.metadata || [] }))}
+                                                onMount={handleEditorDidMount}
+                                            />
+                                        </div>
                                         <ul className="flex flex-col gap-2">
                                             {
                                                 query?.metadata &&
@@ -337,7 +312,7 @@ export default function Selector({ onChange, queries }: {
                             </div>
                         </DialogComponent>
                     </Dialog>
-                    <Dialog>
+                    {/* <Dialog>
                         <DialogTrigger disabled={!selectedValue} asChild>
                             <button
                                 className="disabled:text-[#57577B]"
@@ -353,7 +328,7 @@ export default function Selector({ onChange, queries }: {
                                 <SchemaView schema={schema} />
                             </div>
                         </DialogComponent>
-                    </Dialog>
+                    </Dialog> */}
                 </div>
             </div>
         </div >

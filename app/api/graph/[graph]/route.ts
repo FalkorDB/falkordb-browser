@@ -119,8 +119,25 @@ export async function GET(request: NextRequest, { params }: { params: { graph: s
 
     const graphId = params.graph
     const query = request.nextUrl.searchParams.get("query")
+    
+    if (query) {
+        const graph = client.selectGraph(graphId)
+        const result = await graph.query(query)
 
-    if (!query) {
+        if (!result) throw new Error("something went wrong")
+
+        return NextResponse.json({ result }, { status: 200 })
+    }
+
+    const exists = request.nextUrl.searchParams.get("exists")
+    
+    if (exists) {
+        const data = await client.connection.exists(graphId)
+        return NextResponse.json({ exists: data }, { status: 200 })
+    }
+
+
+    try {
         const ID = request.nextUrl.searchParams.get("ID")
         if (!ID) throw new Error("Missing parameter 'ID'")
         // const result = await securedFetch(`https://localhost:5000/progress/?ID=${ID}`, {
@@ -129,15 +146,6 @@ export async function GET(request: NextRequest, { params }: { params: { graph: s
         // if (!result.ok) throw new Error("something went wrong")
         // const json = await result.json()
         return NextResponse.json({ progress: 10 }, { status: 200 })
-    }
-
-    try {
-        const graph = client.selectGraph(graphId)
-        const result = await graph.query(query)
-
-        if (!result) throw new Error("something went wrong")
-
-        return NextResponse.json({ result }, { status: 200 })
     } catch (err: unknown) {
         return NextResponse.json({ message: (err as Error).message }, { status: 400 })
     }

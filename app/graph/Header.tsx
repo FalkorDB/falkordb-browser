@@ -33,11 +33,11 @@ export default function Header({ graphName, inCreate = false, inSettings = false
             securedFetch(`api/graph/FalkorDB/?query=${prepareArg(query1)}`, {
             method: "GET"
         })
-        const query2 = `CREATE
-            (:Rider {name:'string'})-[:rides]->(:Team {name:'string'})`
-        securedFetch(`api/graph/FalkorDB_schema/?query=${prepareArg(query2)}`, {
-            method: "GET"
-        })
+        // const query2 = `CREATE
+        //     (:Rider {name:'string'})-[:rides]->(:Team {name:'string'})`
+        // securedFetch(`api/graph/FalkorDB_schema/?query=${prepareArg(query2)}`, {
+        //     method: "GET"
+        // })
     }
 
     const handleSettings = () => {
