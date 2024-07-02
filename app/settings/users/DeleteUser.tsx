@@ -40,7 +40,7 @@ export default function DeleteUser({ isDeleteSelected, users, setUsers }: Delete
                             disabled={users.length === 0}
                             variant="Primary"
                             icon={<Trash2 />}
-                            label="Delete User"
+                            label="Delete Users"
                         />
                         : <button
                             title="Delete"
