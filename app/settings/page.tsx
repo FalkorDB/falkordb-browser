@@ -20,9 +20,9 @@ export default function Settings() {
     }
 
     return (
-        <>
+        <div className="w-full h-full flex flex-col">
             <Header inSettings />
-            <div className="flex flex-col gap-8 p-16">
+            <div className="grow flex flex-col gap-8 p-16">
                 <h1 className="text-2xl font-medium px-6">Settings</h1>
                 <div className="flex flex-row gap-16">
                     <button
@@ -42,12 +42,12 @@ export default function Settings() {
                         <p>Users</p>
                     </button>
                 </div>
-                <div className="px-6">
+                <div className="h-1 grow px-6">
                     {
                         getCurrentTab()
                     }
                 </div>
             </div>
-        </>
+        </div>
     )
 }
