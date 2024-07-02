@@ -21,16 +21,18 @@ export interface Query {
     metadata: string[]
 }
 
-export default function Selector({ onChange, queries }: {
+export default function Selector({ onChange, queries, emptyGraphName }: {
+    /* eslint-disable react/require-default-props */
     onChange: (selectedGraphName: string, selectedSchema: Graph) => void
     queries: Query[]
+    emptyGraphName?: string
 }) {
 
     const [options, setOptions] = useState<string[]>([]);
     const [isUploadOpen, setIsUploadOpen] = useState<boolean>(false);
     const [schema, setSchema] = useState<Graph>(Graph.empty());
     const [duplicateName, setDuplicateName] = useState("");
-    const [selectedValue, setSelectedValue] = useState<string>("");
+    const [selectedValue, setSelectedValue] = useState<string>(emptyGraphName || "");
     const [dropOpen, setDropOpen] = useState<boolean>(false);
     const [dialogOpen, setDialogOpen] = useState<boolean>(false);
     const [edgesCount, setEdgesCount] = useState<boolean>(false);
@@ -67,6 +69,8 @@ export default function Selector({ onChange, queries }: {
             const json = await result.json()
 
             const data = json.result.data[0]
+
+            if (!data) return
 
             setEdgesCount(data.edges)
             setNodesCount(data.nodes)

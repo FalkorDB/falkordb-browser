@@ -76,11 +76,11 @@ export async function POST(request: NextRequest, { params }: { params: { graph: 
             body: JSON.stringify(data)
         })
 
-        const result = await res.json()
+        const { token } = await res.json()
+        console.log(token);
+        if (!res.ok) throw new Error("Failed to create graph / schema")
 
-        if (!res.ok) throw new Error(res.statusText)
-
-        return NextResponse.json({ result }, { status: 200 })
+        return NextResponse.json({ token }, { status: 200 })
     } catch (err: unknown) {
         return NextResponse.json({ message: (err as Error).message }, { status: 400 })
     }
@@ -121,14 +121,14 @@ export async function GET(request: NextRequest, { params }: { params: { graph: s
     const query = request.nextUrl.searchParams.get("query")
 
     if (!query) {
-        const ID = request.nextUrl.searchParams.get("ID")
-        if (!ID) throw new Error("Missing parameter 'ID'")
-        // const result = await securedFetch(`https://localhost:5000/progress/?ID=${ID}`, {
-        //     method: "GET"
-        // })
-        // if (!result.ok) throw new Error("something went wrong")
-        // const json = await result.json()
-        return NextResponse.json({ progress: 10 }, { status: 200 })
+        const token = request.nextUrl.searchParams.get("token")
+        if (!token) throw new Error("Missing parameter 'token'")
+        const res = await securedFetch(`https://localhost:5000/pull_status/?token=${token}`, {
+            method: "GET"
+        })
+        if (!res.ok) throw new Error("something went wrong")
+        const result = (await res.json()).progress
+        return NextResponse.json({ result }, { status: 200 })
     }
 
     try {

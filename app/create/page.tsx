@@ -23,7 +23,7 @@ export default function Create() {
 
     const [currentTab, setCurrentTab] = useState<CurrentTab | null>()
     const [schema, setSchema] = useState<Graph>(Graph.empty())
-    const [ID, setID] = useState()
+    const [token, setToken] = useState()
     const [files, setFiles] = useState<File[]>([])
     const [filesPath, setFilesPath] = useState<string[]>()
     const [nodesCount, setNodesCount] = useState<number>(0)
@@ -36,6 +36,27 @@ export default function Create() {
     useEffect(() => {
         if (progress !== 100) return
         const run = async () => {
+
+        }
+        run()
+    }, [progress])
+
+    const fetcher = async (url: string) => {
+
+        const result = await securedFetch(url, {
+            method: "GET",
+        })
+
+        if (!result.ok) {
+            Toast()
+            return
+        }
+
+        const json = await result.json()
+
+        setProgress(json.progress * 100)
+
+        if (json.progress === 1) {
             const q = "MATCH (n)-[e]-(m) RETURN n,e,m"
 
             const res = await securedFetch(`api/graph/${prepareArg(graphName)}_schema/?query=${prepareArg(q)}`, {
@@ -64,26 +85,9 @@ export default function Create() {
             setSchema(Graph.create(`${graphName}_schema`, j.result))
             setCurrentTab("schema")
         }
-        run()
-    }, [progress])
-
-    const fetcher = async (url: string) => {
-
-        const result = await securedFetch(url, {
-            method: "GET",
-        })
-
-        if (!result.ok) {
-            Toast()
-            return
-        }
-
-        const json = await result.json()
-
-        setProgress(prev => json.progress + prev)
     }
 
-    useSWR((currentTab === "loadSchema" && progress < 100) && `api/graph/${graphName}/?ID=${ID}`, fetcher, { refreshInterval: 2500 })
+    useSWR((currentTab === "loadSchema" && progress < 100 && token) && `api/graph/${graphName}/?token=${token}`, fetcher, { refreshInterval: 2500 })
 
     const handleCreateSchema = async (e: FormEvent) => {
 
@@ -133,8 +137,8 @@ export default function Create() {
         }
 
         const json = await result.json()
-
-        setID(json.ID)
+        
+        setToken(json.token)
     }
 
     const handleCreateGraph = async () => {
@@ -256,6 +260,26 @@ export default function Create() {
         return result.ok
     }
 
+    const handelCreateEmptyGraph = async () => {
+
+        if (!graphName) {
+            Toast("Graph name is required")
+            return
+        }
+
+        const q = "MATCH (n) RETURN n"
+        const result = await securedFetch(`api/graph/${prepareArg(graphName)}/?query=${prepareArg(q)}`, {
+            method: "GET"
+        })
+
+        if (!result.ok) {
+            Toast("Failed to create graph")
+            return
+        }
+
+        router.push(`/graph/?emptyGraphName=${prepareArg(graphName)}`)
+    }
+
     const getCurrentTab = () => {
         switch (currentTab) {
             case "loadSchema":
@@ -369,12 +393,18 @@ export default function Create() {
                             </div>
                             <Dropzone filesCount={false} withTable onFileDrop={setFiles} />
                         </div>
-                        <div className="flex flex-row justify-end">
+                        <div className="flex flex-row-reverse gap-4">
                             <Button
                                 variant="Large"
                                 icon={<PlusCircle />}
                                 label="Create Schema"
                                 type="submit"
+                            />
+                            <Button
+                                variant="Large"
+                                icon={<PlusCircle />}
+                                label="Create Empty Graph"
+                                onClick={handelCreateEmptyGraph}
                             />
                         </div>
                     </form>
