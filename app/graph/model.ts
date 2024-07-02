@@ -80,23 +80,29 @@ export class Graph {
 
     private categories: Category[];
 
+    private labels: Category[];
+
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     private elements: ElementDefinition[];
 
     private categoriesMap: Map<string, Category>;
 
+    private labelsMap: Map<string, Category>;
+
     private nodesMap: Map<number, NodeDataDefinition>;
 
     private edgesMap: Map<number, EdgeDataDefinition>;
 
-    private constructor(id: string, categories: Category[], elements: ElementDefinition[],
-        categoriesMap: Map<string, Category>, nodesMap: Map<number, NodeDataDefinition>, edgesMap: Map<number, EdgeDataDefinition>) {
+    private constructor(id: string, categories: Category[], labels: Category[], elements: ElementDefinition[],
+        categoriesMap: Map<string, Category>, labelsMap: Map<string, Category>, nodesMap: Map<number, NodeDataDefinition>, edgesMap: Map<number, EdgeDataDefinition>) {
         this.id = id;
         this.columns = [];
         this.data = [];
         this.categories = categories;
+        this.labels = labels;
         this.elements = elements;
         this.categoriesMap = categoriesMap;
+        this.labelsMap = labelsMap;
         this.nodesMap = nodesMap;
         this.edgesMap = edgesMap;
     }
@@ -108,9 +114,17 @@ export class Graph {
     get Categories(): Category[] {
         return this.categories;
     }
+    
+    get Labels(): Category[] {
+        return this.labels;
+    }
 
     get Elements(): ElementDefinition[] {
         return this.elements;
+    }
+
+    set Elements(elements: ElementDefinition[]) {
+        this.elements = elements
     }
 
     get Columns(): string[] {
@@ -123,7 +137,7 @@ export class Graph {
     }
 
     public static empty(): Graph {
-        return new Graph("", [], [], new Map<string, Category>(), new Map<number, NodeDataDefinition>(), new Map<number, EdgeDataDefinition>())
+        return new Graph("", [], [], [], new Map<string, Category>(), new Map<string, Category>(), new Map<number, NodeDataDefinition>(), new Map<number, EdgeDataDefinition>())
     }
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -135,7 +149,7 @@ export class Graph {
     }
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    private extendNode(cell: any, newElements: ElementDefinition[]) {
+    public extendNode(cell: any, newElements: ElementDefinition[]) {
         // check if category already exists in categories
         let category = this.categoriesMap.get(cell.labels[0])
         if (!category) {
@@ -172,15 +186,28 @@ export class Graph {
         }
         return newElements
     }
-    
+
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    private extendEdge(cell: any, newElements: ElementDefinition[]) {
+    public extendEdge(cell: any, newElements: ElementDefinition[]) {
+
+        let label = this.labelsMap.get(cell.relationshipType)
+        if (!label) {
+            label = { name: cell.relationshipType, index: this.categoriesMap.size, show: true }
+            this.labelsMap.set(label.name, label)
+            this.labels.push(label)
+        }
+
         const currentEdge = this.edgesMap.get(cell.id)
         if (!currentEdge) {
             const sourceId = cell.sourceId.toString();
             const destinationId = cell.destinationId.toString()
-
-            const edge: EdgeDataDefinition = { source: sourceId, target: destinationId, label: cell.relationshipType }
+            const edge: EdgeDataDefinition = {
+                _id: cell.id,
+                source: sourceId,
+                target: destinationId,
+                label: cell.relationshipType,
+                color: getCategoryColorValue(label.index)
+            }
             Object.entries(cell.properties).forEach(([key, value]) => {
                 edge[edgeSafeKey(key)] = value as string;
             });
@@ -194,7 +221,6 @@ export class Graph {
                 source = {
                     id: cell.sourceId.toString(),
                     name: cell.sourceId.toString(),
-                    value: "",
                     category: "",
                     color: getCategoryColorValue()
                 }
@@ -208,7 +234,6 @@ export class Graph {
                 destination = {
                     id: cell.destinationId.toString(),
                     name: cell.destinationId.toString(),
-                    value: "",
                     category: "",
                     color: getCategoryColorValue()
                 }

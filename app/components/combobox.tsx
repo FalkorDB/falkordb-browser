@@ -1,124 +1,189 @@
 "use client"
 
-import { useState, Dispatch, createRef } from "react"
-import { Check, ChevronsUpDown } from "lucide-react"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger
-} from "@/components/ui/dialog"
-import { cn } from "@/lib/utils"
-import { Button } from "@/components/ui/button"
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-} from "@/components/ui/command"
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover"
-import { Separator } from "@/components/ui/separator"
-import { Input } from "@/components/ui/input"
+import { Dialog, DialogTrigger } from "@/components/ui/dialog"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { Toast, cn, prepareArg, securedFetch } from "@/lib/utils"
+import { ChevronDown, ChevronUp, Trash2, UploadIcon } from "lucide-react"
+import { Dispatch, SetStateAction, useEffect, useState } from "react"
+import TableView from "./TableView"
+import Upload from "./Upload"
+import DeleteGraph from "./DeleteGraph"
+import DialogComponent from "./DialogComponent"
 
 /* eslint-disable react/require-default-props */
 interface ComboboxProps {
-  className?: string,
-  type?: string,
+  isSelectGraph?: boolean,
+  disabled?: boolean,
+  inTable?: boolean,
+  type?: string | undefined,
   options: string[],
-  addOption?: Dispatch<string> | null,
-  selectedValue: string,
-  setSelectedValue: Dispatch<string>
+  setOptions?: Dispatch<SetStateAction<string[]>>,
+  selectedValue?: string,
+  setSelectedValue: (value: string) => void,
 }
 
-export default function Combobox({ className = '', type = 'Graph', options, addOption = null, selectedValue, setSelectedValue }: ComboboxProps) {
-  const [open, setOpen] = useState(false)
-  const inputRef = createRef<HTMLInputElement>()
+export default function Combobox({ isSelectGraph, disabled = false, inTable, type, options, setOptions, selectedValue = "", setSelectedValue }: ComboboxProps) {
 
-  // read the text in the create input box and add it to the list of options
-  const onAddOption = () => {
-    setOpen(false)
-    if (!inputRef.current?.value) {
+  const [open, setOpen] = useState<boolean>(false)
+  const [optionName, setNewOptionName] = useState<string[]>([])
+  const [isUploadOpen, setIsUploadOpen] = useState<boolean>(false)
+  const [isDeleteOpen, setIsDeleteOpen] = useState<boolean>(false)
+  const onExport = async (graphName: string) => {
+    const result = await securedFetch(`api/graph/${prepareArg(graphName)}/export`, {
+      method: "GET"
+    })
+
+    if (!result.ok) {
+      const json = await result.json()
+      Toast(json.message)
       return
     }
-    if (addOption) {
-      addOption(inputRef.current.value)
+
+    const blob = await result.blob()
+    const url = window.URL.createObjectURL(blob)
+    try {
+      const link = document.createElement('a')
+      link.href = url
+      link.setAttribute('download', `${selectedValue}.dump`)
+      document.body.appendChild(link)
+      link.click()
+      link.parentNode?.removeChild(link)
+      window.URL.revokeObjectURL(url)
+    } catch (e) {
+      Toast((e as Error).message)
     }
   }
-
-  const handleKeyDown = (event: React.KeyboardEvent) => {
-    if (event.key === "Enter") {
-      onAddOption();
-    }
-  }
-
-  const entityType = type ?? ""
-  return (
-      <Popover open={open} onOpenChange={setOpen}>
-        <PopoverTrigger asChild>
-          <Button
-            variant="outline"
-            role="combobox"
-            aria-expanded={open}
-            className={`w-[200px] justify-between ${className} `}
+  const tableRows = options.map(option => [
+    option,
+    <button
+      key="export"
+      onClick={() => onExport(option)}
+      type="button"
+    >Export</button>,
+    <div key="menu">
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <button
+            className="font-bold rotate-90"
+            title="More"
+            type="button"
           >
-            {selectedValue
-              ? options.find((option) => option === selectedValue)
-              : `Select ${entityType}...`}
-            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-          </Button>
-        </PopoverTrigger>
-        <PopoverContent className="w-[200px] p-0">
-          <Command>
-            <CommandInput placeholder="Search framework..." />
-            <CommandEmpty>No framework found.</CommandEmpty>
-            <CommandGroup>
-              {options.map((option) => (
-                <CommandItem
-                  className="w-full flex flex-row gap-2"
-                  key={option}
-                  onSelect={(currentValue) => {
-                    if (currentValue !== selectedValue) {
-                      setSelectedValue(option)
-                    }
-                    setOpen(false)
-                  }}
+            <p>...</p>
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent side="right" className="flex flex-row min-w-fit">
+          <DropdownMenuItem className="justify-center">
+            <button
+              className="disabled:text-gray-400 disabled:text-opacity-70"
+              title="Upload Data"
+              type="button"
+              aria-label="Upload Data"
+              onClick={() => setIsUploadOpen(true)}
+            >
+              <p><UploadIcon /></p>
+            </button>
+          </DropdownMenuItem>
+          <DropdownMenuItem className="justify-center">
+            <button
+              className="disabled:text-gray-400 disabled:text-opacity-70"
+              title="Delete"
+              type="button"
+              aria-label="Delete"
+              onClick={() => setIsDeleteOpen(true)}
+            >
+              <p><Trash2 /></p>
+            </button>
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <Upload isOpen={isUploadOpen} onOpen={setIsUploadOpen} />
+      <DeleteGraph graphName={option} isOpen={isDeleteOpen} onOpen={setIsDeleteOpen} />
+    </div>
+  ])
+
+  useEffect(() => {
+    if (!setOptions || optionName.length === 0) return
+    const run = async () => {
+      const result = await fetch(`api/graph/${prepareArg(optionName[1])}/?sourceName=${optionName[0]}`, {
+        method: "PUT",
+      })
+      if (!result.ok) {
+        const json = await result.json()
+        Toast(json.message || "Failed to rename graph")
+        return
+      }
+      setOptions(prev => prev.filter(option => option !== optionName[0]).concat(optionName[1]))
+    }
+    run()
+  }, [optionName, setOptions])
+
+  return (
+    <Dialog>
+      <DropdownMenu onOpenChange={setOpen}>
+        <DropdownMenuTrigger disabled={disabled} className="w-fit" asChild>
+          <button
+            disabled={disabled}
+            className={cn(inTable ? "text-sm font-light" : "text-2xl", "w-fit flex flex-row items-center gap-4 disabled:text-gray-300")}
+            title="Select Graph"
+            type="button"
+          >
+            <p>{selectedValue || `Select ${type || "Graph"}...`}</p>
+            {
+              open ?
+                <ChevronUp size={inTable ? 20 : 15} />
+                : <ChevronDown size={inTable ? 20 : 15} />
+            }
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent className="min-w-52">
+          {
+            options.length > 0 &&
+            options.map((option, index) => (
+              // eslint-disable-next-line react/no-array-index-key
+              <DropdownMenuItem className="justify-center" asChild key={index}>
+                <button
+                  className="w-full"
+                  title={option}
+                  type="button"
+                  onClick={() => setSelectedValue(option)}
                 >
-                    <Check
-                      className={cn(
-                        "mr-2 h-4 w-4",
-                        selectedValue === option ? "opacity-100" : "opacity-0"
-                      )}
-                    />
-                    {option}
-                </CommandItem>
-              ))}
-              <Separator orientation="horizontal" />
-              {addOption &&
-                <Dialog>
-                  <DialogTrigger>
-                    <CommandItem>Create new {entityType}...</CommandItem>
-                  </DialogTrigger>
-                  <DialogContent>
-                    <DialogHeader>
-                      <DialogTitle>Create a new {entityType}?</DialogTitle>
-                      <DialogDescription>
-                        <Input type="text" ref={inputRef} id="create" name="create" onKeyDown={handleKeyDown} placeholder={`${entityType} name ...`} />
-                      </DialogDescription>
-                    </DialogHeader>
-                    <Button className="p-4" type="submit" onClick={onAddOption}>Create</Button>
-                  </DialogContent>
-                </Dialog>
-              }
-            </CommandGroup>
-          </Command>
-        </PopoverContent>
-      </Popover>
+                  {option}
+                </button>
+              </DropdownMenuItem>
+            ))
+          }
+          {
+            isSelectGraph &&
+            <>
+              <DropdownMenuSeparator className="bg-gray-300" />
+              <DropdownMenuItem>
+                <DialogTrigger asChild>
+                  <button
+                    className="w-full"
+                    title="Manage"
+                    type="button"
+                  >
+                    <p>Manage...</p>
+                  </button>
+                </DialogTrigger>
+              </DropdownMenuItem>
+            </>
+          }
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <DialogComponent
+        title="Manage Graphs"
+      >
+        <TableView
+          tableHeaders={["GRAPH NAME", "EXPORT", ""]}
+          tableRows={tableRows}
+          editableCells={[{
+            index: 0,
+            setState: setNewOptionName
+          }]}
+          onHoverCells={[]}
+        />
+      </DialogComponent>
+    </Dialog>
   )
 }
