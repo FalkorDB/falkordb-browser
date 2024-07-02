@@ -27,7 +27,7 @@ async function newClient(credentials: { host: string, port: string, password: st
             password: credentials.password ?? undefined,
             username: credentials.username ?? undefined
         }
-        
+
     const client = await FalkorDB.connect(connectionOptions)
 
     // Save connection in connections map for later use
@@ -47,16 +47,23 @@ async function newClient(credentials: { host: string, port: string, password: st
     });
 
     // Verify connection and Role
-    const admin = await client.connection.aclGetUser(credentials.username || "default")
-
-    if (admin) return { role: "Admin", client }
+    try {
+        await client.connection.aclGetUser(credentials.username || "default")
+        return { role: "Admin", client }
+    } catch (error) {
+        console.log(error);
+    }
 
     try {
         await client.connection.sendCommand(["GRAPH.QUERY"])
+    } catch (error: unknown) {
+        if ((error as Error).message.includes("permissions")) {
+            return { role: "Read-Only", client }
+        }
         return { role: "Read-Write", client }
-    } catch (error) {
-        return { role: "Read-Only", client }
     }
+
+    return { role: "Admin", client }
 }
 
 let userId = 1;
@@ -115,7 +122,8 @@ const authOptions: AuthOptions = {
                     username: user.username,
                     password: user.password,
                     tls: user.tls,
-                    ca: user.ca
+                    ca: user.ca,
+                    role: user.role
                 };
             }
             return token;
@@ -132,7 +140,8 @@ const authOptions: AuthOptions = {
                         username: token.username as string,
                         password: token.password as string,
                         tls: token.tls as boolean,
-                        ca: token.ca
+                        ca: token.ca,
+                        role: token.role as Role
                     },
                 };
             }

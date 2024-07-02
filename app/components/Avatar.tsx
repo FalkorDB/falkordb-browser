@@ -27,13 +27,13 @@ export default function AvatarButton({ setUserStatus }: { setUserStatus: (status
 
     setUserStatus(session.user.role)
 
-    const { name } = session.user;
+    const { username } = session.user;
 
     return (
         <DropdownMenu>
             <DropdownMenuTrigger>
                 <div className="flex items-center gap-3">
-                    <div className="text-black">{name || "default"}</div>
+                    <div className="text-black">{username || "default"}</div>
                 </div>
             </DropdownMenuTrigger>
             <DropdownMenuContent>
