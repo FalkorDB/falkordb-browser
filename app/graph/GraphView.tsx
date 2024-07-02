@@ -348,24 +348,6 @@ const GraphView = forwardRef(({ graphName, setQueries, schema }: {
         setSelectedElement(undefined)
     }
 
-    const onSetLabel = async (label: string) => {
-        const isNode = !!selectedElement?.data.category
-        const id = selectedElement?.data.id
-        const q = `MATCH (n) WHERE id(n) = ${id} `
-        const success = (await securedFetch(`api/graph/${prepareArg(graphName)}/?query=${prepareArg(q)}`, {
-            method: "GET"
-        })).ok
-        if (success)
-            graph.Elements.forEach(element => {
-                if (element.data.id !== id) return
-                const e = element
-                if (isNode) {
-                    e.data.category = label
-                } else e.data.label = label
-            })
-        return success
-    }
-
     const onAddEntity = async (entityAttributes: string[][]) => {
         const category = entityAttributes.find(row => row[0] === "category")
         const filteredAttributes = entityAttributes.filter(row => row[0] !== "category")
@@ -510,7 +492,6 @@ const GraphView = forwardRef(({ graphName, setQueries, schema }: {
                 {
                     selectedElement &&
                     <DataPanel
-                        setLabel={onSetLabel}
                         removeProperty={removeProperty}
                         setProperty={setProperty}
                         obj={selectedElement.data}
