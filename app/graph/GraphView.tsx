@@ -211,12 +211,11 @@ const GraphView = forwardRef(({ graphName, setQueries }: {
         const result = await securedFetch(`api/graph/${prepareArg(graphName)}/?query=${prepareArg(defaultQuery())}`, {
             method: "GET"
         })
+
+        if (!result.ok) return
+
         const json = await result.json()
 
-        if (!result.ok) {
-            Toast(json.message)
-            return
-        }
         if (!setQueries) return
         setQueries(prev => [...prev, { text: defaultQuery(), metadata: json.result.metadata }])
         setGraph(Graph.create(graphName, json.result))

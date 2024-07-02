@@ -54,7 +54,7 @@ export default function Selector({ onChange, queries }: {
     useEffect(() => {
         if (!selectedValue) return
         const run = async () => {
-            const q = "MATCH (n) WITH COUNT(n) as nodes MATCH ()-[e]-() RETURN nodes, COUNT(e) as edges"
+            const q = "MATCH (n) WITH COUNT(n) as nodes MATCH ()-[e]->() RETURN nodes, COUNT(e) as edges"
             const result = await securedFetch(`api/graph/${prepareArg(selectedValue)}/?query=${prepareArg(q)}`, {
                 method: "GET"
             })

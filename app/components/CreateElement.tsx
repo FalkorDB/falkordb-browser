@@ -22,17 +22,14 @@ interface Props {
     onCreateElement: (obj: NodeDataDefinition | EdgeDataDefinition) => void;
 }
 
-const edgeDefaultProperties = new Set([
-    "source",
-    "target"
-]);
-
 const excludedProperties = new Set([
     "category",
     "color",
     "id",
     "_id",
     "label",
+    "target",
+    "source",
 ]);
 
 export default function CreateElement({ schema, graphName, type, onExpand, onCreateElement }: Props) {
@@ -80,12 +77,7 @@ export default function CreateElement({ schema, graphName, type, onExpand, onCre
         if (type === "node") {
             setObj(currentSchema.Elements.find((e) => e.data.category === value)?.data || {})
         } else {
-            const newObj = currentSchema.Elements.find((e) => e.data.label === value)?.data
-            if (newObj) {
-                newObj.source = "int"
-                newObj.target = "int"
-            }
-            setObj(newObj || {})
+            setObj(currentSchema.Elements.find((e) => e.data.label === value)?.data || {})
         }
     }
 
@@ -161,7 +153,7 @@ export default function CreateElement({ schema, graphName, type, onExpand, onCre
                             />
                     }
                 </div>
-                <p className="flex flex-row text-white">{Object.keys(obj).filter((v) => !excludedProperties.has(v)).length} Attributes</p>
+                <p className="flex flex-row text-white">{formatObj(obj).length} Attributes</p>
             </div>
             <div className="h-1 grow flex flex-col justify-between items-start">
                 <Table>
@@ -287,9 +279,9 @@ export default function CreateElement({ schema, graphName, type, onExpand, onCre
                                     <TableCell className="p-8">{key}:</TableCell>
                                     <TableCell className="p-6">
                                         <Input
-                                            value={Object.keys(createObj).length >= index + 1 ? Object.entries(createObj).filter((row) => !excludedProperties.has(row[0]))[index][1] : undefined}
+                                            value={Object.keys(createObj).length >= index + 1 ? formatObj(createObj)[index][1] : undefined}
                                             variant="Small"
-                                            placeholder={type === "edge" && edgeDefaultProperties.has(key) ? value : value[0]}
+                                            placeholder={type === "edge" ? value : value[0]}
                                             onKeyDown={(e) => e.code === "Enter" && handelCreateElement()}
                                             onChange={(e) => setCreateObj((prev) => {
                                                 const newObj = { ...prev }
