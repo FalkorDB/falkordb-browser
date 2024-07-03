@@ -1,30 +1,34 @@
 import { FalkorDB } from "falkordb";
 import CredentialsProvider from "next-auth/providers/credentials"
-import { AuthOptions, getServerSession } from "next-auth"
+import { AuthOptions, Role, getServerSession } from "next-auth"
 import { NextResponse } from "next/server";
+import { FalkorDBOptions } from "falkordb/dist/src/falkordb";
 
 const connections = new Map<number, FalkorDB>();
 
-async function newClient(credentials: { host: string, port: string, password: string, username: string, tls: string, ca: string }, id: number) {
-    const client = credentials.ca === "undefined" ? await FalkorDB.connect({
-        socket: {
-            host: credentials.host ?? "localhost",
-            port: credentials.port ? parseInt(credentials.port, 10) : 6379,
-            tls: credentials.tls === "true",
-            checkServerIdentity: () => undefined,
-            ca: credentials.ca && [Buffer.from(credentials.ca, "base64").toString("utf8")]
-        },
-        password: credentials.password ?? undefined,
-        username: credentials.username ?? undefined
-    })
-    : await FalkorDB.connect({
-        socket: {
-            host: credentials.host ?? "localhost",
-            port: credentials.port ? parseInt(credentials.port, 10) : 6379,
-        },
-        password: credentials.password ?? undefined,
-        username: credentials.username ?? undefined
-    })
+async function newClient(credentials: { host: string, port: string, password: string, username: string, tls: string, ca: string }, id: number): Promise<{ role: Role, client: FalkorDB }> {
+    const connectionOptions: FalkorDBOptions = credentials.ca === "undefined" ?
+        {
+            socket: {
+                host: credentials.host ?? "localhost",
+                port: credentials.port ? parseInt(credentials.port, 10) : 6379,
+            },
+            password: credentials.password ?? undefined,
+            username: credentials.username ?? undefined
+        }
+        : {
+            socket: {
+                host: credentials.host ?? "localhost",
+                port: credentials.port ? parseInt(credentials.port, 10) : 6379,
+                tls: credentials.tls === "true",
+                checkServerIdentity: () => undefined,
+                ca: credentials.ca && [Buffer.from(credentials.ca, "base64").toString("utf8")]
+            },
+            password: credentials.password ?? undefined,
+            username: credentials.username ?? undefined
+        }
+
+    const client = await FalkorDB.connect(connectionOptions)
 
     // Save connection in connections map for later use
     connections.set(id, client)
@@ -42,9 +46,24 @@ async function newClient(credentials: { host: string, port: string, password: st
         }
     });
 
-    // Verify connection
-    await client.connection.ping()
-    return client
+    // Verify connection and Role
+    try {
+        await client.connection.aclGetUser(credentials.username || "default")
+        return { role: "Admin", client }
+    } catch (error) {
+        console.log(error);
+    }
+
+    try {
+        await client.connection.sendCommand(["GRAPH.QUERY"])
+    } catch (error: unknown) {
+        if ((error as Error).message.includes("permissions")) {
+            return { role: "Read-Only", client }
+        }
+        return { role: "Read-Write", client }
+    }
+
+    return { role: "Admin", client }
 }
 
 let userId = 1;
@@ -71,7 +90,7 @@ const authOptions: AuthOptions = {
                     const id = userId;
                     userId += 1;
 
-                    await newClient(credentials, id)
+                    const { role } = await newClient(credentials, id)
 
                     const res = {
                         id,
@@ -80,7 +99,8 @@ const authOptions: AuthOptions = {
                         password: credentials.password,
                         username: credentials.username,
                         tls: credentials.tls === "true",
-                        ca: credentials.ca
+                        ca: credentials.ca,
+                        role
                     }
                     return res
                 } catch (err) {
@@ -102,7 +122,8 @@ const authOptions: AuthOptions = {
                     username: user.username,
                     password: user.password,
                     tls: user.tls,
-                    ca: user.ca
+                    ca: user.ca,
+                    role: user.role
                 };
             }
             return token;
@@ -119,7 +140,8 @@ const authOptions: AuthOptions = {
                         username: token.username as string,
                         password: token.password as string,
                         tls: token.tls as boolean,
-                        ca: token.ca
+                        ca: token.ca,
+                        role: token.role as Role
                     },
                 };
             }
@@ -140,20 +162,20 @@ export async function getClient() {
 
     // If client is not found, create a new one
     if (!client) {
-        client = await newClient({
+        client = (await newClient({
             host: user.host,
             port: user.port.toString() ?? "6379",
             username: user.username,
             password: user.password,
             tls: String(user.tls),
             ca: user.ca
-        }, user.id)
+        }, user.id)).client
     }
 
     if (!client) {
         return NextResponse.json({ message: "Not authenticated" }, { status: 401 })
     }
-    
+
     return client
 }
 

@@ -2,7 +2,7 @@
 
 import { SignInOptions, SignInResponse, signIn } from "next-auth/react";
 import { FormEvent, useEffect, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import Dropzone from "@/app/components/Dropzone";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Eye } from "lucide-react";
@@ -73,6 +73,10 @@ export default function LoginForm() {
     reader.readAsDataURL(acceptedFiles[0])
   }
 
+  const onChangeSetError = (func: (val: string) => void, val: string) => {
+    func(val);
+    setError(false);
+  }
   return (
     <div className="w-full h-full flex flex-row items-center justify-center gap-80 LoginForm">
       <Image src="/Logo.svg" alt="" width={451} height={126} />
@@ -90,7 +94,7 @@ export default function LoginForm() {
                 id="server"
                 placeholder={DEFAULT_HOST}
                 type="text"
-                onChange={(e) => setHost(e.target.value)}
+                onChange={(e) => onChangeSetError(setHost, e.target.value)}
                 value={host}
               />
             </div>
@@ -102,7 +106,7 @@ export default function LoginForm() {
                 placeholder={DEFAULT_PORT}
                 min={1}
                 max={65535}
-                onChange={(e) => setPort(e.target.value)}
+                onChange={(e) => onChangeSetError(setPort, e.target.value)}
                 value={port}
               />
             </div>
@@ -113,7 +117,7 @@ export default function LoginForm() {
               variant="Default"
               id="username"
               type="text"
-              onChange={(e) => setUsername(e.target.value)}
+              onChange={(e) => onChangeSetError(setUsername, e.target.value)}
               value={username}
             />
           </div>
@@ -132,7 +136,7 @@ export default function LoginForm() {
               id="password"
               variant="Default"
               type={showPassword ? "text" : "password"}
-              onChange={(e) => setPassword(e.target.value)}
+              onChange={(e) => onChangeSetError(setPassword, e.target.value)}
               value={password}
             />
           </div>

@@ -9,13 +9,12 @@ import { editor } from "monaco-editor";
 import { ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { ImperativePanelHandle } from "react-resizable-panels";
 import { ChevronDown, ChevronLeft, Maximize2 } from "lucide-react"
-import { Toast, cn, prepareArg, securedFetch } from "@/lib/utils";
+import { Toast, cn, defaultQuery, prepareArg, securedFetch } from "@/lib/utils";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
-import { Category, Graph } from "./model";
+import { Category, Graph, Query } from "./model";
 import DataPanel from "./DataPanel";
 import Labels from "./labels";
 import Toolbar from "./toolbar";
-import { Query } from "./Selector";
 
 const monacoOptions: editor.IStandaloneEditorConstructionOptions = {
     renderLineHighlight: "none",
@@ -201,8 +200,6 @@ const GraphView = forwardRef(({ graphName, setQueries, schema }: {
         dataPanel.current?.collapse()
     }, [])
 
-    const defaultQuery = () => query || "MATCH (n) OPTIONAL MATCH (n)-[e]-(m) return n,e,m LIMIT 100"
-
     const runQuery = async () => {
 
         if (!graphName) {
@@ -210,7 +207,7 @@ const GraphView = forwardRef(({ graphName, setQueries, schema }: {
             return
         }
 
-        const result = await securedFetch(`api/graph/${prepareArg(graphName)}/?query=${prepareArg(defaultQuery())}`, {
+        const result = await securedFetch(`api/graph/${prepareArg(graphName)}/?query=${prepareArg(defaultQuery(query))}`, {
             method: "GET"
         })
         const json = await result.json()
@@ -220,7 +217,7 @@ const GraphView = forwardRef(({ graphName, setQueries, schema }: {
             return
         }
         if (!setQueries) return
-        setQueries(prev => [...prev, { text: defaultQuery(), metadata: json.result.metadata }])
+        setQueries(prev => [...prev, { text: defaultQuery(query), metadata: json.result.metadata }])
         setGraph(Graph.create(graphName, json.result))
     }
 

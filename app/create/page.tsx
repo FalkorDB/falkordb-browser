@@ -7,12 +7,12 @@ import { Progress } from "@/components/ui/progress";
 import useSWR from "swr";
 import { EdgeDataDefinition, NodeDataDefinition } from "cytoscape";
 import { Toast, prepareArg, securedFetch } from "@/lib/utils";
-import Header from "../graph/Header";
+import Header from "../components/Header";
 import { Graph } from "../graph/model";
 import Input from "../components/Input";
 import Button from "../components/Button";
 import GraphView from "../graph/GraphView";
-import SchemaView from "../graph/SchemaView";
+import SchemaView from "../schema/SchemaView";
 import Dropzone from "../components/Dropzone";
 
 type CurrentTab = "loadSchema" | "schema" | "graph"

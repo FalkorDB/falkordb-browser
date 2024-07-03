@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { cn } from "@/lib/utils"
-import Header from "../graph/Header"
+import Header from "../components/Header"
 import Users from "./users/Users"
 import Configurations from "./Configurations"
 
