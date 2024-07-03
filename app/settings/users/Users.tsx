@@ -22,10 +22,10 @@ export default function Users() {
     const [users, setUsers] = useState<User[]>([])
     const [checked, setChecked] = useState<boolean>(false)
     const tableHeaders = [
-        <Checkbox
+        [<Checkbox
             key="checkbox"
             checked={checked}
-            className="border-[#57577B] rounded-lg"
+            className="data-[state=checked]:text-[#57577B] border-[#57577B] data-[state=checked]:bg-[#272746] rounded-lg w-5 h-5"
             id="select-all"
             onCheckedChange={(check: CheckedState) => {
                 setChecked(check === true)
@@ -35,15 +35,15 @@ export default function Users() {
                     return u
                 }))
             }}
-        />,
-        "USERNAME",
-        "ROLE",
-        ""
+        />, "w-[10%]"],
+        ["USERNAME", "w-[40%]"],
+        ["ROLE", "w-[40%]"],
+        ["", "w-[10%]"]
     ]
     const tableRows = users.map((user, index) => [
         <Checkbox
             key="checkbox"
-            className={cn(!(index % 2) && "border-[#57577B]", "border-[#272746] rounded-lg")}
+            className={cn(!(index % 2) && "data-[state=checked]:text-[#57577B] border-[#57577B] data-[state=checked]:bg-[#272746]", "data-[state=checked]:text-[#272746] border-[#272746] data-[state=checked]:bg-[#57577B] rounded-lg w-5 h-5")}
             checked={user.selected}
             onCheckedChange={(check) => {
                 setUsers(prev => prev.map(currentUser => {

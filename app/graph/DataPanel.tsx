@@ -6,6 +6,7 @@ import { EdgeDataDefinition, NodeDataDefinition } from "cytoscape";
 import { ChevronRight, MinusCircle, PlusCircle, Trash2 } from "lucide-react";
 import { KeyboardEvent, useEffect, useRef, useState } from "react";
 import Button from "../components/Button";
+import Input from "../components/Input";
 
 /* eslint-disable react/require-default-props */
 interface Props {
@@ -168,7 +169,7 @@ export default function DataPanel({ inSchema, obj, onExpand, setProperty, setPro
                 </div>
                 <p className="flex flex-row text-white">{Object.keys(obj).filter((v) => !excludedProperties.has(v)).length} Attributes</p>
             </div>
-            <div className="h-1 grow flex flex-col justify-between items-start font-medium overflow-auto overflow-y-hidden">
+            <div className="w-full h-1 grow flex flex-col justify-between items-start font-medium">
                 <Table>
                     {
                         (setProperty || setPropertySchema) &&
@@ -242,62 +243,61 @@ export default function DataPanel({ inSchema, obj, onExpand, setProperty, setPro
                                                             // eslint-disable-next-line react/no-array-index-key
                                                             key={i}
                                                             className="p-4"
+                                                            onClick={() => {
+                                                                if (!setPropertySchema) return
+                                                                setEditable(`${index}-${i}`)
+                                                            }}
                                                         >
-                                                            {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions */}
-                                                            <div
-                                                                className={cn("p-4", isEdit && "bg-[#1F1F3D] hover:bg-[#2E2E51] focus:border focus:border-[#5D5FEF] rounded-lg")}
-                                                                ref={ref => {
-                                                                    if (ref?.isContentEditable) {
-                                                                        ref.focus()
-                                                                    }
-                                                                }}
-                                                                onKeyDown={(e) => {
-                                                                    setKey(strKey)
-                                                                    onKeyDownSchema(e)
-                                                                }}
-                                                                onInput={(e) => {
-                                                                    schemaVal[i] = e.currentTarget.textContent || ""
-                                                                }}
-                                                                onClick={() => {
-                                                                    if (!setPropertySchema) return
-                                                                    setEditable(`${index}-${i}`)
-                                                                }}
-                                                                onBlur={() => setEditable("")}
-                                                                contentEditable={isEdit}
-                                                            >
-                                                                {cell.toString()}
-                                                            </div>
+                                                            {
+                                                                isEdit ?
+                                                                    <Input
+                                                                        ref={ref => {
+                                                                            ref?.focus()
+                                                                        }}
+                                                                        variant="Small"
+                                                                        onChange={e => setSchemaVal(prev => {
+                                                                            const p = prev
+                                                                            p[i] = e.target.value
+                                                                            return p
+                                                                        })}
+                                                                        onKeyDown={(e) => {
+                                                                            setKey(strKey)
+                                                                            onKeyDownSchema(e)
+                                                                        }}
+                                                                        onBlur={() => setEditable("")}
+                                                                    />
+                                                                    :
+                                                                    <p>
+                                                                        {cell.toString()}
+                                                                    </p>}
                                                         </TableCell>
                                                     )
                                                 })
                                                 : <TableCell
-                                                    key={row[1]}
-                                                    className="w-1/2 p-4"
+                                                    className="p-4"
+                                                    onClick={() => {
+                                                        if (!setProperty) return
+                                                        setEditable(`${index}`)
+                                                    }}
                                                 >
-                                                    {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions */}
-                                                    <div
-                                                        className={cn("p-4", isEditable && "bg-[#1F1F3D] hover:bg-[#2E2E51] focus:border focus:border-[#5D5FEF] rounded-lg")}
-                                                        ref={ref => {
-                                                            if (ref?.isContentEditable) {
-                                                                ref.focus()
-                                                            }
-                                                        }}
-                                                        onKeyDown={(e) => {
-                                                            setKey(strKey)
-                                                            onKeyDown(e)
-                                                        }}
-                                                        onInput={(e) => {
-                                                            setVal(e.currentTarget.textContent || "")
-                                                        }}
-                                                        onClick={() => {
-                                                            if (!setProperty) return
-                                                            setEditable(`${index}`)
-                                                        }}
-                                                        onBlur={() => setEditable("")}
-                                                        contentEditable={isEditable}
-                                                    >
-                                                        {strCell.toString()}
-                                                    </div>
+                                                    {
+                                                        isEditable ?
+                                                            <Input
+                                                                className="w-40"
+                                                                ref={ref => {
+                                                                    ref?.focus()
+                                                                }}
+                                                                variant="Small"
+                                                                onKeyDown={(e) => {
+                                                                    setKey(strKey)
+                                                                    onKeyDown(e)
+                                                                }}
+                                                                onChange={(e) => setVal(e.target.value)}
+                                                                onBlur={() => setEditable("")}
+                                                            />
+                                                            : <p>
+                                                                {strCell.toString()}
+                                                            </p>}
                                                 </TableCell>
                                         }
                                     </TableRow>
@@ -308,80 +308,82 @@ export default function DataPanel({ inSchema, obj, onExpand, setProperty, setPro
                             isAddValue && inSchema ?
                                 <TableRow className="border-none">
                                     <TableCell className="p-4">
-                                        {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions */}
-                                        <div
-                                            ref={addValueRef}
-                                            className="p-4 rounded-lg bg-[#1F1F3D] hover:bg-[#2E2E51] focus:border focus:border-[#5D5FEF]"
-                                            contentEditable
-                                            onInput={(e) => setKey(e.currentTarget.textContent || "")}
+                                        <Input
+                                            variant="Small"
+                                            onChange={(e) => setKey(e.target.value)}
                                             onKeyDown={onKeyDownSchema}
                                         />
                                     </TableCell>
                                     <TableCell
                                         className="p-4"
                                     >
-                                        {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions */}
-                                        <div
-                                            className="p-4 rounded-lg bg-[#1F1F3D] hover:bg-[#2E2E51] focus:border focus:border-[#5D5FEF]"
-                                            contentEditable
-                                            onInput={(e) => { schemaVal[0] = e.currentTarget.textContent || "" }}
+                                        <Input
+                                            variant="Small"
+                                            onChange={(e) => setSchemaVal(prev => {
+                                                const p = prev
+                                                p[0] = e.target.value
+                                                return p
+                                            })}
                                             onKeyDown={onKeyDownSchema}
                                         />
                                     </TableCell>
                                     <TableCell
                                         className="p-4"
                                     >
-                                        {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions */}
-                                        <div
-                                            className="p-4 rounded-lg bg-[#1F1F3D] hover:bg-[#2E2E51] focus:border focus:border-[#5D5FEF]"
-                                            contentEditable
-                                            onInput={(e) => { schemaVal[1] = e.currentTarget.textContent || "" }}
+                                        <Input
+                                            variant="Small"
+                                            onChange={(e) => setSchemaVal(prev => {
+                                                const p = prev
+                                                p[1] = e.target.value
+                                                return p
+                                            })}
                                             onKeyDown={onKeyDownSchema}
                                         />
                                     </TableCell>
                                     <TableCell
                                         className="p-4"
                                     >
-                                        {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions */}
-                                        <div
-                                            className="p-4 rounded-lg bg-[#1F1F3D] hover:bg-[#2E2E51] focus:border focus:border-[#5D5FEF]"
-                                            contentEditable
-                                            onInput={(e) => { schemaVal[2] = e.currentTarget.textContent || "" }}
+                                        <Input
+                                            variant="Small"
+                                            onChange={(e) => setSchemaVal(prev => {
+                                                const p = prev
+                                                p[2] = e.target.value
+                                                return p
+                                            })}
                                             onKeyDown={onKeyDownSchema}
                                         />
                                     </TableCell>
                                     <TableCell
                                         className="p-4"
                                     >
-                                        {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions */}
-                                        <div
-                                            className="p-4 rounded-lg bg-[#1F1F3D] hover:bg-[#2E2E51] focus:border focus:border-[#5D5FEF]"
-                                            contentEditable
-                                            onInput={(e) => { schemaVal[3] = e.currentTarget.textContent || "" }}
+                                        <Input
+                                            variant="Small"
+                                            onChange={(e) => setSchemaVal(prev => {
+                                                const p = prev
+                                                p[3] = e.target.value
+                                                return p
+                                            })}
                                             onKeyDown={onKeyDownSchema}
                                         />
                                     </TableCell>
                                 </TableRow>
                                 : isAddValue &&
                                 <TableRow>
-                                    <TableCell className="w-1/2 p-4">
-                                        {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions */}
-                                        <div
-                                            ref={addValueRef}
-                                            className="p-4 rounded-lg bg-[#1F1F3D] hover:bg-[#2E2E51] focus:border focus:border-[#5D5FEF]"
-                                            contentEditable
-                                            onInput={(e) => setKey(e.currentTarget.textContent || "")}
+                                    <TableCell className="p-4">
+                                        <Input
+                                            className="w-40"
+                                            variant="Small"
+                                            onChange={(e) => setKey(e.target.value)}
                                             onKeyDown={onKeyDown}
                                         />
                                     </TableCell>
                                     <TableCell
-                                        className="w-1/2 p-4"
+                                        className="p-4"
                                     >
-                                        {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions */}
-                                        <div
-                                            className="p-4 rounded-lg bg-[#1F1F3D] hover:bg-[#2E2E51] focus:border focus:border-[#5D5FEF]"
-                                            contentEditable
-                                            onInput={(e) => setVal(e.currentTarget.textContent || "")}
+                                        <Input
+                                            className="w-40"
+                                            variant="Small"
+                                            onChange={(e) => setVal(e.target.value)}
                                             onKeyDown={onKeyDown}
                                         />
                                     </TableCell>

@@ -28,7 +28,7 @@ export default function DialogComponent({ children, title, description, classNam
                     </button>
                 </DialogClose>
             </DialogHeader>
-            <div className="h-[90%] p-8 flex flex-col gap-10">
+            <div className="h-[90%] p-8 flex flex-col gap-10 overflow-auto">
                 {
                     description &&
                     <DialogDescription className="text-2xl">
