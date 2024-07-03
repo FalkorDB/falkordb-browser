@@ -346,6 +346,7 @@ const GraphView = forwardRef(({ graphName, setQueries, schema }: {
         if (!success) return
         graph.Elements = graph.Elements.filter(element => element.data.id !== id)
         setSelectedElement(undefined)
+        dataPanel.current?.collapse()
     }
 
     const onSetLabel = async (label: string) => {
