@@ -1,6 +1,6 @@
 "use client"
 
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { Dialog, DialogTrigger } from "@/components/ui/dialog"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Toast, cn, prepareArg, securedFetch } from "@/lib/utils"
 import { ChevronDown, ChevronUp, Trash2, UploadIcon } from "lucide-react"
@@ -8,6 +8,7 @@ import { Dispatch, SetStateAction, useEffect, useState } from "react"
 import TableView from "./TableView"
 import Upload from "./Upload"
 import DeleteGraph from "./DeleteGraph"
+import DialogComponent from "./DialogComponent"
 
 /* eslint-disable react/require-default-props */
 interface ComboboxProps {
@@ -170,10 +171,9 @@ export default function Combobox({ isSelectGraph, disabled = false, inTable, typ
           }
         </DropdownMenuContent>
       </DropdownMenu>
-      <DialogContent className="w-1/4">
-        <DialogHeader>
-          <DialogTitle>Manage Graphs</DialogTitle>
-        </DialogHeader>
+      <DialogComponent
+        title="Manage Graphs"
+      >
         <TableView
           tableHeaders={["GRAPH NAME", "EXPORT", ""]}
           tableRows={tableRows}
@@ -181,9 +181,9 @@ export default function Combobox({ isSelectGraph, disabled = false, inTable, typ
             index: 0,
             setState: setNewOptionName
           }]}
-          onHoverCells={[]} 
-          />
-      </DialogContent>
+          onHoverCells={[]}
+        />
+      </DialogComponent>
     </Dialog>
   )
 }

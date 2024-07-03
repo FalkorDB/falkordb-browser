@@ -11,10 +11,13 @@ import Combobox from "../components/combobox";
 import { Graph, Query } from "./model";
 import SchemaView from "../schema/SchemaView";
 import Upload from "../components/Upload";
+import DialogComponent from "../components/DialogComponent";
+import Button from "../components/Button";
+import Input from "../components/Input";
 
 export default function Selector({ onChange, queries, inSchema = false }: {
     /* eslint-disable react/require-default-props */
-    onChange: (selectedGraphName: string, selectedSchema: Graph) => void
+    onChange: (selectedGraphName: string, selectedSchema: Graph) => void 
     queries?: Query[]
     inSchema?: boolean
 }) {
@@ -30,10 +33,6 @@ export default function Selector({ onChange, queries, inSchema = false }: {
     const [nodesCount, setNodesCount] = useState<boolean>(false);
     const [query, setQuery] = useState<Query>();
     const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null)
-
-    const handleViewSchema = async () => {
-
-    }
 
     useEffect(() => {
         const run = async () => {
@@ -72,21 +71,21 @@ export default function Selector({ onChange, queries, inSchema = false }: {
     }
 
     const handleOnChange = async (name: string) => {
-        const q = 'MATCH (n)-[e]-(m) return n,e,m'
-        const result = await securedFetch(`api/graph/${name}_schema/?query=${q}`, {
-            method: "GET"
-        })
-
-        const json = await result.json()
-
-        if (!result.ok) {
-            Toast(json.message)
-            return
+        if (!inSchema) {
+            const q = 'MATCH (n)-[e]-(m) return n,e,m'
+            const result = await securedFetch(`api/graph/${name}_schema/?query=${q}`, {
+                method: "GET"
+            })
+    
+            if (!result.ok) return
+    
+            const json = await result.json()
+    
+            setSchema(Graph.create(name, json.result))
+            onChange(name, Graph.create(name, json.result))
         }
-
+        onChange(name, Graph.empty())
         setSelectedValue(name)
-        setSchema(Graph.create(name, json.result))
-        onChange(name, Graph.create(name, json.result))
     }
 
     const onDuplicate = async (e: FormEvent) => {
@@ -198,34 +197,23 @@ export default function Selector({ onChange, queries, inSchema = false }: {
                                 </DropdownMenuItem>
                             </DropdownMenuContent>
                         </DropdownMenu>
-                        <DialogContent displayClose className="h-[30%] w-[20%] flex flex-col p-0">
-                            <DialogHeader className="h-[20%] bg-indigo-600 flex flex-row justify-between p-4 items-center">
-                                <DialogTitle className="text-white">Duplicate Graph</DialogTitle>
-                                <DialogClose asChild>
-                                    <button
-                                        title="Close"
-                                        type="button"
-                                        aria-label="Close"
-                                    >
-                                        <X color="white" size={30} />
-                                    </button>
-                                </DialogClose>
-                            </DialogHeader>
-                            <form onSubmit={onDuplicate} className="grow p-8 flex flex-col gap-8">
+                        <DialogComponent description="Enter a new graph name" title="Duplicate Graph">
+                            <form onSubmit={onDuplicate} className="grow flex flex-col gap-8">
                                 <div className="flex flex-col gap-2">
                                     <p className="font-medium text-xl">Graph Name</p>
-                                    <input className="border" type="text" value={duplicateName} onChange={(e) => setDuplicateName(e.target.value)} />
+                                    <Input variant="Small" onChange={(e) => setDuplicateName(e.target.value)} required />
                                 </div>
                                 <div className="flex flex-row justify-end">
-                                    <button
-                                        className="bg-indigo-600 p-4 text-white w-[30%]"
-                                        type="submit"
-                                    >
-                                        <p>OK</p>
-                                    </button>
+                                    <DialogClose asChild>
+                                        <Button
+                                            className="px-8"
+                                            variant="Primary"
+                                            label="OK"
+                                        />
+                                    </DialogClose>
                                 </div>
                             </form>
-                        </DialogContent>
+                        </DialogComponent>
                     </Dialog>
                 </div>
             </div>
@@ -252,7 +240,7 @@ export default function Selector({ onChange, queries, inSchema = false }: {
                                     <p>Query History</p>
                                 </button>
                             </DialogTrigger>
-                            <DialogContent displayClose className="w-[70%] h-[70%] flex flex-col p-0 shadow-lg rounded-xl">
+                            <DialogContent disableClose className="w-[70%] h-[70%] flex flex-col p-0 shadow-lg rounded-xl">
                                 <DialogHeader className="h-[10%] p-4 bg-indigo-600 flex flex-row justify-between items-center rounded-t-xl">
                                     <DialogTitle className="text-white">
                                         Query History
@@ -367,12 +355,11 @@ export default function Selector({ onChange, queries, inSchema = false }: {
                                     className="disabled:text-[#57577B]"
                                     title="View Schema"
                                     type="button"
-                                    onClick={handleViewSchema}
                                 >
                                     <p>View Schema</p>
                                 </button>
                             </DialogTrigger>
-                            <DialogContent displayClose className="w-[90%] h-[90%] flex flex-col p-0 rounded-lg">
+                            <DialogContent disableClose className="w-[90%] h-[90%] flex flex-col p-0 rounded-lg">
                                 <DialogHeader className="h-[10%] p-4 bg-indigo-600 flex flex-row justify-between items-center rounded-t-xl">
                                     <DialogTitle className="text-white">
                                         {selectedValue} Schema

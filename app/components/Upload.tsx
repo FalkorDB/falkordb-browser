@@ -1,9 +1,9 @@
-import { Dialog, DialogClose, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { X } from "lucide-react";
+import { Dialog, DialogClose } from "@/components/ui/dialog";
 import { useState } from "react";
 import Dropzone from "./Dropzone";
+import DialogComponent from "./DialogComponent";
 
-export default function Upload({ isOpen, onOpen}: {
+export default function Upload({ isOpen, onOpen }: {
     isOpen: boolean,
     onOpen: (open: boolean) => void
 }) {
@@ -16,21 +16,9 @@ export default function Upload({ isOpen, onOpen}: {
 
     return (
         <Dialog open={isOpen} onOpenChange={onOpen}>
-            <DialogContent displayClose className="h-[80%] w-fit flex flex-col p-0">
-                <DialogHeader className="h-[10%] bg-indigo-600 flex flex-row justify-between p-4 items-center">
-                    <DialogTitle className="text-white">Upload Data</DialogTitle>
-                    <DialogClose asChild>
-                        <button
-                            title="Close"
-                            type="button"
-                            aria-label="Close"
-                        >
-                            <X color="white" size={30} />
-                        </button>
-                    </DialogClose>
-                </DialogHeader>
-                <form onSubmit={onUploadData} className="grow p-8 flex flex-col gap-6 overflow-auto">
-                    <Dropzone filesCount className="grow overflow-auto flex-col gap-10" withTable onFileDrop={setFiles} />
+            <DialogComponent className="h-[90%]" title="Upload Data">
+                <form onSubmit={onUploadData} className="grow p-8 flex flex-col gap-6">
+                    <Dropzone filesCount className="flex-col gap-10" withTable onFileDrop={setFiles} />
                     <div className="flex flex-row-reverse gap-6 justify-start">
                         <DialogClose asChild>
                             <button
@@ -50,7 +38,7 @@ export default function Upload({ isOpen, onOpen}: {
                         </DialogClose>
                     </div>
                 </form>
-            </DialogContent>
+            </DialogComponent>
         </Dialog>
     )
 }

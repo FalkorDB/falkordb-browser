@@ -439,7 +439,7 @@ const GraphView = forwardRef(({ graphName, setQueries, schema }: {
                         </DialogTrigger>
                         <DialogContent closeSize={30} className="w-full h-full">
                             <Editor
-                                width={isCollapsed ? "100%" : "99.99%"}
+                                // width={isCollapsed ? "100%" : "99.99%"}
                                 className="w-full h-full"
                                 beforeMount={handleEditorWillMount}
                                 theme="custom-theme"

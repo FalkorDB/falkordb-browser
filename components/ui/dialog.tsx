@@ -32,14 +32,14 @@ DialogOverlay.displayName = DialogPrimitive.Overlay.displayName
 
 interface ContentProps
   extends React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content> {
-  displayClose?: boolean
+  disableClose?: boolean
   closeSize?: number
 }
 
 const DialogContent = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Content>,
   ContentProps
->(({ className, displayClose, closeSize, children, ...props }, ref) => (
+>(({ className, disableClose, closeSize = 16, children, ...props }, ref) => (
   <DialogPortal>
     <DialogOverlay />
     <DialogPrimitive.Content
@@ -51,13 +51,13 @@ const DialogContent = React.forwardRef<
       {...props}
     >
       {children}
-      <DialogPrimitive.Close className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground">
-        {
-          !displayClose &&
-          <X className={cn(!closeSize && "h-4 w-4")} size={closeSize} />
-        }
-        <span className="sr-only">Close</span>
-      </DialogPrimitive.Close>
+      {
+        !disableClose &&
+        <DialogPrimitive.Close className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground">
+          <X size={closeSize} />
+          <span className="sr-only">Close</span>
+        </DialogPrimitive.Close>
+      }
     </DialogPrimitive.Content>
   </DialogPortal>
 ))
