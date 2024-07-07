@@ -104,7 +104,7 @@ function getStyle() {
     return style
 }
 
-export default function SchemaView({ schema, onAddEntity, onAddRelation, onDelete, removeProperty, setLabel, setProperty}: Props) {
+export default function SchemaView({ schema, onAddEntity, onAddRelation, onDelete, removeProperty, setLabel, setProperty }: Props) {
 
     const [selectedElement, setSelectedElement] = useState<NodeDataDefinition | EdgeDataDefinition>();
     const [isCollapsed, setIsCollapsed] = useState<boolean>(false);
@@ -191,7 +191,7 @@ export default function SchemaView({ schema, onAddEntity, onAddRelation, onDelet
                         </button>
                     }
                 </div>
-                <div className="h-1 grow relative flex">
+                <div className="h-1 grow">
                     <CytoscapeComponent
                         className="Canvas"
                         layout={LAYOUT}
@@ -206,14 +206,14 @@ export default function SchemaView({ schema, onAddEntity, onAddRelation, onDelet
                             cy.on('tap', 'edge', handleTap)
                         }}
                     />
-                    {
-                        schema.Elements.length > 0 &&
-                        <>
-                            <Labels label="Categories" className="absolute left-0 bottom-0" categories={schema.Categories} onClick={onCategoryClick} />
-                            <Labels label="Labels" className="absolute right-0 bottom-0" categories={schema.Labels} onClick={onLabelClick} />
-                        </>
-                    }
                 </div>
+                {
+                    (schema.Categories.length > 0 || schema.Labels.length > 0) &&
+                    <>
+                        <Labels className="left-2" label="Categories" categories={schema.Categories} onClick={onCategoryClick} />
+                        <Labels label="right-2 text-end" categories={schema.Labels} onClick={onLabelClick} />
+                    </>
+                }
             </ResizablePanel>
             <ResizableHandle className="w-3" />
             <ResizablePanel
@@ -232,7 +232,7 @@ export default function SchemaView({ schema, onAddEntity, onAddRelation, onDelet
                         obj={selectedElement}
                         onExpand={onExpand}
                         onDeleteElement={onDelete ? () => onDelete(selectedElement) : undefined}
-                        removeProperty={removeProperty  ? async (key:string) => removeProperty(selectedElement, key) : undefined}
+                        removeProperty={removeProperty ? async (key: string) => removeProperty(selectedElement, key) : undefined}
                         setLabel={setLabel ? async (label: string) => setLabel(selectedElement, label) : undefined}
                         setPropertySchema={setProperty ? async (key: string, newVal: string[]) => setProperty(selectedElement, key, newVal) : undefined}
                     />
