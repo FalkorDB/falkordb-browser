@@ -123,7 +123,7 @@ function getStyle() {
             style: {
                 width: 0.5,
                 "line-color": "data(color)",
-                "arrow-scale": 0.3,
+                "arrow-scale": 0.5,
                 "target-arrow-color": "data(color)",
                 "target-arrow-shape": "triangle",
                 'curve-style': 'straight',
