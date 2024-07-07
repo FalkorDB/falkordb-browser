@@ -338,10 +338,13 @@ export default function Selector({ onChange, queries, inSchema = false }: {
                                         >
                                             <p>Translate to Cypher</p>
                                         </button>
-                                        <Button
-                                            label="Run"
-                                            variant="Primary"
-                                        />
+                                        <button
+                                            className="w-1/6 bg-indigo-600 text-white p-4"
+                                            title="Run"
+                                            type="button"
+                                        >
+                                            <p>RUN</p>
+                                        </button>
                                     </div>
                                 </div>
                             </DialogContent>
