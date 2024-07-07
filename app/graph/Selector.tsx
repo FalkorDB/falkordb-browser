@@ -17,7 +17,7 @@ import Input from "../components/Input";
 
 export default function Selector({ onChange, queries, inSchema = false }: {
     /* eslint-disable react/require-default-props */
-    onChange: (selectedGraphName: string, selectedSchema: Graph) => void 
+    onChange: (selectedGraphName: string, selectedSchema: Graph) => void
     queries?: Query[]
     inSchema?: boolean
 }) {
@@ -76,11 +76,11 @@ export default function Selector({ onChange, queries, inSchema = false }: {
             const result = await securedFetch(`api/graph/${name}_schema/?query=${q}`, {
                 method: "GET"
             })
-    
+
             if (!result.ok) return
-    
+
             const json = await result.json()
-    
+
             setSchema(Graph.create(name, json.result))
             onChange(name, Graph.create(name, json.result))
         }
@@ -338,13 +338,10 @@ export default function Selector({ onChange, queries, inSchema = false }: {
                                         >
                                             <p>Translate to Cypher</p>
                                         </button>
-                                        <button
-                                            className="w-1/6 bg-indigo-600 text-white p-4"
-                                            title="Run"
-                                            type="button"
-                                        >
-                                            <p>RUN</p>
-                                        </button>
+                                        <Button
+                                            label="Run"
+                                            variant="Primary"
+                                        />
                                     </div>
                                 </div>
                             </DialogContent>
