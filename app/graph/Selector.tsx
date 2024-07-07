@@ -178,7 +178,7 @@ export default function Selector({ onChange, queries, inSchema = false }: {
                                 <DropdownMenuItem>
                                     <DialogTrigger asChild>
                                         <button
-                                            className="text-indigo-600"
+                                            className="text-[#7167f6]"
                                             title="Duplicate Graph"
                                             type="button"
                                         >
@@ -188,7 +188,7 @@ export default function Selector({ onChange, queries, inSchema = false }: {
                                 </DropdownMenuItem>
                                 <DropdownMenuItem>
                                     <button
-                                        className="text-indigo-600"
+                                        className="text-[#7167f6]"
                                         title="New graph from schema"
                                         type="button"
                                     >
@@ -318,21 +318,21 @@ export default function Selector({ onChange, queries, inSchema = false }: {
                                     </div>
                                     <div className="flex flex-row justify-end items-center gap-12">
                                         <button
-                                            className="text-indigo-600"
+                                            className="text-[#7167f6]"
                                             title="Profile"
                                             type="button"
                                         >
                                             <p>Profile</p>
                                         </button>
                                         <button
-                                            className="text-indigo-600"
+                                            className="text-[#7167f6]"
                                             title="Explain"
                                             type="button"
                                         >
                                             <p>Explain</p>
                                         </button>
                                         <button
-                                            className="text-indigo-600"
+                                            className="text-[#7167f6]"
                                             title="Profile"
                                             type="button"
                                         >
