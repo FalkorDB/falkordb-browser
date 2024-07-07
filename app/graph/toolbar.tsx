@@ -8,9 +8,9 @@ import { Dialog, DialogTitle } from "@radix-ui/react-dialog";
 import { Link, PlusCircle, Shrink, Trash2, X, ZoomIn, ZoomOut } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Graph } from "./model";
-import Combobox from "../components/combobox";
-import Button from "../components/Button";
-import Input from "../components/Input";
+import Combobox from "../components/ui/combobox";
+import Button from "../components/ui/Button";
+import Input from "../components/ui/Input";
 
 const excludedProperties = new Set([
     "id",

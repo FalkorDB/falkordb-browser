@@ -8,8 +8,8 @@ import Image from "next/image";
 import { cn, prepareArg, securedFetch } from "@/lib/utils";
 import { useRouter, usePathname } from "next/navigation";
 import { Role } from "next-auth";
-import Button from "./Button";
-import Avatar from "./Avatar";
+import Button from "./ui/Button";
+import Avatar from "./ui/Avatar";
 
 /* eslint-disable react/require-default-props */
 interface Props {
