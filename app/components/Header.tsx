@@ -46,9 +46,9 @@ export default function Header({ graphName, inCreate = false, inSettings = false
     }
 
     return (
-        <div className="h-[10%] flex flex-col">
+        <div className="flex flex-col">
             <div className="h-2 rounded-t-lg Top" />
-            <div className="py-6 px-11 flex flex-row justify-between items-center Header">
+            <div className="py-4 px-11 flex flex-row justify-between items-center Header">
                 <div className="flex flex-row gap-4 items-center">
                     <Image width={103} height={29} src="/ColorLogo.svg" alt="" />
                     <p className="text-neutral-200" >|</p>
