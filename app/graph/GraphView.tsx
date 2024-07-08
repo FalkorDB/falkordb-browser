@@ -121,8 +121,9 @@ function getStyle() {
         {
             selector: "edge",
             style: {
-                width: 0.5,
+                width: 1,
                 "line-color": "data(color)",
+                "line-opacity": 0.7,
                 "arrow-scale": 0.5,
                 "target-arrow-color": "data(color)",
                 "target-arrow-shape": "triangle",
@@ -134,6 +135,12 @@ function getStyle() {
             style: {
                 "overlay-opacity": 0,
             },
+        },
+        {
+            selector: "edge:selected",
+            style: {
+                "line-opacity": 1,
+            }
         },
     ]
     return style
