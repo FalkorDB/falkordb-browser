@@ -272,15 +272,12 @@ export default function Create() {
                     <div className="grow flex flex-col gap-10">
                         <SchemaView schema={schema} onAddEntity={onAddEntity} onAddRelation={onAddRelation} onDelete={onDelete} removeProperty={removeProperty} setLabel={setLabel} setProperty={setProperty} />
                         <div className="flex flex-row justify-end gap-16">
-                            <button
+                            <Button
+                                variant="button"
                                 className="flex flex-row gap-1 items-center text-[#7167F6]"
-                                title="Back"
-                                type="button"
+                                label="Back"
                                 onClick={() => setCurrentTab(null)}
-                            >
-                                <ChevronLeft size={15} />
-                                <p>back</p>
-                            </button>
+                            />
                             <Button
                                 variant="Large"
                                 label="Create Graph"
@@ -314,15 +311,14 @@ export default function Create() {
                         </div>
                         <GraphView schema={schema} graphName={graphName} />
                         <div className="flex flex-row justify-end gap-16">
-                            <button
+                            <Button
+                                variant="button"
                                 className="flex flex-row gap-1 items-center text-[#7167F6]"
-                                title="Back"
-                                type="button"
+                                label="Back"
+                                icon={<ChevronLeft size={25} />}
                                 onClick={() => setCurrentTab("schema")}
-                            >
-                                <ChevronLeft size={15} />
-                                <p>back</p>
-                            </button>
+
+                            />
                             <Button
                                 className="w-1/4"
                                 variant="Large"

@@ -7,6 +7,7 @@ import { ChevronRight, MinusCircle, PlusCircle, Trash2 } from "lucide-react";
 import { KeyboardEvent, useEffect, useRef, useState } from "react";
 import Button from "../components/Button";
 import Input from "../components/Input";
+import IconButton from "../components/IconButton";
 
 /* eslint-disable react/require-default-props */
 interface Props {
@@ -142,14 +143,11 @@ export default function DataPanel({ inSchema, obj, onExpand, setProperty, setPro
         <div className="h-full w-full flex flex-col shadow-lg DataPanel">
             <div className="w-full flex flex-row justify-between items-center bg-[#7167F6] p-4">
                 <div className="flex flex-row gap-4 items-center">
-                    <button
-                        title="Close"
-                        type="button"
+                    <IconButton
+                        variant="button"
+                        icon={<ChevronRight />}
                         onClick={() => onExpand()}
-                        aria-label="Close"
-                    >
-                        <ChevronRight />
-                    </button>
+                    />
                     {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions */}
                     <div
                         ref={ref => {
@@ -222,14 +220,10 @@ export default function DataPanel({ inSchema, obj, onExpand, setProperty, setPro
                                             <div className="text-[#ACACC2] flex flex-row gap-2 items-center">
                                                 {
                                                     hover === strKey &&
-                                                    <button
-                                                        title="Delete"
-                                                        type="button"
-                                                        aria-label="delete"
+                                                    <IconButton
+                                                        icon={<Trash2 />}
                                                         onClick={() => onDelete(strKey)}
-                                                    >
-                                                        <Trash2 />
-                                                    </button>
+                                                    />
                                                 }
                                                 {strKey}:
                                             </div>

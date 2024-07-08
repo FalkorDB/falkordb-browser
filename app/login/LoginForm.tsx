@@ -9,6 +9,7 @@ import { Eye } from "lucide-react";
 import Input from "@/app/components/Input";
 import Button from "@/app/components/Button";
 import Image from "next/image";
+import IconButton from "../components/IconButton";
 
 const DEFAULT_HOST = "localhost";
 const DEFAULT_PORT = "6379";
@@ -123,15 +124,11 @@ export default function LoginForm() {
           </div>
           <div className="relative flex flex-col gap-2">
             <p title="Password">{host !== DEFAULT_HOST && "* "}Password</p>
-            <button
+            <IconButton
               className="absolute top-10 right-2 p-0"
-              title="Show Password"
-              type="button"
-              aria-label="Show Password"
+              icon={<Eye strokeWidth={0.5} color="black" />}
               onClick={() => setShowPassword(prev => !prev)}
-            >
-              <Eye strokeWidth={0.5} color="black" />
-            </button>
+            />
             <Input
               id="password"
               variant="Default"

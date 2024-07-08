@@ -12,6 +12,7 @@ import Toolbar from "../graph/toolbar"
 import DataPanel from "../graph/DataPanel"
 import Labels from "../graph/labels"
 import { Category, Graph } from "../graph/model"
+import IconButton from "../components/IconButton"
 
 /* eslint-disable react/require-default-props */
 interface Props {
@@ -104,7 +105,7 @@ function getStyle() {
     return style
 }
 
-export default function SchemaView({ schema, onAddEntity, onAddRelation, onDelete, removeProperty, setLabel, setProperty}: Props) {
+export default function SchemaView({ schema, onAddEntity, onAddRelation, onDelete, removeProperty, setLabel, setProperty }: Props) {
 
     const [selectedElement, setSelectedElement] = useState<NodeDataDefinition | EdgeDataDefinition>();
     const [isCollapsed, setIsCollapsed] = useState<boolean>(false);
@@ -179,16 +180,12 @@ export default function SchemaView({ schema, onAddEntity, onAddRelation, onDelet
                     <Toolbar schema={schema} onAddEntitySchema={onAddEntity} onAddRelationSchema={onAddRelation} onDeleteElementSchema={async () => onDelete && selectedElement && await onDelete(selectedElement)} chartRef={chartRef} />
                     {
                         isCollapsed &&
-                        <button
+                        <IconButton
                             className="absolute top-0 right-0 p-4 bg-[#7167F6] rounded-lg"
-                            title="Open"
-                            type="button"
+                            icon={<ChevronLeft />}
                             onClick={() => onExpand()}
                             disabled={!selectedElement}
-                            aria-label="Open"
-                        >
-                            <ChevronLeft />
-                        </button>
+                        />
                     }
                 </div>
                 <div className="h-1 grow relative flex">
@@ -232,7 +229,7 @@ export default function SchemaView({ schema, onAddEntity, onAddRelation, onDelet
                         obj={selectedElement}
                         onExpand={onExpand}
                         onDeleteElement={onDelete ? () => onDelete(selectedElement) : undefined}
-                        removeProperty={removeProperty  ? async (key:string) => removeProperty(selectedElement, key) : undefined}
+                        removeProperty={removeProperty ? async (key: string) => removeProperty(selectedElement, key) : undefined}
                         setLabel={setLabel ? async (label: string) => setLabel(selectedElement, label) : undefined}
                         setPropertySchema={setProperty ? async (key: string, newVal: string[]) => setProperty(selectedElement, key, newVal) : undefined}
                     />

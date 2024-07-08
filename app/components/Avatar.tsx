@@ -10,18 +10,20 @@ import {
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Role } from "next-auth";
+import Button from "./Button";
 
 export default function AvatarButton({ setUserStatus }: { setUserStatus: (status: Role) => void }) {
     const { data: session, status } = useSession()
 
     if (status === "unauthenticated" || !session) {
         return (
-            <button
-                type="button"
-                onClick={() => signIn(undefined, { callbackUrl: '/sandbox' })}
-                className="h-12 rounded-lg font-bold px-5 text-slate-50">
-                Sign in
-            </button>
+            <Button
+                label="Sign in"
+                className="h-12 rounded-lg font-bold px-5 text-slate-50"
+                variant="button"
+                onClick={() => signIn(undefined, { callbackUrl: '/sandbox' })
+                }
+            />
         )
     }
 

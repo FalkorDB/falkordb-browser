@@ -1,8 +1,9 @@
-import { Dialog, DialogClose, DialogContent, DialogHeader, DialogTrigger } from "@/components/ui/dialog";
-import { EditIcon, X } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTrigger } from "@/components/ui/dialog";
+import { EditIcon } from "lucide-react";
 import { useState } from "react";
 import { Toast, prepareArg, securedFetch } from "@/lib/utils";
 import DialogComponent from "./DialogComponent";
+import CloseDialog from "./CloseDialog";
 
 
 export default function EditGraph({ graphName }: {
@@ -57,15 +58,7 @@ export default function EditGraph({ graphName }: {
             <DialogContent className="flex flex-col gap-4 p-0">
                 <DialogHeader className="h-[10%] bg-indigo-600 text-white p-4 flex flex-row justify-between items-center">
                     <p className="text-xl font-medium">Edit Graph</p>
-                    <DialogClose asChild>
-                        <button
-                            title="Close"
-                            type="button"
-                            aria-label="Close"
-                        >
-                            <p><X /></p>
-                        </button>
-                    </DialogClose>
+                    <CloseDialog/>
                 </DialogHeader>
 
             </DialogContent>

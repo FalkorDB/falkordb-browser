@@ -1,24 +1,39 @@
 import { cn } from "@/lib/utils"
+import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp } from "lucide-react"
 
 /* eslint-disable react/require-default-props */
 interface Props extends React.DetailedHTMLProps<React.ButtonHTMLAttributes<HTMLButtonElement>, HTMLButtonElement> {
     label: string
-    variant: "Large" | "Primary" | "Secondary"
+    variant?: "Large" | "Primary" | "Secondary" | "button"
     icon?: JSX.Element
+    open?: boolean
+    side?: "down" | "left" | "right"
 }
 
-export default function Button({ label, variant, icon, className, type = "button", ...props }: Props) {
-    
+export default function Button({ label, variant = "button", icon, open, side = "down", className, type = "button", ...props }: Props) {
+
+    const getChevron = () => {
+        if (open === undefined) return null
+        switch (side) {
+            case "left": return open ? <ChevronRight /> : <ChevronLeft />
+            case "right": return open ? <ChevronLeft /> : <ChevronRight />
+            default: return open ? <ChevronUp /> : <ChevronDown />
+        }
+    }
+
     return (
         <button
             className={cn(
-                "rounded-lg",
+                "disabled:opacity-50 disabled:cursor-not-allowed",
+                variant !== "button" && "rounded-lg",
                 variant === "Large" && "py-4 bg-[#7167F6] hover:bg-[#6157E9] px-32",
                 variant === "Primary" && "px-3 py-2 bg-[#7167F6] hover:bg-[#6157E9]",
                 variant === "Secondary" && "p-2 bg-[#555577] hover:bg-[#57577B]",
-                icon && variant === "Large" && "flex flex-row items-center gap-4", 
-                icon && variant === "Primary" && "flex flex-row items-center gap-2", 
-                icon && variant === "Secondary" && "flex flex-row items-center gap-1",
+                (icon || open !== undefined) && "flex flex-row items-center",
+                open && "gap-4",
+                icon && variant === "Large" && "gap-4",
+                icon && variant === "Primary" && "gap-2",
+                icon && variant === "Secondary" && "gap-1",
                 className
             )}
             title={label}
@@ -27,8 +42,10 @@ export default function Button({ label, variant, icon, className, type = "button
             // eslint-disable-next-line react/jsx-props-no-spreading
             {...props}
         >
-            {icon} 
+            {icon}
+            {side === "left" && getChevron()}
             <p>{label}</p>
+            {side !== "left" && getChevron()}
         </button>
     )
 }

@@ -1,7 +1,8 @@
-import { Dialog, DialogClose } from "@/components/ui/dialog";
+import { Dialog } from "@/components/ui/dialog";
 import { useState } from "react";
 import Dropzone from "./Dropzone";
 import DialogComponent from "./DialogComponent";
+import CloseDialog from "./CloseDialog";
 
 export default function Upload({ isOpen, onOpen }: {
     isOpen: boolean,
@@ -19,24 +20,7 @@ export default function Upload({ isOpen, onOpen }: {
             <DialogComponent className="h-[90%]" title="Upload Data">
                 <form onSubmit={onUploadData} className="grow p-8 flex flex-col gap-6">
                     <Dropzone filesCount className="flex-col gap-10" withTable onFileDrop={setFiles} />
-                    <div className="flex flex-row-reverse gap-6 justify-start">
-                        <DialogClose asChild>
-                            <button
-                                className="bg-indigo-600 text-white p-4 w-[20%]"
-                                type="submit"
-                            >
-                                <p>Upload</p>
-                            </button>
-                        </DialogClose>
-                        <DialogClose asChild>
-                            <button
-                                className="text-indigo-600"
-                                type="button"
-                            >
-                                <p>Cancel</p>
-                            </button>
-                        </DialogClose>
-                    </div>
+                    <CloseDialog className="w-full" label="Upload" variant="Primary"/>
                 </form>
             </DialogComponent>
         </Dialog>

@@ -8,13 +8,15 @@ import Editor, { Monaco } from "@monaco-editor/react";
 import { editor } from "monaco-editor";
 import { ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { ImperativePanelHandle } from "react-resizable-panels";
-import { ChevronDown, ChevronLeft, Maximize2 } from "lucide-react"
+import { ChevronLeft, Maximize2 } from "lucide-react"
 import { Toast, cn, defaultQuery, prepareArg, securedFetch } from "@/lib/utils";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import { Category, Graph, Query } from "./model";
 import DataPanel from "./DataPanel";
 import Labels from "./labels";
 import Toolbar from "./toolbar";
+import Button from "../components/Button";
+import IconButton from "../components/IconButton";
 
 const monacoOptions: editor.IStandaloneEditorConstructionOptions = {
     renderLineHighlight: "none",
@@ -400,25 +402,20 @@ const GraphView = forwardRef(({ graphName, setQueries, schema }: {
                                 onMount={handleEditorDidMount}
                             />
                         </div>
-                        <button
+                        <Button
                             className="flex flex-row gap-8 bg-[#59597C] border border-[#737392] p-2 rounded-r-lg"
-                            title="Run"
+                            label="Run"
+                            open={false}
                             type="submit"
-                        >
-                            <p>Run</p>
-                            <ChevronDown />
-                        </button>
+                        />
                     </form>
                     <Dialog>
                         <DialogTrigger asChild>
-                            <button
+                            <IconButton
                                 className="p-2"
                                 title="Maximize"
-                                type="button"
-                                aria-label="Maximize"
-                            >
-                                <Maximize2 size={20} />
-                            </button>
+                                icon={<Maximize2 size={20} />}
+                            />
                         </DialogTrigger>
                         <DialogContent closeSize={30} className="w-full h-full">
                             <Editor
@@ -441,16 +438,12 @@ const GraphView = forwardRef(({ graphName, setQueries, schema }: {
                     <Toolbar schema={schema} deleteDisable={!selectedElement?.data.id} onDeleteElementGraph={onDeleteElement} onAddEntityGraph={onAddEntity} onAddRelationGraph={onAddRelation} chartRef={chartRef} />
                     {
                         isCollapsed && graph.Id &&
-                        <button
+                        <IconButton
                             className="absolute top-0 right-0 p-4 bg-[#7167F6] rounded-lg"
-                            title="Open"
-                            type="button"
+                            icon={<ChevronLeft />}
                             onClick={() => onExpand()}
                             disabled={!selectedElement}
-                            aria-label="Open"
-                        >
-                            <ChevronLeft />
-                        </button>
+                        />
                     }
                 </div>
                 <div className="flex relative grow">

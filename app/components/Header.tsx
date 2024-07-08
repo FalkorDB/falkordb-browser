@@ -53,22 +53,18 @@ export default function Header({ graphName, inCreate = false, inSettings = false
                     <Image width={103} height={29} src="/ColorLogo.svg" alt="" />
                     <p className="text-neutral-200" >|</p>
                     <div className="flex flex-row gap-6">
-                        <button
+                        <Button
+                            variant="button"
+                            label="Graphs"
                             className={cn(pathname.includes("/graph") && "text-[#7167F6]")}
                             onClick={() => router.push("/graph")}
-                            type="button"
-                            title="Graphs"
-                        >
-                            <p>Graphs</p>
-                        </button>
-                        <button
+                        />
+                        <Button
+                            variant="button"
+                            label="Schemas"
                             className={cn(pathname.includes("/schema") && "text-[#7167F6]")}
                             onClick={() => router.push("/schema")}
-                            type="button"
-                            title="Schemas"
-                        >
-                            <p>Schemas</p>
-                        </button>
+                        />
                     </div>
                 </div>
                 <div className="flex flex-row items-center gap-8">
@@ -128,9 +124,15 @@ export default function Header({ graphName, inCreate = false, inSettings = false
                                 !inSettings &&
                                 <DropdownMenu onOpenChange={setOpen}>
                                     <DropdownMenuTrigger asChild>
+                                        {/* <Button 
+                                            className="flex flex-row gap-1 items-center focus-visible:outline-none"
+                                            label="help"
+                                            variant="button"
+                                            icon={<LifeBuoy size={20} />}
+                                            open={open}
+                                        /> */}
                                         <button
                                             className="flex flex-row gap-1 items-center focus-visible:outline-none"
-                                            title="help"
                                             type="button"
                                         >
                                             <LifeBuoy size={20} />
@@ -168,20 +170,15 @@ export default function Header({ graphName, inCreate = false, inSettings = false
                             }
                         </>
                     }
-                    <div>
-                        <button
-                            disabled={userStatus !== "Admin"}
-                            className={cn("flex flex-row gap-2", !graphName && "text-[#57577B]")}
-                            title="Settings"
-                            type="button"
-                            onClick={() => router.push("/settings")}
-                            aria-label="Settings"
-                        >
-                            <p>Settings</p>
-                            <Settings size={25} />
-                        </button>
-                    </div>
-                    <Avatar setUserStatus={setUserStatus}/>
+                    <Button
+                        variant="button"
+                        className={cn("flex flex-row gap-2", !graphName && "text-[#57577B]")}
+                        label="Settings"
+                        icon={<Settings size={25} />}
+                        onClick={() => router.push("/settings")}
+                        disabled={userStatus !== "Admin"}
+                    />
+                    <Avatar setUserStatus={setUserStatus} />
                 </div>
             </div>
         </div>
