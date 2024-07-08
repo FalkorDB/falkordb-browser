@@ -139,6 +139,7 @@ function getStyle() {
         {
             selector: "edge:selected",
             style: {
+                width: 2,
                 "line-opacity": 1,
             }
         },
