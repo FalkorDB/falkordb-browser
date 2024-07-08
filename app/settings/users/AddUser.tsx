@@ -1,4 +1,4 @@
-import { Dispatch, FormEvent, SetStateAction, useState } from "react"
+import { Dispatch, FormEvent, SetStateAction, useEffect, useState } from "react"
 import { Toast, securedFetch } from "@/lib/utils";
 import { Eye, PlusCircle } from "lucide-react";
 import { User } from "@/app/api/user/model";
@@ -21,6 +21,13 @@ export default function AddUser({ setUsers }: {
     const [showPassword, setShowPassword] = useState(false)
     const [showConfirmPassword, setConfirmShowPassword] = useState(false)
     const [role, setRole] = useState("")
+
+    useEffect(() => {
+        if (open) return
+        setPassword("")
+        setConfirmPassword("")
+        setRole("")
+    }, [open])
 
     const addUser = async (e: FormEvent) => {
         e.preventDefault();
