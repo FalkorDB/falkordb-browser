@@ -33,11 +33,7 @@ export default function Combobox({ isSelectGraph, disabled = false, inTable, typ
       method: "GET"
     })
 
-    if (!result.ok) {
-      const json = await result.json()
-      Toast(json.message)
-      return
-    }
+    if (!result.ok) return
 
     const blob = await result.blob()
     const url = window.URL.createObjectURL(blob)
