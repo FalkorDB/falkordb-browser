@@ -173,7 +173,7 @@ export default function SchemaView({ schema, onAddEntity, onAddRelation, onDelet
     }
 
     return (
-        <ResizablePanelGroup className="" direction="horizontal">
+        <ResizablePanelGroup direction="horizontal">
             <ResizablePanel defaultSize={100} className={cn("w-1 grow flex flex-col gap-10", !isCollapsed && "mr-8")}>
                 <div className="relative">
                     <Toolbar schema={schema} onAddEntitySchema={onAddEntity} onAddRelationSchema={onAddRelation} onDeleteElementSchema={async () => onDelete && selectedElement && await onDelete(selectedElement)} chartRef={chartRef} />

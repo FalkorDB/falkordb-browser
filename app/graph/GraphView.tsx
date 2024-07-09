@@ -6,7 +6,7 @@ import { useRef, useState, useImperativeHandle, forwardRef, useEffect, Dispatch,
 import fcose from 'cytoscape-fcose';
 import Editor, { Monaco } from "@monaco-editor/react";
 import { editor } from "monaco-editor";
-import { ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
+import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { ImperativePanelHandle } from "react-resizable-panels";
 import { ChevronDown, ChevronLeft, Maximize2 } from "lucide-react"
 import { Toast, cn, defaultQuery, prepareArg, securedFetch } from "@/lib/utils";
@@ -387,9 +387,9 @@ const GraphView = forwardRef(({ graphName, setQueries, schema }: {
     }
 
     return (
-        <ResizablePanelGroup className={cn("grow", !isCollapsed && "gap-8")} direction="horizontal">
+        <ResizablePanelGroup direction="horizontal">
             <ResizablePanel
-                className="w-1 grow pt-8 flex flex-col gap-10"
+                className={cn("w-1 grow flex flex-col gap-10", !isCollapsed && "mr-8")}
                 defaultSize={100}
             >
                 <div className="w-full flex flex-row items-center gap-8">
@@ -487,11 +487,14 @@ const GraphView = forwardRef(({ graphName, setQueries, schema }: {
                     }
                 </div>
             </ResizablePanel>
+            <ResizableHandle className="w-3" />
             <ResizablePanel
                 className="rounded-lg"
                 collapsible
                 ref={dataPanel}
-                defaultSize={30}
+                defaultSize={25}
+                minSize={25}
+                maxSize={50}
                 onCollapse={() => setIsCollapsed(true)}
                 onExpand={() => setIsCollapsed(false)}
             >
