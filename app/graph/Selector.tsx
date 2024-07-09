@@ -60,6 +60,8 @@ export default function Selector({ onChange, queries, inSchema = false }: {
 
             const data = json.result.data[0]
 
+            if (!data) return
+
             setEdgesCount(data.edges)
             setNodesCount(data.nodes)
         }

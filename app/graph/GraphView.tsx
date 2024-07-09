@@ -479,11 +479,11 @@ const GraphView = forwardRef(({ graphName, setQueries, schema }: {
                         stylesheet={getStyle()}
                     />
                     {
-                        graph.Id &&
-                        <div className="absolute w-full bottom-2 flex flex-row justify-between">
-                            <Labels categories={graph.Categories} onClick={onCategoryClick} label="Categories" />
-                            <Labels categories={graph.Labels} onClick={onLabelClick} label="Labels" />
-                        </div>
+                        (graph.Categories.length > 0 || graph.Labels.length > 0) &&
+                        <>
+                            <Labels className="left-2" categories={graph.Categories} onClick={onCategoryClick} label="Categories" />
+                            <Labels className="right-2 text-end" categories={graph.Labels} onClick={onLabelClick} label="Labels" />
+                        </>
                     }
                 </div>
             </ResizablePanel>
