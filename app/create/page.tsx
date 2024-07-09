@@ -273,7 +273,6 @@ export default function Create() {
                         <SchemaView schema={schema} onAddEntity={onAddEntity} onAddRelation={onAddRelation} onDelete={onDelete} removeProperty={removeProperty} setLabel={setLabel} setProperty={setProperty} />
                         <div className="flex flex-row justify-end gap-16">
                             <Button
-                                variant="button"
                                 className="flex flex-row gap-1 items-center text-[#7167F6]"
                                 label="Back"
                                 onClick={() => setCurrentTab(null)}
@@ -312,7 +311,6 @@ export default function Create() {
                         <GraphView schema={schema} graphName={graphName} />
                         <div className="flex flex-row justify-end gap-16">
                             <Button
-                                variant="button"
                                 className="flex flex-row gap-1 items-center text-[#7167F6]"
                                 label="Back"
                                 icon={<ChevronLeft size={25} />}
@@ -323,7 +321,6 @@ export default function Create() {
                                 className="w-1/4"
                                 variant="Large"
                                 label="Go To Main Screen"
-                                type="button"
                                 onClick={handleGoToMain}
                             />
                         </div>

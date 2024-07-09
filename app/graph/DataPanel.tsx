@@ -177,7 +177,6 @@ export default function DataPanel({ inSchema, obj, onExpand, setProperty, setPro
                                 variant="Secondary"
                                 label="Add Attribute"
                                 icon={isAddValue ? <MinusCircle /> : <PlusCircle />}
-                                type="button"
                                 onClick={() => setIsAddValue(prev => !prev)}
                             />
                         </TableCaption>
@@ -392,7 +391,6 @@ export default function DataPanel({ inSchema, obj, onExpand, setProperty, setPro
                         variant="Secondary"
                         label="Delete"
                         icon={<Trash2 />}
-                        type="button"
                         onClick={() => onDeleteElement()}
                     />
                 }

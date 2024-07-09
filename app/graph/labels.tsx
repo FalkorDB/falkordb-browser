@@ -35,10 +35,7 @@ export default function Labels({ categories, onClick, label, className = "" }: P
                                     onClick(category)
                                     setReload(!reload)
                                 }}
-
-                            >
-                                <p>{category.name}</p>
-                            </Button>
+                            />
                         </li>
                     ))
                 }

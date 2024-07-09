@@ -60,9 +60,7 @@ export default function Combobox({ isSelectGraph, disabled = false, inTable, typ
     <Button
       key="export"
       label="Export"
-      variant="button"
       onClick={() => onExport(option)}
-      type="button"
     />,
     <div key="menu">
       <DropdownMenu>
@@ -120,12 +118,10 @@ export default function Combobox({ isSelectGraph, disabled = false, inTable, typ
       <DropdownMenu open={open} onOpenChange={setOpen}>
         <DropdownMenuTrigger disabled={disabled} className="w-fit" asChild>
           {/* <Button
-            variant="button"
             disabled={disabled}
             className={cn(inTable ? "text-sm font-light" : "text-2xl", "w-fit flex flex-row items-center gap-4 disabled:text-gray-300")}
             label={selectedValue || `Select ${type || "Graph"}...`}
             open={open}
-            type="button"
           /> */}
           <button
             disabled={disabled}
@@ -148,10 +144,8 @@ export default function Combobox({ isSelectGraph, disabled = false, inTable, typ
               // eslint-disable-next-line react/no-array-index-key
               <DropdownMenuItem className="justify-center" asChild key={index}>
                 <Button
-                  variant="button"
                   className="w-full"
                   label={option}
-                  type="button"
                   onClick={() => {
                     setSelectedValue(option)
                     setOpen(false)
@@ -169,7 +163,6 @@ export default function Combobox({ isSelectGraph, disabled = false, inTable, typ
                   <Button
                     className="w-full"
                     label="Manage Graphs"
-                    variant="button"
                   />
                 </DialogTrigger>
               </DropdownMenuItem>

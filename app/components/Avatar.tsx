@@ -20,7 +20,6 @@ export default function AvatarButton({ setUserStatus }: { setUserStatus: (status
             <Button
                 label="Sign in"
                 className="h-12 rounded-lg font-bold px-5 text-slate-50"
-                variant="button"
                 onClick={() => signIn(undefined, { callbackUrl: '/sandbox' })
                 }
             />

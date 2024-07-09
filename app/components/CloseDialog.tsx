@@ -12,8 +12,6 @@ interface Props extends React.DetailedHTMLProps<React.ButtonHTMLAttributes<HTMLB
     label?: string
     variant?: "Large" | "Primary" | "Secondary" | "button"
 }
-interface Props {
-}
 
 export default function CloseDialog({ className, label, variant, icon, ...props }: Props) {
     return (
@@ -23,7 +21,7 @@ export default function CloseDialog({ className, label, variant, icon, ...props 
                     <Button
                         icon={icon}
                         className={cn("", className)}
-                        variant={variant || "button"}
+                        variant={variant}
                         label={label}
                         // eslint-disable-next-line react/jsx-props-no-spreading
                         {...props}

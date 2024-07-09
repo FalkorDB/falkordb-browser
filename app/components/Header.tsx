@@ -54,13 +54,11 @@ export default function Header({ graphName, inCreate = false, inSettings = false
                     <p className="text-neutral-200" >|</p>
                     <div className="flex flex-row gap-6">
                         <Button
-                            variant="button"
                             label="Graphs"
                             className={cn(pathname.includes("/graph") && "text-[#7167F6]")}
                             onClick={() => router.push("/graph")}
                         />
                         <Button
-                            variant="button"
                             label="Schemas"
                             className={cn(pathname.includes("/schema") && "text-[#7167F6]")}
                             onClick={() => router.push("/schema")}
@@ -127,7 +125,6 @@ export default function Header({ graphName, inCreate = false, inSettings = false
                                         {/* <Button 
                                             className="flex flex-row gap-1 items-center focus-visible:outline-none"
                                             label="help"
-                                            variant="button"
                                             icon={<LifeBuoy size={20} />}
                                             open={open}
                                         /> */}
@@ -171,7 +168,6 @@ export default function Header({ graphName, inCreate = false, inSettings = false
                         </>
                     }
                     <Button
-                        variant="button"
                         className={cn("flex flex-row gap-2", !graphName && "text-[#57577B]")}
                         label="Settings"
                         icon={<Settings size={25} />}
