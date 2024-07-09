@@ -10,16 +10,17 @@ interface Props extends React.DetailedHTMLProps<React.ButtonHTMLAttributes<HTMLB
     side?: "down" | "left" | "right"
 }
 
+const getChevron = (open: boolean | undefined, side: string) => {
+    if (open === undefined) return null
+    switch (side) {
+        case "left": return open ? <ChevronRight /> : <ChevronLeft />
+        case "right": return open ? <ChevronLeft /> : <ChevronRight />
+        default: return open ? <ChevronUp /> : <ChevronDown />
+    }
+}
+
 export default function Button({ label, variant = "button", icon, open, side = "down", className, type = "button", ...props }: Props) {
 
-    const getChevron = () => {
-        if (open === undefined) return null
-        switch (side) {
-            case "left": return open ? <ChevronRight /> : <ChevronLeft />
-            case "right": return open ? <ChevronLeft /> : <ChevronRight />
-            default: return open ? <ChevronUp /> : <ChevronDown />
-        }
-    }
 
     return (
         <button
@@ -30,7 +31,7 @@ export default function Button({ label, variant = "button", icon, open, side = "
                 variant === "Primary" && "px-3 py-2 bg-[#7167F6] hover:bg-[#6157E9]",
                 variant === "Secondary" && "p-2 bg-[#555577] hover:bg-[#57577B]",
                 (icon || open !== undefined) && "flex flex-row items-center",
-                open && "gap-4",
+                open !== undefined && "gap-4",
                 icon && variant === "Large" && "gap-4",
                 icon && variant === "Primary" && "gap-2",
                 icon && variant === "Secondary" && "gap-1",
@@ -43,9 +44,9 @@ export default function Button({ label, variant = "button", icon, open, side = "
             {...props}
         >
             {icon}
-            {side === "left" && getChevron()}
+            {side === "left" && getChevron(open, side)}
             <p>{label}</p>
-            {side !== "left" && getChevron()}
+            {side !== "left" && getChevron(open, side)}
         </button>
     )
 }
