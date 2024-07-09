@@ -1,8 +1,9 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
-import { Toast, securedFetch } from "@/lib/utils";
-import TableView from "../components/TableView";
+import React, { useEffect, useState, KeyboardEvent } from "react";
+import { Toast, cn, prepareArg, securedFetch } from "@/lib/utils";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import Input from "../components/Input";
 
 type Config = {
     name: string,
@@ -110,55 +111,106 @@ const Configs: Config[] = [
 // Shows the details of a current database connection 
 export default function Configurations() {
 
-    const [configs, setConfigs] = useState<Config[]>(Configs)
+    const [configs, setConfigs] = useState<Config[]>([])
+    const [editable, setEditable] = useState<string>()
+    const [configValue, setConfigValue] = useState<string>("")
 
     useEffect(() => {
         const run = async () => {
-            const result = await securedFetch(`api/graph/?type=config`, {
-                method: 'GET',
-            })
-
-            if (!result.ok) {
-                Toast(`Failed to fetch configurations value`)
-                return
-            }
-            const newConfigs = (await result.json()).config
-            setConfigs(Configs.map((config: Config) => {
-                const c = config
-                const [,value] = newConfigs.find(([name,]: [string, string | number]) => name === c.name);
-                c.value = value;
-                return c
-            }))
-        }
-        run()
-    })
-
-    const tableRows = configs.map(({ name, description, value }) => [
-        name,
-        description,
-        value
-    ])
-
-    useEffect(() => {
-        const run = async () => {
-            const result = await securedFetch(`api/graph/`, {
-                method: 'GET',
-            })
-
-            if (result.ok) {
-                const data = await result.json()
-                Configs.forEach(config => {
-                    const c = config
-                    c.value = data.result[c.name]
+            setConfigs(await Promise.all(Configs.map(async (config: Config) => {
+                const result = await securedFetch(`api/graph/?config=${prepareArg(config.name)}`, {
+                    method: 'GET',
                 })
-            }
+
+                if (!result.ok) {
+                    Toast(`Failed to fetch configurations value`)
+                    return config
+                }
+
+                return {
+                    name: config.name,
+                    description: config.description,
+                    value: (await result.json()).config[1]
+                }
+            })))
         }
         run()
     }, [])
 
+    const handelSetConfig = async (e: KeyboardEvent<HTMLInputElement>, name: string) => {
+
+        if (e.code === "Escape") {
+            setEditable("")
+            setConfigValue("")
+            return
+        }
+
+        if (e.code !== "Enter") return
+
+        const result = await securedFetch(`api/graph/?config=${prepareArg(name)}&value=${prepareArg(configValue)}`, {
+            method: 'POST',
+        })
+
+        if (!result.ok) {
+            Toast(`Failed to set configuration value`)
+            return
+        }
+
+        setConfigs(prev => prev.map((config: Config) => {
+            if (config.name !== name) return config
+            return {
+                ...config,
+                value: configValue
+            }
+        }))
+
+        setEditable("")
+        setConfigValue("")
+    }
+
     return (
-        <div className="w-full h-full flex flex-col space-y-4">
-            <TableView editableCells={[]} onHoverCells={[]} tableHeaders={[["NAME", "w-[15%]"], ["DESCRIPTION", "w-[75%]"], ["VALUE", "w-[10%]"]]} tableRows={tableRows} />
+        <div className="h-full w-full border border-[#57577B] rounded-lg overflow-auto">
+            <Table>
+                <TableHeader>
+                    <TableRow className="border-none p-4">
+                        {
+                            ["Name", "Description", "Value"].map((header) => (
+                                <TableHead key={header}>{header}</TableHead>
+                            ))
+                        }
+                    </TableRow>
+                </TableHeader>
+                <TableBody>
+                    {
+                        configs.map(({ name, description, value }, index) => (
+                            <TableRow key={name} className={cn("border-none", !(index % 2) && "bg-[#57577B] hover:bg-[#57577B]")}>
+                                <TableCell className="w-[20%] py-8">{name}</TableCell>
+                                <TableCell className="w-[70%]">{description}</TableCell>
+                                <TableCell onClick={() => {
+                                    setEditable(name)
+                                    setConfigValue(value.toString())
+                                }}>
+                                    {
+                                        editable === name ?
+                                            <Input
+                                                ref={(ref) => {
+                                                    ref?.focus()
+                                                }}
+                                                className="w-20"
+                                                variant="Small"
+                                                onChange={(e) => setConfigValue(e.target.value)}
+                                                onBlur={() => setEditable("")}
+                                                onKeyDown={(e) => handelSetConfig(e, name)}
+                                                value={configValue}
+                                            />
+                                            : value
+                                    }
+                                </TableCell>
+                            </TableRow>
+                        ))
+                    }
+                </TableBody>
+            </Table>
         </div>
     );
 }

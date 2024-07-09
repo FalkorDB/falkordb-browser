@@ -44,7 +44,7 @@ export default function DeleteUser({ isDeleteSelected, users, setUsers }: Delete
                             label="Delete Users"
                         />
                         : <IconButton
-                            icon={<Trash2 />}
+                            icon={<Trash2/>}
                         />
                 }
             </AlertDialogTrigger>
