@@ -5,7 +5,7 @@ import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuIte
 import { ChevronDown, ChevronUp, LifeBuoy, PlusCircle, Settings } from "lucide-react";
 import { FormEvent, useState } from "react";
 import Image from "next/image";
-import { cn, prepareArg, securedFetch } from "@/lib/utils";
+import { Toast, cn, prepareArg, securedFetch } from "@/lib/utils";
 import { useRouter, usePathname } from "next/navigation";
 import { Role } from "next-auth";
 import { Dialog, DialogTrigger } from "@/components/ui/dialog";
@@ -18,29 +18,38 @@ import Input from "./Input";
 interface Props {
     inCreate?: boolean
     inSettings?: boolean
+    onSetGraphName?: (graphName: string) => void
 }
 
-export default function Header({ inCreate = false, inSettings = false }: Props) {
+export default function Header({ inCreate = false, inSettings = false, onSetGraphName }: Props) {
     const [helpOpen, setHelpOpen] = useState<boolean>(false)
     const [createOpen, setCreateOpen] = useState<boolean>(false)
     const router = useRouter()
     const pathname = usePathname()
     const [userStatus, setUserStatus] = useState<Role>()
-    const [newGraphName, setNewGraphName] = useState<string>("")
+    const [graphName, setGraphName] = useState<string>("")
 
     // const createGraph = async () => {
     //     const result = await securedFetch(`api/graph/${newName}`)
     // }
 
-    const handelCreateGraph = (e: FormEvent) => {
+    const handelCreateGraph = async (e: FormEvent) => {
+        if (!onSetGraphName) return
+
         e.preventDefault()
 
         const q = `RETURN 1`
-        securedFetch(`api/graph/${newGraphName}/?query=${prepareArg(q)}`, {
+        const result = await securedFetch(`api/graph/${graphName}/?query=${prepareArg(q)}`, {
             method: "GET"
         })
 
-        setCreateOpen(false)
+        if (result.ok) {
+            Toast(`Graph ${graphName} created successfully!`, "Success")
+            onSetGraphName(graphName)
+            setCreateOpen(false)
+            setGraphName("")
+        }
+
     }
 
     return (
@@ -88,8 +97,8 @@ export default function Header({ inCreate = false, inSettings = false }: Props) 
                                             <p>Name:</p>
                                             <Input
                                                 variant="Default"
-                                                value={newGraphName}
-                                                onChange={(e) => setNewGraphName(e.target.value)}
+                                                value={graphName}
+                                                onChange={(e) => setGraphName(e.target.value)}
                                             />
                                         </div>
                                         <Button

@@ -15,11 +15,12 @@ import DialogComponent from "../components/DialogComponent";
 import Button from "../components/Button";
 import Input from "../components/Input";
 
-export default function Selector({ onChange, queries, inSchema = false }: {
+export default function Selector({ onChange, queries, inSchema = false, graphName }: {
     /* eslint-disable react/require-default-props */
     onChange: (selectedGraphName: string, selectedSchema: Graph) => void 
     queries?: Query[]
     inSchema?: boolean
+    graphName?: string
 }) {
 
     const [options, setOptions] = useState<string[]>([]);
@@ -45,6 +46,18 @@ export default function Selector({ onChange, queries, inSchema = false }: {
         }
         run()
     }, [inSchema])
+
+    useEffect(() => {
+        if (!graphName) return
+
+        const name = options.find(n => n === graphName)
+        
+        if (!name) {
+            setOptions(prev => [...prev, graphName])
+            setSelectedValue(graphName)
+        }
+
+    }, [graphName])
 
     useEffect(() => {
         if (!selectedValue) return
