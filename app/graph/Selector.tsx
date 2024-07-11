@@ -171,17 +171,23 @@ export default function Selector({ onChange, queries, inSchema = false }: {
                             <DropdownMenuContent>
                                 <DropdownMenuItem>
                                     <DialogTrigger asChild>
-                                        <Button
-                                            className="text-[#7167F6]"
-                                            label="Duplicate Graph"
-                                        />
+                                        <button
+                                            className="text-[#7167f6]"
+                                            title="Duplicate Graph"
+                                            type="button"
+                                        >
+                                            <p>Duplicate Graph</p>
+                                        </button>
                                     </DialogTrigger>
                                 </DropdownMenuItem>
                                 <DropdownMenuItem>
-                                    <Button
-                                        className="text-[#7167F6]"
-                                        label="New graph from schema"
-                                    />
+                                    <button
+                                        className="text-[#7167f6]"
+                                        title="New graph from schema"
+                                        type="button"
+                                    >
+                                        <p>New graph from schema</p>
+                                    </button>
                                 </DropdownMenuItem>
                             </DropdownMenuContent>
                         </DropdownMenu>
@@ -278,15 +284,35 @@ export default function Selector({ onChange, queries, inSchema = false }: {
                                             </ul>
                                         </div>
                                     </div>
-                                    <div className="flex flex-row justify-end items-center gap-12 text-[#7167F6]">
-                                        <Button label="Profile" />
-                                        <Button label="Explain" />
-                                        <Button label="Translate to cypher" />
-                                        <Button
-                                            className="text-white"
-                                            variant="Large"
-                                            label="Run"
-                                        />
+                                    <div className="flex flex-row justify-end items-center gap-12">
+                                        <button
+                                            className="text-[#7167f6]"
+                                            title="Profile"
+                                            type="button"
+                                        >
+                                            <p>Profile</p>
+                                        </button>
+                                        <button
+                                            className="text-[#7167f6]"
+                                            title="Explain"
+                                            type="button"
+                                        >
+                                            <p>Explain</p>
+                                        </button>
+                                        <button
+                                            className="text-[#7167f6]"
+                                            title="Profile"
+                                            type="button"
+                                        >
+                                            <p>Translate to Cypher</p>
+                                        </button>
+                                        <button
+                                            className="w-1/6 bg-indigo-600 text-white p-4"
+                                            title="Run"
+                                            type="button"
+                                        >
+                                            <p>RUN</p>
+                                        </button>
                                     </div>
                                 </div>
                             </DialogComponent>
