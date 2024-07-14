@@ -2,7 +2,7 @@
 
 // import { Dialog, DialogClose, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
-import { ChevronDown, ChevronUp, LifeBuoy, PlusCircle, Settings } from "lucide-react";
+import { LifeBuoy, PlusCircle, Settings } from "lucide-react";
 import { useState } from "react";
 import Image from "next/image";
 import { cn, prepareArg, securedFetch } from "@/lib/utils";
@@ -13,12 +13,11 @@ import Avatar from "./Avatar";
 
 /* eslint-disable react/require-default-props */
 interface Props {
-    graphName?: string
     inCreate?: boolean
     inSettings?: boolean
 }
 
-export default function Header({ graphName, inCreate = false, inSettings = false }: Props) {
+export default function Header({ inCreate = false, inSettings = false }: Props) {
     const [open, setOpen] = useState<boolean>(false)
     const router = useRouter()
     const pathname = usePathname()
@@ -122,24 +121,12 @@ export default function Header({ graphName, inCreate = false, inSettings = false
                                 !inSettings &&
                                 <DropdownMenu onOpenChange={setOpen}>
                                     <DropdownMenuTrigger asChild>
-                                        {/* <Button 
+                                        <Button
                                             className="flex flex-row gap-1 items-center focus-visible:outline-none"
                                             label="help"
                                             icon={<LifeBuoy size={20} />}
                                             open={open}
-                                        /> */}
-                                        <button
-                                            className="flex flex-row gap-1 items-center focus-visible:outline-none"
-                                            type="button"
-                                        >
-                                            <LifeBuoy size={20} />
-                                            <p>Help</p>
-                                            {
-                                                open ?
-                                                    <ChevronUp size={20} />
-                                                    : <ChevronDown size={20} />
-                                            }
-                                        </button>
+                                        />
                                     </DropdownMenuTrigger>
                                     <DropdownMenuContent>
                                         <DropdownMenuItem asChild>
@@ -168,7 +155,6 @@ export default function Header({ graphName, inCreate = false, inSettings = false
                         </>
                     }
                     <Button
-                        className={cn("flex flex-row gap-2", !graphName && "text-[#57577B]")}
                         label="Settings"
                         icon={<Settings size={25} />}
                         onClick={() => router.push("/settings")}

@@ -7,7 +7,6 @@ import { ChevronRight, MinusCircle, PlusCircle, Trash2 } from "lucide-react";
 import { KeyboardEvent, useEffect, useRef, useState } from "react";
 import Button from "../components/Button";
 import Input from "../components/Input";
-import IconButton from "../components/IconButton";
 
 /* eslint-disable react/require-default-props */
 interface Props {
@@ -143,7 +142,7 @@ export default function DataPanel({ inSchema, obj, onExpand, setProperty, setPro
         <div className="h-full w-full flex flex-col shadow-lg DataPanel">
             <div className="w-full flex flex-row justify-between items-center bg-[#7167F6] p-4">
                 <div className="flex flex-row gap-4 items-center">
-                    <IconButton
+                    <Button
                         variant="button"
                         icon={<ChevronRight />}
                         onClick={() => onExpand()}
@@ -219,7 +218,7 @@ export default function DataPanel({ inSchema, obj, onExpand, setProperty, setPro
                                             <div className="text-[#ACACC2] flex flex-row gap-2 items-center">
                                                 {
                                                     hover === strKey &&
-                                                    <IconButton
+                                                    <Button
                                                         icon={<Trash2 />}
                                                         onClick={() => onDelete(strKey)}
                                                     />

@@ -2,7 +2,6 @@
 
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { Dialog, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { ChevronDown, ChevronUp } from "lucide-react";
 import { Editor } from "@monaco-editor/react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { editor } from "monaco-editor";
@@ -136,10 +135,6 @@ export default function Selector({ onChange, queries, inSchema = false }: {
             <div className="flex flex-row justify-between items-center">
                 <Combobox isSelectGraph options={options} setOptions={setOptions} selectedValue={selectedValue} setSelectedValue={handleOnChange} />
                 <div className="flex flex-row gap-16 text-[#7167F6]">
-                    {
-                        !inSchema &&
-                        <p className={cn(!selectedValue && "opacity-50 cursor-not-allowed")}>Versions</p>
-                    }
                     <Button
                         label="Upload Data"
                         onClick={() => setIsUploadOpen(true)}
@@ -154,19 +149,11 @@ export default function Selector({ onChange, queries, inSchema = false }: {
                     <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
                         <DropdownMenu onOpenChange={setDropOpen}>
                             <DropdownMenuTrigger className="disabled:text-[#57577B]" disabled={!selectedValue} asChild>
-                                <button
-                                    className="flex flex-row gap-2"
-                                    title="Duplicate"
-                                    type="button"
+                                <Button
+                                    label="Duplicate"
                                     disabled={!selectedValue}
-                                >
-                                    <p>Duplicate</p>
-                                    {
-                                        dropOpen ?
-                                            <ChevronUp />
-                                            : <ChevronDown />
-                                    }
-                                </button>
+                                    open={dropOpen}
+                                />
                             </DropdownMenuTrigger>
                             <DropdownMenuContent>
                                 <DropdownMenuItem>

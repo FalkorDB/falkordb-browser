@@ -4,7 +4,6 @@ import { Trash2 } from "lucide-react";
 import { Dispatch, SetStateAction } from "react";
 import Button from "@/app/components/Button";
 import { Toast, securedFetch } from "@/lib/utils";
-import IconButton from "@/app/components/IconButton";
 
 interface DeleteUserProps {
     // eslint-disable-next-line react/require-default-props
@@ -43,7 +42,7 @@ export default function DeleteUser({ isDeleteSelected, users, setUsers }: Delete
                             icon={<Trash2 />}
                             label="Delete Users"
                         />
-                        : <IconButton
+                        : <Button
                             icon={<Trash2 />}
                         />
                 }

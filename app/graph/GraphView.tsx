@@ -16,7 +16,6 @@ import DataPanel from "./DataPanel";
 import Labels from "./labels";
 import Toolbar from "./toolbar";
 import Button from "../components/Button";
-import IconButton from "../components/IconButton";
 
 const monacoOptions: editor.IStandaloneEditorConstructionOptions = {
     renderLineHighlight: "none",
@@ -403,15 +402,14 @@ const GraphView = forwardRef(({ graphName, setQueries, schema }: {
                             />
                         </div>
                         <Button
-                            className="flex flex-row gap-8 bg-[#59597C] border border-[#737392] p-2 rounded-r-lg"
+                            className="bg-[#59597C] border border-[#737392] p-2 px-8 rounded-r-lg"
                             label="Run"
-                            open={false}
                             type="submit"
                         />
                     </form>
                     <Dialog>
                         <DialogTrigger asChild>
-                            <IconButton
+                            <Button
                                 className="p-2"
                                 title="Maximize"
                                 icon={<Maximize2 size={20} />}
@@ -438,7 +436,7 @@ const GraphView = forwardRef(({ graphName, setQueries, schema }: {
                     <Toolbar schema={schema} deleteDisable={!selectedElement?.data.id} onDeleteElementGraph={onDeleteElement} onAddEntityGraph={onAddEntity} onAddRelationGraph={onAddRelation} chartRef={chartRef} />
                     {
                         isCollapsed && graph.Id &&
-                        <IconButton
+                        <Button
                             className="absolute top-0 right-0 p-4 bg-[#7167F6] rounded-lg"
                             icon={<ChevronLeft />}
                             onClick={() => onExpand()}
