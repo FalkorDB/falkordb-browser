@@ -180,7 +180,7 @@ const GraphView = forwardRef(({ graphName, setQueries, schema }: {
             inherit: true,
             rules: [
                 { token: '', foreground: 'ffffff' },
-                { token: 'keyword', foreground: '0000ff' },
+                { token: 'keyword', foreground: '#ADD8E6' },
             ],
             colors: {
                 'editor.background': '#1F1F3D',
