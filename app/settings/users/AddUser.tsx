@@ -6,7 +6,6 @@ import Button from "@/app/components/ui/Button";
 import Input from "@/app/components/ui/Input";
 import DialogComponent from "@/app/components/DialogComponent";
 import { Dialog, DialogTrigger } from "@/components/ui/dialog";
-import IconButton from "@/app/components/IconButton";
 import Combobox from "../../components/ui/combobox";
 
 // eslint-disable-next-line no-useless-escape
@@ -81,7 +80,7 @@ export default function AddUser({ setUsers }: {
                     </div>
                     <div className="relative flex flex-col gap-2">
                         <p title="Password">Password</p>
-                        <IconButton
+                        <Button
                             className="absolute top-10 right-2 p-0"
                             icon={<Eye strokeWidth={0.5} />}
                             onClick={() => setShowPassword(prev => !prev)}
@@ -132,7 +131,7 @@ export default function AddUser({ setUsers }: {
                     </div>
                     <div className="relative flex flex-col gap-2">
                         <p title="Confirm Password">Confirm Password</p>
-                        <IconButton
+                        <Button
                             className="absolute top-10 right-2 p-0"
                             icon={<Eye strokeWidth={0.5} />}
                             onClick={() => setConfirmShowPassword(prev => !prev)}

@@ -32,14 +32,14 @@ export default function AvatarButton({ setUserStatus }: { setUserStatus: (status
 
     return (
         <DropdownMenu>
-            <DropdownMenuTrigger>
-                <div className="flex items-center gap-3">
-                    <div className="text-black">{username || "default"}</div>
-                </div>
+            <DropdownMenuTrigger asChild>
+                <Button
+                    label={username || "Default"}
+                />
             </DropdownMenuTrigger>
             <DropdownMenuContent>
-                <DropdownMenuLabel>My Account</DropdownMenuLabel>
-                <DropdownMenuSeparator />
+                <DropdownMenuLabel className="text-center">My Account</DropdownMenuLabel>
+                <DropdownMenuSeparator className="" />
                 <DropdownMenuItem onClick={() => signOut({ callbackUrl: '/' })}>Logout</DropdownMenuItem>
             </DropdownMenuContent>
         </DropdownMenu>

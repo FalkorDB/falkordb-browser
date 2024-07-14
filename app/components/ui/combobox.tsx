@@ -3,15 +3,14 @@
 import { Dialog, DialogTrigger } from "@/components/ui/dialog"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Toast, cn, prepareArg, securedFetch } from "@/lib/utils"
-import { ChevronDown, Trash2, UploadIcon, ChevronUp } from "lucide-react"
+import { Trash2, UploadIcon } from "lucide-react"
 import { Dispatch, SetStateAction, useState } from "react"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import Button from "./Button"
-import Input from "./Input"
 import Upload from "../graph/UploadGraph"
 import DeleteGraph from "../graph/DeleteGraph"
+import Button from "./Button"
 import DialogComponent from "../DialogComponent"
-import IconButton from "../IconButton"
+import Input from "./Input"
 
 /* eslint-disable react/require-default-props */
 interface ComboboxProps {
@@ -81,33 +80,20 @@ export default function Combobox({ isSelectGraph, disabled = false, inTable, typ
   return (
     <Dialog>
       <DropdownMenu open={open} onOpenChange={setOpen}>
-        <DropdownMenuTrigger disabled={disabled} className="w-fit" asChild>
-          {/* <Button
+        <DropdownMenuTrigger asChild>
+          <Button
             disabled={disabled}
-            className={cn(inTable ? "text-sm font-light" : "text-2xl", "w-fit flex flex-row items-center gap-4 disabled:text-gray-300")}
+            className={cn(inTable ? "text-sm font-light" : "text-2xl")}
             label={selectedValue || `Select ${type || "Graph"}...`}
             open={open}
-          /> */}
-          <button
-            disabled={disabled}
-            className={cn(inTable ? "text-sm font-light" : "text-2xl", "w-fit flex flex-row items-center gap-4 disabled:text-gray-300")}
-            title="Select Graph"
-            type="button"
-          >
-            <p>{selectedValue || `Select ${type || "Graph"}...`}</p>
-            {
-              open ?
-                <ChevronUp size={inTable ? 20 : 15} />
-                : <ChevronDown size={inTable ? 20 : 15} />
-            }
-          </button>
+          />
         </DropdownMenuTrigger>
-        <DropdownMenuContent className="min-w-52">
+        <DropdownMenuContent side="bottom" className="min-w-52">
           {
             options.length > 0 &&
             options.map((option, index) => (
               // eslint-disable-next-line react/no-array-index-key
-              <DropdownMenuItem className="justify-center" asChild key={index}>
+              <DropdownMenuItem key={index}>
                 <Button
                   className="w-full"
                   label={option}
@@ -192,7 +178,7 @@ export default function Combobox({ isSelectGraph, disabled = false, inTable, typ
                         </DropdownMenuTrigger>
                         <DropdownMenuContent side="right" className="flex flex-row min-w-fit">
                           <DropdownMenuItem className="justify-center">
-                            <IconButton
+                            <Button
                               variant="button"
                               className="disabled:text-gray-400 disabled:text-opacity-70"
                               icon={<UploadIcon />}
@@ -200,7 +186,7 @@ export default function Combobox({ isSelectGraph, disabled = false, inTable, typ
                             />
                           </DropdownMenuItem>
                           <DropdownMenuItem className="justify-center">
-                            <IconButton
+                            <Button
                               variant="button"
                               className="disabled:text-gray-400 disabled:text-opacity-70"
                               icon={<Trash2 />}
