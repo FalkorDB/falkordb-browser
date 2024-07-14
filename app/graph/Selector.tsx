@@ -7,20 +7,21 @@ import { Editor } from "@monaco-editor/react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { editor } from "monaco-editor";
 import { Toast, cn, prepareArg, securedFetch } from "@/lib/utils";
-import Combobox from "../components/combobox";
+import Combobox from "../components/ui/combobox";
 import { Graph, Query } from "./model";
 import SchemaView from "../schema/SchemaView";
-import Upload from "../components/Upload";
+import Upload from "../components/graph/UploadGraph";
 import DialogComponent from "../components/DialogComponent";
-import Input from "../components/Input";
 import CloseDialog from "../components/CloseDialog";
-import Button from "../components/Button";
+import Button from "../components/ui/Button";
+import Input from "../components/ui/Input";
 
-export default function Selector({ onChange, queries, inSchema = false }: {
+export default function Selector({ onChange, queries, inSchema = false, graphName }: {
     /* eslint-disable react/require-default-props */
     onChange: (selectedGraphName: string, selectedSchema: Graph) => void
     queries?: Query[]
     inSchema?: boolean
+    graphName?: string
 }) {
 
     const [options, setOptions] = useState<string[]>([]);
@@ -48,6 +49,18 @@ export default function Selector({ onChange, queries, inSchema = false }: {
     }, [inSchema])
 
     useEffect(() => {
+        if (!graphName) return
+
+        const name = options.find(n => n === graphName)
+        
+        if (!name) {
+            setOptions(prev => [...prev, graphName])
+            setSelectedValue(graphName)
+        }
+
+    }, [graphName])
+
+    useEffect(() => {
         if (!selectedValue) return
         const run = async () => {
             const q = "MATCH (n) WITH COUNT(n) as nodes MATCH ()-[e]-() RETURN nodes, COUNT(e) as edges"
@@ -60,6 +73,8 @@ export default function Selector({ onChange, queries, inSchema = false }: {
             const json = await result.json()
 
             const data = json.result.data[0]
+
+            if (!data) return
 
             setEdgesCount(data.edges)
             setNodesCount(data.nodes)

@@ -2,7 +2,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { User } from "@/app/api/user/model";
 import { Trash2 } from "lucide-react";
 import { Dispatch, SetStateAction } from "react";
-import Button from "@/app/components/Button";
+import Button from "@/app/components/ui/Button";
 import { Toast, securedFetch } from "@/lib/utils";
 import IconButton from "@/app/components/IconButton";
 

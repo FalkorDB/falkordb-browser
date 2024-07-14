@@ -15,7 +15,7 @@ import { Category, Graph, Query } from "./model";
 import DataPanel from "./DataPanel";
 import Labels from "./labels";
 import Toolbar from "./toolbar";
-import Button from "../components/Button";
+import Button from "../components/ui/Button";
 import IconButton from "../components/IconButton";
 
 const monacoOptions: editor.IStandaloneEditorConstructionOptions = {
@@ -220,13 +220,13 @@ const GraphView = forwardRef(({ graphName, setQueries, schema }: {
         const result = await securedFetch(`api/graph/${prepareArg(graphName)}/?query=${prepareArg(defaultQuery(query))}`, {
             method: "GET"
         })
-        const json = await result.json()
+        
+        if (!result.ok) return
 
-        if (!result.ok) {
-            Toast(json.message)
-            return
-        }
+        const json = await result.json()
+        
         if (!setQueries) return
+        
         setQueries(prev => [...prev, { text: defaultQuery(query), metadata: json.result.metadata }])
         setGraph(Graph.create(graphName, json.result))
     }
