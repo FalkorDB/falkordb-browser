@@ -49,14 +49,12 @@ export default function Selector({ onChange, queries, inSchema = false, graphNam
 
     useEffect(() => {
         if (!graphName) return
-
-        const name = options.find(n => n === graphName)
-        
-        if (!name) {
-            setOptions(prev => [...prev, graphName])
+            setOptions(prev => {
+                if (prev.includes(graphName)) return prev
+                setSelectedValue(graphName)
+                return [...prev, graphName]
+            })
             setSelectedValue(graphName)
-        }
-
     }, [graphName])
 
     useEffect(() => {

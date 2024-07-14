@@ -34,12 +34,12 @@ export default function DeleteUser({ isDeleteSelected, users, setUsers }: Delete
     return (
         <AlertDialog>
             <AlertDialogTrigger disabled={users.length === 0} asChild>
-                        <Button
-                            disabled={users.length === 0}
-                            variant="Primary"
-                            icon={<Trash2 />}
-                            label={isDeleteSelected ? "Delete Users" : undefined}
-                        />
+                <Button
+                    disabled={users.length === 0}
+                    variant="Primary"
+                    icon={<Trash2 />}
+                    label={isDeleteSelected ? "Delete Users" : undefined}
+                />
             </AlertDialogTrigger>
             <AlertDialogContent className="flex flex-col gap-10 p-4">
                 <AlertDialogHeader className="">

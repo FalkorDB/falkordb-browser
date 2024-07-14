@@ -38,15 +38,12 @@ export async function POST(request: NextRequest) {
     const configName = request.nextUrl.searchParams.get("config")
     const value = request.nextUrl.searchParams.get("value")
 
-    if (configName && value) {
-        const config = await client.configSet(configName, parseInt(value, 10))
-        return NextResponse.json({ config }, { status: 200 })
-    }
-
-    try {
-        const result = await client.list()
     
-        return NextResponse.json({ result }, { status: 200 })
+    try {
+        if (configName && value) {
+            const config = await client.configSet(configName, parseInt(value, 10))
+            return NextResponse.json({ config }, { status: 200 })
+        }
     } catch (err: unknown) {
         return NextResponse.json({ message: (err as Error).message }, { status: 400 })
     }
