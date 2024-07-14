@@ -9,11 +9,11 @@ import { EdgeDataDefinition, NodeDataDefinition } from "cytoscape";
 import { Toast, prepareArg, securedFetch } from "@/lib/utils";
 import Header from "../components/Header";
 import { Graph } from "../graph/model";
-import Input from "../components/Input";
-import Button from "../components/Button";
+import Input from "../components/ui/Input";
+import Button from "../components/ui/Button";
 import GraphView from "../graph/GraphView";
 import SchemaView from "../schema/SchemaView";
-import Dropzone from "../components/Dropzone";
+import Dropzone from "../components/ui/Dropzone";
 
 type CurrentTab = "loadSchema" | "schema" | "graph"
 

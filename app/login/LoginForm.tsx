@@ -3,11 +3,11 @@
 import { SignInOptions, SignInResponse, signIn } from "next-auth/react";
 import { FormEvent, useEffect, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
-import Dropzone from "@/app/components/Dropzone";
+import Dropzone from "@/app/components/ui/Dropzone";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Eye } from "lucide-react";
-import Input from "@/app/components/Input";
-import Button from "@/app/components/Button";
+import Input from "@/app/components/ui/Input";
+import Button from "@/app/components/ui/Button";
 import Image from "next/image";
 import { cn } from "@/lib/utils";
 

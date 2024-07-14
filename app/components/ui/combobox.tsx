@@ -5,10 +5,10 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import { Toast, cn, prepareArg, securedFetch } from "@/lib/utils"
 import { ChevronDown, ChevronUp, Trash2, UploadIcon } from "lucide-react"
 import { Dispatch, SetStateAction, useEffect, useState } from "react"
-import TableView from "./TableView"
-import Upload from "./Upload"
-import DeleteGraph from "./DeleteGraph"
-import DialogComponent from "./DialogComponent"
+import TableView from "../TableView"
+import Upload from "../graph/UploadGraph"
+import DeleteGraph from "../graph/DeleteGraph"
+import DialogComponent from "../DialogComponent"
 
 /* eslint-disable react/require-default-props */
 interface ComboboxProps {
