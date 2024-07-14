@@ -15,11 +15,12 @@ import DialogComponent from "../components/DialogComponent";
 import Button from "../components/ui/Button";
 import Input from "../components/ui/Input";
 
-export default function Selector({ onChange, queries, inSchema = false }: {
+export default function Selector({ onChange, queries, inSchema = false, graphName }: {
     /* eslint-disable react/require-default-props */
     onChange: (selectedGraphName: string, selectedSchema: Graph) => void 
     queries?: Query[]
     inSchema?: boolean
+    graphName?: string
 }) {
 
     const [options, setOptions] = useState<string[]>([]);
@@ -47,6 +48,18 @@ export default function Selector({ onChange, queries, inSchema = false }: {
     }, [inSchema])
 
     useEffect(() => {
+        if (!graphName) return
+
+        const name = options.find(n => n === graphName)
+        
+        if (!name) {
+            setOptions(prev => [...prev, graphName])
+            setSelectedValue(graphName)
+        }
+
+    }, [graphName])
+
+    useEffect(() => {
         if (!selectedValue) return
         const run = async () => {
             const q = "MATCH (n) WITH COUNT(n) as nodes MATCH ()-[e]-() RETURN nodes, COUNT(e) as edges"
@@ -59,6 +72,8 @@ export default function Selector({ onChange, queries, inSchema = false }: {
             const json = await result.json()
 
             const data = json.result.data[0]
+
+            if (!data) return
 
             setEdgesCount(data.edges)
             setNodesCount(data.nodes)
