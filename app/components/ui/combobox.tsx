@@ -196,7 +196,17 @@ export default function Combobox({ isSelectGraph, disabled = false, inTable, typ
                         </DropdownMenuContent>
                       </DropdownMenu>
                       <Upload isOpen={isUploadOpen} onOpen={setIsUploadOpen} />
-                      <DeleteGraph graphName={option} isOpen={isDeleteOpen} onOpen={setIsDeleteOpen} />
+                      <DeleteGraph
+                        graphName={option}
+                        isOpen={isDeleteOpen}
+                        onOpen={setIsDeleteOpen}
+                        onDeleteGraph={() => {
+                          if (!setOptions) return
+                          setOptions(prev => prev.filter(name => name !== option))
+                          if (selectedValue !== option) return
+                          setSelectedValue("")
+                        }}
+                      />
                     </TableCell>
                   </TableRow>
                 ))
