@@ -11,6 +11,7 @@
         --secondary: 240 17% 41%;
         --primary: 244 89% 68%;
         --radius: 0.5rem;
+        --muted: 0 0% 100%;
     }
 
     :focus-visible {
