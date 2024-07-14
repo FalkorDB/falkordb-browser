@@ -7,20 +7,21 @@ import { Editor } from "@monaco-editor/react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { editor } from "monaco-editor";
 import { Toast, cn, prepareArg, securedFetch } from "@/lib/utils";
-import Combobox from "../components/combobox";
+import Combobox from "../components/ui/combobox";
 import { Graph, Query } from "./model";
 import SchemaView from "../schema/SchemaView";
-import Upload from "../components/Upload";
+import Upload from "../components/graph/UploadGraph";
 import DialogComponent from "../components/DialogComponent";
-import Input from "../components/Input";
+import Button from "../components/ui/Button";
+import Input from "../components/ui/Input";
 import CloseDialog from "../components/CloseDialog";
-import Button from "../components/Button";
 
-export default function Selector({ onChange, queries, inSchema = false }: {
+export default function Selector({ onChange, queries, inSchema = false, graphName }: {
     /* eslint-disable react/require-default-props */
     onChange: (selectedGraphName: string, selectedSchema: Graph) => void
     queries?: Query[]
     inSchema?: boolean
+    graphName?: string
 }) {
 
     const [options, setOptions] = useState<string[]>([]);
@@ -48,6 +49,18 @@ export default function Selector({ onChange, queries, inSchema = false }: {
     }, [inSchema])
 
     useEffect(() => {
+        if (!graphName) return
+
+        const name = options.find(n => n === graphName)
+        
+        if (!name) {
+            setOptions(prev => [...prev, graphName])
+            setSelectedValue(graphName)
+        }
+
+    }, [graphName])
+
+    useEffect(() => {
         if (!selectedValue) return
         const run = async () => {
             const q = "MATCH (n) WITH COUNT(n) as nodes MATCH ()-[e]-() RETURN nodes, COUNT(e) as edges"
@@ -60,6 +73,8 @@ export default function Selector({ onChange, queries, inSchema = false }: {
             const json = await result.json()
 
             const data = json.result.data[0]
+
+            if (!data) return
 
             setEdgesCount(data.edges)
             setNodesCount(data.nodes)
@@ -171,17 +186,23 @@ export default function Selector({ onChange, queries, inSchema = false }: {
                             <DropdownMenuContent>
                                 <DropdownMenuItem>
                                     <DialogTrigger asChild>
-                                        <Button
-                                            className="text-[#7167F6]"
-                                            label="Duplicate Graph"
-                                        />
+                                        <button
+                                            className="text-[#7167f6]"
+                                            title="Duplicate Graph"
+                                            type="button"
+                                        >
+                                            <p>Duplicate Graph</p>
+                                        </button>
                                     </DialogTrigger>
                                 </DropdownMenuItem>
                                 <DropdownMenuItem>
-                                    <Button
-                                        className="text-[#7167F6]"
-                                        label="New graph from schema"
-                                    />
+                                    <button
+                                        className="text-[#7167f6]"
+                                        title="New graph from schema"
+                                        type="button"
+                                    >
+                                        <p>New graph from schema</p>
+                                    </button>
                                 </DropdownMenuItem>
                             </DropdownMenuContent>
                         </DropdownMenu>
@@ -278,15 +299,35 @@ export default function Selector({ onChange, queries, inSchema = false }: {
                                             </ul>
                                         </div>
                                     </div>
-                                    <div className="flex flex-row justify-end items-center gap-12 text-[#7167F6]">
-                                        <Button label="Profile" />
-                                        <Button label="Explain" />
-                                        <Button label="Translate to cypher" />
-                                        <Button
-                                            className="text-white"
-                                            variant="Large"
-                                            label="Run"
-                                        />
+                                    <div className="flex flex-row justify-end items-center gap-12">
+                                        <button
+                                            className="text-[#7167f6]"
+                                            title="Profile"
+                                            type="button"
+                                        >
+                                            <p>Profile</p>
+                                        </button>
+                                        <button
+                                            className="text-[#7167f6]"
+                                            title="Explain"
+                                            type="button"
+                                        >
+                                            <p>Explain</p>
+                                        </button>
+                                        <button
+                                            className="text-[#7167f6]"
+                                            title="Profile"
+                                            type="button"
+                                        >
+                                            <p>Translate to Cypher</p>
+                                        </button>
+                                        <button
+                                            className="w-1/6 bg-indigo-600 text-white p-4"
+                                            title="Run"
+                                            type="button"
+                                        >
+                                            <p>RUN</p>
+                                        </button>
                                     </div>
                                 </div>
                             </DialogComponent>

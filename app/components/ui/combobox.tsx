@@ -6,12 +6,12 @@ import { Toast, cn, prepareArg, securedFetch } from "@/lib/utils"
 import { ChevronDown, Trash2, UploadIcon, ChevronUp } from "lucide-react"
 import { Dispatch, SetStateAction, useState } from "react"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import Upload from "./Upload"
-import DeleteGraph from "./DeleteGraph"
-import DialogComponent from "./DialogComponent"
 import Button from "./Button"
-import IconButton from "./IconButton"
+import IconButton from "../IconButton"
 import Input from "./Input"
+import Upload from "../graph/UploadGraph"
+import DeleteGraph from "../graph/DeleteGraph"
+import DialogComponent from "../DialogComponent"
 
 /* eslint-disable react/require-default-props */
 interface ComboboxProps {
@@ -37,11 +37,7 @@ export default function Combobox({ isSelectGraph, disabled = false, inTable, typ
       method: "GET"
     })
 
-    if (!result.ok) {
-      const json = await result.json()
-      Toast(json.message)
-      return
-    }
+    if (!result.ok) return
 
     const blob = await result.blob()
     const url = window.URL.createObjectURL(blob)

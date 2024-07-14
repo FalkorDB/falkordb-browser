@@ -20,9 +20,9 @@ export default function Page() {
 
     return (
         <div className="h-full w-full flex flex-col">
-            <Header graphName={graphName}/>            
+            <Header onSetGraphName={setGraphName}/>            
             <div className="h-1 grow p-12 flex flex-col gap-4">
-                <Selector queries={queries} onChange={handleGraphChange}/>
+                <Selector queries={queries} onChange={handleGraphChange} graphName={graphName}/>
                 <GraphView setQueries={setQueries} schema={schema} graphName={graphName}/>
             </div>
         </div>
