@@ -12,7 +12,7 @@ import { Dialog, DialogTrigger } from "@/components/ui/dialog";
 import Button from "./ui/Button";
 import Avatar from "./ui/Avatar";
 import DialogComponent from "./DialogComponent";
-import Input from "./Input";
+import Input from "./ui/Input";
 
 /* eslint-disable react/require-default-props */
 interface Props {
