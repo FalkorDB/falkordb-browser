@@ -15,7 +15,7 @@ import { Category, Graph, Query } from "./model";
 import DataPanel from "./DataPanel";
 import Labels from "./labels";
 import Toolbar from "./toolbar";
-import Button from "../components/Button";
+import Button from "../components/ui/Button";
 import IconButton from "../components/IconButton";
 
 const monacoOptions: editor.IStandaloneEditorConstructionOptions = {

@@ -9,8 +9,8 @@ import { Eye } from "lucide-react";
 import Input from "@/app/components/ui/Input";
 import Button from "@/app/components/ui/Button";
 import Image from "next/image";
-import IconButton from "../components/IconButton";
 import { cn } from "@/lib/utils";
+import IconButton from "../components/IconButton";
 
 const DEFAULT_HOST = "localhost";
 const DEFAULT_PORT = "6379";

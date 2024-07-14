@@ -3,7 +3,7 @@
 import React, { useEffect, useState, KeyboardEvent } from "react";
 import { Toast, cn, prepareArg, securedFetch } from "@/lib/utils";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import Input from "../components/Input";
+import Input from "../components/ui/Input";
 
 type Config = {
     name: string,
