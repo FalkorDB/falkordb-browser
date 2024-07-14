@@ -3,8 +3,9 @@
 import { Dialog, DialogTrigger } from "@/components/ui/dialog"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Toast, cn, prepareArg, securedFetch } from "@/lib/utils"
-import { ChevronDown, ChevronUp, Trash2, UploadIcon } from "lucide-react"
+import { Trash2, UploadIcon } from "lucide-react"
 import { Dispatch, SetStateAction, useEffect, useState } from "react"
+import Button from "./Button"
 import TableView from "../TableView"
 import Upload from "../graph/UploadGraph"
 import DeleteGraph from "../graph/DeleteGraph"
@@ -51,11 +52,11 @@ export default function Combobox({ isSelectGraph, disabled = false, inTable, typ
   }
   const tableRows = options.map(option => [
     option,
-    <button
+    <Button
       key="export"
+      label="Export"
       onClick={() => onExport(option)}
-      type="button"
-    >Export</button>,
+    />,
     <div key="menu">
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
@@ -69,26 +70,20 @@ export default function Combobox({ isSelectGraph, disabled = false, inTable, typ
         </DropdownMenuTrigger>
         <DropdownMenuContent side="right" className="flex flex-row min-w-fit">
           <DropdownMenuItem className="justify-center">
-            <button
+            <Button
+              variant="button"
               className="disabled:text-gray-400 disabled:text-opacity-70"
-              title="Upload Data"
-              type="button"
-              aria-label="Upload Data"
+              icon={<UploadIcon />}
               onClick={() => setIsUploadOpen(true)}
-            >
-              <p><UploadIcon /></p>
-            </button>
+            />
           </DropdownMenuItem>
           <DropdownMenuItem className="justify-center">
-            <button
+            <Button
+              variant="button"
               className="disabled:text-gray-400 disabled:text-opacity-70"
-              title="Delete"
-              type="button"
-              aria-label="Delete"
+              icon={<Trash2 />}
               onClick={() => setIsDeleteOpen(true)}
-            >
-              <p><Trash2 /></p>
-            </button>
+            />
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
@@ -115,36 +110,29 @@ export default function Combobox({ isSelectGraph, disabled = false, inTable, typ
 
   return (
     <Dialog>
-      <DropdownMenu onOpenChange={setOpen}>
-        <DropdownMenuTrigger disabled={disabled} className="w-fit" asChild>
-          <button
+      <DropdownMenu open={open} onOpenChange={setOpen}>
+        <DropdownMenuTrigger asChild>
+          <Button
             disabled={disabled}
-            className={cn(inTable ? "text-sm font-light" : "text-2xl", "w-fit flex flex-row items-center gap-4 disabled:text-gray-300")}
-            title="Select Graph"
-            type="button"
-          >
-            <p>{selectedValue || `Select ${type || "Graph"}...`}</p>
-            {
-              open ?
-                <ChevronUp size={inTable ? 20 : 15} />
-                : <ChevronDown size={inTable ? 20 : 15} />
-            }
-          </button>
+            className={cn(inTable ? "text-sm font-light" : "text-2xl")}
+            label={selectedValue || `Select ${type || "Graph"}...`}
+            open={open}
+          />
         </DropdownMenuTrigger>
-        <DropdownMenuContent className="min-w-52">
+        <DropdownMenuContent side="bottom" className="min-w-52">
           {
             options.length > 0 &&
             options.map((option, index) => (
               // eslint-disable-next-line react/no-array-index-key
-              <DropdownMenuItem className="justify-center" asChild key={index}>
-                <button
+              <DropdownMenuItem key={index}>
+                <Button
                   className="w-full"
-                  title={option}
-                  type="button"
-                  onClick={() => setSelectedValue(option)}
-                >
-                  {option}
-                </button>
+                  label={option}
+                  onClick={() => {
+                    setSelectedValue(option)
+                    setOpen(false)
+                  }}
+                />
               </DropdownMenuItem>
             ))
           }
@@ -154,13 +142,10 @@ export default function Combobox({ isSelectGraph, disabled = false, inTable, typ
               <DropdownMenuSeparator className="bg-gray-300" />
               <DropdownMenuItem>
                 <DialogTrigger asChild>
-                  <button
+                  <Button
                     className="w-full"
-                    title="Manage"
-                    type="button"
-                  >
-                    <p>Manage...</p>
-                  </button>
+                    label="Manage Graphs"
+                  />
                 </DialogTrigger>
               </DropdownMenuItem>
             </>
@@ -180,6 +165,6 @@ export default function Combobox({ isSelectGraph, disabled = false, inTable, typ
           onHoverCells={[]}
         />
       </DialogComponent>
-    </Dialog>
+    </Dialog >
   )
 }

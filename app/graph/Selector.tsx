@@ -1,8 +1,7 @@
 'use client'
 
 import { FormEvent, useEffect, useRef, useState } from "react";
-import { Dialog, DialogClose, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { ChevronDown, ChevronUp, X } from "lucide-react";
+import { Dialog, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Editor } from "@monaco-editor/react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { editor } from "monaco-editor";
@@ -12,12 +11,13 @@ import { Graph, Query } from "./model";
 import SchemaView from "../schema/SchemaView";
 import Upload from "../components/graph/UploadGraph";
 import DialogComponent from "../components/DialogComponent";
+import CloseDialog from "../components/CloseDialog";
 import Button from "../components/ui/Button";
 import Input from "../components/ui/Input";
 
 export default function Selector({ onChange, queries, inSchema = false, graphName }: {
     /* eslint-disable react/require-default-props */
-    onChange: (selectedGraphName: string, selectedSchema: Graph) => void 
+    onChange: (selectedGraphName: string, selectedSchema: Graph) => void
     queries?: Query[]
     inSchema?: boolean
     graphName?: string
@@ -91,11 +91,11 @@ export default function Selector({ onChange, queries, inSchema = false, graphNam
             const result = await securedFetch(`api/graph/${name}_schema/?query=${q}`, {
                 method: "GET"
             })
-    
+
             if (!result.ok) return
-    
+
             const json = await result.json()
-    
+
             setSchema(Graph.create(name, json.result))
             onChange(name, Graph.create(name, json.result))
         }
@@ -149,66 +149,41 @@ export default function Selector({ onChange, queries, inSchema = false, graphNam
         <div className="flex flex-col gap-4">
             <div className="flex flex-row justify-between items-center">
                 <Combobox isSelectGraph options={options} setOptions={setOptions} selectedValue={selectedValue} setSelectedValue={handleOnChange} />
-                <div className="flex flex-row gap-16 text-[#9192FD]">
-                    {
-                        !inSchema &&
-                        <p className={cn(!selectedValue && "text-[#57577B]")}>Versions</p>
-                    }
-                    <button
-                        className="disabled:text-[#57577B]"
-                        title="Upload Data"
-                        type="button"
+                <div className="flex flex-row gap-16 text-[#7167F6]">
+                    <Button
+                        label="Upload Data"
                         onClick={() => setIsUploadOpen(true)}
                         disabled={!selectedValue}
-                    >
-                        <p>Upload Data</p>
-                    </button>
+                    />
                     <Upload isOpen={isUploadOpen} onOpen={setIsUploadOpen} />
-                    <button
-                        className="disabled:text-[#57577B]"
-                        title="Export Data"
-                        type="button"
+                    <Button
+                        label="Export Data"
                         onClick={onExport}
                         disabled={!selectedValue}
-                    >
-                        <p>Export Data</p>
-                    </button>
+                    />
                     <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
                         <DropdownMenu onOpenChange={setDropOpen}>
                             <DropdownMenuTrigger className="disabled:text-[#57577B]" disabled={!selectedValue} asChild>
-                                <button
-                                    className="flex flex-row gap-2"
-                                    title="Duplicate"
-                                    type="button"
-                                >
-                                    <p className={cn(!selectedValue && "text-[#57577B]")} >Duplicate</p>
-                                    {
-                                        dropOpen ?
-                                            <ChevronUp />
-                                            : <ChevronDown />
-                                    }
-                                </button>
+                                <Button
+                                    label="Duplicate"
+                                    disabled={!selectedValue}
+                                    open={dropOpen}
+                                />
                             </DropdownMenuTrigger>
                             <DropdownMenuContent>
                                 <DropdownMenuItem>
                                     <DialogTrigger asChild>
-                                        <button
-                                            className="text-[#7167f6]"
-                                            title="Duplicate Graph"
-                                            type="button"
-                                        >
-                                            <p>Duplicate Graph</p>
-                                        </button>
+                                        <Button
+                                            className="text-[#7167F6]"
+                                            label="Duplicate Graph"
+                                        />
                                     </DialogTrigger>
                                 </DropdownMenuItem>
                                 <DropdownMenuItem>
-                                    <button
-                                        className="text-[#7167f6]"
-                                        title="New graph from schema"
-                                        type="button"
-                                    >
-                                        <p>New graph from schema</p>
-                                    </button>
+                                    <Button
+                                        className="text-[#7167F6]"
+                                        label="New graph from schema"
+                                    />
                                 </DropdownMenuItem>
                             </DropdownMenuContent>
                         </DropdownMenu>
@@ -219,13 +194,7 @@ export default function Selector({ onChange, queries, inSchema = false, graphNam
                                     <Input variant="Small" onChange={(e) => setDuplicateName(e.target.value)} required />
                                 </div>
                                 <div className="flex flex-row justify-end">
-                                    <DialogClose asChild>
-                                        <Button
-                                            className="px-8"
-                                            variant="Primary"
-                                            label="OK"
-                                        />
-                                    </DialogClose>
+                                    <CloseDialog className="px-8" variant="Primary" />
                                 </div>
                             </form>
                         </DialogComponent>
@@ -246,30 +215,13 @@ export default function Selector({ onChange, queries, inSchema = false, graphNam
                     !inSchema &&
                     <div className="flex flex-row gap-4 items-center">
                         <Dialog>
-                            <DialogTrigger disabled={!selectedValue} asChild>
-                                <button
-                                    className="disabled:text-[#57577B]"
-                                    title="Query History"
-                                    type="button"
-                                >
-                                    <p>Query History</p>
-                                </button>
+                            <DialogTrigger disabled={!selectedValue || !queries || queries.length === 0} asChild>
+                                <Button
+                                    disabled={!selectedValue || !queries || queries.length === 0}
+                                    label="Query History"
+                                />
                             </DialogTrigger>
-                            <DialogContent disableClose className="w-[70%] h-[70%] flex flex-col p-0 shadow-lg rounded-xl">
-                                <DialogHeader className="h-[10%] p-4 bg-indigo-600 flex flex-row justify-between items-center rounded-t-xl">
-                                    <DialogTitle className="text-white">
-                                        Query History
-                                    </DialogTitle>
-                                    <DialogClose asChild>
-                                        <button
-                                            title="Close"
-                                            type="button"
-                                            aria-label="Close"
-                                        >
-                                            <X color="white" size={30} />
-                                        </button>
-                                    </DialogClose>
-                                </DialogHeader>
+                            <DialogComponent className="h-[80%] w-[70%]" title="Query History">
                                 <div className="h-1 grow flex flex-col p-8 gap-8">
                                     <DialogTitle>Queries</DialogTitle>
                                     <div className="h-1 grow w-full flex flex-row">
@@ -280,14 +232,11 @@ export default function Selector({ onChange, queries, inSchema = false, graphNam
                                                     queries.map((q, index) => (
                                                         // eslint-disable-next-line react/no-array-index-key
                                                         <li key={index} className="w-full text-sm border-b py-3 px-12">
-                                                            <button
+                                                            <Button
                                                                 className="w-full truncate"
-                                                                title={`Query ${index + 1}`}
-                                                                type="button"
+                                                                label={q.text}
                                                                 onClick={() => setQuery(q)}
-                                                            >
-                                                                <p>{q.text}</p>
-                                                            </button>
+                                                            />
                                                         </li>
                                                     ))
                                                 }
@@ -331,68 +280,31 @@ export default function Selector({ onChange, queries, inSchema = false, graphNam
                                             </ul>
                                         </div>
                                     </div>
-                                    <div className="flex flex-row justify-end items-center gap-12">
-                                        <button
-                                            className="text-[#7167f6]"
-                                            title="Profile"
-                                            type="button"
-                                        >
-                                            <p>Profile</p>
-                                        </button>
-                                        <button
-                                            className="text-[#7167f6]"
-                                            title="Explain"
-                                            type="button"
-                                        >
-                                            <p>Explain</p>
-                                        </button>
-                                        <button
-                                            className="text-[#7167f6]"
-                                            title="Profile"
-                                            type="button"
-                                        >
-                                            <p>Translate to Cypher</p>
-                                        </button>
-                                        <button
-                                            className="w-1/6 bg-indigo-600 text-white p-4"
-                                            title="Run"
-                                            type="button"
-                                        >
-                                            <p>RUN</p>
-                                        </button>
+                                    <div className="flex flex-row justify-end items-center gap-12 text-[#7167F6]">
+                                        <Button label="Profile" />
+                                        <Button label="Explain" />
+                                        <Button label="Translate to cypher" />
+                                        <Button
+                                            className="text-white"
+                                            variant="Large"
+                                            label="Run"
+                                        />
                                     </div>
                                 </div>
-                            </DialogContent>
+                            </DialogComponent>
                         </Dialog>
                         <Dialog>
                             <DialogTrigger disabled={!selectedValue} asChild>
-                                <button
-                                    className="disabled:text-[#57577B]"
-                                    title="View Schema"
-                                    type="button"
-                                >
-                                    <p>View Schema</p>
-                                </button>
+                                <Button
+                                    disabled={!selectedValue}
+                                    label="View Schema"
+                                />
                             </DialogTrigger>
-                            <DialogContent disableClose className="w-[90%] h-[90%] flex flex-col p-0 rounded-lg">
-                                <DialogHeader className="h-[10%] p-4 bg-indigo-600 flex flex-row justify-between items-center rounded-t-xl">
-                                    <DialogTitle className="text-white">
-                                        {selectedValue} Schema
-                                    </DialogTitle>
-                                    <DialogClose asChild>
-                                        <button
-                                            title="Close"
-                                            type="button"
-                                            aria-label="Close"
-                                        >
-                                            <X color="white" size={30} />
-                                        </button>
-                                    </DialogClose>
-                                </DialogHeader>
+                            <DialogComponent title={`${selectedValue} Schema`} className="w-[90%] h-[90%]">
                                 <div className="grow flex p-8">
                                     <SchemaView schema={schema} />
                                 </div>
-                            </DialogContent>
+                            </DialogComponent>
                         </Dialog>
                     </div>
                 }

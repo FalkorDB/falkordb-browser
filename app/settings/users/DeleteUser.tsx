@@ -42,13 +42,9 @@ export default function DeleteUser({ isDeleteSelected, users, setUsers }: Delete
                             icon={<Trash2 />}
                             label="Delete Users"
                         />
-                        : <button
-                            title="Delete"
-                            type="button"
-                            aria-label="Delete"
-                        >
-                            <Trash2 size={15} />
-                        </button>
+                        : <Button
+                            icon={<Trash2 />}
+                        />
                 }
             </AlertDialogTrigger>
             <AlertDialogContent className="flex flex-col gap-10 p-4">

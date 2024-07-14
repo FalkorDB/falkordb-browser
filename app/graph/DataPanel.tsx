@@ -142,14 +142,11 @@ export default function DataPanel({ inSchema, obj, onExpand, setProperty, setPro
         <div className="h-full w-full flex flex-col shadow-lg DataPanel">
             <div className="w-full flex flex-row justify-between items-center bg-[#7167F6] p-4">
                 <div className="flex flex-row gap-4 items-center">
-                    <button
-                        title="Close"
-                        type="button"
+                    <Button
+                        variant="button"
+                        icon={<ChevronRight />}
                         onClick={() => onExpand()}
-                        aria-label="Close"
-                    >
-                        <ChevronRight />
-                    </button>
+                    />
                     {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions */}
                     <div
                         ref={ref => {
@@ -179,7 +176,6 @@ export default function DataPanel({ inSchema, obj, onExpand, setProperty, setPro
                                 variant="Secondary"
                                 label="Add Attribute"
                                 icon={isAddValue ? <MinusCircle /> : <PlusCircle />}
-                                type="button"
                                 onClick={() => setIsAddValue(prev => !prev)}
                             />
                         </TableCaption>
@@ -222,14 +218,10 @@ export default function DataPanel({ inSchema, obj, onExpand, setProperty, setPro
                                             <div className="text-[#ACACC2] flex flex-row gap-2 items-center">
                                                 {
                                                     hover === strKey &&
-                                                    <button
-                                                        title="Delete"
-                                                        type="button"
-                                                        aria-label="delete"
+                                                    <Button
+                                                        icon={<Trash2 />}
                                                         onClick={() => onDelete(strKey)}
-                                                    >
-                                                        <Trash2 />
-                                                    </button>
+                                                    />
                                                 }
                                                 {strKey}:
                                             </div>
@@ -398,7 +390,6 @@ export default function DataPanel({ inSchema, obj, onExpand, setProperty, setPro
                         variant="Secondary"
                         label="Delete"
                         icon={<Trash2 />}
-                        type="button"
                         onClick={() => onDeleteElement()}
                     />
                 }

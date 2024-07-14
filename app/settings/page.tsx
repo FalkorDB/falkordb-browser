@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils"
 import Header from "../components/Header"
 import Users from "./users/Users"
 import Configurations from "./Configurations"
+import Button from "../components/ui/Button"
 
 export default function Settings() {
 
@@ -25,22 +26,16 @@ export default function Settings() {
             <div className="grow flex flex-col gap-8 p-16">
                 <h1 className="text-2xl font-medium px-6">Settings</h1>
                 <div className="flex flex-row gap-16">
-                    <button
+                    <Button
+                        label="DB Configuration"
                         className={cn("py-2 px-6", current === "DB" && "border-b-2 border-[#7167F6] text-[#7167F6] text-sm font-normal")}
-                        title="DB Configuration"
-                        type="button"
                         onClick={() => setCurrent("DB")}
-                    >
-                        <p>DB Configuration</p>
-                    </button>
-                    <button
-                        className={cn("py-2 px-6", current === "Users" && "border-b-2 border-[#7167F6] text-[#7167F6]")}
-                        title="Users"
-                        type="button"
+                    />
+                    <Button
+                        label="Users"
+                        className={cn("py-2 px-6", current === "Users" && "border-b-2 border-[#7167F6] text-[#7167F6] text-sm font-normal")}
                         onClick={() => setCurrent("Users")}
-                    >
-                        <p>Users</p>
-                    </button>
+                    />
                 </div>
                 <div className="h-1 grow px-6">
                     {

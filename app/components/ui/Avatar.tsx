@@ -10,18 +10,19 @@ import {
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Role } from "next-auth";
+import Button from "./Button";
 
 export default function AvatarButton({ setUserStatus }: { setUserStatus: (status: Role) => void }) {
     const { data: session, status } = useSession()
 
     if (status === "unauthenticated" || !session) {
         return (
-            <button
-                type="button"
-                onClick={() => signIn(undefined, { callbackUrl: '/sandbox' })}
-                className="h-12 rounded-lg font-bold px-5 text-slate-50">
-                Sign in
-            </button>
+            <Button
+                label="Sign in"
+                className="h-12 rounded-lg font-bold px-5 text-slate-50"
+                onClick={() => signIn(undefined, { callbackUrl: '/sandbox' })
+                }
+            />
         )
     }
 
@@ -31,14 +32,14 @@ export default function AvatarButton({ setUserStatus }: { setUserStatus: (status
 
     return (
         <DropdownMenu>
-            <DropdownMenuTrigger>
-                <div className="flex items-center gap-3">
-                    <div className="text-black">{username || "default"}</div>
-                </div>
+            <DropdownMenuTrigger asChild>
+                <Button
+                    label={username || "Default"}
+                />
             </DropdownMenuTrigger>
             <DropdownMenuContent>
-                <DropdownMenuLabel>My Account</DropdownMenuLabel>
-                <DropdownMenuSeparator />
+                <DropdownMenuLabel className="text-center">My Account</DropdownMenuLabel>
+                <DropdownMenuSeparator className="" />
                 <DropdownMenuItem onClick={() => signOut({ callbackUrl: '/' })}>Logout</DropdownMenuItem>
             </DropdownMenuContent>
         </DropdownMenu>

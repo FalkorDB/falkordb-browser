@@ -2,7 +2,7 @@
 
 // import { Dialog, DialogClose, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
-import { ChevronDown, ChevronUp, LifeBuoy, PlusCircle, Settings } from "lucide-react";
+import { LifeBuoy, PlusCircle, Settings } from "lucide-react";
 import { FormEvent, useState } from "react";
 import Image from "next/image";
 import { Toast, cn, prepareArg, securedFetch } from "@/lib/utils";
@@ -60,22 +60,16 @@ export default function Header({ inCreate = false, inSettings = false, onSetGrap
                     <Image width={103} height={29} src="/ColorLogo.svg" alt="" />
                     <p className="text-neutral-200" >|</p>
                     <div className="flex flex-row gap-6">
-                        <button
+                        <Button
+                            label="Graphs"
                             className={cn(pathname.includes("/graph") && "text-[#7167F6]")}
                             onClick={() => router.push("/graph")}
-                            type="button"
-                            title="Graphs"
-                        >
-                            <p>Graphs</p>
-                        </button>
-                        <button
+                        />
+                        <Button
+                            label="Schemas"
                             className={cn(pathname.includes("/schema") && "text-[#7167F6]")}
                             onClick={() => router.push("/schema")}
-                            type="button"
-                            title="Schemas"
-                        >
-                            <p>Schemas</p>
-                        </button>
+                        />
                     </div>
                 </div>
                 <div className="flex flex-row items-center gap-8">
@@ -155,19 +149,12 @@ export default function Header({ inCreate = false, inSettings = false, onSetGrap
                                 !inSettings &&
                                 <DropdownMenu onOpenChange={setHelpOpen}>
                                     <DropdownMenuTrigger asChild>
-                                        <button
+                                        <Button
                                             className="flex flex-row gap-1 items-center focus-visible:outline-none"
-                                            title="help"
-                                            type="button"
-                                        >
-                                            <LifeBuoy size={20} />
-                                            <p>Help</p>
-                                            {
-                                                helpOpen ?
-                                                    <ChevronUp size={20} />
-                                                    : <ChevronDown size={20} />
-                                            }
-                                        </button>
+                                            label="help"
+                                            icon={<LifeBuoy size={20} />}
+                                            open={helpOpen}
+                                        />
                                     </DropdownMenuTrigger>
                                     <DropdownMenuContent>
                                         <DropdownMenuItem asChild>
@@ -195,19 +182,12 @@ export default function Header({ inCreate = false, inSettings = false, onSetGrap
                             }
                         </>
                     }
-                    <div>
-                        <button
-                            disabled={userStatus !== "Admin"}
-                            className={cn("flex flex-row gap-2")}
-                            title="Settings"
-                            type="button"
-                            onClick={() => router.push("/settings")}
-                            aria-label="Settings"
-                        >
-                            <p>Settings</p>
-                            <Settings size={25} />
-                        </button>
-                    </div>
+                    <Button
+                        label="Settings"
+                        icon={<Settings size={25} />}
+                        onClick={() => router.push("/settings")}
+                        disabled={userStatus !== "Admin"}
+                    />
                     <Avatar setUserStatus={setUserStatus} />
                 </div>
             </div>

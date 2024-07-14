@@ -3,11 +3,12 @@
 /* eslint-disable react/require-default-props */
 /* eslint-disable react-hooks/exhaustive-deps */
 
-import { DialogClose, DialogContent, DialogHeader, DialogTrigger } from "@/components/ui/dialog";
+import { DialogContent, DialogHeader, DialogTrigger } from "@/components/ui/dialog";
 import { Dialog, DialogTitle } from "@radix-ui/react-dialog";
-import { Link, PlusCircle, Shrink, Trash2, X, ZoomIn, ZoomOut } from "lucide-react";
+import { Link, PlusCircle, Shrink, Trash2, ZoomIn, ZoomOut } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Graph } from "./model";
+import CloseDialog from "../components/CloseDialog";
 import Combobox from "../components/ui/combobox";
 import Button from "../components/ui/Button";
 import Input from "../components/ui/Input";
@@ -55,7 +56,7 @@ export default function Toolbar({ schema, chartRef, onDeleteElementGraph, onDele
     }, [category])
 
     useEffect(() => {
-        if (!schema) return 
+        if (!schema) return
         setRelationAttributes(Object.keys(schema.Elements.
             find(element => element.data?.label === relation)?.data || {}).
             filter((key) => !excludedProperties.has(key)).map(k => [k, ""]))
@@ -101,15 +102,7 @@ export default function Toolbar({ schema, chartRef, onDeleteElementGraph, onDele
                                 <DialogContent className="w-[25%] min-h-[40%] flex flex-col gap-4 p-0" disableClose>
                                     <DialogHeader className="h-[10%] flex flex-row justify-between items-center bg-[#272746] text-white p-8 border-b-2">
                                         <DialogTitle>Add Entity</DialogTitle>
-                                        <DialogClose asChild>
-                                            <button
-                                                title="Close"
-                                                type="button"
-                                                aria-label="Close"
-                                            >
-                                                <X size={25} color="white" />
-                                            </button>
-                                        </DialogClose>
+                                        <CloseDialog />
                                     </DialogHeader>
                                     <form
                                         className="grow flex flex-col gap-8 p-12"
@@ -149,13 +142,7 @@ export default function Toolbar({ schema, chartRef, onDeleteElementGraph, onDele
                                                 )))
                                             }
                                         </ul>
-                                        <DialogClose asChild>
-                                            <Button
-                                                variant="Large"
-                                                label="Submit"
-                                                type="submit"
-                                            />
-                                        </DialogClose>
+                                        <CloseDialog variant="Large" label="Submit" type="submit" />
                                     </form>
                                 </DialogContent>
                             </Dialog>
@@ -173,15 +160,7 @@ export default function Toolbar({ schema, chartRef, onDeleteElementGraph, onDele
                                 <DialogContent className="w-[25%] min-h-[40%] flex flex-col p-0" disableClose>
                                     <DialogHeader className="h-[10%] flex flex-row justify-between items-center border-b-2 bg-[#272746] text-white p-8">
                                         <DialogTitle>Add Relation</DialogTitle>
-                                        <DialogClose asChild>
-                                            <button
-                                                title="Close"
-                                                type="button"
-                                                aria-label="Close"
-                                            >
-                                                <X size={25} color="white" />
-                                            </button>
-                                        </DialogClose>
+                                        <CloseDialog />
                                     </DialogHeader>
                                     <form
                                         className="grow flex flex-col gap-8 p-12"
@@ -221,13 +200,7 @@ export default function Toolbar({ schema, chartRef, onDeleteElementGraph, onDele
                                                 )))
                                             }
                                         </ul>
-                                        <DialogClose asChild>
-                                            <Button
-                                                variant="Large"
-                                                label="Submit"
-                                                type="submit"
-                                            />
-                                        </DialogClose>
+                                        <CloseDialog variant="Large" label="Submit" type="submit" />
                                     </form>
                                 </DialogContent>
                             </Dialog>
