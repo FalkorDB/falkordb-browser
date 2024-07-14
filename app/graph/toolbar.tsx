@@ -8,10 +8,10 @@ import { Dialog, DialogTitle } from "@radix-ui/react-dialog";
 import { Link, PlusCircle, Shrink, Trash2, ZoomIn, ZoomOut } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Graph } from "./model";
+import CloseDialog from "../components/CloseDialog";
 import Combobox from "../components/ui/combobox";
 import Button from "../components/ui/Button";
 import Input from "../components/ui/Input";
-import CloseDialog from "../components/CloseDialog";
 
 const excludedProperties = new Set([
     "id",

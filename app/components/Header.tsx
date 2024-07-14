@@ -2,7 +2,7 @@
 
 // import { Dialog, DialogClose, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
-import { ChevronDown, ChevronUp, LifeBuoy, PlusCircle, Settings } from "lucide-react";
+import { LifeBuoy, PlusCircle, Settings } from "lucide-react";
 import { FormEvent, useState } from "react";
 import Image from "next/image";
 import { Toast, cn, prepareArg, securedFetch } from "@/lib/utils";
@@ -149,24 +149,12 @@ export default function Header({ inCreate = false, inSettings = false, onSetGrap
                                 !inSettings &&
                                 <DropdownMenu onOpenChange={setHelpOpen}>
                                     <DropdownMenuTrigger asChild>
-                                        {/* <Button 
+                                        <Button
                                             className="flex flex-row gap-1 items-center focus-visible:outline-none"
                                             label="help"
                                             icon={<LifeBuoy size={20} />}
-                                            open={open}
-                                        /> */}
-                                        <button
-                                            className="flex flex-row gap-1 items-center focus-visible:outline-none"
-                                            type="button"
-                                        >
-                                            <LifeBuoy size={20} />
-                                            <p>Help</p>
-                                            {
-                                                helpOpen ?
-                                                    <ChevronUp size={20} />
-                                                    : <ChevronDown size={20} />
-                                            }
-                                        </button>
+                                            open={helpOpen}
+                                        />
                                     </DropdownMenuTrigger>
                                     <DropdownMenuContent>
                                         <DropdownMenuItem asChild>
@@ -194,17 +182,12 @@ export default function Header({ inCreate = false, inSettings = false, onSetGrap
                             }
                         </>
                     }
-                    <button
-                        disabled={userStatus !== "Admin"}
-                        className={cn("flex flex-row gap-2")}
-                        title="Settings"
-                        type="button"
+                    <Button
+                        label="Settings"
+                        icon={<Settings size={25} />}
                         onClick={() => router.push("/settings")}
-                        aria-label="Settings"
-                    >
-                        <p>Settings</p>
-                        <Settings size={25} />
-                    </button>
+                        disabled={userStatus !== "Admin"}
+                    />
                     <Avatar setUserStatus={setUserStatus} />
                 </div>
             </div>

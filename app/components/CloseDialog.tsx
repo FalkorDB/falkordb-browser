@@ -3,7 +3,6 @@
 import { DialogClose } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { X } from "lucide-react";
-import IconButton from "./IconButton";
 import Button from "./ui/Button";
 
 /* eslint-disable react/require-default-props */
@@ -16,24 +15,14 @@ interface Props extends React.DetailedHTMLProps<React.ButtonHTMLAttributes<HTMLB
 export default function CloseDialog({ className, label, variant, icon, ...props }: Props) {
     return (
         <DialogClose asChild >
-            {
-                label ?
-                    <Button
-                        icon={icon}
-                        className={cn("", className)}
-                        variant={variant}
-                        label={label}
-                        // eslint-disable-next-line react/jsx-props-no-spreading
-                        {...props}
-                        />
-                        : <IconButton
-                        variant="button"
-                        icon={<X />}
-                        className={cn("", className)}
-                        // eslint-disable-next-line react/jsx-props-no-spreading
-                        {...props}
-                    />
-            }
+            <Button
+                icon={icon || !label ? <X /> : undefined}
+                className={cn("", className)}
+                variant={variant}
+                label={label}
+                // eslint-disable-next-line react/jsx-props-no-spreading
+                {...props}
+            />
         </DialogClose>
     )
 }

@@ -11,6 +11,14 @@ type Config = {
     value: string | number
 }
 
+const disableRunTimeConfigs = new Set([
+    "THREAD_COUNT",
+    "CACHE_SIZE",
+    "OMP_THREAD_COUNT",
+    "NODE_CREATION_BUFFER",
+    "BOLT_PORT"
+])
+
 const Configs: Config[] = [
     {
         name: "THREAD_COUNT",
@@ -191,7 +199,7 @@ export default function Configurations() {
                                     setConfigValue(value.toString())
                                 }}>
                                     {
-                                        editable === name ?
+                                        editable === name && !disableRunTimeConfigs.has(name) ?
                                             <Input
                                                 ref={(ref) => {
                                                     ref?.focus()

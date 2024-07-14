@@ -12,7 +12,7 @@ import Toolbar from "../graph/toolbar"
 import DataPanel from "../graph/DataPanel"
 import Labels from "../graph/labels"
 import { Category, Graph } from "../graph/model"
-import IconButton from "../components/IconButton"
+import Button from "../components/ui/Button"
 
 /* eslint-disable react/require-default-props */
 interface Props {
@@ -180,7 +180,7 @@ export default function SchemaView({ schema, onAddEntity, onAddRelation, onDelet
                     <Toolbar schema={schema} onAddEntitySchema={onAddEntity} onAddRelationSchema={onAddRelation} onDeleteElementSchema={async () => onDelete && selectedElement && await onDelete(selectedElement)} chartRef={chartRef} />
                     {
                         isCollapsed &&
-                        <IconButton
+                        <Button
                             className="absolute top-0 right-0 p-4 bg-[#7167F6] rounded-lg"
                             icon={<ChevronLeft />}
                             onClick={() => onExpand()}
