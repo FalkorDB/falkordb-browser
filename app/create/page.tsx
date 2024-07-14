@@ -237,12 +237,7 @@ export default function Create() {
             method: "GET"
         })
 
-        const json = await result.json()
-
-        if (!result.ok) {
-            Toast(json.message || "Failed to remove property")
-            return result.ok
-        }
+        if (!result.ok) return result.ok
 
         schema.Elements = schema.Elements.map(e => {
             if (e.data.id === id) {
