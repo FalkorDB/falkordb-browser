@@ -5,11 +5,11 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import { Toast, cn, prepareArg, securedFetch } from "@/lib/utils"
 import { Trash2, UploadIcon } from "lucide-react"
 import { Dispatch, SetStateAction, useEffect, useState } from "react"
-import TableView from "./TableView"
-import Upload from "./Upload"
-import DeleteGraph from "./DeleteGraph"
-import DialogComponent from "./DialogComponent"
 import Button from "./Button"
+import TableView from "../TableView"
+import Upload from "../graph/UploadGraph"
+import DeleteGraph from "../graph/DeleteGraph"
+import DialogComponent from "../DialogComponent"
 
 /* eslint-disable react/require-default-props */
 interface ComboboxProps {
@@ -34,11 +34,7 @@ export default function Combobox({ isSelectGraph, disabled = false, inTable, typ
       method: "GET"
     })
 
-    if (!result.ok) {
-      const json = await result.json()
-      Toast(json.message)
-      return
-    }
+    if (!result.ok) return
 
     const blob = await result.blob()
     const url = window.URL.createObjectURL(blob)

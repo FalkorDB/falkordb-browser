@@ -1,6 +1,7 @@
 import { useState } from "react";
+import { cn } from "@/lib/utils";
 import { Category, getCategoryColorName } from "./model";
-import Button from "../components/Button";
+import Button from "../components/ui/Button";
 
 /* eslint-disable react/require-default-props */
 interface Props {
@@ -16,12 +17,12 @@ export default function Labels({ categories, onClick, label, className = "" }: P
     const [reload, setReload] = useState(false)
 
     return (
-        <div className={className}>
+        <div className={cn(className, "absolute bottom-0 flex flex-col gap-2 p-4")}>
             {
                 label &&
                 <h1>{label}</h1>
             }
-            <ul className="flex flex-row gap-6 p-4" >
+            <ul className="flex flex-row gap-6" >
                 {
                     categories.map((category) => (
                         <li key={category.index}>

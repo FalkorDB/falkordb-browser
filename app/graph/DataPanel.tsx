@@ -5,8 +5,8 @@ import { Toast, cn } from "@/lib/utils";
 import { EdgeDataDefinition, NodeDataDefinition } from "cytoscape";
 import { ChevronRight, MinusCircle, PlusCircle, Trash2 } from "lucide-react";
 import { KeyboardEvent, useEffect, useRef, useState } from "react";
-import Button from "../components/Button";
-import Input from "../components/Input";
+import Button from "../components/ui/Button";
+import Input from "../components/ui/Input";
 
 /* eslint-disable react/require-default-props */
 interface Props {
