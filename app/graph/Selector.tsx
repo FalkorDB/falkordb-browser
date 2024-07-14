@@ -7,13 +7,13 @@ import { Editor } from "@monaco-editor/react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { editor } from "monaco-editor";
 import { Toast, cn, prepareArg, securedFetch } from "@/lib/utils";
-import Combobox from "../components/combobox";
+import Combobox from "../components/ui/combobox";
 import { Graph, Query } from "./model";
 import SchemaView from "../schema/SchemaView";
-import Upload from "../components/Upload";
+import Upload from "../components/graph/UploadGraph";
 import DialogComponent from "../components/DialogComponent";
-import Button from "../components/Button";
-import Input from "../components/Input";
+import Button from "../components/ui/Button";
+import Input from "../components/ui/Input";
 
 export default function Selector({ onChange, queries, inSchema = false, graphName }: {
     /* eslint-disable react/require-default-props */

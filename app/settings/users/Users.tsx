@@ -5,7 +5,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { CheckedState } from "@radix-ui/react-checkbox";
 import { User } from "@/app/api/user/model";
 import { cn, securedFetch } from "@/lib/utils";
-import Combobox from "@/app/components/combobox";
+import Combobox from "@/app/components/ui/combobox";
 import TableView from "@/app/components/TableView";
 import DeleteUser from "./DeleteUser";
 import AddUser from "./AddUser";

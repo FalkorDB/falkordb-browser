@@ -9,8 +9,8 @@ import { Toast, cn, prepareArg, securedFetch } from "@/lib/utils";
 import { useRouter, usePathname } from "next/navigation";
 import { Role } from "next-auth";
 import { Dialog, DialogTrigger } from "@/components/ui/dialog";
-import Button from "./Button";
-import Avatar from "./Avatar";
+import Button from "./ui/Button";
+import Avatar from "./ui/Avatar";
 import DialogComponent from "./DialogComponent";
 import Input from "./Input";
 
@@ -53,9 +53,9 @@ export default function Header({ inCreate = false, inSettings = false, onSetGrap
     }
 
     return (
-        <div className="h-[10%] flex flex-col">
+        <div className="flex flex-col">
             <div className="h-2 rounded-t-lg Top" />
-            <div className="py-6 px-11 flex flex-row justify-between items-center Header">
+            <div className="py-4 px-11 flex flex-row justify-between items-center Header">
                 <div className="flex flex-row gap-4 items-center">
                     <Image width={103} height={29} src="/ColorLogo.svg" alt="" />
                     <p className="text-neutral-200" >|</p>
