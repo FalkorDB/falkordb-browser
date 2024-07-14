@@ -3,12 +3,13 @@
 import { SignInOptions, SignInResponse, signIn } from "next-auth/react";
 import { FormEvent, useEffect, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
-import Dropzone from "@/app/components/Dropzone";
+import Dropzone from "@/app/components/ui/Dropzone";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Eye } from "lucide-react";
-import Input from "@/app/components/Input";
-import Button from "@/app/components/Button";
+import Input from "@/app/components/ui/Input";
+import Button from "@/app/components/ui/Button";
 import Image from "next/image";
+import { cn } from "@/lib/utils";
 import IconButton from "../components/IconButton";
 
 const DEFAULT_HOST = "localhost";
@@ -140,7 +141,7 @@ export default function LoginForm() {
           <div className="flex flex-row gap-8">
             <div className="flex flex-row gap-2">
               <Checkbox
-                className="w-6 h-6 rounded-lg"
+                className={cn("w-6 h-6 rounded-lg", !TLS && "border-white")}
                 defaultChecked={false}
                 checked={TLS}
                 onCheckedChange={(checked) => setTLS(checked as boolean)}

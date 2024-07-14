@@ -4,7 +4,7 @@ import { DialogClose } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { X } from "lucide-react";
 import IconButton from "./IconButton";
-import Button from "./Button";
+import Button from "./ui/Button";
 
 /* eslint-disable react/require-default-props */
 interface Props extends React.DetailedHTMLProps<React.ButtonHTMLAttributes<HTMLButtonElement>, HTMLButtonElement> {

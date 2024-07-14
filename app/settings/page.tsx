@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils"
 import Header from "../components/Header"
 import Users from "./users/Users"
 import Configurations from "./Configurations"
-import Button from "../components/Button"
+import Button from "../components/ui/Button"
 
 export default function Settings() {
 

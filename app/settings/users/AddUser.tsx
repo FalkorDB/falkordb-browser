@@ -2,12 +2,12 @@ import { Dispatch, FormEvent, SetStateAction, useState } from "react"
 import { Toast, securedFetch } from "@/lib/utils";
 import { Eye, PlusCircle } from "lucide-react";
 import { User } from "@/app/api/user/model";
-import Button from "@/app/components/Button";
-import Input from "@/app/components/Input";
+import Button from "@/app/components/ui/Button";
+import Input from "@/app/components/ui/Input";
 import DialogComponent from "@/app/components/DialogComponent";
 import { Dialog, DialogTrigger } from "@/components/ui/dialog";
 import IconButton from "@/app/components/IconButton";
-import Combobox from "../../components/combobox";
+import Combobox from "../../components/ui/combobox";
 
 // eslint-disable-next-line no-useless-escape
 const PATTERN = "^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d)(?=.*[@$!%*?&])[A-Za-z\\d@$!%*?&#+]{8,}$"

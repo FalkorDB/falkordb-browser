@@ -3,52 +3,59 @@
 // import { Dialog, DialogClose, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { ChevronDown, ChevronUp, LifeBuoy, PlusCircle, Settings } from "lucide-react";
-import { useState } from "react";
+import { FormEvent, useState } from "react";
 import Image from "next/image";
-import { cn, prepareArg, securedFetch } from "@/lib/utils";
+import { Toast, cn, prepareArg, securedFetch } from "@/lib/utils";
 import { useRouter, usePathname } from "next/navigation";
 import { Role } from "next-auth";
-import Button from "./Button";
-import Avatar from "./Avatar";
+import { Dialog, DialogTrigger } from "@/components/ui/dialog";
+import Button from "./ui/Button";
+import Avatar from "./ui/Avatar";
+import DialogComponent from "./DialogComponent";
+import Input from "./ui/Input";
 
 /* eslint-disable react/require-default-props */
 interface Props {
-    graphName?: string
     inCreate?: boolean
     inSettings?: boolean
+    onSetGraphName?: (graphName: string) => void
 }
 
-export default function Header({ graphName, inCreate = false, inSettings = false }: Props) {
-    const [open, setOpen] = useState<boolean>(false)
+export default function Header({ inCreate = false, inSettings = false, onSetGraphName }: Props) {
+    const [helpOpen, setHelpOpen] = useState<boolean>(false)
+    const [createOpen, setCreateOpen] = useState<boolean>(false)
     const router = useRouter()
     const pathname = usePathname()
     const [userStatus, setUserStatus] = useState<Role>()
-
-    // const [newName, setNewName] = useState<string>("")
+    const [graphName, setGraphName] = useState<string>("")
 
     // const createGraph = async () => {
     //     const result = await securedFetch(`api/graph/${newName}`)
     // }
 
-    const run = () => {
-        const query1 = `CREATE
-            (:Rider {name:'Valentino Rossi'})-[:rides]->(:Team {name:'Yamaha'}),
-            (:Rider {name:'Dani Pedrosa'})-[:rides]->(:Team {name:'Honda'}),
-            (:Rider {name:'Andrea Dovizioso'})-[:rides]->(:Team {name:'Ducati'})`
-        securedFetch(`api/graph/FalkorDB/?query=${prepareArg(query1)}`, {
+    const handelCreateGraph = async (e: FormEvent) => {
+        if (!onSetGraphName) return
+
+        e.preventDefault()
+
+        const q = `RETURN 1`
+        const result = await securedFetch(`api/graph/${graphName}/?query=${prepareArg(q)}`, {
             method: "GET"
         })
-        const query2 = `CREATE
-            (:Rider {name:'string'})-[:rides]->(:Team {name:'string'})`
-        securedFetch(`api/graph/FalkorDB_schema/?query=${prepareArg(query2)}`, {
-            method: "GET"
-        })
+
+        if (result.ok) {
+            Toast(`Graph ${graphName} created successfully!`, "Success")
+            onSetGraphName(graphName)
+            setCreateOpen(false)
+            setGraphName("")
+        }
+
     }
 
     return (
-        <div className="h-[10%] flex flex-col">
+        <div className="flex flex-col">
             <div className="h-2 rounded-t-lg Top" />
-            <div className="py-6 px-11 flex flex-row justify-between items-center Header">
+            <div className="py-4 px-11 flex flex-row justify-between items-center Header">
                 <div className="flex flex-row gap-4 items-center">
                     <Image width={103} height={29} src="/ColorLogo.svg" alt="" />
                     <p className="text-neutral-200" >|</p>
@@ -69,13 +76,33 @@ export default function Header({ graphName, inCreate = false, inSettings = false
                     {
                         !inCreate &&
                         <>
-                            <Button
-                                className="text-white"
-                                variant="Primary"
-                                label="New Graph"
-                                icon={<PlusCircle />}
-                                onClick={() => run()}
-                            />
+                            <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+                                <DialogTrigger asChild>
+                                    <Button
+                                        className="text-white"
+                                        variant="Primary"
+                                        label="New Graph"
+                                        icon={<PlusCircle />}
+                                    />
+                                </DialogTrigger>
+                                <DialogComponent className="w-[40%]" title="Add Graph" description="Enter new graph name">
+                                    <form className="flex flex-col gap-12" onSubmit={handelCreateGraph}>
+                                        <div className="flex flex-col gap-2">
+                                            <p>Name:</p>
+                                            <Input
+                                                variant="Default"
+                                                value={graphName}
+                                                onChange={(e) => setGraphName(e.target.value)}
+                                            />
+                                        </div>
+                                        <Button
+                                            variant="Large"
+                                            label="Create"
+                                            type="submit"
+                                        />
+                                    </form>
+                                </DialogComponent>
+                            </Dialog>
                             {/* <Dialog>
                             <DialogTrigger asChild>
                             </DialogTrigger>
@@ -120,7 +147,7 @@ export default function Header({ graphName, inCreate = false, inSettings = false
                                     </Dialog> */}
                             {
                                 !inSettings &&
-                                <DropdownMenu onOpenChange={setOpen}>
+                                <DropdownMenu onOpenChange={setHelpOpen}>
                                     <DropdownMenuTrigger asChild>
                                         {/* <Button 
                                             className="flex flex-row gap-1 items-center focus-visible:outline-none"
@@ -135,7 +162,7 @@ export default function Header({ graphName, inCreate = false, inSettings = false
                                             <LifeBuoy size={20} />
                                             <p>Help</p>
                                             {
-                                                open ?
+                                                helpOpen ?
                                                     <ChevronUp size={20} />
                                                     : <ChevronDown size={20} />
                                             }
@@ -167,13 +194,19 @@ export default function Header({ graphName, inCreate = false, inSettings = false
                             }
                         </>
                     }
-                    <Button
-                        className={cn("flex flex-row gap-2", !graphName && "text-[#57577B]")}
-                        label="Settings"
-                        icon={<Settings size={25} />}
-                        onClick={() => router.push("/settings")}
-                        disabled={userStatus !== "Admin"}
-                    />
+                    <div>
+                        <button
+                            disabled={userStatus !== "Admin"}
+                            className={cn("flex flex-row gap-2")}
+                            title="Settings"
+                            type="button"
+                            onClick={() => router.push("/settings")}
+                            aria-label="Settings"
+                        >
+                            <p>Settings</p>
+                            <Settings size={25} />
+                        </button>
+                    </div>
                     <Avatar setUserStatus={setUserStatus} />
                 </div>
             </div>

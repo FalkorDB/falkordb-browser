@@ -69,7 +69,7 @@ export default function useScreenSize(): ScreenDimension {
       throttledHandleResize.cancel(); // Cancel the throttle function on cleanup
       window.removeEventListener('resize', throttledHandleResize);
     };
-  }, [throttledHandleResize]);
+  }, [handleResize, throttledHandleResize]);
 
   return dimension;
 }

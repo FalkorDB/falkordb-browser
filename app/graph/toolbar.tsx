@@ -8,10 +8,10 @@ import { Dialog, DialogTitle } from "@radix-ui/react-dialog";
 import { Link, PlusCircle, Shrink, Trash2, ZoomIn, ZoomOut } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Graph } from "./model";
-import Combobox from "../components/combobox";
-import Button from "../components/Button";
-import Input from "../components/Input";
 import CloseDialog from "../components/CloseDialog";
+import Combobox from "../components/ui/combobox";
+import Button from "../components/ui/Button";
+import Input from "../components/ui/Input";
 
 const excludedProperties = new Set([
     "id",
@@ -231,7 +231,7 @@ export default function Toolbar({ schema, chartRef, onDeleteElementGraph, onDele
                                 onClick={onAddRelationSchema}
                             />
                             <Button
-                                disabled={!chartRef}
+                                disabled={!deleteDisable}
                                 variant="Secondary"
                                 label="Delete"
                                 icon={<Trash2 />}
@@ -245,21 +245,21 @@ export default function Toolbar({ schema, chartRef, onDeleteElementGraph, onDele
                 }
                 <div className="flex flex-row items-center gap-4">
                     <Button
-                        disabled={!schema?.Id}
+                        disabled={!chartRef}
                         variant="Secondary"
                         label="Zoom In"
                         icon={<ZoomIn />}
                         onClick={() => handleZoomClick(1.1)}
                     />
                     <Button
-                        disabled={!schema?.Id}
+                        disabled={!chartRef}
                         variant="Secondary"
                         label="Zoom Out"
                         icon={<ZoomOut />}
                         onClick={() => handleZoomClick(0.9)}
                     />
                     <Button
-                        disabled={!schema?.Id}
+                        disabled={!chartRef}
                         variant="Secondary"
                         label="Fit To Size"
                         icon={<Shrink />}
