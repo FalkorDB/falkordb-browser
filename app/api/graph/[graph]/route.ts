@@ -117,21 +117,22 @@ export async function GET(request: NextRequest, { params }: { params: { graph: s
         return client
     }
 
-    const graphId = params.graph
     const query = request.nextUrl.searchParams.get("query")
-
-    if (!query) {
-        const token = request.nextUrl.searchParams.get("token")
-        if (!token) throw new Error("Missing parameter 'token'")
-        const res = await securedFetch(`https://localhost:5000/pull_status/?token=${token}`, {
-            method: "GET"
-        })
-        if (!res.ok) throw new Error("something went wrong")
-        const result = (await res.json()).progress
-        return NextResponse.json({ result }, { status: 200 })
-    }
-
+    console.log("hi");
+    
     try {
+        if (!query) {
+            const token = request.nextUrl.searchParams.get("token")
+            if (!token) throw new Error("Missing parameter 'token'")
+                const res = await securedFetch(`https://localhost:5000/pull_status/?token=${token}`, {
+                method: "GET"
+            })
+            if (!res.ok) throw new Error("something went wrong")
+                const result = (await res.json()).progress
+            return NextResponse.json({ result }, { status: 200 })
+        }
+        
+        const graphId = params.graph
         const graph = client.selectGraph(graphId)
         const result = await graph.query(query)
 

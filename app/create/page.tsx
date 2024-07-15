@@ -1,7 +1,7 @@
 'use client'
 
 import { AlertCircle, ChevronLeft, ChevronRight, PlusCircle } from "lucide-react";
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Progress } from "@/components/ui/progress";
 import useSWR from "swr";
@@ -32,14 +32,6 @@ export default function Create() {
     const [progress, setProgress] = useState<number>(0)
     const [openaiKey, setOpenaiKey] = useState<string>("")
     const router = useRouter()
-
-    useEffect(() => {
-        if (progress !== 100) return
-        const run = async () => {
-
-        }
-        run()
-    }, [progress])
 
     const fetcher = async (url: string) => {
 
@@ -97,7 +89,7 @@ export default function Create() {
 
         if (!files) return
 
-        const newFilesPath = await Promise.all(files.map(async (file) => {
+        const newFilesPath = (await Promise.all(files.map(async (file) => {
             const formData = new FormData();
 
             formData.append("file", file);
@@ -107,15 +99,12 @@ export default function Create() {
                 body: formData
             });
 
-            if (!result.ok) {
-                Toast()
-                return ""
-            }
+            if (!result.ok) return ""
 
             const json = await result.json()
 
             return json.path
-        }))
+        }))).filter((path) => path)
 
         setFilesPath(newFilesPath)
 
@@ -322,6 +311,7 @@ export default function Create() {
                     method: "GET",
                 }).then((response) => response.json()).then((json) => {
                     const data = json.result.data[0]
+                    if (!data) return
                     setNodesCount(data.nodes)
                     setEdgesCount(data.edges)
                 }).catch(() => {
