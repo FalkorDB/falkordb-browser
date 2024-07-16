@@ -17,7 +17,6 @@
     :focus-visible {
         @apply outline-none;
     }
-
 }
 
 @layer base {
@@ -30,6 +29,10 @@
     .LoginForm {
         background: linear-gradient(180deg, #EC806C 0%, #B66EBD 43.41%, #7568F2 100%);
         color: white;
+    }
+
+    .LoginForm > form > p {
+        font-family: "Obviously Narrow" !important;
     }
 
     .Top {
@@ -58,4 +61,20 @@
         align-items: center;
         justify-content: center;
     }
+}
+
+
+@font-face {
+    font-family: 'Obviously Narrow';
+    src: url('/fonts/obviously_narrow.woff2') format('woff2'),
+        url('/fonts/obviously_narrow.woff') format('woff');
+}
+
+@font-face {
+    font-family: 'Fira Code';
+    src: url('/fonts/fira_code.ttf') format('truetype'),
+}
+
+* {
+    font-family: 'Fira Code';
 }
