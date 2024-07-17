@@ -49,11 +49,6 @@ function edgeSafeKey(key: string): string {
     return EDGE_ALTERNATIVE_RESERVED_KEYS[index];
 }
 
-// export function getCategoryColorName(index: number): string {
-//     const colorIndex = index < COLORS_ORDER.length ? index : 0
-//     return COLORS_ORDER[colorIndex]
-// }
-
 function getCategoryColorOpacity(color: string): number {
     return COLORS_ORDER.findIndex(c => c === color) > 6 ? 0.5 : 1
 }
