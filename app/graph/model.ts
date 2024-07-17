@@ -1,6 +1,4 @@
-
 import { EdgeDataDefinition, ElementDefinition, NodeDataDefinition } from 'cytoscape';
-import twcolors from 'tailwindcss/colors'
 
 export interface Query {
     text: string
@@ -15,20 +13,19 @@ export interface Category {
 }
 
 const COLORS_ORDER = [
-    "rose",
-    "yellow",
-    "teal",
-    "fuchsia",
-    "blue",
-    "violet",
-    "slate",
-    "cyan",
-    "orange",
-    "red",
-    "green",
-    "pink",
+    "#F2EB47",
+    "#99E4E5",
+    "#EF8759",
+    "#89D86D",
+    "#ED70B1",
+    "#7167F6",
+    "#F2EB47",
+    "#99E4E5",
+    "#EF8759",
+    "#89D86D",
+    "#ED70B1",
+    "#7167F6"
 ]
-
 
 const NODE_RESERVED_KEYS = ["parent", "id", "position"]
 const NODE_ALTERNATIVE_RESERVED_KEYS = ["_parent_", "_id_", "_position_"]
@@ -52,19 +49,18 @@ function edgeSafeKey(key: string): string {
     return EDGE_ALTERNATIVE_RESERVED_KEYS[index];
 }
 
-export function getCategoryColorName(index: number): string {
-    const colorIndex = index < COLORS_ORDER.length ? index : 0
-    return COLORS_ORDER[colorIndex]
+// export function getCategoryColorName(index: number): string {
+//     const colorIndex = index < COLORS_ORDER.length ? index : 0
+//     return COLORS_ORDER[colorIndex]
+// }
+
+function getCategoryColorOpacity(color: string): number {
+    return COLORS_ORDER.findIndex(c => c === color) > 6 ? 0.5 : 1
 }
 
-function getCategoryColorValue(index = 0): string {
-    const colorIndex = index < COLORS_ORDER.length ? index : 0
-    const colorName = COLORS_ORDER[colorIndex]
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const colors = twcolors as any;
-    const color = colors[colorName];
-    return color["500"];
+export function getCategoryColorValue(index = 0): string {
+    const colorIndex = index % COLORS_ORDER.length
+    return COLORS_ORDER[colorIndex]
 }
 
 export interface ExtractedData {
@@ -120,7 +116,7 @@ export class Graph {
     get Categories(): Category[] {
         return this.categories;
     }
-    
+
     get Labels(): Category[] {
         return this.labels;
     }
@@ -167,11 +163,13 @@ export class Graph {
         // check if node already exists in nodes or fake node was created
         const currentNode = this.nodesMap.get(cell.id)
         if (!currentNode) {
+            const color = getCategoryColorValue(category.index)
             const node: NodeDataDefinition = {
                 id: cell.id.toString(),
                 name: cell.id.toString(),
                 category: category.name,
-                color: getCategoryColorValue(category.index)
+                color,
+                opacity: getCategoryColorOpacity(color)
             }
             Object.entries(cell.properties).forEach(([key, value]) => {
                 node[nodeSafeKey(key)] = value as string;
@@ -212,7 +210,6 @@ export class Graph {
                 source: sourceId,
                 target: destinationId,
                 label: cell.relationshipType,
-                color: getCategoryColorValue(label.index)
             }
             Object.entries(cell.properties).forEach(([key, value]) => {
                 edge[edgeSafeKey(key)] = value as string;

@@ -36,7 +36,7 @@ export default function DeleteUser({ isDeleteSelected, users, setUsers }: Delete
             <AlertDialogTrigger disabled={users.length === 0} asChild>
                 <Button
                     disabled={users.length === 0}
-                    variant="Primary"
+                    variant={isDeleteSelected ? "Primary" : "button"}
                     icon={<Trash2 />}
                     label={isDeleteSelected ? "Delete Users" : undefined}
                 />

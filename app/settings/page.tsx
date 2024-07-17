@@ -25,7 +25,7 @@ export default function Settings() {
             <Header inSettings />
             <div className="grow flex flex-col gap-8 p-16">
                 <h1 className="text-2xl font-medium px-6">Settings</h1>
-                <div className="flex flex-row gap-16">
+                <div className="flex gap-16">
                     <Button
                         label="DB Configuration"
                         className={cn("py-2 px-6", current === "DB" && "border-b-2 border-[#7167F6] text-[#7167F6] text-sm font-normal")}

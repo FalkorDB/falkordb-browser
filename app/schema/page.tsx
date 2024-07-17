@@ -31,9 +31,9 @@ export default function Page() {
 
     return (
         <div className="h-full w-full flex flex-col">
-            <Header />
-            <div className="h-1 grow p-12 flex flex-col gap-8">
-                <Selector inSchema onChange={setSchemaName} />
+            <Header onSetGraphName={setSchemaName}/>
+            <div className="h-1 grow p-8 px-10 flex flex-col gap-8">
+                <Selector onChange={setSchemaName} graphName={schemaName}/>
                 <SchemaView schema={schema} />
             </div>
         </div>

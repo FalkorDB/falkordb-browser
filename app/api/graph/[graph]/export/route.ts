@@ -18,10 +18,15 @@ export async function GET(request: NextRequest, { params } : { params : { graph:
             commandOptions({ returnBuffers: true }),
             graphId
         )
-
         if (!result) throw new Error(`Failed to retrieve graph data for ID: ${graphId}`)
-
-        return NextResponse.json({ result }, { status: 200 })
+        
+        return new NextResponse(result, {
+            status: 200,
+            headers: {
+                "Content-Type": "application/octet-stream",
+                "Content-Disposition": `attachment; filename="${graphId}.dump"`
+            }
+        })
     } catch (err) {
         return NextResponse.json({ message: (err as Error).message }, { status: 400 })
     }

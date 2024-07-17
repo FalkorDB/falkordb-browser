@@ -5,19 +5,19 @@ import cytoscape, { EdgeDefinition, ElementDefinition, EventObject, NodeDataDefi
 import { useRef, useState, useImperativeHandle, forwardRef, useEffect, Dispatch, SetStateAction } from "react";
 import fcose from 'cytoscape-fcose';
 import Editor, { Monaco } from "@monaco-editor/react";
-import { editor } from "monaco-editor";
+import * as monaco from "monaco-editor";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { ImperativePanelHandle } from "react-resizable-panels";
 import { ChevronLeft, Maximize2 } from "lucide-react"
-import { Toast, cn, defaultQuery, prepareArg, securedFetch } from "@/lib/utils";
+import { cn, prepareArg, securedFetch } from "@/lib/utils";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
-import { Category, Graph, Query } from "./model";
+import { Category, Graph } from "./model";
 import DataPanel from "./DataPanel";
 import Labels from "./labels";
 import Toolbar from "./toolbar";
 import Button from "../components/ui/Button";
 
-const monacoOptions: editor.IStandaloneEditorConstructionOptions = {
+const monacoOptions: monaco.editor.IStandaloneEditorConstructionOptions = {
     renderLineHighlight: "none",
     quickSuggestions: false,
     glyphMargin: false,
@@ -92,6 +92,7 @@ function getStyle() {
             style: {
                 label: "data(name)",
                 "color": "white",
+                // "opacity": "data(opacity)" as unknown === "0.5" ? 0.5 : 1,
                 "text-valign": "center",
                 "text-halign": "center",
                 "text-wrap": "ellipsis",
@@ -99,7 +100,7 @@ function getStyle() {
                 shape: "ellipse",
                 height: "15rem",
                 width: "15rem",
-                "border-width": 0.5,
+                "border-width": 0.3,
                 "border-color": "white",
                 "border-opacity": 1,
                 "background-color": "data(color)",
@@ -116,17 +117,17 @@ function getStyle() {
         {
             selector: "node:selected",
             style: {
-                "border-width": 1,
+                "border-width": 0.7,
             }
         },
         {
             selector: "edge",
             style: {
                 width: 1,
-                "line-color": "data(color)",
+                "line-color": "black",
                 "line-opacity": 0.7,
-                "arrow-scale": 0.5,
-                "target-arrow-color": "data(color)",
+                "arrow-scale": 0.7,
+                "target-arrow-color": "black",
                 "target-arrow-shape": "triangle",
                 'curve-style': 'straight',
             },
@@ -142,26 +143,27 @@ function getStyle() {
             style: {
                 width: 2,
                 "line-opacity": 1,
+                "arrow-scale": 1,
             }
         },
     ]
     return style
 }
 
-const GraphView = forwardRef(({ graphName, setQueries, schema }: {
-    graphName: string,
-    schema: Graph,
-    // eslint-disable-next-line react/require-default-props
-    setQueries?: Dispatch<SetStateAction<Query[]>>,
+const GraphView = forwardRef(({ graph, runQuery, setGraph, historyQuery }: {
+    graph: Graph
+    setGraph: Dispatch<SetStateAction<Graph>>
+    runQuery: (query: string) => Promise<void>
+    historyQuery: string
 }, ref) => {
 
-    const [graph, setGraph] = useState<Graph>(Graph.empty())
     const [query, setQuery] = useState<string>("")
     const [selectedElement, setSelectedElement] = useState<NodeDefinition | EdgeDefinition>();
     const [isCollapsed, setIsCollapsed] = useState<boolean>(true);
     const chartRef = useRef<cytoscape.Core | null>(null)
-    const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null)
+    const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null)
     const dataPanel = useRef<ImperativePanelHandle>(null)
+    const submitQuery = useRef<HTMLButtonElement>(null)
 
     useImperativeHandle(ref, () => ({
         expand: (elements: ElementDefinition[]) => {
@@ -174,13 +176,17 @@ const GraphView = forwardRef(({ graphName, setQueries, schema }: {
         }
     }))
 
-    const handleEditorWillMount = (monaco: Monaco) => {
-        monaco.editor.defineTheme('custom-theme', {
+    useEffect(() => {
+        setQuery(historyQuery)
+    }, [historyQuery])
+
+    const handleEditorWillMount = (monacoInstance: Monaco) => {
+        monacoInstance.editor.defineTheme('custom-theme', {
             base: 'vs-dark',
-            inherit: true,
+            inherit: false,
             rules: [
-                { token: '', foreground: 'ffffff' },
-                { token: 'keyword', foreground: '#ADD8E6' },
+                { token: 'keyword', foreground: '#99E4E5' },
+                { token: 'type', foreground: '#89D86D' },
             ],
             colors: {
                 'editor.background': '#1F1F3D',
@@ -189,8 +195,20 @@ const GraphView = forwardRef(({ graphName, setQueries, schema }: {
         });
     };
 
-    const handleEditorDidMount = (e: editor.IStandaloneCodeEditor) => {
+    const handleEditorDidMount = (e: monaco.editor.IStandaloneCodeEditor) => {
         editorRef.current = e
+        e.addAction({
+            id: 'handle-enter-press',
+            label: 'Handle Enter Press',
+            // eslint-disable-next-line no-bitwise
+            keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter],
+            precondition: "!suggestWidgetVisible",
+            contextMenuGroupId: 'navigation',
+            contextMenuOrder: 1.5,
+            run: async () => {
+                submitQuery.current?.click()
+            }
+        });
     }
 
     useEffect(() => {
@@ -208,27 +226,6 @@ const GraphView = forwardRef(({ graphName, setQueries, schema }: {
     useEffect(() => {
         dataPanel.current?.collapse()
     }, [])
-
-    const runQuery = async () => {
-
-        if (!graphName) {
-            Toast("Select a graph first")
-            return
-        }
-
-        const result = await securedFetch(`api/graph/${prepareArg(graphName)}/?query=${prepareArg(defaultQuery(query))}`, {
-            method: "GET"
-        })
-        
-        if (!result.ok) return
-
-        const json = await result.json()
-        
-        if (!setQueries) return
-        
-        setQueries(prev => [...prev, { text: defaultQuery(query), metadata: json.result.metadata }])
-        setGraph(Graph.create(graphName, json.result))
-    }
 
     const onExpand = () => {
         if (!dataPanel.current) return
@@ -316,7 +313,7 @@ const GraphView = forwardRef(({ graphName, setQueries, schema }: {
     const setProperty = async (key: string, newVal: string) => {
         const id = selectedElement?.data.id
         const q = `MATCH (e) WHERE id(e) = ${id} SET e.${key} = '${newVal}'`
-        const success = (await securedFetch(`api/graph/${prepareArg(graphName)}/?query=${prepareArg(q)}`, {
+        const success = (await securedFetch(`api/graph/${prepareArg(graph.Id)}/?query=${prepareArg(q)}`, {
             method: "GET"
         })).ok
         if (success)
@@ -331,7 +328,7 @@ const GraphView = forwardRef(({ graphName, setQueries, schema }: {
     const removeProperty = async (key: string) => {
         const id = selectedElement?.data.id
         const q = `MATCH (e) WHERE id(e) = ${id} SET e.${key} = NULL`
-        const success = (await securedFetch(`api/graph/${prepareArg(graphName)}/?query=${prepareArg(q)}`, {
+        const success = (await securedFetch(`api/graph/${prepareArg(graph.Id)}/?query=${prepareArg(q)}`, {
             method: "GET"
         })).ok
         if (success)
@@ -346,60 +343,34 @@ const GraphView = forwardRef(({ graphName, setQueries, schema }: {
     const onDeleteElement = async () => {
         const id = selectedElement?.data.id
         const q = `MATCH (e) WHERE id(e) = ${id} DELETE e`
-        const success = (await securedFetch(`api/graph/${prepareArg(graphName)}/?query=${prepareArg(q)}`, {
+        const success = (await securedFetch(`api/graph/${prepareArg(graph.Id)}/?query=${prepareArg(q)}`, {
             method: "GET"
         })).ok
         if (!success) return
-        graph.Elements = graph.Elements.filter(element => element.data.id !== id)
+        setGraph(prev => {
+            const p = prev
+            p.Elements = p.Elements.filter(element => element.data.id !== id)
+            return p
+        })
         setSelectedElement(undefined)
         dataPanel.current?.collapse()
-    }
-
-    const onAddEntity = async (entityAttributes: string[][]) => {
-        const category = entityAttributes.find(row => row[0] === "category")
-        const filteredAttributes = entityAttributes.filter(row => row[0] !== "category")
-        if (!category) {
-            Toast("Missing Category")
-            return
-        }
-        const q = `CREATE (n:${category[1]} {${filteredAttributes.map(([k, v]) => `${k}: '${v}'`)}}) return n`
-        const result = await securedFetch(`api/graph/${prepareArg(graphName)}/?query=${prepareArg(q)}`, {
-            method: "GET"
-        })
-        if (!result.ok) return
-        const node = (await result.json()).result.data[0].n
-        graph.Elements = graph.extendNode(node, graph.Elements)
-    }
-
-    const onAddRelation = async (relationAttributes: string[][]) => {
-        const label = relationAttributes.find(row => row[0] === "label")
-        const filteredAttributes = relationAttributes.filter(row => row[0] !== "label")
-        if (!label) {
-            Toast("Missing Label")
-            return
-        }
-        const q = `CREATE (e:${label[1]} {${filteredAttributes.map(([k, v]) => `${k}: '${v}'`)}}) return e`
-        const result = await securedFetch(`api/graph/${prepareArg(graphName)}/?query=${prepareArg(q)}`, {
-            method: "GET"
-        })
-        if (!result.ok) return
-        const edge = (await result.json()).result.data[0].e
-        graph.Elements = graph.extendEdge(edge, graph.Elements)
     }
 
     return (
         <ResizablePanelGroup direction="horizontal">
             <ResizablePanel
-                className={cn("w-1 grow flex flex-col gap-10", !isCollapsed && "mr-8")}
+                className={cn("flex flex-col gap-8", !isCollapsed && "mr-8")}
                 defaultSize={100}
             >
-                <div className="w-full flex flex-row items-center gap-8">
+                <div className="w-full flex items-center gap-8">
                     <p>Query</p>
-                    <form action={runQuery} className="w-1 grow flex flex-row border border-[#343459]">
-                        <div className="flex flex-row grow w-1">
+                    <form onSubmit={(e) => {
+                        e.preventDefault()
+                        runQuery(query)
+                    }} className="w-1 grow flex border border-[#343459] rounded-r-lg overflow-hidden">
+                        <div className="flex grow w-1">
                             <Editor
-                                width="100%"
-                                height="100%"
+                                className="Editor"
                                 language="cypher"
                                 options={monacoOptions}
                                 value={query}
@@ -410,8 +381,10 @@ const GraphView = forwardRef(({ graphName, setQueries, schema }: {
                             />
                         </div>
                         <Button
-                            className="bg-[#59597C] border border-[#737392] p-2 px-8 rounded-r-lg"
+                            ref={submitQuery}
+                            className="bg-[#59597C] border border-[#737392] p-2 px-8"
                             label="Run"
+                            title="Run (Ctrl+Enter)"
                             type="submit"
                         />
                     </form>
@@ -425,7 +398,6 @@ const GraphView = forwardRef(({ graphName, setQueries, schema }: {
                         </DialogTrigger>
                         <DialogContent closeSize={30} className="w-full h-full">
                             <Editor
-                                // width={isCollapsed ? "100%" : "99.99%"}
                                 className="w-full h-full"
                                 beforeMount={handleEditorWillMount}
                                 theme="custom-theme"
@@ -440,19 +412,19 @@ const GraphView = forwardRef(({ graphName, setQueries, schema }: {
                         </DialogContent>
                     </Dialog>
                 </div>
-                <div className="relative">
-                    <Toolbar schema={schema} deleteDisable={!selectedElement?.data.id} onDeleteElementGraph={onDeleteElement} onAddEntityGraph={onAddEntity} onAddRelationGraph={onAddRelation} chartRef={chartRef} />
+                <div className="flex items-center justify-between">
+                    <Toolbar disabled={!graph.Id} deleteDisabled={!selectedElement} onDeleteElement={onDeleteElement} chartRef={chartRef} />
                     {
                         isCollapsed && graph.Id &&
                         <Button
-                            className="absolute top-0 right-0 p-4 bg-[#7167F6] rounded-lg"
+                            className="p-3 bg-[#7167F6] rounded-lg"
                             icon={<ChevronLeft />}
                             onClick={() => onExpand()}
                             disabled={!selectedElement}
                         />
                     }
                 </div>
-                <div className="flex relative grow">
+                <div className="relative grow">
                     <CytoscapeComponent
                         className="Canvas"
                         cy={(cy) => {
@@ -478,7 +450,10 @@ const GraphView = forwardRef(({ graphName, setQueries, schema }: {
                     }
                 </div>
             </ResizablePanel>
-            <ResizableHandle className="w-3" />
+            {
+                !isCollapsed &&
+                <ResizableHandle className="w-3" />
+            }
             <ResizablePanel
                 className="rounded-lg"
                 collapsible

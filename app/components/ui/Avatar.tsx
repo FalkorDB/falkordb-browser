@@ -25,7 +25,7 @@ export default function AvatarButton({ setUserStatus }: { setUserStatus: (status
             />
         )
     }
-
+    
     setUserStatus(session.user.role)
 
     const { username } = session.user;
@@ -39,7 +39,7 @@ export default function AvatarButton({ setUserStatus }: { setUserStatus: (status
             </DropdownMenuTrigger>
             <DropdownMenuContent>
                 <DropdownMenuLabel className="text-center">My Account</DropdownMenuLabel>
-                <DropdownMenuSeparator className="" />
+                <DropdownMenuSeparator/>
                 <DropdownMenuItem onClick={() => signOut({ callbackUrl: '/' })}>Logout</DropdownMenuItem>
             </DropdownMenuContent>
         </DropdownMenu>

@@ -16,23 +16,19 @@ export function Toast(message?: string, type?: string) {
   })
 }
 
-export function securedFetch(input: string | URL | globalThis.Request, init?: RequestInit): Promise<Response> {
-  return fetch(input, init).then((response) => {
-
-    const { status } = response;
-
-    if (status >= 300) {
-      response.text().then((message) => {
-        Toast(message)
-      }).then(() => {
-        if (status === 401 || status >= 500) {
-          signOut({ callbackUrl: '/login' })
-        }
-      })
-    }
-
-    return response
-  })
+export async function securedFetch(input: string | URL | globalThis.Request, init?: RequestInit): Promise<Response> {
+  const response = await fetch(input, init)
+  const { status } = response
+  if (status >= 300) {
+    response.text().then((message) => {
+      Toast(message)
+    }).then(() => {
+      if (status === 401 || status >= 500) {
+        signOut({ callbackUrl: '/login' })
+      }
+    })
+  }
+  return response
 }
 
 export function prepareArg(arg: string) {
