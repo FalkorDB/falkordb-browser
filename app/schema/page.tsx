@@ -5,7 +5,7 @@ import { Toast, prepareArg, securedFetch } from "@/lib/utils";
 import Header from "../components/Header";
 import Selector from "../graph/Selector";
 import SchemaView from "./SchemaView";
-import { Graph } from "../graph/model";
+import { Graph } from "../api/graph/model";
 
 export default function Page() {
 

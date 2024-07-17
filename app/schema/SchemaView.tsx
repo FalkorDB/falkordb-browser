@@ -11,7 +11,7 @@ import { cn } from "@/lib/utils"
 import Toolbar from "../graph/toolbar"
 import DataPanel from "../graph/DataPanel"
 import Labels from "../graph/labels"
-import { Category, Graph } from "../graph/model"
+import { Category, Graph } from "../api/graph/model"
 import Button from "../components/ui/Button"
 
 /* eslint-disable react/require-default-props */

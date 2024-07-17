@@ -7,7 +7,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { editor } from "monaco-editor";
 import { Toast, cn, prepareArg, securedFetch } from "@/lib/utils";
 import Combobox from "../components/ui/combobox";
-import { Graph, Query } from "./model";
+import { Graph, Query } from "../api/graph/model";
 import SchemaView from "../schema/SchemaView";
 import UploadGraph from "../components/graph/UploadGraph";
 import DialogComponent from "../components/DialogComponent";

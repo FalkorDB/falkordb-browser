@@ -8,7 +8,7 @@ import useSWR from "swr";
 import { EdgeDataDefinition, NodeDataDefinition } from "cytoscape";
 import { Toast, prepareArg, securedFetch } from "@/lib/utils";
 import Header from "../components/Header";
-import { Graph } from "../graph/model";
+import { Graph } from "../api/graph/model";
 import Input from "../components/ui/Input";
 import Button from "../components/ui/Button";
 import SchemaView from "../schema/SchemaView";

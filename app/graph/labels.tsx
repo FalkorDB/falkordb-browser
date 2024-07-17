@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { cn } from "@/lib/utils";
-import { Category, getCategoryColorValue } from "./model";
+import { Category, getCategoryColorValue } from "../api/graph/model";
 import Button from "../components/ui/Button";
 
 /* eslint-disable react/require-default-props */

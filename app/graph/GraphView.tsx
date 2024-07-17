@@ -11,7 +11,7 @@ import { ImperativePanelHandle } from "react-resizable-panels";
 import { ChevronLeft, Maximize2 } from "lucide-react"
 import { cn, prepareArg, securedFetch } from "@/lib/utils";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
-import { Category, Graph } from "./model";
+import { Category, Graph } from "../api/graph/model";
 import DataPanel from "./DataPanel";
 import Labels from "./labels";
 import Toolbar from "./toolbar";
