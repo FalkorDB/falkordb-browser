@@ -12,13 +12,16 @@ export interface Category {
     show: boolean,
 }
 
-const COLORS_ORDER = [
-    "#F2EB47",
-    "#99E4E5",
-    "#EF8759",
-    "#89D86D",
-    "#ED70B1",
-    "#7167F6",
+const COLORS_ORDER_NAME = [
+    "blue",
+    "pink",
+    "orange",
+    "aqua",
+    "yellow",
+    "green"
+]
+
+const COLORS_ORDER_VALUE = [
     "#F2EB47",
     "#99E4E5",
     "#EF8759",
@@ -49,13 +52,14 @@ function edgeSafeKey(key: string): string {
     return EDGE_ALTERNATIVE_RESERVED_KEYS[index];
 }
 
-function getCategoryColorOpacity(color: string): number {
-    return COLORS_ORDER.findIndex(c => c === color) > 6 ? 0.5 : 1
+export function getCategoryColorValue(index = 0): string {
+    const colorIndex = index % COLORS_ORDER_VALUE.length
+    return COLORS_ORDER_VALUE[colorIndex]
 }
 
-export function getCategoryColorValue(index = 0): string {
-    const colorIndex = index % COLORS_ORDER.length
-    return COLORS_ORDER[colorIndex]
+export function getCategoryColorName(index = 0): string {
+    const colorIndex = index % COLORS_ORDER_NAME.length
+    return COLORS_ORDER_NAME[colorIndex]
 }
 
 export interface ExtractedData {
@@ -157,14 +161,13 @@ export class Graph {
 
         // check if node already exists in nodes or fake node was created
         const currentNode = this.nodesMap.get(cell.id)
+
         if (!currentNode) {
-            const color = getCategoryColorValue(category.index)
             const node: NodeDataDefinition = {
                 id: cell.id.toString(),
                 name: cell.id.toString(),
                 category: category.name,
-                color,
-                opacity: getCategoryColorOpacity(color)
+                color: getCategoryColorValue(category.index),
             }
             Object.entries(cell.properties).forEach(([key, value]) => {
                 node[nodeSafeKey(key)] = value as string;
@@ -183,6 +186,7 @@ export class Graph {
             });
             newElements.push({ data: currentNode })
         }
+
         return newElements
     }
 
@@ -205,6 +209,7 @@ export class Graph {
                 source: sourceId,
                 target: destinationId,
                 label: cell.relationshipType,
+                color: getCategoryColorValue(label.index),
             }
             Object.entries(cell.properties).forEach(([key, value]) => {
                 edge[edgeSafeKey(key)] = value as string;

@@ -161,7 +161,7 @@ export default function Header({ inCreate = false, inSettings = false, onSetGrap
                                     <DropdownMenuContent>
                                         <DropdownMenuItem>
                                             <a
-                                                className="w-full"
+                                                className="w-full p-2 text-start"
                                                 title="Documentation"
                                                 href="https://docs.falkordb.com/"
                                                 target="_blank"
@@ -172,7 +172,7 @@ export default function Header({ inCreate = false, inSettings = false, onSetGrap
                                         </DropdownMenuItem>
                                         <DropdownMenuItem>
                                             <a
-                                                className="w-full"
+                                                className="w-full p-2 text-start"
                                                 title="Support"
                                                 href="https://www.falkordb.com/contact-us/"
                                                 target="_blank"

@@ -43,12 +43,13 @@ export default function Page() {
         setGraph(Graph.create(graphName, result))
     }
     
-    const runHistoryQuery = async (query: string) => {
+    const runHistoryQuery = async (query: string, setQueriesOpen: (open: boolean) => void) => {
         const result = await run(query)
         if (!result) return
         setQueries(prev => prev.filter(q => q.text === query).length > 0 ? prev : [...prev, { text: query, metadata: result.metadata }])
         setGraph(Graph.create(graphName, result))
         setHistoryQuery(query)
+        setQueriesOpen(false)
     }
 
     return (

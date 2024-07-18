@@ -55,7 +55,7 @@ function getStyle() {
             selector: "node",
             style: {
                 label: "data(category)",
-                "color": "white",
+                "color": "black",
                 // "opacity": "data(opacity)" as unknown === "0.5" ? 0.5 : 1,
                 "text-valign": "center",
                 "text-halign": "center",

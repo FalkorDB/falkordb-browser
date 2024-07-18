@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { cn } from "@/lib/utils";
-import { Category, getCategoryColorValue } from "../api/graph/model";
+import { Category, getCategoryColorName } from "../api/graph/model";
 import Button from "../components/ui/Button";
 
 /* eslint-disable react/require-default-props */
@@ -30,7 +30,7 @@ export default function Labels({ categories, onClick, label, className = "" }: P
                                 className="flex gap-2 items-center"
                                 label={category.name}
                                 icon={
-                                    <div className={`w-4 h-4 rounded-full bg-[${getCategoryColorValue(category.index)}]`} />
+                                    <div className={cn("w-4 h-4 rounded-full", `bg-${getCategoryColorName(category.index)}`, label === "Labels" && "opacity-50")} />
                                 }
                                 onClick={() => {
                                     onClick(category)

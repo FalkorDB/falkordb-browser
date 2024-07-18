@@ -13,21 +13,21 @@ import UploadGraph from "../components/graph/UploadGraph";
 import DialogComponent from "../components/DialogComponent";
 import Button from "../components/ui/Button";
 import Duplicate from "./Duplicate";
-import CloseDialog from "../components/CloseDialog";
 
 export default function Selector({ onChange, queries, graphName, runQuery }: {
     /* eslint-disable react/require-default-props */
     onChange: (selectedGraphName: string) => void
-    runQuery?: (query: string) => Promise<void>
+    runQuery?: (query: string, setQueriesOpen: (open: boolean) => void) => Promise<void>
     queries?: Query[]
     graphName?: string
 }) {
-
+    
     const [options, setOptions] = useState<string[]>([]);
     const [schema, setSchema] = useState<Graph>(Graph.empty());
     const [selectedValue, setSelectedValue] = useState<string>(graphName || "");
     const [duplicateOpen, setDuplicateOpen] = useState<boolean>(false);
     const [dropOpen, setDropOpen] = useState<boolean>(false);
+    const [queriesOpen, setQueriesOpen] = useState<boolean>(false);
     const [edgesCount, setEdgesCount] = useState<number>(0);
     const [nodesCount, setNodesCount] = useState<number>(0);
     const [query, setQuery] = useState<Query>();
@@ -58,7 +58,7 @@ export default function Selector({ onChange, queries, graphName, runQuery }: {
     useEffect(() => {
         if (!selectedValue) return
         const run = async () => {
-            const q = "MATCH (n) WITH COUNT(n) as nodes MATCH ()-[e]-() RETURN nodes, COUNT(e) as edges"
+            const q = "MATCH (n) WITH COUNT(n) as nodes MATCH ()-[e]->() RETURN nodes, COUNT(e) as edges"
             const result = await securedFetch(`api/graph/${prepareArg(selectedValue)}/?query=${prepareArg(q)}`, {
                 method: "GET"
             })
@@ -125,7 +125,6 @@ export default function Selector({ onChange, queries, graphName, runQuery }: {
     }
 
 
-
     return (
         <div className="flex flex-col gap-4">
             <div className="flex justify-between items-center">
@@ -147,14 +146,14 @@ export default function Selector({ onChange, queries, graphName, runQuery }: {
                         <DropdownMenuContent>
                             <DropdownMenuItem>
                                 <Button
-                                    className="text-[#7167F6]"
+                                    className="w-full p-2 text-start"
                                     label="Duplicate Graph"
                                     onClick={() => setDuplicateOpen(true)}
                                 />
                             </DropdownMenuItem >
                             <DropdownMenuItem>
                                 <Button
-                                    className="text-[#7167F6]"
+                                    className="w-full p-2 text-start"
                                     label="New graph from schema"
                                 />
                             </DropdownMenuItem>
@@ -184,7 +183,7 @@ export default function Selector({ onChange, queries, graphName, runQuery }: {
                 {
                     runQuery &&
                     <div className="flex gap-4 items-center">
-                        <Dialog>
+                        <Dialog open={queriesOpen} onOpenChange={setQueriesOpen}>
                             <DialogTrigger disabled={!selectedValue || !queries || queries.length === 0} asChild>
                                 <Button
                                     disabled={!selectedValue || !queries || queries.length === 0}
@@ -194,10 +193,10 @@ export default function Selector({ onChange, queries, graphName, runQuery }: {
                             <DialogComponent className="h-[80%] w-[80%]" title="Query History">
                                 <div className="grow flex flex-col p-8 gap-8">
                                     <DialogTitle>Queries</DialogTitle>
-                                    <div className="grow flex">
+                                    <div className="h-1 grow flex">
                                         {
                                             queries && queries.length > 0 &&
-                                            <ul className="flex-col border overflow-auto">
+                                            <ul className="h-full flex-col border overflow-auto">
                                                 {
                                                     queries.map((q, index) => (
                                                         // eslint-disable-next-line react/no-array-index-key
@@ -261,9 +260,9 @@ export default function Selector({ onChange, queries, graphName, runQuery }: {
                                             label="Translate to cypher"
                                             disabled
                                         />
-                                        <CloseDialog
-                                            className="text-white"
-                                            onClick={() => runQuery(query?.text || "")}
+                                        <Button
+                                            className="text-white w-1/3"
+                                            onClick={() => runQuery(query?.text || "", setQueriesOpen)}
                                             variant="Large"
                                             label="Run"
                                         />

@@ -282,7 +282,7 @@ export default function Create() {
                 )
             case "graph": {
 
-                const q = "MATCH (n) WITH Count(n) as nodes MATCH ()-[e]-() return nodes, Count(e) as edges"
+                const q = "MATCH (n) WITH Count(n) as nodes MATCH ()-[e]->() return nodes, Count(e) as edges"
 
                 securedFetch(`api/graph/${prepareArg(graphName)}/?query=${prepareArg(q)}`, {
                     method: "GET",

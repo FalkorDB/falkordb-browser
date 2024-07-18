@@ -95,7 +95,7 @@ export default function Combobox({ isSelectGraph, disabled = false, inTable, typ
               // eslint-disable-next-line react/no-array-index-key
               <DropdownMenuItem key={index}>
                 <Button
-                  className="w-full"
+                  className="w-full p-2"
                   label={option}
                   onClick={() => {
                     setSelectedValue(option)
@@ -112,7 +112,7 @@ export default function Combobox({ isSelectGraph, disabled = false, inTable, typ
               <DropdownMenuItem>
                 <DialogTrigger asChild>
                   <Button
-                    className="w-full"
+                    className="w-full p-2"
                     label="Manage Graphs"
                   />
                 </DialogTrigger>

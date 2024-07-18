@@ -40,7 +40,6 @@ export default function Duplicate({ open, onOpenChange, selectedValue, onDuplica
                         <Input variant="Small" onChange={(e) => setDuplicateName(e.target.value)} required />
                     </div>
                     <Button
-                        className="px-8"
                         variant="Large"
                         label="Duplicate"
                         type="submit"

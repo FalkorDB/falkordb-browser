@@ -1,7 +1,7 @@
 'use client'
 
 import CytoscapeComponent from "react-cytoscapejs";
-import cytoscape, { EdgeDefinition, ElementDefinition, EventObject, NodeDataDefinition, NodeDefinition } from "cytoscape";
+import cytoscape, { EdgeDefinition, EdgeSingular, ElementDefinition, EventObject, NodeDataDefinition, NodeDefinition } from "cytoscape";
 import { useRef, useState, useImperativeHandle, forwardRef, useEffect, Dispatch, SetStateAction } from "react";
 import fcose from 'cytoscape-fcose';
 import Editor, { Monaco } from "@monaco-editor/react";
@@ -91,8 +91,7 @@ function getStyle() {
             selector: "node",
             style: {
                 label: "data(name)",
-                "color": "white",
-                // "opacity": "data(opacity)" as unknown === "0.5" ? 0.5 : 1,
+                "color": "black",
                 "text-valign": "center",
                 "text-halign": "center",
                 "text-wrap": "ellipsis",
@@ -115,19 +114,13 @@ function getStyle() {
             },
         },
         {
-            selector: "node:selected",
-            style: {
-                "border-width": 0.7,
-            }
-        },
-        {
             selector: "edge",
             style: {
                 width: 1,
-                "line-color": "black",
-                "line-opacity": 0.7,
+                "line-color": "white",
+                "line-opacity": 1,
                 "arrow-scale": 0.7,
-                "target-arrow-color": "black",
+                "target-arrow-color": "white",
                 "target-arrow-shape": "triangle",
                 'curve-style': 'straight',
             },
@@ -137,14 +130,6 @@ function getStyle() {
             style: {
                 "overlay-opacity": 0,
             },
-        },
-        {
-            selector: "edge:selected",
-            style: {
-                width: 2,
-                "line-opacity": 1,
-                "arrow-scale": 1,
-            }
         },
     ]
     return style
@@ -179,6 +164,13 @@ const GraphView = forwardRef(({ graph, runQuery, setGraph, historyQuery }: {
     useEffect(() => {
         setQuery(historyQuery)
     }, [historyQuery])
+
+    const handelSetSelectedElement = (element?: NodeDefinition | EdgeDefinition) => {
+        setSelectedElement(element)
+        if (element) {
+            dataPanel.current?.expand()
+        } else dataPanel.current?.collapse()
+    }
 
     const handleEditorWillMount = (monacoInstance: Monaco) => {
         monacoInstance.editor.defineTheme('custom-theme', {
@@ -300,15 +292,54 @@ const GraphView = forwardRef(({ graph, runQuery, setGraph, historyQuery }: {
         }
     }
 
-    const handleTap = (evt: EventObject) => {
-        if (selectedElement) {
-            selectedElement.selected = false
-        }
+    const handleSelected = (evt: EventObject) => {
+        const { target } = evt
+
+        if (target.isEdge()) {
+            const { color } = target.data()
+            target.style("line-color", color);
+            target.style("target-arrow-color", color);
+            target.style("line-opacity", 0.5);
+            target.style("width", 2);
+            target.style("arrow-scale", 1);
+        } else target.style("border-width", 0.7);
+
         const obj: NodeDefinition | EdgeDefinition = evt.target.json();
-        obj.selected = true
-        setSelectedElement(obj);
-        dataPanel.current?.expand()
+        handelSetSelectedElement(obj);
     }
+
+    const handleUnselected = (evt: EventObject) => {
+        const { target } = evt
+
+        if (target.isEdge()) {
+            target.style("line-color", "white");
+            target.style("target-arrow-color", "white");
+            target.style("line-opacity", 1);
+            target.style("width", 1);
+            target.style("arrow-scale", 0.7);
+        } else target.style("border-width", 0.3);
+
+        handelSetSelectedElement();
+    }
+
+    const handleMouseOver = (evt: EventObject) => {
+        const edge: EdgeSingular = evt.target;
+        const { color } = edge.data();
+
+        edge.style("line-color", color);
+        edge.style("target-arrow-color", color);
+        edge.style("line-opacity", 0.5);
+    };
+
+    const handleMouseOut = async (evt: EventObject) => {
+        const edge: EdgeSingular = evt.target;
+
+        if (edge.selected()) return
+
+        edge.style("line-color", "white");
+        edge.style("target-arrow-color", "white");
+        edge.style("line-opacity", 1);
+    };
 
     const setProperty = async (key: string, newVal: string) => {
         const id = selectedElement?.data.id
@@ -433,9 +464,13 @@ const GraphView = forwardRef(({ graph, runQuery, setGraph, historyQuery }: {
 
                             cy.removeAllListeners()
 
-                            cy.on('tap', 'node', handleTap)
-                            cy.on('tap', 'edge', handleTap)
                             cy.on('dbltap', 'node', handleDoubleTap)
+                            cy.on('mouseover', 'edge', handleMouseOver)
+                            cy.on('mouseout', 'edge', handleMouseOut)
+                            cy.on('tapunselect', 'edge', handleUnselected)
+                            cy.on('tapunselect', 'node', handleUnselected)
+                            cy.on('tapselect', 'edge', handleSelected)
+                            cy.on('tapselect', 'node', handleSelected)
                         }}
                         elements={graph.Elements}
                         layout={LAYOUT}
