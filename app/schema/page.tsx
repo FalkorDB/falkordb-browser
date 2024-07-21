@@ -16,7 +16,7 @@ export default function Page() {
         if (!schemaName) return
         const run = async () => {
             const q = "MATCH (n)-[e]-(m) RETURN n, e, m"
-            const result = await securedFetch(`/api/schema/${prepareArg(schemaName)}/?query=${prepareArg(q)}`, {
+            const result = await securedFetch(`/api/graph/${prepareArg(schemaName)}_schema/?query=${prepareArg(q)}`, {
                 method: "GET"
             })
             if (!result.ok) {
@@ -33,8 +33,8 @@ export default function Page() {
         <div className="h-full w-full flex flex-col">
             <Header onSetGraphName={setSchemaName}/>
             <div className="h-1 grow p-8 px-10 flex flex-col gap-8">
-                <Selector onChange={setSchemaName} graphName={schemaName}/>
-                <SchemaView schema={schema} />
+                <Selector onChange={setSchemaName} graphName={schemaName} isSchema/>
+                <SchemaView schema={schema} setSchema={setSchema}/>
             </div>
         </div>
     )

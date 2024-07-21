@@ -3,25 +3,22 @@
 import { ResizablePanel, ResizablePanelGroup, ResizableHandle } from "@/components/ui/resizable"
 import CytoscapeComponent from "react-cytoscapejs"
 import { ChevronLeft } from "lucide-react"
-import cytoscape, { EdgeDataDefinition, EventObject, NodeDataDefinition } from "cytoscape"
+import cytoscape, { ElementDataDefinition, EventObject } from "cytoscape"
 import { ImperativePanelHandle } from "react-resizable-panels"
-import { useEffect, useRef, useState } from "react"
+import { Dispatch, SetStateAction, useEffect, useRef, useState } from "react"
 import fcose from "cytoscape-fcose";
-import { cn } from "@/lib/utils"
+import { Toast, cn, prepareArg, securedFetch } from "@/lib/utils"
 import Toolbar from "../graph/toolbar"
 import DataPanel from "../graph/DataPanel"
 import Labels from "../graph/labels"
 import { Category, Graph } from "../api/graph/model"
 import Button from "../components/ui/Button"
+import CreateElement from "../components/graph/CreateElement"
 
 /* eslint-disable react/require-default-props */
 interface Props {
     schema: Graph
-    onAddEntity?: () => void
-    onAddRelation?: () => void
-    onDelete?: (selectedValue: NodeDataDefinition | EdgeDataDefinition) => Promise<void>
-    removeProperty?: (selectedValue: NodeDataDefinition | EdgeDataDefinition, key: string) => Promise<boolean>
-    setProperty?: (selectedValue: NodeDataDefinition | EdgeDataDefinition, key: string, newVal: string[]) => Promise<boolean>
+    setSchema: Dispatch<SetStateAction<Graph>>
 }
 
 const LAYOUT = {
@@ -113,12 +110,13 @@ function getStyle() {
     return style
 }
 
-export default function SchemaView({ schema, onAddEntity, onAddRelation, onDelete, removeProperty, setProperty }: Props) {
-
-    const [selectedElement, setSelectedElement] = useState<NodeDataDefinition | EdgeDataDefinition>();
+export default function SchemaView({ schema, setSchema }: Props) {
+    const [selectedElement, setSelectedElement] = useState<ElementDataDefinition>();
     const [isCollapsed, setIsCollapsed] = useState<boolean>(false);
     const chartRef = useRef<cytoscape.Core | null>(null);
     const dataPanel = useRef<ImperativePanelHandle>(null);
+    const [isAddRelation, setIsAddRelation] = useState(false)
+    const [isAddEntity, setIsAddEntity] = useState(false)
 
     useEffect(() => {
         dataPanel.current?.collapse()
@@ -181,6 +179,79 @@ export default function SchemaView({ schema, onAddEntity, onAddRelation, onDelet
         }
     }
 
+    const onDelete = async (selectedValue: ElementDataDefinition) => {
+        const { id } = selectedValue
+        const q = `MATCH (n) WHERE ID(n) = ${id} delete n`
+        const result = await securedFetch(`api/graph/${prepareArg(schema.Id)}_schema/?query=${prepareArg(q)}`, {
+            method: "GET"
+        })
+
+        if (!result.ok) {
+            Toast("Failed to delete")
+            return
+        }
+        setSchema(prev => {
+            const p = prev
+            p.Elements = schema.Elements.filter(e => e.data.id !== id)
+            return p
+        })
+    }
+
+    const setProperty = async (key: string, newVal: string[]) => {
+        if (!selectedElement) return false
+        const { id } = selectedElement
+        const q = `MATCH (n) WHERE ID(n) = ${id} SET n.${key} = "${newVal}"`
+        const { ok } = await securedFetch(`api/graph/${prepareArg(schema.Id)}_schema/?query=${prepareArg(q)}`, {
+            method: "GET"
+        })
+
+        if (!ok) {
+            Toast("Failed to set property")
+            return ok
+        }
+
+        setSchema(prev => {
+            const p = prev
+            p.Elements = schema.Elements.map(e => {
+                if (e.data.id === id) {
+                    const updatedElement = e
+                    updatedElement.data[key] = newVal
+                    return updatedElement
+                }
+                return e
+            })
+            return p
+        })
+
+        return ok
+    }
+
+    const removeProperty = async (key: string) => {
+        if (!selectedElement) return false
+        const { id } = selectedElement
+        const q = `MATCH (n) WHERE ID(n) = ${id} SET n.${key} = null`
+        const { ok } = await securedFetch(`api/graph/${prepareArg(schema.Id)}_schema/?query=${prepareArg(q)}`, {
+            method: "GET"
+        })
+
+        if (!ok) return ok
+
+        setSchema(prev => {
+            const p = prev
+            p.Elements = schema.Elements.map(e => {
+                if (e.data.id === id) {
+                    const updatedElement = e
+                    delete updatedElement.data[key]
+                    return updatedElement
+                }
+                return e
+            })
+            return p
+        })
+
+        return ok
+    }
+
     return (
         <ResizablePanelGroup direction="horizontal">
             <ResizablePanel
@@ -188,7 +259,20 @@ export default function SchemaView({ schema, onAddEntity, onAddRelation, onDelet
                 className={cn("flex flex-col gap-10", !isCollapsed && "mr-8")}
             >
                 <div className="flex items-center justify-between">
-                    <Toolbar disabled={!schema.Id} deleteDisabled={!selectedElement} onAddEntity={onAddEntity} onAddRelation={onAddRelation} onDeleteElement={async () => onDelete && selectedElement && await onDelete(selectedElement)} chartRef={chartRef} />
+                    <Toolbar
+                        disabled={!schema.Id}
+                        deleteDisabled={!selectedElement}
+                        onAddEntity={() => {
+                            setIsAddEntity(true)
+                            setIsAddRelation(false)
+                        }}
+                        onAddRelation={() => {
+                            setIsAddRelation(true)
+                            setIsAddEntity(false)
+                        }}
+                        onDeleteElement={async () => onDelete && selectedElement && await onDelete(selectedElement)}
+                        chartRef={chartRef}
+                    />
                     {
                         isCollapsed &&
                         <Button
@@ -238,14 +322,17 @@ export default function SchemaView({ schema, onAddEntity, onAddRelation, onDelet
                 onExpand={() => setIsCollapsed(false)}
             >
                 {
-                    selectedElement &&
-                    <DataPanel
-                        obj={selectedElement}
-                        onExpand={onExpand}
-                        onDeleteElement={onDelete ? () => onDelete(selectedElement) : undefined}
-                        removeProperty={removeProperty ? async (key: string) => removeProperty(selectedElement, key) : undefined}
-                        setPropertySchema={setProperty ? async (key: string, newVal: string[]) => setProperty(selectedElement, key, newVal) : undefined}
-                    />
+                    isAddEntity || isAddRelation ?
+                        <CreateElement
+                            onCreate={onCreateElement}
+                        /> : selectedElement &&
+                        <DataPanel
+                            obj={selectedElement}
+                            onExpand={onExpand}
+                            onDeleteElement={onDelete ? () => onDelete(selectedElement) : undefined}
+                            removeProperty={removeProperty}
+                            setPropertySchema={setProperty}
+                        />
                 }
             </ResizablePanel>
         </ResizablePanelGroup>

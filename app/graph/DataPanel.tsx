@@ -1,8 +1,7 @@
 'use client'
 
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Toast, cn } from "@/lib/utils";
-import { EdgeDataDefinition, NodeDataDefinition } from "cytoscape";
+import { ElementDataDefinition, Toast, cn } from "@/lib/utils";
 import { ChevronRight, MinusCircle, PlusCircle, Trash2 } from "lucide-react";
 import { KeyboardEvent, useEffect, useRef, useState } from "react";
 import Button from "../components/ui/Button";
@@ -11,7 +10,7 @@ import Input from "../components/ui/Input";
 /* eslint-disable react/require-default-props */
 interface Props {
     inSchema?: boolean;
-    obj: NodeDataDefinition | EdgeDataDefinition;
+    obj: ElementDataDefinition;
     onExpand: () => void;
     setProperty?: (key: string, newVal: string) => Promise<boolean>;
     setPropertySchema?: (key: string, newVal: string[]) => Promise<boolean>;

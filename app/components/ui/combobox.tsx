@@ -22,9 +22,10 @@ interface ComboboxProps {
   setOptions?: Dispatch<SetStateAction<string[]>>,
   selectedValue?: string,
   setSelectedValue: (value: string) => void,
+  isSchema?: boolean
 }
 
-export default function Combobox({ isSelectGraph, disabled = false, inTable, type, options, setOptions, selectedValue = "", setSelectedValue }: ComboboxProps) {
+export default function Combobox({ isSelectGraph, disabled = false, inTable, type, options, setOptions, selectedValue = "", setSelectedValue, isSchema = false}: ComboboxProps) {
 
   const [open, setOpen] = useState<boolean>(false)
   const [optionName, setOptionName] = useState<string>("")
@@ -51,6 +52,13 @@ export default function Combobox({ isSelectGraph, disabled = false, inTable, typ
     } catch (e) {
       Toast((e as Error).message)
     }
+  }
+
+  const handelDelete = (option: string) => {
+    if (!setOptions) return
+    setOptions(prev => prev.filter(name => name !== option))
+    if (selectedValue !== option) return
+    setSelectedValue("")
   }
 
   const handelSetOption = async (e: React.KeyboardEvent<HTMLInputElement>, option: string) => {
@@ -196,12 +204,8 @@ export default function Combobox({ isSelectGraph, disabled = false, inTable, typ
                         graphName={option}
                         isOpen={isDeleteOpen}
                         onOpen={setIsDeleteOpen}
-                        onDeleteGraph={() => {
-                          if (!setOptions) return
-                          setOptions(prev => prev.filter(name => name !== option))
-                          if (selectedValue !== option) return
-                          setSelectedValue("")
-                        }}
+                        onDeleteGraph={() => handelDelete(option)}
+                        isSchema={isSchema}
                       />
                     </TableCell>
                   </TableRow>

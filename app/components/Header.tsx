@@ -27,19 +27,18 @@ export default function Header({ inCreate = false, onSetGraphName }: Props) {
     const pathname = usePathname()
     const [userStatus, setUserStatus] = useState<Role>()
     const [graphName, setGraphName] = useState<string>("")
-
-    // const createGraph = async () => {
-    //     const result = await securedFetch(`api/graph/${newName}`)
-    // }
+    const type = pathname.includes("/schema") ? "Schema" : "Graph"
 
     const handelCreateGraph = async (e: FormEvent) => {
 
-
         if (!onSetGraphName) return
+
         e.preventDefault()
 
+        const name = `${graphName}${type === "Schema" ? "_schema" : ""}`
+
         const q = `RETURN 1`
-        const result = await securedFetch(`api/graph/${graphName}/?query=${prepareArg(q)}`, {
+        const result = await securedFetch(`api/graph/${name}/?query=${prepareArg(q)}`, {
             method: "GET"
         })
 
@@ -49,7 +48,6 @@ export default function Header({ inCreate = false, onSetGraphName }: Props) {
             setCreateOpen(false)
             setGraphName("")
         }
-
     }
 
     return (
@@ -68,14 +66,14 @@ export default function Header({ inCreate = false, onSetGraphName }: Props) {
                     <div className="flex gap-6">
                         <Button
                             label="Graphs"
-                            className={cn(pathname.includes("/graph") && "text-[#7167F6]")}
+                            className={cn(type === "Graph" && "text-[#7167F6]")}
                             onClick={() => router.push("/graph")}
                         />
-                        {/* <Button
+                        <Button
                             label="Schemas"
-                            className={cn(pathname.includes("/schema") && "text-[#7167F6]")}
+                            className={cn(type === "Schema" && "text-[#7167F6]")}
                             onClick={() => router.push("/schema")}
-                        /> */}
+                        />
                     </div>
                 </div>
                 <div className="flex items-center gap-12">
@@ -86,11 +84,11 @@ export default function Header({ inCreate = false, onSetGraphName }: Props) {
                                 <Button
                                     className="text-white"
                                     variant="Primary"
-                                    label="New Graph"
+                                    label={`New ${type}`}
                                     icon={<PlusCircle />}
                                 />
                             </DialogTrigger>
-                            <DialogComponent className="w-[40%]" title="Add Graph" description="Enter new graph name">
+                            <DialogComponent className="w-[40%]" title={`Add ${type}`} description={`Enter new ${type} name`}>
                                 <form className="flex flex-col gap-12" onSubmit={handelCreateGraph}>
                                     <div className="flex flex-col gap-2">
                                         <p>Name:</p>

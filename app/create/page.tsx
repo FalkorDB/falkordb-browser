@@ -5,7 +5,6 @@ import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Progress } from "@/components/ui/progress";
 import useSWR from "swr";
-import { EdgeDataDefinition, NodeDataDefinition } from "cytoscape";
 import { Toast, prepareArg, securedFetch } from "@/lib/utils";
 import Header from "../components/Header";
 import { Graph } from "../api/graph/model";
@@ -15,8 +14,6 @@ import SchemaView from "../schema/SchemaView";
 import Dropzone from "../components/ui/Dropzone";
 
 type CurrentTab = "loadSchema" | "schema" | "graph"
-
-type ElementDataDefinition = NodeDataDefinition | EdgeDataDefinition
 
 export default function Create() {
 
@@ -154,28 +151,6 @@ export default function Create() {
         router.push("/graph")
     }
 
-    const onDelete = async (selectedValue: ElementDataDefinition) => {
-        const { id } = selectedValue
-        const q = `MATCH (n) WHERE ID(n) = ${id} delete n`
-        const result = await securedFetch(`api/graph/${prepareArg(graphName)}_schema/?query=${prepareArg(q)}`, {
-            method: "GET"
-        })
-
-        if (!result.ok) {
-            Toast("Faild to delete")
-            return
-        }
-        schema.Elements = schema.Elements.filter(e => e.data.id !== id)
-    }
-
-    const onAddEntity = () => {
-        schema.Elements = [...schema.Elements, { data: { id: "number" } }]
-    }
-
-    const onAddRelation = () => {
-        schema.Elements = [...schema.Elements, { data: { id: "number" } }]
-    }
-
     // const setLabel = async (selectedElement: ElementDataDefinition, label: string) => {
 
     //     const { id } = selectedElement
@@ -205,51 +180,6 @@ export default function Create() {
     //     return ok
     // }
 
-    const setProperty = async (selectedElement: ElementDataDefinition, key: string, newVal: string[]) => {
-        const { id } = selectedElement
-        const q = `MATCH (n) WHERE ID(n) = ${id} SET n.${key} = "${newVal}"`
-        const { ok } = await securedFetch(`api/graph/${prepareArg(graphName)}_schema/?query=${prepareArg(q)}`, {
-            method: "GET"
-        })
-
-        if (!ok) {
-            Toast("Failed to set property")
-            return ok
-        }
-
-        schema.Elements = schema.Elements.map(e => {
-            if (e.data.id === id) {
-                const updatedElement = e
-                updatedElement.data[key] = newVal
-                return updatedElement
-            }
-            return e
-        })
-
-        return ok
-    }
-
-    const removeProperty = async (selectedElement: ElementDataDefinition, key: string) => {
-        const { id } = selectedElement
-        const q = `MATCH (n) WHERE ID(n) = ${id} SET n.${key} = null`
-        const result = await securedFetch(`api/graph/${prepareArg(graphName)}_schema/?query=${prepareArg(q)}`, {
-            method: "GET"
-        })
-
-        if (!result.ok) return result.ok
-
-        schema.Elements = schema.Elements.map(e => {
-            if (e.data.id === id) {
-                const updatedElement = e
-                delete updatedElement.data[key]
-                return updatedElement
-            }
-            return e
-        })
-
-        return result.ok
-    }
-
     const getCurrentTab = () => {
         switch (currentTab) {
             case "loadSchema":
@@ -264,7 +194,7 @@ export default function Create() {
             case "schema":
                 return (
                     <div className="grow flex flex-col gap-10">
-                        <SchemaView schema={schema} onAddEntity={onAddEntity} onAddRelation={onAddRelation} onDelete={onDelete} removeProperty={removeProperty} setProperty={setProperty} />
+                        <SchemaView schema={schema} setSchema={setSchema} />
                         <div className="flex justify-end gap-16">
                             <Button
                                 className="flex gap-1 items-center text-[#7167F6]"

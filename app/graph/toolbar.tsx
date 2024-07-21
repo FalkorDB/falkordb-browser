@@ -33,14 +33,14 @@ export default function Toolbar({disabled, chartRef, onDeleteElement, onAddEntit
         <div className="flex items-center gap-6 p-1">
             <div className="flex gap-4">
                 <Button
-                    disabled
+                    disabled={disabled}
                     variant="Secondary"
                     label="Add Entity"
                     className="flex items-center gap-2"
                     icon={<PlusCircle />}
                 />
                 <Button
-                    disabled
+                    disabled={disabled}
                     variant="Secondary"
                     className="flex items-center gap-2"
                     label="Add Relation"

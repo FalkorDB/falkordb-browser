@@ -12,17 +12,19 @@ import UploadGraph from "../components/graph/UploadGraph";
 import DialogComponent from "../components/DialogComponent";
 import Button from "../components/ui/Button";
 import Duplicate from "./Duplicate";
+import SchemaView from "../schema/SchemaView";
 
-export default function Selector({ onChange, queries, graphName, runQuery }: {
+export default function Selector({ onChange, queries, graphName, runQuery, isSchema }: {
     /* eslint-disable react/require-default-props */
     onChange: (selectedGraphName: string) => void
     runQuery?: (query: string, setQueriesOpen: (open: boolean) => void) => Promise<void>
     queries?: Query[]
     graphName?: string
+    isSchema?: boolean
 }) {
-    
+
     const [options, setOptions] = useState<string[]>([]);
-    const [, setSchema] = useState<Graph>(Graph.empty());
+    const [schema, setSchema] = useState<Graph>(Graph.empty());
     const [selectedValue, setSelectedValue] = useState<string>(graphName || "");
     const [duplicateOpen, setDuplicateOpen] = useState<boolean>(false);
     const [dropOpen, setDropOpen] = useState<boolean>(false);
@@ -39,7 +41,7 @@ export default function Selector({ onChange, queries, graphName, runQuery }: {
             })
             if (!result.ok) return
             const res = (await result.json()).result as string[]
-            setOptions(!runQuery ? res.filter(name => name.includes("_schema")) : res.filter(name => !name.includes("_schema")))
+            setOptions(!runQuery ? res.filter(name => name.includes("_schema")).map(name => name.split("_")[0]) : res.filter(name => !name.includes("_schema")))
         }
         run()
     }, [runQuery])
@@ -56,9 +58,12 @@ export default function Selector({ onChange, queries, graphName, runQuery }: {
 
     useEffect(() => {
         if (!selectedValue) return
+        const name = `${selectedValue}${isSchema ? "_schema" : ""}`
         const run = async () => {
             const q = "MATCH (n) WITH COUNT(n) as nodes MATCH ()-[e]->() RETURN nodes, COUNT(e) as edges"
-            const result = await securedFetch(`api/graph/${prepareArg(selectedValue)}/?query=${prepareArg(q)}`, {
+            const result = await securedFetch(`api/graph/${prepareArg(name
+
+            )}/?query=${prepareArg(q)}`, {
                 method: "GET"
             })
 
@@ -83,16 +88,16 @@ export default function Selector({ onChange, queries, graphName, runQuery }: {
     const handleOnChange = async (name: string) => {
         if (runQuery) {
             const q = 'MATCH (n)-[e]-(m) return n,e,m'
-            const result = await securedFetch(`api/graph/${name}_schema/?query=${q}`, {
+            const result = await securedFetch(`api/graph/${name}_schema/?query=${q}&create=false`, {
                 method: "GET"
             })
 
             if (!result.ok) return
 
             const json = await result.json()
-
-            setSchema(Graph.create(name, json.result))
-            onChange(name)
+            if (json.result) {
+                setSchema(Graph.create(name, json.result))
+            }
         }
         onChange(name)
         setSelectedValue(name)
@@ -127,7 +132,7 @@ export default function Selector({ onChange, queries, graphName, runQuery }: {
     return (
         <div className="flex flex-col gap-4">
             <div className="flex justify-between items-center">
-                <Combobox isSelectGraph options={options} setOptions={setOptions} selectedValue={selectedValue} setSelectedValue={handleOnChange} />
+                <Combobox isSelectGraph options={options} setOptions={setOptions} selectedValue={selectedValue} setSelectedValue={handleOnChange} isSchema={isSchema}/>
                 <div className="flex gap-16 text-[#7167F6]">
                     <UploadGraph disabled />
                     <Button
@@ -269,7 +274,7 @@ export default function Selector({ onChange, queries, graphName, runQuery }: {
                                 </div>
                             </DialogComponent>
                         </Dialog>
-                        {/* <Dialog>
+                        <Dialog>
                             <DialogTrigger asChild>
                                 <Button
                                     disabled={!schema.Id}
@@ -277,9 +282,9 @@ export default function Selector({ onChange, queries, graphName, runQuery }: {
                                 />
                             </DialogTrigger>
                             <DialogComponent className="h-[90%] w-[90%]" title={`${selectedValue} Schema`}>
-                                <SchemaView schema={schema} />
+                                <SchemaView schema={schema} setSchema={setSchema}/>
                             </DialogComponent>
-                        </Dialog> */}
+                        </Dialog>
                     </div>
                 }
             </div>
