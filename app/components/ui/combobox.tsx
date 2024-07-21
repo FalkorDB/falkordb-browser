@@ -174,14 +174,15 @@ export default function Combobox({ isSelectGraph, disabled = false, inTable, typ
                           />
                         </DropdownMenuTrigger>
                         <DropdownMenuContent side="right" className="flex min-w-0">
-                          <DropdownMenuItem>
+                          <DropdownMenuItem className="p-2">
                             <Button
+                              disabled
                               variant="button"
                               icon={<UploadIcon />}
                               onClick={() => setIsUploadOpen(true)}
                             />
                           </DropdownMenuItem>
-                          <DropdownMenuItem>
+                          <DropdownMenuItem className="p-2">
                             <Button
                               variant="button"
                               icon={<Trash2 />}

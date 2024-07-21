@@ -188,19 +188,20 @@ const GraphView = forwardRef(({ graph, runQuery, setGraph, historyQuery }: {
     };
 
     const handleEditorDidMount = (e: monaco.editor.IStandaloneCodeEditor) => {
+        
         editorRef.current = e
-        e.addAction({
-            id: 'handle-enter-press',
-            label: 'Handle Enter Press',
-            // eslint-disable-next-line no-bitwise
-            keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter],
-            precondition: "!suggestWidgetVisible",
-            contextMenuGroupId: 'navigation',
-            contextMenuOrder: 1.5,
-            run: async () => {
-                submitQuery.current?.click()
-            }
-        });
+
+        // if (typeof window !== "undefined") return
+        // e.addAction({
+        //     id: 'submit',
+        //     label: 'Submit Query',
+        //     // eslint-disable-next-line no-bitwise
+        //     keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter],
+        //     contextMenuOrder: 1.5,
+        //     run: async () => {
+        //         submitQuery.current?.click()
+        //     }
+        // });
     }
 
     useEffect(() => {

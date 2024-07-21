@@ -130,7 +130,7 @@ export default function Selector({ onChange, queries, graphName, runQuery }: {
             <div className="flex justify-between items-center">
                 <Combobox isSelectGraph options={options} setOptions={setOptions} selectedValue={selectedValue} setSelectedValue={handleOnChange} />
                 <div className="flex gap-16 text-[#7167F6]">
-                    <UploadGraph disabled={!selectedValue} />
+                    <UploadGraph disabled />
                     <Button
                         label="Export Data"
                         onClick={onExport}
@@ -273,7 +273,7 @@ export default function Selector({ onChange, queries, graphName, runQuery }: {
                         <Dialog>
                             <DialogTrigger asChild>
                                 <Button
-                                    disabled={!selectedValue}
+                                    disabled={!schema.Id}
                                     label="View Schema"
                                 />
                             </DialogTrigger>
