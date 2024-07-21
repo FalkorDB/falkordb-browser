@@ -8,7 +8,6 @@ import { editor } from "monaco-editor";
 import { Toast, cn, prepareArg, securedFetch } from "@/lib/utils";
 import Combobox from "../components/ui/combobox";
 import { Graph, Query } from "../api/graph/model";
-import SchemaView from "../schema/SchemaView";
 import UploadGraph from "../components/graph/UploadGraph";
 import DialogComponent from "../components/DialogComponent";
 import Button from "../components/ui/Button";
@@ -23,7 +22,7 @@ export default function Selector({ onChange, queries, graphName, runQuery }: {
 }) {
     
     const [options, setOptions] = useState<string[]>([]);
-    const [schema, setSchema] = useState<Graph>(Graph.empty());
+    const [, setSchema] = useState<Graph>(Graph.empty());
     const [selectedValue, setSelectedValue] = useState<string>(graphName || "");
     const [duplicateOpen, setDuplicateOpen] = useState<boolean>(false);
     const [dropOpen, setDropOpen] = useState<boolean>(false);
@@ -270,7 +269,7 @@ export default function Selector({ onChange, queries, graphName, runQuery }: {
                                 </div>
                             </DialogComponent>
                         </Dialog>
-                        <Dialog>
+                        {/* <Dialog>
                             <DialogTrigger asChild>
                                 <Button
                                     disabled={!schema.Id}
@@ -280,7 +279,7 @@ export default function Selector({ onChange, queries, graphName, runQuery }: {
                             <DialogComponent className="h-[90%] w-[90%]" title={`${selectedValue} Schema`}>
                                 <SchemaView schema={schema} />
                             </DialogComponent>
-                        </Dialog>
+                        </Dialog> */}
                     </div>
                 }
             </div>

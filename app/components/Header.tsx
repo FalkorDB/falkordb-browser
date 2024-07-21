@@ -71,11 +71,11 @@ export default function Header({ inCreate = false, onSetGraphName }: Props) {
                             className={cn(pathname.includes("/graph") && "text-[#7167F6]")}
                             onClick={() => router.push("/graph")}
                         />
-                        <Button
+                        {/* <Button
                             label="Schemas"
                             className={cn(pathname.includes("/schema") && "text-[#7167F6]")}
                             onClick={() => router.push("/schema")}
-                        />
+                        /> */}
                     </div>
                 </div>
                 <div className="flex items-center gap-12">

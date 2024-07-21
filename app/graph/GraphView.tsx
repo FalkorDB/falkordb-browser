@@ -480,8 +480,8 @@ const GraphView = forwardRef(({ graph, runQuery, setGraph, historyQuery }: {
                     {
                         (graph.Categories.length > 0 || graph.Labels.length > 0) &&
                         <>
-                            <Labels className="left-2" categories={graph.Categories} onClick={onCategoryClick} label="Categories" />
-                            <Labels className="right-2 text-end" categories={graph.Labels} onClick={onLabelClick} label="Labels" />
+                            <Labels className="left-2" categories={graph.Categories} onClick={onCategoryClick} label="Labels" />
+                            <Labels className="right-2 text-end" categories={graph.Labels} onClick={onLabelClick} label="RelationshipTypes" />
                         </>
                     }
                 </div>
