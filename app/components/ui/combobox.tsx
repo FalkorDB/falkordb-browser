@@ -6,7 +6,7 @@ import { Toast, cn, prepareArg, securedFetch } from "@/lib/utils"
 import { Trash2, UploadIcon } from "lucide-react"
 import { Dispatch, SetStateAction, useState } from "react"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import Upload from "../graph/UploadGraph"
+import UploadGraph from "../graph/UploadGraph"
 import DeleteGraph from "../graph/DeleteGraph"
 import Button from "./Button"
 import DialogComponent from "../DialogComponent"
@@ -95,7 +95,7 @@ export default function Combobox({ isSelectGraph, disabled = false, inTable, typ
               // eslint-disable-next-line react/no-array-index-key
               <DropdownMenuItem key={index}>
                 <Button
-                  className="w-full"
+                  className="w-full p-2"
                   label={option}
                   onClick={() => {
                     setSelectedValue(option)
@@ -112,7 +112,7 @@ export default function Combobox({ isSelectGraph, disabled = false, inTable, typ
               <DropdownMenuItem>
                 <DialogTrigger asChild>
                   <Button
-                    className="w-full"
+                    className="w-full p-2"
                     label="Manage Graphs"
                   />
                 </DialogTrigger>
@@ -129,7 +129,7 @@ export default function Combobox({ isSelectGraph, disabled = false, inTable, typ
             <TableHeader>
               <TableRow className="border-none">
                 {
-                  ["GRAPH NAME", "EXPORT"].map((header) => (
+                  ["GRAPH NAME", "EXPORT", ""].map((header) => (
                     <TableHead key={header}>{header}</TableHead>
                   ))
                 }
@@ -168,34 +168,30 @@ export default function Combobox({ isSelectGraph, disabled = false, inTable, typ
                     <TableCell>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <button
-                            className="font-bold rotate-90"
-                            title="More"
-                            type="button"
-                          >
-                            <p>...</p>
-                          </button>
+                          <Button
+                            className="rotate-90"
+                            label="..."
+                          />
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent side="right" className="flex flex-row min-w-fit">
-                          <DropdownMenuItem className="justify-center">
+                        <DropdownMenuContent side="right" className="flex min-w-0">
+                          <DropdownMenuItem className="p-2">
                             <Button
+                              disabled
                               variant="button"
-                              className="disabled:text-gray-400 disabled:text-opacity-70"
                               icon={<UploadIcon />}
                               onClick={() => setIsUploadOpen(true)}
                             />
                           </DropdownMenuItem>
-                          <DropdownMenuItem className="justify-center">
+                          <DropdownMenuItem className="p-2">
                             <Button
                               variant="button"
-                              className="disabled:text-gray-400 disabled:text-opacity-70"
                               icon={<Trash2 />}
                               onClick={() => setIsDeleteOpen(true)}
                             />
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
-                      <Upload isOpen={isUploadOpen} onOpen={setIsUploadOpen} />
+                      <UploadGraph open={isUploadOpen} onOpenChange={setIsUploadOpen} />
                       <DeleteGraph
                         graphName={option}
                         isOpen={isDeleteOpen}

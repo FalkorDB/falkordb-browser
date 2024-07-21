@@ -15,15 +15,15 @@ interface Props {
 
 export default function DialogComponent({ children, title, description, className }: Props) {
     return (
-        <DialogContent className={cn("max-h-[90%] p-0 flex flex-col gap-0", className)} disableClose>
-            <DialogHeader className="h-[10%] flex flex-row justify-between items-center p-4 bg-[#7167F6]">
+        <DialogContent className={cn("max-h-[90%] p-0 flex flex-col gap-0 rounded-lg border-2 overflow-hidden", className)} disableClose>
+            <DialogHeader className="flex-row justify-between items-center p-8 bg-[#7167F6]">
                 <DialogTitle>{title}</DialogTitle>
                 <CloseDialog />               
             </DialogHeader>
             <div className="h-[90%] p-8 flex flex-col gap-10 overflow-auto">
                 {
                     description &&
-                    <DialogDescription className="text-2xl">
+                    <DialogDescription className="text-xl">
                         {description}
                     </DialogDescription>
                 }

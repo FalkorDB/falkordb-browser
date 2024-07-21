@@ -5,7 +5,7 @@ import { Toast, prepareArg, securedFetch } from "@/lib/utils";
 import Header from "../components/Header";
 import Selector from "../graph/Selector";
 import SchemaView from "./SchemaView";
-import { Graph } from "../graph/model";
+import { Graph } from "../api/graph/model";
 
 export default function Page() {
 
@@ -31,9 +31,9 @@ export default function Page() {
 
     return (
         <div className="h-full w-full flex flex-col">
-            <Header />
-            <div className="h-1 grow p-12 flex flex-col gap-8">
-                <Selector inSchema onChange={setSchemaName} />
+            <Header onSetGraphName={setSchemaName}/>
+            <div className="h-1 grow p-8 px-10 flex flex-col gap-8">
+                <Selector onChange={setSchemaName} graphName={schemaName}/>
                 <SchemaView schema={schema} />
             </div>
         </div>

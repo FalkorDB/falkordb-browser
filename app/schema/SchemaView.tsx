@@ -11,7 +11,7 @@ import { cn } from "@/lib/utils"
 import Toolbar from "../graph/toolbar"
 import DataPanel from "../graph/DataPanel"
 import Labels from "../graph/labels"
-import { Category, Graph } from "../graph/model"
+import { Category, Graph } from "../api/graph/model"
 import Button from "../components/ui/Button"
 
 /* eslint-disable react/require-default-props */
@@ -21,7 +21,6 @@ interface Props {
     onAddRelation?: () => void
     onDelete?: (selectedValue: NodeDataDefinition | EdgeDataDefinition) => Promise<void>
     removeProperty?: (selectedValue: NodeDataDefinition | EdgeDataDefinition, key: string) => Promise<boolean>
-    setLabel?: (selectedValue: NodeDataDefinition | EdgeDataDefinition, label: string) => Promise<boolean>
     setProperty?: (selectedValue: NodeDataDefinition | EdgeDataDefinition, key: string, newVal: string[]) => Promise<boolean>
 }
 
@@ -56,7 +55,7 @@ function getStyle() {
             selector: "node",
             style: {
                 label: "data(category)",
-                "color": "white",
+                "color": "black",
                 "text-valign": "center",
                 "text-halign": "center",
                 "text-wrap": "ellipsis",
@@ -64,7 +63,7 @@ function getStyle() {
                 shape: "ellipse",
                 height: "15rem",
                 width: "15rem",
-                "border-width": 0.5,
+                "border-width": 0.3,
                 "border-color": "white",
                 "border-opacity": 1,
                 "background-color": "data(color)",
@@ -81,16 +80,17 @@ function getStyle() {
         {
             selector: "node:selected",
             style: {
-                "border-width": 1,
+                "border-width": 0.7,
             }
         },
         {
             selector: "edge",
             style: {
-                width: 0.5,
-                "line-color": "data(color)",
-                "arrow-scale": 0.3,
-                "target-arrow-color": "data(color)",
+                width: 1,
+                "line-color": "black",
+                "line-opacity": 0.7,
+                "arrow-scale": 0.7,
+                "target-arrow-color": "black",
                 "target-arrow-shape": "triangle",
                 'curve-style': 'straight',
             },
@@ -101,11 +101,19 @@ function getStyle() {
                 "overlay-opacity": 0,
             },
         },
+        {
+            selector: "edge:selected",
+            style: {
+                width: 2,
+                "line-opacity": 1,
+                "arrow-scale": 1,
+            }
+        },
     ]
     return style
 }
 
-export default function SchemaView({ schema, onAddEntity, onAddRelation, onDelete, removeProperty, setLabel, setProperty }: Props) {
+export default function SchemaView({ schema, onAddEntity, onAddRelation, onDelete, removeProperty, setProperty }: Props) {
 
     const [selectedElement, setSelectedElement] = useState<NodeDataDefinition | EdgeDataDefinition>();
     const [isCollapsed, setIsCollapsed] = useState<boolean>(false);
@@ -175,20 +183,23 @@ export default function SchemaView({ schema, onAddEntity, onAddRelation, onDelet
 
     return (
         <ResizablePanelGroup direction="horizontal">
-            <ResizablePanel defaultSize={100} className={cn("w-1 grow flex flex-col gap-10", !isCollapsed && "mr-8")}>
-                <div className="relative">
-                    <Toolbar schema={schema} onAddEntitySchema={onAddEntity} onAddRelationSchema={onAddRelation} onDeleteElementSchema={async () => onDelete && selectedElement && await onDelete(selectedElement)} chartRef={chartRef} />
+            <ResizablePanel
+                defaultSize={100}
+                className={cn("flex flex-col gap-10", !isCollapsed && "mr-8")}
+            >
+                <div className="flex items-center justify-between">
+                    <Toolbar disabled={!schema.Id} deleteDisabled={!selectedElement} onAddEntity={onAddEntity} onAddRelation={onAddRelation} onDeleteElement={async () => onDelete && selectedElement && await onDelete(selectedElement)} chartRef={chartRef} />
                     {
                         isCollapsed &&
                         <Button
-                            className="absolute top-0 right-0 p-4 bg-[#7167F6] rounded-lg"
+                            className="p-3 bg-[#7167F6] rounded-lg"
                             icon={<ChevronLeft />}
                             onClick={() => onExpand()}
                             disabled={!selectedElement}
                         />
                     }
                 </div>
-                <div className="h-1 grow">
+                <div className="relative grow">
                     <CytoscapeComponent
                         className="Canvas"
                         layout={LAYOUT}
@@ -203,16 +214,19 @@ export default function SchemaView({ schema, onAddEntity, onAddRelation, onDelet
                             cy.on('tap', 'edge', handleTap)
                         }}
                     />
+                    {
+                        (schema.Categories.length > 0 || schema.Labels.length > 0) &&
+                        <>
+                            <Labels className="left-2" label="Categories" categories={schema.Categories} onClick={onCategoryClick} />
+                            <Labels className="right-2 text-end" label="Labels" categories={schema.Labels} onClick={onLabelClick} />
+                        </>
+                    }
                 </div>
-                {
-                    (schema.Categories.length > 0 || schema.Labels.length > 0) &&
-                    <>
-                        <Labels className="left-2" label="Categories" categories={schema.Categories} onClick={onCategoryClick} />
-                        <Labels label="right-2 text-end" categories={schema.Labels} onClick={onLabelClick} />
-                    </>
-                }
             </ResizablePanel>
-            <ResizableHandle className="w-3" />
+            {
+                !isCollapsed &&
+                <ResizableHandle className="w-3" />
+            }
             <ResizablePanel
                 className="rounded-lg"
                 collapsible
@@ -230,7 +244,6 @@ export default function SchemaView({ schema, onAddEntity, onAddRelation, onDelet
                         onExpand={onExpand}
                         onDeleteElement={onDelete ? () => onDelete(selectedElement) : undefined}
                         removeProperty={removeProperty ? async (key: string) => removeProperty(selectedElement, key) : undefined}
-                        setLabel={setLabel ? async (label: string) => setLabel(selectedElement, label) : undefined}
                         setPropertySchema={setProperty ? async (key: string, newVal: string[]) => setProperty(selectedElement, key, newVal) : undefined}
                     />
                 }

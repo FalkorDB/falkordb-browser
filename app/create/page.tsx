@@ -8,10 +8,9 @@ import useSWR from "swr";
 import { EdgeDataDefinition, NodeDataDefinition } from "cytoscape";
 import { Toast, prepareArg, securedFetch } from "@/lib/utils";
 import Header from "../components/Header";
-import { Graph } from "../graph/model";
+import { Graph } from "../api/graph/model";
 import Input from "../components/ui/Input";
 import Button from "../components/ui/Button";
-import GraphView from "../graph/GraphView";
 import SchemaView from "../schema/SchemaView";
 import Dropzone from "../components/ui/Dropzone";
 
@@ -177,34 +176,34 @@ export default function Create() {
         schema.Elements = [...schema.Elements, { data: { id: "number" } }]
     }
 
-    const setLabel = async (selectedElement: ElementDataDefinition, label: string) => {
+    // const setLabel = async (selectedElement: ElementDataDefinition, label: string) => {
 
-        const { id } = selectedElement
-        const q = `MATCH (n) WHERE ID(n) = ${id} SET n:${label} WITH n REMOVE n:${selectedElement.category || selectedElement.label}`
-        const { ok } = await securedFetch(`api/graph/${prepareArg(graphName)}_schema/?query=${prepareArg(q)}`, {
-            method: "GET"
-        })
+    //     const { id } = selectedElement
+    //     const q = `MATCH (n) WHERE ID(n) = ${id} SET n:${label} WITH n REMOVE n:${selectedElement.category || selectedElement.label}`
+    //     const { ok } = await securedFetch(`api/graph/${prepareArg(graphName)}_schema/?query=${prepareArg(q)}`, {
+    //         method: "GET"
+    //     })
 
-        if (!ok) {
-            Toast("Failed to set label")
-            return ok
-        }
+    //     if (!ok) {
+    //         Toast("Failed to set label")
+    //         return ok
+    //     }
 
-        schema.Elements = schema.Elements.map(e => {
-            if (e.data.id === id) {
-                const updatedElement = { ...e }
-                if (updatedElement.data.label) {
-                    updatedElement.data.label = label
-                } else {
-                    updatedElement.data.category = label
-                }
-                return updatedElement
-            }
-            return e
-        })
+    //     schema.Elements = schema.Elements.map(e => {
+    //         if (e.data.id === id) {
+    //             const updatedElement = { ...e }
+    //             if (updatedElement.data.label) {
+    //                 updatedElement.data.label = label
+    //             } else {
+    //                 updatedElement.data.category = label
+    //             }
+    //             return updatedElement
+    //         }
+    //         return e
+    //     })
 
-        return ok
-    }
+    //     return ok
+    // }
 
     const setProperty = async (selectedElement: ElementDataDefinition, key: string, newVal: string[]) => {
         const { id } = selectedElement
@@ -265,10 +264,10 @@ export default function Create() {
             case "schema":
                 return (
                     <div className="grow flex flex-col gap-10">
-                        <SchemaView schema={schema} onAddEntity={onAddEntity} onAddRelation={onAddRelation} onDelete={onDelete} removeProperty={removeProperty} setLabel={setLabel} setProperty={setProperty} />
-                        <div className="flex flex-row justify-end gap-16">
+                        <SchemaView schema={schema} onAddEntity={onAddEntity} onAddRelation={onAddRelation} onDelete={onDelete} removeProperty={removeProperty} setProperty={setProperty} />
+                        <div className="flex justify-end gap-16">
                             <Button
-                                className="flex flex-row gap-1 items-center text-[#7167F6]"
+                                className="flex gap-1 items-center text-[#7167F6]"
                                 label="Back"
                                 onClick={() => setCurrentTab(null)}
                             />
@@ -283,7 +282,7 @@ export default function Create() {
                 )
             case "graph": {
 
-                const q = "MATCH (n) WITH Count(n) as nodes MATCH ()-[e]-() return nodes, Count(e) as edges"
+                const q = "MATCH (n) WITH Count(n) as nodes MATCH ()-[e]->() return nodes, Count(e) as edges"
 
                 securedFetch(`api/graph/${prepareArg(graphName)}/?query=${prepareArg(q)}`, {
                     method: "GET",
@@ -297,16 +296,16 @@ export default function Create() {
 
                 return (
                     <div className="grow flex flex-col gap-8">
-                        <div className="p-4 bg-[#2C2C4C] text-[#FFFFFF] flex flex-row gap-12 items-center rounded-lg">
+                        <div className="p-4 bg-[#2C2C4C] text-[#FFFFFF] flex gap-12 items-center rounded-lg">
                             <span >Created on 2/2 24</span>
                             <span><span>{nodesCount}</span>&emsp;Nodes</span>
                             <p className="text-[#57577B]">|</p>
                             <span><span>{edgesCount}</span>&emsp;Edges</span>
                         </div>
-                        <GraphView schema={schema} graphName={graphName} />
-                        <div className="flex flex-row justify-end gap-16">
+                        {/* <GraphView graphName={graphName} /> */}
+                        <div className="flex justify-end gap-16">
                             <Button
-                                className="flex flex-row gap-1 items-center text-[#7167F6]"
+                                className="flex gap-1 items-center text-[#7167F6]"
                                 label="Back"
                                 icon={<ChevronLeft size={25} />}
                                 onClick={() => setCurrentTab("schema")}
@@ -326,8 +325,8 @@ export default function Create() {
                 return (
                     <form onSubmit={async (e) => { await handleCreateSchema(e) }} className="grow flex flex-col gap-8">
                         <div className="grow flex flex-col gap-6">
-                            <div className="flex flex-row gap-8">
-                                <div className="flex flex-row gap-4">
+                            <div className="flex gap-8">
+                                <div className="flex gap-4">
                                     <p>Graph Name</p>
                                     <Input
                                         className="w-1/2"
@@ -338,8 +337,8 @@ export default function Create() {
                                         required
                                     />
                                 </div>
-                                <div className="grow flex flex-row gap-4">
-                                    <p className="flex flex-row gap-2 items-center">OpenAI Key <AlertCircle size={15} /></p>
+                                <div className="grow flex gap-4">
+                                    <p className="flex gap-2 items-center">OpenAI Key <AlertCircle size={15} /></p>
                                     <Input
                                         className="w-1/2"
                                         variant="Small"
@@ -350,14 +349,14 @@ export default function Create() {
                                     />
                                 </div>
                             </div>
-                            <div className="flex flex-row gap-16">
+                            <div className="flex gap-16">
                                 <h1>Files</h1>
                                 <p>URLs</p>
                                 <p>Amazon S3/GCP</p>
                             </div>
                             <Dropzone filesCount={false} withTable onFileDrop={setFiles} />
                         </div>
-                        <div className="flex flex-row justify-end">
+                        <div className="flex justify-end">
                             <Button
                                 variant="Large"
                                 icon={<PlusCircle />}
@@ -377,7 +376,7 @@ export default function Create() {
                 <h1 className="text-2xl font-medium">Create New Graph</h1>
                 <div className="grow flex flex-col gap-16 p-6">
                     <div className="flex flex-col">
-                        <div className="bg-[#2C2C4C] p-4 rounded-xl flex flex-row gap-8 justify-center">
+                        <div className="bg-[#2C2C4C] p-4 rounded-xl flex gap-8 justify-center">
                             <p className={(currentTab || "data") === "data" ? "text-[#7167F6]" : "text-[#57577B]"}>Add Data</p>
                             <ChevronRight color="#57577B" />
                             <p className={currentTab === "schema" ? "text-[#7167F6]" : "text-[#57577B]"}>Schema</p>

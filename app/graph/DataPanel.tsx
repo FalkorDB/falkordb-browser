@@ -16,7 +16,6 @@ interface Props {
     setProperty?: (key: string, newVal: string) => Promise<boolean>;
     setPropertySchema?: (key: string, newVal: string[]) => Promise<boolean>;
     removeProperty?: (key: string) => Promise<boolean>;
-    setLabel?: (label: string) => Promise<boolean>;
     onDeleteElement?: () => Promise<void>;
 }
 
@@ -30,15 +29,13 @@ const excludedProperties = new Set([
     "source",
 ]);
 
-export default function DataPanel({ inSchema, obj, onExpand, setProperty, setPropertySchema, removeProperty, onDeleteElement, setLabel }: Props) {
+export default function DataPanel({ inSchema, obj, onExpand, setProperty, setPropertySchema, removeProperty, onDeleteElement }: Props) {
 
     const [isAddValue, setIsAddValue] = useState<boolean>(false)
     const [hover, setHover] = useState<string>("")
     const [editable, setEditable] = useState<string>("")
-    const [labelEditable, setLabelEditable] = useState<boolean>(false)
     const [val, setVal] = useState<string>("")
     const [schemaVal, setSchemaVal] = useState<string[]>([])
-    const [newLabel, setNewLabel] = useState<string>("")
     const [key, setKey] = useState<string>("")
     const addValueRef = useRef<HTMLDivElement>(null)
     const type = obj.source ? "edge" : "node"
@@ -120,51 +117,36 @@ export default function DataPanel({ inSchema, obj, onExpand, setProperty, setPro
         delete ob[k]
     }
 
-    const onSetLabel = async (e: KeyboardEvent<HTMLParagraphElement>) => {
-        if (!setLabel) return
-        if (e.code === "Escape") {
-            e.preventDefault()
-            setLabelEditable(false)
-        }
-        if (e.code !== "Enter") return
-        e.preventDefault()
-        const success = await setLabel(newLabel)
-        if (!success) return
-        const ob = obj
-        if (type === "edge") {
-            ob.label = newLabel
-            return
-        }
-        ob.category = newLabel
-    }
+    // const onSetLabel = async (e: KeyboardEvent<HTMLParagraphElement>) => {
+    //     if (!setLabel) return
+    //     if (e.code === "Escape") {
+    //         e.preventDefault()
+    //         setLabelEditable(false)
+    //     }
+    //     if (e.code !== "Enter") return
+    //     e.preventDefault()
+    //     const success = await setLabel(newLabel)
+    //     if (!success) return
+    //     const ob = obj
+    //     if (type === "edge") {
+    //         ob.label = newLabel
+    //         return
+    //     }
+    //     ob.category = newLabel
+    // }
 
     return (
         <div className="h-full w-full flex flex-col shadow-lg DataPanel">
-            <div className="w-full flex flex-row justify-between items-center bg-[#7167F6] p-4">
-                <div className="flex flex-row gap-4 items-center">
+            <div className="w-full flex justify-between items-center bg-[#7167F6] p-4">
+                <div className="flex gap-4 items-center">
                     <Button
                         variant="button"
                         icon={<ChevronRight />}
                         onClick={() => onExpand()}
                     />
-                    {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions */}
-                    <div
-                        ref={ref => {
-                            if (ref?.contentEditable) {
-                                ref.focus()
-                            }
-                        }}
-                        className={cn("text-white py-1 px-2", labelEditable && "bg-white border-gray-200 text-black")}
-                        onInput={(e) => setNewLabel(e.currentTarget.textContent || "")}
-                        onClick={() => label === "label" && setLabel && setLabelEditable(true)}
-                        contentEditable={labelEditable}
-                        onBlur={() => setLabelEditable(false)}
-                        onKeyDown={onSetLabel}
-                    >
-                        {label}
-                    </div>
+                    {label}
                 </div>
-                <p className="flex flex-row text-white">{Object.keys(obj).filter((v) => !excludedProperties.has(v)).length} Attributes</p>
+                <p className="flex text-white">{Object.keys(obj).filter((v) => !excludedProperties.has(v)).length} Attributes</p>
             </div>
             <div className="w-full h-1 grow flex flex-col justify-between items-start font-medium">
                 <Table>
@@ -215,7 +197,7 @@ export default function DataPanel({ inSchema, obj, onExpand, setProperty, setPro
                                             key={row[0]}
                                             className={cn("p-8", !inSchema && "w-1/2")}
                                         >
-                                            <div className="text-[#ACACC2] flex flex-row gap-2 items-center">
+                                            <div className="text-[#ACACC2] flex gap-2 items-center">
                                                 {
                                                     hover === strKey &&
                                                     <Button

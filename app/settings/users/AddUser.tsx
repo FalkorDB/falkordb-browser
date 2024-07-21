@@ -180,7 +180,7 @@ export default function AddUser({ setUsers }: {
                             required
                         />
                     </div>
-                    <div className="flex flex-row justify-end">
+                    <div className="flex justify-end">
                         <Button
                             variant="Primary"
                             label="Add User"
