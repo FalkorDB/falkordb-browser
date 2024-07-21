@@ -17,11 +17,10 @@ import Input from "./ui/Input";
 /* eslint-disable react/require-default-props */
 interface Props {
     inCreate?: boolean
-    inSettings?: boolean
     onSetGraphName?: (graphName: string) => void
 }
 
-export default function Header({ inCreate = false, inSettings = false, onSetGraphName }: Props) {
+export default function Header({ inCreate = false, onSetGraphName }: Props) {
     const [helpOpen, setHelpOpen] = useState<boolean>(false)
     const [createOpen, setCreateOpen] = useState<boolean>(false)
     const router = useRouter()
@@ -34,8 +33,9 @@ export default function Header({ inCreate = false, inSettings = false, onSetGrap
     // }
 
     const handelCreateGraph = async (e: FormEvent) => {
-        if (!onSetGraphName) return
 
+
+        if (!onSetGraphName) return
         e.preventDefault()
 
         const q = `RETURN 1`
@@ -55,11 +55,17 @@ export default function Header({ inCreate = false, inSettings = false, onSetGrap
     return (
         <div className="flex flex-col">
             <div className="h-2 rounded-t-lg Top" />
-            <div className="py-4 px-11 flex flex-row justify-between items-center Header">
-                <div className="flex flex-row gap-4 items-center">
-                    <Image width={103} height={29} src="/ColorLogo.svg" alt="" />
+            <div className="py-4 px-11 flex justify-between items-center Header">
+                <div className="flex gap-4 items-center">
+                    <a
+                        aria-label="FalkorDB"
+                        href="https://www.falkordb.com"
+                        target="_blank" rel="noreferrer"
+                    >
+                        <Image width={103} height={29} src="/ColorLogo.svg" alt="" />
+                    </a>
                     <p className="text-neutral-200" >|</p>
-                    <div className="flex flex-row gap-6">
+                    <div className="flex gap-6">
                         <Button
                             label="Graphs"
                             className={cn(pathname.includes("/graph") && "text-[#7167F6]")}
@@ -72,42 +78,43 @@ export default function Header({ inCreate = false, inSettings = false, onSetGrap
                         />
                     </div>
                 </div>
-                <div className="flex flex-row items-center gap-8">
+                <div className="flex items-center gap-12">
                     {
                         !inCreate &&
-                        <>
-                            <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-                                <DialogTrigger asChild>
-                                    <Button
-                                        className="text-white"
-                                        variant="Primary"
-                                        label="New Graph"
-                                        icon={<PlusCircle />}
-                                    />
-                                </DialogTrigger>
-                                <DialogComponent className="w-[40%]" title="Add Graph" description="Enter new graph name">
-                                    <form className="flex flex-col gap-12" onSubmit={handelCreateGraph}>
-                                        <div className="flex flex-col gap-2">
-                                            <p>Name:</p>
-                                            <Input
-                                                variant="Default"
-                                                value={graphName}
-                                                onChange={(e) => setGraphName(e.target.value)}
-                                            />
-                                        </div>
-                                        <Button
-                                            variant="Large"
-                                            label="Create"
-                                            type="submit"
+                        <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+                            <DialogTrigger asChild>
+                                <Button
+                                    className="text-white"
+                                    variant="Primary"
+                                    label="New Graph"
+                                    icon={<PlusCircle />}
+                                />
+                            </DialogTrigger>
+                            <DialogComponent className="w-[40%]" title="Add Graph" description="Enter new graph name">
+                                <form className="flex flex-col gap-12" onSubmit={handelCreateGraph}>
+                                    <div className="flex flex-col gap-2">
+                                        <p>Name:</p>
+                                        <Input
+                                            ref={ref => ref?.focus()}
+                                            variant="Default"
+                                            value={graphName}
+                                            onChange={(e) => setGraphName(e.target.value)}
                                         />
-                                    </form>
-                                </DialogComponent>
-                            </Dialog>
-                            {/* <Dialog>
+                                    </div>
+                                    <Button
+                                        variant="Large"
+                                        label="Create"
+                                        type="submit"
+                                    />
+                                </form>
+                            </DialogComponent>
+                        </Dialog>
+                    }
+                    {/* <Dialog>
                             <DialogTrigger asChild>
                             </DialogTrigger>
                             <DialogContent displayClose className="flex flex-col gap-6">
-                                <DialogHeader className="flex flex-row justify-between items-center">
+                                <DialogHeader className="flex justify-between items-center">
                                 <DialogTitle>Create New Graph</DialogTitle>
                                 <DialogClose asChild>
                                         <button
@@ -122,7 +129,7 @@ export default function Header({ inCreate = false, inSettings = false, onSetGrap
                                         <DialogDescription>
                                         do you want to upload data or empty graph ?
                                         </DialogDescription>
-                                        <div className="flex flex-row justify-center gap-4">
+                                        <div className="flex justify-center gap-4">
                                         <DialogClose asChild>
                                         <a
                                         className="bg-indigo-600 text-white p-4"
@@ -145,43 +152,40 @@ export default function Header({ inCreate = false, inSettings = false, onSetGrap
                                         </div>
                                         </DialogContent>
                                     </Dialog> */}
-                            {
-                                !inSettings &&
-                                <DropdownMenu onOpenChange={setHelpOpen}>
-                                    <DropdownMenuTrigger asChild>
-                                        <Button
-                                            className="flex flex-row gap-1 items-center focus-visible:outline-none"
-                                            label="help"
-                                            icon={<LifeBuoy size={20} />}
-                                            open={helpOpen}
-                                        />
-                                    </DropdownMenuTrigger>
-                                    <DropdownMenuContent>
-                                        <DropdownMenuItem asChild>
-                                            <a
-                                                title="Documentation"
-                                                href="https://docs.falkordb.com/"
-                                                target="_blank"
-                                                rel="noreferrer"
-                                            >
-                                                <p>Documentation</p>
-                                            </a>
-                                        </DropdownMenuItem>
-                                        <DropdownMenuItem asChild>
-                                            <a
-                                                title="Support"
-                                                href="https://www.falkordb.com/contact-us/"
-                                                target="_blank"
-                                                rel="noreferrer"
-                                            >
-                                                <p>Support</p>
-                                            </a>
-                                        </DropdownMenuItem>
-                                    </DropdownMenuContent>
-                                </DropdownMenu>
-                            }
-                        </>
-                    }
+                    <DropdownMenu onOpenChange={setHelpOpen}>
+                        <DropdownMenuTrigger asChild>
+                            <Button
+                                className="flex gap-1 items-center focus-visible:outline-none"
+                                label="help"
+                                icon={<LifeBuoy size={20} />}
+                                open={helpOpen}
+                            />
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent>
+                            <DropdownMenuItem>
+                                <a
+                                    className="w-full p-2 text-start"
+                                    title="Documentation"
+                                    href="https://docs.falkordb.com/"
+                                    target="_blank"
+                                    rel="noreferrer"
+                                >
+                                    <p>Documentation</p>
+                                </a>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem>
+                                <a
+                                    className="w-full p-2 text-start"
+                                    title="Support"
+                                    href="https://www.falkordb.com/contact-us/"
+                                    target="_blank"
+                                    rel="noreferrer"
+                                >
+                                    <p>Support</p>
+                                </a>
+                            </DropdownMenuItem>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
                     <Button
                         label="Settings"
                         icon={<Settings size={25} />}

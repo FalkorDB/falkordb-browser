@@ -1,12 +1,15 @@
-import { Dialog, DialogClose } from "@/components/ui/dialog";
+import { Dialog, DialogTrigger } from "@/components/ui/dialog";
 import { useState } from "react";
 import Dropzone from "../ui/Dropzone";
 import DialogComponent from "../DialogComponent";
 import Button from "../ui/Button";
+import CloseDialog from "../CloseDialog";
 
-export default function Upload({ isOpen, onOpen }: {
-    isOpen: boolean,
-    onOpen: (open: boolean) => void
+export default function UploadGraph({ disabled, open, onOpenChange }: {
+    /* eslint-disable react/require-default-props */
+    disabled?: boolean
+    open?: boolean
+    onOpenChange?: (open: boolean) => void
 }) {
 
     const [files, setFiles] = useState<File[]>([])
@@ -16,17 +19,23 @@ export default function Upload({ isOpen, onOpen }: {
     }
 
     return (
-        <Dialog open={isOpen} onOpenChange={onOpen}>
+        <Dialog open={open} onOpenChange={onOpenChange}>
+            {
+                !onOpenChange &&
+                <DialogTrigger asChild>
+                    <Button
+                        label="Upload Data"
+                        disabled={disabled}
+                    />
+                </DialogTrigger>
+            }
             <DialogComponent className="h-[90%]" title="Upload Data">
-                <form onSubmit={onUploadData} className="grow p-8 flex flex-col gap-6">
-                    <Dropzone filesCount className="flex-col gap-10" withTable onFileDrop={setFiles} />
-                    <DialogClose asChild>
-                        <Button
-                            className="w-full"
-                            label="Upload"
-                            variant="Large"
-                        />
-                    </DialogClose>
+                <form onSubmit={onUploadData} className="grow p-4 flex flex-col gap-6">
+                    <Dropzone filesCount className="flex-col" withTable onFileDrop={setFiles} />
+                    <CloseDialog
+                        label="Upload"
+                        variant="Large"
+                    />
                 </form>
             </DialogComponent>
         </Dialog>

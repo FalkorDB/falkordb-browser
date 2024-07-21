@@ -36,9 +36,6 @@ export async function POST(request: NextRequest, { params }: { params: { graph: 
 
     const graphId = params.graph;
     const sourceName = request.nextUrl.searchParams.get("sourceName")
-    const type = request.nextUrl.searchParams.get("type")
-    const key = request.nextUrl.searchParams.get("key")
-    const srcs = await request.json()
 
     try {
         if (sourceName) {
@@ -48,6 +45,9 @@ export async function POST(request: NextRequest, { params }: { params: { graph: 
             return NextResponse.json({ success }, { status: 200 })
         }
 
+        const type = request.nextUrl.searchParams.get("type")
+        const key = request.nextUrl.searchParams.get("key")
+        const srcs = await request.json()
 
         if (!key) console.error("Missing parameter 'key'")
 
@@ -118,20 +118,22 @@ export async function GET(request: NextRequest, { params }: { params: { graph: s
     }
 
     const graphId = params.graph
-    const query = request.nextUrl.searchParams.get("query")
-
-    if (!query) {
-        const ID = request.nextUrl.searchParams.get("ID")
-        if (!ID) throw new Error("Missing parameter 'ID'")
-        // const result = await securedFetch(`https://localhost:5000/progress/?ID=${ID}`, {
-        //     method: "GET"
-        // })
-        // if (!result.ok) throw new Error("something went wrong")
-        // const json = await result.json()
-        return NextResponse.json({ progress: 10 }, { status: 200 })
-    }
+    const ID = request.nextUrl.searchParams.get("ID")
 
     try {
+        if (ID) {
+            // const result = await securedFetch(`https://localhost:5000/progress/?ID=${ID}`, {
+            //     method: "GET"
+            // })
+            // if (!result.ok) throw new Error("something went wrong")
+            // const json = await result.json()
+            return NextResponse.json({ progress: 10 }, { status: 200 })
+        }
+
+        const query = request.nextUrl.searchParams.get("query")
+
+        if (!query) throw new Error("Missing parameter 'query'")
+
         const graph = client.selectGraph(graphId)
         const result = await graph.query(query)
 

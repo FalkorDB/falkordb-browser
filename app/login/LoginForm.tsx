@@ -79,7 +79,7 @@ export default function LoginForm() {
     setError(false);
   }
   return (
-    <div className="w-full h-full flex flex-row items-center justify-center gap-80 LoginForm">
+    <div className="w-full h-full flex items-center justify-center gap-80 LoginForm">
       <Image src="/Logo.svg" alt="" width={451} height={126} />
       <form
         className="flex flex-col gap-4 p-2"
@@ -87,7 +87,7 @@ export default function LoginForm() {
       >
         <p className="text-4xl text-white border-b border-slate-200 border-opacity-25 pb-6" title="Connect">Connect</p>
         <div className="flex flex-col gap-8">
-          <div className="flex flex-row gap-6">
+          <div className="flex gap-6">
             <div className="grow flex flex-col gap-2">
               <p title="Host">* Host</p>
               <Input
@@ -137,8 +137,8 @@ export default function LoginForm() {
               value={password}
             />
           </div>
-          <div className="flex flex-row gap-8">
-            <div className="flex flex-row gap-2">
+          <div className="flex gap-8">
+            <div className="flex gap-2">
               <Checkbox
                 className={cn("w-6 h-6 rounded-lg", !TLS && "border-white")}
                 defaultChecked={false}

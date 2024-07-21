@@ -44,9 +44,9 @@ function Dropzone({ filesCount = false, className = "", withTable = false, disab
     const { getRootProps, getInputProps } = useDropzone({ onDrop, disabled })
 
     return (
-        <div className={cn('flex flex-row gap-8 h-1 grow', className)}>
+        <div className={cn('flex gap-4 grow', className)}>
             {/* eslint-disable-next-line react/jsx-props-no-spreading */}
-            <div {...getRootProps(withTable ? { className: cn("Dropzone", filesCount && "p-36") } : {})}>
+            <div {...getRootProps(withTable ? { className: cn("Dropzone", filesCount && "py-20 px-40") } : {})}>
                 {/* eslint-disable-next-line react/jsx-props-no-spreading */}
                 <input {...getInputProps()} />
                 {
@@ -61,11 +61,11 @@ function Dropzone({ filesCount = false, className = "", withTable = false, disab
             </div>
             {
                 withTable &&
-                <div className='flex-1 bg-[#272746] overflow-auto flex flex-col gap-10 justify-center'>
+                <div className='grow bg-[#272746] flex flex-col gap-4 justify-center'>
                     <div className='text-lg'>
                         {`Uploaded Files ${filesCount ? `(${files.length})`: ''}`}
                     </div>
-                    <Table parentClassName='grow'>
+                    <Table parentClassName='h-1 grow overflow-auto'>
                         <TableHeader className='border-b border-[#7E7E9B]'>
                             <TableRow className='border-none'>
                                 {
@@ -77,7 +77,7 @@ function Dropzone({ filesCount = false, className = "", withTable = false, disab
                                 }
                             </TableRow>
                         </TableHeader>
-                        <TableBody className={cn('overflow-auto', files.length > 0 && "border-b border-[#57577B]")}>
+                        <TableBody>
                             {
                                 files.length > 0 ?
                                     files.map((row, index) => (
