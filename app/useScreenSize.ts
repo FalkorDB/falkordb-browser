@@ -53,7 +53,7 @@ export default function useScreenSize(): ScreenDimension {
   // Create a throttled version of the resize handler
   const throttledHandleResize = useCallback(
     throttleFunc,
-    [handleResize, throttleFunc]
+    [throttleFunc]
   );
 
   useEffect(() => {
