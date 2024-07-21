@@ -56,7 +56,6 @@ function getStyle() {
             style: {
                 label: "data(category)",
                 "color": "black",
-                // "opacity": "data(opacity)" as unknown === "0.5" ? 0.5 : 1,
                 "text-valign": "center",
                 "text-halign": "center",
                 "text-wrap": "ellipsis",
