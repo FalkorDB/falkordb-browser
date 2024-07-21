@@ -1,14 +1,23 @@
-import { CircleDot, ZoomIn, ZoomOut } from "lucide-react";
-import { cn } from "@/lib/utils"
+'use client'
 
-export default function Toolbar({ chartRef, className = "" }: {
-    chartRef: React.RefObject<cytoscape.Core>, className: string
+/* eslint-disable react/require-default-props */
+
+import { Link, PlusCircle, Shrink, Trash2, ZoomIn, ZoomOut } from "lucide-react";
+import Button from "../components/ui/Button";
+
+export default function Toolbar({disabled, chartRef, onDeleteElement, onAddEntity, onAddRelation, deleteDisabled }: {
+    disabled?: boolean,
+    chartRef: React.RefObject<cytoscape.Core>,
+    onDeleteElement?: () => Promise<void>,
+    onAddEntity?: () => void,
+    onAddRelation?: () => void,
+    deleteDisabled?: boolean,
 }) {
 
-    function handleZoomClick(changefactor: number) {
+    const handleZoomClick = (changeFactor: number) => {
         const chart = chartRef.current
         if (chart) {
-            chart.zoom(chart.zoom() * changefactor)
+            chart.zoom(chart.zoom() * changeFactor)
         }
     }
 
@@ -21,25 +30,60 @@ export default function Toolbar({ chartRef, className = "" }: {
     }
 
     return (
-        <ul className={cn("flex flex-row gap-2", className)}>
-            <li>
-                <button title="Zoom In" type="button" className="text-gray-600 dark:text-gray-400 rounded-lg border border-gray-300 p-2" onClick={() => handleZoomClick(1.1)}>
-                    { /* eslint-disable jsx-a11y/control-has-associated-label */}
-                    < ZoomIn />
-                </button>
-            </li>
-            <li>
-                <button title="Zoom Out" type="button" className="text-gray-600 dark:text-gray-400 rounded-lg border border-gray-300 p-2" onClick={() => handleZoomClick(0.9)}>
-                    { /* eslint-disable jsx-a11y/control-has-associated-label */}
-                    <ZoomOut />
-                </button>
-            </li>
-            <li>
-                <button title="Center" type="button" className="text-gray-600 dark:text-gray-400 rounded-lg border border-gray-300 p-2" onClick={() => handleCenterClick()}>
-                    { /* eslint-disable jsx-a11y/control-has-associated-label */}
-                    <CircleDot />
-                </button>
-            </li>
-        </ul>
+        <div className="flex items-center gap-6 p-1">
+            <div className="flex gap-4">
+                <Button
+                    disabled
+                    variant="Secondary"
+                    label="Add Entity"
+                    className="flex items-center gap-2"
+                    icon={<PlusCircle />}
+                />
+                <Button
+                    disabled
+                    variant="Secondary"
+                    className="flex items-center gap-2"
+                    label="Add Relation"
+                    type="button"
+                    // eslint-disable-next-line jsx-a11y/anchor-is-valid
+                    icon={<Link />}
+                />
+                <Button
+                    className="flex items-center gap-2"
+                    variant="Secondary"
+                    label="Delete"
+                    icon={<Trash2 />}
+                    onClick={onDeleteElement}
+                    disabled={deleteDisabled}
+                />
+            </div>
+            {
+                (onAddEntity || onAddRelation || onDeleteElement) &&
+                <p className="text-slate-600">|</p>
+            }
+            <div className="flex items-center gap-4">
+                <Button
+                    disabled={disabled}
+                    variant="Secondary"
+                    label="Zoom In"
+                    icon={<ZoomIn />}
+                    onClick={() => handleZoomClick(1.1)}
+                />
+                <Button
+                    disabled={disabled}
+                    variant="Secondary"
+                    label="Zoom Out"
+                    icon={<ZoomOut />}
+                    onClick={() => handleZoomClick(0.9)}
+                />
+                <Button
+                    disabled={disabled}
+                    variant="Secondary"
+                    label="Fit To Size"
+                    icon={<Shrink />}
+                    onClick={() => handleCenterClick()}
+                />
+            </div>
+        </div>
     )
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import Spinning from "@/components/custom/spinning";
+import Spinning from "@/app/components/ui/spinning";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";

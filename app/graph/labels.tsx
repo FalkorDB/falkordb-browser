@@ -1,32 +1,46 @@
-import { cn } from "@/lib/utils";
-import { Minus, Plus } from "lucide-react";
 import { useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Category, getCategoryColorName } from "./model";
+import { cn } from "@/lib/utils";
+import { Category, getCategoryColorName } from "../api/graph/model";
+import Button from "../components/ui/Button";
 
-export default function Labels({ categories, className = "", onClick }: { categories: Category[], className: string, onClick: (category: Category) => void }) {
+/* eslint-disable react/require-default-props */
+interface Props {
+    categories: Category[],
+    onClick: (category: Category) => void,
+    label?: string,
+    className?: string
+}
 
-    // fake stae to force reload
-    const [reload, setReload] = useState(false)
+export default function Labels({ categories, onClick, label, className = "" }: Props) {
+
+    // fake state to force reload
+    const [, setReload] = useState(false)
 
     return (
-        <div className={cn("flex flex-row gap-x-1", className)} >
+        <div className={cn(className, "absolute bottom-0 flex flex-col gap-2 p-4")}>
             {
-                categories.map((category) => (
-                    <div className="flex flex-row gap-x-1 items-center" key={category.index}>
-                        <Button
-                            className={cn(`bg-${getCategoryColorName(category.index)}-500 ${category.show ? "" : "opacity-50"}`, "rounded-lg border border-gray-300 p-2 opac")}
-                            onClick={() => {
-                                onClick(category)
-                                setReload(!reload)
-                            }}
-                        >
-                            {category.show ? <Minus /> : <Plus />}
-                        </Button>
-                        <p>{category.name}</p>
-                    </div>
-                ))
+                label &&
+                <h1>{label}</h1>
             }
+            <ul className="flex gap-6" >
+                {
+                    categories.map((category) => (
+                        <li key={category.index}>
+                            <Button
+                                className="flex gap-2 items-center"
+                                label={category.name}
+                                icon={
+                                    <div className={cn("w-4 h-4 rounded-full", `bg-${getCategoryColorName(category.index)}`, label === "RelationshipTypes" && "opacity-50")} />
+                                }
+                                onClick={() => {
+                                    onClick(category)
+                                    setReload(prev => !prev)
+                                }}
+                            />
+                        </li>
+                    ))
+                }
+            </ul>
         </div>
     )
 }

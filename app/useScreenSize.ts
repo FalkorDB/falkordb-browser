@@ -48,10 +48,12 @@ export default function useScreenSize(): ScreenDimension {
     }
   }, []);
 
+  const throttleFunc = throttle(handleResize, 300);
+
   // Create a throttled version of the resize handler
   const throttledHandleResize = useCallback(
-    throttle(handleResize, 300),
-    [handleResize]
+    throttleFunc,
+    [throttleFunc]
   );
 
   useEffect(() => {
@@ -69,7 +71,7 @@ export default function useScreenSize(): ScreenDimension {
       throttledHandleResize.cancel(); // Cancel the throttle function on cleanup
       window.removeEventListener('resize', throttledHandleResize);
     };
-  }, [throttledHandleResize]);
+  }, [handleResize, throttledHandleResize]);
 
   return dimension;
 }

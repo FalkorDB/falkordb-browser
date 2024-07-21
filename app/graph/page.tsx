@@ -1,118 +1,64 @@
 'use client'
 
-import { toast } from "@/components/ui/use-toast";
-import React, { useState } from "react";
-import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
-import { Maximize2, X } from "lucide-react";
-import { securedFetch } from "@/lib/utils";
-import MainQuery from "./mainQuery";
-import GraphSection from "./graphSection";
-import { GraphState } from "./sectionQuery";
-
-// Validate the graph selection is not empty and show an error message if it is
-function validateGraphSelection(graphName: string): boolean {
-    if (!graphName) {
-        toast({
-            title: "Error",
-            description: "Please select a graph from the list",
-        });
-        return false;
-    }
-    return true;
-}
+import { useState } from "react";
+import { Toast, defaultQuery, prepareArg, securedFetch } from "@/lib/utils";
+import GraphView from "./GraphView";
+import Selector from "./Selector";
+import Header from "../components/Header";
+import { Graph, Query } from "../api/graph/model";
 
 export default function Page() {
 
-    const [queryStates, setQueryStates] = useState<GraphState[]>([])
-    const iconSize = 15
-
-    function prepareArg(arg: string): string {
-        return encodeURIComponent(arg.trim())
+    const [graphName, setGraphName] = useState<string>("")
+    const [graph, setGraph] = useState<Graph>(Graph.empty())
+    const [queries, setQueries] = useState<Query[]>([])
+    const [historyQuery, setHistoryQuery] = useState<string>("")
+    
+    const handleGraphChange = (selectedGraphName: string) => {
+        
+        setGraphName(selectedGraphName)
     }
 
-    const defaultQuery = (q: string) => 
-        q.trim() || "MATCH (n) OPTIONAL MATCH (n)-[e]-(m) RETURN n,e,m limit 100";
-    
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const runQuery = async (event: React.FormEvent<HTMLElement>, graphName: string, query: string): Promise<any | null> => {
-        event.preventDefault()
-        // Proposed abstraction for improved modularity
-        if (!validateGraphSelection(graphName)) return null
-
-        const q = defaultQuery(query)
-
-        const result = await securedFetch(`/api/graph?graph=${prepareArg(graphName)}&query=${prepareArg(q)}`, {
-            method: 'GET',
-            headers: {
-                'Content-Type': 'application/json'
-            }
-        })
-        if (result.ok) {
-            const json = await result.json()
-            return json.result
+    const run = async (query: string) => {
+        if (!graphName) {
+            Toast("Select a graph first")
+            return null
         }
-        return null
+
+        const result = await securedFetch(`api/graph/${prepareArg(graphName)}/?query=${prepareArg(defaultQuery(query))}`, {
+            method: "GET"
+        })
+        
+        if (!result.ok) return null
+
+        const json = await result.json()
+
+        return json.result   
     }
     
-    const runMainQuery = async (event: React.FormEvent<HTMLElement>, graphName: string, query: string) => {
-        event.preventDefault()
-        const data = await runQuery(event, graphName, query)
-        if (!data) return
-        const q = defaultQuery(query)
-        setQueryStates(prev => [new GraphState(graphName, q, data), ...prev])
+    const runQuery = async (query: string) => {
+        const result = await run(query)
+        if (!result) return
+        setQueries(prev => [...prev, { text: defaultQuery(query), metadata: result.metadata }])
+        setGraph(Graph.create(graphName, result))
+    }
+    
+    const runHistoryQuery = async (query: string, setQueriesOpen: (open: boolean) => void) => {
+        const result = await run(query)
+        if (!result) return
+        setQueries(prev => prev.filter(q => q.text === query).length > 0 ? prev : [...prev, { text: query, metadata: result.metadata }])
+        setGraph(Graph.create(graphName, result))
+        setHistoryQuery(query)
+        setQueriesOpen(false)
     }
 
-    const onDelete = (graphName: string) => {
-        setQueryStates((prev: GraphState[]) => prev.filter(state => state.graphName !== graphName))
-    }
-
-    const closeState = (id: number) => {
-        setQueryStates((prev: GraphState[]) => prev.filter(state => state.id !== id))
-    }
     return (
-        <div className="h-full flex flex-col p-2 gap-y-2">
-            <MainQuery
-                onSubmit={runMainQuery}
-                onDelete={onDelete}
-                className="border rounded-lg border-gray-300 p-2"
-            />
-            <ul className="grow space-y-4 overflow-auto">
-                {
-                    queryStates.length > 0 &&
-                    queryStates.map((state) => (
-                        <li key={state.id} className="h-full flex flex-col border rounded-lg border-gray-300 p-2">
-                            <div className="p-2 pt-0 flex flex-row justify-between">
-                                <div>
-                                    <Dialog>
-                                        <DialogTrigger asChild>
-                                            <button title="Fullscreen" type="button">
-                                                {/* eslint-disable-next-line jsx-a11y/control-has-associated-label */}
-                                                <Maximize2 size={iconSize} />
-                                            </button>
-                                        </DialogTrigger>
-                                        <DialogContent className="max-w-full h-full p-3 pt-10">
-                                            <GraphSection
-                                                onSubmit={runQuery}
-                                                queryState={state}
-                                            />
-                                        </DialogContent>
-                                    </Dialog>
-                                </div>
-                                <button title="close" type="button" onClick={() => closeState(state.id)}>
-                                    {/* eslint-disable-next-line jsx-a11y/control-has-associated-label */}
-                                    <X size={iconSize} />
-                                </button>
-                            </div>
-                            <div className="grow">
-                                <GraphSection
-                                    onSubmit={runQuery}
-                                    queryState={state}
-                                />
-                            </div>
-                        </li>
-                    ))
-                }
-            </ul>
+        <div className="h-full w-full flex flex-col">
+            <Header onSetGraphName={setGraphName}/>            
+            <div className="h-1 grow p-8 px-10 flex flex-col gap-8">
+                <Selector queries={queries} onChange={handleGraphChange} graphName={graphName} runQuery={runHistoryQuery}/>
+                <GraphView graph={graph} setGraph={setGraph} runQuery={runQuery} historyQuery={historyQuery}/>
+            </div>
         </div>
     )
 }

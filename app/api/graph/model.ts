@@ -1,6 +1,10 @@
-
 import { EdgeDataDefinition, ElementDefinition, NodeDataDefinition } from 'cytoscape';
-import twcolors from 'tailwindcss/colors'
+
+export interface Query {
+    text: string
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    metadata: string[]
+}
 
 export interface Category {
     index: number,
@@ -8,21 +12,23 @@ export interface Category {
     show: boolean,
 }
 
-const COLORS_ORDER = [
-    "rose",
-    "yellow",
-    "teal",
-    "fuchsia",
+const COLORS_ORDER_NAME = [
     "blue",
-    "violet",
-    "slate",
-    "cyan",
-    "orange",
-    "red",
-    "green",
     "pink",
+    "orange",
+    "aqua",
+    "yellow",
+    "green"
 ]
 
+const COLORS_ORDER_VALUE = [
+    "#F2EB47",
+    "#99E4E5",
+    "#EF8759",
+    "#89D86D",
+    "#ED70B1",
+    "#7167F6"
+]
 
 const NODE_RESERVED_KEYS = ["parent", "id", "position"]
 const NODE_ALTERNATIVE_RESERVED_KEYS = ["_parent_", "_id_", "_position_"]
@@ -46,19 +52,14 @@ function edgeSafeKey(key: string): string {
     return EDGE_ALTERNATIVE_RESERVED_KEYS[index];
 }
 
-export function getCategoryColorName(index: number): string {
-    const colorIndex = index < COLORS_ORDER.length ? index : 0
-    return COLORS_ORDER[colorIndex]
+export function getCategoryColorValue(index = 0): string {
+    const colorIndex = index % COLORS_ORDER_VALUE.length
+    return COLORS_ORDER_VALUE[colorIndex]
 }
 
-function getCategoryColorValue(index = 0): string {
-    const colorIndex = index < COLORS_ORDER.length ? index : 0
-    const colorName = COLORS_ORDER[colorIndex]
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const colors = twcolors as any;
-    const color = colors[colorName];
-    return color["500"];
+export function getCategoryColorName(index = 0): string {
+    const colorIndex = index % COLORS_ORDER_NAME.length
+    return COLORS_ORDER_NAME[colorIndex]
 }
 
 export interface ExtractedData {
@@ -80,23 +81,29 @@ export class Graph {
 
     private categories: Category[];
 
+    private labels: Category[];
+
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     private elements: ElementDefinition[];
 
     private categoriesMap: Map<string, Category>;
 
+    private labelsMap: Map<string, Category>;
+
     private nodesMap: Map<number, NodeDataDefinition>;
 
     private edgesMap: Map<number, EdgeDataDefinition>;
 
-    private constructor(id: string, categories: Category[], elements: ElementDefinition[],
-        categoriesMap: Map<string, Category>, nodesMap: Map<number, NodeDataDefinition>, edgesMap: Map<number, EdgeDataDefinition>) {
+    private constructor(id: string, categories: Category[], labels: Category[], elements: ElementDefinition[],
+        categoriesMap: Map<string, Category>, labelsMap: Map<string, Category>, nodesMap: Map<number, NodeDataDefinition>, edgesMap: Map<number, EdgeDataDefinition>) {
         this.id = id;
         this.columns = [];
         this.data = [];
         this.categories = categories;
+        this.labels = labels;
         this.elements = elements;
         this.categoriesMap = categoriesMap;
+        this.labelsMap = labelsMap;
         this.nodesMap = nodesMap;
         this.edgesMap = edgesMap;
     }
@@ -109,8 +116,16 @@ export class Graph {
         return this.categories;
     }
 
+    get Labels(): Category[] {
+        return this.labels;
+    }
+
     get Elements(): ElementDefinition[] {
         return this.elements;
+    }
+
+    set Elements(elements: ElementDefinition[]) {
+        this.elements = elements
     }
 
     get Columns(): string[] {
@@ -123,7 +138,7 @@ export class Graph {
     }
 
     public static empty(): Graph {
-        return new Graph("", [], [], new Map<string, Category>(), new Map<number, NodeDataDefinition>(), new Map<number, EdgeDataDefinition>())
+        return new Graph("", [], [], [], new Map<string, Category>(), new Map<string, Category>(), new Map<number, NodeDataDefinition>(), new Map<number, EdgeDataDefinition>())
     }
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -135,7 +150,7 @@ export class Graph {
     }
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    private extendNode(cell: any, newElements: ElementDefinition[]) {
+    public extendNode(cell: any, newElements: ElementDefinition[]) {
         // check if category already exists in categories
         let category = this.categoriesMap.get(cell.labels[0])
         if (!category) {
@@ -146,12 +161,13 @@ export class Graph {
 
         // check if node already exists in nodes or fake node was created
         const currentNode = this.nodesMap.get(cell.id)
+
         if (!currentNode) {
             const node: NodeDataDefinition = {
                 id: cell.id.toString(),
                 name: cell.id.toString(),
                 category: category.name,
-                color: getCategoryColorValue(category.index)
+                color: getCategoryColorValue(category.index),
             }
             Object.entries(cell.properties).forEach(([key, value]) => {
                 node[nodeSafeKey(key)] = value as string;
@@ -170,17 +186,31 @@ export class Graph {
             });
             newElements.push({ data: currentNode })
         }
+
         return newElements
     }
-    
+
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    private extendEdge(cell: any, newElements: ElementDefinition[]) {
+    public extendEdge(cell: any, newElements: ElementDefinition[]) {
+
+        let label = this.labelsMap.get(cell.relationshipType)
+        if (!label) {
+            label = { name: cell.relationshipType, index: this.categoriesMap.size, show: true }
+            this.labelsMap.set(label.name, label)
+            this.labels.push(label)
+        }
+
         const currentEdge = this.edgesMap.get(cell.id)
         if (!currentEdge) {
             const sourceId = cell.sourceId.toString();
             const destinationId = cell.destinationId.toString()
-
-            const edge: EdgeDataDefinition = { source: sourceId, target: destinationId, label: cell.relationshipType }
+            const edge: EdgeDataDefinition = {
+                _id: cell.id,
+                source: sourceId,
+                target: destinationId,
+                label: cell.relationshipType,
+                color: getCategoryColorValue(label.index),
+            }
             Object.entries(cell.properties).forEach(([key, value]) => {
                 edge[edgeSafeKey(key)] = value as string;
             });
@@ -194,7 +224,6 @@ export class Graph {
                 source = {
                     id: cell.sourceId.toString(),
                     name: cell.sourceId.toString(),
-                    value: "",
                     category: "",
                     color: getCategoryColorValue()
                 }
@@ -208,7 +237,6 @@ export class Graph {
                 destination = {
                     id: cell.destinationId.toString(),
                     name: cell.destinationId.toString(),
-                    value: "",
                     category: "",
                     color: getCategoryColorValue()
                 }
