@@ -5,7 +5,7 @@
 import { Link, PlusCircle, Shrink, Trash2, ZoomIn, ZoomOut } from "lucide-react";
 import Button from "../components/ui/Button";
 
-export default function Toolbar({disabled, chartRef, onDeleteElement, onAddEntity, onAddRelation, deleteDisabled }: {
+export default function Toolbar({ disabled, chartRef, onDeleteElement, onAddEntity, onAddRelation, deleteDisabled }: {
     disabled?: boolean,
     chartRef: React.RefObject<cytoscape.Core>,
     onDeleteElement?: () => Promise<void>,
