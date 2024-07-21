@@ -20,15 +20,15 @@ export default function UploadGraph({ disabled, open, onOpenChange }: {
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogTrigger asChild>
-                {
-                    !onOpenChange &&
+            {
+                !onOpenChange &&
+                <DialogTrigger asChild>
                     <Button
                         label="Upload Data"
                         disabled={disabled}
                     />
-                }
-            </DialogTrigger>
+                </DialogTrigger>
+            }
             <DialogComponent className="h-[90%]" title="Upload Data">
                 <form onSubmit={onUploadData} className="grow p-4 flex flex-col gap-6">
                     <Dropzone filesCount className="flex-col" withTable onFileDrop={setFiles} />
