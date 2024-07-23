@@ -22,12 +22,12 @@ const COLORS_ORDER_NAME = [
 ]
 
 const COLORS_ORDER_VALUE = [
-    "#F2EB47",
-    "#99E4E5",
-    "#EF8759",
-    "#89D86D",
+    "#7167F6",
     "#ED70B1",
-    "#7167F6"
+    "#EF8759",
+    "#99E4E5",
+    "#F2EB47",
+    "#89D86D"
 ]
 
 const NODE_RESERVED_KEYS = ["parent", "id", "position"]
@@ -53,13 +53,17 @@ function edgeSafeKey(key: string): string {
 }
 
 export function getCategoryColorValue(index = 0): string {
-    const colorIndex = index % COLORS_ORDER_VALUE.length
-    return COLORS_ORDER_VALUE[colorIndex]
+    return COLORS_ORDER_VALUE[index % COLORS_ORDER_VALUE.length]
 }
 
 export function getCategoryColorName(index = 0): string {
-    const colorIndex = index % COLORS_ORDER_NAME.length
-    return COLORS_ORDER_NAME[colorIndex]
+    return COLORS_ORDER_NAME[index % COLORS_ORDER_NAME.length]
+}
+
+export function getCategoryColorNameFromValue(colorValue: string): string {
+    const colorIndex = COLORS_ORDER_VALUE.findIndex((c) => c === colorValue)
+
+    return COLORS_ORDER_NAME[colorIndex % COLORS_ORDER_NAME.length]
 }
 
 export interface ExtractedData {

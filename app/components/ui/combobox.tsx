@@ -23,11 +23,13 @@ interface ComboboxProps {
   selectedValue?: string,
   setSelectedValue: (value: string) => void,
   isSchema?: boolean
+  defaultOpen?: boolean
+  onOpenChange?: (open:boolean) => void
 }
 
-export default function Combobox({ isSelectGraph, disabled = false, inTable, type, options, setOptions, selectedValue = "", setSelectedValue, isSchema = false}: ComboboxProps) {
+export default function Combobox({ isSelectGraph, disabled = false, inTable, type, options, setOptions, selectedValue = "", setSelectedValue, isSchema = false, defaultOpen = false, onOpenChange }: ComboboxProps) {
 
-  const [open, setOpen] = useState<boolean>(false)
+  const [open, setOpen] = useState<boolean>(defaultOpen)
   const [optionName, setOptionName] = useState<string>("")
   const [editable, setEditable] = useState<string>("")
   const [isUploadOpen, setIsUploadOpen] = useState<boolean>(false)
@@ -87,12 +89,15 @@ export default function Combobox({ isSelectGraph, disabled = false, inTable, typ
 
   return (
     <Dialog>
-      <DropdownMenu open={open} onOpenChange={setOpen}>
+      <DropdownMenu open={open} onOpenChange={(o) => {
+        setOpen(o)
+        if (onOpenChange) onOpenChange(o)
+        }}>
         <DropdownMenuTrigger asChild>
           <Button
             disabled={disabled}
             className={cn(inTable ? "text-sm font-light" : "text-2xl")}
-            label={selectedValue || `Select ${type || "Graph"}...`}
+            label={selectedValue || `Select ${type || "Graph"}`}
             open={open}
           />
         </DropdownMenuTrigger>

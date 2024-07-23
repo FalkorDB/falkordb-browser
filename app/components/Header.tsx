@@ -43,7 +43,7 @@ export default function Header({ inCreate = false, onSetGraphName }: Props) {
         })
 
         if (result.ok) {
-            Toast(`Graph ${graphName} created successfully!`, "Success")
+            Toast(`${type} ${graphName} created successfully!`, "Success")
             onSetGraphName(graphName)
             setCreateOpen(false)
             setGraphName("")
