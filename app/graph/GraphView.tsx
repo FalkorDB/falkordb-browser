@@ -1,7 +1,7 @@
 'use client'
 
 import CytoscapeComponent from "react-cytoscapejs";
-import cytoscape, { EdgeDefinition, EdgeSingular, ElementDefinition, EventObject, NodeDataDefinition, NodeDefinition } from "cytoscape";
+import cytoscape, { EdgeDataDefinition, EdgeDefinition, EdgeSingular, ElementDefinition, EventObject, NodeDataDefinition, NodeDefinition } from "cytoscape";
 import { useRef, useState, useImperativeHandle, forwardRef, useEffect, Dispatch, SetStateAction } from "react";
 import fcose from 'cytoscape-fcose';
 import Editor, { Monaco } from "@monaco-editor/react";
@@ -77,12 +77,12 @@ function getStyle() {
                 'active-bg-size': 0,  // hide gray circle when panning
                 // All of the following styles are meaningless and are specified
                 // to satisfy the linter...
-                'active-bg-color': 'blue',
-                'active-bg-opacity': 0.3,
-                "selection-box-border-color": 'blue',
-                "selection-box-border-width": 0,
-                "selection-box-opacity": 1,
-                "selection-box-color": 'blue',
+                'active-bg-color': 'gray',
+                'active-bg-opacity': 1,
+                "selection-box-border-color": 'gray',
+                "selection-box-border-width": 3,
+                "selection-box-opacity": 0.3,
+                "selection-box-color": 'gray',
                 "outside-texture-bg-color": 'blue',
                 "outside-texture-bg-opacity": 1,
             },
@@ -143,6 +143,7 @@ const GraphView = forwardRef(({ graph, runQuery, setGraph, historyQuery }: {
 }, ref) => {
 
     const [query, setQuery] = useState<string>("")
+    const [selectedElements, setSelectedElements] = useState<{ [key: number]: NodeDataDefinition | EdgeDataDefinition }>([]);
     const [selectedElement, setSelectedElement] = useState<NodeDefinition | EdgeDefinition>();
     const [isCollapsed, setIsCollapsed] = useState<boolean>(true);
     const chartRef = useRef<cytoscape.Core | null>(null)
@@ -188,7 +189,7 @@ const GraphView = forwardRef(({ graph, runQuery, setGraph, historyQuery }: {
     };
 
     const handleEditorDidMount = (e: monaco.editor.IStandaloneCodeEditor) => {
-        
+
         editorRef.current = e
 
         // if (typeof window !== "undefined") return
@@ -305,8 +306,30 @@ const GraphView = forwardRef(({ graph, runQuery, setGraph, historyQuery }: {
             target.style("arrow-scale", 1);
         } else target.style("border-width", 0.7);
 
-        const obj: NodeDefinition | EdgeDefinition = evt.target.json();
+        const obj: NodeDefinition | EdgeDefinition = target.json();
         handelSetSelectedElement(obj);
+    }
+
+    const handleBoxSelected = (evt: EventObject) => {
+        const { target } = evt
+        const type = target.isEdge() ? "edge" : "node"
+
+        if (type === "edge") {
+            const { color } = target.data()
+            target.style("line-color", color);
+            target.style("target-arrow-color", color);
+            target.style("line-opacity", 0.5);
+            target.style("width", 2);
+            target.style("arrow-scale", 1);
+        } else target.style("border-width", 0.7);
+
+        const obj: NodeDataDefinition | EdgeDataDefinition = target.json().data;
+
+        setSelectedElements(prev => ({
+            ...prev,
+            // eslint-disable-next-line no-underscore-dangle
+            [Number(obj.id)]: obj
+        }));
     }
 
     const handleUnselected = (evt: EventObject) => {
@@ -321,6 +344,7 @@ const GraphView = forwardRef(({ graph, runQuery, setGraph, historyQuery }: {
         } else target.style("border-width", 0.3);
 
         handelSetSelectedElement();
+        setSelectedElements({});
     }
 
     const handleMouseOver = (evt: EventObject) => {
@@ -373,18 +397,33 @@ const GraphView = forwardRef(({ graph, runQuery, setGraph, historyQuery }: {
     }
 
     const onDeleteElement = async () => {
-        const id = selectedElement?.data.id
-        const q = `MATCH (e) WHERE id(e) = ${id} DELETE e`
+        const chartSelectedElements: (NodeDataDefinition | EdgeDataDefinition)[] = chartRef.current?.elements().filter(element => element.selected()).map(element => element.data()) || [];
+        const stateSelectedElements = Object.values(selectedElements)
+        // eslint-disable-next-line no-nested-ternary
+        const selectedElementsArr = chartSelectedElements.length > 0 ? chartSelectedElements : stateSelectedElements.length > 0 ? stateSelectedElements : selectedElement ? [selectedElement.data] : [];
+
+        const nodeConditions = selectedElementsArr.map(({ _id, id, source }) => `id(${source ? "e" : "n"}) = ${source ? _id : id}`).join(" OR ");
+        const q = `
+                MATCH (n)
+                WITH n
+                MATCH ()-[e]-()
+                WHERE ${nodeConditions}
+                DELETE e, n
+            `;
+
         const success = (await securedFetch(`api/graph/${prepareArg(graph.Id)}/?query=${prepareArg(q)}`, {
             method: "GET"
-        })).ok
-        if (!success) return
+        })).ok;
+
+        if (!success) return;
+
         setGraph(prev => {
-            const p = prev
-            p.Elements = p.Elements.filter(element => element.data.id !== id)
-            return p
-        })
+            const p = prev;
+            p.Elements = p.Elements.filter(({ data }) => !selectedElements[Number(data.id)]);
+            return p;
+        });
         setSelectedElement(undefined)
+        setSelectedElements({})
         dataPanel.current?.collapse()
     }
 
@@ -445,7 +484,7 @@ const GraphView = forwardRef(({ graph, runQuery, setGraph, historyQuery }: {
                     </Dialog>
                 </div>
                 <div className="flex items-center justify-between">
-                    <Toolbar disabled={!graph.Id} deleteDisabled={!selectedElement} onDeleteElement={onDeleteElement} chartRef={chartRef} />
+                    <Toolbar disabled={!graph.Id} deleteDisabled={Object.values(selectedElements).length === 0 && !selectedElement} onDeleteElement={onDeleteElement} chartRef={chartRef} />
                     {
                         isCollapsed && graph.Id &&
                         <Button
@@ -472,6 +511,9 @@ const GraphView = forwardRef(({ graph, runQuery, setGraph, historyQuery }: {
                             cy.on('tapunselect', 'node', handleUnselected)
                             cy.on('tapselect', 'edge', handleSelected)
                             cy.on('tapselect', 'node', handleSelected)
+                            cy.on('tapselect', 'node', handleSelected)
+                            cy.on('boxselect', 'node', handleBoxSelected)
+                            cy.on('boxselect', 'edge', handleBoxSelected)
                         }}
                         elements={graph.Elements}
                         layout={LAYOUT}
