@@ -1,7 +1,7 @@
 'use client'
 
 import CytoscapeComponent from "react-cytoscapejs";
-import cytoscape, { EdgeDataDefinition, EdgeDefinition, EdgeSingular, ElementDefinition, EventObject, NodeDataDefinition, NodeDefinition } from "cytoscape";
+import cytoscape, { EdgeDataDefinition, EdgeSingular, ElementDefinition, EventObject, NodeDataDefinition } from "cytoscape";
 import { useRef, useState, useImperativeHandle, forwardRef, useEffect, Dispatch, SetStateAction } from "react";
 import fcose from 'cytoscape-fcose';
 import Editor, { Monaco } from "@monaco-editor/react";
@@ -143,8 +143,8 @@ const GraphView = forwardRef(({ graph, runQuery, setGraph, historyQuery }: {
 }, ref) => {
 
     const [query, setQuery] = useState<string>("")
-    const [selectedElements, setSelectedElements] = useState<{ [key: number]: NodeDataDefinition | EdgeDataDefinition }>([]);
-    const [selectedElement, setSelectedElement] = useState<NodeDefinition | EdgeDefinition>();
+    const [selectedElements, setSelectedElements] = useState<{ [key: string]: NodeDataDefinition | EdgeDataDefinition }>({});
+    const [selectedElement, setSelectedElement] = useState<NodeDataDefinition | EdgeDataDefinition>();
     const [isCollapsed, setIsCollapsed] = useState<boolean>(true);
     const chartRef = useRef<cytoscape.Core | null>(null)
     const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null)
@@ -166,7 +166,7 @@ const GraphView = forwardRef(({ graph, runQuery, setGraph, historyQuery }: {
         setQuery(historyQuery)
     }, [historyQuery])
 
-    const handelSetSelectedElement = (element?: NodeDefinition | EdgeDefinition) => {
+    const handelSetSelectedElement = (element?: NodeDataDefinition | EdgeDataDefinition) => {
         setSelectedElement(element)
         if (element) {
             dataPanel.current?.expand()
@@ -206,10 +206,7 @@ const GraphView = forwardRef(({ graph, runQuery, setGraph, historyQuery }: {
     }
 
     useEffect(() => {
-        if (chartRef.current) {
-            const layout = chartRef.current.layout(LAYOUT);
-            layout.run();
-        }
+        chartRef.current?.layout(LAYOUT).run();
     }, [graph.Elements]);
 
     useEffect(() => {
@@ -306,7 +303,7 @@ const GraphView = forwardRef(({ graph, runQuery, setGraph, historyQuery }: {
             target.style("arrow-scale", 1);
         } else target.style("border-width", 0.7);
 
-        const obj: NodeDefinition | EdgeDefinition = target.json();
+        const obj: NodeDataDefinition | EdgeDataDefinition = target.json().data;
         handelSetSelectedElement(obj);
     }
 
@@ -328,7 +325,7 @@ const GraphView = forwardRef(({ graph, runQuery, setGraph, historyQuery }: {
         setSelectedElements(prev => ({
             ...prev,
             // eslint-disable-next-line no-underscore-dangle
-            [Number(obj.id)]: obj
+            [obj.id || ""]: obj
         }));
     }
 
@@ -367,7 +364,7 @@ const GraphView = forwardRef(({ graph, runQuery, setGraph, historyQuery }: {
     };
 
     const setProperty = async (key: string, newVal: string) => {
-        const id = selectedElement?.data.id
+        const id = selectedElement?.id
         const q = `MATCH (e) WHERE id(e) = ${id} SET e.${key} = '${newVal}'`
         const success = (await securedFetch(`api/graph/${prepareArg(graph.Id)}/?query=${prepareArg(q)}`, {
             method: "GET"
@@ -382,7 +379,7 @@ const GraphView = forwardRef(({ graph, runQuery, setGraph, historyQuery }: {
     }
 
     const removeProperty = async (key: string) => {
-        const id = selectedElement?.data.id
+        const id = selectedElement?.id
         const q = `MATCH (e) WHERE id(e) = ${id} SET e.${key} = NULL`
         const success = (await securedFetch(`api/graph/${prepareArg(graph.Id)}/?query=${prepareArg(q)}`, {
             method: "GET"
@@ -397,19 +394,24 @@ const GraphView = forwardRef(({ graph, runQuery, setGraph, historyQuery }: {
     }
 
     const onDeleteElement = async () => {
-        const chartSelectedElements: (NodeDataDefinition | EdgeDataDefinition)[] = chartRef.current?.elements().filter(element => element.selected()).map(element => element.data()) || [];
         const stateSelectedElements = Object.values(selectedElements)
-        // eslint-disable-next-line no-nested-ternary
-        const selectedElementsArr = chartSelectedElements.length > 0 ? chartSelectedElements : stateSelectedElements.length > 0 ? stateSelectedElements : selectedElement ? [selectedElement.data] : [];
 
-        const nodeConditions = selectedElementsArr.map(({ _id, id, source }) => `id(${source ? "e" : "n"}) = ${source ? _id : id}`).join(" OR ");
-        const q = `
-                MATCH (n)
-                WITH n
-                MATCH ()-[e]-()
-                WHERE ${nodeConditions}
-                DELETE e, n
-            `;
+        if (stateSelectedElements.length === 0 && selectedElement) {
+            stateSelectedElements.push(selectedElement)
+        }
+
+        const conditionsNodes: string[] = []
+        const conditionsEdges: string[] = []
+
+        stateSelectedElements.forEach(({ _id, id, source }) => {
+            if (source) {
+                conditionsEdges.push(`id(e) = ${_id}`)
+            } else {
+                conditionsNodes.push(`id(n) = ${id}`)
+            }
+        })
+
+        const q = `MATCH (n) WHERE ${conditionsNodes.join(" OR ")} DELETE n WITH * MATCH ()-[e]-() WHERE ${conditionsEdges.join(" OR ")} DELETE e`
 
         const success = (await securedFetch(`api/graph/${prepareArg(graph.Id)}/?query=${prepareArg(q)}`, {
             method: "GET"
@@ -419,7 +421,16 @@ const GraphView = forwardRef(({ graph, runQuery, setGraph, historyQuery }: {
 
         setGraph(prev => {
             const p = prev;
-            p.Elements = p.Elements.filter(({ data }) => !selectedElements[Number(data.id)]);
+            if (stateSelectedElements.length > 0) {
+                p.Elements = p.Elements.filter(({ data }) => {
+                    if (!selectedElements[data.id || ""]) return true
+                    chartRef.current?.remove(`#${data.id}`)
+                    return false
+                })
+                return p
+            }
+            p.Elements = p.Elements.filter(({ data }) => selectedElement?.id !== data.id);
+            chartRef.current?.remove(`#${selectedElement?.id}`);
             return p;
         });
         setSelectedElement(undefined)
@@ -547,7 +558,7 @@ const GraphView = forwardRef(({ graph, runQuery, setGraph, historyQuery }: {
                     <DataPanel
                         removeProperty={removeProperty}
                         setProperty={setProperty}
-                        obj={selectedElement.data}
+                        obj={selectedElement}
                         onExpand={onExpand}
                         onDeleteElement={onDeleteElement}
                     />
