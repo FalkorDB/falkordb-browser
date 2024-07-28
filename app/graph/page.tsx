@@ -56,7 +56,7 @@ export default function Page() {
         <div className="h-full w-full flex flex-col">
             <Header onSetGraphName={setGraphName}/>            
             <div className="h-1 grow p-8 px-10 flex flex-col gap-8">
-                <Selector queries={queries} onChange={handleGraphChange} graphName={graphName} runQuery={runHistoryQuery}/>
+                <Selector queries={queries} onChange={handleGraphChange} graph={graph} runQuery={runHistoryQuery}/>
                 <GraphView graph={graph} setGraph={setGraph} runQuery={runQuery} historyQuery={historyQuery}/>
             </div>
         </div>

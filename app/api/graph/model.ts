@@ -154,7 +154,7 @@ export class Graph {
     }
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    public extendNode(cell: any, newElements: ElementDefinition[]) {
+    public extendNode(cell: any) {
         // check if category already exists in categories
         let category = this.categoriesMap.get(cell.labels[0])
         if (!category) {
@@ -178,8 +178,10 @@ export class Graph {
             });
             this.nodesMap.set(cell.id, node)
             this.elements.push({ data: node })
-            newElements.push({ data: node })
-        } else if (currentNode.category === "") {
+            return node
+        }
+
+        if (currentNode.category === "") {
             // set values in a fake node
             currentNode.id = cell.id.toString();
             currentNode.name = cell.id.toString();
@@ -188,14 +190,13 @@ export class Graph {
             Object.entries(cell.properties).forEach(([key, value]) => {
                 currentNode[nodeSafeKey(key)] = value as string;
             });
-            newElements.push({ data: currentNode })
         }
 
-        return newElements
+        return currentNode
     }
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    public extendEdge(cell: any, newElements: ElementDefinition[]) {
+    public extendEdge(cell: any) {
 
         let label = this.labelsMap.get(cell.relationshipType)
         if (!label) {
@@ -220,8 +221,6 @@ export class Graph {
             });
             this.edgesMap.set(cell.id, edge)
             this.elements.push({ data: edge })
-            newElements.push({ data: edge })
-
             // creates a fakeS node for the source and target
             let source = this.nodesMap.get(cell.sourceId)
             if (!source) {
@@ -233,7 +232,6 @@ export class Graph {
                 }
                 this.nodesMap.set(cell.sourceId, source)
                 this.elements.push({ data: source })
-                newElements.push({ data: source })
             }
 
             let destination = this.nodesMap.get(cell.destinationId)
@@ -246,16 +244,16 @@ export class Graph {
                 }
                 this.nodesMap.set(cell.destinationId, destination)
                 this.elements.push({ data: destination })
-                newElements.push({ data: destination })
             }
+            return edge
         }
-        return newElements
+        return currentEdge
     }
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     public extend(results: any): ElementDefinition[] {
-
         const newElements: ElementDefinition[] = []
+
         if (results?.data?.length) {
             if (results.data[0] instanceof Object) {
                 this.columns = Object.keys(results.data[0])
@@ -272,21 +270,21 @@ export class Graph {
                     if (cell.nodes) {
                         // eslint-disable-next-line @typescript-eslint/no-explicit-any
                         cell.nodes.forEach((node: any) => {
-                            this.extendNode(node, newElements)
+                            newElements.push({ data: this.extendNode(node) })
                         })
                         // eslint-disable-next-line @typescript-eslint/no-explicit-any
                         cell.edges.forEach((edge: any) => {
-                            this.extendEdge(edge, newElements)
+                            newElements.push({ data: this.extendEdge(edge) })
                         })
                     } else if (cell.relationshipType) {
-                        this.extendEdge(cell, newElements)
+                        newElements.push({ data: this.extendEdge(cell) })
                     } else if (cell.labels) {
-                        this.extendNode(cell, newElements)
+                        newElements.push({ data: this.extendNode(cell) })
                     }
                 }
             })
         })
-
+        
         return newElements
     }
 }

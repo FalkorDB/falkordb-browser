@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from "react";
-import { Toast, prepareArg, securedFetch } from "@/lib/utils";
+import { Toast, defaultQuery, prepareArg, securedFetch } from "@/lib/utils";
 import Header from "../components/Header";
 import Selector from "../graph/Selector";
 import SchemaView from "./SchemaView";
@@ -15,8 +15,7 @@ export default function Page() {
     useEffect(() => {
         if (!schemaName) return
         const run = async () => {
-            const q = "MATCH (n)-[e]-(m) RETURN n, e, m"
-            const result = await securedFetch(`/api/graph/${prepareArg(schemaName)}_schema/?query=${prepareArg(q)}`, {
+            const result = await securedFetch(`/api/graph/${prepareArg(schemaName)}_schema/?query=${defaultQuery()}`, {
                 method: "GET"
             })
             if (!result.ok) {
@@ -33,7 +32,7 @@ export default function Page() {
         <div className="h-full w-full flex flex-col">
             <Header onSetGraphName={setSchemaName}/>
             <div className="h-1 grow p-8 px-10 flex flex-col gap-8">
-                <Selector onChange={setSchemaName} graphName={schemaName} isSchema/>
+                <Selector onChange={setSchemaName} graph={schema} isSchema/>
                 <SchemaView schema={schema} setSchema={setSchema}/>
             </div>
         </div>

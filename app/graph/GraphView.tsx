@@ -188,7 +188,7 @@ const GraphView = forwardRef(({ graph, runQuery, setGraph, historyQuery }: {
     };
 
     const handleEditorDidMount = (e: monaco.editor.IStandaloneCodeEditor) => {
-        
+
         editorRef.current = e
 
         // if (typeof window !== "undefined") return
@@ -205,11 +205,8 @@ const GraphView = forwardRef(({ graph, runQuery, setGraph, historyQuery }: {
     }
 
     useEffect(() => {
-        if (chartRef.current) {
-            const layout = chartRef.current.layout(LAYOUT);
-            layout.run();
-        }
-    }, [graph.Elements]);
+        chartRef?.current?.layout(LAYOUT).run();
+    }, [graph.Elements.length]);
 
     useEffect(() => {
         if (!editorRef.current) return
@@ -241,11 +238,10 @@ const GraphView = forwardRef(({ graph, runQuery, setGraph, historyQuery }: {
 
         if (result.ok) {
             const json = await result.json()
-            const elements = graph.extend(json.result)
-            return elements
-
+            return graph.extend(json.result)
         }
-        return [] as ElementDefinition[]
+        
+        return []
     }
 
     const onCategoryClick = (category: Category) => {
@@ -285,12 +281,7 @@ const GraphView = forwardRef(({ graph, runQuery, setGraph, historyQuery }: {
     const handleDoubleTap = async (evt: EventObject) => {
         const node = evt.target.json().data;
         const elements = await onFetchNode(node);
-
-        // adjust entire graph.
-        if (chartRef.current && elements.length > 0) {
-            chartRef.current.add(elements);
-            chartRef.current.elements().layout(LAYOUT).run();
-        }
+        chartRef.current?.add(elements);
     }
 
     const handleSelected = (evt: EventObject) => {

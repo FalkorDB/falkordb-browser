@@ -3,7 +3,7 @@
 import { ResizablePanel, ResizablePanelGroup, ResizableHandle } from "@/components/ui/resizable"
 import CytoscapeComponent from "react-cytoscapejs"
 import { ChevronLeft } from "lucide-react"
-import cytoscape, { EdgeSingular, ElementDefinition, EventObject, NodeDataDefinition } from "cytoscape"
+import cytoscape, { EdgeSingular, EventObject, NodeDataDefinition } from "cytoscape"
 import { ImperativePanelHandle } from "react-resizable-panels"
 import { Dispatch, SetStateAction, useEffect, useRef, useState } from "react"
 import fcose from "cytoscape-fcose";
@@ -75,19 +75,13 @@ function getStyle() {
             },
         },
         {
-            selector: "node:selected",
-            style: {
-                "border-width": 0.7,
-            }
-        },
-        {
             selector: "edge",
             style: {
                 width: 1,
-                "line-color": "black",
+                "line-color": "white",
                 "line-opacity": 0.7,
                 "arrow-scale": 0.7,
-                "target-arrow-color": "black",
+                "target-arrow-color": "white",
                 "target-arrow-shape": "triangle",
                 'curve-style': 'straight',
             },
@@ -97,15 +91,7 @@ function getStyle() {
             style: {
                 "overlay-opacity": 0,
             },
-        },
-        {
-            selector: "edge:selected",
-            style: {
-                width: 2,
-                "line-opacity": 1,
-                "arrow-scale": 1,
-            }
-        },
+        }
     ]
     return style
 }
@@ -118,7 +104,6 @@ const getCreateQuery = (type: string, selectedNodes: NodeDataDefinition[], label
 }
 
 export default function SchemaView({ schema, setSchema }: Props) {
-    const [elements, setElements] = useState<ElementDefinition[]>([]);
     const [selectedElement, setSelectedElement] = useState<ElementDataDefinition>();
     const [selectedNodes, setSelectedNodes] = useState<NodeDataDefinition[]>([]);
     const [isCollapsed, setIsCollapsed] = useState<boolean>(false);
@@ -136,12 +121,8 @@ export default function SchemaView({ schema, setSchema }: Props) {
     }, [isAddRelation])
 
     useEffect(() => {
-        setElements(schema.Elements)
-    }, [schema.Elements])
-
-    useEffect(() => {
-            chartRef?.current?.elements().layout(LAYOUT).run();
-    }, [elements]);
+        chartRef?.current?.elements().layout(LAYOUT).run();
+    }, [schema.Elements.length]);
 
     const onCategoryClick = (category: Category) => {
         const chart = chartRef.current
@@ -336,10 +317,10 @@ export default function SchemaView({ schema, setSchema }: Props) {
             const json = await result.json()
 
             if (type === "node") {
-                setElements(schema.extendNode(json.result.data[0].n, [...schema.Elements]))
+                chartRef?.current?.add({ data: schema.extendNode(json.result.data[0].n) })
                 setIsAddEntity(false)
             } else {
-                setElements(schema.extendEdge(json.result.data[0].e, [...schema.Elements]))
+                chartRef?.current?.add({ data: schema.extendEdge(json.result.data[0].e) })
                 setIsAddRelation(false)
             }
             onExpand()
@@ -391,7 +372,7 @@ export default function SchemaView({ schema, setSchema }: Props) {
                         className="Canvas"
                         layout={LAYOUT}
                         stylesheet={getStyle()}
-                        elements={elements}
+                        elements={schema.Elements}
                         cy={(cy) => {
                             chartRef.current = cy
 

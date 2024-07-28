@@ -2,8 +2,8 @@
 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dispatch, SetStateAction, useState } from "react";
-import { Toast } from "@/lib/utils";
-import { ArrowRight, ArrowRightLeft, ChevronRight } from "lucide-react";
+import { cn, Toast } from "@/lib/utils";
+import { ArrowRight, ArrowRightLeft, ChevronRight, Trash2 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { NodeDataDefinition } from "cytoscape";
 import { getCategoryColorNameFromValue } from "@/app/api/graph/model";
@@ -34,6 +34,7 @@ export default function CreateElement({ onCreate, onExpand, selectedNodes, setSe
   const [label, setLabel] = useState<string>()
   const [labelEditable, setLabelEditable] = useState<boolean>(false)
   const [editable, setEditable] = useState<string>("")
+  const [hover, setHover] = useState<string>("")
 
   const onAddAttribute = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.code === "Escape") {
@@ -155,9 +156,22 @@ export default function CreateElement({ onCreate, onExpand, selectedNodes, setSe
           <TableBody>
             {
               attributes.map((attr, index) => (
-                // eslint-disable-next-line react/no-array-index-key
-                <TableRow className="border-none" key={index}>
-                  <TableCell>
+                <TableRow
+                  // eslint-disable-next-line react/no-array-index-key
+                  key={index}
+                  className="border-none"
+                  onMouseEnter={() => setHover(`${index}`)}
+                  onMouseLeave={() => setHover("")}
+                >
+                  <TableCell className={cn(hover === `${index}` && "flex gap-2")}>
+                    {
+                      hover === `${index}` &&
+                      <Button
+                        className="text-[#ACACC2]"
+                        icon={<Trash2 />}
+                        onClick={() => setAttributes(prev => prev.filter((_, i) => i !== index))}
+                      />
+                    }
                     {
                       editable === `${index}-0` ?
                         <Input
