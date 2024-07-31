@@ -81,21 +81,19 @@ export default function Selector({ onChange, graph, queries, runQuery, isSchema,
     }
 
     const onExport = async () => {
-        const result = await securedFetch(`api/graph/${selectedValue}/export`, {
+        const name = `${selectedValue}${isSchema ? "_schema" : ""}`
+        const result = await securedFetch(`api/graph/${name}/export`, {
             method: "GET"
         })
 
-        if (!result.ok) {
-            Toast("Error while exporting data")
-            return
-        }
+        if (!result.ok) return
 
         const blob = await result.blob()
         const url = window.URL.createObjectURL(blob)
         try {
             const link = document.createElement('a')
             link.href = url
-            link.setAttribute('download', `${selectedValue}.dump`)
+            link.setAttribute('download', `${name}.dump`)
             document.body.appendChild(link)
             link.click()
             link.parentNode?.removeChild(link)

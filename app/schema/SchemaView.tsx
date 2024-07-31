@@ -11,7 +11,7 @@ import { ElementDataDefinition, Toast, cn, prepareArg, securedFetch } from "@/li
 import Toolbar from "../graph/toolbar"
 import SchemaDataPanel, { Attribute } from "./SchemaDataPanel"
 import Labels from "../graph/labels"
-import { Category, Graph } from "../api/graph/model"
+import { Category, getCategoryColorValue, Graph } from "../api/graph/model"
 import Button from "../components/ui/Button"
 import CreateElement from "./SchemaCreateElement"
 
@@ -273,14 +273,9 @@ export default function SchemaView({ schema, setNodesCount, setEdgesCount }: Pro
         })
 
         if (ok) {
-            const s = schema
-            s.Elements = schema.Elements.map(e => {
-                if (e.data.id === selectedElement.id) {
-                    const updatedElement = e
-                    updatedElement.data[key] = newVal
-                    return updatedElement
-                }
-                return e
+            schema.Elements.forEach(e => {
+                if (e.data.id !== selectedElement.id) return
+                e.data[key] = newVal
             })
         } else {
             Toast("Failed to set property")
@@ -292,21 +287,63 @@ export default function SchemaView({ schema, setNodesCount, setEdgesCount }: Pro
     const handelSetLabel = async (label: string) => {
         if (!selectedElement) return false
 
-        const type = selectedElement.sucre ? "node" : "edge"
+        const type = selectedElement.source ? "edge" : "node"
         const { id, query } = getElementId(selectedElement)
-        const q = `MATCH ${query} WHERE ID(e) = ${id} REMOVE e:${selectedElement?.label} SET e:${label} RETURN n`
-        const result = await securedFetch(`api/graph/${prepareArg(schema.Id)}_schema/?query=${prepareArg(q)}`, {
+        const q = `MATCH ${query} WHERE ID(e) = ${id}${type === "node" ? ` REMOVE e:${selectedElement.category}` : ""} SET e:${label}`
+        const success = (await securedFetch(`api/graph/${prepareArg(schema.Id)}_schema/?query=${prepareArg(q)}`, {
             method: "GET"
-        })
+        })).ok
 
-        if (result.ok) {
-            const json = await result.json()
-            schema.Elements.splice(schema.Elements.findIndex(element => element.data.id === id), 1)
-            schema.updateCategories(label, type)
-            schema.Elements.push({ data: schema.extendNode(json.result.data[0].n) })
+        if (success) {
+            schema.Elements.forEach(({ data }) => {
+                if (data.id !== id) return
+
+                if (type === "node") {
+                    // eslint-disable-next-line no-param-reassign
+                    data.category = label
+                    let category = schema.CategoriesMap.get(label)
+
+                    if (!category) {
+                        category = { name: label, index: schema.CategoriesMap.size, show: true }
+                        schema.CategoriesMap.set(label, category)
+                        schema.Categories.push(category)
+                    }
+
+                    chartRef.current?.elements().forEach(n => {
+                        if (n.data().id === id) {
+                            // eslint-disable-next-line no-param-reassign
+                            n.data().label = label
+                            // eslint-disable-next-line no-param-reassign
+                            n.data().color = getCategoryColorValue(category.index)
+                        }
+                    });
+                    chartRef.current?.elements().layout(LAYOUT).run();
+                } else {
+                    // eslint-disable-next-line no-param-reassign
+                    data.label = label
+                    let category = schema.LabelsMap.get(label)
+
+                    if (!category) {
+                        category = { name: label, index: schema.LabelsMap.size, show: true }
+                        schema.LabelsMap.set(label, category)
+                        schema.Labels.push(category)
+                    }
+
+                    chartRef.current?.elements().forEach(r => {
+                        if (r.data().id === selectedElement.id) {
+                            // eslint-disable-next-line no-param-reassign
+                            r.data().label = label
+                            // eslint-disable-next-line no-param-reassign
+                            r.data().color = getCategoryColorValue(category.index)
+                        }
+                    });
+                    chartRef.current?.elements().layout(LAYOUT).run();
+                }
+            })
+            schema.updateCategories(type === "node" ? selectedElement.category : selectedElement.label, type)
         }
 
-        return result.ok
+        return success
     }
 
     const handelRemoveProperty = async (key: string) => {

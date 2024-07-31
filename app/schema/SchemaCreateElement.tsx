@@ -29,6 +29,7 @@ export default function SchemaCreateElement({ onCreate, onExpand, selectedNodes,
   const [newKey, setNewKey] = useState<string>()
   const [newValue, setNewValue] = useState<string>()
   const [label, setLabel] = useState<string>()
+  const [newLabel, setNewLabel] = useState<string>()
   const [labelEditable, setLabelEditable] = useState<boolean>(false)
   const [editable, setEditable] = useState<string>("")
   const [hover, setHover] = useState<string>("")
@@ -50,6 +51,7 @@ export default function SchemaCreateElement({ onCreate, onExpand, selectedNodes,
 
     setAttributes(prev => [...prev, [newKey ,attribute]])
     setAttribute(emptyAttribute())
+    setNewKey("")
   }
 
   const handelSetAttribute = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -79,6 +81,10 @@ export default function SchemaCreateElement({ onCreate, onExpand, selectedNodes,
   }
 
   const handelOnCreate = async () => {
+    if (!label && type === "edge") {
+      Toast("Please fill the label")
+      return
+    }
     const ok = await onCreate(attributes, label)
     if (!ok) {
       Toast("")
@@ -108,6 +114,7 @@ export default function SchemaCreateElement({ onCreate, onExpand, selectedNodes,
 
     if (e.key !== "Enter") return
 
+    setLabel(newLabel)
     setLabelEditable(false)
   }
 
@@ -126,13 +133,13 @@ export default function SchemaCreateElement({ onCreate, onExpand, selectedNodes,
                 ref={ref => ref?.focus()}
                 className="w-28"
                 variant="Small"
-                onChange={(e) => setLabel(e.target.value)}
-                value={label}
+                onChange={(e) => setNewLabel(e.target.value)}
+                value={newLabel}
                 onBlur={handelLabelCancel}
                 onKeyDown={onSetLabel}
               /> : <Button
                 className="underline underline-offset-2"
-                label={label === undefined ? "Edit Label" : label}
+                label={label || "Edit Label"}
                 onClick={() => setLabelEditable(true)}
               />
           }
@@ -280,7 +287,7 @@ export default function SchemaCreateElement({ onCreate, onExpand, selectedNodes,
                   onKeyDown={handelAddAttribute}
                   variant="Small"
                   onChange={(e) => setNewKey(e.target.value)}
-                  value={attribute[0]}
+                  value={newKey}
                 />
               </TableCell>
               <TableCell>

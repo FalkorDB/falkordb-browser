@@ -45,7 +45,7 @@ export default function SchemaCreateElement({ obj, onExpand, onDelete, onSetAttr
     const [editable, setEditable] = useState<string>("")
     const [hover, setHover] = useState<string>("")
     const [isAddValue, setIsAddValue] = useState<boolean>(false)
-    const [attributes, setAttributes] = useState(Object.entries(obj).filter(([k, v]) => !excludedProperties.has(k) && !(k === "name" && v === obj.id)).map(([k, v]) => [k, Array.isArray(v) ? v : v.split(",")] as [string, Attribute]))
+    const [attributes, setAttributes] = useState<[string, Attribute][]>(Object.entries(obj).filter(([k, v]) => !excludedProperties.has(k) && !(k === "name" && v === obj.id)).map(([k, v]) => [k, Array.isArray(v) ? v : v.split(",")] as [string, Attribute]))
     const [label, setLabel] = useState<string>(obj.source ? obj.label : obj.category)
     const [newLabel, setNewLabel] = useState<string>()
 
@@ -77,7 +77,7 @@ export default function SchemaCreateElement({ obj, onExpand, onDelete, onSetAttr
     const handelSetAttribute = async (e: React.KeyboardEvent<HTMLInputElement>) => {
         if (e.code === "Escape") {
             e.preventDefault()
-            setVal(undefined)
+            setVal("")
             setEditable("")
             return
         }
@@ -87,15 +87,16 @@ export default function SchemaCreateElement({ obj, onExpand, onDelete, onSetAttr
         e.preventDefault()
 
         const [index, i] = editable.split("-")
-        
-        if (!newVal || (i === "key" && !newKey)) {
+        const isKey = i === "key"
+
+        if (isKey ? !newKey : !newVal) {
             Toast("Please fill the field")
             return
         }
         
         const attr = attributes[Number(index)][1]
         
-        const success = await onSetAttribute(i === "key" ? newKey as string : attributes[Number(index)][0] , [attr[0], newVal, attr[2], attr[3]])
+        const success = await onSetAttribute(isKey ? newKey as string : attributes[Number(index)][0] , [attr[0], isKey ? attr[1] : newVal as string, attr[2], attr[3]])
 
         if (!success) return
         
@@ -138,7 +139,7 @@ export default function SchemaCreateElement({ obj, onExpand, onDelete, onSetAttr
             return
         }
 
-        const success = await onSetLabel(label)
+        const success = await onSetLabel(newLabel)
 
         if (!success) return
 
@@ -163,13 +164,13 @@ export default function SchemaCreateElement({ obj, onExpand, onDelete, onSetAttr
                                 className="w-28"
                                 variant="Small"
                                 onChange={(e) => setNewLabel(e.target.value)}
-                                value={newLabel === undefined ? label : newLabel}
+                                value={newLabel}
                                 onBlur={handelLabelCancel}
                                 onKeyDown={handelSetLabel}
                             /> : <Button
-                                className="underline underline-offset-2"
+                                className={cn(!obj.source ? "underline underline-offset-2" : "cursor-default")}
                                 label={label || "Edit Label"}
-                                onClick={() => setLabelEditable(true)}
+                                onClick={() => !obj.source && setLabelEditable(true)}
                             />
                     }
                 </div>
@@ -224,7 +225,7 @@ export default function SchemaCreateElement({ obj, onExpand, onDelete, onSetAttr
                                                         ref={ref => ref?.focus()}
                                                         className="w-28"
                                                         variant="Small"
-                                                        value={newKey === undefined ? key : newKey}
+                                                        value={newKey}
                                                         onChange={(e) => setNewKey(e.target.value)}
                                                         onKeyDown={handelSetAttribute}
                                                         onBlur={() => handelCancel()}
@@ -234,7 +235,6 @@ export default function SchemaCreateElement({ obj, onExpand, onDelete, onSetAttr
                                                         label={`${key}:`}
                                                         onClick={() => {
                                                             setEditable(`${index}-key`)
-                                                            setNewKey(key)
                                                         }}
                                                     />
                                             }
@@ -249,11 +249,14 @@ export default function SchemaCreateElement({ obj, onExpand, onDelete, onSetAttr
                                                             const success = await onSetAttribute(key, [selectedValue as Type, attr[1], attr[2], attr[3]])
 
                                                             if (!success) return
+                                                            
                                                             setAttributes(prev => {
                                                                 const p = [...prev]
                                                                 p[index][1][0] = selectedValue as Type
                                                                 return p
                                                             })
+
+                                                            setEditable("")
                                                         }}
                                                         inTable
                                                         type="Type"
@@ -274,7 +277,7 @@ export default function SchemaCreateElement({ obj, onExpand, onDelete, onSetAttr
                                                         ref={ref => ref?.focus()}
                                                         className="w-28"
                                                         variant="Small"
-                                                        value={newVal === undefined ? val[1] : newVal}
+                                                        value={newVal}
                                                         onChange={(e) => setVal(e.target.value)}
                                                         onKeyDown={handelSetAttribute}
                                                         onBlur={() => setEditable("")}
