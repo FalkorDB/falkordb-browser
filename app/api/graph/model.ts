@@ -120,8 +120,24 @@ export class Graph {
         return this.categories;
     }
 
+    set Categories(categories: Category[]) {
+        this.categories = categories;
+    }
+
+    get CategoriesMap(): Map<string, Category> {
+        return this.categoriesMap;
+    }
+
     get Labels(): Category[] {
         return this.labels;
+    }
+
+    set Labels(labels: Category[]) {
+        this.labels = labels;
+    }
+
+    get LabelsMap(): Map<string, Category> {
+        return this.labelsMap;
     }
 
     get Elements(): ElementDefinition[] {
@@ -210,7 +226,7 @@ export class Graph {
             const sourceId = cell.sourceId.toString();
             const destinationId = cell.destinationId.toString()
             const edge: EdgeDataDefinition = {
-                _id: cell.id,
+                id: `_${cell.id}`,
                 source: sourceId,
                 target: destinationId,
                 label: cell.relationshipType,
@@ -284,7 +300,21 @@ export class Graph {
                 }
             })
         })
-        
+
         return newElements
+    }
+
+    public updateCategories(category: string, type: string) {
+        if (type === "node" && !this.elements.find(e => e.data.source ? e.data.label === category : e.data.category === category)) {
+            const i = this.categories.findIndex(({ name }) => name === category)
+            this.categories.splice(i, 1)
+            this.categoriesMap.delete(category)
+        }
+
+        if (type === "edge" && !this.elements.find(e => e.data.source ? e.data.label === category : e.data.category === category)) {
+            const i = this.labels.findIndex(({ name }) => name === category)
+            this.labels.splice(i, 1)
+            this.labelsMap.delete(category)
+        }
     }
 }

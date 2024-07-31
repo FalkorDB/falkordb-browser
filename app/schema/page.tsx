@@ -11,6 +11,34 @@ export default function Page() {
 
     const [schemaName, setSchemaName] = useState<string>("")
     const [schema, setSchema] = useState<Graph>(Graph.empty())
+    const [edgesCount, setEdgesCount] = useState<number>(0);
+    const [nodesCount, setNodesCount] = useState<number>(0);
+
+    useEffect(() => {
+        if (!schemaName) return
+
+        const run = async () => {
+            const name = `${schemaName}_schema`
+            const q = [
+                "MATCH (n) RETURN COUNT(n) as nodes",
+                "MATCH ()-[e]->() RETURN COUNT(e) as edges"
+            ]
+
+            const nodes = await (await securedFetch(`api/graph/${prepareArg(name)}/?query=${q[0]}`, {
+                method: "GET"
+            })).json()
+
+            const edges = await (await securedFetch(`api/graph/${prepareArg(name)}/?query=${q[1]}`, {
+                method: "GET"
+            })).json()
+
+            if (!edges || !nodes) return
+
+            setEdgesCount(edges.result?.data[0].edges)
+            setNodesCount(nodes.result?.data[0].nodes)
+        }
+        run()
+    }, [schemaName])
 
     useEffect(() => {
         if (!schemaName) return
@@ -30,10 +58,10 @@ export default function Page() {
 
     return (
         <div className="h-full w-full flex flex-col">
-            <Header onSetGraphName={setSchemaName}/>
+            <Header onSetGraphName={setSchemaName} />
             <div className="h-1 grow p-8 px-10 flex flex-col gap-8">
-                <Selector onChange={setSchemaName} graph={schema} isSchema/>
-                <SchemaView schema={schema} setSchema={setSchema}/>
+                <Selector onChange={setSchemaName} graph={schema} isSchema edgesCount={edgesCount} nodesCount={nodesCount} setEdgesCount={setEdgesCount} setNodesCount={setNodesCount} />
+                <SchemaView schema={schema} setEdgesCount={setEdgesCount} setNodesCount={setNodesCount} />
             </div>
         </div>
     )

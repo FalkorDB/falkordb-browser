@@ -7,36 +7,33 @@ import { ArrowRight, ArrowRightLeft, ChevronRight, Trash2 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { NodeDataDefinition } from "cytoscape";
 import { getCategoryColorNameFromValue } from "@/app/api/graph/model";
-import Input from "../ui/Input";
-import Button from "../ui/Button";
-import Combobox from "../ui/combobox";
-
-const OPTIONS = ["String", "Integer", "Float", "Geospatial", "Boolean"]
-
-type Type = "String" | "Integer" | "Float" | "Geospatial" | "Boolean" | undefined
-export type Attribute = [string, Type, string, boolean, boolean]
+import Input from "../components/ui/Input";
+import Button from "../components/ui/Button";
+import Combobox from "../components/ui/combobox";
+import { Attribute, OPTIONS, Type } from "./SchemaDataPanel";
 
 interface Props {
-  onCreate: (element: Attribute[], label?: string) => Promise<boolean>
+  onCreate: (element: [string, Attribute][], label?: string) => Promise<boolean>
   onExpand: () => void
   selectedNodes: NodeDataDefinition[]
   setSelectedNodes: Dispatch<SetStateAction<NodeDataDefinition[]>>
   type: "node" | "edge"
 }
 
-const emptyAttribute = (): Attribute => ["", undefined, "", false, false]
+const emptyAttribute = (): Attribute => [undefined, "", false, false]
 
-export default function CreateElement({ onCreate, onExpand, selectedNodes, setSelectedNodes, type }: Props) {
+export default function SchemaCreateElement({ onCreate, onExpand, selectedNodes, setSelectedNodes, type }: Props) {
 
-  const [attributes, setAttributes] = useState<Attribute[]>([])
+  const [attributes, setAttributes] = useState<[string, Attribute][]>([])
   const [attribute, setAttribute] = useState<Attribute>(emptyAttribute())
-  const [value, setValue] = useState<string>()
+  const [newKey, setNewKey] = useState<string>()
+  const [newValue, setNewValue] = useState<string>()
   const [label, setLabel] = useState<string>()
   const [labelEditable, setLabelEditable] = useState<boolean>(false)
   const [editable, setEditable] = useState<string>("")
   const [hover, setHover] = useState<string>("")
 
-  const onAddAttribute = (e: React.KeyboardEvent<HTMLInputElement>) => {
+  const handelAddAttribute = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.code === "Escape") {
       e.preventDefault()
       setAttribute(emptyAttribute())
@@ -46,19 +43,19 @@ export default function CreateElement({ onCreate, onExpand, selectedNodes, setSe
     if (e.key !== 'Enter') return
 
     e.preventDefault()
-    if (!attribute[0] || !attribute[1] || !attribute[2]) {
+    if (!newKey || !attribute[0] || !attribute[1]) {
       Toast('Please fill all the fields')
       return
     }
 
-    setAttributes(prev => [...prev, attribute])
+    setAttributes(prev => [...prev, [newKey ,attribute]])
     setAttribute(emptyAttribute())
   }
 
-  const onSetAttribute = (e: React.KeyboardEvent<HTMLInputElement>) => {
+  const handelSetAttribute = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.code === "Escape") {
       e.preventDefault()
-      setValue(undefined)
+      setNewValue(undefined)
       setEditable("")
       return
     }
@@ -67,7 +64,7 @@ export default function CreateElement({ onCreate, onExpand, selectedNodes, setSe
 
     e.preventDefault()
 
-    if (!value) {
+    if (!newValue) {
       Toast("Please fill the field")
       return
     }
@@ -75,10 +72,10 @@ export default function CreateElement({ onCreate, onExpand, selectedNodes, setSe
     setAttributes(prev => {
       const p = prev
       const [index, i] = editable.split("-").map((v) => parseInt(v, 10))
-      p[index][i] = value
+      p[index][i] = newValue
       return p
     })
-    setValue(undefined)
+    setNewValue(undefined)
   }
 
   const handelOnCreate = async () => {
@@ -99,7 +96,7 @@ export default function CreateElement({ onCreate, onExpand, selectedNodes, setSe
   }
 
   const handelCancel = () => {
-    setValue("")
+    setNewValue("")
     setEditable("")
   }
 
@@ -135,7 +132,7 @@ export default function CreateElement({ onCreate, onExpand, selectedNodes, setSe
                 onKeyDown={onSetLabel}
               /> : <Button
                 className="underline underline-offset-2"
-                label={label || "Edit Label"}
+                label={label === undefined ? "Edit Label" : label}
                 onClick={() => setLabelEditable(true)}
               />
           }
@@ -155,7 +152,7 @@ export default function CreateElement({ onCreate, onExpand, selectedNodes, setSe
           </TableHeader>
           <TableBody>
             {
-              attributes.map((attr, index) => (
+              attributes.map(([key, val], index) => (
                 <TableRow
                   // eslint-disable-next-line react/no-array-index-key
                   key={index}
@@ -173,19 +170,44 @@ export default function CreateElement({ onCreate, onExpand, selectedNodes, setSe
                       />
                     }
                     {
-                      editable === `${index}-0` ?
+                      editable === `${index}-key` ?
                         <Input
                           ref={ref => ref?.focus()}
                           className="w-28"
                           variant="Small"
-                          value={value === undefined ? attr[0] : value}
-                          onChange={(e) => setValue(e.target.value)}
-                          onKeyDown={onSetAttribute}
+                          value={newKey === undefined ? key : newKey}
+                          onChange={(e) => setNewKey(e.target.value)}
+                          onKeyDown={handelSetAttribute}
                           onBlur={() => handelCancel()}
                         />
                         : <Button
                           className="text-[#ACACC2]"
-                          label={`${attr[0]}:`}
+                          label={`${key}:`}
+                          onClick={() => setEditable(`${index}-key`)}
+                        />
+                    }
+                  </TableCell>
+                  <TableCell>
+                    {
+                      editable === `${index}-0` ?
+                        <Combobox
+                          options={OPTIONS}
+                          setSelectedValue={(v) => {
+                            setAttributes(prev => {
+                              const p = [...prev]
+                              p[index][1][0] = v as Type
+                              return p
+                            })
+                            setEditable("")
+                          }}
+                          inTable
+                          type="Type"
+                          selectedValue={attribute[0]}
+                          onOpenChange={(o) => !o && setEditable("")}
+                          defaultOpen
+                        />
+                        : <Button
+                          label={val[0]}
                           onClick={() => setEditable(`${index}-0`)}
                         />
                     }
@@ -193,24 +215,17 @@ export default function CreateElement({ onCreate, onExpand, selectedNodes, setSe
                   <TableCell>
                     {
                       editable === `${index}-1` ?
-                        <Combobox
-                          options={OPTIONS}
-                          setSelectedValue={(v) => {
-                            setAttributes(prev => {
-                              const p = [...prev] as Attribute[]
-                              p[index][1] = v as Type
-                              return p
-                            })
-                            setEditable("")
-                          }}
-                          inTable
-                          type="Type"
-                          selectedValue={attribute[1]}
-                          onOpenChange={(o) => !o && setEditable("")}
-                          defaultOpen
+                        <Input
+                          ref={ref => ref?.focus()}
+                          className="w-28"
+                          variant="Small"
+                          value={newValue === undefined ? val[1] : newValue}
+                          onChange={(e) => setNewValue(e.target.value)}
+                          onKeyDown={handelSetAttribute}
+                          onBlur={() => setEditable("")}
                         />
                         : <Button
-                          label={attr[1]}
+                          label={val[1]}
                           onClick={() => setEditable(`${index}-1`)}
                         />
                     }
@@ -218,18 +233,20 @@ export default function CreateElement({ onCreate, onExpand, selectedNodes, setSe
                   <TableCell>
                     {
                       editable === `${index}-2` ?
-                        <Input
+                        <Checkbox
                           ref={ref => ref?.focus()}
-                          className="w-28"
-                          variant="Small"
-                          value={value === undefined ? attr[2] : value}
-                          onChange={(e) => setValue(e.target.value)}
-                          onKeyDown={onSetAttribute}
+                          className="h-6 w-6 border-[#57577B] data-[state=checked]:bg-[#57577B]"
+                          onCheckedChange={(checked) => setAttributes(prev => {
+                            const p = [...prev]
+                            p[index][1][2] = checked as boolean
+                            return p
+                          })}
+                          checked={val[3]}
                           onBlur={() => setEditable("")}
                         />
                         : <Button
-                          label={attr[2]}
-                          onClick={() => setEditable(`${index}-2`)}
+                          label={val[3].toString()}
+                          onClick={() => setEditable(`${index}-3`)}
                         />
                     }
                   </TableCell>
@@ -240,35 +257,15 @@ export default function CreateElement({ onCreate, onExpand, selectedNodes, setSe
                           ref={ref => ref?.focus()}
                           className="h-6 w-6 border-[#57577B] data-[state=checked]:bg-[#57577B]"
                           onCheckedChange={(checked) => setAttributes(prev => {
-                            const p = [...prev] as Attribute[]
-                            p[index][3] = checked as boolean
+                            const p = [...prev]
+                            p[index][1][3] = checked as boolean
                             return p
                           })}
-                          checked={attr[3]}
+                          checked={val[3]}
                           onBlur={() => setEditable("")}
                         />
                         : <Button
-                          label={attr[3].toString()}
-                          onClick={() => setEditable(`${index}-3`)}
-                        />
-                    }
-                  </TableCell>
-                  <TableCell>
-                    {
-                      editable === `${index}-4` ?
-                        <Checkbox
-                          ref={ref => ref?.focus()}
-                          className="h-6 w-6 border-[#57577B] data-[state=checked]:bg-[#57577B]"
-                          onCheckedChange={(checked) => setAttributes(prev => {
-                            const p = [...prev] as Attribute[]
-                            p[index][4] = checked as boolean
-                            return p
-                          })}
-                          checked={attr[4]}
-                          onBlur={() => setEditable("")}
-                        />
-                        : <Button
-                          label={attr[4].toString()}
+                          label={val[3].toString()}
                           onClick={() => setEditable(`${index}-4`)}
                         />
                     }
@@ -280,13 +277,9 @@ export default function CreateElement({ onCreate, onExpand, selectedNodes, setSe
               <TableCell>
                 <Input
                   className="w-28"
-                  onKeyDown={onAddAttribute}
+                  onKeyDown={handelAddAttribute}
                   variant="Small"
-                  onChange={(e) => setAttribute(prev => {
-                    const p = [...prev] as Attribute
-                    p[0] = e.target.value
-                    return p
-                  })}
+                  onChange={(e) => setNewKey(e.target.value)}
                   value={attribute[0]}
                 />
               </TableCell>
@@ -295,25 +288,36 @@ export default function CreateElement({ onCreate, onExpand, selectedNodes, setSe
                   options={OPTIONS}
                   setSelectedValue={(v) => setAttribute(prev => {
                     const p = [...prev] as Attribute
-                    p[1] = v as Type
+                    p[0] = v as Type
                     return p
                   })}
                   inTable
                   type="Type"
-                  selectedValue={attribute[1]}
+                  selectedValue={attribute[0]}
                 />
               </TableCell>
               <TableCell>
                 <Input
                   className="w-28"
-                  onKeyDown={onAddAttribute}
+                  onKeyDown={handelAddAttribute}
                   variant="Small"
                   onChange={(e) => setAttribute(prev => {
                     const p = [...prev] as Attribute
-                    p[2] = e.target.value
+                    p[1] = e.target.value
                     return p
                   })}
-                  value={attribute[2]}
+                  value={attribute[1]}
+                />
+              </TableCell>
+              <TableCell>
+                <Checkbox
+                  className="h-6 w-6 border-[#57577B] data-[state=checked]:bg-[#57577B]"
+                  onCheckedChange={(checked) => setAttribute(prev => {
+                    const p = [...prev] as Attribute
+                    p[2] = checked as boolean
+                    return p
+                  })}
+                  checked={attribute[2]}
                 />
               </TableCell>
               <TableCell>
@@ -325,17 +329,6 @@ export default function CreateElement({ onCreate, onExpand, selectedNodes, setSe
                     return p
                   })}
                   checked={attribute[3]}
-                />
-              </TableCell>
-              <TableCell>
-                <Checkbox
-                  className="h-6 w-6 border-[#57577B] data-[state=checked]:bg-[#57577B]"
-                  onCheckedChange={(checked) => setAttribute(prev => {
-                    const p = [...prev] as Attribute
-                    p[4] = checked as boolean
-                    return p
-                  })}
-                  checked={attribute[4]}
                 />
               </TableCell>
             </TableRow>

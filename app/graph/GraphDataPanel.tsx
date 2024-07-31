@@ -28,7 +28,7 @@ const excludedProperties = new Set([
     "source",
 ]);
 
-export default function DataPanel({ inSchema, obj, onExpand, setProperty, setPropertySchema, removeProperty, onDeleteElement }: Props) {
+export default function GraphDataPanel({ inSchema, obj, onExpand, setProperty, setPropertySchema, removeProperty, onDeleteElement }: Props) {
 
     const [isAddValue, setIsAddValue] = useState<boolean>(false)
     const [hover, setHover] = useState<string>("")

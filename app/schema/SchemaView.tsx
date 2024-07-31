@@ -3,22 +3,23 @@
 import { ResizablePanel, ResizablePanelGroup, ResizableHandle } from "@/components/ui/resizable"
 import CytoscapeComponent from "react-cytoscapejs"
 import { ChevronLeft } from "lucide-react"
-import cytoscape, { EdgeSingular, EventObject, NodeDataDefinition } from "cytoscape"
+import cytoscape, { EdgeDataDefinition, EdgeSingular, EventObject, NodeDataDefinition } from "cytoscape"
 import { ImperativePanelHandle } from "react-resizable-panels"
 import { Dispatch, SetStateAction, useEffect, useRef, useState } from "react"
 import fcose from "cytoscape-fcose";
 import { ElementDataDefinition, Toast, cn, prepareArg, securedFetch } from "@/lib/utils"
 import Toolbar from "../graph/toolbar"
-import DataPanel from "../graph/DataPanel"
+import SchemaDataPanel, { Attribute } from "./SchemaDataPanel"
 import Labels from "../graph/labels"
 import { Category, Graph } from "../api/graph/model"
 import Button from "../components/ui/Button"
-import CreateElement, { Attribute } from "../components/graph/CreateElement"
+import CreateElement from "./SchemaCreateElement"
 
 /* eslint-disable react/require-default-props */
 interface Props {
     schema: Graph
-    setSchema: Dispatch<SetStateAction<Graph>>
+    setNodesCount: Dispatch<SetStateAction<number>>
+    setEdgesCount: Dispatch<SetStateAction<number>>
 }
 
 const LAYOUT = {
@@ -96,14 +97,16 @@ function getStyle() {
     return style
 }
 
-const getCreateQuery = (type: string, selectedNodes: NodeDataDefinition[], label?: string, attributes: Attribute[] = []) => {
+const getElementId = (element: NodeDataDefinition | EdgeDataDefinition) => element.source ? { id: element.id?.slice(1), query: "()-[e]-()" } : { id: element.id, query: "(e)" }
+
+const getCreateQuery = (type: string, selectedNodes: NodeDataDefinition[], attributes: [string, Attribute][], label?: string) => {
     if (type === "node") {
-        return `CREATE (n${label ? `:${label}` : ""}${attributes?.length > 0 ? ` {${attributes.map(([k, t, d, u, un]) => `${k}: ["${t}", "${d}", "${u}", "${un}"]`).join(",")}}` : ""}) RETURN n`
+        return `CREATE (n${label ? `:${label}` : ""}${attributes?.length > 0 ? ` {${attributes.map(([k, [t, d, u, un]]) => `${k}: ["${t}", "${d}", "${u}", "${un}"]`).join(",")}}` : ""}) RETURN n`
     }
-    return `MATCH (a), (b) WHERE ID(a) = ${selectedNodes[0].id} AND ID(b) = ${selectedNodes[1].id} CREATE (a)-[e${label ? `:${label}` : ""}${attributes?.length > 0 ? ` {${attributes.map(([k, t, d, u, un]) => `${k}: ["${t}", "${d}", "${u}", "${un}"]`).join(",")}}` : ""}]->(b) RETURN e`
+    return `MATCH (a), (b) WHERE ID(a) = ${selectedNodes[0].id} AND ID(b) = ${selectedNodes[1].id} CREATE (a)-[e${label ? `:${label}` : ""}${attributes?.length > 0 ? ` {${attributes.map(([k, [t, d, u, un]]) => `${k}: ["${t}", "${d}", "${u}", "${un}"]`).join(",")}}` : ""}]->(b) RETURN e`
 }
 
-export default function SchemaView({ schema, setSchema }: Props) {
+export default function SchemaView({ schema, setNodesCount, setEdgesCount }: Props) {
     const [selectedElement, setSelectedElement] = useState<ElementDataDefinition>();
     const [selectedNodes, setSelectedNodes] = useState<NodeDataDefinition[]>([]);
     const [isCollapsed, setIsCollapsed] = useState<boolean>(false);
@@ -233,44 +236,51 @@ export default function SchemaView({ schema, setSchema }: Props) {
         }
     }
 
-    const onDelete = async (selectedValue: ElementDataDefinition) => {
-        const { id } = selectedValue
-        const q = `MATCH (n) WHERE ID(n) = ${id} delete n`
-        const result = await securedFetch(`api/graph/${prepareArg(schema.Id)}_schema/?query=${prepareArg(q)}`, {
+    const handelDelete = async () => {
+        if (!selectedElement) return
+
+        const type = selectedElement.source ? "edge" : "node"
+        const { id, query } = getElementId(selectedElement)
+        const q = `MATCH ${query} WHERE ID(e) = ${id} delete e`
+        const result = await securedFetch(`api/graph/${prepareArg(schema.Id)}_schema/?query=${prepareArg(q)} `, {
             method: "GET"
         })
 
-        if (!result.ok) {
-            Toast("Failed to delete")
-            return
+        if (!result.ok) return
+
+        schema.Elements.splice(schema.Elements.findIndex(e => e.data.id === id), 1)
+        chartRef.current?.remove(`#${id} `)
+
+        if (type === "node") {
+            setNodesCount(prev => prev - 1)
+        } else {
+            setEdgesCount(prev => prev - 1)
         }
-        setSchema(prev => {
-            const p = prev
-            p.Elements = schema.Elements.filter(e => e.data.id !== id)
-            return p
-        })
+
+        schema.updateCategories(type === "node" ? selectedElement.category : selectedElement.label, type)
+        setSelectedElement(undefined)
+        onExpand()
+
     }
 
-    const setProperty = async (key: string, newVal: string[]) => {
+    const handelSetAttribute = async (key: string, newVal: Attribute) => {
         if (!selectedElement) return false
-        const { id } = selectedElement
-        const q = `MATCH (n) WHERE ID(n) = ${id} SET n.${key} = "${newVal}"`
+
+        const { id, query } = getElementId(selectedElement)
+        const q = `MATCH ${query} WHERE ID(e) = ${id} SET e.${key} = "${newVal}"`
         const { ok } = await securedFetch(`api/graph/${prepareArg(schema.Id)}_schema/?query=${prepareArg(q)}`, {
             method: "GET"
         })
 
         if (ok) {
-            setSchema(prev => {
-                const p = prev
-                p.Elements = schema.Elements.map(e => {
-                    if (e.data.id === id) {
-                        const updatedElement = e
-                        updatedElement.data[key] = newVal
-                        return updatedElement
-                    }
-                    return e
-                })
-                return p
+            const s = schema
+            s.Elements = schema.Elements.map(e => {
+                if (e.data.id === selectedElement.id) {
+                    const updatedElement = e
+                    updatedElement.data[key] = newVal
+                    return updatedElement
+                }
+                return e
             })
         } else {
             Toast("Failed to set property")
@@ -279,37 +289,54 @@ export default function SchemaView({ schema, setSchema }: Props) {
         return ok
     }
 
-    const removeProperty = async (key: string) => {
+    const handelSetLabel = async (label: string) => {
         if (!selectedElement) return false
 
-        const { id } = selectedElement
-        const q = `MATCH (n) WHERE ID(n) = ${id} SET n.${key} = null`
+        const type = selectedElement.sucre ? "node" : "edge"
+        const { id, query } = getElementId(selectedElement)
+        const q = `MATCH ${query} WHERE ID(e) = ${id} REMOVE e:${selectedElement?.label} SET e:${label} RETURN n`
+        const result = await securedFetch(`api/graph/${prepareArg(schema.Id)}_schema/?query=${prepareArg(q)}`, {
+            method: "GET"
+        })
+
+        if (result.ok) {
+            const json = await result.json()
+            schema.Elements.splice(schema.Elements.findIndex(element => element.data.id === id), 1)
+            schema.updateCategories(label, type)
+            schema.Elements.push({ data: schema.extendNode(json.result.data[0].n) })
+        }
+
+        return result.ok
+    }
+
+    const handelRemoveProperty = async (key: string) => {
+        if (!selectedElement) return false
+
+        const { id, query } = getElementId(selectedElement)
+        const q = `MATCH ${query} WHERE ID(e) = ${id} SET e.${key} = null`
         const { ok } = await securedFetch(`api/graph/${prepareArg(schema.Id)}_schema/?query=${prepareArg(q)}`, {
             method: "GET"
         })
 
         if (!ok) return ok
 
-        setSchema(prev => {
-            const p = prev
-            p.Elements = schema.Elements.map(e => {
-                if (e.data.id === id) {
-                    const updatedElement = e
-                    delete updatedElement.data[key]
-                    return updatedElement
-                }
-                return e
-            })
-            return p
+        const s = schema
+        s.Elements = schema.Elements.map(e => {
+            if (e.data.id === id) {
+                const updatedElement = e
+                delete updatedElement.data[key]
+                return updatedElement
+            }
+            return e
         })
 
         return ok
     }
 
-    const onCreateElement = async (attributes: Attribute[], label?: string) => {
+    const onCreateElement = async (attributes: [string, Attribute][], label?: string) => {
         const type = isAddEntity ? "node" : ""
 
-        const result = await securedFetch(`api/graph/${prepareArg(schema.Id)}_schema/?query=${getCreateQuery(type, selectedNodes, label, attributes)}`, {
+        const result = await securedFetch(`api/graph/${prepareArg(schema.Id)}_schema/?query=${getCreateQuery(type, selectedNodes, attributes, label)}`, {
             method: "GET"
         })
 
@@ -318,9 +345,11 @@ export default function SchemaView({ schema, setSchema }: Props) {
 
             if (type === "node") {
                 chartRef?.current?.add({ data: schema.extendNode(json.result.data[0].n) })
+                setNodesCount(prev => prev + 1)
                 setIsAddEntity(false)
             } else {
                 chartRef?.current?.add({ data: schema.extendEdge(json.result.data[0].e) })
+                setEdgesCount(prev => prev + 1)
                 setIsAddRelation(false)
             }
             onExpand()
@@ -354,7 +383,7 @@ export default function SchemaView({ schema, setSchema }: Props) {
                             if (dataPanel.current?.isExpanded()) return
                             onExpand()
                         }}
-                        onDeleteElement={async () => onDelete && selectedElement && await onDelete(selectedElement)}
+                        onDeleteElement={handelDelete}
                         chartRef={chartRef}
                     />
                     {
@@ -412,12 +441,13 @@ export default function SchemaView({ schema, setSchema }: Props) {
             >
                 {
                     selectedElement ?
-                        <DataPanel
+                        <SchemaDataPanel
                             obj={selectedElement}
                             onExpand={onExpand}
-                            onDeleteElement={onDelete ? () => onDelete(selectedElement) : undefined}
-                            removeProperty={removeProperty}
-                            setPropertySchema={setProperty}
+                            onRemoveAttribute={handelRemoveProperty}
+                            onSetAttribute={handelSetAttribute}
+                            onDelete={handelDelete}
+                            onSetLabel={handelSetLabel}
                         />
                         : (isAddEntity || isAddRelation) &&
                         <CreateElement

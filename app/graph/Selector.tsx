@@ -1,11 +1,11 @@
 'use client'
 
-import { useEffect, useRef, useState } from "react";
+import { Dispatch, SetStateAction, useEffect, useRef, useState } from "react";
 import { Dialog, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Editor } from "@monaco-editor/react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { editor } from "monaco-editor";
-import { Toast, cn, prepareArg, securedFetch } from "@/lib/utils";
+import { Toast, cn, securedFetch } from "@/lib/utils";
 import Combobox from "../components/ui/combobox";
 import { Graph, Query } from "../api/graph/model";
 import UploadGraph from "../components/graph/UploadGraph";
@@ -14,13 +14,17 @@ import Button from "../components/ui/Button";
 import Duplicate from "./Duplicate";
 import SchemaView from "../schema/SchemaView";
 
-export default function Selector({ onChange, graph, queries, runQuery, isSchema }: {
+export default function Selector({ onChange, graph, queries, runQuery, isSchema, edgesCount, nodesCount, setEdgesCount, setNodesCount }: {
     /* eslint-disable react/require-default-props */
     onChange: (selectedGraphName: string) => void
     graph: Graph
     runQuery?: (query: string, setQueriesOpen: (open: boolean) => void) => Promise<void>
     queries?: Query[]
     isSchema?: boolean
+    edgesCount: number
+    nodesCount: number
+    setEdgesCount: Dispatch<SetStateAction<number>>
+    setNodesCount: Dispatch<SetStateAction<number>>
 }) {
 
     const [options, setOptions] = useState<string[]>([]);
@@ -29,8 +33,6 @@ export default function Selector({ onChange, graph, queries, runQuery, isSchema 
     const [duplicateOpen, setDuplicateOpen] = useState<boolean>(false);
     const [dropOpen, setDropOpen] = useState<boolean>(false);
     const [queriesOpen, setQueriesOpen] = useState<boolean>(false);
-    const [edgesCount, setEdgesCount] = useState<number>(0);
-    const [nodesCount, setNodesCount] = useState<number>(0);
     const [query, setQuery] = useState<Query>();
     const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null)
 
@@ -55,31 +57,6 @@ export default function Selector({ onChange, graph, queries, runQuery, isSchema 
         })
         setSelectedValue(graph.Id)
     }, [graph.Id])
-
-    useEffect(() => {
-        if (!selectedValue) return
-        const name = `${selectedValue}${isSchema ? "_schema" : ""}`
-        const run = async () => {
-            const q = [
-                "MATCH (n) RETURN COUNT(n) as nodes",
-                "MATCH ()-[e]->() RETURN COUNT(e) as edges"
-            ]
-
-            const nodes = await (await securedFetch(`api/graph/${prepareArg(name)}/?query=${q[0]}`, {
-                method: "GET"
-            })).json()
-
-            const edges = await (await securedFetch(`api/graph/${prepareArg(name)}/?query=${q[1]}`, {
-                method: "GET"
-            })).json()
-
-            if (!edges || !nodes) return
-
-            setEdgesCount(edges.result?.data[0].edges)
-            setNodesCount(nodes.result?.data[0].nodes)
-        }
-        run()
-    }, [isSchema, selectedValue, graph.Elements.length])
 
     const handleEditorDidMount = (e: editor.IStandaloneCodeEditor) => {
         editorRef.current = e
@@ -282,7 +259,7 @@ export default function Selector({ onChange, graph, queries, runQuery, isSchema 
                                 />
                             </DialogTrigger>
                             <DialogComponent className="h-[90%] w-[90%]" title={`${selectedValue} Schema`}>
-                                <SchemaView schema={schema} setSchema={setSchema} />
+                                <SchemaView schema={schema} setEdgesCount={setEdgesCount} setNodesCount={setNodesCount}/>
                             </DialogComponent>
                         </Dialog>
                     </div>

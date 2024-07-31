@@ -12,7 +12,7 @@ import { ChevronLeft, Maximize2 } from "lucide-react"
 import { cn, prepareArg, securedFetch } from "@/lib/utils";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import { Category, Graph } from "../api/graph/model";
-import DataPanel from "./DataPanel";
+import DataPanel from "./GraphDataPanel";
 import Labels from "./labels";
 import Toolbar from "./toolbar";
 import Button from "../components/ui/Button";
