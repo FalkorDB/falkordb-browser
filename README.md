@@ -11,7 +11,9 @@ FalkorDB-Browser is a visualization UI for FalkorDB.
 
 To see a running demo, check: https://browser.falkordb.com/
 
-![image](https://github.com/FalkorDB/falkordb-browser/assets/753206/51a81ef9-6bb2-40ce-ad9b-6381978c7562)
+![image](https://github.com/user-attachments/assets/c1e3c868-fc73-421c-a299-29004aa86f2a)
+
+![image](https://github.com/user-attachments/assets/58ebc352-31bd-495e-ad8b-2fdc36f5a656)
 
 ## Run in Docker
 
