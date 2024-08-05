@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Toast, defaultQuery, prepareArg, securedFetch } from "@/lib/utils";
 import GraphView from "./GraphView";
 import Selector from "./Selector";
@@ -9,42 +9,43 @@ import { Graph, Query } from "../api/graph/model";
 
 export default function Page() {
 
+    const [edgesCount, setEdgesCount] = useState<number>(0)
+    const [nodesCount, setNodesCount] = useState<number>(0)
     const [graphName, setGraphName] = useState<string>("")
     const [graph, setGraph] = useState<Graph>(Graph.empty())
     const [queries, setQueries] = useState<Query[]>([])
     const [historyQuery, setHistoryQuery] = useState<string>("")
-    const [edgesCount, setEdgesCount] = useState<number>(0);
-    const [nodesCount, setNodesCount] = useState<number>(0);
+
+    const fetchCount = useCallback(async () => {
+        if (!graphName) return
+        const q = [
+            "MATCH (n) RETURN COUNT(n) as nodes",
+            "MATCH ()-[e]->() RETURN COUNT(e) as edges"
+        ]
+        
+        const nodes = await (await securedFetch(`api/graph/${prepareArg(graphName)}/?query=${q[0]}`, {
+            method: "GET"
+        })).json()
+        
+        const edges = await (await securedFetch(`api/graph/${prepareArg(graphName)}/?query=${q[1]}`, {
+            method: "GET"
+        })).json()
+        
+        if (!edges || !nodes) return
+        
+        setEdgesCount(edges.result?.data[0].edges)
+        setNodesCount(nodes.result?.data[0].nodes)
+    }, [graphName])
+    
+    useEffect(() => {
+        if (graphName !== graph.Id) {
+            setGraph(Graph.empty())
+        }
+    }, [graph.Id, graphName])
 
     useEffect(() => {
-        if (!graphName) return
-
-        const run = async () => {
-            const q = [
-                "MATCH (n) RETURN COUNT(n) as nodes",
-                "MATCH ()-[e]->() RETURN COUNT(e) as edges"
-            ]
-
-            const nodes = await (await securedFetch(`api/graph/${prepareArg(graphName)}/?query=${q[0]}`, {
-                method: "GET"
-            })).json()
-
-            const edges = await (await securedFetch(`api/graph/${prepareArg(graphName)}/?query=${q[1]}`, {
-                method: "GET"
-            })).json()
-
-            if (!edges || !nodes) return
-
-            setEdgesCount(edges.result?.data[0].edges)
-            setNodesCount(nodes.result?.data[0].nodes)
-        }
-        run()
-    }, [graphName])
-
-    const handleGraphChange = (selectedGraphName: string) => {
-
-        setGraphName(selectedGraphName)
-    }
+        fetchCount()
+    }, [fetchCount, graphName])
 
     const run = async (query: string) => {
         if (!graphName) {
@@ -59,7 +60,7 @@ export default function Page() {
         if (!result.ok) return null
 
         const json = await result.json()
-
+        fetchCount()
         return json.result
     }
 
@@ -85,8 +86,8 @@ export default function Page() {
             <div className="h-1 grow p-8 px-10 flex flex-col gap-8">
                 <Selector
                     queries={queries}
-                    onChange={handleGraphChange}
-                    graph={graph}
+                    onChange={setGraphName}
+                    graphName={graphName}
                     runQuery={runHistoryQuery}
                     setEdgesCount={setEdgesCount}
                     setNodesCount={setNodesCount}

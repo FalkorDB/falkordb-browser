@@ -139,6 +139,14 @@ export class Graph {
     get LabelsMap(): Map<string, Category> {
         return this.labelsMap;
     }
+    
+    get NodesMap(): Map<number, NodeDataDefinition> {
+        return this.nodesMap;
+    }
+
+    get EdgesMap(): Map<number, EdgeDataDefinition> {
+        return this.edgesMap;
+    }
 
     get Elements(): ElementDefinition[] {
         return this.elements;
@@ -306,13 +314,13 @@ export class Graph {
     }
 
     public updateCategories(category: string, type: string) {
-        if (type === "node" && !this.elements.find(e => e.data.source ? e.data.label === category : e.data.category === category)) {
+        if (type === "node" && !this.elements.find(e => e.data.category === category)) {
             const i = this.categories.findIndex(({ name }) => name === category)
             this.categories.splice(i, 1)
             this.categoriesMap.delete(category)
         }
 
-        if (type === "edge" && !this.elements.find(e => e.data.source ? e.data.label === category : e.data.category === category)) {
+        if (type === "edge" && !this.elements.find(e => e.data.label === category)) {
             const i = this.labels.findIndex(({ name }) => name === category)
             this.labels.splice(i, 1)
             this.labelsMap.delete(category)

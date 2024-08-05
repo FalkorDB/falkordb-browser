@@ -14,13 +14,12 @@ import Button from "../components/ui/Button";
 import Duplicate from "./Duplicate";
 import SchemaView from "../schema/SchemaView";
 
-export default function Selector({ onChange, graph, queries, runQuery, isSchema, edgesCount, nodesCount, setEdgesCount, setNodesCount }: {
+export default function Selector({ onChange, graphName, queries, runQuery, edgesCount, nodesCount, setEdgesCount, setNodesCount }: {
     /* eslint-disable react/require-default-props */
     onChange: (selectedGraphName: string) => void
-    graph: Graph
+    graphName: string
     runQuery?: (query: string, setQueriesOpen: (open: boolean) => void) => Promise<void>
     queries?: Query[]
-    isSchema?: boolean
     edgesCount: number
     nodesCount: number
     setEdgesCount: Dispatch<SetStateAction<number>>
@@ -49,13 +48,13 @@ export default function Selector({ onChange, graph, queries, runQuery, isSchema,
     }, [runQuery])
 
     useEffect(() => {
-        if (!graph.Id) return
+        if (!graphName) return
         setOptions(prev => {
-            if (prev.includes(graph.Id)) return prev
-            setSelectedValue(graph.Id)
-            return [...prev, graph.Id]
+            if (prev.includes(graphName)) return prev
+            setSelectedValue(graphName)
+            return [...prev, graphName]
         })
-    }, [graph.Id])
+    }, [graphName])
 
     const handleEditorDidMount = (e: editor.IStandaloneCodeEditor) => {
         editorRef.current = e
@@ -80,7 +79,7 @@ export default function Selector({ onChange, graph, queries, runQuery, isSchema,
     }
 
     const onExport = async () => {
-        const name = `${selectedValue}${isSchema ? "_schema" : ""}`
+        const name = `${selectedValue}${!runQuery ? "_schema" : ""}`
         const result = await securedFetch(`api/graph/${name}/export`, {
             method: "GET"
         })
@@ -106,7 +105,7 @@ export default function Selector({ onChange, graph, queries, runQuery, isSchema,
     return (
         <div className="flex flex-col gap-4">
             <div className="flex justify-between items-center">
-                <Combobox isSelectGraph options={options} setOptions={setOptions} selectedValue={selectedValue} setSelectedValue={handleOnChange} isSchema={isSchema} />
+                <Combobox isSelectGraph options={options} setOptions={setOptions} selectedValue={selectedValue} setSelectedValue={handleOnChange} isSchema={!runQuery} />
                 <div className="flex gap-16 text-[#7167F6]">
                     <UploadGraph disabled />
                     <Button
@@ -256,7 +255,7 @@ export default function Selector({ onChange, graph, queries, runQuery, isSchema,
                                 />
                             </DialogTrigger>
                             <DialogComponent className="h-[90%] w-[90%]" title={`${selectedValue} Schema`}>
-                                <SchemaView schema={schema} setEdgesCount={isSchema ? setEdgesCount : undefined} setNodesCount={isSchema ? setNodesCount: undefined}/>
+                                <SchemaView schema={schema} setEdgesCount={setEdgesCount} setNodesCount={setNodesCount}/>
                             </DialogComponent>
                         </Dialog>
                     </div>

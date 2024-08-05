@@ -18,8 +18,8 @@ import CreateElement from "./SchemaCreateElement"
 /* eslint-disable react/require-default-props */
 interface Props {
     schema: Graph
-    setNodesCount?: Dispatch<SetStateAction<number>>
-    setEdgesCount?: Dispatch<SetStateAction<number>>
+    setNodesCount: Dispatch<SetStateAction<number>>
+    setEdgesCount: Dispatch<SetStateAction<number>>
 }
 
 const LAYOUT = {
@@ -121,6 +121,10 @@ export default function SchemaView({ schema, setNodesCount, setEdgesCount }: Pro
     }, [])
 
     useEffect(() => {
+        setSelectedElement(undefined)
+    }, [schema.Id])
+
+    useEffect(() => {
         setSelectedNodes([])
     }, [isAddRelation])
 
@@ -177,9 +181,9 @@ export default function SchemaView({ schema, setNodesCount, setEdgesCount }: Pro
 
     const handleSelected = (evt: EventObject) => {
         if (isAddRelation) return
-        const { target } = evt
-        const obj: ElementDataDefinition = target.json().data;
 
+        const { target } = evt
+        
         if (target.isEdge()) {
             const { color } = target.data()
             target.style("line-color", color);
@@ -190,6 +194,8 @@ export default function SchemaView({ schema, setNodesCount, setEdgesCount }: Pro
         } else {
             target.style("border-width", 0.7)
         };
+        
+        const obj: ElementDataDefinition = target.json().data
 
         handelSetSelectedElement(obj);
     }
@@ -288,18 +294,22 @@ export default function SchemaView({ schema, setNodesCount, setEdgesCount }: Pro
             const { id } = getElementId(element)
             schema.Elements.splice(schema.Elements.findIndex(e => e.data.id === id), 1)
             chartRef.current?.remove(`#${id} `)
-
-            if (type === "node" && setNodesCount) {
+            
+            if (type) {
+                schema.NodesMap.delete(Number(id))
+                chartRef.current?.remove(`#${id} `)
                 setNodesCount(prev => prev - 1)
-            } else if (type === "edge" && setEdgesCount) {
+            } else {
+                schema.EdgesMap.delete(Number(id))
+                chartRef.current?.remove(`#_${id} `)
                 setEdgesCount(prev => prev - 1)
             }
-
+    
             schema.updateCategories(type === "node" ? element.category : element.label, type)
         })
 
-        setSelectedElements([])
         setSelectedElement(undefined)
+        setSelectedElements([])
 
         dataPanel.current?.collapse()
     }

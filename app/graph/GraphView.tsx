@@ -164,6 +164,12 @@ const GraphView = forwardRef(({ graph, runQuery, historyQuery, setNodesCount, se
             }
         }
     }))
+    
+    useEffect(() => {
+        setSelectedElement(undefined)
+        setSelectedElements([])
+        dataPanel.current?.collapse()
+    }, [graph.Id])
 
     useEffect(() => {
         setQuery(historyQuery)
@@ -426,6 +432,9 @@ const GraphView = forwardRef(({ graph, runQuery, historyQuery, setNodesCount, se
 
             graph.updateCategories(type === "node" ? element.category : element.label, type)
         })
+
+        setSelectedElements([])
+        setSelectedElement(undefined)
 
         dataPanel.current?.collapse()
     }
