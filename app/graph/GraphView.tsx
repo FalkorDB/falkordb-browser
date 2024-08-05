@@ -175,6 +175,11 @@ const GraphView = forwardRef(({ graph, runQuery, historyQuery, setNodesCount, se
         setQuery(historyQuery)
     }, [historyQuery])
 
+    useEffect(() => {
+        setSelectedElement(undefined)
+        setSelectedElements([])
+    }, [graph.Id])
+
     const handelSetSelectedElement = (element?: ElementDataDefinition) => {
         setSelectedElement(element)
         if (element) {

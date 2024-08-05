@@ -24,7 +24,7 @@ interface ComboboxProps {
   setSelectedValue: (value: string) => void,
   isSchema?: boolean
   defaultOpen?: boolean
-  onOpenChange?: (open:boolean) => void
+  onOpenChange?: (open: boolean) => void
 }
 
 export default function Combobox({ isSelectGraph, disabled = false, inTable, type, options, setOptions, selectedValue = "", setSelectedValue, isSchema = false, defaultOpen = false, onOpenChange }: ComboboxProps) {
@@ -32,8 +32,8 @@ export default function Combobox({ isSelectGraph, disabled = false, inTable, typ
   const [open, setOpen] = useState<boolean>(defaultOpen)
   const [optionName, setOptionName] = useState<string>("")
   const [editable, setEditable] = useState<string>("")
-  const [isUploadOpen, setIsUploadOpen] = useState<boolean>(false)
-  const [isDeleteOpen, setIsDeleteOpen] = useState<boolean>(false)
+  const [isUploadOpen, setIsUploadOpen] = useState<string>()
+  const [isDeleteOpen, setIsDeleteOpen] = useState<string>()
   const onExport = async (graphName: string) => {
     const result = await securedFetch(`api/graph/${prepareArg(graphName)}/export`, {
       method: "GET"
@@ -57,6 +57,7 @@ export default function Combobox({ isSelectGraph, disabled = false, inTable, typ
   }
 
   const handelDelete = (option: string) => {
+
     if (!setOptions) return
     setOptions(prev => prev.filter(name => name !== option))
     if (selectedValue !== option) return
@@ -92,7 +93,7 @@ export default function Combobox({ isSelectGraph, disabled = false, inTable, typ
       <DropdownMenu open={open} onOpenChange={(o) => {
         setOpen(o)
         if (onOpenChange) onOpenChange(o)
-        }}>
+      }}>
         <DropdownMenuTrigger asChild>
           <Button
             disabled={disabled}
@@ -192,24 +193,24 @@ export default function Combobox({ isSelectGraph, disabled = false, inTable, typ
                               disabled
                               variant="button"
                               icon={<UploadIcon />}
-                              onClick={() => setIsUploadOpen(true)}
+                              onClick={() => setIsUploadOpen(option)}
                             />
                           </DropdownMenuItem>
                           <DropdownMenuItem className="p-2">
                             <Button
                               variant="button"
                               icon={<Trash2 />}
-                              onClick={() => setIsDeleteOpen(true)}
+                              onClick={() => setIsDeleteOpen(option)}
                             />
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
-                      <UploadGraph open={isUploadOpen} onOpenChange={setIsUploadOpen} />
+                      <UploadGraph open={isUploadOpen === option} onOpenChange={(o) => setIsUploadOpen(o ? option : "")} />
                       <DeleteGraph
                         graphName={option}
-                        isOpen={isDeleteOpen}
-                        onOpen={setIsDeleteOpen}
-                        onDeleteGraph={() => handelDelete(option)}
+                        isOpen={isDeleteOpen === option}
+                        onOpen={(o) => setIsDeleteOpen(o ? option : "")}
+                        onDeleteGraph={handelDelete}
                         isSchema={isSchema}
                       />
                     </TableCell>

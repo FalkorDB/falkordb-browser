@@ -122,6 +122,7 @@ export default function SchemaView({ schema, setNodesCount, setEdgesCount }: Pro
 
     useEffect(() => {
         setSelectedElement(undefined)
+        setSelectedElements([])
     }, [schema.Id])
 
     useEffect(() => {
