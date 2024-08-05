@@ -44,6 +44,7 @@
     }
 
     .DataPanel {
+        @apply h-full w-full flex flex-col shadow-lg;
         background-color: #434366;
     }
 

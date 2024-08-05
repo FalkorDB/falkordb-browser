@@ -44,17 +44,19 @@ export default function Toolbar({ disabled, chartRef, onDeleteElement, onAddEnti
         <div className="flex items-center gap-6 p-1">
             <div className="flex gap-4">
                 <Button
-                    disabled
+                    disabled={disabled}
                     variant="Secondary"
                     label="Add Entity"
                     className="flex items-center gap-2"
+                    onClick={onAddEntity}
                     icon={<PlusCircle />}
-                />
+                    />
                 <Button
-                    disabled
+                    disabled={disabled}
                     variant="Secondary"
                     className="flex items-center gap-2"
                     label="Add Relation"
+                    onClick={onAddRelation}
                     type="button"
                     // eslint-disable-next-line jsx-a11y/anchor-is-valid
                     icon={<Link />}
