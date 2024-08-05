@@ -2,10 +2,9 @@
 
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useState } from "react";
-import { cn, Toast } from "@/lib/utils";
+import { cn, ElementDataDefinition, Toast } from "@/lib/utils";
 import { ChevronRight, Trash2 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
-import { EdgeDataDefinition, NodeDataDefinition } from "cytoscape";
 import Input from "../components/ui/Input";
 import Button from "../components/ui/Button";
 import Combobox from "../components/ui/combobox";
