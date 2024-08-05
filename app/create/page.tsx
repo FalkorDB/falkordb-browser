@@ -7,10 +7,8 @@ import { Progress } from "@/components/ui/progress";
 import useSWR from "swr";
 import { Toast, prepareArg, securedFetch } from "@/lib/utils";
 import Header from "../components/Header";
-import { Graph } from "../api/graph/model";
 import Input from "../components/ui/Input";
 import Button from "../components/ui/Button";
-import SchemaView from "../schema/SchemaView";
 import Dropzone from "../components/ui/Dropzone";
 
 type CurrentTab = "loadSchema" | "schema" | "graph"
@@ -18,7 +16,7 @@ type CurrentTab = "loadSchema" | "schema" | "graph"
 export default function Create() {
 
     const [currentTab, setCurrentTab] = useState<CurrentTab | null>()
-    const [schema, setSchema] = useState<Graph>(Graph.empty())
+    // const [schema, setSchema] = useState<Graph>(Graph.empty())
     const [ID, setID] = useState()
     const [files, setFiles] = useState<File[]>([])
     const [filesPath, setFilesPath] = useState<string[]>()
@@ -57,7 +55,7 @@ export default function Create() {
             }
 
             setProgress(0)
-            setSchema(Graph.create(`${graphName}_schema`, j.result))
+            // setSchema(Graph.create(`${graphName}_schema`, j.result))
             setCurrentTab("schema")
         }
         run()
@@ -194,7 +192,7 @@ export default function Create() {
             case "schema":
                 return (
                     <div className="grow flex flex-col gap-10">
-                        <SchemaView schema={schema} setSchema={setSchema} />
+                        {/* <SchemaView schema={schema}  /> */}
                         <div className="flex justify-end gap-16">
                             <Button
                                 className="flex gap-1 items-center text-[#7167F6]"
