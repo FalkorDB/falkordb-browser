@@ -120,6 +120,10 @@ export default function SchemaView({ schema, setNodesCount, setEdgesCount }: Pro
     }, [])
 
     useEffect(() => {
+        setSelectedElement(undefined)
+    }, [schema.Id])
+
+    useEffect(() => {
         setSelectedNodes([])
     }, [isAddRelation])
 
@@ -176,9 +180,9 @@ export default function SchemaView({ schema, setNodesCount, setEdgesCount }: Pro
 
     const handleSelected = (evt: EventObject) => {
         if (isAddRelation) return
-        const { target } = evt
-        const obj: ElementDataDefinition = target.json().data;
 
+        const { target } = evt
+        
         if (target.isEdge()) {
             const { color } = target.data()
             target.style("line-color", color);
@@ -189,6 +193,8 @@ export default function SchemaView({ schema, setNodesCount, setEdgesCount }: Pro
         } else {
             target.style("border-width", 0.7)
         };
+        
+        const obj: ElementDataDefinition = target.json().data
 
         handelSetSelectedElement(obj);
     }
@@ -239,7 +245,7 @@ export default function SchemaView({ schema, setNodesCount, setEdgesCount }: Pro
     const handelDelete = async () => {
         if (!selectedElement) return
 
-        const type = selectedElement.source ? "edge" : "node"
+        const type = !selectedElement.source
         const { id, query } = getElementId(selectedElement)
         const q = `MATCH ${query} WHERE ID(e) = ${id} delete e`
         const result = await securedFetch(`api/graph/${prepareArg(schema.Id)}_schema/?query=${prepareArg(q)} `, {
@@ -249,15 +255,18 @@ export default function SchemaView({ schema, setNodesCount, setEdgesCount }: Pro
         if (!result.ok) return
 
         schema.Elements.splice(schema.Elements.findIndex(e => e.data.id === id), 1)
-        chartRef.current?.remove(`#${id} `)
-
-        if (type === "node") {
+        
+        if (type) {
+            schema.NodesMap.delete(Number(id))
+            chartRef.current?.remove(`#${id} `)
             setNodesCount(prev => prev - 1)
         } else {
+            schema.EdgesMap.delete(Number(id))
+            chartRef.current?.remove(`#_${id} `)
             setEdgesCount(prev => prev - 1)
         }
 
-        schema.updateCategories(type === "node" ? selectedElement.category : selectedElement.label, type)
+        schema.updateCategories(type ? selectedElement.category : selectedElement.label, type ? "node" : "edge")
         setSelectedElement(undefined)
         onExpand()
 

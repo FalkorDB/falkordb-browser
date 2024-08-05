@@ -11,13 +11,22 @@ export default function Page() {
 
     const [schemaName, setSchemaName] = useState<string>("")
     const [schema, setSchema] = useState<Graph>(Graph.empty())
-    const [edgesCount, setEdgesCount] = useState<number>(0);
-    const [nodesCount, setNodesCount] = useState<number>(0);
+    const [edgesCount, setEdgesCount] = useState<number>(0)
+    const [nodesCount, setNodesCount] = useState<number>(0)
 
     useEffect(() => {
         if (!schemaName) return
-
         const run = async () => {
+            const result = await securedFetch(`/api/graph/${prepareArg(schemaName)}_schema/?query=${defaultQuery()}`, {
+                method: "GET"
+            })
+            if (!result.ok) {
+                Toast("Failed fetching schema")
+                return
+            }
+            const json = await result.json()
+            setSchema(Graph.create(schemaName, json.result))
+
             const name = `${schemaName}_schema`
             const q = [
                 "MATCH (n) RETURN COUNT(n) as nodes",
@@ -40,27 +49,18 @@ export default function Page() {
         run()
     }, [schemaName])
 
-    useEffect(() => {
-        if (!schemaName) return
-        const run = async () => {
-            const result = await securedFetch(`/api/graph/${prepareArg(schemaName)}_schema/?query=${defaultQuery()}`, {
-                method: "GET"
-            })
-            if (!result.ok) {
-                Toast("Failed fetching schema")
-                return
-            }
-            const json = await result.json()
-            setSchema(Graph.create(schemaName, json.result))
-        }
-        run()
-    }, [schemaName])
-
     return (
         <div className="h-full w-full flex flex-col">
             <Header onSetGraphName={setSchemaName} />
             <div className="h-1 grow p-8 px-10 flex flex-col gap-8">
-                <Selector onChange={setSchemaName} graph={schema} isSchema edgesCount={edgesCount} nodesCount={nodesCount} setEdgesCount={setEdgesCount} setNodesCount={setNodesCount} />
+                <Selector
+                    edgesCount={edgesCount}
+                    nodesCount={nodesCount}
+                    setEdgesCount={setEdgesCount}
+                    setNodesCount={setNodesCount}
+                    onChange={setSchemaName}
+                    graphName={schemaName}
+                />
                 <SchemaView schema={schema} setEdgesCount={setEdgesCount} setNodesCount={setNodesCount} />
             </div>
         </div>
