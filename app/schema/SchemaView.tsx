@@ -429,12 +429,16 @@ export default function SchemaView({ schema, setNodesCount, setEdgesCount }: Pro
 
         if (result.ok) {
             const json = await result.json()
-
             if (isAddEntity) {
                 chartRef?.current?.add({ data: schema.extendNode(json.result.data[0].n) })
                 setNodesCount(prev => prev + 1)
                 setIsAddEntity(false)
             } else {
+            if (isAddEntity && setNodesCount) {
+                chartRef?.current?.add({ data: schema.extendNode(json.result.data[0].n) })
+                setNodesCount(prev => prev + 1)
+                setIsAddEntity(false)
+            } else if (isAddEntity && setEdgesCount) {
                 chartRef?.current?.add({ data: schema.extendEdge(json.result.data[0].e) })
                 setEdgesCount(prev => prev + 1)
                 setIsAddRelation(false)
