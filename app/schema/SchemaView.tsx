@@ -3,7 +3,7 @@
 import { ResizablePanel, ResizablePanelGroup, ResizableHandle } from "@/components/ui/resizable"
 import CytoscapeComponent from "react-cytoscapejs"
 import { ChevronLeft } from "lucide-react"
-import cytoscape, { EdgeDataDefinition, EdgeSingular, EventObject, NodeDataDefinition } from "cytoscape"
+import cytoscape, { EdgeSingular, EventObject, NodeDataDefinition } from "cytoscape"
 import { ImperativePanelHandle } from "react-resizable-panels"
 import { Dispatch, SetStateAction, useEffect, useRef, useState } from "react"
 import fcose from "cytoscape-fcose";
@@ -41,10 +41,10 @@ function getStyle() {
                 // to satisfy the linter...
                 'active-bg-color': 'blue',
                 'active-bg-opacity': 0.3,
-                "selection-box-border-color": 'blue',
-                "selection-box-border-width": 0,
-                "selection-box-opacity": 1,
-                "selection-box-color": 'blue',
+                "selection-box-border-color": 'gray',
+                "selection-box-border-width": 3,
+                "selection-box-opacity": 0.5,
+                "selection-box-color": 'gray',
                 "outside-texture-bg-color": 'blue',
                 "outside-texture-bg-opacity": 1,
             },
@@ -97,7 +97,7 @@ function getStyle() {
     return style
 }
 
-const getElementId = (element: NodeDataDefinition | EdgeDataDefinition) => element.source ? { id: element.id?.slice(1), query: "()-[e]-()" } : { id: element.id, query: "(e)" }
+const getElementId = (element: ElementDataDefinition) => element.source ? { id: element.id?.slice(1), query: "()-[e]-()" } : { id: element.id, query: "(e)" }
 
 const getCreateQuery = (type: string, selectedNodes: NodeDataDefinition[], attributes: [string, Attribute][], label?: string) => {
     if (type === "node") {
@@ -108,6 +108,7 @@ const getCreateQuery = (type: string, selectedNodes: NodeDataDefinition[], attri
 
 export default function SchemaView({ schema, setNodesCount, setEdgesCount }: Props) {
     const [selectedElement, setSelectedElement] = useState<ElementDataDefinition>();
+    const [selectedElements, setSelectedElements] = useState<ElementDataDefinition[]>([]);
     const [selectedNodes, setSelectedNodes] = useState<NodeDataDefinition[]>([]);
     const [isCollapsed, setIsCollapsed] = useState<boolean>(false);
     const chartRef = useRef<cytoscape.Core | null>(null);
@@ -199,6 +200,24 @@ export default function SchemaView({ schema, setNodesCount, setEdgesCount }: Pro
         handelSetSelectedElement(obj);
     }
 
+    const handleBoxSelected = (evt: EventObject) => {
+        const { target } = evt
+        const type = target.isEdge() ? "edge" : "node"
+
+        if (type === "edge") {
+            const { color } = target.data()
+            target.style("line-color", color);
+            target.style("target-arrow-color", color);
+            target.style("line-opacity", 0.5);
+            target.style("width", 2);
+            target.style("arrow-scale", 1);
+        } else target.style("border-width", 0.7);
+
+        const obj: ElementDataDefinition = target.json().data;
+
+        setSelectedElements(prev => [...prev, obj])
+    }
+
     const handleUnselected = (evt: EventObject) => {
         const { target } = evt
 
@@ -211,6 +230,7 @@ export default function SchemaView({ schema, setNodesCount, setEdgesCount }: Pro
         } else target.style("border-width", 0.3);
 
         handelSetSelectedElement();
+        setSelectedElements([]);
     }
 
     const handleMouseOver = (evt: EventObject) => {
@@ -242,34 +262,56 @@ export default function SchemaView({ schema, setNodesCount, setEdgesCount }: Pro
         }
     }
 
-    const handelDelete = async () => {
-        if (!selectedElement) return
+    const handelDeleteElement = async () => {
+        const stateSelectedElements = Object.values(selectedElements)
 
-        const type = !selectedElement.source
-        const { id, query } = getElementId(selectedElement)
-        const q = `MATCH ${query} WHERE ID(e) = ${id} delete e`
+        if (stateSelectedElements.length === 0 && selectedElement) {
+            stateSelectedElements.push(selectedElement)
+            setSelectedElement(undefined)
+        }
+
+        const conditionsNodes: string[] = []
+        const conditionsEdges: string[] = []
+
+        stateSelectedElements.forEach((element) => {
+            const { id } = getElementId(element)
+            if (element.source) {
+                conditionsEdges.push(`id(e) = ${id}`)
+            } else {
+                conditionsNodes.push(`id(n) = ${id}`)
+            }
+        })
+
+        const q = `${conditionsNodes.length > 0 ? `MATCH (n) WHERE ${conditionsNodes.join(" OR ")} DELETE n` : ""}${conditionsEdges.length > 0 && conditionsNodes.length > 0 ? " WITH * " : ""}${conditionsEdges.length > 0 ? `MATCH ()-[e]-() WHERE ${conditionsEdges.join(" OR ")} DELETE e` : ""}`
+
         const result = await securedFetch(`api/graph/${prepareArg(schema.Id)}_schema/?query=${prepareArg(q)} `, {
             method: "GET"
         })
 
         if (!result.ok) return
-
-        schema.Elements.splice(schema.Elements.findIndex(e => e.data.id === id), 1)
-        
-        if (type) {
-            schema.NodesMap.delete(Number(id))
+        stateSelectedElements.forEach((element) => {
+            const type = element.source ? "edge" : "node"
+            const { id } = getElementId(element)
+            schema.Elements.splice(schema.Elements.findIndex(e => e.data.id === id), 1)
             chartRef.current?.remove(`#${id} `)
-            setNodesCount(prev => prev - 1)
-        } else {
-            schema.EdgesMap.delete(Number(id))
-            chartRef.current?.remove(`#_${id} `)
-            setEdgesCount(prev => prev - 1)
-        }
+            
+            if (type) {
+                schema.NodesMap.delete(Number(id))
+                chartRef.current?.remove(`#${id} `)
+                setNodesCount(prev => prev - 1)
+            } else {
+                schema.EdgesMap.delete(Number(id))
+                chartRef.current?.remove(`#_${id} `)
+                setEdgesCount(prev => prev - 1)
+            }
+    
+            schema.updateCategories(type === "node" ? element.category : element.label, type)
+        })
 
-        schema.updateCategories(type ? selectedElement.category : selectedElement.label, type ? "node" : "edge")
         setSelectedElement(undefined)
-        onExpand()
+        setSelectedElements([])
 
+        dataPanel.current?.collapse()
     }
 
     const handelSetAttribute = async (key: string, newVal: Attribute) => {
@@ -389,11 +431,11 @@ export default function SchemaView({ schema, setNodesCount, setEdgesCount }: Pro
         if (result.ok) {
             const json = await result.json()
 
-            if (type === "node") {
+            if (type === "node" && setNodesCount) {
                 chartRef?.current?.add({ data: schema.extendNode(json.result.data[0].n) })
                 setNodesCount(prev => prev + 1)
                 setIsAddEntity(false)
-            } else {
+            } else if (type === "node" && setEdgesCount) {
                 chartRef?.current?.add({ data: schema.extendEdge(json.result.data[0].e) })
                 setEdgesCount(prev => prev + 1)
                 setIsAddRelation(false)
@@ -414,7 +456,7 @@ export default function SchemaView({ schema, setNodesCount, setEdgesCount }: Pro
                 <div className="flex items-center justify-between">
                     <Toolbar
                         disabled={!schema.Id}
-                        deleteDisabled={!selectedElement}
+                        deleteDisabled={Object.values(selectedElements).length === 0 && !selectedElement}
                         onAddEntity={() => {
                             setIsAddEntity(true)
                             setIsAddRelation(false)
@@ -429,7 +471,7 @@ export default function SchemaView({ schema, setNodesCount, setEdgesCount }: Pro
                             if (dataPanel.current?.isExpanded()) return
                             onExpand()
                         }}
-                        onDeleteElement={handelDelete}
+                        onDeleteElement={handelDeleteElement}
                         chartRef={chartRef}
                     />
                     {
@@ -459,6 +501,8 @@ export default function SchemaView({ schema, setNodesCount, setEdgesCount }: Pro
                             cy.on('tapunselect', 'node', handleUnselected)
                             cy.on('tapselect', 'edge', handleSelected)
                             cy.on('tapselect', 'node', handleSelected)
+                            cy.on('boxselect', 'node', handleBoxSelected)
+                            cy.on('boxselect', 'edge', handleBoxSelected)
                             cy.on('tap', 'node', handleTap)
                         }}
                     />
@@ -492,7 +536,7 @@ export default function SchemaView({ schema, setNodesCount, setEdgesCount }: Pro
                             onExpand={onExpand}
                             onRemoveAttribute={handelRemoveProperty}
                             onSetAttribute={handelSetAttribute}
-                            onDelete={handelDelete}
+                            onDelete={handelDeleteElement}
                             onSetLabel={handelSetLabel}
                         />
                         : (isAddEntity || isAddRelation) &&

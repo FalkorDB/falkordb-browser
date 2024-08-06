@@ -1,7 +1,7 @@
 'use client'
 
 import CytoscapeComponent from "react-cytoscapejs";
-import cytoscape, { EdgeDefinition, EdgeSingular, ElementDefinition, EventObject, NodeDataDefinition, NodeDefinition } from "cytoscape";
+import cytoscape, { EdgeSingular, ElementDefinition, EventObject, NodeDataDefinition } from "cytoscape";
 import { useRef, useState, useImperativeHandle, forwardRef, useEffect, Dispatch, SetStateAction } from "react";
 import fcose from 'cytoscape-fcose';
 import Editor, { Monaco } from "@monaco-editor/react";
@@ -9,7 +9,7 @@ import * as monaco from "monaco-editor";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { ImperativePanelHandle } from "react-resizable-panels";
 import { ChevronLeft, Maximize2 } from "lucide-react"
-import { cn, prepareArg, securedFetch } from "@/lib/utils";
+import { cn, ElementDataDefinition, prepareArg, securedFetch } from "@/lib/utils";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import { Category, Graph } from "../api/graph/model";
 import DataPanel from "./GraphDataPanel";
@@ -79,10 +79,10 @@ function getStyle() {
                 // to satisfy the linter...
                 'active-bg-color': 'blue',
                 'active-bg-opacity': 0.3,
-                "selection-box-border-color": 'blue',
-                "selection-box-border-width": 0,
-                "selection-box-opacity": 1,
-                "selection-box-color": 'blue',
+                "selection-box-border-color": 'gray',
+                "selection-box-border-width": 3,
+                "selection-box-opacity": 0.5,
+                "selection-box-color": 'gray',
                 "outside-texture-bg-color": 'blue',
                 "outside-texture-bg-opacity": 1,
             },
@@ -135,15 +135,19 @@ function getStyle() {
     return style
 }
 
-const GraphView = forwardRef(({ graph, runQuery, setGraph, historyQuery }: {
+const getElementId = (element: ElementDataDefinition) => element.source ? { id: element.id?.slice(1), query: "()-[e]-()" } : { id: element.id, query: "(e)" }
+
+const GraphView = forwardRef(({ graph, runQuery, historyQuery, setNodesCount, setEdgesCount }: {
     graph: Graph
-    setGraph: Dispatch<SetStateAction<Graph>>
     runQuery: (query: string) => Promise<void>
     historyQuery: string
+    setNodesCount: Dispatch<SetStateAction<number>>
+    setEdgesCount: Dispatch<SetStateAction<number>>
 }, ref) => {
 
     const [query, setQuery] = useState<string>("")
-    const [selectedElement, setSelectedElement] = useState<NodeDefinition | EdgeDefinition>();
+    const [selectedElements, setSelectedElements] = useState<(ElementDataDefinition)[]>([]);
+    const [selectedElement, setSelectedElement] = useState<ElementDataDefinition>();
     const [isCollapsed, setIsCollapsed] = useState<boolean>(true);
     const chartRef = useRef<cytoscape.Core | null>(null)
     const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null)
@@ -160,12 +164,18 @@ const GraphView = forwardRef(({ graph, runQuery, setGraph, historyQuery }: {
             }
         }
     }))
+    
+    useEffect(() => {
+        setSelectedElement(undefined)
+        setSelectedElements([])
+        dataPanel.current?.collapse()
+    }, [graph.Id])
 
     useEffect(() => {
         setQuery(historyQuery)
     }, [historyQuery])
 
-    const handelSetSelectedElement = (element?: NodeDefinition | EdgeDefinition) => {
+    const handelSetSelectedElement = (element?: ElementDataDefinition) => {
         setSelectedElement(element)
         if (element) {
             dataPanel.current?.expand()
@@ -240,7 +250,7 @@ const GraphView = forwardRef(({ graph, runQuery, setGraph, historyQuery }: {
             const json = await result.json()
             return graph.extend(json.result)
         }
-        
+
         return []
     }
 
@@ -296,8 +306,26 @@ const GraphView = forwardRef(({ graph, runQuery, setGraph, historyQuery }: {
             target.style("arrow-scale", 1);
         } else target.style("border-width", 0.7);
 
-        const obj: NodeDefinition | EdgeDefinition = evt.target.json();
+        const obj: ElementDataDefinition = target.json().data;
         handelSetSelectedElement(obj);
+    }
+
+    const handleBoxSelected = (evt: EventObject) => {
+        const { target } = evt
+        const type = target.isEdge() ? "edge" : "node"
+
+        if (type === "edge") {
+            const { color } = target.data()
+            target.style("line-color", color);
+            target.style("target-arrow-color", color);
+            target.style("line-opacity", 0.5);
+            target.style("width", 2);
+            target.style("arrow-scale", 1);
+        } else target.style("border-width", 0.7);
+
+        const obj: ElementDataDefinition = target.json().data;
+
+        setSelectedElements(prev => [...prev, obj]);
     }
 
     const handleUnselected = (evt: EventObject) => {
@@ -312,6 +340,7 @@ const GraphView = forwardRef(({ graph, runQuery, setGraph, historyQuery }: {
         } else target.style("border-width", 0.3);
 
         handelSetSelectedElement();
+        setSelectedElements([]);
     }
 
     const handleMouseOver = (evt: EventObject) => {
@@ -334,7 +363,7 @@ const GraphView = forwardRef(({ graph, runQuery, setGraph, historyQuery }: {
     };
 
     const setProperty = async (key: string, newVal: string) => {
-        const id = selectedElement?.data.id
+        const id = selectedElement?.id
         const q = `MATCH (e) WHERE id(e) = ${id} SET e.${key} = '${newVal}'`
         const success = (await securedFetch(`api/graph/${prepareArg(graph.Id)}/?query=${prepareArg(q)}`, {
             method: "GET"
@@ -349,7 +378,7 @@ const GraphView = forwardRef(({ graph, runQuery, setGraph, historyQuery }: {
     }
 
     const removeProperty = async (key: string) => {
-        const id = selectedElement?.data.id
+        const id = selectedElement?.id
         const q = `MATCH (e) WHERE id(e) = ${id} SET e.${key} = NULL`
         const success = (await securedFetch(`api/graph/${prepareArg(graph.Id)}/?query=${prepareArg(q)}`, {
             method: "GET"
@@ -363,19 +392,50 @@ const GraphView = forwardRef(({ graph, runQuery, setGraph, historyQuery }: {
         return success
     }
 
-    const onDeleteElement = async () => {
-        const id = selectedElement?.data.id
-        const q = `MATCH (e) WHERE id(e) = ${id} DELETE e`
-        const success = (await securedFetch(`api/graph/${prepareArg(graph.Id)}/?query=${prepareArg(q)}`, {
-            method: "GET"
-        })).ok
-        if (!success) return
-        setGraph(prev => {
-            const p = prev
-            p.Elements = p.Elements.filter(element => element.data.id !== id)
-            return p
+    const handelDeleteElement = async () => {
+        if (selectedElements.length === 0 && selectedElement) {
+            selectedElements.push(selectedElement)
+            setSelectedElement(undefined)
+        }
+
+        const conditionsNodes: string[] = []
+        const conditionsEdges: string[] = []
+
+        selectedElements.forEach((element) => {
+            const { id } = getElementId(element)
+            if (element.source) {
+                conditionsEdges.push(`id(e) = ${id}`)
+            } else {
+                conditionsNodes.push(`id(n) = ${id}`)
+            }
         })
+
+        const q = `${conditionsNodes.length !== 0 ? `MATCH (n) WHERE ${conditionsNodes.join(" OR ")} DELETE n` : ""}${conditionsEdges.length > 0 && conditionsNodes.length > 0 ? " WITH * " : ""}${conditionsEdges.length !== 0 ? `MATCH ()-[e]-() WHERE ${conditionsEdges.join(" OR ")} DELETE e` : ""}`
+
+        const result = await securedFetch(`api/graph/${prepareArg(graph.Id)}/?query=${prepareArg(q)} `, {
+            method: "GET"
+        })
+
+        if (!result.ok) return
+
+        selectedElements.forEach((element) => {
+            const type = element.source ? "edge" : "node"
+            const { id } = getElementId(element)
+            graph.Elements.splice(graph.Elements.findIndex(e => e.data.id === id), 1)
+            chartRef.current?.remove(`#${id} `)
+
+            if (type === "node") {
+                setNodesCount(prev => prev - 1)
+            } else {
+                setEdgesCount(prev => prev - 1)
+            }
+
+            graph.updateCategories(type === "node" ? element.category : element.label, type)
+        })
+
+        setSelectedElements([])
         setSelectedElement(undefined)
+
         dataPanel.current?.collapse()
     }
 
@@ -436,7 +496,12 @@ const GraphView = forwardRef(({ graph, runQuery, setGraph, historyQuery }: {
                     </Dialog>
                 </div>
                 <div className="flex items-center justify-between">
-                    <Toolbar disabled={!graph.Id} deleteDisabled={!selectedElement} onDeleteElement={onDeleteElement} chartRef={chartRef} />
+                    <Toolbar
+                        disabled={!graph.Id}
+                        deleteDisabled={Object.values(selectedElements).length === 0 && !selectedElement}
+                        onDeleteElement={handelDeleteElement}
+                        chartRef={chartRef}
+                    />
                     {
                         isCollapsed && graph.Id &&
                         <Button
@@ -463,6 +528,9 @@ const GraphView = forwardRef(({ graph, runQuery, setGraph, historyQuery }: {
                             cy.on('tapunselect', 'node', handleUnselected)
                             cy.on('tapselect', 'edge', handleSelected)
                             cy.on('tapselect', 'node', handleSelected)
+                            cy.on('tapselect', 'node', handleSelected)
+                            cy.on('boxselect', 'node', handleBoxSelected)
+                            cy.on('boxselect', 'edge', handleBoxSelected)
                         }}
                         elements={graph.Elements}
                         layout={LAYOUT}
@@ -496,9 +564,9 @@ const GraphView = forwardRef(({ graph, runQuery, setGraph, historyQuery }: {
                     <DataPanel
                         removeProperty={removeProperty}
                         setProperty={setProperty}
-                        obj={selectedElement.data}
+                        obj={selectedElement}
                         onExpand={onExpand}
-                        onDeleteElement={onDeleteElement}
+                        onDeleteElement={handelDeleteElement}
                     />
                 }
             </ResizablePanel>

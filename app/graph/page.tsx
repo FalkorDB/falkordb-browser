@@ -85,16 +85,22 @@ export default function Page() {
             <Header onSetGraphName={setGraphName} />
             <div className="h-1 grow p-8 px-10 flex flex-col gap-8">
                 <Selector
-                    edgesCount={edgesCount}
-                    nodesCount={nodesCount}
+                    queries={queries}
+                    onChange={setGraphName}
+                    graphName={graphName}
+                    runQuery={runHistoryQuery}
                     setEdgesCount={setEdgesCount}
                     setNodesCount={setNodesCount}
-                    graphName={graphName}
-                    onChange={setGraphName}
-                    queries={queries}
-                    runQuery={runHistoryQuery}
+                    edgesCount={edgesCount}
+                    nodesCount={nodesCount}
                 />
-                <GraphView graph={graph} setGraph={setGraph} runQuery={runQuery} historyQuery={historyQuery} />
+                <GraphView
+                    graph={graph}
+                    runQuery={runQuery}
+                    historyQuery={historyQuery}
+                    setEdgesCount={setEdgesCount}
+                    setNodesCount={setNodesCount}
+                />
             </div>
         </div>
     )

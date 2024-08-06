@@ -192,7 +192,6 @@ export default function Create() {
             case "schema":
                 return (
                     <div className="grow flex flex-col gap-10">
-                        {/* <SchemaView schema={schema}  /> */}
                         <div className="flex justify-end gap-16">
                             <Button
                                 className="flex gap-1 items-center text-[#7167F6]"

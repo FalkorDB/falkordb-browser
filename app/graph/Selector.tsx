@@ -54,7 +54,6 @@ export default function Selector({ onChange, graphName, queries, runQuery, edges
             setSelectedValue(graphName)
             return [...prev, graphName]
         })
-        setSelectedValue(graphName)
     }, [graphName])
 
     const handleEditorDidMount = (e: editor.IStandaloneCodeEditor) => {

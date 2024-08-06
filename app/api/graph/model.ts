@@ -179,10 +179,11 @@ export class Graph {
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     public extendNode(cell: any) {
+        const categoryName = cell.labels[0] || ""
         // check if category already exists in categories
-        let category = this.categoriesMap.get(cell.labels[0])
+        let category = this.categoriesMap.get(categoryName)
         if (!category) {
-            category = { name: cell.labels[0], index: this.categoriesMap.size, show: true }
+            category = { name: categoryName, index: this.categoriesMap.size, show: true }
             this.categoriesMap.set(category.name, category)
             this.categories.push(category)
         }
