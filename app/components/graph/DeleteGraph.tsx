@@ -5,7 +5,7 @@ export default function DeleteGraph({ graphName, isOpen, onOpen, onDeleteGraph, 
     graphName: string
     isOpen: boolean
     onOpen: (open: boolean) => void
-    onDeleteGraph: () => void
+    onDeleteGraph: (option: string) => void
     isSchema: boolean
 }) {
 
@@ -19,7 +19,7 @@ export default function DeleteGraph({ graphName, isOpen, onOpen, onDeleteGraph, 
 
         if (result.ok) {
             Toast(`${type} ${graphName} deleted`, "Success")
-            onDeleteGraph()
+            onDeleteGraph(graphName)
         }
     }
 
