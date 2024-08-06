@@ -29,6 +29,7 @@ interface ComboboxProps {
 
 export default function Combobox({ isSelectGraph, disabled = false, inTable, type, options, setOptions, selectedValue = "", setSelectedValue, isSchema = false, defaultOpen = false, onOpenChange }: ComboboxProps) {
 
+  const [openDialog, setOpenDialog] = useState<boolean>(false)
   const [open, setOpen] = useState<boolean>(defaultOpen)
   const [optionName, setOptionName] = useState<string>("")
   const [editable, setEditable] = useState<string>("")
@@ -57,11 +58,11 @@ export default function Combobox({ isSelectGraph, disabled = false, inTable, typ
   }
 
   const handelDelete = (option: string) => {
-
     if (!setOptions) return
     setOptions(prev => prev.filter(name => name !== option))
     if (selectedValue !== option) return
     setSelectedValue("")
+    setOpenDialog(false)
   }
 
   const handelSetOption = async (e: React.KeyboardEvent<HTMLInputElement>, option: string) => {
@@ -89,7 +90,7 @@ export default function Combobox({ isSelectGraph, disabled = false, inTable, typ
   }
 
   return (
-    <Dialog>
+    <Dialog open={openDialog} onOpenChange={setOpenDialog}>
       <DropdownMenu open={open} onOpenChange={(o) => {
         setOpen(o)
         if (onOpenChange) onOpenChange(o)
