@@ -424,18 +424,18 @@ const GraphView = forwardRef(({ graph, runQuery, historyQuery, setNodesCount, se
         if (!result.ok) return
 
         selectedElements.forEach((element) => {
-            const type = element.source ? "edge" : "node"
+            const type = !element.source
             const { id } = getElementId(element)
             graph.Elements.splice(graph.Elements.findIndex(e => e.data.id === id), 1)
             chartRef.current?.remove(`#${id} `)
 
-            if (type === "node") {
+            if (type) {
                 setNodesCount(prev => prev - 1)
             } else {
                 setEdgesCount(prev => prev - 1)
             }
 
-            graph.updateCategories(type === "node" ? element.category : element.label, type)
+            graph.updateCategories(type ? element.category : element.label, type)
         })
 
         setSelectedElements([])
