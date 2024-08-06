@@ -1,7 +1,7 @@
 'use client'
 
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { cn, ElementDataDefinition, Toast } from "@/lib/utils";
 import { ChevronRight, Trash2 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -48,6 +48,11 @@ export default function SchemaCreateElement({ obj, onExpand, onDelete, onSetAttr
     const [label, setLabel] = useState<string>(obj.source ? obj.label : obj.category)
     const [newLabel, setNewLabel] = useState<string>()
 
+    useEffect(() => {
+        setAttributes(Object.entries(obj).filter(([k, v]) => !excludedProperties.has(k) && !(k === "name" && v === obj.id)).map(([k, v]) => [k, Array.isArray(v) ? v : v.split(",")] as [string, Attribute]))
+        setLabel(obj.source ? obj.label : obj.category)
+    }, [obj])
+
     const handelAddAttribute = async (e: React.KeyboardEvent<HTMLInputElement>) => {
         if (e.code === "Escape") {
             e.preventDefault()
@@ -80,7 +85,7 @@ export default function SchemaCreateElement({ obj, onExpand, onDelete, onSetAttr
             setEditable("")
             return
         }
-        
+
         if (e.key !== 'Enter') return
 
         e.preventDefault()
@@ -92,16 +97,16 @@ export default function SchemaCreateElement({ obj, onExpand, onDelete, onSetAttr
             Toast("Please fill the field")
             return
         }
-        
+
         const attr = attributes[Number(index)][1]
-        
-        const success = await onSetAttribute(isKey ? newKey as string : attributes[Number(index)][0] , [attr[0], isKey ? attr[1] : newVal as string, attr[2], attr[3]])
+
+        const success = await onSetAttribute(isKey ? newKey as string : attributes[Number(index)][0], [attr[0], isKey ? attr[1] : newVal as string, attr[2], attr[3]])
 
         if (!success) return
-        
+
         setAttributes(prev => {
             const p = [...prev]
-            
+
             if (i === "key") {
                 p[Number(index)][0] = newKey as string
             }
@@ -114,7 +119,7 @@ export default function SchemaCreateElement({ obj, onExpand, onDelete, onSetAttr
         setNewKey("")
         setEditable("")
     }
-    
+
     const handelLabelCancel = () => {
         setNewLabel(undefined)
         setLabelEditable(false)
@@ -199,142 +204,142 @@ export default function SchemaCreateElement({ obj, onExpand, onDelete, onSetAttr
                     <TableBody>
                         {
                             attributes.map(([key, val], index) => (
-                                    <TableRow
-                                        // eslint-disable-next-line react/no-array-index-key
-                                        key={index}
-                                        className="border-none"
-                                        onMouseEnter={() => setHover(`${index}`)}
-                                        onMouseLeave={() => setHover("")}
-                                    >
-                                        <TableCell className={cn(hover === `${index}` && "flex gap-2")}>
-                                            {
-                                                hover === `${index}` &&
-                                                <Button
+                                <TableRow
+                                    // eslint-disable-next-line react/no-array-index-key
+                                    key={index}
+                                    className="border-none"
+                                    onMouseEnter={() => setHover(`${index}`)}
+                                    onMouseLeave={() => setHover("")}
+                                >
+                                    <TableCell className={cn(hover === `${index}` && "flex gap-2")}>
+                                        {
+                                            hover === `${index}` &&
+                                            <Button
+                                                className="text-[#ACACC2]"
+                                                icon={<Trash2 />}
+                                                onClick={() => {
+                                                    onRemoveAttribute(key)
+                                                    setAttributes(prev => prev.filter(([k]) => k !== key))
+                                                }}
+                                            />
+                                        }
+                                        {
+                                            editable === `${index}-key` ?
+                                                <Input
+                                                    ref={ref => ref?.focus()}
+                                                    className="w-28"
+                                                    variant="Small"
+                                                    value={newKey}
+                                                    onChange={(e) => setNewKey(e.target.value)}
+                                                    onKeyDown={handelSetAttribute}
+                                                    onBlur={() => handelCancel()}
+                                                />
+                                                : <Button
                                                     className="text-[#ACACC2]"
-                                                    icon={<Trash2 />}
+                                                    label={`${key}:`}
                                                     onClick={() => {
-                                                        onRemoveAttribute(key)
-                                                        setAttributes(prev => prev.filter(([k]) => k !== key))
+                                                        setEditable(`${index}-key`)
                                                     }}
                                                 />
-                                            }
-                                            {
-                                                editable === `${index}-key` ?
-                                                    <Input
-                                                        ref={ref => ref?.focus()}
-                                                        className="w-28"
-                                                        variant="Small"
-                                                        value={newKey}
-                                                        onChange={(e) => setNewKey(e.target.value)}
-                                                        onKeyDown={handelSetAttribute}
-                                                        onBlur={() => handelCancel()}
-                                                    />
-                                                    : <Button
-                                                        className="text-[#ACACC2]"
-                                                        label={`${key}:`}
-                                                        onClick={() => {
-                                                            setEditable(`${index}-key`)
-                                                        }}
-                                                    />
-                                            }
-                                        </TableCell>
-                                        <TableCell>
-                                            {
-                                                editable === `${index}-0` ?
-                                                    <Combobox
-                                                        options={OPTIONS}
-                                                        setSelectedValue={async (selectedValue) => {
-                                                            const attr = attributes[index][1]
-                                                            const success = await onSetAttribute(key, [selectedValue as Type, attr[1], attr[2], attr[3]])
+                                        }
+                                    </TableCell>
+                                    <TableCell>
+                                        {
+                                            editable === `${index}-0` ?
+                                                <Combobox
+                                                    options={OPTIONS}
+                                                    setSelectedValue={async (selectedValue) => {
+                                                        const attr = attributes[index][1]
+                                                        const success = await onSetAttribute(key, [selectedValue as Type, attr[1], attr[2], attr[3]])
 
-                                                            if (!success) return
-                                                            
-                                                            setAttributes(prev => {
-                                                                const p = [...prev]
-                                                                p[index][1][0] = selectedValue as Type
-                                                                return p
-                                                            })
+                                                        if (!success) return
 
-                                                            setEditable("")
-                                                        }}
-                                                        inTable
-                                                        type="Type"
-                                                        selectedValue={val[0]}
-                                                        onOpenChange={(o) => !o && setEditable("")}
-                                                        defaultOpen
-                                                    />
-                                                    : <Button
-                                                        label={val[0]}
-                                                        onClick={() => setEditable(`${index}-0`)}
-                                                    />
-                                            }
-                                        </TableCell>
-                                        <TableCell>
-                                            {
-                                                editable === `${index}-1` ?
-                                                    <Input
-                                                        ref={ref => ref?.focus()}
-                                                        className="w-28"
-                                                        variant="Small"
-                                                        value={newVal}
-                                                        onChange={(e) => setVal(e.target.value)}
-                                                        onKeyDown={handelSetAttribute}
-                                                        onBlur={() => setEditable("")}
-                                                    />
-                                                    : <Button
-                                                        label={val[1]}
-                                                        onClick={() => setEditable(`${index}-1`)}
-                                                    />
-                                            }
-                                        </TableCell>
-                                        <TableCell>
-                                            {
-                                                editable === `${index}-2` ?
-                                                    <Checkbox
-                                                        ref={ref => ref?.focus()}
-                                                        className="h-6 w-6 border-[#57577B] data-[state=checked]:bg-[#57577B]"
-                                                        onCheckedChange={(checked) => {
-                                                            setAttributes(prev => {
-                                                                const p = [...prev]
-                                                                p[index][1][2] = checked as boolean
-                                                                return p
-                                                            })
-                                                            onSetAttribute(key, attributes[index][1])
-                                                        }}
-                                                        checked={val[2]}
-                                                        onBlur={() => setEditable("")}
-                                                    />
-                                                    : <Button
-                                                        label={val[2].toString()}
-                                                        onClick={() => setEditable(`${index}-2`)}
-                                                    />
-                                            }
-                                        </TableCell>
-                                        <TableCell>
-                                            {
-                                                editable === `${index}-3` ?
-                                                    <Checkbox
-                                                        ref={ref => ref?.focus()}
-                                                        className="h-6 w-6 border-[#57577B] data-[state=checked]:bg-[#57577B]"
-                                                        onCheckedChange={(checked) => {
-                                                            setAttributes(prev => {
-                                                                const p = [...prev]
-                                                                p[index][1][3] = checked as boolean
-                                                                return p
-                                                            })
-                                                            onSetAttribute(key, attributes[index][1])
-                                                        }}
-                                                        checked={val[3]}
-                                                        onBlur={() => setEditable("")}
-                                                    />
-                                                    : <Button
-                                                        label={val[3].toString()}
-                                                        onClick={() => setEditable(`${index}-3`)}
-                                                    />
-                                            }
-                                        </TableCell>
-                                    </TableRow>
-                                ))
+                                                        setAttributes(prev => {
+                                                            const p = [...prev]
+                                                            p[index][1][0] = selectedValue as Type
+                                                            return p
+                                                        })
+
+                                                        setEditable("")
+                                                    }}
+                                                    inTable
+                                                    type="Type"
+                                                    selectedValue={val[0]}
+                                                    onOpenChange={(o) => !o && setEditable("")}
+                                                    defaultOpen
+                                                />
+                                                : <Button
+                                                    label={val[0]}
+                                                    onClick={() => setEditable(`${index}-0`)}
+                                                />
+                                        }
+                                    </TableCell>
+                                    <TableCell>
+                                        {
+                                            editable === `${index}-1` ?
+                                                <Input
+                                                    ref={ref => ref?.focus()}
+                                                    className="w-28"
+                                                    variant="Small"
+                                                    value={newVal}
+                                                    onChange={(e) => setVal(e.target.value)}
+                                                    onKeyDown={handelSetAttribute}
+                                                    onBlur={() => setEditable("")}
+                                                />
+                                                : <Button
+                                                    label={val[1]}
+                                                    onClick={() => setEditable(`${index}-1`)}
+                                                />
+                                        }
+                                    </TableCell>
+                                    <TableCell>
+                                        {
+                                            editable === `${index}-2` ?
+                                                <Checkbox
+                                                    ref={ref => ref?.focus()}
+                                                    className="h-6 w-6 border-[#57577B] data-[state=checked]:bg-[#57577B]"
+                                                    onCheckedChange={(checked) => {
+                                                        setAttributes(prev => {
+                                                            const p = [...prev]
+                                                            p[index][1][2] = checked as boolean
+                                                            return p
+                                                        })
+                                                        onSetAttribute(key, attributes[index][1])
+                                                    }}
+                                                    checked={val[2]}
+                                                    onBlur={() => setEditable("")}
+                                                />
+                                                : <Button
+                                                    label={val[2].toString()}
+                                                    onClick={() => setEditable(`${index}-2`)}
+                                                />
+                                        }
+                                    </TableCell>
+                                    <TableCell>
+                                        {
+                                            editable === `${index}-3` ?
+                                                <Checkbox
+                                                    ref={ref => ref?.focus()}
+                                                    className="h-6 w-6 border-[#57577B] data-[state=checked]:bg-[#57577B]"
+                                                    onCheckedChange={(checked) => {
+                                                        setAttributes(prev => {
+                                                            const p = [...prev]
+                                                            p[index][1][3] = checked as boolean
+                                                            return p
+                                                        })
+                                                        onSetAttribute(key, attributes[index][1])
+                                                    }}
+                                                    checked={val[3]}
+                                                    onBlur={() => setEditable("")}
+                                                />
+                                                : <Button
+                                                    label={val[3].toString()}
+                                                    onClick={() => setEditable(`${index}-3`)}
+                                                />
+                                        }
+                                    </TableCell>
+                                </TableRow>
+                            ))
                         }
                         {
                             isAddValue &&

@@ -17,7 +17,7 @@ interface Props {
   onExpand: () => void
   selectedNodes: NodeDataDefinition[]
   setSelectedNodes: Dispatch<SetStateAction<NodeDataDefinition[]>>
-  type: "node" | "edge"
+  type: boolean
 }
 
 const emptyAttribute = (): Attribute => [undefined, "", false, false]
@@ -26,10 +26,10 @@ export default function SchemaCreateElement({ onCreate, onExpand, selectedNodes,
 
   const [attributes, setAttributes] = useState<[string, Attribute][]>([])
   const [attribute, setAttribute] = useState<Attribute>(emptyAttribute())
-  const [newKey, setNewKey] = useState<string>()
-  const [newValue, setNewValue] = useState<string>()
-  const [label, setLabel] = useState<string>()
-  const [newLabel, setNewLabel] = useState<string>()
+  const [newKey, setNewKey] = useState<string>("")
+  const [newValue, setNewValue] = useState<string>("")
+  const [label, setLabel] = useState<string>("")
+  const [newLabel, setNewLabel] = useState<string>("")
   const [labelEditable, setLabelEditable] = useState<boolean>(false)
   const [editable, setEditable] = useState<string>("")
   const [hover, setHover] = useState<string>("")
@@ -57,7 +57,7 @@ export default function SchemaCreateElement({ onCreate, onExpand, selectedNodes,
   const handelSetAttribute = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.code === "Escape") {
       e.preventDefault()
-      setNewValue(undefined)
+      setNewValue("")
       setEditable("")
       return
     }
@@ -77,19 +77,16 @@ export default function SchemaCreateElement({ onCreate, onExpand, selectedNodes,
       p[index][i] = newValue
       return p
     })
-    setNewValue(undefined)
+    setNewValue("")
   }
 
   const handelOnCreate = async () => {
-    if (!label && type === "edge") {
+    if (!label && !type) {
       Toast("Please fill the label")
       return
     }
     const ok = await onCreate(attributes, label)
-    if (!ok) {
-      Toast("")
-      return
-    }
+    if (!ok) return
     setAttributes([])
     setAttribute(emptyAttribute())
     setLabel("")
@@ -182,7 +179,7 @@ export default function SchemaCreateElement({ onCreate, onExpand, selectedNodes,
                           ref={ref => ref?.focus()}
                           className="w-28"
                           variant="Small"
-                          value={newKey === undefined ? key : newKey}
+                          value={newKey === "" ? key : newKey}
                           onChange={(e) => setNewKey(e.target.value)}
                           onKeyDown={handelSetAttribute}
                           onBlur={() => handelCancel()}
@@ -226,7 +223,7 @@ export default function SchemaCreateElement({ onCreate, onExpand, selectedNodes,
                           ref={ref => ref?.focus()}
                           className="w-28"
                           variant="Small"
-                          value={newValue === undefined ? val[1] : newValue}
+                          value={newValue === "" ? val[1] : newValue}
                           onChange={(e) => setNewValue(e.target.value)}
                           onKeyDown={handelSetAttribute}
                           onBlur={() => setEditable("")}
@@ -342,7 +339,7 @@ export default function SchemaCreateElement({ onCreate, onExpand, selectedNodes,
           </TableBody>
         </Table>
         {
-          type === "edge" &&
+          !type &&
           <div className="w-full flex flex-col gap-4">
             <div className="w-full flex justify-between p-8 items-center">
               <div className={`flex h-16 w-16 rounded-full bg-[#57577B] justify-center items-center bg-${getCategoryColorNameFromValue(selectedNodes[0]?.color)}`}>

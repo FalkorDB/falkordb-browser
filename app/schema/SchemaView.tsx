@@ -99,8 +99,8 @@ function getStyle() {
 
 const getElementId = (element: ElementDataDefinition) => element.source ? { id: element.id?.slice(1), query: "()-[e]-()" } : { id: element.id, query: "(e)" }
 
-const getCreateQuery = (type: string, selectedNodes: NodeDataDefinition[], attributes: [string, Attribute][], label?: string) => {
-    if (type === "node") {
+const getCreateQuery = (type: boolean, selectedNodes: NodeDataDefinition[], attributes: [string, Attribute][], label?: string) => {
+    if (type) {
         return `CREATE (n${label ? `:${label}` : ""}${attributes?.length > 0 ? ` {${attributes.map(([k, [t, d, u, un]]) => `${k}: ["${t}", "${d}", "${u}", "${un}"]`).join(",")}}` : ""}) RETURN n`
     }
     return `MATCH (a), (b) WHERE ID(a) = ${selectedNodes[0].id} AND ID(b) = ${selectedNodes[1].id} CREATE (a)-[e${label ? `:${label}` : ""}${attributes?.length > 0 ? ` {${attributes.map(([k, [t, d, u, un]]) => `${k}: ["${t}", "${d}", "${u}", "${un}"]`).join(",")}}` : ""}]->(b) RETURN e`
@@ -184,7 +184,7 @@ export default function SchemaView({ schema, setNodesCount, setEdgesCount }: Pro
         if (isAddRelation) return
 
         const { target } = evt
-        
+
         if (target.isEdge()) {
             const { color } = target.data()
             target.style("line-color", color);
@@ -195,7 +195,7 @@ export default function SchemaView({ schema, setNodesCount, setEdgesCount }: Pro
         } else {
             target.style("border-width", 0.7)
         };
-        
+
         const obj: ElementDataDefinition = target.json().data
 
         handelSetSelectedElement(obj);
@@ -284,29 +284,25 @@ export default function SchemaView({ schema, setNodesCount, setEdgesCount }: Pro
         })
 
         const q = `${conditionsNodes.length > 0 ? `MATCH (n) WHERE ${conditionsNodes.join(" OR ")} DELETE n` : ""}${conditionsEdges.length > 0 && conditionsNodes.length > 0 ? " WITH * " : ""}${conditionsEdges.length > 0 ? `MATCH ()-[e]-() WHERE ${conditionsEdges.join(" OR ")} DELETE e` : ""}`
-
+        const type = !selectedElement?.source
         const result = await securedFetch(`api/graph/${prepareArg(schema.Id)}_schema/?query=${prepareArg(q)} `, {
             method: "GET"
         })
 
         if (!result.ok) return
         stateSelectedElements.forEach((element) => {
-            const type = element.source ? "edge" : "node"
             const { id } = getElementId(element)
-            schema.Elements.splice(schema.Elements.findIndex(e => e.data.id === id), 1)
-            chartRef.current?.remove(`#${id} `)
-            
+            schema.Elements.splice(schema.Elements.findIndex(e => e.data.id === element.id), 1)
             if (type) {
                 schema.NodesMap.delete(Number(id))
-                chartRef.current?.remove(`#${id} `)
+                chartRef.current?.remove(`#${id}`)
                 setNodesCount(prev => prev - 1)
             } else {
                 schema.EdgesMap.delete(Number(id))
-                chartRef.current?.remove(`#_${id} `)
+                chartRef.current?.remove(`#_${id}`)
                 setEdgesCount(prev => prev - 1)
             }
-    
-            schema.updateCategories(type === "node" ? element.category : element.label, type)
+            schema.updateCategories(type ? element.category : element.label, type)
         })
 
         setSelectedElement(undefined)
@@ -339,9 +335,9 @@ export default function SchemaView({ schema, setNodesCount, setEdgesCount }: Pro
     const handelSetLabel = async (label: string) => {
         if (!selectedElement) return false
 
-        const type = selectedElement.source ? "edge" : "node"
         const { id, query } = getElementId(selectedElement)
-        const q = `MATCH ${query} WHERE ID(e) = ${id}${type === "node" ? ` REMOVE e:${selectedElement.category}` : ""} SET e:${label}`
+        const type = !!selectedElement.source
+        const q = `MATCH ${query} WHERE ID(e) = ${id}${type ? ` REMOVE e:${selectedElement.category}` : ""} SET e:${label}`
         const success = (await securedFetch(`api/graph/${prepareArg(schema.Id)}_schema/?query=${prepareArg(q)}`, {
             method: "GET"
         })).ok
@@ -350,7 +346,7 @@ export default function SchemaView({ schema, setNodesCount, setEdgesCount }: Pro
             schema.Elements.forEach(({ data }) => {
                 if (data.id !== id) return
 
-                if (type === "node") {
+                if (type) {
                     // eslint-disable-next-line no-param-reassign
                     data.category = label
                     let category = schema.CategoriesMap.get(label)
@@ -364,7 +360,7 @@ export default function SchemaView({ schema, setNodesCount, setEdgesCount }: Pro
                     chartRef.current?.elements().forEach(n => {
                         if (n.data().id === id) {
                             // eslint-disable-next-line no-param-reassign
-                            n.data().label = label
+                            n.data().category = label
                             // eslint-disable-next-line no-param-reassign
                             n.data().color = getCategoryColorValue(category.index)
                         }
@@ -392,7 +388,7 @@ export default function SchemaView({ schema, setNodesCount, setEdgesCount }: Pro
                     chartRef.current?.elements().layout(LAYOUT).run();
                 }
             })
-            schema.updateCategories(type === "node" ? selectedElement.category : selectedElement.label, type)
+            schema.updateCategories(type ? selectedElement.category : selectedElement.label, type)
         }
 
         return success
@@ -423,26 +419,29 @@ export default function SchemaView({ schema, setNodesCount, setEdgesCount }: Pro
     }
 
     const onCreateElement = async (attributes: [string, Attribute][], label?: string) => {
-        const type = isAddEntity ? "node" : ""
-
-        const result = await securedFetch(`api/graph/${prepareArg(schema.Id)}_schema/?query=${getCreateQuery(type, selectedNodes, attributes, label)}`, {
+        if (!isAddEntity && selectedNodes.length === 0) {
+            Toast("Select nodes to create a relation")
+            return false
+        }
+        const result = await securedFetch(`api/graph/${prepareArg(schema.Id)}_schema/?query=${getCreateQuery(isAddEntity, selectedNodes, attributes, label)}`, {
             method: "GET"
         })
 
         if (result.ok) {
             const json = await result.json()
 
-            if (type === "node" && setNodesCount) {
+            if (isAddEntity) {
                 chartRef?.current?.add({ data: schema.extendNode(json.result.data[0].n) })
                 setNodesCount(prev => prev + 1)
                 setIsAddEntity(false)
-            } else if (type === "node" && setEdgesCount) {
+            } else {
                 chartRef?.current?.add({ data: schema.extendEdge(json.result.data[0].e) })
                 setEdgesCount(prev => prev + 1)
                 setIsAddRelation(false)
             }
+
             onExpand()
-        } else Toast("Failed to create element")
+        }
 
         return result.ok
     }
@@ -511,7 +510,7 @@ export default function SchemaView({ schema, setNodesCount, setEdgesCount }: Pro
                         (schema.Categories.length > 0 || schema.Labels.length > 0) &&
                         <>
                             <Labels className="left-2" label="Categories" categories={schema.Categories} onClick={onCategoryClick} />
-                            <Labels className="right-2 text-end" label="Labels" categories={schema.Labels} onClick={onLabelClick} />
+                            <Labels className="right-2 text-end" label="RelationshipTypes" categories={schema.Labels} onClick={onLabelClick} />
                         </>
                     }
                 </div>
@@ -546,7 +545,7 @@ export default function SchemaView({ schema, setNodesCount, setEdgesCount }: Pro
                             onExpand={onExpand}
                             selectedNodes={selectedNodes}
                             setSelectedNodes={setSelectedNodes}
-                            type={isAddEntity ? "node" : "edge"}
+                            type={isAddEntity}
                         />
                 }
             </ResizablePanel>

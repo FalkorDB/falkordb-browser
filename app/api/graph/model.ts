@@ -313,17 +313,17 @@ export class Graph {
         return newElements
     }
 
-    public updateCategories(category: string, type: string) {
-        if (type === "node" && !this.elements.find(e => e.data.category === category)) {
+    public updateCategories(category: string, type: boolean) {
+        if (type && !this.elements.find(e => e.data.category === category)) {
             const i = this.categories.findIndex(({ name }) => name === category)
             this.categories.splice(i, 1)
             this.categoriesMap.delete(category)
         }
 
-        if (type === "edge" && !this.elements.find(e => e.data.label === category)) {
+        if (!type && !this.elements.find(e => e.data.label === category)) {
             const i = this.labels.findIndex(({ name }) => name === category)
             this.labels.splice(i, 1)
             this.labelsMap.delete(category)
-        }
+            }
     }
 }
