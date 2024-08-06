@@ -99,8 +99,8 @@ function getStyle() {
 
 const getElementId = (element: ElementDataDefinition) => element.source ? { id: element.id?.slice(1), query: "()-[e]-()" } : { id: element.id, query: "(e)" }
 
-const getCreateQuery = (type: string, selectedNodes: NodeDataDefinition[], attributes: [string, Attribute][], label?: string) => {
-    if (type === "node") {
+const getCreateQuery = (type: boolean, selectedNodes: NodeDataDefinition[], attributes: [string, Attribute][], label?: string) => {
+    if (type) {
         return `CREATE (n${label ? `:${label}` : ""}${attributes?.length > 0 ? ` {${attributes.map(([k, [t, d, u, un]]) => `${k}: ["${t}", "${d}", "${u}", "${un}"]`).join(",")}}` : ""}) RETURN n`
     }
     return `MATCH (a), (b) WHERE ID(a) = ${selectedNodes[0].id} AND ID(b) = ${selectedNodes[1].id} CREATE (a)-[e${label ? `:${label}` : ""}${attributes?.length > 0 ? ` {${attributes.map(([k, [t, d, u, un]]) => `${k}: ["${t}", "${d}", "${u}", "${un}"]`).join(",")}}` : ""}]->(b) RETURN e`
@@ -423,20 +423,18 @@ export default function SchemaView({ schema, setNodesCount, setEdgesCount }: Pro
     }
 
     const onCreateElement = async (attributes: [string, Attribute][], label?: string) => {
-        const type = isAddEntity ? "node" : ""
-
-        const result = await securedFetch(`api/graph/${prepareArg(schema.Id)}_schema/?query=${getCreateQuery(type, selectedNodes, attributes, label)}`, {
+        const result = await securedFetch(`api/graph/${prepareArg(schema.Id)}_schema/?query=${getCreateQuery(isAddEntity, selectedNodes, attributes, label)}`, {
             method: "GET"
         })
 
         if (result.ok) {
             const json = await result.json()
 
-            if (type === "node" && setNodesCount) {
+            if (isAddEntity && setNodesCount) {
                 chartRef?.current?.add({ data: schema.extendNode(json.result.data[0].n) })
                 setNodesCount(prev => prev + 1)
                 setIsAddEntity(false)
-            } else if (type === "node" && setEdgesCount) {
+            } else if (isAddEntity && setEdgesCount) {
                 chartRef?.current?.add({ data: schema.extendEdge(json.result.data[0].e) })
                 setEdgesCount(prev => prev + 1)
                 setIsAddRelation(false)
