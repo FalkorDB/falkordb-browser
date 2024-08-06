@@ -1,8 +1,7 @@
 'use client'
 
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Toast, cn } from "@/lib/utils";
-import { EdgeDataDefinition, NodeDataDefinition } from "cytoscape";
+import { ElementDataDefinition, Toast, cn } from "@/lib/utils";
 import { ChevronRight, MinusCircle, PlusCircle, Trash2 } from "lucide-react";
 import { KeyboardEvent, useEffect, useRef, useState } from "react";
 import Button from "../components/ui/Button";
@@ -11,7 +10,7 @@ import Input from "../components/ui/Input";
 /* eslint-disable react/require-default-props */
 interface Props {
     inSchema?: boolean;
-    obj: NodeDataDefinition | EdgeDataDefinition;
+    obj: ElementDataDefinition;
     onExpand: () => void;
     setProperty?: (key: string, newVal: string) => Promise<boolean>;
     setPropertySchema?: (key: string, newVal: string[]) => Promise<boolean>;
@@ -29,7 +28,7 @@ const excludedProperties = new Set([
     "source",
 ]);
 
-export default function DataPanel({ inSchema, obj, onExpand, setProperty, setPropertySchema, removeProperty, onDeleteElement }: Props) {
+export default function GraphDataPanel({ inSchema, obj, onExpand, setProperty, setPropertySchema, removeProperty, onDeleteElement }: Props) {
 
     const [isAddValue, setIsAddValue] = useState<boolean>(false)
     const [hover, setHover] = useState<string>("")
@@ -136,7 +135,7 @@ export default function DataPanel({ inSchema, obj, onExpand, setProperty, setPro
     // }
 
     return (
-        <div className="h-full w-full flex flex-col shadow-lg DataPanel">
+        <div className="DataPanel">
             <div className="w-full flex justify-between items-center bg-[#7167F6] p-4">
                 <div className="flex gap-4 items-center">
                     <Button
