@@ -21,7 +21,7 @@ export default function Settings() {
     }
 
     return (
-        <div className="w-full h-full flex flex-col">
+        <div className="Page">
             <Header />
             <div className="grow flex flex-col gap-8 p-16">
                 <h1 className="text-2xl font-medium px-6">Settings</h1>
