@@ -89,8 +89,6 @@ export default function Page() {
                     onChange={setGraphName}
                     graphName={graphName}
                     runQuery={runHistoryQuery}
-                    setEdgesCount={setEdgesCount}
-                    setNodesCount={setNodesCount}
                     edgesCount={edgesCount}
                     nodesCount={nodesCount}
                 />
