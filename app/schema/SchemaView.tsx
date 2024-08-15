@@ -5,7 +5,7 @@ import CytoscapeComponent from "react-cytoscapejs"
 import { ChevronLeft } from "lucide-react"
 import cytoscape, { EdgeSingular, EventObject, NodeDataDefinition } from "cytoscape"
 import { ImperativePanelHandle } from "react-resizable-panels"
-import { Dispatch, SetStateAction, useEffect, useRef, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import fcose from "cytoscape-fcose";
 import { ElementDataDefinition, Toast, cn, prepareArg, securedFetch } from "@/lib/utils"
 import Toolbar from "../graph/toolbar"
@@ -18,8 +18,7 @@ import CreateElement from "./SchemaCreateElement"
 /* eslint-disable react/require-default-props */
 interface Props {
     schema: Graph
-    setNodesCount: Dispatch<SetStateAction<number>>
-    setEdgesCount: Dispatch<SetStateAction<number>>
+    fetchCount?: () => void
 }
 
 const LAYOUT = {
@@ -106,7 +105,7 @@ const getCreateQuery = (type: boolean, selectedNodes: NodeDataDefinition[], attr
     return `MATCH (a), (b) WHERE ID(a) = ${selectedNodes[0].id} AND ID(b) = ${selectedNodes[1].id} CREATE (a)-[e${label ? `:${label}` : ""}${attributes?.length > 0 ? ` {${attributes.map(([k, [t, d, u, un]]) => `${k}: ["${t}", "${d}", "${u}", "${un}"]`).join(",")}}` : ""}]->(b) RETURN e`
 }
 
-export default function SchemaView({ schema, setNodesCount, setEdgesCount }: Props) {
+export default function SchemaView({ schema, fetchCount }: Props) {
     const [selectedElement, setSelectedElement] = useState<ElementDataDefinition>();
     const [selectedElements, setSelectedElements] = useState<ElementDataDefinition[]>([]);
     const [selectedNodes, setSelectedNodes] = useState<NodeDataDefinition[]>([]);
@@ -290,18 +289,24 @@ export default function SchemaView({ schema, setNodesCount, setEdgesCount }: Pro
         })
 
         if (!result.ok) return
+
         stateSelectedElements.forEach((element) => {
             const { id } = getElementId(element)
+
             schema.Elements.splice(schema.Elements.findIndex(e => e.data.id === element.id), 1)
+
             if (type) {
                 schema.NodesMap.delete(Number(id))
                 chartRef.current?.remove(`#${id}`)
-                setNodesCount(prev => prev - 1)
             } else {
                 schema.EdgesMap.delete(Number(id))
                 chartRef.current?.remove(`#_${id}`)
-                setEdgesCount(prev => prev - 1)
             }
+
+            if (fetchCount) {
+                fetchCount()
+            }
+
             schema.updateCategories(type ? element.category : element.label, type)
         })
 
@@ -332,12 +337,11 @@ export default function SchemaView({ schema, setNodesCount, setEdgesCount }: Pro
         return ok
     }
 
-    const handelSetLabel = async (label: string) => {
+    const handelSetCategory = async (category: string) => {
         if (!selectedElement) return false
 
-        const { id, query } = getElementId(selectedElement)
-        const type = !!selectedElement.source
-        const q = `MATCH ${query} WHERE ID(e) = ${id}${type ? ` REMOVE e:${selectedElement.category}` : ""} SET e:${label}`
+        const { id } = getElementId(selectedElement)
+        const q = `MATCH (n) WHERE ID(n) = ${id} REMOVE n:${selectedElement.category} SET n:${category}`
         const success = (await securedFetch(`api/graph/${prepareArg(schema.Id)}_schema/?query=${prepareArg(q)}`, {
             method: "GET"
         })).ok
@@ -346,51 +350,29 @@ export default function SchemaView({ schema, setNodesCount, setEdgesCount }: Pro
             schema.Elements.forEach(({ data }) => {
                 if (data.id !== id) return
 
-                if (type) {
-                    // eslint-disable-next-line no-param-reassign
-                    data.category = label
-                    let category = schema.CategoriesMap.get(label)
+                // eslint-disable-next-line no-param-reassign
+                data.category = category
 
-                    if (!category) {
-                        category = { name: label, index: schema.CategoriesMap.size, show: true }
-                        schema.CategoriesMap.set(label, category)
-                        schema.Categories.push(category)
+                setSelectedElement({ ...selectedElement, category })
+
+                const prevCategory = schema.CategoriesMap.get(selectedElement.category) as Category
+
+                schema.updateCategories(prevCategory.name, true)
+
+                const c = schema.createCategory(category)
+
+                chartRef.current?.elements().forEach(n => {
+                    if (n.data().category === category) {
+                        // eslint-disable-next-line no-param-reassign
+                        n.data().category = category
+                        // eslint-disable-next-line no-param-reassign
+                        n.data().color = getCategoryColorValue(c.index)
                     }
+                });
+                chartRef.current?.elements().layout(LAYOUT).run();
 
-                    chartRef.current?.elements().forEach(n => {
-                        if (n.data().id === id) {
-                            // eslint-disable-next-line no-param-reassign
-                            n.data().category = label
-                            // eslint-disable-next-line no-param-reassign
-                            n.data().color = getCategoryColorValue(category.index)
-                        }
-                    });
-                    chartRef.current?.elements().layout(LAYOUT).run();
-                } else {
-                    // eslint-disable-next-line no-param-reassign
-                    data.label = label
-                    let category = schema.LabelsMap.get(label)
-
-                    if (!category) {
-                        category = { name: label, index: schema.LabelsMap.size, show: true }
-                        schema.LabelsMap.set(label, category)
-                        schema.Labels.push(category)
-                    }
-
-                    chartRef.current?.elements().forEach(r => {
-                        if (r.data().id === selectedElement.id) {
-                            // eslint-disable-next-line no-param-reassign
-                            r.data().label = label
-                            // eslint-disable-next-line no-param-reassign
-                            r.data().color = getCategoryColorValue(category.index)
-                        }
-                    });
-                    chartRef.current?.elements().layout(LAYOUT).run();
-                }
             })
-            schema.updateCategories(type ? selectedElement.category : selectedElement.label, type)
         }
-
         return success
     }
 
@@ -408,10 +390,9 @@ export default function SchemaView({ schema, setNodesCount, setEdgesCount }: Pro
         const s = schema
         s.Elements = schema.Elements.map(e => {
             if (e.data.id === id) {
-                const updatedElement = e
-                delete updatedElement.data[key]
-                return updatedElement
+                delete e.data[key]
             }
+
             return e
         })
 
@@ -423,20 +404,24 @@ export default function SchemaView({ schema, setNodesCount, setEdgesCount }: Pro
             Toast("Select nodes to create a relation")
             return false
         }
+
         const result = await securedFetch(`api/graph/${prepareArg(schema.Id)}_schema/?query=${getCreateQuery(isAddEntity, selectedNodes, attributes, label)}`, {
             method: "GET"
         })
 
         if (result.ok) {
             const json = await result.json()
+
             if (isAddEntity) {
                 chartRef?.current?.add({ data: schema.extendNode(json.result.data[0].n) })
-                setNodesCount(prev => prev + 1)
                 setIsAddEntity(false)
             } else {
                 chartRef?.current?.add({ data: schema.extendEdge(json.result.data[0].e) })
-                setEdgesCount(prev => prev + 1)
                 setIsAddRelation(false)
+            }
+
+            if (fetchCount) {
+                fetchCount()
             }
 
             onExpand()
@@ -536,7 +521,7 @@ export default function SchemaView({ schema, setNodesCount, setEdgesCount }: Pro
                             onRemoveAttribute={handelRemoveProperty}
                             onSetAttribute={handelSetAttribute}
                             onDelete={handelDeleteElement}
-                            onSetLabel={handelSetLabel}
+                            onSetCategory={handelSetCategory}
                         />
                         : (isAddEntity || isAddRelation) &&
                         <CreateElement

@@ -90,9 +90,9 @@ export class Graph {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     private elements: ElementDefinition[];
 
-    private categoriesMap: Map<string, Category>;
+    private categoriesMap: Map<string, Category | undefined>;
 
-    private labelsMap: Map<string, Category>;
+    private labelsMap: Map<string, Category | undefined>;
 
     private nodesMap: Map<number, NodeDataDefinition>;
 
@@ -124,7 +124,7 @@ export class Graph {
         this.categories = categories;
     }
 
-    get CategoriesMap(): Map<string, Category> {
+    get CategoriesMap(): Map<string, Category | undefined> {
         return this.categoriesMap;
     }
 
@@ -136,10 +136,10 @@ export class Graph {
         this.labels = labels;
     }
 
-    get LabelsMap(): Map<string, Category> {
+    get LabelsMap(): Map<string, Category | undefined> {
         return this.labelsMap;
     }
-    
+
     get NodesMap(): Map<number, NodeDataDefinition> {
         return this.nodesMap;
     }
@@ -179,14 +179,8 @@ export class Graph {
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     public extendNode(cell: any) {
-        const categoryName = cell.labels[0] || ""
         // check if category already exists in categories
-        let category = this.categoriesMap.get(categoryName)
-        if (!category) {
-            category = { name: categoryName, index: this.categoriesMap.size, show: true }
-            this.categoriesMap.set(category.name, category)
-            this.categories.push(category)
-        }
+        const category = this.createCategory(cell.labels[0] || "")
 
         // check if node already exists in nodes or fake node was created
         const currentNode = this.nodesMap.get(cell.id)
@@ -223,12 +217,7 @@ export class Graph {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     public extendEdge(cell: any) {
 
-        let label = this.labelsMap.get(cell.relationshipType)
-        if (!label) {
-            label = { name: cell.relationshipType, index: this.categoriesMap.size, show: true }
-            this.labelsMap.set(label.name, label)
-            this.labels.push(label)
-        }
+        const label = this.createLabel(cell.relationshipType)
 
         const currentEdge = this.edgesMap.get(cell.id)
         if (!currentEdge) {
@@ -317,13 +306,41 @@ export class Graph {
         if (type && !this.elements.find(e => e.data.category === category)) {
             const i = this.categories.findIndex(({ name }) => name === category)
             this.categories.splice(i, 1)
-            this.categoriesMap.delete(category)
+            this.categoriesMap.set(category, undefined)
+            return true
         }
 
         if (!type && !this.elements.find(e => e.data.label === category)) {
             const i = this.labels.findIndex(({ name }) => name === category)
             this.labels.splice(i, 1)
-            this.labelsMap.delete(category)
-            }
+            this.labelsMap.set(category, undefined)
+            return true
+        }
+
+        return false
+    }
+
+    public createCategory(category: string): Category {
+        let c = this.categoriesMap.get(category)
+
+        if (!c) {
+            c = { name: category, index: this.categoriesMap.size, show: true }
+            this.categoriesMap.set(c.name, c)
+            this.categories.push(c)
+        }
+
+        return c
+    }
+
+    public createLabel(category: string): Category {
+        let l = this.labelsMap.get(category)
+
+        if (!l) {
+            l = { name: category, index: this.categoriesMap.size, show: true }
+            this.categoriesMap.set(l.name, l)
+            this.categories.push(l)
+        }
+
+        return l
     }
 }
