@@ -40,6 +40,21 @@ export default function Users() {
         run()
     }, [])
 
+    const handelSetRole = async (role: string, username: string) => {
+        const result = await securedFetch(`api/user/${username}/?role=${role}`, {
+            method: 'PATCH',
+        })
+
+        if (result.ok) {
+            setUsers(prev => prev.map(user => {
+                if (user.username !== username) return user
+                const u = user
+                u.role = role
+                return u
+            }))
+        }
+    }
+
     return (
         <div className="w-full h-full flex flex-col space-y-4">
             <div className="flex flex-row-reverse gap-4">
@@ -93,7 +108,7 @@ export default function Users() {
                                     <TableCell className="w-[5%] py-6">
                                         <Checkbox
                                             key="checkbox"
-                                            className={cn(!(index % 2) && "data-[state=checked]:text-[#57577B] border-[#57577B] data-[state=checked]:bg-[#272746]", "data-[state=checked]:text-[#272746] border-[#272746] data-[state=checked]:bg-[#57577B] rounded-lg w-5 h-5")}
+                                            className={cn((index % 2) && "data-[state=checked]:text-[#57577B] border-[#57577B] data-[state=checked]:bg-[#272746]", !(index % 2) && "data-[state=checked]:text-[#272746] border-[#272746] data-[state=checked]:bg-[#57577B]", "rounded-lg w-5 h-5")}
                                             checked={selected}
                                             onCheckedChange={(check) => {
                                                 setUsers(prev => prev.map(currentUser => {
@@ -112,13 +127,7 @@ export default function Users() {
                                             type="Role"
                                             options={ROLES}
                                             selectedValue={role || ""}
-                                            setSelectedValue={(r) => setUsers(prev => prev.map((user) => {
-                                                if (username !== user.username) return user
-                                                return {
-                                                    ...user,
-                                                    role: r
-                                                }
-                                            }))} />
+                                            setSelectedValue={(r) => handelSetRole(r, username)} />
                                     </TableCell>
                                     <TableCell className="w-[10%]">
                                         {

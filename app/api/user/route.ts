@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getClient } from "@/app/api/auth/[...nextauth]/options";
 import { User } from "./model"
 
-const ROLE = new Map<string, string[]>(
+export const ROLE = new Map<string, string[]>(
     [
         ["Admin", ["on", "~*", "&*", "+@all"]],
         ["Read-Write", ["on", "~*", "resetchannels", "-@all", "+graph.query", "+graph.explain", "+graph.list", "+ping", "+graph.profile",]],
@@ -64,15 +64,15 @@ export async function POST(req: NextRequest) {
     try {
         if (!username || !password || !roleValue) throw (new Error("Missing parameters"))
 
-            try {
-                const user = await client.connection.aclGetUser(username)
-                
-                if (user) {
-                    return NextResponse.json({ message: `User ${username} already exists` }, { status: 409 })
-                }
-            } catch (err: unknown) {
-                // Just a workaround for https://github.com/redis/node-redis/issues/2745
+        try {
+            const user = await client.connection.aclGetUser(username)
+
+            if (user) {
+                return NextResponse.json({ message: `User ${username} already exists` }, { status: 409 })
             }
+        } catch (err: unknown) {
+            // Just a workaround for https://github.com/redis/node-redis/issues/2745
+        }
 
         await client.connection.aclSetUser(username, roleValue.concat(`>${password}`))
         return NextResponse.json(
@@ -84,6 +84,28 @@ export async function POST(req: NextRequest) {
                 }
             }
         )
+    } catch (err: unknown) {
+        return NextResponse.json({ message: (err as Error).message }, { status: 400 })
+    }
+}
+
+// eslint-disable-next-line import/prefer-default-export
+export async function PATCH(req: NextRequest) {
+
+    const client = await getClient()
+    if (client instanceof NextResponse) {
+        return client
+    }
+
+    const username = req.nextUrl.searchParams.get("username")
+    const role = req.nextUrl.searchParams.get("role")
+
+    try {
+        if (!username || !role) throw (new Error("Missing parameters"))
+
+        await client.connection.aclSetUser(username, ROLE.get(role) as string[])
+
+        return NextResponse.json({ message: "User updated" }, { status: 200 })
     } catch (err: unknown) {
         return NextResponse.json({ message: (err as Error).message }, { status: 400 })
     }
