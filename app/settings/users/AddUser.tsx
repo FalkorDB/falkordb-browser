@@ -44,7 +44,7 @@ export default function AddUser({ setUsers }: {
         })
 
         if (response.ok) {
-            Toast("User added successfully", "Success")
+            Toast("Success", "User added successfully")
             setUsers(prev => [...prev, { username, role, selected: false }])
         }
         setOpen(false)

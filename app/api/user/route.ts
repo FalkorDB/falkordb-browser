@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getClient } from "@/app/api/auth/[...nextauth]/options";
 import { User } from "./model"
 
-export const ROLE = new Map<string, string[]>(
+const ROLE = new Map<string, string[]>(
     [
         ["Admin", ["on", "~*", "&*", "+@all"]],
         ["Read-Write", ["on", "~*", "resetchannels", "-@all", "+graph.query", "+graph.explain", "+graph.list", "+ping", "+graph.profile",]],
@@ -84,28 +84,6 @@ export async function POST(req: NextRequest) {
                 }
             }
         )
-    } catch (err: unknown) {
-        return NextResponse.json({ message: (err as Error).message }, { status: 400 })
-    }
-}
-
-// eslint-disable-next-line import/prefer-default-export
-export async function PATCH(req: NextRequest) {
-
-    const client = await getClient()
-    if (client instanceof NextResponse) {
-        return client
-    }
-
-    const username = req.nextUrl.searchParams.get("username")
-    const role = req.nextUrl.searchParams.get("role")
-
-    try {
-        if (!username || !role) throw (new Error("Missing parameters"))
-
-        await client.connection.aclSetUser(username, ROLE.get(role) as string[])
-
-        return NextResponse.json({ message: "User updated" }, { status: 200 })
     } catch (err: unknown) {
         return NextResponse.json({ message: (err as Error).message }, { status: 400 })
     }
