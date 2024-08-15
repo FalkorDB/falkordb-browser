@@ -64,15 +64,15 @@ export async function POST(req: NextRequest) {
     try {
         if (!username || !password || !roleValue) throw (new Error("Missing parameters"))
 
-        try {
-            const user = await client.connection.aclGetUser(username)
-
-            if (user) {
-                return NextResponse.json({ message: `User ${username} already exists` }, { status: 409 })
+            try {
+                const user = await client.connection.aclGetUser(username)
+                
+                if (user) {
+                    return NextResponse.json({ message: `User ${username} already exists` }, { status: 409 })
+                }
+            } catch (err: unknown) {
+                // Just a workaround for https://github.com/redis/node-redis/issues/2745
             }
-        } catch (err: unknown) {
-            // Just a workaround for https://github.com/redis/node-redis/issues/2745
-        }
 
         await client.connection.aclSetUser(username, roleValue.concat(`>${password}`))
         return NextResponse.json(
