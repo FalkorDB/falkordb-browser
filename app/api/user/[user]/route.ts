@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getClient } from "../../auth/[...nextauth]/options"
-import { ROLE } from "../route"
+import { ROLE } from "../options"
 
 // eslint-disable-next-line import/prefer-default-export
 export async function PATCH(req: NextRequest, { params }: { params: { user: string } }) {
@@ -16,7 +16,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { user: stri
         if (!role) throw new Error("Role is missing")
 
         await client.connection.aclSetUser(username, role)
-        return NextResponse.json({ message: "User created" }, { status: 200 })
+        return NextResponse.json({ message: "User created" },{status: 200})
     } catch (err: unknown) {
         return NextResponse.json({ message: (err as Error).message }, { status: 400 })
     }

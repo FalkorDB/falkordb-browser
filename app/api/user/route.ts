@@ -1,22 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getClient } from "@/app/api/auth/[...nextauth]/options";
 import { User } from "./model"
+import { CreateUser, ROLE } from "./options";
 
-export const ROLE = new Map<string, string[]>(
-    [
-        ["Admin", ["on", "~*", "&*", "+@all"]],
-        ["Read-Write", ["on", "~*", "resetchannels", "-@all", "+graph.query", "+graph.explain", "+graph.list", "+ping", "+graph.profile",]],
-        ["Read-Only", ["on", "~*", "resetchannels", "-@all", "+graph.ro_query", "+graph.explain", "+graph.list", "+ping"]]
-    ]
-)
-
-interface CreateUser {
-    username: string
-    password: string
-    role: string
-}
-
-// eslint-disable-next-line import/prefer-default-export
 export async function GET() {
 
     const client = await getClient()
@@ -50,7 +36,6 @@ export async function GET() {
     }
 }
 
-// eslint-disable-next-line import/prefer-default-export
 export async function POST(req: NextRequest) {
 
     const client = await getClient()
@@ -89,7 +74,6 @@ export async function POST(req: NextRequest) {
     }
 }
 
-// eslint-disable-next-line import/prefer-default-export
 export async function DELETE(req: NextRequest) {
 
     const client = await getClient()
