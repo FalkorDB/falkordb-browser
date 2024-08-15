@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getClient } from "@/app/api/auth/[...nextauth]/options";
 import { User } from "./model"
 
-const ROLE = new Map<string, string[]>(
+export const ROLE = new Map<string, string[]>(
     [
         ["Admin", ["on", "~*", "&*", "+@all"]],
         ["Read-Write", ["on", "~*", "resetchannels", "-@all", "+graph.query", "+graph.explain", "+graph.list", "+ping", "+graph.profile",]],
