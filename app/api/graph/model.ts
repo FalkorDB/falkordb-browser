@@ -90,9 +90,13 @@ export class Graph {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     private elements: ElementDefinition[];
 
-    private categoriesMap: Map<string, Category | undefined>;
+    private categoriesMap: Map<string, Category>;
 
-    private labelsMap: Map<string, Category | undefined>;
+    private categoriesColorIndex: number = 0;
+    
+    private labelsMap: Map<string, Category>;
+
+    private labelsColorIndex: number = 0;
 
     private nodesMap: Map<number, NodeDataDefinition>;
 
@@ -306,14 +310,14 @@ export class Graph {
         if (type && !this.elements.find(e => e.data.category === category)) {
             const i = this.categories.findIndex(({ name }) => name === category)
             this.categories.splice(i, 1)
-            this.categoriesMap.set(category, undefined)
+            this.categoriesMap.delete(category)
             return true
         }
 
         if (!type && !this.elements.find(e => e.data.label === category)) {
             const i = this.labels.findIndex(({ name }) => name === category)
             this.labels.splice(i, 1)
-            this.labelsMap.set(category, undefined)
+            this.labelsMap.delete(category)
             return true
         }
 
@@ -324,19 +328,21 @@ export class Graph {
         let c = this.categoriesMap.get(category)
 
         if (!c) {
-            c = { name: category, index: this.categoriesMap.size, show: true }
+            c = { name: category, index: this.categoriesColorIndex, show: true }
+            this.categoriesColorIndex += 1
             this.categoriesMap.set(c.name, c)
             this.categories.push(c)
         }
-
+        
         return c
     }
-
+    
     public createLabel(category: string): Category {
         let l = this.labelsMap.get(category)
-
+        
         if (!l) {
-            l = { name: category, index: this.categoriesMap.size, show: true }
+            l = { name: category, index: this.labelsColorIndex, show: true }
+            this.labelsColorIndex += 1
             this.categoriesMap.set(l.name, l)
             this.categories.push(l)
         }
