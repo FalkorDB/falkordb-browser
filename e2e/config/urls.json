@@ -1,0 +1,10 @@
+{
+    "falkorDBWeb": "https://www.falkordb.com/",
+    "localHost": "http://localhost:3000",
+    "loginUrl":"http://localhost:3000/login",
+    "graphUrl": "http://localhost:3000/graph",
+    "schemaUrl": "http://localhost:3000/schema",
+    "settingsUrl": "http://localhost:3000/settings",
+    "documentationUrl": "https://docs.falkordb.com/",
+    "supportUrl": "https://www.falkordb.com/contact-us/" 
+}
