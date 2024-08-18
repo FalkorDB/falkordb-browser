@@ -2,7 +2,7 @@
 
 import CytoscapeComponent from "react-cytoscapejs";
 import cytoscape, { EdgeSingular, ElementDefinition, EventObject, NodeDataDefinition } from "cytoscape";
-import { useRef, useState, useImperativeHandle, forwardRef, useEffect, Dispatch, SetStateAction } from "react";
+import { useRef, useState, useImperativeHandle, forwardRef, useEffect } from "react";
 import fcose from 'cytoscape-fcose';
 import Editor, { Monaco } from "@monaco-editor/react";
 import * as monaco from "monaco-editor";
@@ -137,12 +137,11 @@ function getStyle() {
 
 const getElementId = (element: ElementDataDefinition) => element.source ? { id: element.id?.slice(1), query: "()-[e]-()" } : { id: element.id, query: "(e)" }
 
-const GraphView = forwardRef(({ graph, runQuery, historyQuery, setNodesCount, setEdgesCount }: {
+const GraphView = forwardRef(({ graph, runQuery, historyQuery, fetchCount }: {
     graph: Graph
     runQuery: (query: string) => Promise<void>
     historyQuery: string
-    setNodesCount: Dispatch<SetStateAction<number>>
-    setEdgesCount: Dispatch<SetStateAction<number>>
+    fetchCount: () => void
 }, ref) => {
 
     const [query, setQuery] = useState<string>("")
@@ -164,7 +163,7 @@ const GraphView = forwardRef(({ graph, runQuery, historyQuery, setNodesCount, se
             }
         }
     }))
-    
+
     useEffect(() => {
         setSelectedElement(undefined)
         setSelectedElements([])
@@ -429,11 +428,7 @@ const GraphView = forwardRef(({ graph, runQuery, historyQuery, setNodesCount, se
             graph.Elements.splice(graph.Elements.findIndex(e => e.data.id === id), 1)
             chartRef.current?.remove(`#${id} `)
 
-            if (type) {
-                setNodesCount(prev => prev - 1)
-            } else {
-                setEdgesCount(prev => prev - 1)
-            }
+            fetchCount()
 
             graph.updateCategories(type ? element.category : element.label, type)
         })

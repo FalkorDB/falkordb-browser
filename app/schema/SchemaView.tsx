@@ -5,7 +5,7 @@ import CytoscapeComponent from "react-cytoscapejs"
 import { ChevronLeft } from "lucide-react"
 import cytoscape, { EdgeSingular, EventObject, NodeDataDefinition } from "cytoscape"
 import { ImperativePanelHandle } from "react-resizable-panels"
-import { Dispatch, SetStateAction, useEffect, useRef, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import fcose from "cytoscape-fcose";
 import { ElementDataDefinition, Toast, cn, prepareArg, securedFetch } from "@/lib/utils"
 import Toolbar from "../graph/toolbar"
@@ -18,8 +18,7 @@ import CreateElement from "./SchemaCreateElement"
 /* eslint-disable react/require-default-props */
 interface Props {
     schema: Graph
-    setNodesCount: Dispatch<SetStateAction<number>>
-    setEdgesCount: Dispatch<SetStateAction<number>>
+    fetchCount?: () => void
 }
 
 const LAYOUT = {
@@ -106,7 +105,7 @@ const getCreateQuery = (type: boolean, selectedNodes: NodeDataDefinition[], attr
     return `MATCH (a), (b) WHERE ID(a) = ${selectedNodes[0].id} AND ID(b) = ${selectedNodes[1].id} CREATE (a)-[e${label ? `:${label}` : ""}${attributes?.length > 0 ? ` {${attributes.map(([k, [t, d, u, un]]) => `${k}: ["${t}", "${d}", "${u}", "${un}"]`).join(",")}}` : ""}]->(b) RETURN e`
 }
 
-export default function SchemaView({ schema, setNodesCount, setEdgesCount }: Props) {
+export default function SchemaView({ schema, fetchCount }: Props) {
     const [selectedElement, setSelectedElement] = useState<ElementDataDefinition>();
     const [selectedElements, setSelectedElements] = useState<ElementDataDefinition[]>([]);
     const [selectedNodes, setSelectedNodes] = useState<NodeDataDefinition[]>([]);
@@ -296,12 +295,13 @@ export default function SchemaView({ schema, setNodesCount, setEdgesCount }: Pro
             if (type) {
                 schema.NodesMap.delete(Number(id))
                 chartRef.current?.remove(`#${id}`)
-                setNodesCount(prev => prev - 1)
             } else {
                 schema.EdgesMap.delete(Number(id))
                 chartRef.current?.remove(`#_${id}`)
-                setEdgesCount(prev => prev - 1)
             }
+
+            if (fetchCount) fetchCount()
+
             schema.updateCategories(type ? element.category : element.label, type)
         })
 
@@ -431,13 +431,13 @@ export default function SchemaView({ schema, setNodesCount, setEdgesCount }: Pro
             const json = await result.json()
             if (isAddEntity) {
                 chartRef?.current?.add({ data: schema.extendNode(json.result.data[0].n) })
-                setNodesCount(prev => prev + 1)
                 setIsAddEntity(false)
             } else {
                 chartRef?.current?.add({ data: schema.extendEdge(json.result.data[0].e) })
-                setEdgesCount(prev => prev + 1)
                 setIsAddRelation(false)
             }
+
+            if (fetchCount) fetchCount()
 
             onExpand()
         }
