@@ -303,9 +303,7 @@ export default function SchemaView({ schema, fetchCount }: Props) {
                 chartRef.current?.remove(`#_${id}`)
             }
 
-            if (fetchCount) {
-                fetchCount()
-            }
+            if (fetchCount) fetchCount()
 
             schema.updateCategories(type ? element.category : element.label, type)
         })
@@ -420,9 +418,7 @@ export default function SchemaView({ schema, fetchCount }: Props) {
                 setIsAddRelation(false)
             }
 
-            if (fetchCount) {
-                fetchCount()
-            }
+            if (fetchCount) fetchCount()
 
             onExpand()
         }

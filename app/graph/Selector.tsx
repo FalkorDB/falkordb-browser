@@ -253,7 +253,7 @@ export default function Selector({ onChange, graphName, queries, runQuery, edges
                                 />
                             </DialogTrigger>
                             <DialogComponent className="h-[90%] w-[90%]" title={`${selectedValue} Schema`}>
-                                <SchemaView schema={schema}/>
+                                <SchemaView schema={schema} />
                             </DialogComponent>
                         </Dialog>
                     </div>

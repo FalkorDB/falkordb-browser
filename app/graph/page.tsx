@@ -96,8 +96,7 @@ export default function Page() {
                     graph={graph}
                     runQuery={runQuery}
                     historyQuery={historyQuery}
-                    setEdgesCount={setEdgesCount}
-                    setNodesCount={setNodesCount}
+                    fetchCount={fetchCount}
                 />
             </div>
         </div>
