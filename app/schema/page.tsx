@@ -14,7 +14,7 @@ export default function Page() {
     const [edgesCount, setEdgesCount] = useState<number>(0)
     const [nodesCount, setNodesCount] = useState<number>(0)
 
-    const fetchCount = async () => {
+    const fetchCount = useCallback(async () => {
         const name = `${schemaName}_schema`
             const q = [
                 "MATCH (n) RETURN COUNT(n) as nodes",
@@ -33,7 +33,7 @@ export default function Page() {
 
             setEdgesCount(edges.result?.data[0].edges)
             setNodesCount(nodes.result?.data[0].nodes)
-    }
+    }, [schemaName])
 
     useEffect(() => {
         if (!schemaName) return
