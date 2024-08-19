@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Toast, defaultQuery, prepareArg, securedFetch } from "@/lib/utils";
 import Header from "../components/Header";
 import Selector from "../graph/Selector";
@@ -14,7 +14,7 @@ export default function Page() {
     const [edgesCount, setEdgesCount] = useState<number>(0)
     const [nodesCount, setNodesCount] = useState<number>(0)
 
-    const fetchCount = async () => {
+    const fetchCount = useCallback(async () => {
         const name = `${schemaName}_schema`
             const q = [
                 "MATCH (n) RETURN COUNT(n) as nodes",
@@ -33,7 +33,7 @@ export default function Page() {
 
             setEdgesCount(edges.result?.data[0].edges)
             setNodesCount(nodes.result?.data[0].nodes)
-    }
+    }, [schemaName])
 
     useEffect(() => {
         if (!schemaName) return
@@ -48,10 +48,11 @@ export default function Page() {
             const json = await result.json()
             setSchema(Graph.create(schemaName, json.result))
 
-            fetchCount()            
+            fetchCount()
+
         }
         run()
-    }, [schemaName])
+    }, [fetchCount, schemaName])
 
     return (
         <div className="Page">

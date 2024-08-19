@@ -289,9 +289,12 @@ export default function SchemaView({ schema, fetchCount }: Props) {
         })
 
         if (!result.ok) return
+
         stateSelectedElements.forEach((element) => {
             const { id } = getElementId(element)
+
             schema.Elements.splice(schema.Elements.findIndex(e => e.data.id === element.id), 1)
+
             if (type) {
                 schema.NodesMap.delete(Number(id))
                 chartRef.current?.remove(`#${id}`)
@@ -332,12 +335,11 @@ export default function SchemaView({ schema, fetchCount }: Props) {
         return ok
     }
 
-    const handelSetLabel = async (label: string) => {
+    const handelSetCategory = async (category: string) => {
         if (!selectedElement) return false
 
-        const { id, query } = getElementId(selectedElement)
-        const type = !!selectedElement.source
-        const q = `MATCH ${query} WHERE ID(e) = ${id}${type ? ` REMOVE e:${selectedElement.category}` : ""} SET e:${label}`
+        const { id } = getElementId(selectedElement)
+        const q = `MATCH (n) WHERE ID(n) = ${id} REMOVE n:${selectedElement.category} SET n:${category}`
         const success = (await securedFetch(`api/graph/${prepareArg(schema.Id)}_schema/?query=${prepareArg(q)}`, {
             method: "GET"
         })).ok
@@ -346,51 +348,29 @@ export default function SchemaView({ schema, fetchCount }: Props) {
             schema.Elements.forEach(({ data }) => {
                 if (data.id !== id) return
 
-                if (type) {
-                    // eslint-disable-next-line no-param-reassign
-                    data.category = label
-                    let category = schema.CategoriesMap.get(label)
+                // eslint-disable-next-line no-param-reassign
+                data.category = category
 
-                    if (!category) {
-                        category = { name: label, index: schema.CategoriesMap.size, show: true }
-                        schema.CategoriesMap.set(label, category)
-                        schema.Categories.push(category)
+                setSelectedElement({ ...selectedElement, category })
+
+                const prevCategory = schema.CategoriesMap.get(selectedElement.category) as Category
+
+                schema.updateCategories(prevCategory.name, true)
+
+                const c = schema.createCategory(category)
+
+                chartRef.current?.elements().forEach(n => {
+                    if (n.data().category === category) {
+                        // eslint-disable-next-line no-param-reassign
+                        n.data().category = category
+                        // eslint-disable-next-line no-param-reassign
+                        n.data().color = getCategoryColorValue(c.index)
                     }
+                });
+                chartRef.current?.elements().layout(LAYOUT).run();
 
-                    chartRef.current?.elements().forEach(n => {
-                        if (n.data().id === id) {
-                            // eslint-disable-next-line no-param-reassign
-                            n.data().category = label
-                            // eslint-disable-next-line no-param-reassign
-                            n.data().color = getCategoryColorValue(category.index)
-                        }
-                    });
-                    chartRef.current?.elements().layout(LAYOUT).run();
-                } else {
-                    // eslint-disable-next-line no-param-reassign
-                    data.label = label
-                    let category = schema.LabelsMap.get(label)
-
-                    if (!category) {
-                        category = { name: label, index: schema.LabelsMap.size, show: true }
-                        schema.LabelsMap.set(label, category)
-                        schema.Labels.push(category)
-                    }
-
-                    chartRef.current?.elements().forEach(r => {
-                        if (r.data().id === selectedElement.id) {
-                            // eslint-disable-next-line no-param-reassign
-                            r.data().label = label
-                            // eslint-disable-next-line no-param-reassign
-                            r.data().color = getCategoryColorValue(category.index)
-                        }
-                    });
-                    chartRef.current?.elements().layout(LAYOUT).run();
-                }
             })
-            schema.updateCategories(type ? selectedElement.category : selectedElement.label, type)
         }
-
         return success
     }
 
@@ -408,10 +388,9 @@ export default function SchemaView({ schema, fetchCount }: Props) {
         const s = schema
         s.Elements = schema.Elements.map(e => {
             if (e.data.id === id) {
-                const updatedElement = e
-                delete updatedElement.data[key]
-                return updatedElement
+                delete e.data[key]
             }
+
             return e
         })
 
@@ -423,12 +402,14 @@ export default function SchemaView({ schema, fetchCount }: Props) {
             Toast("Select nodes to create a relation")
             return false
         }
+
         const result = await securedFetch(`api/graph/${prepareArg(schema.Id)}_schema/?query=${getCreateQuery(isAddEntity, selectedNodes, attributes, label)}`, {
             method: "GET"
         })
 
         if (result.ok) {
             const json = await result.json()
+
             if (isAddEntity) {
                 chartRef?.current?.add({ data: schema.extendNode(json.result.data[0].n) })
                 setIsAddEntity(false)
@@ -536,7 +517,7 @@ export default function SchemaView({ schema, fetchCount }: Props) {
                             onRemoveAttribute={handelRemoveProperty}
                             onSetAttribute={handelSetAttribute}
                             onDelete={handelDeleteElement}
-                            onSetLabel={handelSetLabel}
+                            onSetCategory={handelSetCategory}
                         />
                         : (isAddEntity || isAddRelation) &&
                         <CreateElement
