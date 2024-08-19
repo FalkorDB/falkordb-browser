@@ -44,8 +44,8 @@ export default function LoginForm() {
 
     const params: SignInOptions = {
       redirect: false,
-      host: host ?? DEFAULT_HOST,
-      port: port ?? DEFAULT_PORT,
+      host: host.trim() ?? DEFAULT_HOST,
+      port: port.trim() ?? DEFAULT_PORT,
       tls: TLS,
       ca: CA
     };

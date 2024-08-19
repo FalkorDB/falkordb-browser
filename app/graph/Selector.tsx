@@ -1,6 +1,6 @@
 'use client'
 
-import { Dispatch, SetStateAction, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Dialog, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Editor } from "@monaco-editor/react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -14,7 +14,7 @@ import Button from "../components/ui/Button";
 import Duplicate from "./Duplicate";
 import SchemaView from "../schema/SchemaView";
 
-export default function Selector({ onChange, graphName, queries, runQuery, edgesCount, nodesCount, setEdgesCount, setNodesCount }: {
+export default function Selector({ onChange, graphName, queries, runQuery, edgesCount, nodesCount }: {
     /* eslint-disable react/require-default-props */
     onChange: (selectedGraphName: string) => void
     graphName: string
@@ -22,8 +22,6 @@ export default function Selector({ onChange, graphName, queries, runQuery, edges
     queries?: Query[]
     edgesCount: number
     nodesCount: number
-    setEdgesCount: Dispatch<SetStateAction<number>>
-    setNodesCount: Dispatch<SetStateAction<number>>
 }) {
 
     const [options, setOptions] = useState<string[]>([]);
@@ -255,7 +253,7 @@ export default function Selector({ onChange, graphName, queries, runQuery, edges
                                 />
                             </DialogTrigger>
                             <DialogComponent className="h-[90%] w-[90%]" title={`${selectedValue} Schema`}>
-                                <SchemaView schema={schema} setEdgesCount={setEdgesCount} setNodesCount={setNodesCount}/>
+                                <SchemaView schema={schema} />
                             </DialogComponent>
                         </Dialog>
                     </div>

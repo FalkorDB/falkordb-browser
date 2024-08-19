@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Toast, defaultQuery, prepareArg, securedFetch } from "@/lib/utils";
 import Header from "../components/Header";
 import Selector from "../graph/Selector";
@@ -14,20 +14,8 @@ export default function Page() {
     const [edgesCount, setEdgesCount] = useState<number>(0)
     const [nodesCount, setNodesCount] = useState<number>(0)
 
-    useEffect(() => {
-        if (!schemaName) return
-        const run = async () => {
-            const result = await securedFetch(`/api/graph/${prepareArg(schemaName)}_schema/?query=${defaultQuery()}`, {
-                method: "GET"
-            })
-            if (!result.ok) {
-                Toast("Failed fetching schema")
-                return
-            }
-            const json = await result.json()
-            setSchema(Graph.create(schemaName, json.result))
-
-            const name = `${schemaName}_schema`
+    const fetchCount = useCallback(async () => {
+        const name = `${schemaName}_schema`
             const q = [
                 "MATCH (n) RETURN COUNT(n) as nodes",
                 "MATCH ()-[e]->() RETURN COUNT(e) as edges"
@@ -45,9 +33,26 @@ export default function Page() {
 
             setEdgesCount(edges.result?.data[0].edges)
             setNodesCount(nodes.result?.data[0].nodes)
+    }, [schemaName])
+
+    useEffect(() => {
+        if (!schemaName) return
+        const run = async () => {
+            const result = await securedFetch(`/api/graph/${prepareArg(schemaName)}_schema/?query=${defaultQuery()}`, {
+                method: "GET"
+            })
+            if (!result.ok) {
+                Toast("Failed fetching schema")
+                return
+            }
+            const json = await result.json()
+            setSchema(Graph.create(schemaName, json.result))
+
+            fetchCount()
+
         }
         run()
-    }, [schemaName])
+    }, [fetchCount, schemaName])
 
     return (
         <div className="Page">
@@ -56,12 +61,10 @@ export default function Page() {
                 <Selector
                     edgesCount={edgesCount}
                     nodesCount={nodesCount}
-                    setEdgesCount={setEdgesCount}
-                    setNodesCount={setNodesCount}
                     onChange={setSchemaName}
                     graphName={schemaName}
                 />
-                <SchemaView schema={schema} setEdgesCount={setEdgesCount} setNodesCount={setNodesCount} />
+                <SchemaView schema={schema} fetchCount={fetchCount} />
             </div>
         </div>
     )

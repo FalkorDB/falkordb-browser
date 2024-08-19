@@ -30,23 +30,23 @@ interface Props {
     onDelete: () => void
     onSetAttribute: (key: string, val: Attribute) => Promise<boolean>
     onRemoveAttribute: (key: string) => Promise<boolean>
-    onSetLabel: (label: string) => Promise<boolean>
+    onSetCategory: (label: string) => Promise<boolean>
 }
 
 const emptyAttribute = (): Attribute => [undefined, "", false, false]
 
-export default function SchemaCreateElement({ obj, onExpand, onDelete, onSetAttribute, onRemoveAttribute, onSetLabel }: Props) {
+export default function SchemaCreateElement({ obj, onExpand, onDelete, onSetAttribute, onRemoveAttribute, onSetCategory }: Props) {
 
     const [attribute, setAttribute] = useState<Attribute>(emptyAttribute())
-    const [newVal, setVal] = useState<string>()
-    const [newKey, setNewKey] = useState<string>()
+    const [newVal, setVal] = useState<string>("")
+    const [newKey, setNewKey] = useState<string>("")
     const [labelEditable, setLabelEditable] = useState<boolean>(false)
     const [editable, setEditable] = useState<string>("")
     const [hover, setHover] = useState<string>("")
     const [isAddValue, setIsAddValue] = useState<boolean>(false)
     const [attributes, setAttributes] = useState<[string, Attribute][]>(Object.entries(obj).filter(([k, v]) => !excludedProperties.has(k) && !(k === "name" && v === obj.id)).map(([k, v]) => [k, Array.isArray(v) ? v : v.split(",")] as [string, Attribute]))
     const [label, setLabel] = useState<string>(obj.source ? obj.label : obj.category)
-    const [newLabel, setNewLabel] = useState<string>()
+    const [newLabel, setNewLabel] = useState<string>("")
 
     useEffect(() => {
         setAttributes(Object.entries(obj).filter(([k, v]) => !excludedProperties.has(k) && !(k === "name" && v === obj.id)).map(([k, v]) => [k, Array.isArray(v) ? v : v.split(",")] as [string, Attribute]))
@@ -115,13 +115,13 @@ export default function SchemaCreateElement({ obj, onExpand, onDelete, onSetAttr
 
             return p
         })
-        setVal(undefined)
+        setVal("")
         setNewKey("")
         setEditable("")
     }
 
     const handelLabelCancel = () => {
-        setNewLabel(undefined)
+        setNewLabel("")
         setLabelEditable(false)
     }
 
@@ -143,7 +143,7 @@ export default function SchemaCreateElement({ obj, onExpand, onDelete, onSetAttr
             return
         }
 
-        const success = await onSetLabel(newLabel)
+        const success = await onSetCategory(newLabel)
 
         if (!success) return
 
