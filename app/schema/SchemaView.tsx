@@ -54,7 +54,6 @@ function getStyle() {
                 label: "data(category)",
                 "color": "white",
                 "text-valign": "center",
-                "text-halign": "center",
                 "text-wrap": "ellipsis",
                 "text-max-width": "10rem",
                 shape: "ellipse",
@@ -78,10 +77,10 @@ function getStyle() {
             selector: "edge",
             style: {
                 width: 1,
-                "line-color": "white",
+                "line-color": "data(color)",
                 "line-opacity": 0.7,
                 "arrow-scale": 0.7,
-                "target-arrow-color": "white",
+                "target-arrow-color": "data(color)",
                 "target-arrow-shape": "triangle",
                 'curve-style': 'straight',
             },
@@ -174,21 +173,19 @@ export default function SchemaView({ schema, fetchCount }: Props) {
         } else dataPanel.current?.collapse()
     }
 
-    const handleTap = (evt: EventObject) => {
-        const obj: ElementDataDefinition = evt.target.json().data;
-        setSelectedNodes(prev => prev.length >= 2 ? [prev[prev.length - 1], obj as NodeDataDefinition] : [...prev, obj as NodeDataDefinition])
-    }
-
     const handleSelected = (evt: EventObject) => {
-        if (isAddRelation) return
+        if (isAddRelation) {
+            const { target } = evt;
+            (target as EdgeSingular).unselect()
+            const obj: ElementDataDefinition = evt.target.json().data;
+            setSelectedNodes(prev => prev.length >= 2 ? [prev[prev.length - 1], obj as NodeDataDefinition] : [...prev, obj as NodeDataDefinition])
+            return
+        }
 
         const { target } = evt
 
         if (target.isEdge()) {
-            const { color } = target.data()
-            target.style("line-color", color);
-            target.style("target-arrow-color", color);
-            target.style("line-opacity", 0.5);
+            target.style("line-opacity", 0.9);
             target.style("width", 2);
             target.style("arrow-scale", 1);
         } else {
@@ -201,14 +198,19 @@ export default function SchemaView({ schema, fetchCount }: Props) {
     }
 
     const handleBoxSelected = (evt: EventObject) => {
+        if (isAddRelation) {
+            const { target } = evt;
+            (target as EdgeSingular).unselect()
+            const obj: ElementDataDefinition = target.json().data;
+            setSelectedNodes(prev => prev.length >= 2 ? [prev[prev.length - 1], obj as NodeDataDefinition] : [...prev, obj as NodeDataDefinition])
+            return
+        }
+
         const { target } = evt
         const type = target.isEdge() ? "edge" : "node"
 
         if (type === "edge") {
-            const { color } = target.data()
-            target.style("line-color", color);
-            target.style("target-arrow-color", color);
-            target.style("line-opacity", 0.5);
+            target.style("line-opacity", 0.9);
             target.style("width", 2);
             target.style("arrow-scale", 1);
         } else target.style("border-width", 0.7);
@@ -222,9 +224,7 @@ export default function SchemaView({ schema, fetchCount }: Props) {
         const { target } = evt
 
         if (target.isEdge()) {
-            target.style("line-color", "white");
-            target.style("target-arrow-color", "white");
-            target.style("line-opacity", 1);
+            target.style("line-opacity", 0.7);
             target.style("width", 1);
             target.style("arrow-scale", 0.7);
         } else target.style("border-width", 0.3);
@@ -234,22 +234,25 @@ export default function SchemaView({ schema, fetchCount }: Props) {
     }
 
     const handleMouseOver = (evt: EventObject) => {
-        const edge: EdgeSingular = evt.target;
-        const { color } = edge.data();
+        const { target } = evt;
 
-        edge.style("line-color", color);
-        edge.style("target-arrow-color", color);
-        edge.style("line-opacity", 0.5);
+        if (target.selected()) return
+        if (target.isEdge()) {
+            target.style("line-opacity", 0.9);
+            target.style("width", 2);
+            target.style("arrow-scale", 1);
+        } else target.style("border-width", 0.7);
     };
 
     const handleMouseOut = async (evt: EventObject) => {
-        const edge: EdgeSingular = evt.target;
+        const { target } = evt;
 
-        if (edge.selected()) return
-
-        edge.style("line-color", "white");
-        edge.style("target-arrow-color", "white");
-        edge.style("line-opacity", 1);
+        if (target.selected()) return
+        if (target.isEdge()) {
+            target.style("line-opacity", 0.7);
+            target.style("width", 1);
+            target.style("arrow-scale", 0.7);
+        } else target.style("border-width", 0.3);
     };
 
     const onExpand = () => {
@@ -476,14 +479,15 @@ export default function SchemaView({ schema, fetchCount }: Props) {
                             cy.removeAllListeners()
 
                             cy.on('mouseover', 'edge', handleMouseOver)
+                            cy.on('mouseover', 'node', handleMouseOver)
                             cy.on('mouseout', 'edge', handleMouseOut)
+                            cy.on('mouseout', 'node', handleMouseOut)
                             cy.on('tapunselect', 'edge', handleUnselected)
                             cy.on('tapunselect', 'node', handleUnselected)
                             cy.on('tapselect', 'edge', handleSelected)
                             cy.on('tapselect', 'node', handleSelected)
                             cy.on('boxselect', 'node', handleBoxSelected)
                             cy.on('boxselect', 'edge', handleBoxSelected)
-                            cy.on('tap', 'node', handleTap)
                         }}
                     />
                     {
