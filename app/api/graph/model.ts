@@ -128,7 +128,7 @@ export class Graph {
         this.categories = categories;
     }
 
-    get CategoriesMap(): Map<string, Category | undefined> {
+    get CategoriesMap(): Map<string, Category> {
         return this.categoriesMap;
     }
 
@@ -140,7 +140,7 @@ export class Graph {
         this.labels = labels;
     }
 
-    get LabelsMap(): Map<string, Category | undefined> {
+    get LabelsMap(): Map<string, Category> {
         return this.labelsMap;
     }
 
