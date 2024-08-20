@@ -6,21 +6,20 @@ import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 
 export default function Home() {
-  const { data: session, status } = useSession()
+  const { status } = useSession()
   const router = useRouter()
 
-  // Check session if already signed in redirect to graph page
   useEffect(() => {
     if (status === "authenticated") {
       router.push("/graph")
     } else {
       router.push("/login")
     }
-  }, [router, session, status]);
+  }, [router, status]);
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen py-2">
-      <main className="flex flex-col items-center justify-center flex-1 px-20 text-center space-y-5">
+    <div className="h-full LandingPage">
+      <main className="h-full flex items-center justify-center">
         <Spinning/>
       </main>
     </div>
