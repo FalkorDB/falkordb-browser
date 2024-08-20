@@ -2,7 +2,7 @@
 
 import { ResizablePanel, ResizablePanelGroup, ResizableHandle } from "@/components/ui/resizable"
 import CytoscapeComponent from "react-cytoscapejs"
-import { ChevronLeft } from "lucide-react"
+import { ChevronLeft, Maximize2, Minimize2 } from "lucide-react"
 import cytoscape, { EdgeSingular, EventObject, NodeDataDefinition } from "cytoscape"
 import { ImperativePanelHandle } from "react-resizable-panels"
 import { Dispatch, SetStateAction, useEffect, useRef, useState } from "react"
@@ -115,6 +115,20 @@ export default function SchemaView({ schema, setNodesCount, setEdgesCount }: Pro
     const dataPanel = useRef<ImperativePanelHandle>(null);
     const [isAddRelation, setIsAddRelation] = useState(false)
     const [isAddEntity, setIsAddEntity] = useState(false)
+    const [maximize, setMaximize] = useState<boolean>(false)
+
+    useEffect(() => {
+        const chart = chartRef.current
+        if (chart) {
+            chart.resize()
+            chart.fit()
+            chart.center()
+        }
+    }, [maximize])
+
+    useEffect(() => {
+        chartRef?.current?.layout(LAYOUT).run();
+    }, [schema.Elements.length]);
 
     useEffect(() => {
         dataPanel.current?.collapse()
@@ -128,10 +142,6 @@ export default function SchemaView({ schema, setNodesCount, setEdgesCount }: Pro
     useEffect(() => {
         setSelectedNodes([])
     }, [isAddRelation])
-
-    useEffect(() => {
-        chartRef?.current?.elements().layout(LAYOUT).run();
-    }, [schema.Elements.length]);
 
     const onCategoryClick = (category: Category) => {
         const chart = chartRef.current
@@ -255,9 +265,13 @@ export default function SchemaView({ schema, setNodesCount, setEdgesCount }: Pro
 
     const onExpand = () => {
         if (!dataPanel.current) return
+
         const panel = dataPanel.current
+
         if (panel.isExpanded()) {
             panel.collapse()
+            setIsAddEntity(false)
+            setIsAddRelation(false)
         } else {
             panel.expand()
         }
@@ -440,6 +454,7 @@ export default function SchemaView({ schema, setNodesCount, setEdgesCount }: Pro
             }
 
             onExpand()
+
         }
 
         return result.ok
@@ -447,7 +462,7 @@ export default function SchemaView({ schema, setNodesCount, setEdgesCount }: Pro
 
 
     return (
-        <ResizablePanelGroup direction="horizontal">
+        <ResizablePanelGroup direction="horizontal" className={cn(maximize && "h-full p-10 bg-background fixed left-[50%] top-[50%] z-50 grid translate-x-[-50%] translate-y-[-50%]")}>
             <ResizablePanel
                 defaultSize={selectedElement ? 75 : 100}
                 className={cn("flex flex-col gap-10", !isCollapsed && "mr-8")}
@@ -483,7 +498,22 @@ export default function SchemaView({ schema, setNodesCount, setEdgesCount }: Pro
                         />
                     }
                 </div>
-                <div className="relative grow">
+                <div className="relative h-1 grow">
+                    {
+                        !maximize ?
+                            <Button
+                                className="z-10 absolute top-4 right-4"
+                                icon={<Maximize2 />}
+                                title="Maximize"
+                                onClick={() => setMaximize(true)}
+
+                            /> : <Button
+                                className="z-10 absolute top-4 right-4"
+                                icon={<Minimize2 />}
+                                title="Minimize"
+                                onClick={() => setMaximize(false)}
+                            />
+                    }
                     <CytoscapeComponent
                         className="Canvas"
                         layout={LAYOUT}
