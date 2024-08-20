@@ -43,20 +43,20 @@ export default function Users() {
     const handelSetRole = async (role: string, username?: string) => {
         const updatedUsers = await Promise.all(users.map(async user => {
             const updated = username ? user.username === username : user.selected
-        
+
             if (!updated) return user
-        
+
             const result = await securedFetch(`api/user/${username}/?role=${role}`, {
                 method: 'PATCH'
             })
-        
+
             if (result.ok) {
                 return {
                     ...user,
                     role
                 }
             }
-        
+
             return user
         }))
 
@@ -134,7 +134,7 @@ export default function Users() {
                                     </TableCell>
                                     <TableCell className="w-[10%]">
                                         {
-                                            hover === username &&
+                                            hover === username && username !== "default" &&
                                             <DeleteUser key="delete" users={[{ username, role, selected }]} setUsers={setUsers} />
                                         }
                                     </TableCell>
