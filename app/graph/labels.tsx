@@ -27,10 +27,10 @@ export default function Labels({ categories, onClick, label, className = "" }: P
                     categories.map((category) => (
                         <li key={category.index}>
                             <Button
-                                className="flex gap-2 items-center"
+                                className={cn(category.name && "flex gap-2 items-center")}
                                 label={category.name}
                                 icon={
-                                    <div className={cn("w-4 h-4 rounded-full", `bg-${getCategoryColorName(category.index)}`, label === "RelationshipTypes" && "opacity-50")} />
+                                    <div className={cn("w-6 h-6 rounded-full", `bg-${getCategoryColorName(category.index)}`, label === "RelationshipTypes" && "opacity-50")} />
                                 }
                                 onClick={() => {
                                     onClick(category)

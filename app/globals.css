@@ -26,6 +26,15 @@
 }
 
 @layer components {
+    
+    .Page {
+        @apply h-full w-full flex flex-col bg-background;
+    }
+
+    .LandingPage {
+        background: linear-gradient(180deg, #EC806C 0%, #B66EBD 43.41%, #7568F2 100%);
+    }
+    
     .LoginForm {
         background: linear-gradient(180deg, #EC806C 0%, #B66EBD 43.41%, #7568F2 100%);
         color: white;
@@ -44,6 +53,7 @@
     }
 
     .DataPanel {
+        @apply h-full w-full flex flex-col shadow-lg;
         background-color: #434366;
     }
 
