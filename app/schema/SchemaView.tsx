@@ -5,7 +5,7 @@ import CytoscapeComponent from "react-cytoscapejs"
 import { ChevronLeft, Maximize2, Minimize2 } from "lucide-react"
 import cytoscape, { EdgeSingular, EventObject, NodeDataDefinition } from "cytoscape"
 import { ImperativePanelHandle } from "react-resizable-panels"
-import { Dispatch, SetStateAction, useEffect, useRef, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import fcose from "cytoscape-fcose";
 import { ElementDataDefinition, Toast, cn, prepareArg, securedFetch } from "@/lib/utils"
 import Toolbar from "../graph/toolbar"
@@ -18,8 +18,7 @@ import CreateElement from "./SchemaCreateElement"
 /* eslint-disable react/require-default-props */
 interface Props {
     schema: Graph
-    setNodesCount: Dispatch<SetStateAction<number>>
-    setEdgesCount: Dispatch<SetStateAction<number>>
+    fetchCount?: () => void
 }
 
 const LAYOUT = {
@@ -55,7 +54,6 @@ function getStyle() {
                 label: "data(category)",
                 "color": "white",
                 "text-valign": "center",
-                "text-halign": "center",
                 "text-wrap": "ellipsis",
                 "text-max-width": "10rem",
                 shape: "ellipse",
@@ -79,10 +77,10 @@ function getStyle() {
             selector: "edge",
             style: {
                 width: 1,
-                "line-color": "white",
+                "line-color": "data(color)",
                 "line-opacity": 0.7,
                 "arrow-scale": 0.7,
-                "target-arrow-color": "white",
+                "target-arrow-color": "data(color)",
                 "target-arrow-shape": "triangle",
                 'curve-style': 'straight',
             },
@@ -106,7 +104,7 @@ const getCreateQuery = (type: boolean, selectedNodes: NodeDataDefinition[], attr
     return `MATCH (a), (b) WHERE ID(a) = ${selectedNodes[0].id} AND ID(b) = ${selectedNodes[1].id} CREATE (a)-[e${label ? `:${label}` : ""}${attributes?.length > 0 ? ` {${attributes.map(([k, [t, d, u, un]]) => `${k}: ["${t}", "${d}", "${u}", "${un}"]`).join(",")}}` : ""}]->(b) RETURN e`
 }
 
-export default function SchemaView({ schema, setNodesCount, setEdgesCount }: Props) {
+export default function SchemaView({ schema, fetchCount }: Props) {
     const [selectedElement, setSelectedElement] = useState<ElementDataDefinition>();
     const [selectedElements, setSelectedElements] = useState<ElementDataDefinition[]>([]);
     const [selectedNodes, setSelectedNodes] = useState<NodeDataDefinition[]>([]);
@@ -185,21 +183,19 @@ export default function SchemaView({ schema, setNodesCount, setEdgesCount }: Pro
         } else dataPanel.current?.collapse()
     }
 
-    const handleTap = (evt: EventObject) => {
-        const obj: ElementDataDefinition = evt.target.json().data;
-        setSelectedNodes(prev => prev.length >= 2 ? [prev[prev.length - 1], obj as NodeDataDefinition] : [...prev, obj as NodeDataDefinition])
-    }
-
     const handleSelected = (evt: EventObject) => {
-        if (isAddRelation) return
+        if (isAddRelation) {
+            const { target } = evt;
+            (target as EdgeSingular).unselect()
+            const obj: ElementDataDefinition = evt.target.json().data;
+            setSelectedNodes(prev => prev.length >= 2 ? [prev[prev.length - 1], obj as NodeDataDefinition] : [...prev, obj as NodeDataDefinition])
+            return
+        }
 
         const { target } = evt
 
         if (target.isEdge()) {
-            const { color } = target.data()
-            target.style("line-color", color);
-            target.style("target-arrow-color", color);
-            target.style("line-opacity", 0.5);
+            target.style("line-opacity", 0.9);
             target.style("width", 2);
             target.style("arrow-scale", 1);
         } else {
@@ -212,14 +208,19 @@ export default function SchemaView({ schema, setNodesCount, setEdgesCount }: Pro
     }
 
     const handleBoxSelected = (evt: EventObject) => {
+        if (isAddRelation) {
+            const { target } = evt;
+            (target as EdgeSingular).unselect()
+            const obj: ElementDataDefinition = target.json().data;
+            setSelectedNodes(prev => prev.length >= 2 ? [prev[prev.length - 1], obj as NodeDataDefinition] : [...prev, obj as NodeDataDefinition])
+            return
+        }
+
         const { target } = evt
         const type = target.isEdge() ? "edge" : "node"
 
         if (type === "edge") {
-            const { color } = target.data()
-            target.style("line-color", color);
-            target.style("target-arrow-color", color);
-            target.style("line-opacity", 0.5);
+            target.style("line-opacity", 0.9);
             target.style("width", 2);
             target.style("arrow-scale", 1);
         } else target.style("border-width", 0.7);
@@ -233,9 +234,7 @@ export default function SchemaView({ schema, setNodesCount, setEdgesCount }: Pro
         const { target } = evt
 
         if (target.isEdge()) {
-            target.style("line-color", "white");
-            target.style("target-arrow-color", "white");
-            target.style("line-opacity", 1);
+            target.style("line-opacity", 0.7);
             target.style("width", 1);
             target.style("arrow-scale", 0.7);
         } else target.style("border-width", 0.3);
@@ -245,22 +244,25 @@ export default function SchemaView({ schema, setNodesCount, setEdgesCount }: Pro
     }
 
     const handleMouseOver = (evt: EventObject) => {
-        const edge: EdgeSingular = evt.target;
-        const { color } = edge.data();
+        const { target } = evt;
 
-        edge.style("line-color", color);
-        edge.style("target-arrow-color", color);
-        edge.style("line-opacity", 0.5);
+        if (target.selected()) return
+        if (target.isEdge()) {
+            target.style("line-opacity", 0.9);
+            target.style("width", 2);
+            target.style("arrow-scale", 1);
+        } else target.style("border-width", 0.7);
     };
 
     const handleMouseOut = async (evt: EventObject) => {
-        const edge: EdgeSingular = evt.target;
+        const { target } = evt;
 
-        if (edge.selected()) return
-
-        edge.style("line-color", "white");
-        edge.style("target-arrow-color", "white");
-        edge.style("line-opacity", 1);
+        if (target.selected()) return
+        if (target.isEdge()) {
+            target.style("line-opacity", 0.7);
+            target.style("width", 1);
+            target.style("arrow-scale", 0.7);
+        } else target.style("border-width", 0.3);
     };
 
     const onExpand = () => {
@@ -304,18 +306,22 @@ export default function SchemaView({ schema, setNodesCount, setEdgesCount }: Pro
         })
 
         if (!result.ok) return
+
         stateSelectedElements.forEach((element) => {
             const { id } = getElementId(element)
+
             schema.Elements.splice(schema.Elements.findIndex(e => e.data.id === element.id), 1)
+
             if (type) {
                 schema.NodesMap.delete(Number(id))
                 chartRef.current?.remove(`#${id}`)
-                setNodesCount(prev => prev - 1)
             } else {
                 schema.EdgesMap.delete(Number(id))
                 chartRef.current?.remove(`#_${id}`)
-                setEdgesCount(prev => prev - 1)
             }
+
+            if (fetchCount) fetchCount()
+
             schema.updateCategories(type ? element.category : element.label, type)
         })
 
@@ -346,12 +352,11 @@ export default function SchemaView({ schema, setNodesCount, setEdgesCount }: Pro
         return ok
     }
 
-    const handelSetLabel = async (label: string) => {
+    const handelSetCategory = async (category: string) => {
         if (!selectedElement) return false
 
-        const { id, query } = getElementId(selectedElement)
-        const type = !!selectedElement.source
-        const q = `MATCH ${query} WHERE ID(e) = ${id}${type ? ` REMOVE e:${selectedElement.category}` : ""} SET e:${label}`
+        const { id } = getElementId(selectedElement)
+        const q = `MATCH (n) WHERE ID(n) = ${id} REMOVE n:${selectedElement.category} SET n:${category}`
         const success = (await securedFetch(`api/graph/${prepareArg(schema.Id)}_schema/?query=${prepareArg(q)}`, {
             method: "GET"
         })).ok
@@ -360,51 +365,29 @@ export default function SchemaView({ schema, setNodesCount, setEdgesCount }: Pro
             schema.Elements.forEach(({ data }) => {
                 if (data.id !== id) return
 
-                if (type) {
-                    // eslint-disable-next-line no-param-reassign
-                    data.category = label
-                    let category = schema.CategoriesMap.get(label)
+                // eslint-disable-next-line no-param-reassign
+                data.category = category
 
-                    if (!category) {
-                        category = { name: label, index: schema.CategoriesMap.size, show: true }
-                        schema.CategoriesMap.set(label, category)
-                        schema.Categories.push(category)
+                setSelectedElement({ ...selectedElement, category })
+
+                const prevCategory = schema.CategoriesMap.get(selectedElement.category) as Category
+
+                schema.updateCategories(prevCategory.name, true)
+
+                const c = schema.createCategory(category)
+
+                chartRef.current?.elements().forEach(n => {
+                    if (n.data().category === category) {
+                        // eslint-disable-next-line no-param-reassign
+                        n.data().category = category
+                        // eslint-disable-next-line no-param-reassign
+                        n.data().color = getCategoryColorValue(c.index)
                     }
+                });
+                chartRef.current?.elements().layout(LAYOUT).run();
 
-                    chartRef.current?.elements().forEach(n => {
-                        if (n.data().id === id) {
-                            // eslint-disable-next-line no-param-reassign
-                            n.data().category = label
-                            // eslint-disable-next-line no-param-reassign
-                            n.data().color = getCategoryColorValue(category.index)
-                        }
-                    });
-                    chartRef.current?.elements().layout(LAYOUT).run();
-                } else {
-                    // eslint-disable-next-line no-param-reassign
-                    data.label = label
-                    let category = schema.LabelsMap.get(label)
-
-                    if (!category) {
-                        category = { name: label, index: schema.LabelsMap.size, show: true }
-                        schema.LabelsMap.set(label, category)
-                        schema.Labels.push(category)
-                    }
-
-                    chartRef.current?.elements().forEach(r => {
-                        if (r.data().id === selectedElement.id) {
-                            // eslint-disable-next-line no-param-reassign
-                            r.data().label = label
-                            // eslint-disable-next-line no-param-reassign
-                            r.data().color = getCategoryColorValue(category.index)
-                        }
-                    });
-                    chartRef.current?.elements().layout(LAYOUT).run();
-                }
             })
-            schema.updateCategories(type ? selectedElement.category : selectedElement.label, type)
         }
-
         return success
     }
 
@@ -422,10 +405,9 @@ export default function SchemaView({ schema, setNodesCount, setEdgesCount }: Pro
         const s = schema
         s.Elements = schema.Elements.map(e => {
             if (e.data.id === id) {
-                const updatedElement = e
-                delete updatedElement.data[key]
-                return updatedElement
+                delete e.data[key]
             }
+
             return e
         })
 
@@ -437,21 +419,23 @@ export default function SchemaView({ schema, setNodesCount, setEdgesCount }: Pro
             Toast("Select nodes to create a relation")
             return false
         }
+
         const result = await securedFetch(`api/graph/${prepareArg(schema.Id)}_schema/?query=${getCreateQuery(isAddEntity, selectedNodes, attributes, label)}`, {
             method: "GET"
         })
 
         if (result.ok) {
             const json = await result.json()
+
             if (isAddEntity) {
                 chartRef?.current?.add({ data: schema.extendNode(json.result.data[0].n) })
-                setNodesCount(prev => prev + 1)
                 setIsAddEntity(false)
             } else {
                 chartRef?.current?.add({ data: schema.extendEdge(json.result.data[0].e) })
-                setEdgesCount(prev => prev + 1)
                 setIsAddRelation(false)
             }
+
+            if (fetchCount) fetchCount()
 
             onExpand()
 
@@ -525,14 +509,15 @@ export default function SchemaView({ schema, setNodesCount, setEdgesCount }: Pro
                             cy.removeAllListeners()
 
                             cy.on('mouseover', 'edge', handleMouseOver)
+                            cy.on('mouseover', 'node', handleMouseOver)
                             cy.on('mouseout', 'edge', handleMouseOut)
+                            cy.on('mouseout', 'node', handleMouseOut)
                             cy.on('tapunselect', 'edge', handleUnselected)
                             cy.on('tapunselect', 'node', handleUnselected)
                             cy.on('tapselect', 'edge', handleSelected)
                             cy.on('tapselect', 'node', handleSelected)
                             cy.on('boxselect', 'node', handleBoxSelected)
                             cy.on('boxselect', 'edge', handleBoxSelected)
-                            cy.on('tap', 'node', handleTap)
                         }}
                     />
                     {
@@ -566,7 +551,7 @@ export default function SchemaView({ schema, setNodesCount, setEdgesCount }: Pro
                             onRemoveAttribute={handelRemoveProperty}
                             onSetAttribute={handelSetAttribute}
                             onDelete={handelDeleteElement}
-                            onSetLabel={handelSetLabel}
+                            onSetCategory={handelSetCategory}
                         />
                         : (isAddEntity || isAddRelation) &&
                         <CreateElement

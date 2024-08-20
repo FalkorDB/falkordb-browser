@@ -1,8 +1,8 @@
 'use client'
 
 import CytoscapeComponent from "react-cytoscapejs";
-import cytoscape, { EdgeSingular, ElementDefinition, EventObject, NodeDataDefinition } from "cytoscape";
-import { useRef, useState, useImperativeHandle, forwardRef, useEffect, Dispatch, SetStateAction } from "react";
+import cytoscape, { ElementDefinition, EventObject, NodeDataDefinition } from "cytoscape";
+import { useRef, useState, useImperativeHandle, forwardRef, useEffect } from "react";
 import fcose from 'cytoscape-fcose';
 import Editor, { Monaco } from "@monaco-editor/react";
 import * as monaco from "monaco-editor";
@@ -93,7 +93,6 @@ function getStyle() {
                 label: "data(name)",
                 "color": "black",
                 "text-valign": "center",
-                "text-halign": "center",
                 "text-wrap": "ellipsis",
                 "text-max-width": "10rem",
                 shape: "ellipse",
@@ -117,10 +116,10 @@ function getStyle() {
             selector: "edge",
             style: {
                 width: 1,
-                "line-color": "white",
-                "line-opacity": 1,
+                "line-color": "data(color)",
+                "line-opacity": 0.7,
                 "arrow-scale": 0.7,
-                "target-arrow-color": "white",
+                "target-arrow-color": "data(color)",
                 "target-arrow-shape": "triangle",
                 'curve-style': 'straight',
             },
@@ -137,12 +136,11 @@ function getStyle() {
 
 const getElementId = (element: ElementDataDefinition) => element.source ? { id: element.id?.slice(1), query: "()-[e]-()" } : { id: element.id, query: "(e)" }
 
-const GraphView = forwardRef(({ graph, runQuery, historyQuery, setNodesCount, setEdgesCount }: {
+const GraphView = forwardRef(({ graph, runQuery, historyQuery, fetchCount }: {
     graph: Graph
     runQuery: (query: string) => Promise<void>
     historyQuery: string
-    setNodesCount: Dispatch<SetStateAction<number>>
-    setEdgesCount: Dispatch<SetStateAction<number>>
+    fetchCount: () => void
 }, ref) => {
 
     const [query, setQuery] = useState<string>("")
@@ -313,10 +311,7 @@ const GraphView = forwardRef(({ graph, runQuery, historyQuery, setNodesCount, se
         const { target } = evt
 
         if (target.isEdge()) {
-            const { color } = target.data()
-            target.style("line-color", color);
-            target.style("target-arrow-color", color);
-            target.style("line-opacity", 0.5);
+            target.style("line-opacity", 0.9);
             target.style("width", 2);
             target.style("arrow-scale", 1);
         } else target.style("border-width", 0.7);
@@ -330,10 +325,7 @@ const GraphView = forwardRef(({ graph, runQuery, historyQuery, setNodesCount, se
         const type = target.isEdge() ? "edge" : "node"
 
         if (type === "edge") {
-            const { color } = target.data()
-            target.style("line-color", color);
-            target.style("target-arrow-color", color);
-            target.style("line-opacity", 0.5);
+            target.style("line-opacity", 0.9);
             target.style("width", 2);
             target.style("arrow-scale", 1);
         } else target.style("border-width", 0.7);
@@ -347,9 +339,7 @@ const GraphView = forwardRef(({ graph, runQuery, historyQuery, setNodesCount, se
         const { target } = evt
 
         if (target.isEdge()) {
-            target.style("line-color", "white");
-            target.style("target-arrow-color", "white");
-            target.style("line-opacity", 1);
+            target.style("line-opacity", 0.7);
             target.style("width", 1);
             target.style("arrow-scale", 0.7);
         } else target.style("border-width", 0.3);
@@ -359,22 +349,25 @@ const GraphView = forwardRef(({ graph, runQuery, historyQuery, setNodesCount, se
     }
 
     const handleMouseOver = (evt: EventObject) => {
-        const edge: EdgeSingular = evt.target;
-        const { color } = edge.data();
+        const { target } = evt;
 
-        edge.style("line-color", color);
-        edge.style("target-arrow-color", color);
-        edge.style("line-opacity", 0.5);
+        if (target.selected()) return
+        if (target.isEdge()) {
+            target.style("line-opacity", 0.9);
+            target.style("width", 2);
+            target.style("arrow-scale", 1);
+        } else target.style("border-width", 0.7);
     };
 
     const handleMouseOut = async (evt: EventObject) => {
-        const edge: EdgeSingular = evt.target;
+        const { target } = evt;
 
-        if (edge.selected()) return
-
-        edge.style("line-color", "white");
-        edge.style("target-arrow-color", "white");
-        edge.style("line-opacity", 1);
+        if (target.selected()) return
+        if (target.isEdge()) {
+            target.style("line-opacity", 0.7);
+            target.style("width", 1);
+            target.style("arrow-scale", 0.7);
+        } else target.style("border-width", 0.3);
     };
 
     const setProperty = async (key: string, newVal: string) => {
@@ -439,11 +432,7 @@ const GraphView = forwardRef(({ graph, runQuery, historyQuery, setNodesCount, se
             graph.Elements.splice(graph.Elements.findIndex(e => e.data.id === id), 1)
             chartRef.current?.remove(`#${id} `)
 
-            if (type) {
-                setNodesCount(prev => prev - 1)
-            } else {
-                setEdgesCount(prev => prev - 1)
-            }
+            fetchCount()
 
             graph.updateCategories(type ? element.category : element.label, type)
         })
@@ -558,13 +547,14 @@ const GraphView = forwardRef(({ graph, runQuery, historyQuery, setNodesCount, se
                             cy.removeAllListeners()
 
                             cy.on('dbltap', 'node', handleDoubleTap)
+                            cy.on('mouseover', 'node', handleMouseOver)
                             cy.on('mouseover', 'edge', handleMouseOver)
+                            cy.on('mouseout', 'node', handleMouseOut)
                             cy.on('mouseout', 'edge', handleMouseOut)
-                            cy.on('tapunselect', 'edge', handleUnselected)
                             cy.on('tapunselect', 'node', handleUnselected)
+                            cy.on('tapunselect', 'edge', handleUnselected)
+                            cy.on('tapselect', 'node', handleSelected)
                             cy.on('tapselect', 'edge', handleSelected)
-                            cy.on('tapselect', 'node', handleSelected)
-                            cy.on('tapselect', 'node', handleSelected)
                             cy.on('boxselect', 'node', handleBoxSelected)
                             cy.on('boxselect', 'edge', handleBoxSelected)
                         }}

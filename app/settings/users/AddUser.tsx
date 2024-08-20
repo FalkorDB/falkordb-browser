@@ -22,16 +22,20 @@ export default function AddUser({ setUsers }: {
     const [showConfirmPassword, setConfirmShowPassword] = useState(false)
     const [role, setRole] = useState("")
 
+    const handelClose = () => {
+        setPassword("")
+        setConfirmPassword("")
+        setUsername("")
+        setRole("")
+        setConfirmShowPassword(false)
+        setShowPassword(false)
+    }
+
     const addUser = async (e: FormEvent) => {
         e.preventDefault();
 
         if (!role) {
             Toast("select role is required")
-            return
-        }
-
-        if (password !== confirmPassword) {
-            Toast("Passwords do not match")
             return
         }
 
@@ -44,14 +48,22 @@ export default function AddUser({ setUsers }: {
         })
 
         if (response.ok) {
-            Toast("Success", "User added successfully")
+            Toast("User added successfully", "Success")
             setUsers(prev => [...prev, { username, role, selected: false }])
         }
         setOpen(false)
+
+        handelClose()
     };
 
     return (
-        <Dialog open={open} onOpenChange={setOpen}>
+        <Dialog
+            open={open}
+            onOpenChange={(o) => {
+                setOpen(o)
+                handelClose()
+            }}
+        >
             <DialogTrigger asChild>
                 <Button
                     variant="Primary"
@@ -73,6 +85,7 @@ export default function AddUser({ setUsers }: {
                             onChange={(e) => {
                                 setUsername(e.target.value)
                                 e.currentTarget.setCustomValidity("")
+                                e.currentTarget.reportValidity()
                             }}
                             onInvalid={(e) => e.currentTarget.setCustomValidity("Username is required")}
                             required
@@ -92,23 +105,7 @@ export default function AddUser({ setUsers }: {
                             onChange={(e) => {
                                 setPassword(e.target.value)
                                 e.currentTarget.setCustomValidity("")
-                                if (!e.target.checkValidity()) {
-                                    if (!e.target.value) {
-                                        e.currentTarget.setCustomValidity("Password is required");
-                                    } else if (e.target.validity.patternMismatch) {
-                                        e.currentTarget.setCustomValidity(`
-                                            Password must contain:
-                                            - At least one lowercase letter
-                                            - At least one uppercase letter
-                                            - At least one digit
-                                            - At least one special character (@$!%*?&#+)
-                                            - At least 8 characters
-                                            `);
-                                    }
-                                } else {
-                                    // If the value is valid or the input is empty, clear the custom validity message
-                                    e.currentTarget.setCustomValidity("");
-                                }
+                                e.currentTarget.reportValidity()
                             }}
                             value={password}
                             onInvalid={(e) => {
@@ -124,7 +121,6 @@ export default function AddUser({ setUsers }: {
                                             - At least 8 characters
                                             `);
                                 }
-                                e.currentTarget.reportValidity();
                             }}
                             required
                         />
@@ -141,29 +137,18 @@ export default function AddUser({ setUsers }: {
                             variant="Small"
                             type={showConfirmPassword ? "text" : "password"}
                             onChange={(e) => {
-                                setConfirmPassword(e.target.value)
+                                const val = e.target.value
+                                setConfirmPassword(val)
                                 e.currentTarget.setCustomValidity("")
-                                if (!e.target.checkValidity()) {
-                                    if (!e.target.value) {
-                                        e.currentTarget.setCustomValidity("Password is required");
-                                    } else if (e.target.validity.patternMismatch) {
-                                        e.currentTarget.setCustomValidity(`
-                                            Password must contain:
-                                            - At least one lowercase letter
-                                            - At least one uppercase letter
-                                            - At least one digit
-                                            - At least one special character (@$!%*?&#+)
-                                            - At least 8 characters
-                                            `);
-                                    }
-                                } else {
-                                    // If the value is valid or the input is empty, clear the custom validity message
-                                    e.currentTarget.setCustomValidity("");
+                                const valid = e.target.reportValidity()
+                                if (valid && password !== val) {
+                                    e.currentTarget.setCustomValidity("password do not match")
                                 }
                             }}
                             value={confirmPassword}
                             onInvalid={(e) => {
-                                if (!e.currentTarget.value) {
+                                const val = e.currentTarget.value
+                                if (!val) {
                                     e.currentTarget.setCustomValidity("Confirm Password is required");
                                 } else if (e.currentTarget.validity.patternMismatch) {
                                     e.currentTarget.setCustomValidity(`
@@ -175,7 +160,6 @@ export default function AddUser({ setUsers }: {
                                             - At least 8 characters
                                             `);
                                 }
-                                e.currentTarget.reportValidity();
                             }}
                             required
                         />
@@ -190,6 +174,6 @@ export default function AddUser({ setUsers }: {
                     </div>
                 </form>
             </DialogComponent>
-        </Dialog>
+        </Dialog >
     )
 }
