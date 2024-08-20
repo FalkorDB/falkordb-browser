@@ -10,11 +10,15 @@ import {
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Role } from "next-auth";
+import { useEffect } from "react";
 import Button from "./Button";
 
 export default function AvatarButton({ setUserStatus }: { setUserStatus: (status: Role) => void }) {
     const { data: session, status } = useSession()
-
+    useEffect(() => {
+        setUserStatus(session?.user.role || "Read-Only")
+    }, [session, setUserStatus])
+    
     if (status === "unauthenticated" || !session) {
         return (
             <Button
@@ -26,7 +30,6 @@ export default function AvatarButton({ setUserStatus }: { setUserStatus: (status
         )
     }
     
-    setUserStatus(session.user.role)
 
     const { username } = session.user;
 
