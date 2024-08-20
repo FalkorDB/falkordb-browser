@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 import urls  from '../config/urls.json'
-import { BrowserWrapper } from "../infra/ui/browserWrapper";
-import { navBarComponent } from '../logic/POM/navBarComponent'
+import BrowserWrapper from "../infra/ui/browserWrapper";
+import NavBarComponent from '../logic/POM/navBarComponent'
 
 test.describe('NavBar Tests', () => {
     let browser : BrowserWrapper;
@@ -16,7 +16,7 @@ test.describe('NavBar Tests', () => {
 
 
     test("Verify clicking on FalkorDB logo redirects to specified URL", async () => {
-        const navBar = await browser.createNewPage(navBarComponent, urls.graphUrl)
+        const navBar = await browser.createNewPage(NavBarComponent, urls.graphUrl)
         
         const context = browser.getContext()!;
         const [newPage] = await Promise.all([
@@ -30,9 +30,41 @@ test.describe('NavBar Tests', () => {
         expect(newUrl).toBe("https://www.falkordb.com/")
        
     })
+    
+    test("Verify clicking on Graphs button redirects to specified URL", async () => {
+        const navBar = await browser.createNewPage(NavBarComponent, urls.graphUrl)
+        
+        const context = browser.getContext()!;
+        const [newPage] = await Promise.all([
+            context.waitForEvent('page'),
+            navBar.clickOnGraphsButton(),
+        ]);
+
+        await newPage.waitForLoadState('domcontentloaded');
+        const newUrl = newPage.url();
+
+        expect(newUrl).toBe("https://browser.falkordb.com/graph")
+       
+    })
+    
+    test("Verify clicking on Schemas logo redirects to specified URL", async () => {
+        const navBar = await browser.createNewPage(NavBarComponent, urls.graphUrl)
+        
+        const context = browser.getContext()!;
+        const [newPage] = await Promise.all([
+            context.waitForEvent('page'),
+            navBar.clickOnSchemasButton(),
+        ]);
+
+        await newPage.waitForLoadState('domcontentloaded');
+        const newUrl = newPage.url();
+
+        expect(newUrl).toBe("https://browser.falkordb.com/schema")
+       
+    })
 
     test("Verify clicking on help -> Documentation redirects to specified URL", async () => {
-        const navBar = await browser.createNewPage(navBarComponent, urls.graphUrl)
+        const navBar = await browser.createNewPage(NavBarComponent, urls.graphUrl)
         
         const context = browser.getContext()!;
         const [newPage] = await Promise.all([
@@ -49,7 +81,7 @@ test.describe('NavBar Tests', () => {
     })
 
     test("Verify clicking on help -> Support redirects to specified URL", async () => {
-        const navBar = await browser.createNewPage(navBarComponent, urls.graphUrl)
+        const navBar = await browser.createNewPage(NavBarComponent, urls.graphUrl)
         
         const context = browser.getContext()!;
         const [newPage] = await Promise.all([
