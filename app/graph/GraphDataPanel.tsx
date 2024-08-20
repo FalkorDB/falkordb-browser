@@ -145,7 +145,7 @@ export default function GraphDataPanel({ inSchema, obj, onExpand, setProperty, s
                     />
                     {label}
                 </div>
-                <p className="flex text-white">{Object.keys(obj).filter((v) => !excludedProperties.has(v)).length} Attributes</p>
+                <p className="flex text-white">{Object.entries(obj).filter(([k, v]) => !excludedProperties.has(k) && !(k === "name" && v === obj.id)).length} Attributes</p>
             </div>
             <div className="w-full h-1 grow flex flex-col justify-between items-start font-medium">
                 <Table>

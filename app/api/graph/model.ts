@@ -92,7 +92,11 @@ export class Graph {
 
     private categoriesMap: Map<string, Category>;
 
+    private categoriesColorIndex: number = 0;
+    
     private labelsMap: Map<string, Category>;
+
+    private labelsColorIndex: number = 0;
 
     private nodesMap: Map<number, NodeDataDefinition>;
 
@@ -139,7 +143,7 @@ export class Graph {
     get LabelsMap(): Map<string, Category> {
         return this.labelsMap;
     }
-    
+
     get NodesMap(): Map<number, NodeDataDefinition> {
         return this.nodesMap;
     }
@@ -179,14 +183,8 @@ export class Graph {
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     public extendNode(cell: any) {
-        const categoryName = cell.labels[0] || ""
         // check if category already exists in categories
-        let category = this.categoriesMap.get(categoryName)
-        if (!category) {
-            category = { name: categoryName, index: this.categoriesMap.size, show: true }
-            this.categoriesMap.set(category.name, category)
-            this.categories.push(category)
-        }
+        const category = this.createCategory(cell.labels[0] || "")
 
         // check if node already exists in nodes or fake node was created
         const currentNode = this.nodesMap.get(cell.id)
@@ -223,12 +221,7 @@ export class Graph {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     public extendEdge(cell: any) {
 
-        let label = this.labelsMap.get(cell.relationshipType)
-        if (!label) {
-            label = { name: cell.relationshipType, index: this.categoriesMap.size, show: true }
-            this.labelsMap.set(label.name, label)
-            this.labels.push(label)
-        }
+        const label = this.createLabel(cell.relationshipType)
 
         const currentEdge = this.edgesMap.get(cell.id)
         if (!currentEdge) {
@@ -318,12 +311,42 @@ export class Graph {
             const i = this.categories.findIndex(({ name }) => name === category)
             this.categories.splice(i, 1)
             this.categoriesMap.delete(category)
+            return true
         }
 
         if (!type && !this.elements.find(e => e.data.label === category)) {
             const i = this.labels.findIndex(({ name }) => name === category)
             this.labels.splice(i, 1)
             this.labelsMap.delete(category)
-            }
+            return true
+        }
+
+        return false
+    }
+
+    public createCategory(category: string): Category {
+        let c = this.categoriesMap.get(category)
+
+        if (!c) {
+            c = { name: category, index: this.categoriesColorIndex, show: true }
+            this.categoriesColorIndex += 1
+            this.categoriesMap.set(c.name, c)
+            this.categories.push(c)
+        }
+        
+        return c
+    }
+    
+    public createLabel(category: string): Category {
+        let l = this.labelsMap.get(category)
+        
+        if (!l) {
+            l = { name: category, index: this.labelsColorIndex, show: true }
+            this.labelsColorIndex += 1
+            this.categoriesMap.set(l.name, l)
+            this.categories.push(l)
+        }
+
+        return l
     }
 }
