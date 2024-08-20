@@ -343,8 +343,8 @@ export class Graph {
         if (!l) {
             l = { name: category, index: this.labelsColorIndex, show: true }
             this.labelsColorIndex += 1
-            this.categoriesMap.set(l.name, l)
-            this.categories.push(l)
+            this.labelsMap.set(l.name, l)
+            this.labels.push(l)
         }
 
         return l
