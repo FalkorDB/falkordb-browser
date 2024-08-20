@@ -22,15 +22,19 @@ interface ComboboxProps {
   setOptions?: Dispatch<SetStateAction<string[]>>,
   selectedValue?: string,
   setSelectedValue: (value: string) => void,
+  isSchema?: boolean
+  defaultOpen?: boolean
+  onOpenChange?: (open: boolean) => void
 }
 
-export default function Combobox({ isSelectGraph, disabled = false, inTable, type, options, setOptions, selectedValue = "", setSelectedValue }: ComboboxProps) {
+export default function Combobox({ isSelectGraph, disabled = false, inTable, type, options, setOptions, selectedValue = "", setSelectedValue, isSchema = false, defaultOpen = false, onOpenChange }: ComboboxProps) {
 
-  const [open, setOpen] = useState<boolean>(false)
+  const [openDialog, setOpenDialog] = useState<boolean>(false)
+  const [open, setOpen] = useState<boolean>(defaultOpen)
   const [optionName, setOptionName] = useState<string>("")
   const [editable, setEditable] = useState<string>("")
-  const [isUploadOpen, setIsUploadOpen] = useState<boolean>(false)
-  const [isDeleteOpen, setIsDeleteOpen] = useState<boolean>(false)
+  const [isUploadOpen, setIsUploadOpen] = useState<string>()
+  const [isDeleteOpen, setIsDeleteOpen] = useState<string>()
   const onExport = async (graphName: string) => {
     const result = await securedFetch(`api/graph/${prepareArg(graphName)}/export`, {
       method: "GET"
@@ -51,6 +55,14 @@ export default function Combobox({ isSelectGraph, disabled = false, inTable, typ
     } catch (e) {
       Toast((e as Error).message)
     }
+  }
+
+  const handelDelete = (option: string) => {
+    if (!setOptions) return
+    setOptions(prev => prev.filter(name => name !== option))
+    if (selectedValue !== option) return
+    setSelectedValue("")
+    setOpenDialog(false)
   }
 
   const handelSetOption = async (e: React.KeyboardEvent<HTMLInputElement>, option: string) => {
@@ -78,13 +90,16 @@ export default function Combobox({ isSelectGraph, disabled = false, inTable, typ
   }
 
   return (
-    <Dialog>
-      <DropdownMenu open={open} onOpenChange={setOpen}>
+    <Dialog open={openDialog} onOpenChange={setOpenDialog}>
+      <DropdownMenu open={open} onOpenChange={(o) => {
+        setOpen(o)
+        if (onOpenChange) onOpenChange(o)
+      }}>
         <DropdownMenuTrigger asChild>
           <Button
             disabled={disabled}
             className={cn(inTable ? "text-sm font-light" : "text-2xl")}
-            label={selectedValue || `Select ${type || "Graph"}...`}
+            label={selectedValue || `Select ${type || "Graph"}`}
             open={open}
           />
         </DropdownMenuTrigger>
@@ -179,29 +194,25 @@ export default function Combobox({ isSelectGraph, disabled = false, inTable, typ
                               disabled
                               variant="button"
                               icon={<UploadIcon />}
-                              onClick={() => setIsUploadOpen(true)}
+                              onClick={() => setIsUploadOpen(option)}
                             />
                           </DropdownMenuItem>
                           <DropdownMenuItem className="p-2">
                             <Button
                               variant="button"
                               icon={<Trash2 />}
-                              onClick={() => setIsDeleteOpen(true)}
+                              onClick={() => setIsDeleteOpen(option)}
                             />
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
-                      <UploadGraph open={isUploadOpen} onOpenChange={setIsUploadOpen} />
+                      <UploadGraph open={isUploadOpen === option} onOpenChange={(o) => setIsUploadOpen(o ? option : "")} />
                       <DeleteGraph
                         graphName={option}
-                        isOpen={isDeleteOpen}
-                        onOpen={setIsDeleteOpen}
-                        onDeleteGraph={() => {
-                          if (!setOptions) return
-                          setOptions(prev => prev.filter(name => name !== option))
-                          if (selectedValue !== option) return
-                          setSelectedValue("")
-                        }}
+                        isOpen={isDeleteOpen === option}
+                        onOpen={(o) => setIsDeleteOpen(o ? option : "")}
+                        onDeleteGraph={handelDelete}
+                        isSchema={isSchema}
                       />
                     </TableCell>
                   </TableRow>

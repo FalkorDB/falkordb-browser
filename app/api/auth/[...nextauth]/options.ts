@@ -3,6 +3,7 @@ import CredentialsProvider from "next-auth/providers/credentials"
 import { AuthOptions, Role, getServerSession } from "next-auth"
 import { NextResponse } from "next/server";
 import { FalkorDBOptions } from "falkordb/dist/src/falkordb";
+import { ErrorReply } from "redis";
 
 const connections = new Map<number, FalkorDB>();
 
@@ -50,19 +51,24 @@ async function newClient(credentials: { host: string, port: string, password: st
     try {
         await client.connection.aclGetUser(credentials.username || "default")
         return { role: "Admin", client }
-    } catch (error) {
-        console.log(error);
+    } catch (error: unknown) {
+        if (error instanceof ErrorReply && (error as ErrorReply).message.startsWith("NOPERM")) {
+            console.debug(error);
+
+        } else throw error
     }
 
     try {
         await client.connection.sendCommand(["GRAPH.QUERY"])
     } catch (error: unknown) {
         if ((error as Error).message.includes("permissions")) {
+            console.debug(error);
             return { role: "Read-Only", client }
         }
+        console.debug(error);
         return { role: "Read-Write", client }
     }
-
+    
     return { role: "Admin", client }
 }
 
