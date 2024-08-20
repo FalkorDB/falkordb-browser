@@ -8,7 +8,7 @@ import Editor, { Monaco } from "@monaco-editor/react";
 import * as monaco from "monaco-editor";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { ImperativePanelHandle } from "react-resizable-panels";
-import { ChevronLeft, Maximize2 } from "lucide-react"
+import { ChevronLeft, Maximize2, Minimize2 } from "lucide-react"
 import { cn, ElementDataDefinition, prepareArg, securedFetch } from "@/lib/utils";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import { Category, Graph } from "../api/graph/model";
@@ -151,6 +151,7 @@ const GraphView = forwardRef(({ graph, runQuery, historyQuery, fetchCount }: {
     const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null)
     const dataPanel = useRef<ImperativePanelHandle>(null)
     const submitQuery = useRef<HTMLButtonElement>(null)
+    const [maximize, setMaximize] = useState<boolean>(false)
 
     useImperativeHandle(ref, () => ({
         expand: (elements: ElementDefinition[]) => {
@@ -216,6 +217,15 @@ const GraphView = forwardRef(({ graph, runQuery, historyQuery, fetchCount }: {
         //     }
         // });
     }
+
+    useEffect(() => {
+        const chart = chartRef.current
+        if (chart) {
+            chart.resize()
+            chart.fit()
+            chart.center()
+        }
+    }, [maximize])
 
     useEffect(() => {
         chartRef?.current?.layout(LAYOUT).run();
@@ -434,61 +444,67 @@ const GraphView = forwardRef(({ graph, runQuery, historyQuery, fetchCount }: {
     }
 
     return (
-        <ResizablePanelGroup direction="horizontal">
+        <ResizablePanelGroup direction="horizontal" className={cn(maximize && "h-full p-10 bg-background fixed left-[50%] top-[50%] z-50 grid translate-x-[-50%] translate-y-[-50%]")}>
             <ResizablePanel
                 className={cn("flex flex-col gap-8", !isCollapsed && "mr-8")}
                 defaultSize={100}
-            >
-                <div className="w-full flex items-center gap-8">
-                    <p>Query</p>
-                    <form onSubmit={(e) => {
-                        e.preventDefault()
-                        runQuery(query)
-                    }} className="w-1 grow flex border border-[#343459] rounded-lg overflow-hidden">
-                        <div className="flex grow w-1">
-                            <Editor
-                                className="Editor"
-                                language="cypher"
-                                options={monacoOptions}
-                                value={query}
-                                onChange={(val) => setQuery(val || "")}
-                                theme="custom-theme"
-                                beforeMount={handleEditorWillMount}
-                                onMount={handleEditorDidMount}
-                            />
-                        </div>
-                        <Button
-                            ref={submitQuery}
-                            className="bg-[#59597C] border border-[#737392] p-2 px-8"
-                            label="Run"
-                            title="Run (Ctrl+Enter)"
-                            type="submit"
-                        />
-                    </form>
+            >     
+                {
+                    !maximize &&
                     <Dialog>
-                        <DialogTrigger asChild>
-                            <Button
-                                className="p-2"
-                                title="Maximize"
-                                icon={<Maximize2 size={20} />}
-                            />
-                        </DialogTrigger>
-                        <DialogContent closeSize={30} className="w-full h-full">
-                            <Editor
-                                className="w-full h-full"
-                                beforeMount={handleEditorWillMount}
-                                theme="custom-theme"
-                                options={{
-                                    lineHeight: 30,
-                                    fontSize: 25
+                        <div className="w-full flex items-center gap-8">
+                            <p>Query</p>
+                            <form
+                                className="w-1 grow flex border border-[#343459] rounded-lg overflow-hidden"
+                                onSubmit={(e) => {
+                                    e.preventDefault()
+                                    runQuery(query)
                                 }}
-                                value={query}
-                                onChange={(val) => setQuery(val || "")}
-                                language="cypher"
-                            />
-                        </DialogContent>
+                            >
+                                <div className="relative flex grow w-1">
+                                    <Editor
+                                        className="Editor"
+                                        language="cypher"
+                                        options={monacoOptions}
+                                        value={query}
+                                        onChange={(val) => setQuery(val || "")}
+                                        theme="custom-theme"
+                                        beforeMount={handleEditorWillMount}
+                                        onMount={handleEditorDidMount}
+                                    />
+                                    <DialogTrigger asChild>
+                                        <Button
+                                            className="absolute top-0 right-0 p-3"
+                                            title="Maximize"
+                                            icon={<Maximize2 size={20} />}
+                                        />
+                                    </DialogTrigger>
+                                </div>
+                                <Button
+                                    ref={submitQuery}
+                                    className="bg-[#59597C] border border-[#737392] p-2 px-8"
+                                    label="Run"
+                                    title="Run (Ctrl+Enter)"
+                                    type="submit"
+                                />
+                            </form>
+                            <DialogContent closeSize={30} className="w-full h-full">
+                                <Editor
+                                    className="w-full h-full"
+                                    beforeMount={handleEditorWillMount}
+                                    theme="custom-theme"
+                                    options={{
+                                        lineHeight: 30,
+                                        fontSize: 25
+                                    }}
+                                    value={query}
+                                    onChange={(val) => setQuery(val || "")}
+                                    language="cypher"
+                                />
+                            </DialogContent>
+                        </div>
                     </Dialog>
-                </div>
+                }
                 <div className="flex items-center justify-between">
                     <Toolbar
                         disabled={!graph.Id}
@@ -506,7 +522,22 @@ const GraphView = forwardRef(({ graph, runQuery, historyQuery, fetchCount }: {
                         />
                     }
                 </div>
-                <div className="relative grow rounded-lg overflow-hidden">
+                <div className="relative h-1 grow rounded-lg overflow-hidden">
+                    {
+                        !maximize ?
+                            <Button
+                                className="z-10 absolute top-4 right-4"
+                                icon={<Maximize2 />}
+                                title="Maximize"
+                                onClick={() => setMaximize(true)}
+
+                            /> : <Button
+                                className="z-10 absolute top-4 right-4"
+                                icon={<Minimize2 />}
+                                title="Minimize"
+                                onClick={() => setMaximize(false)}
+                            />
+                    }
                     <CytoscapeComponent
                         className="Canvas"
                         cy={(cy) => {
