@@ -448,14 +448,14 @@ const GraphView = forwardRef(({ graph, runQuery, historyQuery, fetchCount }: {
             <ResizablePanel
                 className={cn("flex flex-col gap-8", !isCollapsed && "mr-8")}
                 defaultSize={100}
-            >
+            >     
                 {
                     !maximize &&
                     <Dialog>
                         <div className="w-full flex items-center gap-8">
                             <p>Query</p>
                             <form
-                                className="w-1 grow flex border border-[#343459] rounded-r-lg overflow-hidden"
+                                className="w-1 grow flex border border-[#343459] rounded-lg overflow-hidden"
                                 onSubmit={(e) => {
                                     e.preventDefault()
                                     runQuery(query)
@@ -522,7 +522,7 @@ const GraphView = forwardRef(({ graph, runQuery, historyQuery, fetchCount }: {
                         />
                     }
                 </div>
-                <div className="relative h-1 grow">
+                <div className="relative h-1 grow rounded-lg overflow-hidden">
                     {
                         !maximize ?
                             <Button

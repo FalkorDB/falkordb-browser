@@ -482,7 +482,7 @@ export default function SchemaView({ schema, fetchCount }: Props) {
                         />
                     }
                 </div>
-                <div className="relative h-1 grow">
+                <div className="relative h-1 grow rounded-lg overflow-hidden">
                     {
                         !maximize ?
                             <Button
