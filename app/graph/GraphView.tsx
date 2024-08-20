@@ -444,7 +444,7 @@ const GraphView = forwardRef(({ graph, runQuery, historyQuery, fetchCount }: {
                     <form onSubmit={(e) => {
                         e.preventDefault()
                         runQuery(query)
-                    }} className="w-1 grow flex border border-[#343459] rounded-r-lg overflow-hidden">
+                    }} className="w-1 grow flex border border-[#343459] rounded-lg overflow-hidden">
                         <div className="flex grow w-1">
                             <Editor
                                 className="Editor"
@@ -506,7 +506,7 @@ const GraphView = forwardRef(({ graph, runQuery, historyQuery, fetchCount }: {
                         />
                     }
                 </div>
-                <div className="relative grow">
+                <div className="relative grow rounded-lg overflow-hidden">
                     <CytoscapeComponent
                         className="Canvas"
                         cy={(cy) => {

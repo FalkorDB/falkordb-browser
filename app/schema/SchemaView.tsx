@@ -467,7 +467,7 @@ export default function SchemaView({ schema, fetchCount }: Props) {
                         />
                     }
                 </div>
-                <div className="relative grow">
+                <div className="relative grow rounded-lg overflow-hidden">
                     <CytoscapeComponent
                         className="Canvas"
                         layout={LAYOUT}
