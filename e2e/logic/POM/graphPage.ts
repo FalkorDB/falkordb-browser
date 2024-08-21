@@ -5,7 +5,7 @@ import { waitForTimeOut } from "@/e2e/infra/utils";
 export class graphPage extends BasePage {
 
     private get graphsMenu(): Locator {
-        return this.page.getByRole("button", { name : "Select Graph..."});
+        return this.page.getByRole("button", { name : "Select Graph"});
     }
 
     private get dropDownMenuGraphs(): Locator {
