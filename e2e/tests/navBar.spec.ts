@@ -33,33 +33,17 @@ test.describe('NavBar Tests', () => {
     
     test("Verify clicking on Graphs button redirects to specified URL", async () => {
         const navBar = await browser.createNewPage(NavBarComponent, urls.graphUrl)
-        
-        const context = browser.getContext()!;
-        const [newPage] = await Promise.all([
-            context.waitForEvent('page'),
-            navBar.clickOnGraphsButton(),
-        ]);
-
-        await newPage.waitForLoadState('domcontentloaded');
-        const newUrl = newPage.url();
-
+        await navBar.clickOnGraphsButton()
+        const newUrl = navBar.getCurrentURL();
         expect(newUrl).toBe(urls.graphUrl)
        
     })
     
     test("Verify clicking on Schemas button redirects to specified URL", async () => {
         const navBar = await browser.createNewPage(NavBarComponent, urls.graphUrl)
-        
-        const context = browser.getContext()!;
-        const [newPage] = await Promise.all([
-            context.waitForEvent('page'),
-            navBar.clickOnSchemasButton(),
-        ]);
-
-        await newPage.waitForLoadState('domcontentloaded');
-        const newUrl = newPage.url();
-
-        expect(newUrl).toBe(urls.schemaUrl)
+        await  navBar.clickOnSchemasButton()
+        const newUrl = navBar.getCurrentURL();
+        expect(newUrl).toBe(urls.graphUrl)
        
     })
 

@@ -32,11 +32,11 @@ export default class NavBarComponent extends BasePage {
     }
     
     async clickOnGraphsButton(): Promise<void> {
-        await this.falkorDBLogo.click();
+        await this.graphsButton.click();
     }
     
     async clickOnSchemasButton(): Promise<void> {
-        await this.falkorDBLogo.click();
+        await this.schemaButton.click();
     }
 
     async clickOnHelpBtn(): Promise<void> {
