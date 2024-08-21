@@ -1,5 +1,6 @@
 import { Locator } from "playwright";
 import BasePage from "@/e2e/infra/ui/basePage";
+import { waitForTimeOut } from "@/e2e/infra/utils";
 
 export default class NavBarComponent extends BasePage {
 
@@ -37,6 +38,7 @@ export default class NavBarComponent extends BasePage {
     
     async clickOnSchemasButton(): Promise<void> {
         await this.schemaButton.click();
+        await waitForTimeOut(this.page, 1000)
     }
 
     async clickOnHelpBtn(): Promise<void> {

@@ -43,7 +43,7 @@ test.describe('NavBar Tests', () => {
         const navBar = await browser.createNewPage(NavBarComponent, urls.graphUrl)
         await  navBar.clickOnSchemasButton()
         const newUrl = navBar.getCurrentURL();
-        expect(newUrl).toBe(urls.graphUrl)
+        expect(newUrl).toBe(urls.schemaUrl)
        
     })
 
