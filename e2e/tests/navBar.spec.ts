@@ -1,6 +1,6 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "@playwright/test"
 import urls  from '../config/urls.json'
-import BrowserWrapper from "../infra/ui/browserWrapper";
+import BrowserWrapper from "../infra/ui/browserWrapper"
 import NavBarComponent from '../logic/POM/navBarComponent'
 
 test.describe('NavBar Tests', () => {
@@ -43,11 +43,11 @@ test.describe('NavBar Tests', () => {
         await newPage.waitForLoadState('domcontentloaded');
         const newUrl = newPage.url();
 
-        expect(newUrl).toBe("https://browser.falkordb.com/graph")
+        expect(newUrl).toBe(urls.graphUrl)
        
     })
     
-    test("Verify clicking on Schemas logo redirects to specified URL", async () => {
+    test("Verify clicking on Schemas button redirects to specified URL", async () => {
         const navBar = await browser.createNewPage(NavBarComponent, urls.graphUrl)
         
         const context = browser.getContext()!;
@@ -59,7 +59,7 @@ test.describe('NavBar Tests', () => {
         await newPage.waitForLoadState('domcontentloaded');
         const newUrl = newPage.url();
 
-        expect(newUrl).toBe("https://browser.falkordb.com/schema")
+        expect(newUrl).toBe(urls.schemaUrl)
        
     })
 
