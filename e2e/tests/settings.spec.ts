@@ -7,15 +7,18 @@ import { SettingsPage } from "../logic/POM/settingsPage";
 test.describe('Settings Tests', () => {
     let browser : BrowserWrapper;
 
-    test.beforeEach(async () => {
+    test.beforeAll(async () => {
         browser = new BrowserWrapper();
+    })
+
+    test.afterAll(async () => {
+        await browser.closeBrowser();
     })
 
     test.afterEach(async () => {
         const settingsPage = await browser.createNewPage(SettingsPage, urls.settingsUrl)
         await settingsPage.navigateToUserTab();
         await settingsPage.deleteAllUsers()
-        await browser.closeBrowser();
     })
 
     test("Add one new user -> validating one user exists in the users list", async () => {
@@ -54,7 +57,6 @@ test.describe('Settings Tests', () => {
         await settingsPage.refreshPage()
         await settingsPage.navigateToUserTab()
         const newUserRole = await settingsPage.getSecondNewUserRole()
-        console.log("newRole: ",newUserRole);
         
         expect(newUserRole).toBe("Read-Only")
             
@@ -75,10 +77,8 @@ test.describe('Settings Tests', () => {
         await settingsPage.navigateToUserTab()
         const newSecondUserRole = await settingsPage.getSecondNewUserRole()
         const newThirdUserRole = await settingsPage.getThirdNewUserRole()
-        console.log("newRole2: ",newSecondUserRole);
-        console.log("newRole3: ",newThirdUserRole);
         
-        expect([newSecondUserRole, newThirdUserRole]).toBe("Read-Only")
+        expect([newSecondUserRole, newThirdUserRole]).toBe(["Read-Only", "Read-Only"])
             
     })
 

@@ -21,7 +21,7 @@ export class SettingsPage extends BasePage {
     }
 
     private get userRoleBtnPopUp(): Locator {
-        return this.page.getByRole("button", { name: "Select Role..." });
+        return this.page.getByRole("button", { name: "Select Role" });
     }
 
     private get selectUserRoleBtnPopUp(): Locator {
@@ -81,11 +81,15 @@ export class SettingsPage extends BasePage {
     }
 
     private get selectRoleBtn(): Locator {
-        return this.page.getByRole("button", {name: "Select Role..."})
+        return this.page.getByRole("button", {name: "Select Role"})
     }
 
     private get DeleteUsersBtn(): Locator {
         return this.page.getByRole("button", {name: "Delete Users"})
+    }
+
+    private get selectReadOnlyRole(): Locator {
+        return this.page.getByRole("button", {name: "Read-Only"})
     }
 
     async navigateToUserTab(): Promise<void> {
@@ -130,6 +134,7 @@ export class SettingsPage extends BasePage {
         await this.secondCheckboxInUsersTable.click()
         await this.thirdCheckboxInUsersTable.click()
         await this.selectRoleBtn.click()
+        await this.selectReadOnlyRole.click()
     }
 
     async deleteTwoUsersByCheckbox(): Promise<void> {
