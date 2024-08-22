@@ -15,14 +15,37 @@ test.describe('Graph Tests', () => {
         await browser.closeBrowser();
     })
 
-    test("Add graph Test", async () => {
+    test.beforeEach(async () => {
+        const graph = await browser.createNewPage(graphPage, urls.graphUrl)
+        await graph.removeAllGraphs();
+    })
+
+    test.afterEach(async () => {
+        const graph = await browser.createNewPage(graphPage, urls.graphUrl)
+        await graph.removeAllGraphs();
+    })
+
+    test("Add graph via api -> verify display in UI test", async () => {
         const graph = await browser.createNewPage(graphPage, urls.graphUrl)
         const preGraphCount = await graph.countGraphsInMenu()
         const apiCall = new ApiCalls()
-        await apiCall.addGraph()
+        const graphName = `graph_${Date.now()}`
+        await apiCall.addGraph(graphName)
         await graph.refreshPage()
-        const postGraphCount = await graph.countGraphsInMenu()
+        const postGraphCount = await graph.countGraphsInMenu()        
         expect(postGraphCount).toBe(preGraphCount + 1)
+    })
+
+    test("Add graph via UI -> remove graph via API -> Verify graph removal in UI test", async () => {
+        const graph = await browser.createNewPage(graphPage, urls.graphUrl)
+        const graphName = `graph_${Date.now()}`
+        await graph.addGraph(graphName);
+        const apiCall = new ApiCalls()
+        await new Promise(resolve => setTimeout(resolve, 1000)); 
+        await apiCall.removeGraph(graphName);
+        await graph.refreshPage()
+        expect(await graph.countGraphsInMenu()).toBe(0)
+        
     })
 
 })

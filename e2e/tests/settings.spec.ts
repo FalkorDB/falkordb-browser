@@ -21,6 +21,12 @@ test.describe('Settings Tests', () => {
         await settingsPage.deleteAllUsers()
     })
 
+    test.beforeEach(async () => {
+        const settingsPage = await browser.createNewPage(SettingsPage, urls.settingsUrl)
+        await settingsPage.navigateToUserTab();
+        await settingsPage.deleteAllUsers()
+    })
+
     test("Add one new user -> validating one user exists in the users list", async () => {
         const settingsPage = await browser.createNewPage(SettingsPage, urls.settingsUrl)
         await settingsPage.navigateToUserTab();
@@ -46,44 +52,41 @@ test.describe('Settings Tests', () => {
         
     })
 
-    // test("Add one user -> change the role -> Validate that the user role have been changed", async () => {
-    //     // Adding one user
-    //     const settingsPage = await browser.createNewPage(SettingsPage, urls.settingsUrl)
-    //     await settingsPage.navigateToUserTab();
-    //     await settingsPage.addOneUser(user.user1);
+    test.skip("Add one user -> change the role -> Validate that the user role have been changed", async () => {
+        // Adding one user
+        const settingsPage = await browser.createNewPage(SettingsPage, urls.settingsUrl)
+        await settingsPage.navigateToUserTab();
+        await settingsPage.addOneUser(user.user1);
         
-    //     // modify user role
-    //     await settingsPage.modifyOneUserRole()
-    //     await settingsPage.refreshPage()
-    //     await settingsPage.navigateToUserTab()
-    //     const newUserRole = await settingsPage.getSecondNewUserRole()
-    //     console.log("newRole: ",newUserRole);
+        // modify user role
+        await settingsPage.modifyOneUserRole()
+        await settingsPage.refreshPage()
+        await settingsPage.navigateToUserTab()
+        const newUserRole = await settingsPage.getSecondNewUserRole()
         
-    //     expect(newUserRole).toBe("Read-Only")
+        expect(newUserRole).toBe("Read-Only")
             
-    // })
+    })
 
-    // test("Add two users -> change their roles via checkbox -> Validate that the users roles have been changed", async () => {
-    //     // Adding two user
-    //     const settingsPage = await browser.createNewPage(SettingsPage, urls.settingsUrl)
-    //     await settingsPage.navigateToUserTab();
-    //     await settingsPage.addOneUser(user.user1);
-    //     await settingsPage.refreshPage()
-    //     await settingsPage.navigateToUserTab()
-    //     await settingsPage.addOneUser(user.user2);
+    test.skip("Add two users -> change their roles via checkbox -> Validate that the users roles have been changed", async () => {
+        // Adding two user
+        const settingsPage = await browser.createNewPage(SettingsPage, urls.settingsUrl)
+        await settingsPage.navigateToUserTab();
+        await settingsPage.addOneUser(user.user1);
+        await settingsPage.refreshPage()
+        await settingsPage.navigateToUserTab()
+        await settingsPage.addOneUser(user.user2);
         
-    //     // modify users roles
-    //     await settingsPage.modifyTwoUsersRolesByCheckbox()
-    //     await settingsPage.refreshPage()
-    //     await settingsPage.navigateToUserTab()
-    //     const newSecondUserRole = await settingsPage.getSecondNewUserRole()
-    //     const newThirdUserRole = await settingsPage.getThirdNewUserRole()
-    //     console.log("newRole2: ",newSecondUserRole);
-    //     console.log("newRole3: ",newThirdUserRole);
+        // modify users roles
+        await settingsPage.modifyTwoUsersRolesByCheckbox()
+        await settingsPage.refreshPage()
+        await settingsPage.navigateToUserTab()
+        const newSecondUserRole = await settingsPage.getSecondNewUserRole()
+        const newThirdUserRole = await settingsPage.getThirdNewUserRole()
         
-    //     expect([newSecondUserRole, newThirdUserRole]).toEqual(["Read-Only", "Read-Only"])
+        expect([newSecondUserRole, newThirdUserRole]).toEqual(["Read-Only", "Read-Only"])
             
-    // })
+    })
 
     test("Add two users -> delete the two users -> Validate that the users have been deleted", async () => {
         // Adding two user

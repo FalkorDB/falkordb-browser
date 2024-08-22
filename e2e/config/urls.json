@@ -1,7 +1,8 @@
 {
     "api": {
-        "addGraphUrl": "http://localhost:3000/api/graph/test5?query=RETURN%201",
-        "LoginApiUrl": "http://localhost:3000/api/auth/providers"
+        "addGraphUrl": "http://localhost:3000/api/graph/",
+        "LoginApiUrl": "http://localhost:3000/api/auth/providers",
+        "deleteGraphUrl": "http://localhost:3000/api/graph/"
     },
 
     "falkorDBWeb": "https://www.falkordb.com/",
