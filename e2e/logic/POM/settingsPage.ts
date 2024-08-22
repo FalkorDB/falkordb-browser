@@ -21,7 +21,7 @@ export class SettingsPage extends BasePage {
     }
 
     private get userRoleBtnPopUp(): Locator {
-        return this.page.getByRole("button", { name: "Select Role..." });
+        return this.page.getByRole("button", { name: "Select Role" });
     }
 
     private get selectUserRoleBtnPopUp(): Locator {
@@ -81,7 +81,7 @@ export class SettingsPage extends BasePage {
     }
 
     private get selectRoleBtn(): Locator {
-        return this.page.getByRole("button", {name: "Select Role..."})
+        return this.page.getByRole("button", {name: "Select Role"})
     }
 
     private get DeleteUsersBtn(): Locator {
