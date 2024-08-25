@@ -1,12 +1,9 @@
-import { Locator, Page } from "@playwright/test";
+import { Locator } from "@playwright/test";
+import BasePage from "@/e2e/infra/ui/basePage";
 import { waitForTimeOut } from '../../infra/utils'
-import { BasePage } from "@/e2e/infra/ui/basePage";
 import user from '../../config/user.json'
 
-export class SettingsPage extends BasePage {
-    constructor(page: Page) {
-        super(page);
-    }
+export default class SettingsPage extends BasePage {
 
     private get usersTabBtn(): Locator {
         return this.page.getByRole("button", { name: "Users" });
@@ -88,13 +85,18 @@ export class SettingsPage extends BasePage {
         return this.page.getByRole("button", {name: "Delete Users"})
     }
 
+    private get selectReadOnlyRole(): Locator {
+        return this.page.getByRole("button", {name: "Read-Only"})
+    }
+  
     async navigateToUserTab(): Promise<void> {
         await this.usersTabBtn.click();
     }
 
     async countUsersInTable(): Promise<number> {
         await waitForTimeOut(this.page, 1000);
-        return await this.usersTable.count();
+        const count = await this.usersTable.count();
+        return count;
     }
 
     async addOneUser(userDetails: { [key: string]: string }): Promise<void> {
@@ -114,11 +116,13 @@ export class SettingsPage extends BasePage {
     }
 
     async getSecondNewUserRole(): Promise<string | null> {
-        return await this.newSecondUserRole.textContent();
+        const content = await this.newSecondUserRole.textContent();
+        return content
     }
 
     async getThirdNewUserRole(): Promise<string | null> {
-        return await this.newThirdUserRole.textContent();
+        const content = await this.newSecondUserRole.textContent();
+        return content
     }
 
     async modifyOneUserRole(): Promise<void> {
@@ -130,6 +134,7 @@ export class SettingsPage extends BasePage {
         await this.secondCheckboxInUsersTable.click()
         await this.thirdCheckboxInUsersTable.click()
         await this.selectRoleBtn.click()
+        await this.selectReadOnlyRole.click()
     }
 
     async deleteTwoUsersByCheckbox(): Promise<void> {

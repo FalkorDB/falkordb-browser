@@ -1,7 +1,7 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "@playwright/test"
 import urls  from '../config/urls.json'
-import { BrowserWrapper } from "../infra/ui/browserWrapper";
-import { navBarComponent } from '../logic/POM/navBarComponent'
+import BrowserWrapper from "../infra/ui/browserWrapper"
+import NavBarComponent from '../logic/POM/navBarComponent'
 
 test.describe('NavBar Tests', () => {
     let browser : BrowserWrapper;
@@ -16,7 +16,7 @@ test.describe('NavBar Tests', () => {
 
 
     test("Verify clicking on FalkorDB logo redirects to specified URL", async () => {
-        const navBar = await browser.createNewPage(navBarComponent, urls.graphUrl)
+        const navBar = await browser.createNewPage(NavBarComponent, urls.graphUrl)
         
         const context = browser.getContext()!;
         const [newPage] = await Promise.all([
@@ -30,9 +30,25 @@ test.describe('NavBar Tests', () => {
         expect(newUrl).toBe("https://www.falkordb.com/")
        
     })
+    
+    test("Verify clicking on Graphs button redirects to specified URL", async () => {
+        const navBar = await browser.createNewPage(NavBarComponent, urls.graphUrl)
+        await navBar.clickOnGraphsButton()
+        const newUrl = navBar.getCurrentURL();
+        expect(newUrl).toBe(urls.graphUrl)
+       
+    })
+    
+    test("Verify clicking on Schemas button redirects to specified URL", async () => {
+        const navBar = await browser.createNewPage(NavBarComponent, urls.graphUrl)
+        await  navBar.clickOnSchemasButton()
+        const newUrl = navBar.getCurrentURL();
+        expect(newUrl).toBe(urls.schemaUrl)
+       
+    })
 
     test("Verify clicking on help -> Documentation redirects to specified URL", async () => {
-        const navBar = await browser.createNewPage(navBarComponent, urls.graphUrl)
+        const navBar = await browser.createNewPage(NavBarComponent, urls.graphUrl)
         
         const context = browser.getContext()!;
         const [newPage] = await Promise.all([
@@ -49,7 +65,7 @@ test.describe('NavBar Tests', () => {
     })
 
     test("Verify clicking on help -> Support redirects to specified URL", async () => {
-        const navBar = await browser.createNewPage(navBarComponent, urls.graphUrl)
+        const navBar = await browser.createNewPage(NavBarComponent, urls.graphUrl)
         
         const context = browser.getContext()!;
         const [newPage] = await Promise.all([
@@ -66,7 +82,7 @@ test.describe('NavBar Tests', () => {
     })
 
     test("Verify clicking on Settings redirects to specified URL", async () => {
-        const navBar = await browser.createNewPage(navBarComponent, urls.graphUrl)
+        const navBar = await browser.createNewPage(NavBarComponent, urls.graphUrl)
         await navBar.clickOnSettingsBtn()
         const newUrl = navBar.getCurrentURL()
         expect(newUrl).toBe(urls.settingsUrl)

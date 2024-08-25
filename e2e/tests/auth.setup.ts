@@ -1,6 +1,6 @@
-
-import {test as setup} from "@playwright/test"
+import { test as setup } from "@playwright/test"
 import urls from '../config/urls.json'
+
 const authFile = 'playwright/.auth/user.json'
 
 setup("authentication", async ({ page }) => {

@@ -4,6 +4,7 @@ import React, { useEffect, useState, KeyboardEvent } from "react";
 import { Toast, cn, prepareArg, securedFetch } from "@/lib/utils";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import Input from "../components/ui/Input";
+import Button from "../components/ui/Button";
 
 type Config = {
     name: string,
@@ -194,10 +195,7 @@ export default function Configurations() {
                             <TableRow key={name} className={cn("border-none", !(index % 2) && "bg-[#57577B] hover:bg-[#57577B]")}>
                                 <TableCell className="w-[20%] py-8">{name}</TableCell>
                                 <TableCell className="w-[70%]">{description}</TableCell>
-                                <TableCell onClick={() => {
-                                    setEditable(name)
-                                    setConfigValue(value.toString())
-                                }}>
+                                <TableCell>
                                     {
                                         editable === name && !disableRunTimeConfigs.has(name) ?
                                             <Input
@@ -211,7 +209,14 @@ export default function Configurations() {
                                                 onKeyDown={(e) => handelSetConfig(e, name)}
                                                 value={configValue}
                                             />
-                                            : value
+                                            : <Button
+                                                label={typeof value === "number" ? value.toString() : value}
+                                                onClick={() => {
+                                                    setEditable(name)
+                                                    setConfigValue(value.toString())
+                                                }}
+                                            />
+
                                     }
                                 </TableCell>
                             </TableRow>

@@ -1,8 +1,8 @@
 import { expect, test } from "@playwright/test";
 import urls  from '../config/urls.json'
 import user from '../config/user.json'
-import { BrowserWrapper } from "../infra/ui/browserWrapper";
-import { SettingsPage } from "../logic/POM/settingsPage";
+import  BrowserWrapper  from "../infra/ui/browserWrapper";
+import  SettingsPage  from "../logic/POM/settingsPage";
 
 test.describe('Settings Tests', () => {
     let browser : BrowserWrapper;
@@ -85,6 +85,7 @@ test.describe('Settings Tests', () => {
         const newThirdUserRole = await settingsPage.getThirdNewUserRole()
         
         expect([newSecondUserRole, newThirdUserRole]).toEqual(["Read-Only", "Read-Only"])
+
             
     })
 

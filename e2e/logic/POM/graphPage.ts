@@ -1,5 +1,5 @@
-import { Locator, Page } from "@playwright/test";
-import { BasePage } from "@/e2e/infra/ui/basePage";
+import { Locator } from "@playwright/test";
+import BasePage from "@/e2e/infra/ui/basePage";
 import { waitForTimeOut } from "@/e2e/infra/utils";
 
 export class graphPage extends BasePage {
