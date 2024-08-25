@@ -7,4 +7,5 @@
     "settingsUrl": "http://localhost:3000/settings",
     "documentationUrl": "https://docs.falkordb.com/",
     "supportUrl": "https://www.falkordb.com/contact-us/" 
+    "settingsUrl": "http://localhost:3000/settings"
 }
