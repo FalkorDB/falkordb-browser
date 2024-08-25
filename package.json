@@ -2,7 +2,7 @@
   "name": "falkordb-browser",
   "author": "FalkorDB",
   "description": "FalkorDB Browser",
-  "version": "0.4.0",
+  "version": "0.6.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -55,6 +55,7 @@
     "next": "14.1.0",
     "next-auth": "^4.24.5",
     "next-themes": "^0.2.1",
+    "playwright": "^1.46.1",
     "react": "^18",
     "react-cytoscapejs": "^2.0.0",
     "react-dom": "^18",
@@ -73,7 +74,7 @@
     "zod": "^3.22.4"
   },
   "devDependencies": {
-    "@playwright/test": "^1.43.1",
+    "@playwright/test": "^1.46.1",
     "@svgr/webpack": "^8.1.0",
     "@types/busboy": "^1.5.4",
     "@types/cytoscape-fcose": "^2.2.4",
