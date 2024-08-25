@@ -1,15 +1,19 @@
-import { Locator, Page } from "@playwright/test";
-import { BasePage } from "@/e2e/infra/ui/basePage";
+import { Locator } from "playwright";
+import BasePage from "@/e2e/infra/ui/basePage";
 import { waitForTimeOut } from "@/e2e/infra/utils";
 
-export class navBarComponent extends BasePage {
+export default class NavBarComponent extends BasePage {
 
     private get falkorDBLogo(): Locator {
         return this.page.locator("//a[@aria-label='FalkorDB']");
     }
-
-    private get graphButton(): Locator {
-        return this.page.getByRole("button", { name : "Graphs"});
+    
+    private get graphsButton(): Locator {
+        return this.page.getByRole("button", { name: "Graphs"});
+    }
+    
+    private get schemaButton(): Locator {
+        return this.page.getByRole("button", { name: "Schemas"});
     }
 
     private get helpButton(): Locator {
@@ -42,6 +46,14 @@ export class navBarComponent extends BasePage {
 
     async clickOnGraphBtn(): Promise<void> {
         await this.graphButton.click();
+    
+    async clickOnGraphsButton(): Promise<void> {
+        await this.graphsButton.click();
+    }
+    
+    async clickOnSchemasButton(): Promise<void> {
+        await this.schemaButton.click();
+        await waitForTimeOut(this.page, 2000)
     }
 
     async clickOnHelpBtn(): Promise<void> {
@@ -66,5 +78,4 @@ export class navBarComponent extends BasePage {
         await this.LogoutButton.click()
         await waitForTimeOut(this.page, 2000);
     }
-  
 }

@@ -1,8 +1,8 @@
 import { expect, test } from "@playwright/test";
 import urls  from '../config/urls.json'
 import user from '../config/user.json'
-import { BrowserWrapper } from "../infra/ui/browserWrapper";
-import { SettingsPage } from "../logic/POM/settingsPage";
+import  BrowserWrapper  from "../infra/ui/browserWrapper";
+import  SettingsPage  from "../logic/POM/settingsPage";
 
 test.describe('Settings Tests', () => {
     let browser : BrowserWrapper;
@@ -46,44 +46,41 @@ test.describe('Settings Tests', () => {
         
     })
 
-    // test("Add one user -> change the role -> Validate that the user role have been changed", async () => {
-    //     // Adding one user
-    //     const settingsPage = await browser.createNewPage(SettingsPage, urls.settingsUrl)
-    //     await settingsPage.navigateToUserTab();
-    //     await settingsPage.addOneUser(user.user1);
+    test("Add one user -> change the role -> Validate that the user role have been changed", async () => {
+        // Adding one user
+        const settingsPage = await browser.createNewPage(SettingsPage, urls.settingsUrl)
+        await settingsPage.navigateToUserTab();
+        await settingsPage.addOneUser(user.user1);
         
-    //     // modify user role
-    //     await settingsPage.modifyOneUserRole()
-    //     await settingsPage.refreshPage()
-    //     await settingsPage.navigateToUserTab()
-    //     const newUserRole = await settingsPage.getSecondNewUserRole()
-    //     console.log("newRole: ",newUserRole);
+        // modify user role
+        await settingsPage.modifyOneUserRole()
+        await settingsPage.refreshPage()
+        await settingsPage.navigateToUserTab()
+        const newUserRole = await settingsPage.getSecondNewUserRole()
         
-    //     expect(newUserRole).toBe("Read-Only")
+        expect(newUserRole).toBe("Read-Only")
             
-    // })
+    })
 
-    // test("Add two users -> change their roles via checkbox -> Validate that the users roles have been changed", async () => {
-    //     // Adding two user
-    //     const settingsPage = await browser.createNewPage(SettingsPage, urls.settingsUrl)
-    //     await settingsPage.navigateToUserTab();
-    //     await settingsPage.addOneUser(user.user1);
-    //     await settingsPage.refreshPage()
-    //     await settingsPage.navigateToUserTab()
-    //     await settingsPage.addOneUser(user.user2);
+    test.skip("Add two users -> change their roles via checkbox -> Validate that the users roles have been changed", async () => {
+        // Adding two user
+        const settingsPage = await browser.createNewPage(SettingsPage, urls.settingsUrl)
+        await settingsPage.navigateToUserTab();
+        await settingsPage.addOneUser(user.user1);
+        await settingsPage.refreshPage()
+        await settingsPage.navigateToUserTab()
+        await settingsPage.addOneUser(user.user2);
         
-    //     // modify users roles
-    //     await settingsPage.modifyTwoUsersRolesByCheckbox()
-    //     await settingsPage.refreshPage()
-    //     await settingsPage.navigateToUserTab()
-    //     const newSecondUserRole = await settingsPage.getSecondNewUserRole()
-    //     const newThirdUserRole = await settingsPage.getThirdNewUserRole()
-    //     console.log("newRole2: ",newSecondUserRole);
-    //     console.log("newRole3: ",newThirdUserRole);
+        // modify users roles
+        await settingsPage.modifyTwoUsersRolesByCheckbox()
+        await settingsPage.refreshPage()
+        await settingsPage.navigateToUserTab()
+        const newSecondUserRole = await settingsPage.getSecondNewUserRole()
+        const newThirdUserRole = await settingsPage.getThirdNewUserRole()
         
-    //     expect([newSecondUserRole, newThirdUserRole]).toEqual(["Read-Only", "Read-Only"])
+        expect([newSecondUserRole, newThirdUserRole]).toBe(["Read-Only", "Read-Only"])
             
-    // })
+    })
 
     test("Add two users -> delete the two users -> Validate that the users have been deleted", async () => {
         // Adding two user
