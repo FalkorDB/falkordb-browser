@@ -1,12 +1,9 @@
-import { Locator, Page } from "@playwright/test";
+import { Locator } from "playwright";
+import BasePage from "../../infra/ui/basePage";
 import { waitForTimeOut } from '../../infra/utils'
-import { BasePage } from "@/e2e/infra/ui/basePage";
 import user from '../../config/user.json'
 
-export class SettingsPage extends BasePage {
-    constructor(page: Page) {
-        super(page);
-    }
+export default class SettingsPage extends BasePage {
 
     private get usersTabBtn(): Locator {
         return this.page.getByRole("button", { name: "Users" });
@@ -81,15 +78,23 @@ export class SettingsPage extends BasePage {
     }
 
     private get selectRoleBtn(): Locator {
-        return this.page.getByRole("button", {name: "Select Role"})
+        return this.page.getByRole("button", { name: "Select Role" })
     }
 
     private get DeleteUsersBtn(): Locator {
-        return this.page.getByRole("button", {name: "Delete Users"})
+        return this.page.getByRole("button", { name: "Delete Users" })
     }
 
     private get selectReadOnlyRole(): Locator {
-        return this.page.getByRole("button", {name: "Read-Only"})
+        return this.page.getByRole("button", { name: "Read-Only" })
+    }
+    
+    private get configurationValueButton (): Locator {
+        return this.page.locator(`tr[key="MAX_QUEUED_QUERIES"] button`)
+    }
+    
+    private get configurationValueInput (): Locator {
+        return this.page.locator(`tr[key="MAX_QUEUED_QUERIES"] input`)
     }
 
     async navigateToUserTab(): Promise<void> {
@@ -98,7 +103,8 @@ export class SettingsPage extends BasePage {
 
     async countUsersInTable(): Promise<number> {
         await waitForTimeOut(this.page, 1000);
-        return await this.usersTable.count();
+        const count = await this.usersTable.count();
+        return count;
     }
 
     async addOneUser(userDetails: { [key: string]: string }): Promise<void> {
@@ -118,11 +124,13 @@ export class SettingsPage extends BasePage {
     }
 
     async getSecondNewUserRole(): Promise<string | null> {
-        return await this.newSecondUserRole.textContent();
+        const content = await this.newSecondUserRole.textContent();
+        return content;
     }
 
     async getThirdNewUserRole(): Promise<string | null> {
-        return await this.newThirdUserRole.textContent();
+        const content = await this.newThirdUserRole.textContent();
+        return content;
     }
 
     async modifyOneUserRole(): Promise<void> {
@@ -146,8 +154,23 @@ export class SettingsPage extends BasePage {
 
     async deleteAllUsers(): Promise<void> {
         const userCount = await this.countUsersInTable();
-        for(let i = userCount - 1; i >= 1; i--){
-            await this.removeOneUser()
+        for (let i = userCount - 1; i >= 1; i -= 1) {
+            // eslint-disable-next-line no-await-in-loop
+            await this.removeOneUser();
         }
+    }
+
+    async setConfiguration(): Promise<string> {
+        await this.configurationValueButton.click()
+        const value = "10"
+        await this.configurationValueInput.fill(value)
+        await this.page.keyboard.press("Enter")
+        return value
+    }
+    
+    async getConfigurationValue(): Promise<string | null> {
+        await this.refreshPage()
+        const value = await this.configurationValueInput.getAttribute("value")
+        return value
     }
 }

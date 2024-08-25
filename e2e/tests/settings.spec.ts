@@ -1,8 +1,8 @@
 import { expect, test } from "@playwright/test";
-import urls  from '../config/urls.json'
 import user from '../config/user.json'
-import { BrowserWrapper } from "../infra/ui/browserWrapper";
-import { SettingsPage } from "../logic/POM/settingsPage";
+import urls  from '../config/urls.json'
+import BrowserWrapper from "../infra/ui/browserWrapper";
+import SettingsPage from "../logic/POM/settingsPage";
 
 test.describe('Settings Tests', () => {
     let browser : BrowserWrapper;
@@ -97,6 +97,13 @@ test.describe('Settings Tests', () => {
         const currentUserCount = await settingsPage.countUsersInTable()
         expect(currentUserCount).toEqual(preUsersCount)
             
+    })
+
+    test("Set configuration -> Validate that the configuration has been set", async () => {
+        const settingsPage = await browser.createNewPage(SettingsPage, urls.settingsUrl)
+        const setValue = await settingsPage.setConfiguration();
+        const value = await settingsPage.getConfigurationValue()
+        expect(value).toBe(setValue)
     })
 
 
