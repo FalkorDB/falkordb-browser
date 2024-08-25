@@ -44,9 +44,6 @@ export default class NavBarComponent extends BasePage {
         await this.falkorDBLogo.click();
     }
 
-    async clickOnGraphBtn(): Promise<void> {
-        await this.graphButton.click();
-    
     async clickOnGraphsButton(): Promise<void> {
         await this.graphsButton.click();
     }
@@ -70,7 +67,7 @@ export default class NavBarComponent extends BasePage {
 
     async clickOnSettingsBtn(): Promise<void> {
         await this.settingsButton.click();
-        await waitForTimeOut(this.page, 500);
+        await waitForTimeOut(this.page, 2000);
     }
 
     async Logout(): Promise<void> {

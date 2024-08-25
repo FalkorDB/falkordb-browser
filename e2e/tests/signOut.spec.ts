@@ -1,8 +1,7 @@
 import { expect, test } from "@playwright/test";
 import urls  from '../config/urls.json'
-import user from '../config/user.json'
-import { BrowserWrapper } from "../infra/ui/browserWrapper";
-import { navBarComponent } from '../logic/POM/navBarComponent'
+import BrowserWrapper from "../infra/ui/browserWrapper";
+import navBarComponent from '../logic/POM/navBarComponent'
 
 test.describe('NavBar Tests', () => {
     let browser : BrowserWrapper;

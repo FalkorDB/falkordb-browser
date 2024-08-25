@@ -83,7 +83,7 @@ test.describe('NavBar Tests', () => {
     })
 
     test("Verify clicking on Settings redirects to specified URL", async () => {
-        const navBar = await browser.createNewPage(navBarComponent, urls.graphUrl)
+        const navBar = await browser.createNewPage(NavBarComponent, urls.graphUrl)
         await navBar.clickOnSettingsBtn()
         const newUrl = navBar.getCurrentURL()
         expect(newUrl).toBe(urls.settingsUrl)
