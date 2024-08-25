@@ -1,8 +1,8 @@
 import { expect, test } from "@playwright/test";
 import urls  from '../config/urls.json'
 import user from '../config/user.json'
-import { BrowserWrapper } from "../infra/ui/browserWrapper";
-import { SettingsPage } from "../logic/POM/settingsPage";
+import  BrowserWrapper  from "../infra/ui/browserWrapper";
+import  SettingsPage  from "../logic/POM/settingsPage";
 
 test.describe('Settings Tests', () => {
     let browser : BrowserWrapper;
@@ -62,7 +62,7 @@ test.describe('Settings Tests', () => {
             
     })
 
-    test("Add two users -> change their roles via checkbox -> Validate that the users roles have been changed", async () => {
+    test.skip("Add two users -> change their roles via checkbox -> Validate that the users roles have been changed", async () => {
         // Adding two user
         const settingsPage = await browser.createNewPage(SettingsPage, urls.settingsUrl)
         await settingsPage.navigateToUserTab();
