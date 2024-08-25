@@ -1,7 +1,9 @@
 'use client'
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { cn } from "@/lib/utils"
+import { useSession } from "next-auth/react"
+import { useRouter } from "next/navigation"
 import Header from "../components/Header"
 import Users from "./users/Users"
 import Configurations from "./Configurations"
@@ -10,6 +12,12 @@ import Button from "../components/ui/Button"
 export default function Settings() {
 
     const [current, setCurrent] = useState('DB')
+    const router = useRouter()
+    const {data: session} = useSession()
+
+    useEffect(() => {
+            if (session?.user.role !== "Admin") router.back()
+    }, [router, session])
 
     const getCurrentTab = () => {
         switch (current) {
