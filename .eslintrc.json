@@ -11,10 +11,18 @@
     "plugin:react/recommended"
   ],
   "rules": {
-    "react/react-in-jsx-scope": "off"
+    "react/react-in-jsx-scope": "off",
+    "import/no-extraneous-dependencies": [
+      "error",
+      {
+        "devDependencies": true
+      }
+    ]
   },
   "parser": "@typescript-eslint/parser",
-  "ignorePatterns": ["components/ui/"],
+  "ignorePatterns": [
+    "components/ui/"
+  ],
   "overrides": [
     {
       "files": [
