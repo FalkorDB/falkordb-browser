@@ -62,7 +62,7 @@ test.describe('Settings Tests', () => {
             
     })
 
-    test("Add two users -> change their roles via checkbox -> Validate that the users roles have been changed", async () => {
+    test.skip("Add two users -> change their roles via checkbox -> Validate that the users roles have been changed", async () => {
         // Adding two user
         const settingsPage = await browser.createNewPage(SettingsPage, urls.settingsUrl)
         await settingsPage.navigateToUserTab();

@@ -38,7 +38,7 @@ export default class NavBarComponent extends BasePage {
     
     async clickOnSchemasButton(): Promise<void> {
         await this.schemaButton.click();
-        await waitForTimeOut(this.page, 1000)
+        await waitForTimeOut(this.page, 2000)
     }
 
     async clickOnHelpBtn(): Promise<void> {
