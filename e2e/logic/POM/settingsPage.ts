@@ -1,12 +1,9 @@
-import { Locator, Page } from "@playwright/test";
+import { Locator } from "@playwright/test";
 import BasePage from "@/e2e/infra/ui/basePage";
 import { waitForTimeOut } from '../../infra/utils'
 import user from '../../config/user.json'
 
 export default class SettingsPage extends BasePage {
-    constructor(page: Page) {
-        super(page);
-    }
 
     private get usersTabBtn(): Locator {
         return this.page.getByRole("button", { name: "Users" });
@@ -91,13 +88,15 @@ export default class SettingsPage extends BasePage {
     private get selectReadOnlyRole(): Locator {
         return this.page.getByRole("button", {name: "Read-Only"})
     }
+
     async navigateToUserTab(): Promise<void> {
         await this.usersTabBtn.click();
     }
 
     async countUsersInTable(): Promise<number> {
         await waitForTimeOut(this.page, 1000);
-        return await this.usersTable.count();
+        const count = await this.usersTable.count();
+        return count;
     }
 
     async addOneUser(userDetails: { [key: string]: string }): Promise<void> {
@@ -122,7 +121,8 @@ export default class SettingsPage extends BasePage {
     }
 
     async getThirdNewUserRole(): Promise<string | null> {
-        return await this.newThirdUserRole.textContent();
+        const count = await this.newThirdUserRole.textContent();
+        return count;
     }
 
     async modifyOneUserRole(): Promise<void> {

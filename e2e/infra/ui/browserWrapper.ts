@@ -24,7 +24,6 @@ export default class BrowserWrapper {
             await this.navigateTo(url)
         }
 
-
         const pageInstance = new pageClass(this.page);
         return pageInstance;
     }
@@ -57,6 +56,7 @@ export default class BrowserWrapper {
     async closePage() {
         this.page ? await this.page.close() : this.page = null;
     }
+    
     async closeBrowser() {
         if (this.browser) {
             await this.browser.close();
