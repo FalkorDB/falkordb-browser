@@ -25,7 +25,7 @@ export default class BrowserWrapper {
         }
 
 
-        const pageInstance = new PageClass(this.page);
+        const pageInstance = new pageClass(this.page);
         return pageInstance;
     }
 
