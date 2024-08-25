@@ -1,3 +1,4 @@
+
 import { Locator } from "@playwright/test";
 import BasePage from "@/e2e/infra/ui/basePage";
 import { waitForTimeOut } from '../../infra/utils'
@@ -88,7 +89,7 @@ export default class SettingsPage extends BasePage {
     private get selectReadOnlyRole(): Locator {
         return this.page.getByRole("button", {name: "Read-Only"})
     }
-
+  
     async navigateToUserTab(): Promise<void> {
         await this.usersTabBtn.click();
     }

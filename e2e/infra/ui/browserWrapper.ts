@@ -10,7 +10,6 @@ export default class BrowserWrapper {
     private page: Page | null = null;
 
     async createNewPage<T extends BasePage>(pageClass: new (page: Page) => T, url?: string) {
-
         if (!this.browser) {
             this.browser = await chromium.launch();
         }
@@ -52,7 +51,7 @@ export default class BrowserWrapper {
         }
         await this.page.goto(url);
     }
-
+      
     async closePage() {
         this.page ? await this.page.close() : this.page = null;
     }

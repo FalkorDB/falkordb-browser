@@ -1,3 +1,4 @@
+
 import { expect, test } from "@playwright/test"
 import urls  from '../config/urls.json'
 import BrowserWrapper from "../infra/ui/browserWrapper"
@@ -79,6 +80,13 @@ test.describe('NavBar Tests', () => {
         
         expect(newUrl).toBe("https://www.falkordb.com/contact-us/")
        
+    })
+
+    test("Verify clicking on Settings redirects to specified URL", async () => {
+        const navBar = await browser.createNewPage(NavBarComponent, urls.graphUrl)
+        await navBar.clickOnSettingsBtn()
+        const newUrl = navBar.getCurrentURL()
+        expect(newUrl).toBe(urls.settingsUrl)
     })
 
 })

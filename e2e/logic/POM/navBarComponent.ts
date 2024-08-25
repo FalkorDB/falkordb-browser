@@ -28,10 +28,22 @@ export default class NavBarComponent extends BasePage {
         return this.page.locator("//a[@title='Support']")
     }
 
+    private get settingsButton(): Locator {
+        return this.page.locator("//button[@title='Settings']")
+    }
+
+    private get DefaultButton(): Locator {
+        return this.page.getByRole("button", { name : "Default"})
+    }
+    
+    private get LogoutButton(): Locator {
+        return this.page.locator("//div[contains(text(), 'Logout')]")
+    }
+
     async clickOnFalkorLogo(): Promise<void> {
         await this.falkorDBLogo.click();
     }
-    
+
     async clickOnGraphsButton(): Promise<void> {
         await this.graphsButton.click();
     }
@@ -53,5 +65,14 @@ export default class NavBarComponent extends BasePage {
         await this.supportButton.click();
     }
 
-  
+    async clickOnSettingsBtn(): Promise<void> {
+        await this.settingsButton.click();
+        await waitForTimeOut(this.page, 2000);
+    }
+
+    async Logout(): Promise<void> {
+        await this.DefaultButton.click()
+        await this.LogoutButton.click()
+        await waitForTimeOut(this.page, 2000);
+    }
 }

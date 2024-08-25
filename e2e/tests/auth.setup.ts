@@ -1,3 +1,4 @@
+
 import { test as setup } from "@playwright/test"
 import urls from '../config/urls.json'
 
@@ -13,4 +14,3 @@ setup("authentication", async ({ page }) => {
         console.error("Error during authentication setup:", error);
     }
 });
-

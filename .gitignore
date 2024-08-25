@@ -43,4 +43,3 @@ next-env.d.ts
 /playwright/.cache/
 /e2e/playwright/.auth
 /playwright
-
