@@ -61,4 +61,6 @@ export default class BrowserWrapper {
             await this.browser.close();
         }
     }
+
 }
+

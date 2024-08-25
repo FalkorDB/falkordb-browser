@@ -1,4 +1,3 @@
-
 import { expect, test } from "@playwright/test"
 import urls  from '../config/urls.json'
 import BrowserWrapper from "../infra/ui/browserWrapper"

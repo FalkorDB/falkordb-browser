@@ -1,4 +1,3 @@
-
 import { Locator } from "@playwright/test";
 import BasePage from "@/e2e/infra/ui/basePage";
 import { waitForTimeOut } from '../../infra/utils'
@@ -122,8 +121,8 @@ export default class SettingsPage extends BasePage {
     }
 
     async getThirdNewUserRole(): Promise<string | null> {
-        const count = await this.newThirdUserRole.textContent();
-        return count;
+        const content = await this.newSecondUserRole.textContent();
+        return content
     }
 
     async modifyOneUserRole(): Promise<void> {

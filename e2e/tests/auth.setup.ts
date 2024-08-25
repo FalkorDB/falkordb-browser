@@ -1,4 +1,3 @@
-
 import { test as setup } from "@playwright/test"
 import urls from '../config/urls.json'
 

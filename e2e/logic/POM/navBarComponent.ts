@@ -1,3 +1,4 @@
+
 import { Locator } from "playwright";
 import BasePage from "@/e2e/infra/ui/basePage";
 import { waitForTimeOut } from "@/e2e/infra/utils";
@@ -73,6 +74,8 @@ export default class NavBarComponent extends BasePage {
     async Logout(): Promise<void> {
         await this.DefaultButton.click()
         await this.LogoutButton.click()
+        await this.initPage()
         await waitForTimeOut(this.page, 2000);
     }
+
 }
