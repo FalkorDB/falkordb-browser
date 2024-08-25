@@ -74,6 +74,7 @@ export default class NavBarComponent extends BasePage {
     async Logout(): Promise<void> {
         await this.DefaultButton.click()
         await this.LogoutButton.click()
+        await this.initPage()
         await waitForTimeOut(this.page, 2000);
     }
 

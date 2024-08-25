@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { BrowserWrapper } from "../infra/ui/browserWrapper";
+import BrowserWrapper from "../infra/ui/browserWrapper";
 import { ApiCalls } from "../logic/api/apiCalls";
 import { graphPage } from "../logic/POM/graphPage";
 import urls  from '../config/urls.json'
