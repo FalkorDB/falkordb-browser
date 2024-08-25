@@ -17,8 +17,8 @@ const DEFAULT_PORT = "6379";
 export default function LoginForm() {
   const router = useRouter();
   const [error, setError] = useState(false);
-  const [host, setHost] = useState(DEFAULT_HOST);
-  const [port, setPort] = useState(DEFAULT_PORT);
+  const [host, setHost] = useState("");
+  const [port, setPort] = useState("");
   const [TLS, setTLS] = useState(false);
   const [CA, setCA] = useState<string>();
   const [username, setUsername] = useState("");
@@ -33,8 +33,8 @@ export default function LoginForm() {
     const usernameParam = searchParams.get("username");
     const tls = searchParams.get("tls");
 
-    setHost(decodeURIComponent(hostParam || DEFAULT_HOST));
-    setPort(decodeURIComponent(portParam || DEFAULT_PORT));
+    setHost(decodeURIComponent(hostParam || ""));
+    setPort(decodeURIComponent(portParam || ""));
     setUsername(decodeURIComponent(usernameParam ?? ""));
     setTLS(tls === "true")
   }, [searchParams]);
