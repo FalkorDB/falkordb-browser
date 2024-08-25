@@ -42,11 +42,11 @@ export default function Users() {
 
     const handelSetRole = async (role: string, username?: string) => {
         const updatedUsers = await Promise.all(users.map(async user => {
-            const updated = username ? user.username === username : user.selected
+            const selected = username ? user.username === username : user.selected
 
-            if (!updated) return user
+            if (!selected) return user
 
-            const result = await securedFetch(`api/user/${username}/?role=${role}`, {
+            const result = await securedFetch(`api/user/${user.username}/?role=${role}`, {
                 method: 'PATCH'
             })
 
