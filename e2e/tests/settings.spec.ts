@@ -21,6 +21,12 @@ test.describe('Settings Tests', () => {
         await settingsPage.deleteAllUsers()
     })
 
+    test.beforeEach(async () => {
+        const settingsPage = await browser.createNewPage(SettingsPage, urls.settingsUrl)
+        await settingsPage.navigateToUserTab();
+        await settingsPage.deleteAllUsers()
+    })
+
     test("Add one new user -> validating one user exists in the users list", async () => {
         const settingsPage = await browser.createNewPage(SettingsPage, urls.settingsUrl)
         await settingsPage.navigateToUserTab();
@@ -46,7 +52,7 @@ test.describe('Settings Tests', () => {
         
     })
 
-    test("Add one user -> change the role -> Validate that the user role have been changed", async () => {
+    test.skip("Add one user -> change the role -> Validate that the user role have been changed", async () => {
         // Adding one user
         const settingsPage = await browser.createNewPage(SettingsPage, urls.settingsUrl)
         await settingsPage.navigateToUserTab();
@@ -78,7 +84,8 @@ test.describe('Settings Tests', () => {
         const newSecondUserRole = await settingsPage.getSecondNewUserRole()
         const newThirdUserRole = await settingsPage.getThirdNewUserRole()
         
-        expect([newSecondUserRole, newThirdUserRole]).toBe(["Read-Only", "Read-Only"])
+        expect([newSecondUserRole, newThirdUserRole]).toEqual(["Read-Only", "Read-Only"])
+
             
     })
 

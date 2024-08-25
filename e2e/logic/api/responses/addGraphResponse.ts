@@ -5,5 +5,4 @@ export interface AddGraphResponse {
       [key: string]: number;
     }[];
   };
-  status: number;
 }
