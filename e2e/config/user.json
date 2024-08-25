@@ -1,0 +1,14 @@
+{
+    "user1":{
+        "userName": "test1",
+        "role": "Read-Write",
+        "password": "Test111@",
+        "confirmPassword": "Test111@"
+    },
+    "user2":{
+        "userName": "test2",
+        "role": "Read-Write",
+        "password": "Test222@",
+        "confirmPassword": "Test222@"
+    }
+}
