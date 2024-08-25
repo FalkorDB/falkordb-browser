@@ -6,6 +6,5 @@
     "schemaUrl": "http://localhost:3000/schema",
     "settingsUrl": "http://localhost:3000/settings",
     "documentationUrl": "https://docs.falkordb.com/",
-    "supportUrl": "https://www.falkordb.com/contact-us/",
-    "settingsUrl": "http://localhost:3000/settings"
+    "supportUrl": "https://www.falkordb.com/contact-us/"
 }
