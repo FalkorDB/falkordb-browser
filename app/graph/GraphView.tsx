@@ -1,6 +1,5 @@
 'use client'
 
-import CytoscapeComponent from "react-cytoscapejs";
 import cytoscape, { ElementDefinition, EventObject, NodeDataDefinition } from "cytoscape";
 import { useRef, useState, useImperativeHandle, forwardRef, useEffect } from "react";
 import fcose from 'cytoscape-fcose';
@@ -11,6 +10,7 @@ import { ImperativePanelHandle } from "react-resizable-panels";
 import { ChevronLeft, Maximize2, Minimize2 } from "lucide-react"
 import { cn, ElementDataDefinition, prepareArg, securedFetch } from "@/lib/utils";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
+import ForceGraph3D from "react-force-graph-3d";
 import { Category, Graph } from "../api/graph/model";
 import DataPanel from "./GraphDataPanel";
 import Labels from "./labels";
@@ -229,7 +229,7 @@ const GraphView = forwardRef(({ graph, runQuery, historyQuery, fetchCount }: {
 
     useEffect(() => {
         chartRef?.current?.layout(LAYOUT).run();
-    }, [graph.Elements.length]);
+    }, [graph.GraphData.nodes.length, graph.GraphData.links.length]);
 
     useEffect(() => {
         if (!editorRef.current) return
@@ -376,12 +376,24 @@ const GraphView = forwardRef(({ graph, runQuery, historyQuery, fetchCount }: {
         const success = (await securedFetch(`api/graph/${prepareArg(graph.Id)}/?query=${prepareArg(q)}`, {
             method: "GET"
         })).ok
-        if (success)
-            graph.Elements.forEach(e => {
-                const el = e
-                if (el.data.id !== id) return
-                el.data[key] = newVal
-            })
+        if (success) {
+            Object.values(graph.GraphData).forEach((arr, i) => {
+                if (i === 0) {
+                    graph.GraphData.nodes.forEach(n => {
+                        const node = n
+                        if (node.id !== id) return
+                        node[key] = newVal
+                    })
+                } else {
+                    graph.GraphData.links.forEach(e => {
+                        const edge = e
+                        if (edge.id !== id) return
+                        edge[key] = newVal
+                    })
+                }
+            }
+            )
+        }
         return success
     }
 
@@ -391,12 +403,24 @@ const GraphView = forwardRef(({ graph, runQuery, historyQuery, fetchCount }: {
         const success = (await securedFetch(`api/graph/${prepareArg(graph.Id)}/?query=${prepareArg(q)}`, {
             method: "GET"
         })).ok
-        if (success)
-            graph.Elements.forEach(element => {
-                if (element.data.id !== id) return
-                const e = element
-                delete e.data[key]
+
+        if (success) {
+            Object.values(graph.GraphData).forEach((arr ,i) => {
+                if (i === 0) {
+                    graph.GraphData.nodes.forEach(n => {
+                        if (n.id !== id) return
+                        const node = n
+                        delete node[key]
+                    })
+                } else {
+                    graph.GraphData.links.forEach(e => {
+                        if (e.id !== id) return
+                        const edge = e
+                        delete edge[key]
+                    })
+                }
             })
+        }
         return success
     }
 
@@ -429,7 +453,13 @@ const GraphView = forwardRef(({ graph, runQuery, historyQuery, fetchCount }: {
         selectedElements.forEach((element) => {
             const type = !element.source
             const { id } = getElementId(element)
-            graph.Elements.splice(graph.Elements.findIndex(e => e.data.id === id), 1)
+
+            if (type) {
+                graph.GraphData.nodes.splice(graph.GraphData.nodes.findIndex(n => n.id === id), 1)
+            } else {
+                graph.GraphData.links.splice(graph.GraphData.links.findIndex(e => e.id === id), 1)
+            }
+
             chartRef.current?.remove(`#${id} `)
 
             fetchCount()
@@ -448,7 +478,7 @@ const GraphView = forwardRef(({ graph, runQuery, historyQuery, fetchCount }: {
             <ResizablePanel
                 className={cn("flex flex-col gap-8", !isCollapsed && "mr-8")}
                 defaultSize={100}
-            >     
+            >
                 {
                     !maximize &&
                     <Dialog>
@@ -538,7 +568,13 @@ const GraphView = forwardRef(({ graph, runQuery, historyQuery, fetchCount }: {
                                 onClick={() => setMaximize(false)}
                             />
                     }
-                    <CytoscapeComponent
+                    <ForceGraph3D
+                        graphData={graph.GraphData}
+                        onNodeClick={handleSelected}
+                        onNodeHover={handleMouseOver}
+                        on
+                    />
+                    {/* <CytoscapeComponent
                         className="Canvas"
                         cy={(cy) => {
 
@@ -558,10 +594,10 @@ const GraphView = forwardRef(({ graph, runQuery, historyQuery, fetchCount }: {
                             cy.on('boxselect', 'node', handleBoxSelected)
                             cy.on('boxselect', 'edge', handleBoxSelected)
                         }}
-                        elements={graph.Elements}
+                        elements={graph.GraphData}
                         layout={LAYOUT}
                         stylesheet={getStyle()}
-                    />
+                    /> */}
                     {
                         (graph.Categories.length > 0 || graph.Labels.length > 0) &&
                         <>

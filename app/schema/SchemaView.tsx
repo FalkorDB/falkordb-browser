@@ -126,7 +126,7 @@ export default function SchemaView({ schema, fetchCount }: Props) {
 
     useEffect(() => {
         chartRef?.current?.layout(LAYOUT).run();
-    }, [schema.Elements.length]);
+    }, [schema.GraphData.length]);
 
     useEffect(() => {
         dataPanel.current?.collapse()
@@ -310,7 +310,7 @@ export default function SchemaView({ schema, fetchCount }: Props) {
         stateSelectedElements.forEach((element) => {
             const { id } = getElementId(element)
 
-            schema.Elements.splice(schema.Elements.findIndex(e => e.data.id === element.id), 1)
+            schema.GraphData.splice(schema.GraphData.findIndex(e => e.data.id === element.id), 1)
 
             if (type) {
                 schema.NodesMap.delete(Number(id))
@@ -341,7 +341,7 @@ export default function SchemaView({ schema, fetchCount }: Props) {
         })
 
         if (ok) {
-            schema.Elements.forEach(e => {
+            schema.GraphData.forEach(e => {
                 if (e.data.id !== selectedElement.id) return
                 e.data[key] = newVal
             })
@@ -362,7 +362,7 @@ export default function SchemaView({ schema, fetchCount }: Props) {
         })).ok
 
         if (success) {
-            schema.Elements.forEach(({ data }) => {
+            schema.GraphData.forEach(({ data }) => {
                 if (data.id !== id) return
 
                 // eslint-disable-next-line no-param-reassign
@@ -403,7 +403,7 @@ export default function SchemaView({ schema, fetchCount }: Props) {
         if (!ok) return ok
 
         const s = schema
-        s.Elements = schema.Elements.map(e => {
+        s.GraphData = schema.GraphData.map(e => {
             if (e.data.id === id) {
                 delete e.data[key]
             }
@@ -502,7 +502,7 @@ export default function SchemaView({ schema, fetchCount }: Props) {
                         className="Canvas"
                         layout={LAYOUT}
                         stylesheet={getStyle()}
-                        elements={schema.Elements}
+                        elements={schema.GraphData}
                         cy={(cy) => {
                             chartRef.current = cy
 
