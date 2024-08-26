@@ -42,8 +42,8 @@ const getClassName = (variant: Variant, disable: boolean | undefined, open: bool
             className += icon ? " gap-3.5" : ""
             break
         case "Secondary":
-            className += " px-3 py-2 bg-[#555577]"
-            className += !disable ? " hover:bg-[#57577B]" : ""
+            className += " px-3 py-2 bg-[#57577B]"
+            className += !disable ? " hover:bg-[#444466]" : ""
             break
         default:
     }

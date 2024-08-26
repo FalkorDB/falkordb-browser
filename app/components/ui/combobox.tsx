@@ -95,9 +95,8 @@ export default function Combobox({ isSelectGraph, disabled = false, inTable, typ
         setOpen(o)
         if (onOpenChange) onOpenChange(o)
       }}>
-        <DropdownMenuTrigger asChild>
+        <DropdownMenuTrigger disabled={disabled} asChild>
           <Button
-            disabled={disabled}
             className={cn(inTable ? "text-sm font-light" : "text-2xl")}
             label={selectedValue || `Select ${type || "Graph"}`}
             open={open}
