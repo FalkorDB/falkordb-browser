@@ -106,5 +106,49 @@ test.describe('Settings Tests', () => {
             
     })
 
+    const searchData = [
+        { invalidPassword: 'Test123', description: "short password"},
+        { invalidPassword: 'Test1234', description: "without special character"},
+        { invalidPassword: 'Testtes@', description: "without digits"},
+        { invalidPassword: 'TESTES1@', description: "without lowercase letters"},
+        { invalidPassword: 'testte1@', description: "without uppercase letters"},
+        { invalidPassword: '', description: "without password"}
+    ];
+
+    searchData.forEach(({ invalidPassword, description }) => {
+        test(`Enter password for new user: ${invalidPassword} reason: ${description} `, async () => {
+            const settingsPage = await browser.createNewPage(SettingsPage, urls.settingsUrl)
+            await settingsPage.navigateToUserTab();
+            const preUsersCount = await settingsPage.countUsersInTable();
+            await settingsPage.addOneUser({userName: `user_${Date.now()}`, role: 'Read-Write', password: invalidPassword, confirmPassword: invalidPassword});
+            await settingsPage.refreshPage()
+            await settingsPage.navigateToUserTab();
+            const postUserCount = await settingsPage.countUsersInTable();
+            expect(postUserCount).toEqual(preUsersCount)
+        });
+    })
+
+    test("Add a user without assigning a role -> Verify that the user has not been added", async () => {
+        const settingsPage = await browser.createNewPage(SettingsPage, urls.settingsUrl)
+        await settingsPage.navigateToUserTab();
+        const preUsersCount = await settingsPage.countUsersInTable();
+        await settingsPage.attemptToAddUserWithoutRole({userName: `user_${Date.now()}`, password: "Pass123@", confirmPassword: "Pass123@"});
+        await settingsPage.refreshPage()
+        await settingsPage.navigateToUserTab()
+        const postUserCount = await settingsPage.countUsersInTable();
+        expect(postUserCount).toEqual(preUsersCount)
+    })
+
+    test("Attempt to delete the default admin user -> Verify that the user has not been deleted.", async () => {
+        const settingsPage = await browser.createNewPage(SettingsPage, urls.settingsUrl)
+        await settingsPage.navigateToUserTab();
+        const preUsersCount = await settingsPage.countUsersInTable();
+        await settingsPage.attempToDeleteDefaultUser()
+        await settingsPage.refreshPage()
+        await settingsPage.navigateToUserTab()
+        const postUserCount = await settingsPage.countUsersInTable();
+        expect(postUserCount).toEqual(preUsersCount)
+    })
+
 
 })
