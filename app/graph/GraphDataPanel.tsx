@@ -22,10 +22,18 @@ const excludedProperties = new Set([
     "category",
     "color",
     "_id",
+    "__threeObj",
     "id",
+    "index",
     "label",
     "target",
     "source",
+    "x",
+    "y",
+    "z",
+    "vx",
+    "vy",
+    "vz",
 ]);
 
 export default function GraphDataPanel({ inSchema, obj, onExpand, setProperty, setPropertySchema, removeProperty, onDeleteElement }: Props) {

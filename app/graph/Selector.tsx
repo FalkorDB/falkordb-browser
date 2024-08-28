@@ -145,7 +145,7 @@ export default function Selector({ onChange, graphName, queries, runQuery, edges
                     />
                 </div >
             </div >
-            <div className={cn("bg-[#2C2C4C] flex gap-4 justify-between items-center p-4 rounded-xl min-h-14", !selectedValue && "justify-end")}>
+            {/* <div className={cn("bg-[#2C2C4C] flex gap-4 justify-between items-center p-4 rounded-xl min-h-14", !selectedValue && "justify-end")}>
                 {
                     selectedValue &&
                     <div className="flex gap-6">
@@ -258,7 +258,7 @@ export default function Selector({ onChange, graphName, queries, runQuery, edges
                         </Dialog>
                     </div>
                 }
-            </div>
+            </div> */}
         </div >
     )
 }

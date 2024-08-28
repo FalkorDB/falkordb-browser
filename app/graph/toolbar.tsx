@@ -2,15 +2,17 @@
 
 /* eslint-disable react/require-default-props */
 
-import { Link, PlusCircle, Shrink, Trash2, ZoomIn, ZoomOut } from "lucide-react";
+import { Link, PlusCircle, Shrink, Trash2 } from "lucide-react";
 import { Dialog, DialogTrigger } from "@/components/ui/dialog";
-import { useState } from "react";
+import { MutableRefObject, useState } from "react";
+import { ForceGraphMethods, LinkObject, NodeObject } from "react-force-graph-3d";
 import Button from "../components/ui/Button";
 import DialogComponent from "../components/DialogComponent";
+import { Edge, Node } from "../api/graph/model";
 
-export default function Toolbar({ disabled, chartRef, onDeleteElement, onAddEntity, onAddRelation, deleteDisabled }: {
+export default function Toolbar({ disabled, graphRef, onDeleteElement, onAddEntity, onAddRelation, deleteDisabled }: {
     disabled?: boolean,
-    chartRef: React.RefObject<cytoscape.Core>,
+    graphRef: MutableRefObject<ForceGraphMethods<NodeObject<Node>, LinkObject<Node, Edge>> | undefined> | undefined,
     onDeleteElement?: () => Promise<void>,
     onAddEntity?: () => void,
     onAddRelation?: () => void,
@@ -19,19 +21,15 @@ export default function Toolbar({ disabled, chartRef, onDeleteElement, onAddEnti
 
     const [deleteOpen, setDeleteOpen] = useState(false)
 
-    const handleZoomClick = (changeFactor: number) => {
-        const chart = chartRef.current
-        if (chart) {
-            chart.zoom(chart.zoom() * changeFactor)
-        }
-    }
+    // const handleZoomClick = (changeFactor: number) => {
+    // const chart = chartRef.
+    // if (chart) {
+    //     chart.zoom(chart.zoom() * changeFactor)
+    // }
+    // }
 
     const handleCenterClick = () => {
-        const chart = chartRef.current
-        if (chart) {
-            chart.fit()
-            chart.center()
-        }
+        graphRef?.current?.zoomToFit(200, 10);
     }
 
     const handelDeleteElement = async () => {
@@ -50,7 +48,7 @@ export default function Toolbar({ disabled, chartRef, onDeleteElement, onAddEnti
                     className="flex items-center gap-2"
                     onClick={onAddEntity}
                     icon={<PlusCircle />}
-                    />
+                />
                 <Button
                     disabled
                     variant="Secondary"
@@ -94,7 +92,7 @@ export default function Toolbar({ disabled, chartRef, onDeleteElement, onAddEnti
                 <p className="text-slate-600">|</p>
             }
             <div className="flex items-center gap-4">
-                <Button
+                {/* <Button
                     disabled={disabled}
                     variant="Secondary"
                     label="Zoom In"
@@ -107,7 +105,7 @@ export default function Toolbar({ disabled, chartRef, onDeleteElement, onAddEnti
                     label="Zoom Out"
                     icon={<ZoomOut />}
                     onClick={() => handleZoomClick(0.9)}
-                />
+                /> */}
                 <Button
                     disabled={disabled}
                     variant="Secondary"

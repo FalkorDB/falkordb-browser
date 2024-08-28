@@ -60,7 +60,7 @@ export default function Header({ inCreate = false, onSetGraphName }: Props) {
                         href="https://www.falkordb.com"
                         target="_blank" rel="noreferrer"
                     >
-                        <Image width={103} height={29} src="/ColorLogo.svg" alt="" />
+                        <Image width={103} height={29} src="/ColorLogo.svg" alt="" priority />
                     </a>
                     <p className="text-neutral-200" >|</p>
                     <div className="flex gap-6">

@@ -1,9 +1,6 @@
 'use client'
 
-import CytoscapeComponent from "react-cytoscapejs";
-import cytoscape, { ElementDefinition, EventObject, NodeDataDefinition } from "cytoscape";
-import { useRef, useState, useImperativeHandle, forwardRef, useEffect } from "react";
-import fcose from 'cytoscape-fcose';
+import { useRef, useState, useEffect } from "react";
 import Editor, { Monaco } from "@monaco-editor/react";
 import * as monaco from "monaco-editor";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
@@ -11,17 +8,22 @@ import { ImperativePanelHandle } from "react-resizable-panels";
 import { ChevronLeft, Maximize2, Minimize2 } from "lucide-react"
 import { cn, ElementDataDefinition, prepareArg, securedFetch } from "@/lib/utils";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
-import { Category, Graph } from "../api/graph/model";
+import { ForceGraphMethods, LinkObject, NodeObject } from "react-force-graph-3d";
+import { Category, Edge, Graph, Node } from "../api/graph/model";
 import DataPanel from "./GraphDataPanel";
 import Labels from "./labels";
 import Toolbar from "./toolbar";
 import Button from "../components/ui/Button";
+import dynamic from 'next/dynamic';
+
+const ForceGraph3D: = dynamic(() => import('react-force-graph-3d'), {
+    ssr: false,
+});
 
 const monacoOptions: monaco.editor.IStandaloneEditorConstructionOptions = {
     renderLineHighlight: "none",
     quickSuggestions: false,
     glyphMargin: false,
-    lineDecorationsWidth: 0,
     folding: false,
     fixedOverflowWidgets: true,
     occurrencesHighlight: "off",
@@ -42,12 +44,13 @@ const monacoOptions: monaco.editor.IStandaloneEditorConstructionOptions = {
         autoFindInSelection: "never",
         seedSearchStringFromSelection: "never",
     },
-    fontSize: 30,
+    fontSize: 25,
     fontWeight: "normal",
     wordWrap: "off",
     lineHeight: 42,
     lineNumbers: "off",
     lineNumbersMinChars: 0,
+    lineDecorationsWidth: 10,
     overviewRulerLanes: 0,
     overviewRulerBorder: false,
     hideCursorInOverviewRuler: true,
@@ -60,109 +63,36 @@ const monacoOptions: monaco.editor.IStandaloneEditorConstructionOptions = {
     },
 };
 
-const LAYOUT = {
-    name: "fcose",
-    fit: true,
-    padding: 30,
-}
-
-cytoscape.use(fcose);
-
-function getStyle() {
-
-    const style: cytoscape.Stylesheet[] = [
-        {
-            selector: "core",
-            style: {
-                'active-bg-size': 0,  // hide gray circle when panning
-                // All of the following styles are meaningless and are specified
-                // to satisfy the linter...
-                'active-bg-color': 'blue',
-                'active-bg-opacity': 0.3,
-                "selection-box-border-color": 'gray',
-                "selection-box-border-width": 3,
-                "selection-box-opacity": 0.5,
-                "selection-box-color": 'gray',
-                "outside-texture-bg-color": 'blue',
-                "outside-texture-bg-opacity": 1,
-            },
-        },
-        {
-            selector: "node",
-            style: {
-                label: "data(name)",
-                "color": "black",
-                "text-valign": "center",
-                "text-wrap": "ellipsis",
-                "text-max-width": "10rem",
-                shape: "ellipse",
-                height: "15rem",
-                width: "15rem",
-                "border-width": 0.3,
-                "border-color": "white",
-                "border-opacity": 1,
-                "background-color": "data(color)",
-                "font-size": "3rem",
-                "overlay-padding": "1rem",
-            },
-        },
-        {
-            selector: "node:active",
-            style: {
-                "overlay-opacity": 0,  // hide gray box around active node
-            },
-        },
-        {
-            selector: "edge",
-            style: {
-                width: 1,
-                "line-color": "data(color)",
-                "line-opacity": 0.7,
-                "arrow-scale": 0.7,
-                "target-arrow-color": "data(color)",
-                "target-arrow-shape": "triangle",
-                'curve-style': 'straight',
-            },
-        },
-        {
-            selector: "edge:active",
-            style: {
-                "overlay-opacity": 0,
-            },
-        },
-    ]
-    return style
-}
-
 const getElementId = (element: ElementDataDefinition) => element.source ? { id: element.id?.slice(1), query: "()-[e]-()" } : { id: element.id, query: "(e)" }
 
-const GraphView = forwardRef(({ graph, runQuery, historyQuery, fetchCount }: {
+function GraphView({ graph, runQuery, historyQuery, fetchCount }: {
     graph: Graph
     runQuery: (query: string) => Promise<void>
     historyQuery: string
     fetchCount: () => void
-}, ref) => {
+}) {
 
     const [query, setQuery] = useState<string>("")
     const [selectedElements, setSelectedElements] = useState<(ElementDataDefinition)[]>([]);
     const [selectedElement, setSelectedElement] = useState<ElementDataDefinition>();
     const [isCollapsed, setIsCollapsed] = useState<boolean>(true);
-    const chartRef = useRef<cytoscape.Core | null>(null)
     const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null)
     const dataPanel = useRef<ImperativePanelHandle>(null)
     const submitQuery = useRef<HTMLButtonElement>(null)
+    const graphRef = useRef<ForceGraphMethods<NodeObject<Node>, LinkObject<Node, Edge>> | undefined>()
+    const parentGraphRef = useRef<HTMLDivElement | null>(null)
     const [maximize, setMaximize] = useState<boolean>(false)
+    const [graphHeight, setGraphHeight] = useState<number>(0)
 
-    useImperativeHandle(ref, () => ({
-        expand: (elements: ElementDefinition[]) => {
-            const chart = chartRef.current
-            if (chart) {
-                chart.elements().remove()
-                chart.add(elements)
-                chart.elements().layout(LAYOUT).run();
-            }
+    useEffect(() => {
+        console.log(graphRef);
+    }, [graphRef.current])
+
+    useEffect(() => {
+        if (parentGraphRef.current) {
+            setGraphHeight(parentGraphRef.current.clientHeight)
         }
-    }))
+    }, [parentGraphRef.current, maximize])
 
     useEffect(() => {
         setSelectedElement(undefined)
@@ -219,19 +149,6 @@ const GraphView = forwardRef(({ graph, runQuery, historyQuery, fetchCount }: {
     }
 
     useEffect(() => {
-        const chart = chartRef.current
-        if (chart) {
-            chart.resize()
-            chart.fit()
-            chart.center()
-        }
-    }, [maximize])
-
-    useEffect(() => {
-        chartRef?.current?.layout(LAYOUT).run();
-    }, [graph.Elements.length]);
-
-    useEffect(() => {
         if (!editorRef.current) return
         editorRef.current.layout();
     }, [isCollapsed])
@@ -251,43 +168,45 @@ const GraphView = forwardRef(({ graph, runQuery, historyQuery, fetchCount }: {
     }
 
     // Send the user query to the server to expand a node
-    const onFetchNode = async (node: NodeDataDefinition) => {
-        const result = await securedFetch(`/api/graph/${graph.Id}/${node.id}`, {
-            method: 'GET',
-            headers: {
-                'Content-Type': 'application/json'
-            }
-        });
+    // const onFetchNode = async (node: NodeDataDefinition) => {
+    //     const result = await securedFetch(`/api/graph/${graph.Id}/${node.id}`, {
+    //         method: 'GET',
+    //         headers: {
+    //             'Content-Type': 'application/json'
+    //         }
+    //     });
 
-        if (result.ok) {
-            const json = await result.json()
-            return graph.extend(json.result)
-        }
+    //     if (result.ok) {
+    //         const json = await result.json()
+    //         return graph.extend(json.result)
+    //     }
 
-        return []
-    }
+    //     return []
+    // }
 
     const onCategoryClick = (category: Category) => {
-        const chart = chartRef.current
-        if (chart) {
-            const elements = chart.elements(`node[category = "${category.name}"]`)
+        if (category) return 1
+        return 0
+        // const chart = chartRef.current
+        // if (chart) {
+        //     const elements = chart.elements(`node[category = "${category.name}"]`)
 
-            // eslint-disable-next-line no-param-reassign
-            category.show = !category.show
+        //     // eslint-disable-next-line no-param-reassign
+        //     category.show = !category.show
 
-            if (category.show) {
-                elements.style({ display: 'element' })
-            } else {
-                elements.style({ display: 'none' })
-            }
-            chart.elements().layout(LAYOUT).run();
-        }
+        //     if (category.show) {
+        //         elements.style({ display: 'element' })
+        //     } else {
+        //         elements.style({ display: 'none' })
+        //     }
+        //     chart.elements().layout(LAYOUT).run();
+        // }
     }
 
     const onLabelClick = (label: Category) => {
-        const chart = chartRef.current
-        if (chart) {
-            const elements = chart.elements(`edge[label = "${label.name}"]`)
+        const graph = graphRef.current
+        if (graph) {
+            const elements = graph(`edge[label = "${label.name}"]`)
 
             // eslint-disable-next-line no-param-reassign
             label.show = !label.show
@@ -297,78 +216,85 @@ const GraphView = forwardRef(({ graph, runQuery, historyQuery, fetchCount }: {
             } else {
                 elements.style({ display: 'none' })
             }
-            chart.elements().layout(LAYOUT).run();
         }
     }
 
-    const handleDoubleTap = async (evt: EventObject) => {
-        const node = evt.target.json().data;
-        const elements = await onFetchNode(node);
-        chartRef.current?.add(elements);
+    // const handleDoubleTap = async (node: Node) => {
+    //     const elements = await onFetchNode(node);
+    
+    //     chartRef.current?.add(elements);
+    // }
+
+    const handleSelectedNode = (node: Node) => {
+
+        handelSetSelectedElement(node);
     }
 
-    const handleSelected = (evt: EventObject) => {
-        const { target } = evt
+    const handleSelectedEdge = (edge: Edge) => {
 
-        if (target.isEdge()) {
-            target.style("line-opacity", 0.9);
-            target.style("width", 2);
-            target.style("arrow-scale", 1);
-        } else target.style("border-width", 0.7);
-
-        const obj: ElementDataDefinition = target.json().data;
-        handelSetSelectedElement(obj);
+        handelSetSelectedElement(edge);
     }
 
-    const handleBoxSelected = (evt: EventObject) => {
-        const { target } = evt
-        const type = target.isEdge() ? "edge" : "node"
-
-        if (type === "edge") {
-            target.style("line-opacity", 0.9);
-            target.style("width", 2);
-            target.style("arrow-scale", 1);
-        } else target.style("border-width", 0.7);
-
-        const obj: ElementDataDefinition = target.json().data;
-
-        setSelectedElements(prev => [...prev, obj]);
-    }
-
-    const handleUnselected = (evt: EventObject) => {
-        const { target } = evt
-
-        if (target.isEdge()) {
-            target.style("line-opacity", 0.7);
-            target.style("width", 1);
-            target.style("arrow-scale", 0.7);
-        } else target.style("border-width", 0.3);
-
+    const handleUnselected = () => {
         handelSetSelectedElement();
         setSelectedElements([]);
     }
 
-    const handleMouseOver = (evt: EventObject) => {
-        const { target } = evt;
-
-        if (target.selected()) return
-        if (target.isEdge()) {
-            target.style("line-opacity", 0.9);
-            target.style("width", 2);
-            target.style("arrow-scale", 1);
-        } else target.style("border-width", 0.7);
+    const handleMouseHoverNode = (node: Node) => {
+        // if (element.selected()) return
+        node.color = "#FF0000"
+        console.log(graphRef.current);
+        graphRef.current?.refresh()
     };
 
-    const handleMouseOut = async (evt: EventObject) => {
-        const { target } = evt;
-
-        if (target.selected()) return
-        if (target.isEdge()) {
-            target.style("line-opacity", 0.7);
-            target.style("width", 1);
-            target.style("arrow-scale", 0.7);
-        } else target.style("border-width", 0.3);
+    const handleMouseHoverEdge = (edge: Edge) => {
+        if (edge) return 1
+        return 0
+        // if (element.selected()) return
+        // if (element.isEdge()) {
+        //     element.style("line-opacity", 0.9);
+        //     element.style("width", 2);
+        //     element.style("arrow-scale", 1);
+        // } else element.style("border-width", 0.7);
     };
+
+    const handleMouseOutNode = async (node: Node) => {
+        if (node) return 1
+        return 0
+        // if (element.selected()) return
+        // if (element.isEdge()) {
+        //     element.style("line-opacity", 0.7);
+        //     element.style("width", 1);
+        //     element.style("arrow-scale", 0.7);
+        // } else element.style("border-width", 0.3);
+    };
+
+    const handleMouseOutEdge = async (edge: Edge) => {
+        if (edge) return 1
+        return 0
+        // if (element.selected()) return
+        // if (element.isEdge()) {
+        //     element.style("line-opacity", 0.7);
+        //     element.style("width", 1);
+        //     element.style("arrow-scale", 0.7);
+        // } else element.style("border-width", 0.3);
+    };
+
+    const handleMouseNode = (node: Node | null, prevNode: Node | null) => {
+        if (node) {
+            handleMouseHoverNode(node)
+        } else if (!node && prevNode) {
+            handleMouseOutNode(prevNode)
+        }
+    }
+
+    const handleMouseEdge = (edge: Edge | null, prevEdge: Edge | null) => {
+        if (edge) {
+            handleMouseHoverEdge(edge)
+        } else if (!edge && prevEdge) {
+            handleMouseOutEdge(prevEdge)
+        }
+    }
 
     const setProperty = async (key: string, newVal: string) => {
         const id = selectedElement?.id
@@ -376,12 +302,24 @@ const GraphView = forwardRef(({ graph, runQuery, historyQuery, fetchCount }: {
         const success = (await securedFetch(`api/graph/${prepareArg(graph.Id)}/?query=${prepareArg(q)}`, {
             method: "GET"
         })).ok
-        if (success)
-            graph.Elements.forEach(e => {
-                const el = e
-                if (el.data.id !== id) return
-                el.data[key] = newVal
-            })
+        if (success) {
+            Object.values(graph.GraphData).forEach((arr, i) => {
+                if (i === 0) {
+                    graph.GraphData.nodes.forEach(n => {
+                        const node = n
+                        if (node.id !== id) return
+                        node[key] = newVal
+                    })
+                } else {
+                    graph.GraphData.links.forEach(e => {
+                        const edge = e
+                        if (edge.id !== id) return
+                        edge[key] = newVal
+                    })
+                }
+            }
+            )
+        }
         return success
     }
 
@@ -391,12 +329,24 @@ const GraphView = forwardRef(({ graph, runQuery, historyQuery, fetchCount }: {
         const success = (await securedFetch(`api/graph/${prepareArg(graph.Id)}/?query=${prepareArg(q)}`, {
             method: "GET"
         })).ok
-        if (success)
-            graph.Elements.forEach(element => {
-                if (element.data.id !== id) return
-                const e = element
-                delete e.data[key]
+
+        if (success) {
+            Object.values(graph.GraphData).forEach((arr, i) => {
+                if (i === 0) {
+                    graph.GraphData.nodes.forEach(n => {
+                        if (n.id !== id) return
+                        const node = n
+                        delete node[key]
+                    })
+                } else {
+                    graph.GraphData.links.forEach(e => {
+                        if (e.id !== id) return
+                        const edge = e
+                        delete edge[key]
+                    })
+                }
             })
+        }
         return success
     }
 
@@ -429,8 +379,14 @@ const GraphView = forwardRef(({ graph, runQuery, historyQuery, fetchCount }: {
         selectedElements.forEach((element) => {
             const type = !element.source
             const { id } = getElementId(element)
-            graph.Elements.splice(graph.Elements.findIndex(e => e.data.id === id), 1)
-            chartRef.current?.remove(`#${id} `)
+
+            if (type) {
+                graph.GraphData.nodes.splice(graph.GraphData.nodes.findIndex(n => n.id === id), 1)
+            } else {
+                graph.GraphData.links.splice(graph.GraphData.links.findIndex(e => e.id === id), 1)
+            }
+
+            // chartRef.current?.remove(`#${id} `)
 
             fetchCount()
 
@@ -447,8 +403,8 @@ const GraphView = forwardRef(({ graph, runQuery, historyQuery, fetchCount }: {
         <ResizablePanelGroup direction="horizontal" className={cn(maximize && "h-full p-10 bg-background fixed left-[50%] top-[50%] z-50 grid translate-x-[-50%] translate-y-[-50%]")}>
             <ResizablePanel
                 className={cn("flex flex-col gap-8", !isCollapsed && "mr-8")}
-                defaultSize={100}
-            >     
+                defaultSize={selectedElement ? 75 : 100}
+            >
                 {
                     !maximize &&
                     <Dialog>
@@ -510,7 +466,7 @@ const GraphView = forwardRef(({ graph, runQuery, historyQuery, fetchCount }: {
                         disabled={!graph.Id}
                         deleteDisabled={Object.values(selectedElements).length === 0 && !selectedElement}
                         onDeleteElement={handelDeleteElement}
-                        chartRef={chartRef}
+                        graphRef={graphRef}
                     />
                     {
                         isCollapsed && graph.Id &&
@@ -522,7 +478,7 @@ const GraphView = forwardRef(({ graph, runQuery, historyQuery, fetchCount }: {
                         />
                     }
                 </div>
-                <div className="relative h-1 grow rounded-lg overflow-hidden">
+                <div ref={parentGraphRef} className="relative h-1 grow rounded-lg overflow-hidden">
                     {
                         !maximize ?
                             <Button
@@ -538,29 +494,16 @@ const GraphView = forwardRef(({ graph, runQuery, historyQuery, fetchCount }: {
                                 onClick={() => setMaximize(false)}
                             />
                     }
-                    <CytoscapeComponent
-                        className="Canvas"
-                        cy={(cy) => {
-
-                            chartRef.current = cy
-
-                            cy.removeAllListeners()
-
-                            cy.on('dbltap', 'node', handleDoubleTap)
-                            cy.on('mouseover', 'node', handleMouseOver)
-                            cy.on('mouseover', 'edge', handleMouseOver)
-                            cy.on('mouseout', 'node', handleMouseOut)
-                            cy.on('mouseout', 'edge', handleMouseOut)
-                            cy.on('tapunselect', 'node', handleUnselected)
-                            cy.on('tapunselect', 'edge', handleUnselected)
-                            cy.on('tapselect', 'node', handleSelected)
-                            cy.on('tapselect', 'edge', handleSelected)
-                            cy.on('boxselect', 'node', handleBoxSelected)
-                            cy.on('boxselect', 'edge', handleBoxSelected)
-                        }}
-                        elements={graph.Elements}
-                        layout={LAYOUT}
-                        stylesheet={getStyle()}
+                    <ForceGraph3D
+                        ref={graphRef}
+                        graphData={graph.GraphData}
+                        onNodeClick={handleSelectedNode}
+                        onLinkClick={handleSelectedEdge}
+                        onNodeHover={handleMouseNode}
+                        onLinkHover={handleMouseEdge}
+                        onBackgroundClick={handleUnselected}
+                        backgroundColor="#434366"
+                        height={graphHeight}
                     />
                     {
                         (graph.Categories.length > 0 || graph.Labels.length > 0) &&
@@ -571,15 +514,12 @@ const GraphView = forwardRef(({ graph, runQuery, historyQuery, fetchCount }: {
                     }
                 </div>
             </ResizablePanel>
-            {
-                !isCollapsed &&
-                <ResizableHandle className="w-3" />
-            }
+                <ResizableHandle className={cn(selectedElement ? "w-3" : "w-0 !cursor-default")} disabled={!selectedElement} />
             <ResizablePanel
                 className="rounded-lg"
                 collapsible
                 ref={dataPanel}
-                defaultSize={25}
+                defaultSize={selectedElement ? 25 : 0}
                 minSize={25}
                 maxSize={50}
                 onCollapse={() => setIsCollapsed(true)}
@@ -598,7 +538,7 @@ const GraphView = forwardRef(({ graph, runQuery, historyQuery, fetchCount }: {
             </ResizablePanel>
         </ResizablePanelGroup>
     )
-});
+}
 
 GraphView.displayName = "GraphView";
 

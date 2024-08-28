@@ -1,4 +1,22 @@
 import { EdgeDataDefinition, ElementDefinition, NodeDataDefinition } from 'cytoscape';
+import { GraphData, LinkObject, NodeObject } from 'react-force-graph-3d';
+
+export type Node = {
+    id: string,
+    name: string,
+    category: string,
+    color: string,
+    [key: string]: string,
+}
+
+export type Edge = {
+    id: string,
+    source: string,
+    target: string,
+    label: string,
+    color: string,
+    [key: string]: string,
+}
 
 export interface Query {
     text: string
@@ -88,28 +106,28 @@ export class Graph {
     private labels: Category[];
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    private elements: ElementDefinition[];
+    private graphData: GraphData<Node, Edge>;
 
     private categoriesMap: Map<string, Category>;
 
     private categoriesColorIndex: number = 0;
-    
+
     private labelsMap: Map<string, Category>;
 
     private labelsColorIndex: number = 0;
 
-    private nodesMap: Map<number, NodeDataDefinition>;
+    private nodesMap: Map<number, Node>;
 
-    private edgesMap: Map<number, EdgeDataDefinition>;
+    private edgesMap: Map<number, Edge>;
 
-    private constructor(id: string, categories: Category[], labels: Category[], elements: ElementDefinition[],
-        categoriesMap: Map<string, Category>, labelsMap: Map<string, Category>, nodesMap: Map<number, NodeDataDefinition>, edgesMap: Map<number, EdgeDataDefinition>) {
+    private constructor(id: string, categories: Category[], labels: Category[], graphData: GraphData<Node, Edge>,
+        categoriesMap: Map<string, Category>, labelsMap: Map<string, Category>, nodesMap: Map<number, Node>, edgesMap: Map<number, Edge>) {
         this.id = id;
         this.columns = [];
         this.data = [];
         this.categories = categories;
         this.labels = labels;
-        this.elements = elements;
+        this.graphData = graphData;
         this.categoriesMap = categoriesMap;
         this.labelsMap = labelsMap;
         this.nodesMap = nodesMap;
@@ -144,20 +162,20 @@ export class Graph {
         return this.labelsMap;
     }
 
-    get NodesMap(): Map<number, NodeDataDefinition> {
+    get NodesMap(): Map<number, Node> {
         return this.nodesMap;
     }
 
-    get EdgesMap(): Map<number, EdgeDataDefinition> {
+    get EdgesMap(): Map<number, Edge> {
         return this.edgesMap;
     }
 
-    get Elements(): ElementDefinition[] {
-        return this.elements;
+    get GraphData(): GraphData<Node, Edge> {
+        return this.graphData;
     }
 
-    set Elements(elements: ElementDefinition[]) {
-        this.elements = elements
+    set GraphData(graphData: GraphData<Node, Edge>) {
+        this.graphData = graphData
     }
 
     get Columns(): string[] {
@@ -170,7 +188,7 @@ export class Graph {
     }
 
     public static empty(): Graph {
-        return new Graph("", [], [], [], new Map<string, Category>(), new Map<string, Category>(), new Map<number, NodeDataDefinition>(), new Map<number, EdgeDataDefinition>())
+        return new Graph("", [], [], { nodes: [], links: [] }, new Map<string, Category>(), new Map<string, Category>(), new Map<number, Node>(), new Map<number, Edge>())
     }
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -190,7 +208,7 @@ export class Graph {
         const currentNode = this.nodesMap.get(cell.id)
 
         if (!currentNode) {
-            const node: NodeDataDefinition = {
+            const node: Node = {
                 id: cell.id.toString(),
                 name: cell.id.toString(),
                 category: category.name,
@@ -200,7 +218,7 @@ export class Graph {
                 node[nodeSafeKey(key)] = value as string;
             });
             this.nodesMap.set(cell.id, node)
-            this.elements.push({ data: node })
+            this.graphData.nodes.push(node)
             return node
         }
 
@@ -227,7 +245,7 @@ export class Graph {
         if (!currentEdge) {
             const sourceId = cell.sourceId.toString();
             const destinationId = cell.destinationId.toString()
-            const edge: EdgeDataDefinition = {
+            const edge: Edge = {
                 id: `_${cell.id}`,
                 source: sourceId,
                 target: destinationId,
@@ -238,9 +256,9 @@ export class Graph {
                 edge[edgeSafeKey(key)] = value as string;
             });
             this.edgesMap.set(cell.id, edge)
-            this.elements.push({ data: edge })
+            this.graphData.links.push(edge)
             // creates a fakeS node for the source and target
-            let source = this.nodesMap.get(cell.sourceId)
+            let source: Node | undefined = this.nodesMap.get(cell.sourceId)
             if (!source) {
                 source = {
                     id: cell.sourceId.toString(),
@@ -249,10 +267,10 @@ export class Graph {
                     color: getCategoryColorValue()
                 }
                 this.nodesMap.set(cell.sourceId, source)
-                this.elements.push({ data: source })
+                this.graphData.nodes.push(source)
             }
 
-            let destination = this.nodesMap.get(cell.destinationId)
+            let destination: Node | undefined = this.nodesMap.get(cell.destinationId)
             if (!destination) {
                 destination = {
                     id: cell.destinationId.toString(),
@@ -261,7 +279,7 @@ export class Graph {
                     color: getCategoryColorValue()
                 }
                 this.nodesMap.set(cell.destinationId, destination)
-                this.elements.push({ data: destination })
+                this.graphData.nodes.push(destination)
             }
             return edge
         }
@@ -307,14 +325,14 @@ export class Graph {
     }
 
     public updateCategories(category: string, type: boolean) {
-        if (type && !this.elements.find(e => e.data.category === category)) {
+        if (type && !this.graphData.nodes.find(n => n.category === category)) {
             const i = this.categories.findIndex(({ name }) => name === category)
             this.categories.splice(i, 1)
             this.categoriesMap.delete(category)
             return true
         }
 
-        if (!type && !this.elements.find(e => e.data.label === category)) {
+        if (!type && !this.graphData.links.find(e => e.label === category)) {
             const i = this.labels.findIndex(({ name }) => name === category)
             this.labels.splice(i, 1)
             this.labelsMap.delete(category)
@@ -333,13 +351,13 @@ export class Graph {
             this.categoriesMap.set(c.name, c)
             this.categories.push(c)
         }
-        
+
         return c
     }
-    
+
     public createLabel(category: string): Category {
         let l = this.labelsMap.get(category)
-        
+
         if (!l) {
             l = { name: category, index: this.labelsColorIndex, show: true }
             this.labelsColorIndex += 1
