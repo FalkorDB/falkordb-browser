@@ -4,8 +4,8 @@ import { useCallback, useEffect, useState } from "react";
 import { Toast, defaultQuery, prepareArg, securedFetch } from "@/lib/utils";
 import Header from "../components/Header";
 import Selector from "../graph/Selector";
-import SchemaView from "./SchemaView";
 import { Graph } from "../api/graph/model";
+import SchemaView from "./SchemaView";
 
 export default function Page() {
 

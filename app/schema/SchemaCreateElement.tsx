@@ -11,12 +11,14 @@ import Input from "../components/ui/Input";
 import Button from "../components/ui/Button";
 import Combobox from "../components/ui/combobox";
 import { Attribute, OPTIONS, Type } from "./SchemaDataPanel";
+import { Graph } from "redis";
+import { GraphNode } from "reagraph";
 
 interface Props {
   onCreate: (element: [string, Attribute][], label?: string) => Promise<boolean>
   onExpand: () => void
   selectedNodes: NodeDataDefinition[]
-  setSelectedNodes: Dispatch<SetStateAction<NodeDataDefinition[]>>
+  setSelectedNodes: Dispatch<SetStateAction<GraphNode[]>>
   type: boolean
 }
 

@@ -12,6 +12,7 @@
         --primary: 244 89% 68%;
         --radius: 0.5rem;
         --muted: 0 0% 100%;
+        --input: 240 6% 40%;
     }
 
     :focus-visible {

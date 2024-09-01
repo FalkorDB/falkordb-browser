@@ -4,13 +4,15 @@
 
 import { Link, PlusCircle, Shrink, Trash2, ZoomIn, ZoomOut } from "lucide-react";
 import { Dialog, DialogTrigger } from "@/components/ui/dialog";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Button from "../components/ui/Button";
 import DialogComponent from "../components/DialogComponent";
+import { GraphCanvasRef } from "reagraph";
 
-export default function Toolbar({ disabled, chartRef, onDeleteElement, onAddEntity, onAddRelation, deleteDisabled }: {
+export default function Toolbar({ disabled, chartRef, onDeleteElement, onAddEntity, onAddRelation, deleteDisabled, isThreeD }: {
+    isThreeD?: boolean,
     disabled?: boolean,
-    chartRef: React.RefObject<cytoscape.Core>,
+    chartRef: React.RefObject<GraphCanvasRef>,
     onDeleteElement?: () => Promise<void>,
     onAddEntity?: () => void,
     onAddRelation?: () => void,
@@ -18,19 +20,19 @@ export default function Toolbar({ disabled, chartRef, onDeleteElement, onAddEnti
 }) {
 
     const [deleteOpen, setDeleteOpen] = useState(false)
+    const centerRef = useRef<HTMLButtonElement>(null)
 
-    const handleZoomClick = (changeFactor: number) => {
-        const chart = chartRef.current
-        if (chart) {
-            chart.zoom(chart.zoom() * changeFactor)
-        }
-    }
+    useEffect(() => {
+        setTimeout(() => {
+            centerRef.current?.click()
+        }, 1)
+    }, [isThreeD])
 
     const handleCenterClick = () => {
         const chart = chartRef.current
         if (chart) {
-            chart.fit()
-            chart.center()
+            chart.fitNodesInView()
+            chart.centerGraph()
         }
     }
 
@@ -44,7 +46,7 @@ export default function Toolbar({ disabled, chartRef, onDeleteElement, onAddEnti
         <div className="flex items-center gap-6 p-1">
             <div className="flex gap-4">
                 <Button
-                    disabled
+                    disabled={!onAddEntity}
                     variant="Secondary"
                     label="Add Entity"
                     className="flex items-center gap-2"
@@ -52,7 +54,7 @@ export default function Toolbar({ disabled, chartRef, onDeleteElement, onAddEnti
                     icon={<PlusCircle />}
                     />
                 <Button
-                    disabled
+                    disabled={!onAddRelation}
                     variant="Secondary"
                     className="flex items-center gap-2"
                     label="Add Relation"
@@ -99,16 +101,17 @@ export default function Toolbar({ disabled, chartRef, onDeleteElement, onAddEnti
                     variant="Secondary"
                     label="Zoom In"
                     icon={<ZoomIn />}
-                    onClick={() => handleZoomClick(1.1)}
+                    onClick={() => chartRef.current?.zoomIn()}
                 />
                 <Button
                     disabled={disabled}
                     variant="Secondary"
                     label="Zoom Out"
                     icon={<ZoomOut />}
-                    onClick={() => handleZoomClick(0.9)}
+                    onClick={() => chartRef.current?.zoomOut()}
                 />
                 <Button
+                    ref={centerRef}
                     disabled={disabled}
                     variant="Secondary"
                     label="Fit To Size"

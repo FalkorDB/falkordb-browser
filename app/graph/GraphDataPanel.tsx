@@ -3,7 +3,7 @@
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ElementDataDefinition, Toast, cn } from "@/lib/utils";
 import { ChevronRight, MinusCircle, PlusCircle, Trash2 } from "lucide-react";
-import { KeyboardEvent, useEffect, useRef, useState } from "react";
+import { KeyboardEvent, use, useEffect, useRef, useState } from "react";
 import Button from "../components/ui/Button";
 import Input from "../components/ui/Input";
 
@@ -18,15 +18,7 @@ interface Props {
     onDeleteElement?: () => Promise<void>;
 }
 
-const excludedProperties = new Set([
-    "category",
-    "color",
-    "_id",
-    "id",
-    "label",
-    "target",
-    "source",
-]);
+const excludedProperties = new Set(["category", "label", "id", "labelVisible", "source", "target"]);
 
 export default function GraphDataPanel({ inSchema, obj, onExpand, setProperty, setPropertySchema, removeProperty, onDeleteElement }: Props) {
 
@@ -38,7 +30,13 @@ export default function GraphDataPanel({ inSchema, obj, onExpand, setProperty, s
     const [key, setKey] = useState<string>("")
     const addValueRef = useRef<HTMLDivElement>(null)
     const type = obj.source ? "edge" : "node"
-    const label = (type === "edge" ? obj.label : obj.category) || "label"
+    const [attributes, setAttributes] = useState<[string, unknown][]>(Object.entries(obj.data).filter((row) => !excludedProperties.has(row[0]) && !(row[0] === "name" && row[1] === obj.id))) 
+    const [label, setLabel] = useState((type === "edge" ? obj.data.label : obj.data.category) || "label")
+
+    useEffect(() => {
+        setAttributes(Object.entries(obj.data).filter((row) => !excludedProperties.has(row[0]) && !(row[0] === "name" && row[1] === obj.id)))
+        setLabel((type === "edge" ? obj.data.label : obj.data.category) || "label")
+    }, [obj])
 
     useEffect(() => {
         if (!isAddValue) return
@@ -145,7 +143,7 @@ export default function GraphDataPanel({ inSchema, obj, onExpand, setProperty, s
                     />
                     {label}
                 </div>
-                <p className="flex text-white">{Object.entries(obj).filter(([k, v]) => !excludedProperties.has(k) && !(k === "name" && v === obj.id)).length} Attributes</p>
+                <p className="flex text-white">{attributes.length} Attributes</p>
             </div>
             <div className="w-full h-1 grow flex flex-col justify-between items-start font-medium">
                 <Table>
@@ -175,7 +173,7 @@ export default function GraphDataPanel({ inSchema, obj, onExpand, setProperty, s
                     }
                     <TableBody>
                         {
-                            Object.entries(obj).filter((row) => !excludedProperties.has(row[0]) && !(row[0] === "name" && row[1] === obj.id)).map((row, index) => {
+                            attributes.map((row, index) => {
                                 const strKey = JSON.parse(JSON.stringify(row[0]))
                                 const strCell = JSON.parse(JSON.stringify(row[1]))
                                 const isEditable = !inSchema && editable === `${index}`

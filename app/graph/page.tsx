@@ -2,10 +2,10 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { Toast, defaultQuery, prepareArg, securedFetch } from "@/lib/utils";
-import GraphView from "./GraphView";
 import Selector from "./Selector";
 import Header from "../components/Header";
 import { Graph, Query } from "../api/graph/model";
+import GraphView from "./GraphView";
 
 export default function Page() {
 
@@ -68,7 +68,8 @@ export default function Page() {
         const result = await run(query)
         if (!result) return
         setQueries(prev => [...prev, { text: defaultQuery(query), metadata: result.metadata }])
-        setGraph(Graph.create(graphName, result))
+        const newGraph = Graph.create(graphName, result)
+        setGraph(newGraph)
     }
 
     const runHistoryQuery = async (query: string, setQueriesOpen: (open: boolean) => void) => {

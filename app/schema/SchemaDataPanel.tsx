@@ -2,12 +2,13 @@
 
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useEffect, useState } from "react";
-import { cn, ElementDataDefinition, Toast } from "@/lib/utils";
+import { cn, Toast } from "@/lib/utils";
 import { ChevronRight, Trash2 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import Input from "../components/ui/Input";
 import Button from "../components/ui/Button";
 import Combobox from "../components/ui/combobox";
+import { GraphEdge, GraphNode } from "reagraph";
 
 export const OPTIONS = ["String", "Integer", "Float", "Geospatial", "Boolean"]
 
@@ -15,17 +16,14 @@ export type Type = "String" | "Integer" | "Float" | "Geospatial" | "Boolean" | u
 export type Attribute = [Type, string, boolean, boolean]
 
 const excludedProperties = new Set([
-    "category",
-    "color",
-    "_id",
+    "labelVisible",
     "id",
     "label",
-    "target",
-    "source",
+    "category",
 ]);
 
 interface Props {
-    obj: ElementDataDefinition
+    obj: GraphNode | GraphEdge
     onExpand: () => void
     onDelete: () => void
     onSetAttribute: (key: string, val: Attribute) => Promise<boolean>
@@ -44,13 +42,14 @@ export default function SchemaCreateElement({ obj, onExpand, onDelete, onSetAttr
     const [editable, setEditable] = useState<string>("")
     const [hover, setHover] = useState<string>("")
     const [isAddValue, setIsAddValue] = useState<boolean>(false)
-    const [attributes, setAttributes] = useState<[string, Attribute][]>(Object.entries(obj).filter(([k, v]) => !excludedProperties.has(k) && !(k === "name" && v === obj.id)).map(([k, v]) => [k, Array.isArray(v) ? v : v.split(",")] as [string, Attribute]))
-    const [label, setLabel] = useState<string>(obj.source ? obj.label : obj.category)
+    const [attributes, setAttributes] = useState<[string, Attribute][]>([])
+    const [label, setLabel] = useState<string>("")
     const [newLabel, setNewLabel] = useState<string>("")
-
+    
     useEffect(() => {
-        setAttributes(Object.entries(obj).filter(([k, v]) => !excludedProperties.has(k) && !(k === "name" && v === obj.id)).map(([k, v]) => [k, Array.isArray(v) ? v : v.split(",")] as [string, Attribute]))
-        setLabel(obj.source ? obj.label : obj.category)
+        debugger
+        setAttributes(Object.entries(obj.data).filter(([k, v]) => !excludedProperties.has(k) && !(k === "name" && v === obj.id)).map(([k, v]) => [k, Array.isArray(v) ? [v[0], v[1], v[2], v[3]] : (v as string).split(",") as Attribute]))
+        setLabel("source" in obj ? obj.data.label : obj.data.category)
     }, [obj])
 
     const handelAddAttribute = async (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -172,9 +171,9 @@ export default function SchemaCreateElement({ obj, onExpand, onDelete, onSetAttr
                                 onBlur={handelLabelCancel}
                                 onKeyDown={handelSetLabel}
                             /> : <Button
-                                className={cn(!obj.source ? "underline underline-offset-2" : "cursor-default")}
+                                className={cn(!("source" in obj) ? "underline underline-offset-2" : "cursor-default")}
                                 label={label || "Edit Label"}
-                                onClick={() => !obj.source && setLabelEditable(true)}
+                                onClick={() => !("source" in obj) && setLabelEditable(true)}
                             />
                     }
                 </div>
@@ -310,7 +309,7 @@ export default function SchemaCreateElement({ obj, onExpand, onDelete, onSetAttr
                                                     onBlur={() => setEditable("")}
                                                 />
                                                 : <Button
-                                                    label={val[2].toString()}
+                                                    label={`${val[2]}`}
                                                     onClick={() => setEditable(`${index}-2`)}
                                                 />
                                         }
@@ -333,7 +332,7 @@ export default function SchemaCreateElement({ obj, onExpand, onDelete, onSetAttr
                                                     onBlur={() => setEditable("")}
                                                 />
                                                 : <Button
-                                                    label={val[3].toString()}
+                                                    label={`${val[3]}`}
                                                     onClick={() => setEditable(`${index}-3`)}
                                                 />
                                         }

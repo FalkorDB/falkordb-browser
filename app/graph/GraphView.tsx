@@ -1,21 +1,20 @@
 'use client'
 
-import CytoscapeComponent from "react-cytoscapejs";
-import cytoscape, { ElementDefinition, EventObject, NodeDataDefinition } from "cytoscape";
-import { useRef, useState, useImperativeHandle, forwardRef, useEffect } from "react";
-import fcose from 'cytoscape-fcose';
+import { useRef, useState, useEffect } from "react";
 import Editor, { Monaco } from "@monaco-editor/react";
 import * as monaco from "monaco-editor";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { ImperativePanelHandle } from "react-resizable-panels";
 import { ChevronLeft, Maximize2, Minimize2 } from "lucide-react"
-import { cn, ElementDataDefinition, prepareArg, securedFetch } from "@/lib/utils";
+import { cn, prepareArg, securedFetch } from "@/lib/utils";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import { Category, Graph } from "../api/graph/model";
 import DataPanel from "./GraphDataPanel";
 import Labels from "./labels";
 import Toolbar from "./toolbar";
 import Button from "../components/ui/Button";
+import { Switch } from "@/components/ui/switch";
+import { GraphCanvas, GraphCanvasRef, GraphEdge, GraphNode, InternalGraphEdge, InternalGraphNode, darkTheme } from "reagraph";
 
 const monacoOptions: monaco.editor.IStandaloneEditorConstructionOptions = {
     renderLineHighlight: "none",
@@ -60,115 +59,22 @@ const monacoOptions: monaco.editor.IStandaloneEditorConstructionOptions = {
     },
 };
 
-const LAYOUT = {
-    name: "fcose",
-    fit: true,
-    padding: 30,
-}
-
-cytoscape.use(fcose);
-
-function getStyle() {
-
-    const style: cytoscape.Stylesheet[] = [
-        {
-            selector: "core",
-            style: {
-                'active-bg-size': 0,  // hide gray circle when panning
-                // All of the following styles are meaningless and are specified
-                // to satisfy the linter...
-                'active-bg-color': 'blue',
-                'active-bg-opacity': 0.3,
-                "selection-box-border-color": 'gray',
-                "selection-box-border-width": 3,
-                "selection-box-opacity": 0.5,
-                "selection-box-color": 'gray',
-                "outside-texture-bg-color": 'blue',
-                "outside-texture-bg-opacity": 1,
-            },
-        },
-        {
-            selector: "node",
-            style: {
-                label: "data(name)",
-                "color": "black",
-                "text-valign": "center",
-                "text-wrap": "ellipsis",
-                "text-max-width": "10rem",
-                shape: "ellipse",
-                height: "15rem",
-                width: "15rem",
-                "border-width": 0.3,
-                "border-color": "white",
-                "border-opacity": 1,
-                "background-color": "data(color)",
-                "font-size": "3rem",
-                "overlay-padding": "1rem",
-            },
-        },
-        {
-            selector: "node:active",
-            style: {
-                "overlay-opacity": 0,  // hide gray box around active node
-            },
-        },
-        {
-            selector: "edge",
-            style: {
-                width: 1,
-                "line-color": "data(color)",
-                "line-opacity": 0.7,
-                "arrow-scale": 0.7,
-                "target-arrow-color": "data(color)",
-                "target-arrow-shape": "triangle",
-                'curve-style': 'straight',
-            },
-        },
-        {
-            selector: "edge:active",
-            style: {
-                "overlay-opacity": 0,
-            },
-        },
-    ]
-    return style
-}
-
-const getElementId = (element: ElementDataDefinition) => element.source ? { id: element.id?.slice(1), query: "()-[e]-()" } : { id: element.id, query: "(e)" }
-
-const GraphView = forwardRef(({ graph, runQuery, historyQuery, fetchCount }: {
+const GraphView = ({ graph, runQuery, historyQuery, fetchCount }: {
     graph: Graph
     runQuery: (query: string) => Promise<void>
     historyQuery: string
     fetchCount: () => void
-}, ref) => {
+}) => {
 
     const [query, setQuery] = useState<string>("")
-    const [selectedElements, setSelectedElements] = useState<(ElementDataDefinition)[]>([]);
-    const [selectedElement, setSelectedElement] = useState<ElementDataDefinition>();
+    const [selectedElement, setSelectedElement] = useState<GraphNode | GraphEdge>();
     const [isCollapsed, setIsCollapsed] = useState<boolean>(true);
-    const chartRef = useRef<cytoscape.Core | null>(null)
     const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null)
     const dataPanel = useRef<ImperativePanelHandle>(null)
+    const graphRef = useRef<GraphCanvasRef>(null)
     const submitQuery = useRef<HTMLButtonElement>(null)
     const [maximize, setMaximize] = useState<boolean>(false)
-
-    useImperativeHandle(ref, () => ({
-        expand: (elements: ElementDefinition[]) => {
-            const chart = chartRef.current
-            if (chart) {
-                chart.elements().remove()
-                chart.add(elements)
-                chart.elements().layout(LAYOUT).run();
-            }
-        }
-    }))
-
-    useEffect(() => {
-        setSelectedElement(undefined)
-        setSelectedElements([])
-        dataPanel.current?.collapse()
-    }, [graph.Id])
+    const [isThreeD, setIsThreeD] = useState<boolean>(false)
 
     useEffect(() => {
         setQuery(historyQuery)
@@ -176,10 +82,15 @@ const GraphView = forwardRef(({ graph, runQuery, historyQuery, fetchCount }: {
 
     useEffect(() => {
         setSelectedElement(undefined)
-        setSelectedElements([])
+        dataPanel.current?.collapse()
     }, [graph.Id])
 
-    const handelSetSelectedElement = (element?: ElementDataDefinition) => {
+    useEffect(() => {
+        if (!editorRef.current) return
+        editorRef.current.layout();
+    }, [isCollapsed])
+
+    const handelSetSelectedElement = (element?: GraphNode | GraphEdge) => {
         setSelectedElement(element)
         if (element) {
             dataPanel.current?.expand()
@@ -218,28 +129,6 @@ const GraphView = forwardRef(({ graph, runQuery, historyQuery, fetchCount }: {
         // });
     }
 
-    useEffect(() => {
-        const chart = chartRef.current
-        if (chart) {
-            chart.resize()
-            chart.fit()
-            chart.center()
-        }
-    }, [maximize])
-
-    useEffect(() => {
-        chartRef?.current?.layout(LAYOUT).run();
-    }, [graph.Elements.length]);
-
-    useEffect(() => {
-        if (!editorRef.current) return
-        editorRef.current.layout();
-    }, [isCollapsed])
-
-    useEffect(() => {
-        dataPanel.current?.collapse()
-    }, [])
-
     const onExpand = () => {
         if (!dataPanel.current) return
         const panel = dataPanel.current
@@ -251,174 +140,128 @@ const GraphView = forwardRef(({ graph, runQuery, historyQuery, fetchCount }: {
     }
 
     // Send the user query to the server to expand a node
-    const onFetchNode = async (node: NodeDataDefinition) => {
-        const result = await securedFetch(`/api/graph/${graph.Id}/${node.id}`, {
-            method: 'GET',
-            headers: {
-                'Content-Type': 'application/json'
-            }
-        });
+    // const onFetchNode = async (node: NodeDataDefinition) => {
+    //     const result = await securedFetch(`/api/graph/${graph.Id}/${node.id}`, {
+    //         method: 'GET',
+    //         headers: {
+    //             'Content-Type': 'application/json'
+    //         }
+    //     });
 
-        if (result.ok) {
-            const json = await result.json()
-            return graph.extend(json.result)
-        }
+    //     if (result.ok) {
+    //         const json = await result.json()
+    //         return graph.extend(json.result)
+    //     }
 
-        return []
-    }
+    //     return []
+    // }
 
     const onCategoryClick = (category: Category) => {
-        const chart = chartRef.current
-        if (chart) {
-            const elements = chart.elements(`node[category = "${category.name}"]`)
-
-            // eslint-disable-next-line no-param-reassign
-            category.show = !category.show
-
-            if (category.show) {
-                elements.style({ display: 'element' })
-            } else {
-                elements.style({ display: 'none' })
-            }
-            chart.elements().layout(LAYOUT).run();
-        }
+        const nodes = graphRef.current?.getGraph().nodes()
+        category.show = !category.show
     }
 
     const onLabelClick = (label: Category) => {
-        const chart = chartRef.current
-        if (chart) {
-            const elements = chart.elements(`edge[label = "${label.name}"]`)
-
-            // eslint-disable-next-line no-param-reassign
-            label.show = !label.show
-
-            if (label.show) {
-                elements.style({ display: 'element' })
-            } else {
-                elements.style({ display: 'none' })
-            }
-            chart.elements().layout(LAYOUT).run();
-        }
+        label.show = !label.show
     }
 
-    const handleDoubleTap = async (evt: EventObject) => {
-        const node = evt.target.json().data;
-        const elements = await onFetchNode(node);
-        chartRef.current?.add(elements);
+    // const handleDoubleTap = async (evt: EventObject) => {
+    //     const node = evt.target.json().data;
+    //     const elements = await onFetchNode(node);
+    //     chartRef.current?.add(elements);
+    // }
+
+    const handleSelectedEdge = (edge: InternalGraphEdge) => {
+        handelSetSelectedElement(edge);
     }
 
-    const handleSelected = (evt: EventObject) => {
-        const { target } = evt
-
-        if (target.isEdge()) {
-            target.style("line-opacity", 0.9);
-            target.style("width", 2);
-            target.style("arrow-scale", 1);
-        } else target.style("border-width", 0.7);
-
-        const obj: ElementDataDefinition = target.json().data;
-        handelSetSelectedElement(obj);
+    const handleSelectedNode = (node: InternalGraphNode) => {
+        handelSetSelectedElement(node);
     }
 
-    const handleBoxSelected = (evt: EventObject) => {
-        const { target } = evt
-        const type = target.isEdge() ? "edge" : "node"
+    // const handleBoxSelected = (evt: EventObject) => {
+    //     const { target } = evt
+    //     const type = target.isEdge() ? "edge" : "node"
 
-        if (type === "edge") {
-            target.style("line-opacity", 0.9);
-            target.style("width", 2);
-            target.style("arrow-scale", 1);
-        } else target.style("border-width", 0.7);
+    //     if (type === "edge") {
+    //         target.style("line-opacity", 0.9);
+    //         target.style("width", 2);
+    //         target.style("arrow-scale", 1);
+    //     } else target.style("border-width", 0.7);
 
-        const obj: ElementDataDefinition = target.json().data;
+    //     const obj: ElementDataDefinition = target.json().data;
 
-        setSelectedElements(prev => [...prev, obj]);
-    }
+    //     setSelectedElements(prev => [...prev, obj]);
+    // }
 
-    const handleUnselected = (evt: EventObject) => {
-        const { target } = evt
-
-        if (target.isEdge()) {
-            target.style("line-opacity", 0.7);
-            target.style("width", 1);
-            target.style("arrow-scale", 0.7);
-        } else target.style("border-width", 0.3);
-
+    const handleUnselected = () => {
         handelSetSelectedElement();
-        setSelectedElements([]);
     }
 
-    const handleMouseOver = (evt: EventObject) => {
-        const { target } = evt;
-
-        if (target.selected()) return
-        if (target.isEdge()) {
-            target.style("line-opacity", 0.9);
-            target.style("width", 2);
-            target.style("arrow-scale", 1);
-        } else target.style("border-width", 0.7);
+    const handleMouseOverNode = (node: InternalGraphNode) => {
+        node.size = 15;
     };
 
-    const handleMouseOut = async (evt: EventObject) => {
-        const { target } = evt;
+    const handleMouseOverEdge = (edge: InternalGraphEdge) => {
+        edge.size = 5;
+    };
 
-        if (target.selected()) return
-        if (target.isEdge()) {
-            target.style("line-opacity", 0.7);
-            target.style("width", 1);
-            target.style("arrow-scale", 0.7);
-        } else target.style("border-width", 0.3);
+    const handleMouseOutNode = async (node: InternalGraphNode) => {
+        node.size = 10;
+    };
+
+    const handleMouseOutEdge = async (edge: InternalGraphEdge) => {
+        edge.size = 3;
     };
 
     const setProperty = async (key: string, newVal: string) => {
+        const type = selectedElement && "sucre" in selectedElement;
         const id = selectedElement?.id
         const q = `MATCH (e) WHERE id(e) = ${id} SET e.${key} = '${newVal}'`
         const success = (await securedFetch(`api/graph/${prepareArg(graph.Id)}/?query=${prepareArg(q)}`, {
             method: "GET"
         })).ok
         if (success)
-            graph.Elements.forEach(e => {
-                const el = e
-                if (el.data.id !== id) return
-                el.data[key] = newVal
+            if (type) {
+
+                graph.Nodes.forEach(node => {
+                    if (node.id !== id) return
+                    node.data[key] = newVal
+                })
+            } else graph.Edges.forEach(edge => {
+                if (edge.id !== id) return
+                edge.data[key] = newVal
             })
         return success
     }
 
     const removeProperty = async (key: string) => {
+        const type = selectedElement && "sucre" in selectedElement;
         const id = selectedElement?.id
         const q = `MATCH (e) WHERE id(e) = ${id} SET e.${key} = NULL`
         const success = (await securedFetch(`api/graph/${prepareArg(graph.Id)}/?query=${prepareArg(q)}`, {
             method: "GET"
         })).ok
         if (success)
-            graph.Elements.forEach(element => {
-                if (element.data.id !== id) return
-                const e = element
+            if (type) {
+
+                graph.Nodes.forEach(node => {
+                    if (node.data.id !== id) return
+                    const e = node
+                    delete e.data[key]
+                })
+            } else graph.Edges.forEach(edge => {
+                if (edge.data.id !== id) return
+                const e = edge
                 delete e.data[key]
             })
         return success
     }
 
     const handelDeleteElement = async () => {
-        if (selectedElements.length === 0 && selectedElement) {
-            selectedElements.push(selectedElement)
-            setSelectedElement(undefined)
-        }
-
-        const conditionsNodes: string[] = []
-        const conditionsEdges: string[] = []
-
-        selectedElements.forEach((element) => {
-            const { id } = getElementId(element)
-            if (element.source) {
-                conditionsEdges.push(`id(e) = ${id}`)
-            } else {
-                conditionsNodes.push(`id(n) = ${id}`)
-            }
-        })
-
-        const q = `${conditionsNodes.length !== 0 ? `MATCH (n) WHERE ${conditionsNodes.join(" OR ")} DELETE n` : ""}${conditionsEdges.length > 0 && conditionsNodes.length > 0 ? " WITH * " : ""}${conditionsEdges.length !== 0 ? `MATCH ()-[e]-() WHERE ${conditionsEdges.join(" OR ")} DELETE e` : ""}`
+        const type = selectedElement ? !("source" in selectedElement) : false
+        const id = selectedElement?.id
+        const q = `MATCH ${type ? "(e)" : "()-[e]-()"} WHERE ID(e) = ${id} DELETE e`
 
         const result = await securedFetch(`api/graph/${prepareArg(graph.Id)}/?query=${prepareArg(q)} `, {
             method: "GET"
@@ -426,18 +269,8 @@ const GraphView = forwardRef(({ graph, runQuery, historyQuery, fetchCount }: {
 
         if (!result.ok) return
 
-        selectedElements.forEach((element) => {
-            const type = !element.source
-            const { id } = getElementId(element)
-            graph.Elements.splice(graph.Elements.findIndex(e => e.data.id === id), 1)
-            chartRef.current?.remove(`#${id} `)
+        graph.updateCategories(type ? selectedElement?.data.category : selectedElement?.data.label, type)
 
-            fetchCount()
-
-            graph.updateCategories(type ? element.category : element.label, type)
-        })
-
-        setSelectedElements([])
         setSelectedElement(undefined)
 
         dataPanel.current?.collapse()
@@ -447,8 +280,8 @@ const GraphView = forwardRef(({ graph, runQuery, historyQuery, fetchCount }: {
         <ResizablePanelGroup direction="horizontal" className={cn(maximize && "h-full p-10 bg-background fixed left-[50%] top-[50%] z-50 grid translate-x-[-50%] translate-y-[-50%]")}>
             <ResizablePanel
                 className={cn("flex flex-col gap-8", !isCollapsed && "mr-8")}
-                defaultSize={100}
-            >     
+                defaultSize={selectedElement ? 75 : 100}
+            >
                 {
                     !maximize &&
                     <Dialog>
@@ -508,9 +341,10 @@ const GraphView = forwardRef(({ graph, runQuery, historyQuery, fetchCount }: {
                 <div className="flex items-center justify-between">
                     <Toolbar
                         disabled={!graph.Id}
-                        deleteDisabled={Object.values(selectedElements).length === 0 && !selectedElement}
+                        deleteDisabled={!selectedElement}
                         onDeleteElement={handelDeleteElement}
-                        chartRef={chartRef}
+                        chartRef={graphRef}
+                        isThreeD={isThreeD}
                     />
                     {
                         isCollapsed && graph.Id &&
@@ -538,29 +372,37 @@ const GraphView = forwardRef(({ graph, runQuery, historyQuery, fetchCount }: {
                                 onClick={() => setMaximize(false)}
                             />
                     }
-                    <CytoscapeComponent
-                        className="Canvas"
-                        cy={(cy) => {
-
-                            chartRef.current = cy
-
-                            cy.removeAllListeners()
-
-                            cy.on('dbltap', 'node', handleDoubleTap)
-                            cy.on('mouseover', 'node', handleMouseOver)
-                            cy.on('mouseover', 'edge', handleMouseOver)
-                            cy.on('mouseout', 'node', handleMouseOut)
-                            cy.on('mouseout', 'edge', handleMouseOut)
-                            cy.on('tapunselect', 'node', handleUnselected)
-                            cy.on('tapunselect', 'edge', handleUnselected)
-                            cy.on('tapselect', 'node', handleSelected)
-                            cy.on('tapselect', 'edge', handleSelected)
-                            cy.on('boxselect', 'node', handleBoxSelected)
-                            cy.on('boxselect', 'edge', handleBoxSelected)
+                    <div
+                        className="z-10 absolute top-4 left-4 flex gap-3 items-center"
+                    >
+                        <div className="flex flex-col gap-2 items-center">
+                            <p>Graph 3D</p>
+                            <Switch
+                                checked={isThreeD}
+                                onCheckedChange={(checked) => setIsThreeD(checked)}
+                            />
+                        </div>
+                    </div>
+                    <GraphCanvas
+                        ref={graphRef}
+                        nodes={graph.Nodes}
+                        edges={graph.Edges}
+                        theme={{
+                            ...darkTheme,
+                            canvas: {
+                                background: "#434366"
+                            }
                         }}
-                        elements={graph.Elements}
-                        layout={LAYOUT}
-                        stylesheet={getStyle()}
+                        onNodeClick={handleSelectedNode}
+                        onEdgeClick={handleSelectedEdge}
+                        onCanvasClick={handleUnselected}
+                        onNodePointerOver={handleMouseOverNode}
+                        onNodePointerOut={handleMouseOutNode}
+                        onEdgePointerOver={handleMouseOverEdge}
+                        onEdgePointerOut={handleMouseOutEdge}
+                        layoutType={isThreeD ? "forceDirected3d" : "forceDirected2d"}
+                        cameraMode={isThreeD ? "rotate" : "pan"}
+                        draggable
                     />
                     {
                         (graph.Categories.length > 0 || graph.Labels.length > 0) &&
@@ -571,15 +413,12 @@ const GraphView = forwardRef(({ graph, runQuery, historyQuery, fetchCount }: {
                     }
                 </div>
             </ResizablePanel>
-            {
-                !isCollapsed &&
-                <ResizableHandle className="w-3" />
-            }
+            <ResizableHandle className={cn(isCollapsed ? "w-0 !cursor-default" : "w-3")} disabled={!selectedElement} />
             <ResizablePanel
                 className="rounded-lg"
                 collapsible
                 ref={dataPanel}
-                defaultSize={25}
+                defaultSize={selectedElement ? 25 : 0}
                 minSize={25}
                 maxSize={50}
                 onCollapse={() => setIsCollapsed(true)}
@@ -598,8 +437,8 @@ const GraphView = forwardRef(({ graph, runQuery, historyQuery, fetchCount }: {
             </ResizablePanel>
         </ResizablePanelGroup>
     )
-});
+};
 
 GraphView.displayName = "GraphView";
 
-export default GraphView;
+export default GraphView
