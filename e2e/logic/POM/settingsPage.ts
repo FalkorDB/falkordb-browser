@@ -1,16 +1,11 @@
-import { Locator } from "@playwright/test";
+import { Locator, Page } from "@playwright/test";
 import BasePage from "@/e2e/infra/ui/basePage";
 import { waitForTimeOut } from '../../infra/utils'
-import user from '../../config/user.json'
 
 export default class SettingsPage extends BasePage {
 
     private get usersTabBtn(): Locator {
         return this.page.getByRole("button", { name: "Users" });
-    }
-
-    private get usersTable(): Locator {
-        return this.page.locator("//table[.//th[2][contains(text(),'USERNAME')]]/tbody/tr");
     }
 
     private get addUserButton(): Locator {
@@ -41,69 +36,57 @@ export default class SettingsPage extends BasePage {
         return this.page.getByRole("button", { name: "Add User" });
     }
 
-    private get secondUserInTable(): Locator {
-        return this.page.locator("//tbody/tr[2]");
-    }
-
-    private get deleteSecondUserBtn(): Locator {
-        return this.page.locator("//tbody/tr[2]/td[4]/button");
-    }
-
-    private get confirmSecondUserDeleteMsg(): Locator {
+    private get confirmUserDeleteMsg(): Locator {
         return this.page.getByRole("button", { name: "Continue" });
     }
 
-    private get secondUserRole(): Locator {
-        return this.page.getByRole("button", { name: "Read-Write" });
+    private get currentUserRole(): (selectedUser: string) => Locator {
+        return (selectedUser: string) => this.page.locator(`//tbody/tr/td[2][starts-with(text(), '${selectedUser}')]/parent::tr/td[3]/button`);
     }
 
-    private get thirdRoleBtnSecondUser(): Locator {
-        return this.page.locator("//div[@role='menu']//div[@role='menuitem'][3]//button");
+    private get selectUserRole(): (role : string) => Locator {
+        return (role: string) => this.page.locator(`//div[@role='menu']//div[@role='menuitem'][${role}]//button`);
     }
 
-    private get newSecondUserRole(): Locator {
-        return this.page.locator("//tbody/tr[2]/td[3]/button/p");
+    private get userRoleContent(): (selectedUser: string) => Locator {
+        return (selectedUser: string) => this.page.locator(`//tbody/tr/td[2][starts-with(text(), '${selectedUser}')]/parent::tr/td[3]/button/p`);
     }
 
-    private get newThirdUserRole(): Locator {
-        return this.page.locator("//tbody/tr[3]/td[3]/button/p");
+    private get userCheckboxBtn(): (selectedUser: string) => Locator {
+        return (selectedUser: string) => this.page.locator(`//tbody/tr/td[2][starts-with(text(), '${selectedUser}')]/preceding-sibling::td/button`);
     }
 
-    private get firstCheckboxInUsersTable(): Locator {
-        return this.page.locator("//tbody/tr[1]//button[@role='checkbox']")
+    private get findUserName() : (selectedUser : string) => Locator { 
+        return (selectedUser : string) => this.page.locator(`//tbody/tr/td[2][text() = '${selectedUser}']`)
     }
 
-    private get secondCheckboxInUsersTable(): Locator {
-        return this.page.locator("//tbody/tr[2]//button[@role='checkbox']")
-    }
-
-    private get thirdCheckboxInUsersTable(): Locator {
-        return this.page.locator("//tbody/tr[3]//button[@role='checkbox']")
+    private get hoverDeleteBtn() : (selectedUser : string) => Locator {
+        return (selectedUser : string) => this.page.locator(`//tbody/tr/td[2][starts-with(text(), '${selectedUser}')]/following-sibling::td[last()]/button`)
     }
 
     private get selectRoleBtn(): Locator {
         return this.page.getByRole("button", {name: "Select Role"})
     }
 
-    private get DeleteUsersBtn(): Locator {
+    private get deleteUsersBtn(): Locator {
         return this.page.getByRole("button", {name: "Delete Users"})
     }
 
     private get selectReadOnlyRole(): Locator {
         return this.page.getByRole("button", {name: "Read-Only"})
     }
-  
+    
     async navigateToUserTab(): Promise<void> {
         await this.usersTabBtn.click();
     }
 
-    async countUsersInTable(): Promise<number> {
-        await waitForTimeOut(this.page, 1000);
-        const count = await this.usersTable.count();
-        return count;
+    async verifyUserExists(selectedUser : string): Promise<Boolean>{
+        await waitForTimeOut(this.page, 2000)// time for response
+        return await this.findUserName(selectedUser).isVisible();
     }
 
-    async addOneUser(userDetails: { [key: string]: string }): Promise<void> {
+    async addUser(userDetails: { [key: string]: string }): Promise<void> {
+        await this.page.waitForLoadState('networkidle'); 
         await this.addUserButton.click();
         await this.userRoleBtnPopUp.click();
         await this.selectUserRoleBtnPopUp.click();
@@ -111,51 +94,40 @@ export default class SettingsPage extends BasePage {
         await this.passwordField.fill(userDetails.password);
         await this.confirmPasswordField.fill(userDetails.confirmPassword);
         await this.addUserBtnPopUp.click();
+        await waitForTimeOut(this.page, 1500)
     }
 
-    async removeOneUser(): Promise<void> {
-        await this.secondUserInTable.hover();
-        await this.deleteSecondUserBtn.click();
-        await this.confirmSecondUserDeleteMsg.click();
+    async getUserRole(selectedUser : string): Promise<string | null> {
+        await this.page.waitForLoadState('networkidle'); 
+        return await this.userRoleContent(selectedUser).textContent();
     }
 
-    async getSecondNewUserRole(): Promise<string | null> {
-        const content = await this.newSecondUserRole.textContent();
-        return content
+    async modifyUserRole(selectedUser : string, role : string): Promise<void> {
+        await this.page.waitForLoadState('networkidle'); 
+        await this.currentUserRole(selectedUser).click();
+        await this.selectUserRole(role).click();
+        await waitForTimeOut(this.page, 1500)
     }
 
-    async getThirdNewUserRole(): Promise<string | null> {
-        const content = await this.newThirdUserRole.textContent();
-        return content
-    }
-
-    async modifyOneUserRole(): Promise<void> {
-        await this.secondUserRole.click();
-        await this.thirdRoleBtnSecondUser.click();
-    }
-
-    async modifyTwoUsersRolesByCheckbox(): Promise<void> {
-        await this.secondCheckboxInUsersTable.click()
-        await this.thirdCheckboxInUsersTable.click()
+    async modifyTwoUsersRolesByCheckbox(selectedUser1 : string, selectedUser2 : string): Promise<void> {
+        await this.page.waitForLoadState('networkidle'); 
+        await this.userCheckboxBtn(selectedUser1).click()
+        await this.userCheckboxBtn(selectedUser2).click();
         await this.selectRoleBtn.click()
         await this.selectReadOnlyRole.click()
     }
 
-    async deleteTwoUsersByCheckbox(): Promise<void> {
-        await this.secondCheckboxInUsersTable.click()
-        await this.thirdCheckboxInUsersTable.click()
-        await this.DeleteUsersBtn.click()
-        await this.confirmSecondUserDeleteMsg.click()
-    }
-
-    async deleteAllUsers(): Promise<void> {
-        const userCount = await this.countUsersInTable();
-        for(let i = userCount - 1; i >= 1; i--){
-            await this.removeOneUser()
-        }
+    async deleteTwoUsersByCheckbox(selectedUser1 : string, selectedUser2 : string): Promise<void> {
+        await this.page.waitForLoadState('networkidle'); 
+        await this.userCheckboxBtn(selectedUser1).click()
+        await this.userCheckboxBtn(selectedUser2).click()
+        await this.deleteUsersBtn.click()  
+        await this.confirmUserDeleteMsg.click()
+        await waitForTimeOut(this.page, 1500)
     }
 
     async attemptToAddUserWithoutRole(userDetails: { [key: string]: string }): Promise<void> {
+        await this.page.waitForLoadState('networkidle'); 
         await this.addUserButton.click();
         await this.userNameField.fill(userDetails.userName);
         await this.passwordField.fill(userDetails.password);
@@ -163,8 +135,19 @@ export default class SettingsPage extends BasePage {
         await this.addUserBtnPopUp.click();
     }
 
-    async attempToDeleteDefaultUser(): Promise<void>{
-        await this.firstCheckboxInUsersTable.click()
-        await this.DeleteUsersBtn.click()
+    async removeUserByCheckbox(selectedUser : string): Promise<void>{
+        await this.page.waitForLoadState('networkidle'); 
+        await this.userCheckboxBtn(selectedUser).click();
+        await this.deleteUsersBtn.click();
+        await this.confirmUserDeleteMsg.click();
+        await waitForTimeOut(this.page, 1500)
     }
+
+    async removeUserByHover(selectedUser : string): Promise<void> {
+        await this.page.waitForLoadState('networkidle'); 
+        await this.findUserName(selectedUser).hover();
+        await this.hoverDeleteBtn(selectedUser).click();
+        await this.confirmUserDeleteMsg.click();
+    }
+    
 }

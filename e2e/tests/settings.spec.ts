@@ -1,6 +1,5 @@
 import { expect, test } from "@playwright/test";
 import urls  from '../config/urls.json'
-import user from '../config/user.json'
 import  BrowserWrapper  from "../infra/ui/browserWrapper";
 import  SettingsPage  from "../logic/POM/settingsPage";
 
@@ -15,94 +14,81 @@ test.describe('Settings Tests', () => {
         await browser.closeBrowser();
     })
 
-    test.afterEach(async () => {
+    test("Add one new user -> validating user exists in the users list", async () => {
         const settingsPage = await browser.createNewPage(SettingsPage, urls.settingsUrl)
         await settingsPage.navigateToUserTab();
-        await settingsPage.deleteAllUsers()
+        const username = `user_${Date.now()}`
+        await settingsPage.addUser({userName: username, role: 'Read-Write', password: "Pass123@", confirmPassword: "Pass123@"});
+        const isVisible = await settingsPage.verifyUserExists(username)
+        await settingsPage.removeUserByHover(username)
+        expect(isVisible).toBe(true)
     })
 
-    test.beforeEach(async () => {
-        const settingsPage = await browser.createNewPage(SettingsPage, urls.settingsUrl)
-        await settingsPage.navigateToUserTab();
-        await settingsPage.deleteAllUsers()
-    })
-
-    test("Add one new user -> validating one user exists in the users list", async () => {
-        const settingsPage = await browser.createNewPage(SettingsPage, urls.settingsUrl)
-        await settingsPage.navigateToUserTab();
-        const preUsersCount = await settingsPage.countUsersInTable();
-        await settingsPage.addOneUser(user.user1);
-        const postUserCount = await settingsPage.countUsersInTable();
-        expect(postUserCount).toEqual(preUsersCount + 1)
-    })
-
-    test("Add one user -> remove one user -> Validate that the user has been removed", async () => {
+    test("Add one user -> remove one user by hover -> Validate that the user has been removed", async () => {
         // Adding one user
         const settingsPage = await browser.createNewPage(SettingsPage, urls.settingsUrl)
         await settingsPage.navigateToUserTab();
-        const preUsersCount = await settingsPage.countUsersInTable();
-        await settingsPage.addOneUser(user.user1);
-       
-        await settingsPage.refreshPage();
-        await settingsPage.navigateToUserTab();
+        const username = `user_${Date.now()}`
+        await settingsPage.addUser({userName: username, role: 'Read-Write', password: "Pass123@", confirmPassword: "Pass123@"});
         // Deleting one user
-        await settingsPage.removeOneUser();
-        const currentUserCount = await settingsPage.countUsersInTable()
-        expect(currentUserCount).toEqual(preUsersCount)
-        
-    })
-
-    test.skip("Add one user -> change the role -> Validate that the user role have been changed", async () => {
-        // Adding one user
-        const settingsPage = await browser.createNewPage(SettingsPage, urls.settingsUrl)
-        await settingsPage.navigateToUserTab();
-        await settingsPage.addOneUser(user.user1);
-        
-        // modify user role
-        await settingsPage.modifyOneUserRole()
+        await settingsPage.removeUserByHover(username)
         await settingsPage.refreshPage()
         await settingsPage.navigateToUserTab()
-        const newUserRole = await settingsPage.getSecondNewUserRole()
+        const isVisible = await settingsPage.verifyUserExists(username)
+        expect(isVisible).toBe(false)
         
+    })
+
+    test("Add one user -> change the role -> Validate that the user role have been changed", async () => {
+        // Adding one user
+        const settingsPage = await browser.createNewPage(SettingsPage, urls.settingsUrl)
+        await settingsPage.navigateToUserTab();
+        const username = `user_${Date.now()}`
+        await settingsPage.addUser({userName: username, role: 'Read-Write', password: "Pass123@", confirmPassword: "Pass123@"});
+        
+        // modify user role
+        await settingsPage.modifyUserRole(username, '3')
+        const newUserRole = await settingsPage.getUserRole(username)
+        await settingsPage.removeUserByHover(username)
         expect(newUserRole).toBe("Read-Only")
             
     })
 
-    test.skip("Add two users -> change their roles via checkbox -> Validate that the users roles have been changed", async () => {
+    test("Add two users -> change their roles via checkbox -> Validate that the users roles have been changed", async () => {
         // Adding two user
         const settingsPage = await browser.createNewPage(SettingsPage, urls.settingsUrl)
         await settingsPage.navigateToUserTab();
-        await settingsPage.addOneUser(user.user1);
-        await settingsPage.refreshPage()
-        await settingsPage.navigateToUserTab()
-        await settingsPage.addOneUser(user.user2);
+        const username1 = `user_${Date.now()}`
+        await settingsPage.addUser({userName: username1, role: 'Read-Write', password: "Pass123@", confirmPassword: "Pass123@"});
+        const username2 = `user_${Date.now()}`
+        await settingsPage.addUser({userName: username2, role: 'Read-Write', password: "Pass123@", confirmPassword: "Pass123@"});
         
         // modify users roles
-        await settingsPage.modifyTwoUsersRolesByCheckbox()
+        await settingsPage.modifyTwoUsersRolesByCheckbox(username1, username2)
         await settingsPage.refreshPage()
         await settingsPage.navigateToUserTab()
-        const newSecondUserRole = await settingsPage.getSecondNewUserRole()
-        const newThirdUserRole = await settingsPage.getThirdNewUserRole()
-        
-        expect([newSecondUserRole, newThirdUserRole]).toEqual(["Read-Only", "Read-Only"])
-
-            
+        const userName1Role = await settingsPage.getUserRole(username1)
+        const userName2Role = await settingsPage.getUserRole(username2)
+        await settingsPage.deleteTwoUsersByCheckbox(username1, username2)
+        expect([userName1Role, userName2Role]).toEqual(["Read-Only", "Read-Only"])   
     })
 
-    test("Add two users -> delete the two users -> Validate that the users have been deleted", async () => {
+    test("Add two users -> delete the two users by checkbox -> Validate that the users have been deleted", async () => {
         // Adding two user
         const settingsPage = await browser.createNewPage(SettingsPage, urls.settingsUrl)
         await settingsPage.navigateToUserTab();
-        const preUsersCount = await settingsPage.countUsersInTable();
-        await settingsPage.addOneUser(user.user1);
-        await settingsPage.refreshPage();
+        const username1 = `user_${Date.now()}`
+        await settingsPage.addUser({userName: username1, role: 'Read-Write', password: "Pass123@", confirmPassword: "Pass123@"});
+        await settingsPage.refreshPage()
         await settingsPage.navigateToUserTab()
-        await settingsPage.addOneUser(user.user2);
+        const username2 = `user_${Date.now()}`
+        await settingsPage.addUser({userName: username2, role: 'Read-Write', password: "Pass123@", confirmPassword: "Pass123@"});
         
         // delete two users
-        await settingsPage.deleteTwoUsersByCheckbox()
-        const currentUserCount = await settingsPage.countUsersInTable()
-        expect(currentUserCount).toEqual(preUsersCount)
+        await settingsPage.deleteTwoUsersByCheckbox(username1, username2)
+        const isVisible1 = await settingsPage.verifyUserExists(username1)
+        const isVisible2 = await settingsPage.verifyUserExists(username2)
+        expect([isVisible1, isVisible2]).toEqual([false, false])
             
     })
 
@@ -119,35 +105,34 @@ test.describe('Settings Tests', () => {
         test(`Enter password for new user: ${invalidPassword} reason: ${description} `, async () => {
             const settingsPage = await browser.createNewPage(SettingsPage, urls.settingsUrl)
             await settingsPage.navigateToUserTab();
-            const preUsersCount = await settingsPage.countUsersInTable();
-            await settingsPage.addOneUser({userName: `user_${Date.now()}`, role: 'Read-Write', password: invalidPassword, confirmPassword: invalidPassword});
+            const username = `user_${Date.now()}`
+            await settingsPage.addUser({userName: username, role: 'Read-Write', password: invalidPassword, confirmPassword: invalidPassword});
             await settingsPage.refreshPage()
             await settingsPage.navigateToUserTab();
-            const postUserCount = await settingsPage.countUsersInTable();
-            expect(postUserCount).toEqual(preUsersCount)
+            const isVisible = await settingsPage.verifyUserExists(username)
+            expect(isVisible).toEqual(false)
         });
     })
 
     test("Add a user without assigning a role -> Verify that the user has not been added", async () => {
         const settingsPage = await browser.createNewPage(SettingsPage, urls.settingsUrl)
         await settingsPage.navigateToUserTab();
-        const preUsersCount = await settingsPage.countUsersInTable();
-        await settingsPage.attemptToAddUserWithoutRole({userName: `user_${Date.now()}`, password: "Pass123@", confirmPassword: "Pass123@"});
+        const username = `user_${Date.now()}`
+        await settingsPage.attemptToAddUserWithoutRole({userName: username, password: "Pass123@", confirmPassword: "Pass123@"});
         await settingsPage.refreshPage()
         await settingsPage.navigateToUserTab()
-        const postUserCount = await settingsPage.countUsersInTable();
-        expect(postUserCount).toEqual(preUsersCount)
+        const isVisible = await settingsPage.verifyUserExists(username)
+        expect(isVisible).toBe(false)
     })
 
     test("Attempt to delete the default admin user -> Verify that the user has not been deleted.", async () => {
         const settingsPage = await browser.createNewPage(SettingsPage, urls.settingsUrl)
         await settingsPage.navigateToUserTab();
-        const preUsersCount = await settingsPage.countUsersInTable();
-        await settingsPage.attempToDeleteDefaultUser()
+        await settingsPage.removeUserByCheckbox('default')
         await settingsPage.refreshPage()
         await settingsPage.navigateToUserTab()
-        const postUserCount = await settingsPage.countUsersInTable();
-        expect(postUserCount).toEqual(preUsersCount)
+        const isVisible = await settingsPage.verifyUserExists('default');
+        expect(isVisible).toBe(true)
     })
 
 
