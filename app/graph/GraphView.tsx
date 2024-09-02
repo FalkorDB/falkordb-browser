@@ -1,3 +1,5 @@
+/* eslint-disable no-param-reassign */
+
 'use client'
 
 import { useRef, useState, useEffect } from "react";
@@ -8,13 +10,13 @@ import { ImperativePanelHandle } from "react-resizable-panels";
 import { ChevronLeft, Maximize2, Minimize2 } from "lucide-react"
 import { cn, prepareArg, securedFetch } from "@/lib/utils";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
+import { Switch } from "@/components/ui/switch";
+import { GraphCanvas, GraphCanvasRef, GraphEdge, GraphNode, InternalGraphEdge, InternalGraphNode, darkTheme } from "reagraph";
 import { Category, Graph } from "../api/graph/model";
 import DataPanel from "./GraphDataPanel";
 import Labels from "./labels";
 import Toolbar from "./toolbar";
 import Button from "../components/ui/Button";
-import { Switch } from "@/components/ui/switch";
-import { GraphCanvas, GraphCanvasRef, GraphEdge, GraphNode, InternalGraphEdge, InternalGraphNode, darkTheme } from "reagraph";
 
 const monacoOptions: monaco.editor.IStandaloneEditorConstructionOptions = {
     renderLineHighlight: "none",
@@ -59,12 +61,12 @@ const monacoOptions: monaco.editor.IStandaloneEditorConstructionOptions = {
     },
 };
 
-const GraphView = ({ graph, runQuery, historyQuery, fetchCount }: {
+function GraphView({ graph, runQuery, historyQuery, fetchCount }: {
     graph: Graph
     runQuery: (query: string) => Promise<void>
     historyQuery: string
     fetchCount: () => void
-}) => {
+}) {
 
     const [query, setQuery] = useState<string>("")
     const [selectedElement, setSelectedElement] = useState<GraphNode | GraphEdge>();
@@ -158,7 +160,7 @@ const GraphView = ({ graph, runQuery, historyQuery, fetchCount }: {
     // }
 
     const onCategoryClick = (category: Category) => {
-        const nodes = graphRef.current?.getGraph().nodes()
+        // const nodes = graphRef.current?.getGraph().nodes()
         category.show = !category.show
     }
 
@@ -275,6 +277,8 @@ const GraphView = ({ graph, runQuery, historyQuery, fetchCount }: {
         setSelectedElement(undefined)
 
         dataPanel.current?.collapse()
+
+        fetchCount()
     }
 
     return (
@@ -439,7 +443,7 @@ const GraphView = ({ graph, runQuery, historyQuery, fetchCount }: {
             </ResizablePanel>
         </ResizablePanelGroup>
     )
-};
+}
 
 GraphView.displayName = "GraphView";
 

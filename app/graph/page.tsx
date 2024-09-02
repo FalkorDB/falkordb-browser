@@ -2,10 +2,14 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { Toast, defaultQuery, prepareArg, securedFetch } from "@/lib/utils";
+import dynamic from "next/dynamic";
 import Selector from "./Selector";
 import Header from "../components/Header";
 import { Graph, Query } from "../api/graph/model";
-import GraphView from "./GraphView";
+
+const GraphView = dynamic(() => import("./GraphView"), {
+    ssr: false
+})
 
 export default function Page() {
 
@@ -22,21 +26,21 @@ export default function Page() {
             "MATCH (n) RETURN COUNT(n) as nodes",
             "MATCH ()-[e]->() RETURN COUNT(e) as edges"
         ]
-        
+
         const nodes = await (await securedFetch(`api/graph/${prepareArg(graphName)}/?query=${q[0]}`, {
             method: "GET"
         })).json()
-        
+
         const edges = await (await securedFetch(`api/graph/${prepareArg(graphName)}/?query=${q[1]}`, {
             method: "GET"
         })).json()
-        
+
         if (!edges || !nodes) return
-        
+
         setEdgesCount(edges.result?.data[0].edges)
         setNodesCount(nodes.result?.data[0].nodes)
     }, [graphName])
-    
+
     useEffect(() => {
         if (graphName !== graph.Id) {
             setGraph(Graph.empty())

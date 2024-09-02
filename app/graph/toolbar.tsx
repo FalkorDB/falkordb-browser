@@ -5,9 +5,9 @@
 import { Link, PlusCircle, Shrink, Trash2, ZoomIn, ZoomOut } from "lucide-react";
 import { Dialog, DialogTrigger } from "@/components/ui/dialog";
 import { RefObject, useEffect, useRef, useState } from "react";
+import { GraphCanvasRef } from "reagraph";
 import Button from "../components/ui/Button";
 import DialogComponent from "../components/DialogComponent";
-import { GraphCanvasRef } from "reagraph";
 
 export default function Toolbar({ disabled, graphRef, onDeleteElement, onAddEntity, onAddRelation, deleteDisabled, isThreeD }: {
     isThreeD?: boolean,

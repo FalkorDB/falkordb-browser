@@ -1,4 +1,6 @@
-import { EdgeDataDefinition, ElementDefinition, NodeDataDefinition } from 'cytoscape';
+"use client"
+
+import { EdgeDataDefinition, NodeDataDefinition } from 'cytoscape';
 import { GraphEdge, GraphNode } from 'reagraph';
 
 export interface Query {
@@ -185,7 +187,7 @@ export class Graph {
     }
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    public extendNode(cell: any) {
+    public extendNode(cell: any): GraphNode {
         // check if category already exists in categories
         const category = this.createCategory(cell.labels[0] || "")
 
@@ -195,7 +197,6 @@ export class Graph {
             const node: GraphNode = {
                 id: cell.id.toString(),
                 fill: getCategoryColorValue(category.index),
-                labelVisible: true,
                 // label: cell.properties.name || cell.id.toString(),
                 data: {
                     category: category.name,
@@ -214,7 +215,6 @@ export class Graph {
             // set values in a fake node
             currentNode.id = cell.id.toString();
             currentNode.fill = getCategoryColorValue(category.index)
-            currentNode.labelVisible = true
             currentData.category = category.name;
             Object.entries(cell.properties).forEach(([key, value]) => {
                 currentData[nodeSafeKey(key)] = value as string;
@@ -225,8 +225,7 @@ export class Graph {
     }
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    public extendEdge(cell: any) {
-
+    public extendEdge(cell: any): GraphEdge {
         const label = this.createLabel(cell.relationshipType)
 
         const currentEdge = this.edgesMap.get(cell.id)
@@ -238,8 +237,7 @@ export class Graph {
                 source: sourceId,
                 target: destinationId,
                 // fill: getCategoryColorValue(label.index),
-                // label: label.name,
-                labelVisible: true,
+                label: label.name,
                 size: 3,
                 data: {
                     label: label.name,
@@ -272,14 +270,16 @@ export class Graph {
                 this.nodesMap.set(cell.destinationId, destination)
                 this.nodes.push(destination)
             }
+
             return edge
         }
+
         return currentEdge
     }
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    public extend(results: any): ElementDefinition[] {
-        const newElements: ElementDefinition[] = []
+    public extend(results: any): (GraphNode | GraphEdge | undefined)[] {
+        const newElements: (GraphNode | GraphEdge | undefined)[] = []
 
         if (results?.data?.length) {
             if (results.data[0] instanceof Object) {
@@ -297,16 +297,16 @@ export class Graph {
                     if (cell.nodes) {
                         // eslint-disable-next-line @typescript-eslint/no-explicit-any
                         cell.nodes.forEach((node: any) => {
-                            newElements.push({ data: this.extendNode(node) })
+                            newElements.push(this.extendNode(node))
                         })
                         // eslint-disable-next-line @typescript-eslint/no-explicit-any
                         cell.edges.forEach((edge: any) => {
-                            newElements.push({ data: this.extendEdge(edge) })
+                            newElements.push(this.extendEdge(edge))
                         })
                     } else if (cell.relationshipType) {
-                        newElements.push({ data: this.extendEdge(cell) })
+                        newElements.push(this.extendEdge(cell))
                     } else if (cell.labels) {
-                        newElements.push({ data: this.extendNode(cell) })
+                        newElements.push(this.extendNode(cell))
                     }
                 }
             })

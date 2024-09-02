@@ -5,10 +5,10 @@ import { useEffect, useState } from "react";
 import { cn, Toast } from "@/lib/utils";
 import { ChevronRight, Trash2 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
+import { GraphEdge, GraphNode } from "reagraph";
 import Input from "../components/ui/Input";
 import Button from "../components/ui/Button";
 import Combobox from "../components/ui/combobox";
-import { GraphEdge, GraphNode } from "reagraph";
 
 export const OPTIONS = ["String", "Integer", "Float", "Geospatial", "Boolean"]
 
@@ -16,9 +16,6 @@ export type Type = "String" | "Integer" | "Float" | "Geospatial" | "Boolean" | u
 export type Attribute = [Type, string, boolean, boolean]
 
 const excludedProperties = new Set([
-    "labelVisible",
-    "id",
-    "label",
     "category",
 ]);
 
@@ -134,7 +131,6 @@ export default function SchemaCreateElement({ obj, onExpand, onDelete, onSetAttr
         }
         
         if (e.key !== "Enter") return
-        debugger
         
         if (!newLabel) {
             Toast("Label can't be empty")

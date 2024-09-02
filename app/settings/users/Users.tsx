@@ -107,7 +107,7 @@ export default function Users() {
                     <TableBody>
                         {
                             users.map(({ username, role, selected }, index) => (
-                                <TableRow onMouseEnter={() => setHover(username)} onMouseLeave={() => setHover("")} key={"anchel"} className={cn("border-none", !(index % 2) && "bg-[#57577B] hover:bg-[#57577B]")}>
+                                <TableRow onMouseEnter={() => setHover(username)} onMouseLeave={() => setHover("")} key={username} className={cn("border-none", !(index % 2) && "bg-[#57577B] hover:bg-[#57577B]")}>
                                     <TableCell className="w-[5%] py-6">
                                         <Checkbox
                                             key="checkbox"

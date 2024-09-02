@@ -3,7 +3,7 @@
 import Spinning from "@/app/components/ui/spinning";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 
 export default function Home() {
   const { status } = useSession()

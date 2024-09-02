@@ -1,3 +1,5 @@
+/* eslint-disable no-param-reassign */
+
 'use client'
 
 import { ResizablePanel, ResizablePanelGroup, ResizableHandle } from "@/components/ui/resizable"
@@ -5,16 +7,14 @@ import { ChevronLeft, Maximize2, Minimize2 } from "lucide-react"
 import { ImperativePanelHandle } from "react-resizable-panels"
 import { useEffect, useRef, useState } from "react"
 import { Toast, cn, prepareArg, securedFetch } from "@/lib/utils"
+import { GraphCanvas, darkTheme, GraphCanvasRef, GraphEdge, GraphNode, InternalGraphEdge, InternalGraphNode } from "reagraph"
+import { Switch } from "@/components/ui/switch"
 import Toolbar from "../graph/toolbar"
 import SchemaDataPanel, { Attribute } from "./SchemaDataPanel"
 import Labels from "../graph/labels"
 import { Category, getCategoryColorValue, Graph } from "../api/graph/model"
 import Button from "../components/ui/Button"
 import CreateElement from "./SchemaCreateElement"
-import { darkTheme, GraphCanvas, GraphCanvasRef, GraphEdge, GraphNode, InternalGraphEdge, InternalGraphNode } from "reagraph"
-import { Switch } from "@/components/ui/switch"
-import { at } from "lodash"
-import { get } from "http"
 
 /* eslint-disable react/require-default-props */
 interface Props {
@@ -91,11 +91,13 @@ function SchemaView({ schema, fetchCount }: Props) {
     };
 
     const handleMouseOutNode = async (node: InternalGraphNode) => {
+        if (selectedElement?.id === node.id) return
         node.size = 10
     };
 
-    const handleMouseOutEdge = async (node: InternalGraphEdge) => {
-        node.size = 10
+    const handleMouseOutEdge = async (edge: InternalGraphEdge) => {
+        if (selectedElement?.id === edge.id) return
+        edge.size = 10
     };
 
     const onExpand = () => {
@@ -182,7 +184,6 @@ function SchemaView({ schema, fetchCount }: Props) {
                 // eslint-disable-next-line no-param-reassign
                 node.data.category = c.name
                 setSelectedElement({ ...selectedElement, fill: getCategoryColorValue(c.index), data: { ...selectedElement.data, category: c.name } })
-                debugger
                 schema.updateCategories(selectedElement?.data.category, true)
             })
             schemaRef.current?.getGraph().updateNode(id, (attr) => ({
@@ -238,7 +239,7 @@ function SchemaView({ schema, fetchCount }: Props) {
                 schemaRef.current?.getGraph().addNode(schema.extendNode(json.result.data[0].n))
             } else {
                 setIsAddRelation(false)
-                const edge = schema.extendEdge(json.result.data[0].e)
+                const edge = schema.extendEdge(json.result.data[0].e)!
                 schemaRef.current?.getGraph().addEdge(edge.source, edge.target, edge)
             }
 
@@ -336,6 +337,7 @@ function SchemaView({ schema, fetchCount }: Props) {
                         onEdgePointerOut={handleMouseOutEdge}
                         layoutType={isThreeD ? "forceDirected3d" : "forceDirected2d"}
                         cameraMode={isThreeD ? "rotate" : "pan"}
+                        edgeLabelPosition="natural"
                         draggable
                     />
                     {

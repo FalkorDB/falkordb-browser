@@ -7,12 +7,11 @@ import { ArrowRight, ArrowRightLeft, ChevronRight, Trash2 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { NodeDataDefinition } from "cytoscape";
 import { getCategoryColorNameFromValue } from "@/app/api/graph/model";
+import { GraphNode } from "reagraph";
 import Input from "../components/ui/Input";
 import Button from "../components/ui/Button";
 import Combobox from "../components/ui/combobox";
 import { Attribute, OPTIONS, Type } from "./SchemaDataPanel";
-import { Graph } from "redis";
-import { GraphNode } from "reagraph";
 
 interface Props {
   onCreate: (element: [string, Attribute][], label?: string) => Promise<boolean>

@@ -3,7 +3,7 @@
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ElementDataDefinition, Toast, cn } from "@/lib/utils";
 import { ChevronRight, MinusCircle, PlusCircle, Trash2 } from "lucide-react";
-import { KeyboardEvent, use, useEffect, useRef, useState } from "react";
+import { KeyboardEvent, useEffect, useRef, useState } from "react";
 import Button from "../components/ui/Button";
 import Input from "../components/ui/Input";
 
@@ -18,7 +18,7 @@ interface Props {
     onDeleteElement?: () => Promise<void>;
 }
 
-const excludedProperties = new Set(["category", "label", "id", "labelVisible", "source", "target"]);
+const excludedProperties = new Set(["category"]);
 
 export default function GraphDataPanel({ inSchema, obj, onExpand, setProperty, setPropertySchema, removeProperty, onDeleteElement }: Props) {
 
@@ -36,7 +36,7 @@ export default function GraphDataPanel({ inSchema, obj, onExpand, setProperty, s
     useEffect(() => {
         setAttributes(Object.entries(obj.data).filter((row) => !excludedProperties.has(row[0]) && !(row[0] === "name" && row[1] === obj.id)))
         setLabel((type === "edge" ? obj.data.label : obj.data.category) || "label")
-    }, [obj])
+    }, [obj, type])
 
     useEffect(() => {
         if (!isAddValue) return

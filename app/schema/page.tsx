@@ -2,10 +2,14 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { Toast, defaultQuery, prepareArg, securedFetch } from "@/lib/utils";
+import dynamic from "next/dynamic";
 import Header from "../components/Header";
 import Selector from "../graph/Selector";
 import { Graph } from "../api/graph/model";
-import SchemaView from "./SchemaView";
+
+const  SchemaView = dynamic(() => import( "./SchemaView"), {
+    ssr: false
+})
 
 export default function Page() {
 
