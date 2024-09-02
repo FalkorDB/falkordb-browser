@@ -1,8 +1,8 @@
 import { useRef, useState } from "react";
 import { cn } from "@/lib/utils";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Category, getCategoryColorName } from "../api/graph/model";
 import Button from "../components/ui/Button";
-import { ChevronLeft, ChevronRight } from "lucide-react";
 
 /* eslint-disable react/require-default-props */
 interface Props {
