@@ -8,11 +8,13 @@ import { Toast, cn, prepareArg, securedFetch } from "@/lib/utils"
 import Toolbar from "../graph/toolbar"
 import SchemaDataPanel, { Attribute } from "./SchemaDataPanel"
 import Labels from "../graph/labels"
-import { Category, Graph } from "../api/graph/model"
+import { Category, getCategoryColorValue, Graph } from "../api/graph/model"
 import Button from "../components/ui/Button"
 import CreateElement from "./SchemaCreateElement"
 import { darkTheme, GraphCanvas, GraphCanvasRef, GraphEdge, GraphNode, InternalGraphEdge, InternalGraphNode } from "reagraph"
 import { Switch } from "@/components/ui/switch"
+import { at } from "lodash"
+import { get } from "http"
 
 /* eslint-disable react/require-default-props */
 interface Props {
@@ -120,6 +122,14 @@ function SchemaView({ schema, fetchCount }: Props) {
 
         if (!result.ok) return
 
+        if (type) {
+            const index = schema.Nodes.findIndex(n => n.data.id === id)
+            schema.Nodes.splice(index, 1)
+        } else {
+            const index = schema.Edges.findIndex(n => n.data.id === id)
+            schema.Edges.splice(index, 1)
+        }
+
         schema.updateCategories(type ? selectedElement?.data.category : selectedElement?.data.label, type)
 
         setSelectedElement(undefined)
@@ -164,16 +174,25 @@ function SchemaView({ schema, fetchCount }: Props) {
         })).ok
 
         if (success) {
-            schema.Nodes.forEach(({ data }) => {
-                if (data.id !== id) return
+            const c = schema.createCategory(category)
+
+            schema.Nodes.forEach((node) => {
+                if (node.id !== id) return
 
                 // eslint-disable-next-line no-param-reassign
-                data.category = category
-
-                setSelectedElement({ ...selectedElement, data: { ...selectedElement.data, category } })
-
+                node.data.category = c.name
+                setSelectedElement({ ...selectedElement, fill: getCategoryColorValue(c.index), data: { ...selectedElement.data, category: c.name } })
+                debugger
                 schema.updateCategories(selectedElement?.data.category, true)
             })
+            schemaRef.current?.getGraph().updateNode(id, (attr) => ({
+                ...attr,
+                fill: getCategoryColorValue(c.index),
+                data: {
+                    ...attr.data,
+                    category
+                }
+            }))
         }
         return success
     }
@@ -214,11 +233,13 @@ function SchemaView({ schema, fetchCount }: Props) {
 
         if (result.ok) {
             const json = await result.json()
-
             if (isAddEntity) {
                 setIsAddEntity(false)
+                schemaRef.current?.getGraph().addNode(schema.extendNode(json.result.data[0].n))
             } else {
                 setIsAddRelation(false)
+                const edge = schema.extendEdge(json.result.data[0].e)
+                schemaRef.current?.getGraph().addEdge(edge.source, edge.target, edge)
             }
 
             if (fetchCount) fetchCount()
@@ -256,7 +277,7 @@ function SchemaView({ schema, fetchCount }: Props) {
                             onExpand()
                         }}
                         onDeleteElement={handelDeleteElement}
-                        chartRef={schemaRef}
+                        graphRef={schemaRef}
                         isThreeD={isThreeD}
                     />
                     {

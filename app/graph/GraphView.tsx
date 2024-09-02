@@ -72,6 +72,7 @@ const GraphView = ({ graph, runQuery, historyQuery, fetchCount }: {
     const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null)
     const dataPanel = useRef<ImperativePanelHandle>(null)
     const graphRef = useRef<GraphCanvasRef>(null)
+    const graphContainerRef = useRef<HTMLDivElement>(null)
     const submitQuery = useRef<HTMLButtonElement>(null)
     const [maximize, setMaximize] = useState<boolean>(false)
     const [isThreeD, setIsThreeD] = useState<boolean>(false)
@@ -343,7 +344,7 @@ const GraphView = ({ graph, runQuery, historyQuery, fetchCount }: {
                         disabled={!graph.Id}
                         deleteDisabled={!selectedElement}
                         onDeleteElement={handelDeleteElement}
-                        chartRef={graphRef}
+                        graphRef={graphRef}
                         isThreeD={isThreeD}
                     />
                     {
@@ -373,6 +374,7 @@ const GraphView = ({ graph, runQuery, historyQuery, fetchCount }: {
                             />
                     }
                     <div
+                        ref={graphContainerRef}
                         className="z-10 absolute top-4 left-4 flex gap-3 items-center"
                     >
                         <div className="flex flex-col gap-2 items-center">

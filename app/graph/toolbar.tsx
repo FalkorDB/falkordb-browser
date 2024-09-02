@@ -4,15 +4,15 @@
 
 import { Link, PlusCircle, Shrink, Trash2, ZoomIn, ZoomOut } from "lucide-react";
 import { Dialog, DialogTrigger } from "@/components/ui/dialog";
-import { useEffect, useRef, useState } from "react";
+import { RefObject, useEffect, useRef, useState } from "react";
 import Button from "../components/ui/Button";
 import DialogComponent from "../components/DialogComponent";
 import { GraphCanvasRef } from "reagraph";
 
-export default function Toolbar({ disabled, chartRef, onDeleteElement, onAddEntity, onAddRelation, deleteDisabled, isThreeD }: {
+export default function Toolbar({ disabled, graphRef, onDeleteElement, onAddEntity, onAddRelation, deleteDisabled, isThreeD }: {
     isThreeD?: boolean,
     disabled?: boolean,
-    chartRef: React.RefObject<GraphCanvasRef>,
+    graphRef: RefObject<GraphCanvasRef>,
     onDeleteElement?: () => Promise<void>,
     onAddEntity?: () => void,
     onAddRelation?: () => void,
@@ -25,11 +25,11 @@ export default function Toolbar({ disabled, chartRef, onDeleteElement, onAddEnti
     useEffect(() => {
         setTimeout(() => {
             centerRef.current?.click()
-        }, 1)
+        }, 20)
     }, [isThreeD])
 
     const handleCenterClick = () => {
-        const chart = chartRef.current
+        const chart = graphRef.current
         if (chart) {
             chart.fitNodesInView()
             chart.centerGraph()
@@ -101,14 +101,14 @@ export default function Toolbar({ disabled, chartRef, onDeleteElement, onAddEnti
                     variant="Secondary"
                     label="Zoom In"
                     icon={<ZoomIn />}
-                    onClick={() => chartRef.current?.zoomIn()}
+                    onClick={() => graphRef.current?.zoomIn()}
                 />
                 <Button
                     disabled={disabled}
                     variant="Secondary"
                     label="Zoom Out"
                     icon={<ZoomOut />}
-                    onClick={() => chartRef.current?.zoomOut()}
+                    onClick={() => graphRef.current?.zoomOut()}
                 />
                 <Button
                     ref={centerRef}

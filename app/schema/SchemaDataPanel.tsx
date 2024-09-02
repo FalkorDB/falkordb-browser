@@ -47,7 +47,6 @@ export default function SchemaCreateElement({ obj, onExpand, onDelete, onSetAttr
     const [newLabel, setNewLabel] = useState<string>("")
     
     useEffect(() => {
-        debugger
         setAttributes(Object.entries(obj.data).filter(([k, v]) => !excludedProperties.has(k) && !(k === "name" && v === obj.id)).map(([k, v]) => [k, Array.isArray(v) ? [v[0], v[1], v[2], v[3]] : (v as string).split(",") as Attribute]))
         setLabel("source" in obj ? obj.data.label : obj.data.category)
     }, [obj])
@@ -130,13 +129,13 @@ export default function SchemaCreateElement({ obj, onExpand, onDelete, onSetAttr
     }
 
     const handelSetLabel = async (e: React.KeyboardEvent<HTMLInputElement>) => {
-
         if (e.key === "Escape") {
             handelLabelCancel()
         }
-
+        
         if (e.key !== "Enter") return
-
+        debugger
+        
         if (!newLabel) {
             Toast("Label can't be empty")
             return
