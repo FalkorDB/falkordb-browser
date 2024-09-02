@@ -41,7 +41,7 @@ export default class SettingsPage extends BasePage {
     }
 
     private get currentUserRole(): (selectedUser: string) => Locator {
-        return (selectedUser: string) => this.page.locator(`//tbody/tr/td[2][starts-with(text(), '${selectedUser}')]/parent::tr/td[3]/button`);
+        return (selectedUser: string) => this.page.locator(`//tbody/tr[@data-username='${selectedUser}']/td[3]/button`);
     }
 
     private get selectUserRole(): (role : string) => Locator {
@@ -49,19 +49,19 @@ export default class SettingsPage extends BasePage {
     }
 
     private get userRoleContent(): (selectedUser: string) => Locator {
-        return (selectedUser: string) => this.page.locator(`//tbody/tr/td[2][starts-with(text(), '${selectedUser}')]/parent::tr/td[3]/button/p`);
+        return (selectedUser: string) => this.page.locator(`//tbody/tr[@data-username='${selectedUser}']/td[3]/button/p`);
     }
 
     private get userCheckboxBtn(): (selectedUser: string) => Locator {
-        return (selectedUser: string) => this.page.locator(`//tbody/tr/td[2][starts-with(text(), '${selectedUser}')]/preceding-sibling::td/button`);
+        return (selectedUser: string) => this.page.locator(`//tbody/tr[@data-username='${selectedUser}']/td[1]/button`);
     }
 
     private get findUserName() : (selectedUser : string) => Locator { 
-        return (selectedUser : string) => this.page.locator(`//tbody/tr/td[2][text() = '${selectedUser}']`)
+        return (selectedUser : string) => this.page.locator(`//tbody/tr[@data-username='${selectedUser}']/td[2]`)
     }
 
     private get hoverDeleteBtn() : (selectedUser : string) => Locator {
-        return (selectedUser : string) => this.page.locator(`//tbody/tr/td[2][starts-with(text(), '${selectedUser}')]/following-sibling::td[last()]/button`)
+        return (selectedUser : string) => this.page.locator(`//tbody/tr[@data-username='${selectedUser}']/td[4]/button`)
     }
 
     private get selectRoleBtn(): Locator {
