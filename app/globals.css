@@ -26,6 +26,11 @@
 }
 
 @layer components {
+
+    .hide-scrollbar {
+        scrollbar-width: none;
+        -ms-overflow-style: none;
+    }
     
     .Page {
         @apply h-full w-full flex flex-col bg-background;
