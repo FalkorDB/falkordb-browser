@@ -36,12 +36,12 @@ export default function Labels({ categories, onClick, label, className = "" }: P
                     <Button
                         icon={<ChevronRight />}
                         title="Scroll right"
-                        onClick={() => handelScroll(100)}
+                        onClick={() => handelScroll(200)}
                     />
                     <Button
                         icon={<ChevronLeft />}
                         title="Scroll left"
-                        onClick={() => handelScroll(-100)}
+                        onClick={() => handelScroll(-200)}
                     />
                 </div>
                 <ul ref={listRef} className={cn("flex gap-6 w-full overflow-auto hide-scrollbar items-center", label === "RelationshipTypes" && "flex-row-reverse")}>
