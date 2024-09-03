@@ -16,6 +16,7 @@ import DataPanel from "./GraphDataPanel";
 import Labels from "./labels";
 import Toolbar from "./toolbar";
 import Button from "../components/ui/Button";
+import Combobox from "../components/ui/combobox";
 
 const monacoOptions: monaco.editor.IStandaloneEditorConstructionOptions = {
     renderLineHighlight: "none",
@@ -136,14 +137,18 @@ function getStyle() {
 
 const getElementId = (element: ElementDataDefinition) => element.source ? { id: element.id?.slice(1), query: "()-[e]-()" } : { id: element.id, query: "(e)" }
 
-const GraphView = forwardRef(({ graph, runQuery, historyQuery, fetchCount }: {
+const GraphView = forwardRef(({ graph, runQuery, onGraphChange, graphName }: {
+    graphName: string
     graph: Graph
     runQuery: (query: string) => Promise<void>
-    historyQuery: string
-    fetchCount: () => void
+    onGraphChange: (name: string) => void
+    // historyQuery: string
+    // fetchCount: () => void
 }, ref) => {
 
     const [query, setQuery] = useState<string>("")
+    const [selectedValue, setSelectedValue] = useState<string>("");
+    const [options, setOptions] = useState<string[]>([]);
     const [selectedElements, setSelectedElements] = useState<(ElementDataDefinition)[]>([]);
     const [selectedElement, setSelectedElement] = useState<ElementDataDefinition>();
     const [isCollapsed, setIsCollapsed] = useState<boolean>(true);
@@ -165,14 +170,23 @@ const GraphView = forwardRef(({ graph, runQuery, historyQuery, fetchCount }: {
     }))
 
     useEffect(() => {
+        if (!graphName) return
+        setOptions(prev => {
+            if (prev.includes(graphName)) return prev
+            setSelectedValue(graphName)
+            return [...prev, graphName]
+        })
+    }, [graphName])
+
+    useEffect(() => {
         setSelectedElement(undefined)
         setSelectedElements([])
         dataPanel.current?.collapse()
     }, [graph.Id])
 
-    useEffect(() => {
-        setQuery(historyQuery)
-    }, [historyQuery])
+    // useEffect(() => {
+    //     setQuery(historyQuery)
+    // }, [historyQuery])
 
     useEffect(() => {
         setSelectedElement(undefined)
@@ -432,7 +446,7 @@ const GraphView = forwardRef(({ graph, runQuery, historyQuery, fetchCount }: {
             graph.Elements.splice(graph.Elements.findIndex(e => e.data.id === id), 1)
             chartRef.current?.remove(`#${id} `)
 
-            fetchCount()
+            // fetchCount()
 
             graph.updateCategories(type ? element.category : element.label, type)
         })
@@ -441,6 +455,11 @@ const GraphView = forwardRef(({ graph, runQuery, historyQuery, fetchCount }: {
         setSelectedElement(undefined)
 
         dataPanel.current?.collapse()
+    }
+
+    const handleOnChange = async (name: string) => {
+        onGraphChange(name)
+        setSelectedValue(name)
     }
 
     return (
@@ -453,7 +472,7 @@ const GraphView = forwardRef(({ graph, runQuery, historyQuery, fetchCount }: {
                     !maximize &&
                     <Dialog>
                         <div className="w-full flex items-center gap-8">
-                            <p>Query</p>
+                        <Combobox isSelectGraph options={options} setOptions={setOptions} selectedValue={selectedValue} setSelectedValue={handleOnChange} isSchema={!runQuery} />
                             <form
                                 className="w-1 grow flex rounded-lg overflow-hidden"
                                 onSubmit={(e) => {
