@@ -11,6 +11,7 @@ import { ChevronLeft, Maximize2, Minimize2 } from "lucide-react"
 import { cn, prepareArg, securedFetch } from "@/lib/utils";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import { Switch } from "@/components/ui/switch";
+// eslint-disable-next-line import/no-extraneous-dependencies
 import { GraphCanvas, GraphCanvasRef, GraphEdge, GraphNode, InternalGraphEdge, InternalGraphNode, darkTheme } from "reagraph";
 import { Category, Graph } from "../api/graph/model";
 import DataPanel from "./GraphDataPanel";
@@ -362,24 +363,9 @@ function GraphView({ graph, runQuery, historyQuery, fetchCount }: {
                     }
                 </div>
                 <div className="relative h-1 grow rounded-lg overflow-hidden">
-                    {
-                        !maximize ?
-                            <Button
-                                className="z-10 absolute top-4 right-4"
-                                icon={<Maximize2 />}
-                                title="Maximize"
-                                onClick={() => setMaximize(true)}
-
-                            /> : <Button
-                                className="z-10 absolute top-4 right-4"
-                                icon={<Minimize2 />}
-                                title="Minimize"
-                                onClick={() => setMaximize(false)}
-                            />
-                    }
                     <div
                         ref={graphContainerRef}
-                        className="z-10 absolute top-4 left-4 flex gap-3 items-center"
+                        className="z-10 absolute top-4 right-4 flex gap-6"
                     >
                         <div className="flex flex-col gap-2 items-center">
                             <p>Graph 3D</p>
@@ -388,6 +374,19 @@ function GraphView({ graph, runQuery, historyQuery, fetchCount }: {
                                 onCheckedChange={(checked) => setIsThreeD(checked)}
                             />
                         </div>
+                        {
+                            !maximize ?
+                                <Button
+                                    icon={<Maximize2 />}
+                                    title="Maximize"
+                                    onClick={() => setMaximize(true)}
+
+                                /> : <Button
+                                    icon={<Minimize2 />}
+                                    title="Minimize"
+                                    onClick={() => setMaximize(false)}
+                                />
+                        }
                     </div>
                     <GraphCanvas
                         ref={graphRef}
