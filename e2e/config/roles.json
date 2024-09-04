@@ -1,0 +1,13 @@
+{
+    "roles":{
+        "maxQueuedQueries": "MAX_QUEUED_QUERIES",
+        "TimeOut": "TIMEOUT",
+        "maxTimeOut":"TIMEOUT_MAX",
+        "defaultTimeOut":"TIMEOUT_DEFAULT",
+        "resultSetSize": "RESULTSET_SIZE",
+        "queryMemCapacity": "QUERY_MEM_CAPACITY",
+        "vKeyMaxEntityCount": "VKEY_MAX_ENTITY_COUNT",
+        "cmdInfo": "CMD_INFO",
+        "maxInfoQueries": "MAX_INFO_QUERIES"
+    }
+}

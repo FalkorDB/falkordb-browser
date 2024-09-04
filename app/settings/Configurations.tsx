@@ -192,7 +192,7 @@ export default function Configurations() {
                 <TableBody>
                     {
                         configs.map(({ name, description, value }, index) => (
-                            <TableRow key={name} className={cn("border-none", !(index % 2) && "bg-[#57577B] hover:bg-[#57577B]")}>
+                            <TableRow key={name} data-id={name} className={cn("border-none", !(index % 2) && "bg-[#57577B] hover:bg-[#57577B]")}>
                                 <TableCell className="w-[20%] py-8">{name}</TableCell>
                                 <TableCell className="w-[70%]">{description}</TableCell>
                                 <TableCell>
