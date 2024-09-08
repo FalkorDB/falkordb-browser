@@ -59,7 +59,7 @@ export class Graph {
     private columns: string[];
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any    
-    private results: { data: any[] };
+    private data: any[];
 
     private categories: Category[];
 
@@ -86,7 +86,7 @@ export class Graph {
         categoriesMap: Map<string, Category>, labelsMap: Map<string, Category>, nodesMap: Map<number, NodeDataDefinition>, edgesMap: Map<number, EdgeDataDefinition>, colors?: string[]) {
         this.id = id;
         this.columns = [];
-        this.results = { data: [] };
+        this.data = [];
         this.categories = categories;
         this.labels = labels;
         this.elements = elements;
@@ -153,8 +153,8 @@ export class Graph {
     }
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    get Results(): { data: any[] } {
-        return this.results;
+    get Data(): any[] {
+        return this.data;
     }
 
     get Colors(): string[] {
@@ -268,15 +268,17 @@ export class Graph {
     public extend(results: any): ElementDefinition[] {
         const newElements: ElementDefinition[] = []
         
-        if (results?.data?.length) {
-            if (results.data[0] instanceof Object) {
-                this.columns = Object.keys(results.data[0])
+        const data = results?.data
+        if (data?.length) {
+            if (data[0] instanceof Object) {
+                this.columns = Object.keys(data[0])
             }
-            this.results = results
+
+            this.data = data 
         }
         
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        this.results.data.forEach((row: any[]) => {
+        this.data.forEach((row: any[]) => {
             
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             Object.values(row).forEach((cell: any) => {

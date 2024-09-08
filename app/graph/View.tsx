@@ -21,7 +21,7 @@ export default function View({ graph, setGraph, selectedValue }: {
     const [editable, setEditable] = useState<string>("")
 
     const handelPreferencesChange = (colors?: string[]) => {
-        setGraph(Graph.create(graph.Id, graph.Results, colors || colorsArr))
+        setGraph(Graph.create(graph.Id, { data: graph.Data }, colors || colorsArr))
         if (colors) return
         localStorage.setItem(graph.Id, JSON.stringify(colorsArr));
     }
