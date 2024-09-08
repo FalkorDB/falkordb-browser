@@ -79,15 +79,6 @@
 
 }
 
-input[type="number"]::-webkit-outer-spin-button,
-input[type="number"]::-webkit-inner-spin-button {
-    -webkit-appearance: none;
-    margin: 0;
-}
-input[type="number"] {
-    -moz-appearance: textfield;
-}
-
 @font-face {
     font-family: 'Obviously Narrow';
     src: url('/fonts/obviously_narrow.woff2') format('woff2'),
