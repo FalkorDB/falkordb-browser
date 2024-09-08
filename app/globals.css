@@ -27,6 +27,11 @@
 
 @layer components {
     
+    .hide-scrollbar {
+        scrollbar-width: none;
+        -ms-overflow-style: none;
+    }
+
     .Page {
         @apply h-full w-full flex flex-col bg-background;
     }
@@ -34,7 +39,7 @@
     .LandingPage {
         background: linear-gradient(180deg, #EC806C 0%, #B66EBD 43.41%, #7568F2 100%);
     }
-    
+
     .LoginForm {
         background: linear-gradient(180deg, #EC806C 0%, #B66EBD 43.41%, #7568F2 100%);
         color: white;
@@ -71,8 +76,17 @@
         align-items: center;
         justify-content: center;
     }
+
 }
 
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+input[type="number"] {
+    -moz-appearance: textfield;
+}
 
 @font-face {
     font-family: 'Obviously Narrow';
