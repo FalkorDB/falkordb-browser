@@ -11,7 +11,7 @@ import { ElementDataDefinition, Toast, cn, prepareArg, securedFetch } from "@/li
 import Toolbar from "../graph/toolbar"
 import SchemaDataPanel, { Attribute } from "./SchemaDataPanel"
 import Labels from "../graph/labels"
-import { Category, getCategoryColorValue, Graph } from "../api/graph/model"
+import { Category, Graph } from "../api/graph/model"
 import Button from "../components/ui/Button"
 import CreateElement from "./SchemaCreateElement"
 
@@ -381,7 +381,7 @@ export default function SchemaView({ schema, fetchCount }: Props) {
                         // eslint-disable-next-line no-param-reassign
                         n.data().category = category
                         // eslint-disable-next-line no-param-reassign
-                        n.data().color = getCategoryColorValue(c.index)
+                        n.data().color = schema.getCategoryColorValue(c.index)
                     }
                 });
                 chartRef.current?.elements().layout(LAYOUT).run();
@@ -523,8 +523,8 @@ export default function SchemaView({ schema, fetchCount }: Props) {
                     {
                         (schema.Categories.length > 0 || schema.Labels.length > 0) &&
                         <>
-                            <Labels className="left-2" label="Categories" categories={schema.Categories} onClick={onCategoryClick} />
-                            <Labels className="right-2 text-end" label="RelationshipTypes" categories={schema.Labels} onClick={onLabelClick} />
+                            <Labels className="left-2" label="Categories" categories={schema.Categories} onClick={onCategoryClick} graph={schema} />
+                            <Labels className="right-2 text-end" label="RelationshipTypes" categories={schema.Labels} onClick={onLabelClick} graph={schema} />
                         </>
                     }
                 </div>

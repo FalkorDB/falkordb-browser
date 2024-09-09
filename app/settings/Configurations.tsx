@@ -231,8 +231,7 @@ export default function Configurations() {
                                                 />
                                             </div>
                                             : <Button
-                                                className={cn(disableRunTimeConfigs.has(name) && "cursor-default")}
-                                                label={typeof value === "number" ? value.toString() : value}
+                                               label={typeof value === "number" ? value.toString() : value}
                                                 onClick={() => {
                                                     setEditable(name)
                                                     setConfigValue(value.toString())
