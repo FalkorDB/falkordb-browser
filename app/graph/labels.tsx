@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import { Category, Graph } from "../api/graph/model";
 import Button from "../components/ui/Button";
@@ -16,14 +16,32 @@ export default function Labels({ graph, categories, onClick, label, className = 
 
     // fake state to force reload
     const [, setReload] = useState(false)
+    const listRef = useRef<HTMLUListElement>(null)
+    const isScrollable = listRef.current && listRef.current.scrollHeight > (listRef.current.clientHeight + 10)
+
+    const handelScroll = (scrollTo: number) => {
+        listRef.current?.scrollBy({
+            behavior: "smooth",
+            top: scrollTo,
+        })
+    }
 
     return (
-        <div className={cn(className, "absolute bottom-0 flex flex-col gap-2 p-4")}>
+        <div className={cn(className, "absolute top-10 flex flex-col gap-2 p-4 h-[96%] w-[15%]", label === "RelationshipTypes" && "items-end")}>
             {
                 label &&
                 <h1>{label}</h1>
             }
-            <ul className="flex gap-6" >
+            <div className={cn("h-1 grow flex flex-col items-center gap-4 p-4")}>
+                {
+                    isScrollable &&
+                    <Button
+                        icon={<ChevronUp />}
+                        title="Scroll left"
+                        onClick={() => handelScroll(-200)}
+                    />
+                }
+                <ul ref={listRef} className={cn("flex flex-col gap-4 w-full overflow-auto hide-scrollbar", label === "RelationshipTypes" && "items-end")}>
                 {
                     categories.map((category) => (
                         <li key={category.index}>
@@ -40,8 +58,9 @@ export default function Labels({ graph, categories, onClick, label, className = 
                             />
                         </li>
                     ))
-                }
-            </ul>
+                  }
+                        </ul>
+            </div>
         </div>
     )
 }

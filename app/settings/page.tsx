@@ -13,10 +13,10 @@ export default function Settings() {
 
     const [current, setCurrent] = useState('DB')
     const router = useRouter()
-    const {data: session} = useSession()
+    const { data: session } = useSession()
 
     useEffect(() => {
-            if (session?.user.role !== "Admin") router.back()
+        if (session && session.user.role !== "Admin") router.back()
     }, [router, session])
 
     const getCurrentTab = () => {

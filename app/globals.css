@@ -26,6 +26,11 @@
 }
 
 @layer components {
+
+    .hide-scrollbar {
+        scrollbar-width: none;
+        -ms-overflow-style: none;
+    }
     
     .hide-scrollbar {
         scrollbar-width: none;
