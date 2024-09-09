@@ -16,7 +16,7 @@ export default function CloseDialog({ className, label, variant, icon, ...props 
     return (
         <DialogClose asChild >
             <Button
-                icon={icon || !label ? <X /> : undefined}
+                icon={icon || (!label ? <X /> : undefined)}
                 className={cn("", className)}
                 variant={variant}
                 label={label}

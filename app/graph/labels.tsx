@@ -1,18 +1,19 @@
 import { useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import { ChevronDown, ChevronUp } from "lucide-react";
-import { Category, getCategoryColorName } from "../api/graph/model";
+import { Category, Graph } from "../api/graph/model";
 import Button from "../components/ui/Button";
 
 /* eslint-disable react/require-default-props */
 interface Props {
+    graph: Graph,
     categories: Category[],
     onClick: (category: Category) => void,
     label?: string,
     className?: string
 }
 
-export default function Labels({ categories, onClick, label, className = "" }: Props) {
+export default function Labels({ graph, categories, onClick, label, className = "" }: Props) {
 
     // fake state to force reload
     const [, setReload] = useState(false)
@@ -37,7 +38,7 @@ export default function Labels({ categories, onClick, label, className = "" }: P
                     isScrollable &&
                     <Button
                         icon={<ChevronUp />}
-                        title="Scroll left"
+                        title="Scroll up"
                         onClick={() => handelScroll(-200)}
                     />
                 }
@@ -46,10 +47,10 @@ export default function Labels({ categories, onClick, label, className = "" }: P
                         categories.map((category) => (
                             <li key={category.index}>
                                 <Button
-                                    className={cn(category.name && "flex gap-2 items-center", label === "RelationshipTypes" && "flex-row-reverse")}
+                                    className={cn(category.name && "flex gap-2 items-center")}
                                     label={category.name}
                                     icon={
-                                        <div className={cn("w-6 h-6 rounded-full", `bg-${getCategoryColorName(category.index)}`, label === "RelationshipTypes" && "opacity-50")} />
+                                        <div style={{ backgroundColor: `${graph.getCategoryColorValue(category.index)}` }} className={cn("w-6 h-6 rounded-full", label === "RelationshipTypes" && "opacity-50")} />
                                     }
                                     onClick={() => {
                                         onClick(category)
@@ -59,15 +60,15 @@ export default function Labels({ categories, onClick, label, className = "" }: P
                             </li>
                         ))
                     }
+                    {
+                        isScrollable &&
+                        <Button
+                            icon={<ChevronDown />}
+                            title="Scroll down"
+                            onClick={() => handelScroll(200)}
+                        />
+                    }
                 </ul>
-                {
-                    isScrollable &&
-                    <Button
-                        icon={<ChevronDown />}
-                        title="Scroll right"
-                        onClick={() => handelScroll(200)}
-                    />
-                }
             </div>
         </div>
     )
