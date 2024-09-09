@@ -160,15 +160,15 @@ export class Graph {
     get Colors(): string[] {
         return this.COLORS_ORDER_VALUE;
     }
-    
+
     set Colors(colors: string[]) {
         this.COLORS_ORDER_VALUE = colors;
     }
-    
+
     public static empty(graphName?: string, colors?: string[]): Graph {
         return new Graph(graphName || "", [], [], [], new Map<string, Category>(), new Map<string, Category>(), new Map<number, NodeDataDefinition>(), new Map<number, EdgeDataDefinition>(), colors)
     }
-    
+
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     public static create(id: string, results: any, colors?: string[]): Graph {
         const graph = Graph.empty(undefined, colors)
@@ -176,15 +176,15 @@ export class Graph {
         graph.id = id
         return graph
     }
-    
+
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     public extendNode(cell: any) {
         // check if category already exists in categories
         const category = this.createCategory(cell.labels[0] || "")
-        
+
         // check if node already exists in nodes or fake node was created
         const currentNode = this.nodesMap.get(cell.id)
-        
+
         if (!currentNode) {
             const node: NodeDataDefinition = {
                 id: cell.id.toString(),
@@ -199,7 +199,7 @@ export class Graph {
             this.elements.push({ data: node })
             return node
         }
-        
+
         if (currentNode.category === "") {
             // set values in a fake node
             currentNode.id = cell.id.toString();
@@ -210,15 +210,15 @@ export class Graph {
                 currentNode[nodeSafeKey(key)] = value as string;
             });
         }
-        
+
         return currentNode
     }
-    
+
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     public extendEdge(cell: any) {
-        
+
         const label = this.createLabel(cell.relationshipType)
-        
+
         const currentEdge = this.edgesMap.get(cell.id)
         if (!currentEdge) {
             const sourceId = cell.sourceId.toString();
@@ -247,7 +247,7 @@ export class Graph {
                 this.nodesMap.set(cell.sourceId, source)
                 this.elements.push({ data: source })
             }
-            
+
             let destination = this.nodesMap.get(cell.destinationId)
             if (!destination) {
                 destination = {
@@ -263,23 +263,23 @@ export class Graph {
         }
         return currentEdge
     }
-    
+
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     public extend(results: any): ElementDefinition[] {
         const newElements: ElementDefinition[] = []
-        
+
         const data = results?.data
         if (data?.length) {
             if (data[0] instanceof Object) {
                 this.columns = Object.keys(data[0])
             }
 
-            this.data = data 
+            this.data = data
         }
-        
+
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         this.data.forEach((row: any[]) => {
-            
+
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             Object.values(row).forEach((cell: any) => {
                 if (cell instanceof Object) {
@@ -300,10 +300,10 @@ export class Graph {
                 }
             })
         })
-        
+
         return newElements
     }
-    
+
     public updateCategories(category: string, type: boolean) {
         if (type && !this.elements.find(e => e.data.category === category)) {
             const i = this.categories.findIndex(({ name }) => name === category)
@@ -311,43 +311,43 @@ export class Graph {
             this.categoriesMap.delete(category)
             return true
         }
-        
+
         if (!type && !this.elements.find(e => e.data.label === category)) {
             const i = this.labels.findIndex(({ name }) => name === category)
             this.labels.splice(i, 1)
             this.labelsMap.delete(category)
             return true
         }
-        
+
         return false
     }
 
     public createCategory(category: string): Category {
         let c = this.categoriesMap.get(category)
-        
+
         if (!c) {
             c = { name: category, index: this.categoriesColorIndex, show: true }
             this.categoriesColorIndex += 1
             this.categoriesMap.set(c.name, c)
             this.categories.push(c)
         }
-        
+
         return c
     }
-    
+
     public createLabel(category: string): Category {
         let l = this.labelsMap.get(category)
-        
+
         if (!l) {
             l = { name: category, index: this.labelsColorIndex, show: true }
             this.labelsColorIndex += 1
             this.labelsMap.set(l.name, l)
             this.labels.push(l)
         }
-        
+
         return l
     }
-    
+
     public getCategoryColorValue(index = 0): string {
         return this.COLORS_ORDER_VALUE[index % this.COLORS_ORDER_VALUE.length]
     }
