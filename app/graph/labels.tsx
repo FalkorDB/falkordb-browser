@@ -1,5 +1,6 @@
 import { useRef, useState } from "react";
 import { cn } from "@/lib/utils";
+import { ChevronDown, ChevronUp } from "lucide-react";
 import { Category, Graph } from "../api/graph/model";
 import Button from "../components/ui/Button";
 
@@ -42,24 +43,32 @@ export default function Labels({ graph, categories, onClick, label, className = 
                     />
                 }
                 <ul ref={listRef} className={cn("flex flex-col gap-4 w-full overflow-auto hide-scrollbar", label === "RelationshipTypes" && "items-end")}>
-                {
-                    categories.map((category) => (
-                        <li key={category.index}>
-                            <Button
-                                className={cn(category.name && "flex gap-2 items-center")}
-                                label={category.name}
-                                icon={
-                                    <div style={{ backgroundColor: `${graph.getCategoryColorValue(category.index)}`}} className={cn("w-6 h-6 rounded-full", label === "RelationshipTypes" && "opacity-50")} />
-                                }
-                            onClick={() => {
-                                onClick(category)
-                                setReload(prev => !prev)
-                            }}
-                            />
-                        </li>
-                    ))
-                  }
-                        </ul>
+                    {
+                        categories.map((category) => (
+                            <li key={category.index}>
+                                <Button
+                                    className={cn(category.name && "flex gap-2 items-center")}
+                                    label={category.name}
+                                    icon={
+                                        <div style={{ backgroundColor: `${graph.getCategoryColorValue(category.index)}` }} className={cn("w-6 h-6 rounded-full", label === "RelationshipTypes" && "opacity-50")} />
+                                    }
+                                    onClick={() => {
+                                        onClick(category)
+                                        setReload(prev => !prev)
+                                    }}
+                                />
+                            </li>
+                        ))
+                    }
+                    {
+                        isScrollable &&
+                        <Button
+                            icon={<ChevronDown />}
+                            title="Scroll left"
+                            onClick={() => handelScroll(200)}
+                        />
+                    }
+                </ul>
             </div>
         </div>
     )
