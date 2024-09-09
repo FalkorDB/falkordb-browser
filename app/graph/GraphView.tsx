@@ -448,7 +448,7 @@ const GraphView = forwardRef(({ graph, runQuery, historyQuery, fetchCount }: {
             <ResizablePanel
                 className={cn("flex flex-col gap-8", !isCollapsed && "mr-8")}
                 defaultSize={100}
-            >     
+            >
                 {
                     !maximize &&
                     <Dialog>
@@ -536,6 +536,7 @@ const GraphView = forwardRef(({ graph, runQuery, historyQuery, fetchCount }: {
                                 icon={<Minimize2 />}
                                 title="Minimize"
                                 onClick={() => setMaximize(false)}
+                                onKeyDown={(e) => e.code === "Escape" && setMaximize(false)}
                             />
                     }
                     <CytoscapeComponent
