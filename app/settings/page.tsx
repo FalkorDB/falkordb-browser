@@ -16,7 +16,7 @@ export default function Settings() {
     const { data: session } = useSession()
 
     useEffect(() => {
-        if (session && session?.user.role !== "Admin") router.back()
+        if (session && session.user.role !== "Admin") router.back()
     }, [router, session])
 
     const getCurrentTab = () => {
