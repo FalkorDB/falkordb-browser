@@ -38,7 +38,7 @@ export default function Labels({ graph, categories, onClick, label, className = 
                     isScrollable &&
                     <Button
                         icon={<ChevronUp />}
-                        title="Scroll left"
+                        title="Scroll up"
                         onClick={() => handelScroll(-200)}
                     />
                 }
@@ -64,7 +64,7 @@ export default function Labels({ graph, categories, onClick, label, className = 
                         isScrollable &&
                         <Button
                             icon={<ChevronDown />}
-                            title="Scroll left"
+                            title="Scroll down"
                             onClick={() => handelScroll(200)}
                         />
                     }
