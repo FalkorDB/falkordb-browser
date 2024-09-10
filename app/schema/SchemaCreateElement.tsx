@@ -6,7 +6,6 @@ import { cn, Toast } from "@/lib/utils";
 import { ArrowRight, ArrowRightLeft, ChevronRight, Trash2 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { NodeDataDefinition } from "cytoscape";
-import { getCategoryColorNameFromValue } from "@/app/api/graph/model";
 import Input from "../components/ui/Input";
 import Button from "../components/ui/Button";
 import Combobox from "../components/ui/combobox";
@@ -342,11 +341,11 @@ export default function SchemaCreateElement({ onCreate, onExpand, selectedNodes,
           !type &&
           <div className="w-full flex flex-col gap-4">
             <div className="w-full flex justify-between p-8 items-center">
-              <div className={`flex h-16 w-16 rounded-full bg-[#57577B] justify-center items-center bg-${getCategoryColorNameFromValue(selectedNodes[0]?.color)}`}>
+              <div style={{ backgroundColor: selectedNodes[0]?.color }} className="flex h-16 w-16 rounded-full bg-[#57577B] justify-center items-center">
                 <p>{selectedNodes[0]?.category}</p>
               </div>
               <ArrowRight strokeWidth={1} size={40} />
-              <div className={`flex h-16 w-16 rounded-full bg-[#57577B] justify-center items-center bg-${getCategoryColorNameFromValue(selectedNodes[1]?.color)}`}>
+              <div style={{ backgroundColor: selectedNodes[1]?.color }} className="flex h-16 w-16 rounded-full bg-[#57577B] justify-center items-center">
                 <p>{selectedNodes[1]?.category}</p>
               </div>
             </div>
