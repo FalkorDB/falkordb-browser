@@ -2,10 +2,12 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { Toast, defaultQuery, prepareArg, securedFetch } from "@/lib/utils";
-import GraphView from "./GraphView";
+import dynamic from "next/dynamic";
 import Selector from "./Selector";
 import Header from "../components/Header";
 import { Graph, Query } from "../api/graph/model";
+
+const GraphView = dynamic(() => import("./GraphView"), { ssr: false })
 
 export default function Page() {
 

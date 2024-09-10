@@ -18,8 +18,9 @@ import Toolbar from "./toolbar";
 import Button from "../components/ui/Button";
 
 const monacoOptions: monaco.editor.IStandaloneEditorConstructionOptions = {
+
     renderLineHighlight: "none",
-    quickSuggestions: false,
+    quickSuggestions: true,
     glyphMargin: false,
     lineDecorationsWidth: 0,
     folding: false,
@@ -41,6 +42,7 @@ const monacoOptions: monaco.editor.IStandaloneEditorConstructionOptions = {
         addExtraSpaceOnTop: false,
         autoFindInSelection: "never",
         seedSearchStringFromSelection: "never",
+        loop: false,
     },
     fontSize: 30,
     fontWeight: "normal",
@@ -153,6 +155,12 @@ const GraphView = forwardRef(({ graph, runQuery, historyQuery, fetchCount }: {
     const submitQuery = useRef<HTMLButtonElement>(null)
     const [maximize, setMaximize] = useState<boolean>(false)
 
+    useEffect(() => {
+        
+    }, [
+
+    ])
+
     useImperativeHandle(ref, () => ({
         expand: (elements: ElementDefinition[]) => {
             const chart = chartRef.current
@@ -197,25 +205,58 @@ const GraphView = forwardRef(({ graph, runQuery, historyQuery, fetchCount }: {
             colors: {
                 'editor.background': '#1F1F3D',
                 'editor.foreground': 'ffffff',
+                'editorSuggestWidget.background': '#272745',
+                'editorSuggestWidget.foreground': '#FFFFFF',
+                'editorSuggestWidget.selectedBackground': '#57577B',
+                'editorSuggestWidget.hoverBackground': '#28283F',
             },
         });
+
+        monacoInstance.languages.registerCompletionItemProvider('cypher', {
+            provideCompletionItems: (model, position) => {
+                const word = model.getWordUntilPosition(position)
+                const range = new monaco.Range(position.lineNumber, word.startColumn, position.lineNumber, word.endColumn)
+                return {
+                    suggestions: [
+                        { insertText: "CREATE", label: "CREATE", kind: monaco.languages.CompletionItemKind.Keyword, range },
+                        // { insertText: "CREATE ()-[]-()", label: "CREATE ()", kind: monaco.languages.CompletionItemKind.Snippet, range },
+                        // { insertText: "CREATE ()-[]-()", label: "()", kind: monaco.languages.CompletionItemKind.Snippet, range },
+                        { insertText: "MATCH", label: "MATCH", kind: monaco.languages.CompletionItemKind.Keyword, range },
+                        { insertText: "OPTIONAL", label: "OPTIONAL", kind: monaco.languages.CompletionItemKind.Keyword, range },
+                        { insertText: "AS", label: "AS", kind: monaco.languages.CompletionItemKind.Keyword, range },
+                        { insertText: "WHERE", label: "WHERE", kind: monaco.languages.CompletionItemKind.Keyword, range },
+                        { insertText: "RETURN", label: "RETURN", kind: monaco.languages.CompletionItemKind.Keyword, range },
+                        { insertText: "ORDER BY", label: "ORDER BY", kind: monaco.languages.CompletionItemKind.Keyword, range },
+                        { insertText: "SKIP", label: "SKIP", kind: monaco.languages.CompletionItemKind.Keyword, range },
+                        { insertText: "LIMIT", label: "LIMIT", kind: monaco.languages.CompletionItemKind.Keyword, range },
+                        { insertText: "MARGE", label: "MARGE", kind: monaco.languages.CompletionItemKind.Keyword, range },
+                        { insertText: "DELETE", label: "DELETE", kind: monaco.languages.CompletionItemKind.Keyword, range },
+                        { insertText: "SET", label: "SET", kind: monaco.languages.CompletionItemKind.Keyword, range },
+                        { insertText: "WITH", label: "WITH", kind: monaco.languages.CompletionItemKind.Keyword, range },
+                        { insertText: "UNION", label: "UNION", kind: monaco.languages.CompletionItemKind.Keyword, range },
+                        { insertText: "UNWIND", label: "UNWIND", kind: monaco.languages.CompletionItemKind.Keyword, range },
+                        { insertText: "FOREACH", label: "FOREACH", kind: monaco.languages.CompletionItemKind.Keyword, range },
+                        { insertText: "CALL", label: "CALL", kind: monaco.languages.CompletionItemKind.Keyword, range },
+                    ]
+                }
+            }
+        })
     };
 
     const handleEditorDidMount = (e: monaco.editor.IStandaloneCodeEditor) => {
 
         editorRef.current = e
 
-        // if (typeof window !== "undefined") return
-        // e.addAction({
-        //     id: 'submit',
-        //     label: 'Submit Query',
-        //     // eslint-disable-next-line no-bitwise
-        //     keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter],
-        //     contextMenuOrder: 1.5,
-        //     run: async () => {
-        //         submitQuery.current?.click()
-        //     }
-        // });
+        e.addAction({
+            id: 'submit',
+            label: 'Submit Query',
+            // eslint-disable-next-line no-bitwise
+            keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter],
+            contextMenuOrder: 1.5,
+            run: async () => {
+                submitQuery.current?.click()
+            }
+        });
     }
 
     useEffect(() => {
@@ -567,7 +608,7 @@ const GraphView = forwardRef(({ graph, runQuery, historyQuery, fetchCount }: {
                         (graph.Categories.length > 0 || graph.Labels.length > 0) &&
                         <>
                             <Labels className="left-2" categories={graph.Categories} onClick={onCategoryClick} label="Labels" graph={graph} />
-                            <Labels className="right-2 text-end" categories={graph.Labels} onClick={onLabelClick} label="RelationshipTypes" graph={graph}/>
+                            <Labels className="right-2 text-end" categories={graph.Labels} onClick={onLabelClick} label="RelationshipTypes" graph={graph} />
                         </>
                     }
                 </div>
