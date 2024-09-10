@@ -1,14 +1,13 @@
 {
-    "user1":{
-        "userName": "test1",
-        "role": "Read-Write",
+    "user":{
         "password": "Test111@",
-        "confirmPassword": "Test111@"
-    },
-    "user2":{
-        "userName": "test2",
-        "role": "Read-Write",
-        "password": "Test222@",
-        "confirmPassword": "Test222@"
+        "confirmPassword": "Test111@",
+        "ReadWrite":"Read-Write",
+        "ReadOnly":"Read-Only",
+        "role": {
+            "admin": 1,
+            "readWrite": 2,
+            "readOnly": 3
+        }
     }
 }

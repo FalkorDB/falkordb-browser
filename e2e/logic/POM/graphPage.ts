@@ -44,6 +44,14 @@ export class graphPage extends BasePage {
         return this.page.getByRole("button", { name : "Export Data"});
     }
 
+    private get findGraphInMenu(): (graph: string) => Locator {
+        return (graph: string) => this.page.locator(`//tbody//tr/td[1][contains(text(), '${graph}')]`);
+    }
+
+    private get deleteGraphInMenu(): (graph: string) => Locator {
+        return (graph: string) => this.page.locator(`//tbody//tr/td[1][contains(text(), '${graph}')]/parent::tr//td[3]/button`);
+    }
+
     async countGraphsInMenu(): Promise<number> {
         await waitForTimeOut(this.page, 1000);
         await this.graphsMenu.click()
@@ -73,11 +81,26 @@ export class graphPage extends BasePage {
     }
 
     async clickOnExportDataBtn(): Promise<Download> {
+        await this.page.waitForLoadState('networkidle'); 
         const [download] = await Promise.all([
             this.page.waitForEvent('download'),
             await this.exportDataBtn.click()
         ]);
 
         return download;
+    }
+
+    async verifyGraphExists(graph : string): Promise<Boolean>{
+        await this.graphsMenu.click();
+        await this.manageGraphBtn.click();
+        return await this.findGraphInMenu(graph).isVisible();
+    }
+
+    async deleteGraph(graph : string): Promise<void> {
+        await this.graphsMenu.click();
+        await this.manageGraphBtn.click();
+        await this.deleteGraphInMenu(graph).click();
+        await this.deleteIconSvg.click()
+        await this.confirmGraphDeleteBtn.click()
     }
 }
