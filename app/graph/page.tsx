@@ -22,24 +22,25 @@ export default function Page() {
             "MATCH (n) RETURN COUNT(n) as nodes",
             "MATCH ()-[e]->() RETURN COUNT(e) as edges"
         ]
-        
+
         const nodes = await (await securedFetch(`api/graph/${prepareArg(graphName)}/?query=${q[0]}`, {
             method: "GET"
         })).json()
-        
+
         const edges = await (await securedFetch(`api/graph/${prepareArg(graphName)}/?query=${q[1]}`, {
             method: "GET"
         })).json()
-        
+
         if (!edges || !nodes) return
-        
+
         setEdgesCount(edges.result?.data[0].edges)
         setNodesCount(nodes.result?.data[0].nodes)
     }, [graphName])
-    
+
     useEffect(() => {
         if (graphName !== graph.Id) {
-            setGraph(Graph.empty())
+            const colors = localStorage.getItem(graphName)?.split(/[[\]",]/).filter(c => c)
+            setGraph(Graph.empty(graphName, colors))
         }
     }, [graph.Id, graphName])
 
@@ -68,7 +69,7 @@ export default function Page() {
         const result = await run(query)
         if (!result) return
         setQueries(prev => [...prev, { text: defaultQuery(query), metadata: result.metadata }])
-        setGraph(Graph.create(graphName, result))
+        setGraph(Graph.create(graphName, result, graph.Colors))
     }
 
     const runHistoryQuery = async (query: string, setQueriesOpen: (open: boolean) => void) => {
@@ -91,6 +92,9 @@ export default function Page() {
                     runQuery={runHistoryQuery}
                     edgesCount={edgesCount}
                     nodesCount={nodesCount}
+                    setGraph={setGraph}
+                    graph={graph}
+
                 />
                 <GraphView
                     graph={graph}
