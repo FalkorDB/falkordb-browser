@@ -46,7 +46,8 @@ export default function Page() {
                 return
             }
             const json = await result.json()
-            setSchema(Graph.create(schemaName, json.result))
+            const colors = localStorage.getItem(schemaName)?.split(/[[\]",]/).filter(c => c)
+            setSchema(Graph.create(schemaName, json.result, colors))
 
             fetchCount()
 
@@ -63,6 +64,8 @@ export default function Page() {
                     nodesCount={nodesCount}
                     onChange={setSchemaName}
                     graphName={schemaName}
+                    graph={schema}
+                    setGraph={setSchema}
                 />
                 <SchemaView schema={schema} fetchCount={fetchCount} />
             </div>

@@ -3,6 +3,7 @@
 import React, { useEffect, useState, KeyboardEvent } from "react";
 import { Toast, cn, prepareArg, securedFetch } from "@/lib/utils";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { CheckCircle2, XCircle } from "lucide-react";
 import Input from "../components/ui/Input";
 import Button from "../components/ui/Button";
 
@@ -146,16 +147,7 @@ export default function Configurations() {
         run()
     }, [])
 
-    const handelSetConfig = async (e: KeyboardEvent<HTMLInputElement>, name: string) => {
-
-        if (e.code === "Escape") {
-            setEditable("")
-            setConfigValue("")
-            return
-        }
-
-        if (e.code !== "Enter") return
-
+    const handelSetConfig = async (name: string) => {
         const result = await securedFetch(`api/graph/?config=${prepareArg(name)}&value=${prepareArg(configValue)}`, {
             method: 'POST',
         })
@@ -177,6 +169,19 @@ export default function Configurations() {
         setConfigValue("")
     }
 
+    const onKeyDown = (e: KeyboardEvent<HTMLInputElement>, name: string) => {
+
+        if (e.code === "Escape") {
+            setEditable("")
+            setConfigValue("")
+            return
+        }
+
+        if (e.code !== "Enter") return
+
+        handelSetConfig(name)
+    }
+
     return (
         <div className="h-full w-full border border-[#57577B] rounded-lg overflow-auto">
             <Table>
@@ -195,22 +200,38 @@ export default function Configurations() {
                             <TableRow key={name} data-id={name} className={cn("border-none", !(index % 2) && "bg-[#57577B] hover:bg-[#57577B]")}>
                                 <TableCell className="w-[20%] py-8">{name}</TableCell>
                                 <TableCell className="w-[70%]">{description}</TableCell>
-                                <TableCell>
+                                <TableCell className="w-[15%]">
                                     {
                                         editable === name && !disableRunTimeConfigs.has(name) ?
-                                            <Input
-                                                ref={(ref) => {
-                                                    ref?.focus()
-                                                }}
-                                                className="w-20"
-                                                variant="Small"
-                                                onChange={(e) => setConfigValue(e.target.value)}
-                                                onBlur={() => setEditable("")}
-                                                onKeyDown={(e) => handelSetConfig(e, name)}
-                                                value={configValue}
-                                            />
+                                            <div className="flex gap-2">
+                                                <Input
+                                                    ref={(ref) => {
+                                                        ref?.focus()
+                                                    }}
+                                                    className="w-20"
+                                                    type="number"
+                                                    variant="Small"
+                                                    onChange={(e) => setConfigValue(e.target.value)}
+                                                    onKeyDown={(e) => onKeyDown(e, name)}
+                                                    value={configValue}
+                                                    style={{
+                                                        WebkitAppearance: 'none',
+                                                        margin: 0,
+                                                    }}
+                                                />
+                                                <Button
+                                                    icon={<XCircle color={!(index % 2) ? "#272746" : "#57577B"} />}
+                                                    onClick={() => setEditable("")}
+                                                    onMouseDown={(e) => e.preventDefault()}
+                                                />
+                                                <Button
+                                                    icon={<CheckCircle2 color={!(index % 2) ? "#272746" : "#57577B"} />}
+                                                    onClick={() => handelSetConfig(name)}
+                                                    onMouseDown={(e) => e.preventDefault()}
+                                                />
+                                            </div>
                                             : <Button
-                                                label={typeof value === "number" ? value.toString() : value}
+                                               label={typeof value === "number" ? value.toString() : value}
                                                 onClick={() => {
                                                     setEditable(name)
                                                     setConfigValue(value.toString())
