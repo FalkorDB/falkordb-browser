@@ -91,7 +91,6 @@ export class graphPage extends BasePage {
     }
 
     async verifyGraphExists(graph : string): Promise<Boolean>{
-        // await waitForTimeOut(this.page, 2000)// time for response
         await this.graphsMenu.click();
         await this.manageGraphBtn.click();
         return await this.findGraphInMenu(graph).isVisible();
