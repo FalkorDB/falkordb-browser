@@ -13,8 +13,9 @@ import DialogComponent from "../components/DialogComponent";
 import Button from "../components/ui/Button";
 import Duplicate from "./Duplicate";
 import SchemaView from "../schema/SchemaView";
+import View from "./View";
 
-export default function Selector({ onChange, graphName, queries, runQuery, edgesCount, nodesCount }: {
+export default function Selector({ onChange, graphName, queries, runQuery, edgesCount, nodesCount, setGraph, graph }: {
     /* eslint-disable react/require-default-props */
     onChange: (selectedGraphName: string) => void
     graphName: string
@@ -22,6 +23,8 @@ export default function Selector({ onChange, graphName, queries, runQuery, edges
     queries?: Query[]
     edgesCount: number
     nodesCount: number
+    setGraph: (graph: Graph) => void
+    graph: Graph
 }) {
 
     const [options, setOptions] = useState<string[]>([]);
@@ -143,6 +146,7 @@ export default function Selector({ onChange, graphName, queries, runQuery, edges
                         }}
                         selectedValue={selectedValue}
                     />
+                    <View setGraph={setGraph} graph={graph} selectedValue={selectedValue} />
                 </div >
             </div >
             <div className={cn("bg-[#2C2C4C] flex gap-4 justify-between items-center p-4 rounded-xl min-h-14", !selectedValue && "justify-end")}>
