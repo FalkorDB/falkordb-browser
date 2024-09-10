@@ -1,4 +1,4 @@
-import { Locator } from "@playwright/test";
+import { Locator, Download  } from "@playwright/test";
 import BasePage from "@/e2e/infra/ui/basePage";
 import { waitForTimeOut } from "@/e2e/infra/utils";
 
@@ -40,6 +40,9 @@ export class graphPage extends BasePage {
         return this.page.getByRole("button", { name : "Create"});
     }
 
+    private get exportDataBtn(): Locator {
+        return this.page.getByRole("button", { name : "Export Data"});
+    }
 
     async countGraphsInMenu(): Promise<number> {
         await waitForTimeOut(this.page, 1000);
@@ -67,5 +70,14 @@ export class graphPage extends BasePage {
         await this.addGraphBtnInNavBar.click()
         await this.graphNameInput.fill(graphName);
         await this.createGraphBtn.click()
+    }
+
+    async clickOnExportDataBtn(): Promise<Download> {
+        const [download] = await Promise.all([
+            this.page.waitForEvent('download'),
+            await this.exportDataBtn.click()
+        ]);
+
+        return download;
     }
 }

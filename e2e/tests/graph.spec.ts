@@ -3,6 +3,7 @@ import BrowserWrapper from "../infra/ui/browserWrapper";
 import { ApiCalls } from "../logic/api/apiCalls";
 import { graphPage } from "../logic/POM/graphPage";
 import urls  from '../config/urls.json'
+import fs from 'fs';
 
 test.describe('Graph Tests', () => {
     let browser : BrowserWrapper;
@@ -46,6 +47,15 @@ test.describe('Graph Tests', () => {
         await graph.refreshPage()
         expect(await graph.countGraphsInMenu()).toBe(0)
         
+    })
+
+    test("Clicking the Export Data button -> verify the file has been successfully downloaded", async () => {
+        const graph = await browser.createNewPage(graphPage, urls.graphUrl)
+        const graphName = `graph_${Date.now()}`
+        await graph.addGraph(graphName);
+        const download = await graph.clickOnExportDataBtn();
+        const downloadPath = await download.path();
+        expect(fs.existsSync(downloadPath)).toBe(true);
     })
 
 })
