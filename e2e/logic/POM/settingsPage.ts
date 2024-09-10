@@ -22,7 +22,7 @@ export default class SettingsPage extends BasePage {
     }
 
     private get selectUserRoleBtnPopUp(): Locator {
-        return this.page.getByRole("button", { name: user.user1.role });
+        return this.page.getByRole("button", { name: "Read-Write" });
     }
 
     private get userNameField(): Locator {
@@ -54,7 +54,7 @@ export default class SettingsPage extends BasePage {
     }
 
     private get secondUserRole(): Locator {
-        return this.page.getByRole("button", { name: user.user1.role });
+        return this.page.getByRole("button", { name: "Read-Write" });
     }
 
     private get thirdRoleBtnSecondUser(): Locator {
@@ -67,6 +67,10 @@ export default class SettingsPage extends BasePage {
 
     private get newThirdUserRole(): Locator {
         return this.page.locator("//tbody/tr[3]/td[3]/button/p");
+    }
+
+    private get firstCheckboxInUsersTable(): Locator {
+        return this.page.locator("//tbody/tr[1]//button[@role='checkbox']")
     }
 
     private get secondCheckboxInUsersTable(): Locator {
@@ -121,7 +125,7 @@ export default class SettingsPage extends BasePage {
     }
 
     async getThirdNewUserRole(): Promise<string | null> {
-        const content = await this.newSecondUserRole.textContent();
+        const content = await this.newThirdUserRole.textContent();
         return content
     }
 
@@ -149,5 +153,18 @@ export default class SettingsPage extends BasePage {
         for(let i = userCount - 1; i >= 1; i--){
             await this.removeOneUser()
         }
+    }
+
+    async attemptToAddUserWithoutRole(userDetails: { [key: string]: string }): Promise<void> {
+        await this.addUserButton.click();
+        await this.userNameField.fill(userDetails.userName);
+        await this.passwordField.fill(userDetails.password);
+        await this.confirmPasswordField.fill(userDetails.confirmPassword);
+        await this.addUserBtnPopUp.click();
+    }
+
+    async attempToDeleteDefaultUser(): Promise<void>{
+        await this.firstCheckboxInUsersTable.click()
+        await this.DeleteUsersBtn.click()
     }
 }
