@@ -108,7 +108,8 @@ const Configs: Config[] = [
     {
         name: "CMD_INFO",
         description: `An on/off toggle for the GRAPH.INFO command.
-         Disabling this command may increase performance and lower the memory usage and these are the main reasons for it to be disabled`,
+         Disabling this command may increase performance and lower the memory usage and these are the main reasons for it to be disabled
+         It’s valid values are ‘yes’ and ‘no’ (i.e., on and off).`,
         value: ""
     },
     {
@@ -204,21 +205,39 @@ export default function Configurations() {
                                     {
                                         editable === name && !disableRunTimeConfigs.has(name) ?
                                             <div className="flex gap-2">
-                                                <Input
-                                                    ref={(ref) => {
-                                                        ref?.focus()
-                                                    }}
-                                                    className="w-20"
-                                                    type="number"
-                                                    variant="Small"
-                                                    onChange={(e) => setConfigValue(e.target.value)}
-                                                    onKeyDown={(e) => onKeyDown(e, name)}
-                                                    value={configValue}
-                                                    style={{
-                                                        WebkitAppearance: 'none',
-                                                        margin: 0,
-                                                    }}
-                                                />
+                                                {
+                                                    name === "CMD_INFO" ?
+                                                        <Input
+                                                            ref={(ref) => {
+                                                                ref?.focus()
+                                                            }}
+                                                            className="w-20"
+                                                            type="text"
+                                                            variant="Small"
+                                                            onChange={(e) => setConfigValue(e.target.value)}
+                                                            onKeyDown={(e) => onKeyDown(e, name)}
+                                                            value={configValue}
+                                                            style={{
+                                                                WebkitAppearance: 'none',
+                                                                margin: 0,
+                                                            }}
+                                                        />
+                                                        : <Input
+                                                            ref={(ref) => {
+                                                                ref?.focus()
+                                                            }}
+                                                            className="w-20"
+                                                            type="number"
+                                                            variant="Small"
+                                                            onChange={(e) => setConfigValue(e.target.value)}
+                                                            onKeyDown={(e) => onKeyDown(e, name)}
+                                                            value={configValue}
+                                                            style={{
+                                                                WebkitAppearance: 'none',
+                                                                margin: 0,
+                                                            }}
+                                                        />
+                                                }
                                                 <Button
                                                     icon={<XCircle color={!(index % 2) ? "#272746" : "#57577B"} />}
                                                     onClick={() => setEditable("")}
@@ -231,7 +250,7 @@ export default function Configurations() {
                                                 />
                                             </div>
                                             : <Button
-                                               label={typeof value === "number" ? value.toString() : value}
+                                                label={typeof value === "number" ? value.toString() : value}
                                                 onClick={() => {
                                                     setEditable(name)
                                                     setConfigValue(value.toString())

@@ -41,7 +41,7 @@ export async function POST(request: NextRequest) {
     
     try {
         if (configName && value) {
-            const config = await client.configSet(configName, parseInt(value, 10))
+            const config = await client.configSet(configName, configName === "CMD_INFO" ? configName : parseInt(value, 10))
             return NextResponse.json({ config }, { status: 200 })
         }
     } catch (err: unknown) {
