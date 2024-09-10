@@ -50,6 +50,7 @@ export default class BrowserWrapper {
             throw new Error('Browser is not launched yet!');
         }
         await this.page.goto(url);
+        await this.page.waitForLoadState('networkidle');
     }
       
     async closePage() {
