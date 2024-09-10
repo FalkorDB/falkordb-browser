@@ -154,12 +154,72 @@ const GraphView = forwardRef(({ graph, runQuery, historyQuery, fetchCount }: {
     const dataPanel = useRef<ImperativePanelHandle>(null)
     const submitQuery = useRef<HTMLButtonElement>(null)
     const [maximize, setMaximize] = useState<boolean>(false)
+    const [monacoInstance, setMonacoInstance] = useState<Monaco>()
 
     useEffect(() => {
-        
-    }, [
+        if (!graph.Id || !monacoInstance) return
 
-    ])
+        const run = async () => {
+            const suggestions: Map<string, {
+                label: string,
+                kind: monaco.languages.CompletionItemKind,
+                insertText: string,
+            }> = new Map()
+            const q = `MATCH (n) RETURN DISTINCT keys(n) AS keys, labels(n) AS labels UNION MATCH ()-[e]->() RETURN DISTINCT keys(e) AS keys, type(e) AS labels`
+            const result = await securedFetch(`api/graph/${graph.Id}/?query=${q}`, {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            if (result.ok) {
+                const json = await result.json()
+
+                if (json.result.data[0] && !("keys" in json.result.data[0])) return
+
+                json.result.data.forEach((element: { keys: string[], labels: string[] }) => {
+                    element.keys.forEach((key) => {
+                        suggestions.set(key, {
+                            label: key,
+                            kind: monaco.languages.CompletionItemKind.Field,
+                            insertText: key,
+                        })
+                    })
+                    if (Array.isArray(element.labels)) {
+                        element.labels.forEach((label) => {
+                            suggestions.set(label, {
+                                label,
+                                kind: monaco.languages.CompletionItemKind.TypeParameter,
+                                insertText: label,
+                            })
+                        })
+                    } else {
+                        const label = element.labels
+                        suggestions.set(label, {
+                            label,
+                            kind: monaco.languages.CompletionItemKind.TypeParameter,
+                            insertText: label,
+                        })
+                    }
+                })
+            }
+            monacoInstance.languages.registerCompletionItemProvider('cypher', {
+                provideCompletionItems: (model, position) => {
+                    const word = model.getWordUntilPosition(position)
+                    const range = new monaco.Range(position.lineNumber, word.startColumn, position.lineNumber, word.endColumn)
+                    const suggestionsArr = Array.from(suggestions.values())
+                    return {
+                        suggestions: suggestionsArr.map(s => ({ ...s, range })),
+                    }
+                }
+
+            })
+        }
+
+        run()
+
+    }, [graph, monacoInstance])
 
     useImperativeHandle(ref, () => ({
         expand: (elements: ElementDefinition[]) => {
@@ -194,11 +254,15 @@ const GraphView = forwardRef(({ graph, runQuery, historyQuery, fetchCount }: {
         } else dataPanel.current?.collapse()
     }
 
-    const handleEditorWillMount = (monacoInstance: Monaco) => {
-        monacoInstance.editor.defineTheme('custom-theme', {
+    const handleEditorWillMount = (monacoI: Monaco) => {
+        setMonacoInstance(monacoI)
+
+        monacoI.editor.defineTheme('custom-theme', {
             base: 'vs-dark',
             inherit: false,
             rules: [
+                { token: 'string', foreground: '#CE9178' },
+                { token: 'number', foreground: '#B5CEA8' },
                 { token: 'keyword', foreground: '#99E4E5' },
                 { token: 'type', foreground: '#89D86D' },
             ],
@@ -212,7 +276,7 @@ const GraphView = forwardRef(({ graph, runQuery, historyQuery, fetchCount }: {
             },
         });
 
-        monacoInstance.languages.registerCompletionItemProvider('cypher', {
+        monacoI.languages.registerCompletionItemProvider('cypher', {
             provideCompletionItems: (model, position) => {
                 const word = model.getWordUntilPosition(position)
                 const range = new monaco.Range(position.lineNumber, word.startColumn, position.lineNumber, word.endColumn)

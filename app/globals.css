@@ -95,7 +95,7 @@ input[type="number"] {
 }
 
 .monaco-editor .suggest-widget {
-    margin-top: 0.5rem; /* Adjust this value to change the distance */
+    margin-top: 0.5rem;
 }
 
 @font-face {

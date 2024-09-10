@@ -46,10 +46,6 @@ export default function Page() {
         }
     }, [graph.Id, graphName])
 
-    useEffect(() => {
-        fetchCount()
-    }, [fetchCount, graphName])
-
     const run = async (query: string) => {
         if (!graphName) {
             Toast("Select a graph first")
