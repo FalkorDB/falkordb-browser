@@ -84,7 +84,7 @@ export class graphPage extends BasePage {
         await this.page.waitForLoadState('networkidle'); 
         const [download] = await Promise.all([
             this.page.waitForEvent('download'),
-            await this.exportDataBtn.click()
+            this.exportDataBtn.click()
         ]);
 
         return download;
