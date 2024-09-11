@@ -123,7 +123,7 @@ const Configs: Config[] = [
 export default function Configurations() {
 
     const [configs, setConfigs] = useState<Config[]>([])
-    const [editable, setEditable] = useState<string>()
+    const [editable, setEditable] = useState<string>("")
     const [configValue, setConfigValue] = useState<string>("")
 
     useEffect(() => {
@@ -138,10 +138,18 @@ export default function Configurations() {
                     return config
                 }
 
+                let value = (await result.json()).config[1]
+                
+                if (config.name === "CMD_INFO") {
+                    if(value === 0) {
+                        value = "no" 
+                    } else value = "yes"
+                }
+                
                 return {
                     name: config.name,
                     description: config.description,
-                    value: (await result.json()).config[1]
+                    value
                 }
             })))
         }
