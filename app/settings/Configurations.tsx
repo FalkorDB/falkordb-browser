@@ -148,6 +148,12 @@ export default function Configurations() {
     }, [])
 
     const handelSetConfig = async (name: string) => {
+        
+        if (!configValue) {
+            Toast(`Please enter a value`)
+            return
+        }
+
         const result = await securedFetch(`api/graph/?config=${prepareArg(name)}&value=${prepareArg(configValue)}`, {
             method: 'POST',
         })
@@ -209,7 +215,7 @@ export default function Configurations() {
                                                         ref?.focus()
                                                     }}
                                                     className="w-20"
-                                                    type="number"
+                                                    type="text"
                                                     variant="Small"
                                                     onChange={(e) => setConfigValue(e.target.value)}
                                                     onKeyDown={(e) => onKeyDown(e, name)}
@@ -217,6 +223,10 @@ export default function Configurations() {
                                                     style={{
                                                         WebkitAppearance: 'none',
                                                         margin: 0,
+                                                    }}
+                                                    onInput={(e) => {
+                                                        const target = e.target as HTMLInputElement;
+                                                        target.value = target.value.replace(/[^0-9]/g, '');
                                                     }}
                                                 />
                                                 <Button
@@ -231,7 +241,7 @@ export default function Configurations() {
                                                 />
                                             </div>
                                             : <Button
-                                               label={typeof value === "number" ? value.toString() : value}
+                                                label={typeof value === "number" ? value.toString() : value}
                                                 onClick={() => {
                                                     setEditable(name)
                                                     setConfigValue(value.toString())
