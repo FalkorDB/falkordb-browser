@@ -148,7 +148,7 @@ export default function Configurations() {
     }, [])
 
     const handelSetConfig = async (name: string) => {
-        
+
         if (!configValue) {
             Toast(`Please enter a value`)
             return
