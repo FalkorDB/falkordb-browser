@@ -235,13 +235,14 @@ export class Graph {
             });
             this.edgesMap.set(cell.id, edge)
             this.elements.push({ data: edge })
+            const category = this.createCategory("")
             // creates a fakeS node for the source and target
             let source = this.nodesMap.get(cell.sourceId)
             if (!source) {
                 source = {
                     id: cell.sourceId.toString(),
                     name: cell.sourceId.toString(),
-                    category: "",
+                    category: category.name,
                     color: this.getCategoryColorValue()
                 }
                 this.nodesMap.set(cell.sourceId, source)
@@ -253,7 +254,7 @@ export class Graph {
                 destination = {
                     id: cell.destinationId.toString(),
                     name: cell.destinationId.toString(),
-                    category: "",
+                    category: category.name,
                     color: this.getCategoryColorValue()
                 }
                 this.nodesMap.set(cell.destinationId, destination)

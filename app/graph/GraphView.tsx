@@ -18,7 +18,6 @@ import Toolbar from "./toolbar";
 import Button from "../components/ui/Button";
 
 const monacoOptions: monaco.editor.IStandaloneEditorConstructionOptions = {
-
     renderLineHighlight: "none",
     quickSuggestions: true,
     glyphMargin: false,
@@ -159,8 +158,10 @@ const GraphView = forwardRef(({ graph, runQuery, historyQuery, fetchCount }: {
     useEffect(() => {
         if (!graph.Id || !monacoInstance) return
 
+        let provider: monaco.IDisposable | undefined
+
         const run = async () => {
-            const suggestions: Map<string, {
+            const sug: Map<string, {
                 label: string,
                 kind: monaco.languages.CompletionItemKind,
                 insertText: string,
@@ -180,7 +181,7 @@ const GraphView = forwardRef(({ graph, runQuery, historyQuery, fetchCount }: {
 
                 json.result.data.forEach((element: { keys: string[], labels: string[] }) => {
                     element.keys.forEach((key) => {
-                        suggestions.set(key, {
+                        sug.set(key, {
                             label: key,
                             kind: monaco.languages.CompletionItemKind.Field,
                             insertText: key,
@@ -188,7 +189,7 @@ const GraphView = forwardRef(({ graph, runQuery, historyQuery, fetchCount }: {
                     })
                     if (Array.isArray(element.labels)) {
                         element.labels.forEach((label) => {
-                            suggestions.set(label, {
+                            sug.set(label, {
                                 label,
                                 kind: monaco.languages.CompletionItemKind.TypeParameter,
                                 insertText: label,
@@ -196,7 +197,7 @@ const GraphView = forwardRef(({ graph, runQuery, historyQuery, fetchCount }: {
                         })
                     } else {
                         const label = element.labels
-                        suggestions.set(label, {
+                        sug.set(label, {
                             label,
                             kind: monaco.languages.CompletionItemKind.TypeParameter,
                             insertText: label,
@@ -204,21 +205,25 @@ const GraphView = forwardRef(({ graph, runQuery, historyQuery, fetchCount }: {
                     }
                 })
             }
-            monacoInstance.languages.registerCompletionItemProvider('cypher', {
+
+            provider = monacoInstance.languages.registerCompletionItemProvider('cypher', {
                 provideCompletionItems: (model, position) => {
                     const word = model.getWordUntilPosition(position)
                     const range = new monaco.Range(position.lineNumber, word.startColumn, position.lineNumber, word.endColumn)
-                    const suggestionsArr = Array.from(suggestions.values())
+                    const suggestionsArr = Array.from(sug.values())
                     return {
                         suggestions: suggestionsArr.map(s => ({ ...s, range })),
                     }
-                }
-
+                },
             })
         }
 
         run()
 
+        // eslint-disable-next-line consistent-return
+        return () => {
+            provider?.dispose()
+        }
     }, [graph, monacoInstance])
 
     useImperativeHandle(ref, () => ({
@@ -276,6 +281,8 @@ const GraphView = forwardRef(({ graph, runQuery, historyQuery, fetchCount }: {
             },
         });
 
+
+
         monacoI.languages.registerCompletionItemProvider('cypher', {
             provideCompletionItems: (model, position) => {
                 const word = model.getWordUntilPosition(position)
@@ -283,10 +290,17 @@ const GraphView = forwardRef(({ graph, runQuery, historyQuery, fetchCount }: {
                 return {
                     suggestions: [
                         { insertText: "CREATE", label: "CREATE", kind: monaco.languages.CompletionItemKind.Keyword, range },
-                        // { insertText: "CREATE ()-[]-()", label: "CREATE ()", kind: monaco.languages.CompletionItemKind.Snippet, range },
-                        // { insertText: "CREATE ()-[]-()", label: "()", kind: monaco.languages.CompletionItemKind.Snippet, range },
+                        { insertText: "CREATE (n)", label: "CREATE", kind: monaco.languages.CompletionItemKind.Snippet, range, detail: "Create Node" },
+                        { insertText: "CREATE ()-[e:e]->()", label: "CREATE", kind: monaco.languages.CompletionItemKind.Snippet, range, detail: "Create Edge" },
+                        { insertText: "CREATE (n)-[e:e]->(m)", label: "CREATE", kind: monaco.languages.CompletionItemKind.Snippet, range, detail: "Create" },
                         { insertText: "MATCH", label: "MATCH", kind: monaco.languages.CompletionItemKind.Keyword, range },
+                        { insertText: "MATCH (n)", label: "MATCH", kind: monaco.languages.CompletionItemKind.Snippet, range, detail: "Match Node" },
+                        { insertText: "MATCH ()-[e]-()", label: "MATCH", kind: monaco.languages.CompletionItemKind.Snippet, range, detail: "Match Edge" },
+                        { insertText: "MATCH ()-[e]->()", label: "MATCH", kind: monaco.languages.CompletionItemKind.Snippet, range, detail: "Match Edge Directed" },
+                        { insertText: "MATCH (n)-[e]-(m)", label: "MATCH", kind: monaco.languages.CompletionItemKind.Snippet, range, detail: "Match" },
+                        { insertText: "MATCH (n)-[e]->(m)", label: "MATCH", kind: monaco.languages.CompletionItemKind.Snippet, range, detail: "Match Directed" },
                         { insertText: "OPTIONAL", label: "OPTIONAL", kind: monaco.languages.CompletionItemKind.Keyword, range },
+                        { insertText: "MATCH (n) OPTIONAL MATCH (n)-[e]-(m)", label: "OPTIONAL", kind: monaco.languages.CompletionItemKind.Snippet, range },
                         { insertText: "AS", label: "AS", kind: monaco.languages.CompletionItemKind.Keyword, range },
                         { insertText: "WHERE", label: "WHERE", kind: monaco.languages.CompletionItemKind.Keyword, range },
                         { insertText: "RETURN", label: "RETURN", kind: monaco.languages.CompletionItemKind.Keyword, range },
@@ -307,7 +321,9 @@ const GraphView = forwardRef(({ graph, runQuery, historyQuery, fetchCount }: {
         })
     };
 
-    const handleEditorDidMount = (e: monaco.editor.IStandaloneCodeEditor) => {
+    const handleEditorDidMount = (e: monaco.editor.IStandaloneCodeEditor, monacoI: Monaco) => {
+
+        setMonacoInstance(monacoI)
 
         editorRef.current = e
 
