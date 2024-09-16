@@ -4,14 +4,14 @@
       { "input": "-3", "description": "invalid input - negative number", "expected": false },
       { "input": "0", "description": "invalid input - zero value", "expected": false },
       { "input": "00-1", "description": "invalid input", "expected": false },
-      { "input": "12", "description": "valid input", "expected": true }
+      { "input": "21", "description": "valid input", "expected": true }
     ],
     "inputDataAcceptsZero": [
       { "input": "aa", "description": "invalid input - character", "expected": false },
       { "input": "-3", "description": "invalid input - negative number", "expected": false },
       { "input": "00-1", "description": "invalid input", "expected": false },
       { "input": "0", "description": "valid input - zero value", "expected": true },
-      { "input": "12", "description": "valid input", "expected": true }
+      { "input": "21", "description": "valid input", "expected": true }
     ],
     "CMDData": [
       { "input": "aa", "description": "invalid input - character", "expected": false },
