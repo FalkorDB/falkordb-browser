@@ -28,7 +28,7 @@ test.describe('Settings Tests', () => {
         });
     })
     
-    Data.inputDataAcceptsZero.forEach(({ input, description, expected }) => {
+    Data.maxTimeOut.forEach(({ input, description, expected }) => {
         test(`Modify ${roles.maxTimeOut} via API validation via UI: Input value: ${input} description: ${description}`, async () => {
             const settingsConfigPage = await browser.createNewPage(SettingsConfigPage, urls.settingsUrl)
             const apiCall = new ApiCalls()
@@ -67,7 +67,8 @@ test.describe('Settings Tests', () => {
             const apiCall = new ApiCalls()
             await apiCall.modifySettingsRole(roles.queryMemCapacity, input)
             await settingsConfigPage.refreshPage()
-            const value = await settingsConfigPage.getRoleContentValue(roles.queryMemCapacity)      
+            const value = await settingsConfigPage.getRoleContentValue(roles.queryMemCapacity)
+            await apiCall.modifySettingsRole(roles.queryMemCapacity, "0")//update to default values    
             expect(value === input).toBe(expected)
         });
     })
@@ -110,7 +111,9 @@ test.describe('Settings Tests', () => {
             const settingsConfigPage = await browser.createNewPage(SettingsConfigPage, urls.settingsUrl)
             await settingsConfigPage.modifyRoleValue(role, input)
             const apiCall = new ApiCalls()
-            const value = String((await apiCall.getSettingsRoleValue(role)).config[1]);  
+            let value = String((await apiCall.getSettingsRoleValue(role)).config[1]);
+            value = value === '1' ? 'yes' : value === '0' ? 'no' : value;
+            await apiCall.modifySettingsRole(roles.queryMemCapacity, "0")//update to default values   
             expect(value === input).toBe(expected)
         });
     })
