@@ -54,7 +54,7 @@ export async function POST(request: NextRequest, { params }: { params: { graph: 
         if (!srcs) console.error("Missing parameter 'srcs'")
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const socket = client.connection.options?.socket as any
+        const socket = (await client.connection).options?.socket as any
 
         if (!socket) console.error("socket not found")
 
@@ -100,7 +100,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { graph:
     try {
         if (!sourceName) throw (new Error("Missing parameter 'sourceName'"))
 
-        const data = await client.connection.renameNX(sourceName, graphId);
+        const data = await (await client.connection).renameNX(sourceName, graphId);
 
         if (!data) throw new Error(`${graphId} already exists`)
 
@@ -135,7 +135,7 @@ export async function GET(request: NextRequest, { params }: { params: { graph: s
 
         if (!query) throw new Error("Missing parameter 'query'")
         if (create === "false") {
-            const type = await client.connection.type(graphId)
+            const type = await (await client.connection).type(graphId)
             if (type === "none") return NextResponse.json({}, { status: 200 })
         }
         const graph = client.selectGraph(graphId)

@@ -108,7 +108,8 @@ const Configs: Config[] = [
     {
         name: "CMD_INFO",
         description: `An on/off toggle for the GRAPH.INFO command.
-         Disabling this command may increase performance and lower the memory usage and these are the main reasons for it to be disabled`,
+         Disabling this command may increase performance and lower the memory usage and these are the main reasons for it to be disabled
+         It’s valid values are ‘yes’ and ‘no’ (i.e., on and off).`,
         value: ""
     },
     {
@@ -122,7 +123,7 @@ const Configs: Config[] = [
 export default function Configurations() {
 
     const [configs, setConfigs] = useState<Config[]>([])
-    const [editable, setEditable] = useState<string>()
+    const [editable, setEditable] = useState<string>("")
     const [configValue, setConfigValue] = useState<string>("")
 
     useEffect(() => {
@@ -137,10 +138,18 @@ export default function Configurations() {
                     return config
                 }
 
+                let value = (await result.json()).config[1]
+                
+                if (config.name === "CMD_INFO") {
+                    if(value === 0) {
+                        value = "no" 
+                    } else value = "yes"
+                }
+                
                 return {
                     name: config.name,
                     description: config.description,
-                    value: (await result.json()).config[1]
+                    value
                 }
             })))
         }
@@ -210,25 +219,21 @@ export default function Configurations() {
                                     {
                                         editable === name && !disableRunTimeConfigs.has(name) ?
                                             <div className="flex gap-2">
-                                                <Input
-                                                    ref={(ref) => {
-                                                        ref?.focus()
-                                                    }}
-                                                    className="w-20"
-                                                    type="text"
-                                                    variant="Small"
-                                                    onChange={(e) => setConfigValue(e.target.value)}
-                                                    onKeyDown={(e) => onKeyDown(e, name)}
-                                                    value={configValue}
-                                                    style={{
-                                                        WebkitAppearance: 'none',
-                                                        margin: 0,
-                                                    }}
-                                                    onInput={(e) => {
-                                                        const target = e.target as HTMLInputElement;
-                                                        target.value = target.value.replace(/[^0-9]/g, '');
-                                                    }}
-                                                />
+                                                        <Input
+                                                            ref={(ref) => {
+                                                                ref?.focus()
+                                                            }}
+                                                            className="w-20"
+                                                            type={name === "CMD_INFO" ? "text" : "number"}
+                                                            variant="Small"
+                                                            onChange={(e) => setConfigValue(e.target.value)}
+                                                            onKeyDown={(e) => onKeyDown(e, name)}
+                                                            value={configValue}
+                                                            style={{
+                                                                WebkitAppearance: 'none',
+                                                                margin: 0,
+                                                            }}
+                                                        />
                                                 <Button
                                                     icon={<XCircle color={!(index % 2) ? "#272746" : "#57577B"} />}
                                                     onClick={() => setEditable("")}
