@@ -50,7 +50,6 @@ async function newClient(credentials: { host: string, port: string, password: st
     // Verify connection and Role
     const connection = await client.connection
 
-
     try {
         connection.aclGetUser(credentials.username || "default")
         return { role: "Admin", client }

@@ -10,7 +10,7 @@ export async function GET() {
         return client
     }
     try {
-        const list = await client.connection.aclList()
+        const list = await (await client.connection).aclList()
         const result: User[] = list
             .map((userACL: string) => userACL.split(" "))
             .filter((userDetails: string[]) => userDetails.length > 1 && userDetails[0] === "user")
@@ -44,12 +44,12 @@ export async function POST(req: NextRequest) {
     }
 
     const isDelete = req.nextUrl.searchParams.get("isDelete")
-
+    const connection = await client.connection
     if (isDelete) {
         const { users } = await req.json()
 
         await Promise.all(users.map(async (user: CreateUser) => {
-            await client.connection.aclDelUser(user.username)
+            await connection.aclDelUser(user.username)
         }))
 
         return NextResponse.json({ message: "Users deleted" }, { status: 200 })
@@ -61,7 +61,7 @@ export async function POST(req: NextRequest) {
         if (!username || !password || !roleValue) throw (new Error("Missing parameters"))
 
         try {
-            const user = await client.connection.aclGetUser(username)
+            const user = await connection.aclGetUser(username)
 
             if (user) {
                 return NextResponse.json({ message: `User ${username} already exists` }, { status: 409 })
@@ -70,7 +70,7 @@ export async function POST(req: NextRequest) {
             // Just a workaround for https://github.com/redis/node-redis/issues/2745
         }
 
-        await client.connection.aclSetUser(username, roleValue.concat(`>${password}`))
+        await connection.aclSetUser(username, roleValue.concat(`>${password}`))
         return NextResponse.json(
             { message: "User created" },
             {
