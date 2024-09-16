@@ -21,8 +21,9 @@ const postRequest = async (url: string, body: any, availableRequest?: APIRequest
   return await requestContext.post(url, requestOptions);
 };
   
-const deleteRequest = async (url: string, headers?: Record<string, string>) => {
+const deleteRequest = async (url: string, body?: any, headers?: Record<string, string>) => {
   const requestOptions = {
+    data: body,
     headers: headers || undefined,
   };
 
