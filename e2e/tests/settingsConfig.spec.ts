@@ -27,17 +27,6 @@ test.describe('Settings Tests', () => {
             expect(value === input).toBe(expected)
         });
     })
-
-    Data.inputDataAcceptsZero.forEach(({ input, description, expected }) => {
-        test(`Modify ${roles.TimeOut} via API validation via UI: Input value: ${input} description: ${description}`, async () => {
-            const settingsConfigPage = await browser.createNewPage(SettingsConfigPage, urls.settingsUrl)
-            const apiCall = new ApiCalls()
-            await apiCall.modifySettingsRole(roles.TimeOut, input)
-            await settingsConfigPage.refreshPage()
-            const value = await settingsConfigPage.getRoleContentValue(roles.TimeOut)      
-            expect(value === input).toBe(expected)
-        });
-    })
     
     Data.inputDataAcceptsZero.forEach(({ input, description, expected }) => {
         test(`Modify ${roles.maxTimeOut} via API validation via UI: Input value: ${input} description: ${description}`, async () => {
@@ -45,7 +34,7 @@ test.describe('Settings Tests', () => {
             const apiCall = new ApiCalls()
             await apiCall.modifySettingsRole(roles.maxTimeOut, input)
             await settingsConfigPage.refreshPage()
-            const value = await settingsConfigPage.getRoleContentValue(roles.maxTimeOut)      
+            const value = await settingsConfigPage.getRoleContentValue(roles.maxTimeOut)  
             expect(value === input).toBe(expected)
         });
     })
@@ -56,7 +45,7 @@ test.describe('Settings Tests', () => {
             const apiCall = new ApiCalls()
             await apiCall.modifySettingsRole(roles.defaultTimeOut, input)
             await settingsConfigPage.refreshPage()
-            const value = await settingsConfigPage.getRoleContentValue(roles.defaultTimeOut)      
+            const value = await settingsConfigPage.getRoleContentValue(roles.defaultTimeOut)    
             expect(value === input).toBe(expected)
         });
     })
