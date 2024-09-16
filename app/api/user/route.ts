@@ -43,21 +43,32 @@ export async function POST(req: NextRequest) {
         return client
     }
 
-    const { username, password, role } = await req.json() as CreateUser
+    const isDelete = req.nextUrl.searchParams.get("isDelete")
 
+    if (isDelete) {
+        const { users } = await req.json()
+
+        await Promise.all(users.map(async (user: CreateUser) => {
+            await client.connection.aclDelUser(user.username)
+        }))
+
+        return NextResponse.json({ message: "Users deleted" }, { status: 200 })
+    }
+
+    const { username, password, role } = await req.json() as CreateUser
     const roleValue = ROLE.get(role)
     try {
         if (!username || !password || !roleValue) throw (new Error("Missing parameters"))
 
-            try {
-                const user = await client.connection.aclGetUser(username)
-                
-                if (user) {
-                    return NextResponse.json({ message: `User ${username} already exists` }, { status: 409 })
-                }
-            } catch (err: unknown) {
-                // Just a workaround for https://github.com/redis/node-redis/issues/2745
+        try {
+            const user = await client.connection.aclGetUser(username)
+
+            if (user) {
+                return NextResponse.json({ message: `User ${username} already exists` }, { status: 409 })
             }
+        } catch (err: unknown) {
+            // Just a workaround for https://github.com/redis/node-redis/issues/2745
+        }
 
         await client.connection.aclSetUser(username, roleValue.concat(`>${password}`))
         return NextResponse.json(
@@ -69,24 +80,6 @@ export async function POST(req: NextRequest) {
                 }
             }
         )
-    } catch (err: unknown) {
-        return NextResponse.json({ message: (err as Error).message }, { status: 400 })
-    }
-}
-
-export async function DELETE(req: NextRequest) {
-
-    const client = await getClient()
-    if (client instanceof NextResponse) {
-        return client
-    }
-
-    const { users } = await req.json()
-    try {
-        await Promise.all(users.map(async (user: CreateUser) => {
-            await client.connection.aclDelUser(user.username)
-        }))
-        return NextResponse.json({ message: "Users deleted" }, { status: 200 })
     } catch (err: unknown) {
         return NextResponse.json({ message: (err as Error).message }, { status: 400 })
     }

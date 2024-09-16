@@ -16,7 +16,7 @@ export default class BasePage {
     }
 
     async refreshPage(){
-        await this.page.reload();
+        await this.page.reload({ waitUntil: 'networkidle' });
     }
 
 }

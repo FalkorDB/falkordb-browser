@@ -157,6 +157,12 @@ export default function Configurations() {
     }, [])
 
     const handelSetConfig = async (name: string) => {
+
+        if (!configValue) {
+            Toast(`Please enter a value`)
+            return
+        }
+
         const result = await securedFetch(`api/graph/?config=${prepareArg(name)}&value=${prepareArg(configValue)}`, {
             method: 'POST',
         })
@@ -206,8 +212,8 @@ export default function Configurations() {
                 <TableBody>
                     {
                         configs.map(({ name, description, value }, index) => (
-                            <TableRow key={name} className={cn("border-none", !(index % 2) && "bg-[#57577B]")}>
-                                <TableCell className="py-8">{name}</TableCell>
+                            <TableRow key={name} data-id={name} className={cn("border-none", !(index % 2) && "bg-[#57577B] hover:bg-[#57577B]")}>
+                                <TableCell className="w-[20%] py-8">{name}</TableCell>
                                 <TableCell className="w-[70%]">{description}</TableCell>
                                 <TableCell className="w-[15%]">
                                     {
