@@ -148,5 +148,32 @@ test.describe('Settings Tests', () => {
         const User = users.result.find(user => user.username === username);
         expect(User?.username === username).toBe(true)
     })
+    // fail tests
+    test(`API Test: without passing a username, Attempt to add a user and validate the user was not added`, async () => {
+        const apiCall = new ApiCalls()
+        const username = ''
+        await apiCall.createUsers({ username: username, password: user.password, role: user.ReadOnly });
+        const users = await apiCall.getUsers()
+        const User = users.result.find(user => user.username === username);
+        expect(User).toBeUndefined();
+    });
+
+    test(`API Test: without passing a role, Attempt to add a user and validate the user was not added`, async () => {
+        const apiCall = new ApiCalls()
+        const username = `user_${Date.now()}` 
+        await apiCall.createUsers({ username: username, password: '', role: user.ReadOnly });
+        const users = await apiCall.getUsers()
+        const User = users.result.find(user => user.username === username);
+        expect(User).toBeUndefined();
+    });
+
+    test(`API Test: without passing a password, Attempt to add a user and validate the user was not added`, async () => {
+        const apiCall = new ApiCalls()
+        const username = `user_${Date.now()}` 
+        await apiCall.createUsers({username: username, password: user.password, role: ''})
+        const users = await apiCall.getUsers()
+        const User = users.result.find(user => user.username === username);
+        expect(User).toBeUndefined();
+    });
 
 })
