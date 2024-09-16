@@ -277,7 +277,6 @@ export class Graph {
 
             this.data = data
         }
-
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         this.data.forEach((row: any[]) => {
 

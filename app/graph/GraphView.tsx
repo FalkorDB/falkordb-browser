@@ -1,3 +1,5 @@
+/* eslint-disable no-template-curly-in-string */
+
 'use client'
 
 import CytoscapeComponent from "react-cytoscapejs";
@@ -19,13 +21,11 @@ import Button from "../components/ui/Button";
 
 const monacoOptions: monaco.editor.IStandaloneEditorConstructionOptions = {
     renderLineHighlight: "none",
-    quickSuggestions: true,
     glyphMargin: false,
     lineDecorationsWidth: 0,
     folding: false,
     fixedOverflowWidgets: true,
     occurrencesHighlight: "off",
-    acceptSuggestionOnEnter: "on",
     hover: {
         delay: 100,
     },
@@ -34,8 +34,6 @@ const monacoOptions: monaco.editor.IStandaloneEditorConstructionOptions = {
     cursorStyle: "line-thin",
     links: false,
     minimap: { enabled: false },
-    // see: https://github.com/microsoft/monaco-editor/issues/1746
-    wordBasedSuggestions: "off",
     // disable `Find`
     find: {
         addExtraSpaceOnTop: false,
@@ -60,6 +58,27 @@ const monacoOptions: monaco.editor.IStandaloneEditorConstructionOptions = {
         alwaysConsumeMouseWheel: false,
     },
 };
+
+const KEYWORDS = [
+    "CREATE",
+    "MATCH",
+    "OPTIONAL",
+    "AS",
+    "WHERE",
+    "RETURN",
+    "ORDER BY",
+    "SKIP",
+    "LIMIT",
+    "MARGE",
+    "DELETE",
+    "SET",
+    "WITH",
+    "UNION",
+    "UNWIND",
+    "FOREACH",
+    "CALL",
+    "YIELD",
+]
 
 const LAYOUT = {
     name: "fcose",
@@ -154,65 +173,139 @@ const GraphView = forwardRef(({ graph, runQuery, historyQuery, fetchCount }: {
     const submitQuery = useRef<HTMLButtonElement>(null)
     const [maximize, setMaximize] = useState<boolean>(false)
     const [monacoInstance, setMonacoInstance] = useState<Monaco>()
+    const [provider, setProvider] = useState<monaco.IDisposable>()
 
     useEffect(() => {
         if (!graph.Id || !monacoInstance) return
 
-        let provider: monaco.IDisposable | undefined
+        if (provider) {
+            provider.dispose()
+        }
 
+        let p: monaco.IDisposable | undefined
         const run = async () => {
-            const sug: Map<string, {
-                label: string,
-                kind: monaco.languages.CompletionItemKind,
-                insertText: string,
-            }> = new Map()
-            const q = `MATCH (n) RETURN DISTINCT keys(n) AS keys, labels(n) AS labels UNION MATCH ()-[e]->() RETURN DISTINCT keys(e) AS keys, type(e) AS labels`
-            const result = await securedFetch(`api/graph/${graph.Id}/?query=${q}`, {
-                method: 'GET',
-                headers: {
-                    'Content-Type': 'application/json'
-                }
-            });
+            const sug: monaco.languages.CompletionItem[] = []
 
-            if (result.ok) {
-                const json = await result.json()
+            const propertyKeysQuery = `CALL db.propertyKeys()`
 
-                if (json.result.data[0] && !("keys" in json.result.data[0])) return
-
-                json.result.data.forEach((element: { keys: string[], labels: string[] }) => {
-                    element.keys.forEach((key) => {
-                        sug.set(key, {
-                            label: key,
-                            kind: monaco.languages.CompletionItemKind.Field,
-                            insertText: key,
-                        })
+            await securedFetch(`api/graph/${prepareArg(graph.Id)}/?query=${prepareArg(propertyKeysQuery)}`, {
+                method: "GET"
+            }).then((res) => res.json()).then((json) => {
+                json.result.data.forEach(({ propertyKey }: { propertyKey: string }) => {
+                    sug.push({
+                        label: propertyKey,
+                        kind: monaco.languages.CompletionItemKind.Property,
+                        insertText: propertyKey,
+                        range: new monaco.Range(1, 1, 1, 1),
+                        detail: "(property)"
                     })
-                    if (Array.isArray(element.labels)) {
-                        element.labels.forEach((label) => {
-                            sug.set(label, {
-                                label,
-                                kind: monaco.languages.CompletionItemKind.TypeParameter,
-                                insertText: label,
-                            })
-                        })
-                    } else {
-                        const label = element.labels
-                        sug.set(label, {
-                            label,
-                            kind: monaco.languages.CompletionItemKind.TypeParameter,
-                            insertText: label,
-                        })
-                    }
                 })
-            }
+            })
 
-            provider = monacoInstance.languages.registerCompletionItemProvider('cypher', {
+            const relationshipTypeQuery = `CALL db.relationshipTypes()`
+
+            await securedFetch(`api/graph/${prepareArg(graph.Id)}/?query=${prepareArg(relationshipTypeQuery)}`, {
+                method: "GET"
+            }).then((res) => res.json()).then((json) => {
+                json.result.data.forEach(({ relationshipType }: { relationshipType: string }) => {
+                    sug.push({
+                        label: relationshipType,
+                        kind: monaco.languages.CompletionItemKind.TypeParameter,
+                        insertText: relationshipType,
+                        range: new monaco.Range(1, 1, 1, 1),
+                        detail: "(relationship type)"
+                    })
+                })
+            })
+
+            const labelsQuery = `CALL db.labels()`
+
+            await securedFetch(`api/graph/${prepareArg(graph.Id)}/?query=${prepareArg(labelsQuery)}`, {
+                method: "GET"
+            }).then((res) => res.json()).then((json) => {
+                json.result.data.forEach(({ label }: { label: string }) => {
+                    sug.push({
+                        label,
+                        kind: monaco.languages.CompletionItemKind.TypeParameter,
+                        insertText: label,
+                        range: new monaco.Range(1, 1, 1, 1),
+                        detail: "(label)"
+                    })
+                })
+            })
+
+            const proceduresQuery = `CALL dbms.procedures() YIELD name`
+            const procedures: monaco.languages.CompletionItem[] = []
+
+            await securedFetch(`api/graph/${prepareArg(graph.Id)}/?query=${prepareArg(proceduresQuery)}`, {
+                method: "GET"
+            }).then((res) => res.json()).then((json) => {
+                json.result.data.forEach(({ name }: { name: string }) => {
+                    procedures.push({
+                        label: name,
+                        kind: monaco.languages.CompletionItemKind.Function,
+                        insertText: name,
+                        range: new monaco.Range(1, 1, 1, 1),
+                        detail: "(function)"
+                    })
+                })
+            })
+
+            const namespaces = new Map()
+            procedures.forEach(({ label }) => {
+                let namespace: string
+                if (typeof label === "string") {
+                    [namespace] = label.split(".")
+                } else {
+                    [namespace] = label.label.split(".")
+                }
+
+                namespaces.set(namespace, namespace)
+            })
+            monacoInstance.languages.setMonarchTokensProvider('custom-language', {
+                brackets: [
+                    { open: '{', close: '}', token: 'brackets.level1' },
+                    { open: '(', close: ')', token: 'brackets.level2' },
+                    { open: '[', close: ']', token: 'brackets.level3' }
+                ],
+                tokenizer: {
+                    root: [
+                        [new RegExp(`\\b(${[...KEYWORDS, ...Array.from(namespaces.values())].join('|')})\\b`), "keyword"],
+                        [new RegExp(`\\b(${procedures.map(({ label }) => label).join('|')})\\b`), "function"],
+                        [/"([^"\\]|\\.)*$/, 'string.invalid'],
+                        [/"([^"\\]|\\.)*"/, 'string'],
+                        [/\d+/, 'number'],
+                        [/:(\w+)/, 'type'],
+                        [/\{|\}|\(|\)|\[|\]/, '@brackets'],
+                    ],
+                },
+                ignoreCase: true,
+
+            })
+
+            p = monacoInstance.languages.registerCompletionItemProvider('custom-language', {
+                triggerCharacters: ["."],
                 provideCompletionItems: (model, position) => {
                     const word = model.getWordUntilPosition(position)
                     const range = new monaco.Range(position.lineNumber, word.startColumn, position.lineNumber, word.endColumn)
-                    const suggestionsArr = Array.from(sug.values())
+                    const textBeforeCursor = model.getValueInRange(new monaco.Range(position.lineNumber, 1, position.lineNumber, position.column));
+
+                    if (textBeforeCursor.endsWith("CALL ")) {
+                        return {
+                            suggestions: procedures.map(s => ({ ...s, range })),
+                        }
+                    }
+
                     return {
-                        suggestions: suggestionsArr.map(s => ({ ...s, range })),
+                        suggestions: [
+                            ...sug.map(s => ({ ...s, range })),
+                            ...KEYWORDS.map(key => ({
+                                insertText: key,
+                                label: key,
+                                kind: monaco.languages.CompletionItemKind.Keyword,
+                                range,
+                                detail: "()"
+                            }))],
                     }
                 },
             })
@@ -222,9 +315,9 @@ const GraphView = forwardRef(({ graph, runQuery, historyQuery, fetchCount }: {
 
         // eslint-disable-next-line consistent-return
         return () => {
-            provider?.dispose()
+            p?.dispose()
         }
-    }, [graph, monacoInstance])
+    }, [graph.Id, monacoInstance, provider])
 
     useImperativeHandle(ref, () => ({
         expand: (elements: ElementDefinition[]) => {
@@ -260,7 +353,24 @@ const GraphView = forwardRef(({ graph, runQuery, historyQuery, fetchCount }: {
     }
 
     const handleEditorWillMount = (monacoI: Monaco) => {
-        setMonacoInstance(monacoI)
+        monacoI.languages.setMonarchTokensProvider('custom-language', {
+            brackets: [
+                { open: '{', close: '}', token: 'brackets.level1' },
+                { open: '(', close: ')', token: 'brackets.level2' },
+                { open: '[', close: ']', token: 'brackets.level3' }
+            ],
+            tokenizer: {
+                root: [
+                    [new RegExp(`\\b(${KEYWORDS.join('|')})\\b`), "keyword"],
+                    [/"([^"\\]|\\.)*$/, 'string.invalid'],
+                    [/"([^"\\]|\\.)*"/, 'string'],
+                    [/\d+/, 'number'],
+                    [/:(\w+)/, 'type'],
+                    [/\{|\}|\(|\)|\[|\]/, '@brackets'],
+                ],
+            },
+            ignoreCase: true,
+        });
 
         monacoI.editor.defineTheme('custom-theme', {
             base: 'vs-dark',
@@ -269,7 +379,11 @@ const GraphView = forwardRef(({ graph, runQuery, historyQuery, fetchCount }: {
                 { token: 'string', foreground: '#CE9178' },
                 { token: 'number', foreground: '#B5CEA8' },
                 { token: 'keyword', foreground: '#99E4E5' },
+                { token: 'function', foreground: '#DCDCAA' },
                 { token: 'type', foreground: '#89D86D' },
+                { token: 'brackets.level1', foreground: '#E5C07B' },
+                { token: 'brackets.level2', foreground: '#C678DD' },
+                { token: 'brackets.level3', foreground: '#61AFEF' },
             ],
             colors: {
                 'editor.background': '#1F1F3D',
@@ -281,44 +395,28 @@ const GraphView = forwardRef(({ graph, runQuery, historyQuery, fetchCount }: {
             },
         });
 
-
-
-        monacoI.languages.registerCompletionItemProvider('cypher', {
+        const p = monacoI.languages.registerCompletionItemProvider('custom-language', {
+            triggerCharacters: ["."],
             provideCompletionItems: (model, position) => {
                 const word = model.getWordUntilPosition(position)
                 const range = new monaco.Range(position.lineNumber, word.startColumn, position.lineNumber, word.endColumn)
+                const suggestions = KEYWORDS.map(key => ({
+                    insertText: key,
+                    label: key,
+                    kind: monaco.languages.CompletionItemKind.Keyword,
+                    range,
+                    detail: "(keyword)"
+                }))
+
                 return {
-                    suggestions: [
-                        { insertText: "CREATE", label: "CREATE", kind: monaco.languages.CompletionItemKind.Keyword, range },
-                        { insertText: "CREATE (n)", label: "CREATE", kind: monaco.languages.CompletionItemKind.Snippet, range, detail: "Create Node" },
-                        { insertText: "CREATE ()-[e:e]->()", label: "CREATE", kind: monaco.languages.CompletionItemKind.Snippet, range, detail: "Create Edge" },
-                        { insertText: "CREATE (n)-[e:e]->(m)", label: "CREATE", kind: monaco.languages.CompletionItemKind.Snippet, range, detail: "Create" },
-                        { insertText: "MATCH", label: "MATCH", kind: monaco.languages.CompletionItemKind.Keyword, range },
-                        { insertText: "MATCH (n)", label: "MATCH", kind: monaco.languages.CompletionItemKind.Snippet, range, detail: "Match Node" },
-                        { insertText: "MATCH ()-[e]-()", label: "MATCH", kind: monaco.languages.CompletionItemKind.Snippet, range, detail: "Match Edge" },
-                        { insertText: "MATCH ()-[e]->()", label: "MATCH", kind: monaco.languages.CompletionItemKind.Snippet, range, detail: "Match Edge Directed" },
-                        { insertText: "MATCH (n)-[e]-(m)", label: "MATCH", kind: monaco.languages.CompletionItemKind.Snippet, range, detail: "Match" },
-                        { insertText: "MATCH (n)-[e]->(m)", label: "MATCH", kind: monaco.languages.CompletionItemKind.Snippet, range, detail: "Match Directed" },
-                        { insertText: "OPTIONAL", label: "OPTIONAL", kind: monaco.languages.CompletionItemKind.Keyword, range },
-                        { insertText: "MATCH (n) OPTIONAL MATCH (n)-[e]-(m)", label: "OPTIONAL", kind: monaco.languages.CompletionItemKind.Snippet, range },
-                        { insertText: "AS", label: "AS", kind: monaco.languages.CompletionItemKind.Keyword, range },
-                        { insertText: "WHERE", label: "WHERE", kind: monaco.languages.CompletionItemKind.Keyword, range },
-                        { insertText: "RETURN", label: "RETURN", kind: monaco.languages.CompletionItemKind.Keyword, range },
-                        { insertText: "ORDER BY", label: "ORDER BY", kind: monaco.languages.CompletionItemKind.Keyword, range },
-                        { insertText: "SKIP", label: "SKIP", kind: monaco.languages.CompletionItemKind.Keyword, range },
-                        { insertText: "LIMIT", label: "LIMIT", kind: monaco.languages.CompletionItemKind.Keyword, range },
-                        { insertText: "MARGE", label: "MARGE", kind: monaco.languages.CompletionItemKind.Keyword, range },
-                        { insertText: "DELETE", label: "DELETE", kind: monaco.languages.CompletionItemKind.Keyword, range },
-                        { insertText: "SET", label: "SET", kind: monaco.languages.CompletionItemKind.Keyword, range },
-                        { insertText: "WITH", label: "WITH", kind: monaco.languages.CompletionItemKind.Keyword, range },
-                        { insertText: "UNION", label: "UNION", kind: monaco.languages.CompletionItemKind.Keyword, range },
-                        { insertText: "UNWIND", label: "UNWIND", kind: monaco.languages.CompletionItemKind.Keyword, range },
-                        { insertText: "FOREACH", label: "FOREACH", kind: monaco.languages.CompletionItemKind.Keyword, range },
-                        { insertText: "CALL", label: "CALL", kind: monaco.languages.CompletionItemKind.Keyword, range },
-                    ]
+                    suggestions
                 }
             }
         })
+
+        setProvider(p)
+        monacoI.editor.setTheme('custom-theme');
+        monacoI.languages.register({ id: 'custom-language' });
     };
 
     const handleEditorDidMount = (e: monaco.editor.IStandaloneCodeEditor, monacoI: Monaco) => {
@@ -585,7 +683,7 @@ const GraphView = forwardRef(({ graph, runQuery, historyQuery, fetchCount }: {
                                 <div className="relative border border-[#343459] flex grow w-1">
                                     <Editor
                                         className="Editor"
-                                        language="cypher"
+                                        language="custom-language"
                                         options={monacoOptions}
                                         value={query}
                                         onChange={(val) => setQuery(val || "")}
@@ -612,7 +710,7 @@ const GraphView = forwardRef(({ graph, runQuery, historyQuery, fetchCount }: {
                             <DialogContent closeSize={30} className="w-full h-full">
                                 <Editor
                                     className="w-full h-full"
-                                    beforeMount={handleEditorWillMount}
+                                    onMount={handleEditorDidMount}
                                     theme="custom-theme"
                                     options={{
                                         lineHeight: 30,
@@ -620,7 +718,7 @@ const GraphView = forwardRef(({ graph, runQuery, historyQuery, fetchCount }: {
                                     }}
                                     value={query}
                                     onChange={(val) => setQuery(val || "")}
-                                    language="cypher"
+                                    language="custom-language"
                                 />
                             </DialogContent>
                         </div>
