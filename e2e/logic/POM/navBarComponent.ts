@@ -72,6 +72,7 @@ export default class NavBarComponent extends BasePage {
     }
 
     async Logout(): Promise<void> {
+        await this.page.waitForLoadState('networkidle'); 
         await this.DefaultButton.click()
         await this.LogoutButton.click()
         await this.initPage()
