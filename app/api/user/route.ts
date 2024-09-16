@@ -44,9 +44,11 @@ export async function POST(req: NextRequest) {
     }
 
     const connection = await client.connection
-    const { users } = await req.json()
+    const isDelete = req.nextUrl.searchParams.get("isDelete")
     
-    if (users) {
+    if (isDelete === "true") {
+        const { users } = await req.json()
+        
         await Promise.all(users.map(async (user: CreateUser) => {
             await connection.aclDelUser(user.username)
         }))
