@@ -3,7 +3,9 @@
 import React, { useEffect, useState, KeyboardEvent } from "react";
 import { Toast, cn, prepareArg, securedFetch } from "@/lib/utils";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { CheckCircle2, XCircle } from "lucide-react";
 import Input from "../components/ui/Input";
+import Button from "../components/ui/Button";
 
 type Config = {
     name: string,
@@ -106,7 +108,8 @@ const Configs: Config[] = [
     {
         name: "CMD_INFO",
         description: `An on/off toggle for the GRAPH.INFO command.
-         Disabling this command may increase performance and lower the memory usage and these are the main reasons for it to be disabled`,
+         Disabling this command may increase performance and lower the memory usage and these are the main reasons for it to be disabled
+         It’s valid values are ‘yes’ and ‘no’ (i.e., on and off).`,
         value: ""
     },
     {
@@ -120,7 +123,7 @@ const Configs: Config[] = [
 export default function Configurations() {
 
     const [configs, setConfigs] = useState<Config[]>([])
-    const [editable, setEditable] = useState<string>()
+    const [editable, setEditable] = useState<string>("")
     const [configValue, setConfigValue] = useState<string>("")
 
     useEffect(() => {
@@ -135,25 +138,30 @@ export default function Configurations() {
                     return config
                 }
 
+                let value = (await result.json()).config[1]
+                
+                if (config.name === "CMD_INFO") {
+                    if(value === 0) {
+                        value = "no" 
+                    } else value = "yes"
+                }
+                
                 return {
                     name: config.name,
                     description: config.description,
-                    value: (await result.json()).config[1]
+                    value
                 }
             })))
         }
         run()
     }, [])
 
-    const handelSetConfig = async (e: KeyboardEvent<HTMLInputElement>, name: string) => {
+    const handelSetConfig = async (name: string) => {
 
-        if (e.code === "Escape") {
-            setEditable("")
-            setConfigValue("")
+        if (!configValue) {
+            Toast(`Please enter a value`)
             return
         }
-
-        if (e.code !== "Enter") return
 
         const result = await securedFetch(`api/graph/?config=${prepareArg(name)}&value=${prepareArg(configValue)}`, {
             method: 'POST',
@@ -176,6 +184,19 @@ export default function Configurations() {
         setConfigValue("")
     }
 
+    const onKeyDown = (e: KeyboardEvent<HTMLInputElement>, name: string) => {
+
+        if (e.code === "Escape") {
+            setEditable("")
+            setConfigValue("")
+            return
+        }
+
+        if (e.code !== "Enter") return
+
+        handelSetConfig(name)
+    }
+
     return (
         <div className="h-full w-full border border-[#57577B] rounded-lg overflow-auto">
             <Table>
@@ -191,27 +212,47 @@ export default function Configurations() {
                 <TableBody>
                     {
                         configs.map(({ name, description, value }, index) => (
-                            <TableRow key={name} className={cn("border-none", !(index % 2) && "bg-[#57577B] hover:bg-[#57577B]")}>
+                            <TableRow key={name} data-id={name} className={cn("border-none", !(index % 2) && "bg-[#57577B] hover:bg-[#57577B]")}>
                                 <TableCell className="w-[20%] py-8">{name}</TableCell>
                                 <TableCell className="w-[70%]">{description}</TableCell>
-                                <TableCell onClick={() => {
-                                    setEditable(name)
-                                    setConfigValue(value.toString())
-                                }}>
+                                <TableCell className="w-[15%]">
                                     {
                                         editable === name && !disableRunTimeConfigs.has(name) ?
-                                            <Input
-                                                ref={(ref) => {
-                                                    ref?.focus()
+                                            <div className="flex gap-2">
+                                                        <Input
+                                                            ref={(ref) => {
+                                                                ref?.focus()
+                                                            }}
+                                                            className="w-20"
+                                                            type={name === "CMD_INFO" ? "text" : "number"}
+                                                            variant="Small"
+                                                            onChange={(e) => setConfigValue(e.target.value)}
+                                                            onKeyDown={(e) => onKeyDown(e, name)}
+                                                            value={configValue}
+                                                            style={{
+                                                                WebkitAppearance: 'none',
+                                                                margin: 0,
+                                                            }}
+                                                        />
+                                                <Button
+                                                    icon={<XCircle color={!(index % 2) ? "#272746" : "#57577B"} />}
+                                                    onClick={() => setEditable("")}
+                                                    onMouseDown={(e) => e.preventDefault()}
+                                                />
+                                                <Button
+                                                    icon={<CheckCircle2 color={!(index % 2) ? "#272746" : "#57577B"} />}
+                                                    onClick={() => handelSetConfig(name)}
+                                                    onMouseDown={(e) => e.preventDefault()}
+                                                />
+                                            </div>
+                                            : <Button
+                                                label={typeof value === "number" ? value.toString() : value}
+                                                onClick={() => {
+                                                    setEditable(name)
+                                                    setConfigValue(value.toString())
                                                 }}
-                                                className="w-20"
-                                                variant="Small"
-                                                onChange={(e) => setConfigValue(e.target.value)}
-                                                onBlur={() => setEditable("")}
-                                                onKeyDown={(e) => handelSetConfig(e, name)}
-                                                value={configValue}
                                             />
-                                            : value
+
                                     }
                                 </TableCell>
                             </TableRow>

@@ -14,7 +14,7 @@ export async function GET(request: NextRequest, { params } : { params : { graph:
 
     try {
         
-        const result = await client.connection.dump(
+        const result = await (await client.connection).dump(
             commandOptions({ returnBuffers: true }),
             graphId
         )

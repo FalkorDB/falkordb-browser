@@ -15,7 +15,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { user: stri
     try {
         if (!role) throw new Error("Role is missing")
 
-        await client.connection.aclSetUser(username, role)
+        await (await client.connection).aclSetUser(username, role)
         return NextResponse.json({ message: "User created" },{status: 200})
     } catch (err: unknown) {
         return NextResponse.json({ message: (err as Error).message }, { status: 400 })

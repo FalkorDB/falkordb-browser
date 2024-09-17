@@ -42,11 +42,11 @@ export default function Users() {
 
     const handelSetRole = async (role: string, username?: string) => {
         const updatedUsers = await Promise.all(users.map(async user => {
-            const updated = username ? user.username === username : user.selected
+            const selected = username ? user.username === username : user.selected
 
-            if (!updated) return user
+            if (!selected) return user
 
-            const result = await securedFetch(`api/user/${username}/?role=${role}`, {
+            const result = await securedFetch(`api/user/${user.username}/?role=${role}`, {
                 method: 'PATCH'
             })
 
@@ -107,7 +107,7 @@ export default function Users() {
                     <TableBody>
                         {
                             users.map(({ username, role, selected }, index) => (
-                                <TableRow onMouseEnter={() => setHover(username)} onMouseLeave={() => setHover("")} key={username} className={cn("border-none", !(index % 2) && "bg-[#57577B] hover:bg-[#57577B]")}>
+                                <TableRow onMouseEnter={() => setHover(username)} onMouseLeave={() => setHover("")} data-username={username} key={username} className={cn("border-none", !(index % 2) && "bg-[#57577B] hover:bg-[#57577B]")}>
                                     <TableCell className="w-[5%] py-6">
                                         <Checkbox
                                             key="checkbox"

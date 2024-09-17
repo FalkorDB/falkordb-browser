@@ -448,20 +448,20 @@ const GraphView = forwardRef(({ graph, runQuery, historyQuery, fetchCount }: {
             <ResizablePanel
                 className={cn("flex flex-col gap-8", !isCollapsed && "mr-8")}
                 defaultSize={100}
-            >     
+            >
                 {
                     !maximize &&
                     <Dialog>
                         <div className="w-full flex items-center gap-8">
                             <p>Query</p>
                             <form
-                                className="w-1 grow flex border border-[#343459] rounded-lg overflow-hidden"
+                                className="w-1 grow flex rounded-lg overflow-hidden"
                                 onSubmit={(e) => {
                                     e.preventDefault()
                                     runQuery(query)
                                 }}
                             >
-                                <div className="relative flex grow w-1">
+                                <div className="relative border border-[#343459] flex grow w-1">
                                     <Editor
                                         className="Editor"
                                         language="cypher"
@@ -474,7 +474,7 @@ const GraphView = forwardRef(({ graph, runQuery, historyQuery, fetchCount }: {
                                     />
                                     <DialogTrigger asChild>
                                         <Button
-                                            className="absolute top-0 right-0 p-3"
+                                            className="absolute top-0 right-0 p-2.5"
                                             title="Maximize"
                                             icon={<Maximize2 size={20} />}
                                         />
@@ -482,9 +482,9 @@ const GraphView = forwardRef(({ graph, runQuery, historyQuery, fetchCount }: {
                                 </div>
                                 <Button
                                     ref={submitQuery}
-                                    className="bg-[#59597C] border border-[#737392] p-2 px-8"
+                                    className="rounded-none px-8"
+                                    variant="Secondary"
                                     label="Run"
-                                    title="Run (Ctrl+Enter)"
                                     type="submit"
                                 />
                             </form>
@@ -536,6 +536,7 @@ const GraphView = forwardRef(({ graph, runQuery, historyQuery, fetchCount }: {
                                 icon={<Minimize2 />}
                                 title="Minimize"
                                 onClick={() => setMaximize(false)}
+                                onKeyDown={(e) => e.code === "Escape" && setMaximize(false)}
                             />
                     }
                     <CytoscapeComponent
@@ -565,8 +566,8 @@ const GraphView = forwardRef(({ graph, runQuery, historyQuery, fetchCount }: {
                     {
                         (graph.Categories.length > 0 || graph.Labels.length > 0) &&
                         <>
-                            <Labels className="left-2" categories={graph.Categories} onClick={onCategoryClick} label="Labels" />
-                            <Labels className="right-2 text-end" categories={graph.Labels} onClick={onLabelClick} label="RelationshipTypes" />
+                            <Labels className="left-2" categories={graph.Categories} onClick={onCategoryClick} label="Labels" graph={graph} />
+                            <Labels className="right-2 text-end" categories={graph.Labels} onClick={onLabelClick} label="RelationshipTypes" graph={graph}/>
                         </>
                     }
                 </div>

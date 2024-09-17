@@ -48,18 +48,19 @@ async function newClient(credentials: { host: string, port: string, password: st
     });
 
     // Verify connection and Role
+    const connection = await client.connection
+
     try {
-        await client.connection.aclGetUser(credentials.username || "default")
+        connection.aclGetUser(credentials.username || "default")
         return { role: "Admin", client }
     } catch (error: unknown) {
         if (error instanceof ErrorReply && (error as ErrorReply).message.startsWith("NOPERM")) {
             console.debug(error);
-
         } else throw error
     }
 
     try {
-        await client.connection.sendCommand(["GRAPH.QUERY"])
+        await connection.sendCommand(["GRAPH.QUERY"])
     } catch (error: unknown) {
         if ((error as Error).message.includes("permissions")) {
             console.debug(error);

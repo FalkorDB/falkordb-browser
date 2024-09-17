@@ -1,0 +1,41 @@
+{
+    "inputDataRejectsZero": [
+      { "input": "aa", "description": "invalid input - character", "expected": false },
+      { "input": "-3", "description": "invalid input - negative number", "expected": false },
+      { "input": "00-1", "description": "invalid input", "expected": false },
+      { "input": "1", "description": "valid input", "expected": true },
+      { "input": "0", "description": "invalid input - zero value", "expected": false }
+    ],
+    "inputDataAcceptsZero": [
+      { "input": "aa", "description": "invalid input - character", "expected": false },
+      { "input": "-3", "description": "invalid input - negative number", "expected": false },
+      { "input": "00-1", "description": "invalid input", "expected": false },
+      { "input": "1", "description": "valid input", "expected": true },
+      { "input": "0", "description": "valid input - zero value", "expected": true }
+    ],
+    "maxTimeOut": [
+      { "input": "aa", "description": "invalid input - character", "expected": false },
+      { "input": "-3", "description": "invalid input - negative number", "expected": false },
+      { "input": "00-1", "description": "invalid input", "expected": false },
+      { "input": "30", "description": "valid input", "expected": true }
+    ],
+    "CMDData": [
+      { "input": "aa", "description": "invalid input - character", "expected": false },
+      { "input": "-3", "description": "invalid input - negative number", "expected": false },
+      { "input": "00-1", "description": "invalid input", "expected": false },
+      { "input": "10s", "description": "invalid input", "expected": false },
+      { "input": "no", "description": "valid input - no value", "expected": true },
+      { "input": "yes", "description": "valid input - yes value", "expected": true }
+    ],
+    "roleModificationData": [
+        {"role": "MAX_QUEUED_QUERIES", "description": "modify maxQueuedQueries", "input": "20", "expected": true},
+        {"role": "TIMEOUT_MAX", "description": "modify maxTimeOut", "input": "25", "expected": true},
+        {"role": "TIMEOUT_DEFAULT", "description": "modify defaultTimeOut", "input": "10", "expected": true},
+        {"role": "RESULTSET_SIZE", "description": "modify resultSetSize", "input": "20", "expected": true},
+        {"role": "QUERY_MEM_CAPACITY", "description": "modify queryMemCapacity", "input": "20", "expected": true},
+        {"role": "VKEY_MAX_ENTITY_COUNT", "description": "modify vKeyMaxEntityCount", "input": "20", "expected": true},
+        {"role": "CMD_INFO", "description": "modify cmdInfo", "input": "yes", "expected": true},
+        {"role": "MAX_INFO_QUERIES", "description": "modify maxInfoQueries", "input": "20", "expected": true}
+  ]
+}
+  

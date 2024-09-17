@@ -13,7 +13,7 @@ export async function GET() {
         return client
     }
 
-    const infoMemory = await client.connection.info("memory")
+    const infoMemory = await (await client.connection).info("memory")
     const infoGraph = await client.info()
 
     const dataMemory = infoMemory.split('\r\n').map((item: string) => {
