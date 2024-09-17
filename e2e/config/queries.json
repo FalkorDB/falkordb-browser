@@ -1,0 +1,8 @@
+{
+    "queries": [
+      {
+        "name": "querySuccess1",
+        "query": "graphName?query=unwind%20range(1%2C20)%20as%20x%20create%20(n%3Arider)-%5Be%3Arides%5D-%3E(m%3Ateam)%20return%20*"
+      }
+    ]
+  }

@@ -4,6 +4,7 @@ import { ApiCalls } from "../logic/api/apiCalls";
 import { graphPage } from "../logic/POM/graphPage";
 import urls  from '../config/urls.json'
 import fs from 'fs';
+import queryData from '../config/queries.json'
 
 test.describe('Graph Tests', () => {
     let browser : BrowserWrapper;
@@ -49,6 +50,20 @@ test.describe('Graph Tests', () => {
         const download = await graph.clickOnExportDataBtn();
         const downloadPath = await download.path();
         expect(fs.existsSync(downloadPath)).toBe(true);
+    })
+
+    test("Query Test: Create a graph via api -> run a query via api and validate that the response data is correct", async () => {
+        const apiCall = new ApiCalls()
+        const graphName = `graph_${Date.now()}`
+        await apiCall.addGraph(graphName)
+        const query = graphName + queryData.queries[0].query
+        const res = await apiCall.runQuery(query)  
+        expect(
+            res.result &&
+            Array.isArray(res.result.metadata) &&
+            res.result.metadata.length >= 5 &&
+            Array.isArray(res.result.data)
+        ).toBe(true);      
     })
 
 })
