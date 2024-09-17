@@ -6,7 +6,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",Hi
+    "build": "next build",
     "start": "next start",
     "lint": "next lint",
     "test:e2e": "playwright test"
