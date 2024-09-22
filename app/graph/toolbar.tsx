@@ -8,7 +8,8 @@ import { useState } from "react";
 import Button from "../components/ui/Button";
 import DialogComponent from "../components/DialogComponent";
 
-export default function Toolbar({ disabled, chartRef, onDeleteElement, onAddEntity, onAddRelation, deleteDisabled }: {
+export default function Toolbar({ disabled, addDisabled, chartRef, onDeleteElement, onAddEntity, onAddRelation, deleteDisabled }: {
+    addDisabled?: boolean,
     disabled?: boolean,
     chartRef: React.RefObject<cytoscape.Core>,
     onDeleteElement?: () => Promise<void>,
@@ -44,7 +45,7 @@ export default function Toolbar({ disabled, chartRef, onDeleteElement, onAddEnti
         <div className="flex items-center gap-6 p-1">
             <div className="flex gap-4">
                 <Button
-                    disabled={disabled}
+                    disabled={addDisabled}
                     variant="Secondary"
                     label="Add Entity"
                     className="flex items-center gap-2"
@@ -52,7 +53,7 @@ export default function Toolbar({ disabled, chartRef, onDeleteElement, onAddEnti
                     icon={<PlusCircle />}
                 />
                 <Button
-                    disabled={disabled}
+                    disabled={addDisabled}
                     variant="Secondary"
                     className="flex items-center gap-2"
                     label="Add Relation"

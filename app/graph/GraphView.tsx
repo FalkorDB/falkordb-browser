@@ -507,7 +507,8 @@ const GraphView = forwardRef(({ graph, runQuery, historyQuery, fetchCount }: {
                 }
                 <div className="flex items-center justify-between">
                     <Toolbar
-                        disabled
+                        addDisabled
+                        disabled={!graph.Id}
                         deleteDisabled={Object.values(selectedElements).length === 0 && !selectedElement}
                         onDeleteElement={handelDeleteElement}
                         chartRef={chartRef}
