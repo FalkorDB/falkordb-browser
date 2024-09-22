@@ -44,8 +44,8 @@ export default function LoginForm() {
 
     const params: SignInOptions = {
       redirect: false,
-      host: host.trim() ?? DEFAULT_HOST,
-      port: port.trim() ?? DEFAULT_PORT,
+      host: host.trim(),
+      port: port.trim(),
       tls: TLS,
       ca: CA
     };
@@ -55,6 +55,7 @@ export default function LoginForm() {
     if (password) {
       params.password = password;
     }
+
     signIn("credentials", params).then((res?: SignInResponse) => {
       if (res?.error) {
         setError(true);
