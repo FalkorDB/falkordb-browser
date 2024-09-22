@@ -447,7 +447,7 @@ const GraphView = forwardRef(({ graph, runQuery, historyQuery, fetchCount }: {
         <ResizablePanelGroup direction="horizontal" className={cn(maximize && "h-full p-10 bg-background fixed left-[50%] top-[50%] z-50 grid translate-x-[-50%] translate-y-[-50%]")}>
             <ResizablePanel
                 className={cn("flex flex-col gap-8", !isCollapsed && "mr-8")}
-                defaultSize={100}
+                defaultSize={selectedElement ? 75 : 100}
             >
                 {
                     !maximize &&
@@ -507,6 +507,7 @@ const GraphView = forwardRef(({ graph, runQuery, historyQuery, fetchCount }: {
                 }
                 <div className="flex items-center justify-between">
                     <Toolbar
+                        addDisabled
                         disabled={!graph.Id}
                         deleteDisabled={Object.values(selectedElements).length === 0 && !selectedElement}
                         onDeleteElement={handelDeleteElement}
@@ -567,20 +568,17 @@ const GraphView = forwardRef(({ graph, runQuery, historyQuery, fetchCount }: {
                         (graph.Categories.length > 0 || graph.Labels.length > 0) &&
                         <>
                             <Labels className="left-2" categories={graph.Categories} onClick={onCategoryClick} label="Labels" graph={graph} />
-                            <Labels className="right-2 text-end" categories={graph.Labels} onClick={onLabelClick} label="RelationshipTypes" graph={graph}/>
+                            <Labels className="right-2 text-end" categories={graph.Labels} onClick={onLabelClick} label="RelationshipTypes" graph={graph} />
                         </>
                     }
                 </div>
             </ResizablePanel>
-            {
-                !isCollapsed &&
-                <ResizableHandle className="w-3" />
-            }
+            <ResizableHandle className={!isCollapsed ? "w-3" : "w-0"} />
             <ResizablePanel
                 className="rounded-lg"
                 collapsible
                 ref={dataPanel}
-                defaultSize={25}
+                defaultSize={selectedElement ? 25 : 0}
                 minSize={25}
                 maxSize={50}
                 onCollapse={() => setIsCollapsed(true)}
