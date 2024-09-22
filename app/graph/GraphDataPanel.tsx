@@ -143,7 +143,7 @@ export default function GraphDataPanel({ inSchema, obj, onExpand, setProperty, s
                         icon={<ChevronRight />}
                         onClick={() => onExpand()}
                     />
-                    {label}
+                    {Array.isArray(label) ? label.join(", ") : label}
                 </div>
                 <p className="flex text-white">{Object.entries(obj).filter(([k, v]) => !excludedProperties.has(k) && !(k === "name" && v === obj.id)).length} Attributes</p>
             </div>

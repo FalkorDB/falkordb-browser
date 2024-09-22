@@ -270,24 +270,33 @@ const GraphView = forwardRef(({ graph, runQuery, historyQuery, fetchCount }: {
     const onCategoryClick = (category: Category) => {
         const chart = chartRef.current
         if (chart) {
-            const elements = chart.elements(`node[category = "${category.name}"]`)
+            for (let i = 0; i < graph.MaxLengthCategories; i += 1) {
+                const elements = chart.nodes(`[category.${i} = "${category.name}"]`)
 
-            // eslint-disable-next-line no-param-reassign
-            category.show = !category.show
+                if (elements.length !== 0) {
+                    // eslint-disable-next-line no-param-reassign
+                    category.show = !category.show
 
-            if (category.show) {
-                elements.style({ display: 'element' })
-            } else {
-                elements.style({ display: 'none' })
+                    if (category.show) {
+                        elements.forEach(collection => {
+                            collection.style({ display: 'element' })
+                        })
+                    } else {
+                        elements.forEach(collection => {
+                            collection.style({ display: 'none' })
+                        })
+                    }
+
+                    chart.elements().layout(LAYOUT).run();
+                }
             }
-            chart.elements().layout(LAYOUT).run();
         }
     }
 
     const onLabelClick = (label: Category) => {
         const chart = chartRef.current
         if (chart) {
-            const elements = chart.elements(`edge[label = "${label.name}"]`)
+            const elements = chart.edges(`[label = "${label.name}"]`)
 
             // eslint-disable-next-line no-param-reassign
             label.show = !label.show
@@ -507,7 +516,6 @@ const GraphView = forwardRef(({ graph, runQuery, historyQuery, fetchCount }: {
                 }
                 <div className="flex items-center justify-between">
                     <Toolbar
-                        addDisabled
                         disabled={!graph.Id}
                         deleteDisabled={Object.values(selectedElements).length === 0 && !selectedElement}
                         onDeleteElement={handelDeleteElement}
