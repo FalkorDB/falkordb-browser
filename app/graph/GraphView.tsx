@@ -270,21 +270,19 @@ const GraphView = forwardRef(({ graph, runQuery, historyQuery, fetchCount }: {
     const onCategoryClick = (category: Category) => {
         const chart = chartRef.current
         if (chart) {
+            
+            // eslint-disable-next-line no-param-reassign
+            category.show = !category.show
+
             for (let i = 0; i < graph.MaxLengthCategories; i += 1) {
                 const elements = chart.nodes(`[category.${i} = "${category.name}"]`)
 
                 if (elements.length !== 0) {
-                    // eslint-disable-next-line no-param-reassign
-                    category.show = !category.show
 
                     if (category.show) {
-                        elements.forEach(collection => {
-                            collection.style({ display: 'element' })
-                        })
+                        elements.style({ display: 'element' })
                     } else {
-                        elements.forEach(collection => {
-                            collection.style({ display: 'none' })
-                        })
+                        elements.style({ display: 'none' })
                     }
 
                     chart.elements().layout(LAYOUT).run();
