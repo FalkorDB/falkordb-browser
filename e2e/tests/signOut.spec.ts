@@ -3,22 +3,26 @@ import urls  from '../config/urls.json'
 import BrowserWrapper from "../infra/ui/browserWrapper";
 import navBarComponent from '../logic/POM/navBarComponent'
 
-test.describe('SignOut Test', () => {
-    let browser : BrowserWrapper;
+const roles = [{ name: "admin" }, { name: "readwrite" }, { name: "readonly" }];
 
-    test.beforeAll(async () => {
-        browser = new BrowserWrapper();
+roles.forEach((role) => {
+    test.describe(`@${role.name} SignOut Test`, () => {
+        let browser : BrowserWrapper;
+
+        test.beforeAll(async () => {
+            browser = new BrowserWrapper();
+        })
+
+        test.afterAll(async () => {
+            await browser.closeBrowser();
+        })
+
+        test("Sign out Test", async () => {
+            const navBar = await browser.createNewPage(navBarComponent, urls.graphUrl)
+            await navBar.Logout();
+            const newUrl = navBar.getCurrentURL();
+            expect(newUrl).toBe(urls.loginUrl)
+        })
+
     })
-
-    test.afterAll(async () => {
-        await browser.closeBrowser();
-    })
-
-    test("Sign out Test", async () => {
-        const navBar = await browser.createNewPage(navBarComponent, urls.graphUrl)
-        await navBar.Logout();
-        const newUrl = navBar.getCurrentURL();
-        expect(newUrl).toBe(urls.loginUrl)
-    })
-
 })
