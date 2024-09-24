@@ -135,10 +135,11 @@ export async function GET(request: NextRequest, { params }: { params: { graph: s
 
         if (!query) throw new Error("Missing parameter 'query'")
         if (create === "false") {
-            const type = await (await client.connection).type(graphId)
+            const type = (await client.list()).filter((g) => g === graphId).length === 0 ? "none" : "exists"
             if (type === "none") return NextResponse.json({}, { status: 200 })
         }
         const graph = client.selectGraph(graphId)
+
         const result = await graph.query(query)
 
         if (!result) throw new Error("something went wrong")
