@@ -36,21 +36,62 @@ export default defineConfig({
     //Setup project
     {name: 'setup', testMatch: /.*\.setup\.ts/},
     {
-      name: 'chromium',
+      name: '[Admin] Chromium',
       use: { 
         ...devices['Desktop Chrome'],
-      storageState: 'playwright/.auth/user.json'
+        storageState: 'playwright/.auth/admin.json',
       },
-      dependencies:['setup']
+      dependencies: ['setup'],
+      grep: /@admin/,
     },
-
     {
-      name: 'firefox',
+      name: '[Admin] Firefox',
       use: { 
         ...devices['Desktop Firefox'],
-        storageState: 'playwright/.auth/user.json'
+        storageState: 'playwright/.auth/admin.json',
       },
-      dependencies:['setup']
+      dependencies: ['setup'],
+      grep: /@admin/,
+    },
+
+    // Read-Write user projects
+    {
+      name: '[Read-Write] - Chromium',
+      use: { 
+        ...devices['Desktop Chrome'],
+        storageState: 'playwright/.auth/readwriteuser.json',
+      },
+      dependencies: ['setup'],
+      grep: /@readwrite/,
+    },
+    {
+      name: '[Read-Write] - Firefox',
+      use: { 
+        ...devices['Desktop Firefox'],
+        storageState: 'playwright/.auth/readwriteuser.json',
+      },
+      dependencies: ['setup'],
+      grep: /@readwrite/,
+    },
+
+    // // Read-Only user projects
+    {
+      name: '[Read-Only] - Chromium',
+      use: { 
+        ...devices['Desktop Chrome'],
+        storageState: 'playwright/.auth/readonlyuser.json',
+      },
+      dependencies: ['setup'],
+      grep: /@readonly/,
+    },
+    {
+      name: '[Read-Only] - Firefox',
+      use: { 
+        ...devices['Desktop Firefox'],
+        storageState: 'playwright/.auth/readonlyuser.json',
+      },
+      dependencies: ['setup'],
+      grep: /@readonly/,
     },
 
     // {

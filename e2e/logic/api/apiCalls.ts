@@ -6,6 +6,7 @@ import { ModifySettingsRoleResponse } from "./responses/modifySettingsRoleRespon
 import { GetSettingsRoleValue } from "./responses/getSettingsRoleValue";
 import { CreateUsersResponse } from "./responses/createUsersResponse";
 import { DeleteUsersResponse } from "./responses/deleteUsersResponse";
+import { runQueryResponse } from "./responses/runQueryResponse";
 
 export class ApiCalls{
 
@@ -47,6 +48,12 @@ export class ApiCalls{
 
     async deleteUsers(data? :any): Promise<DeleteUsersResponse>{
         const result = await postRequest(urls.api.settingsUsers, data)
+        const jsonData = await result.json();
+        return jsonData
+    }
+
+    async runQuery(query: string, data?: any): Promise<runQueryResponse>{
+        const result = await getRequest(urls.api.runQueryUrl + query, data)
         const jsonData = await result.json();
         return jsonData
     }

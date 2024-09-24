@@ -3,7 +3,7 @@ import urls  from '../config/urls.json'
 import BrowserWrapper from "../infra/ui/browserWrapper";
 import navBarComponent from '../logic/POM/navBarComponent'
 
-test.describe('NavBar Tests', () => {
+test.describe('SignOut Test', () => {
     let browser : BrowserWrapper;
 
     test.beforeAll(async () => {
