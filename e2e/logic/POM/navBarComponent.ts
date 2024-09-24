@@ -34,8 +34,8 @@ export default class NavBarComponent extends BasePage {
         return this.page.locator("//button[@title='Settings']")
     }
 
-    private get DefaultButton(): Locator {
-        return this.page.getByRole("button", { name : "Default"})
+    private get clickOnUser(): (user: string) => Locator {
+        return (user: string) => this.page.getByRole("button", { name : `${user}`})
     }
     
     private get LogoutButton(): Locator {
@@ -76,9 +76,9 @@ export default class NavBarComponent extends BasePage {
         return await this.settingsButton.isEnabled();
     }
 
-    async Logout(): Promise<void> {
+    async Logout(user: string): Promise<void> {
         await this.page.waitForLoadState('networkidle'); 
-        await this.DefaultButton.click()
+        await this.clickOnUser(user).click()
         await this.LogoutButton.click()
         await waitForURL(this.page, urls.loginUrl);
     }
