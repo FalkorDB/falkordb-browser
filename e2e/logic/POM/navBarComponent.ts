@@ -52,7 +52,7 @@ export default class NavBarComponent extends BasePage {
     
     async clickOnSchemasButton(): Promise<void> {
         await this.schemaButton.click();
-        await waitForTimeOut(this.page, 2000)
+        await waitForURL(this.page, urls.schemaUrl);
     }
 
     async clickOnHelpBtn(): Promise<void> {
@@ -69,7 +69,7 @@ export default class NavBarComponent extends BasePage {
 
     async clickOnSettingsBtn(): Promise<void> {
         await this.settingsButton.click();
-        await waitForTimeOut(this.page, 2000);
+        await waitForURL(this.page, urls.settingsUrl);
     }
 
     async isSettingsButtonEnabled(): Promise<Boolean> {

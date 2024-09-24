@@ -1,19 +1,21 @@
-import { expect, test } from "@playwright/test"
-import urls  from '../config/urls.json'
-import BrowserWrapper from "../infra/ui/browserWrapper"
-import NavBarComponent from '../logic/POM/navBarComponent'
+import { expect, test } from "@playwright/test";
+import urls from "../config/urls.json";
+import BrowserWrapper from "../infra/ui/browserWrapper";
+import NavBarComponent from "../logic/POM/navBarComponent";
 
-test.describe('NavBar Tests', () => {
-    let browser : BrowserWrapper;
+const roles = [{ name: "admin" }, { name: "readwrite" }, { name: "readonly" }];
+
+roles.forEach((role) => {
+  test.describe(`@${role.name} role, Navbar tests`, () => {
+    let browser: BrowserWrapper;
 
     test.beforeAll(async () => {
-        browser = new BrowserWrapper();
-    })
+      browser = new BrowserWrapper();
+    });
 
     test.afterAll(async () => {
-        await browser.closeBrowser();
-    })
-
+      await browser.closeBrowser();
+    });
 
     test("Verify clicking on FalkorDB logo redirects to specified URL", async () => {
         const navBar = await browser.createNewPage(NavBarComponent, urls.graphUrl)
@@ -52,11 +54,13 @@ test.describe('NavBar Tests', () => {
        
     })
 
-    test("@admin Verify clicking on Settings redirects to specified URL", async () => {
-        const navBar = await browser.createNewPage(NavBarComponent, urls.graphUrl)
-        await navBar.clickOnSettingsBtn()
-        const newUrl = navBar.getCurrentURL()
-        expect(newUrl).toBe(urls.settingsUrl)
-    })
-
-})
+    if(role.name === 'admin'){
+        test("@admin Verify clicking on Settings redirects to specified URL", async () => {
+            const navBar = await browser.createNewPage(NavBarComponent, urls.graphUrl)
+            await navBar.clickOnSettingsBtn()
+            const newUrl = navBar.getCurrentURL()
+            expect(newUrl).toBe(urls.settingsUrl)
+        })
+    }
+  });
+});
