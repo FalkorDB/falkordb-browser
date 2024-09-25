@@ -2,14 +2,9 @@ import { expect, test } from "@playwright/test";
 import urls  from '../config/urls.json'
 import BrowserWrapper from "../infra/ui/browserWrapper";
 import navBarComponent from '../logic/POM/navBarComponent'
+import roles from '../config/user.json'
 
-const roles = [
-    { name: 'Default', role: 'admin' },
-    { name: 'readwriteuser', role: 'readwrite' },
-    { name: 'readonlyuser', role: 'readonly' },
-];
-
-roles.forEach((role) => {
+roles.userRoles.forEach((role) => {
     test.describe(`@${role.role} SignOut Test`, () => {
         let browser : BrowserWrapper;
 
