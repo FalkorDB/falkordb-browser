@@ -197,7 +197,7 @@ export class Graph {
                 id: cell.id.toString(),
                 name: cell.id.toString(),
                 category: categories.map(c => c.name),
-                color: this.getCategoryColorValue(categories[0].index),
+                color: this.getCategoryColorValue(categories[0]?.index),
             }
             Object.entries(cell.properties).forEach(([key, value]) => {
                 node[nodeSafeKey(key)] = value as string;
