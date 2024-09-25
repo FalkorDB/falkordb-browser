@@ -62,5 +62,13 @@ roles.forEach((role) => {
             expect(newUrl).toBe(urls.settingsUrl)
         })
     }
+    
+    if(role.name === 'readwrite' || role.name === 'readonly'){
+        test("Attempt to click on Settings does not result in a redirect", async () => {
+            const navBar = await browser.createNewPage(NavBarComponent, urls.graphUrl)
+            const result = await navBar.isSettingsButtonEnabled()  
+            expect(result).toBe(false)
+        })
+    }
   });
 });
