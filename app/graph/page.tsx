@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { Toast, defaultQuery, prepareArg, securedFetch } from "@/lib/utils";
+import { ElementDataDefinition } from "cytoscape";
 import GraphView from "./GraphView";
 import Selector from "./Selector";
 import Header from "../components/Header";
@@ -15,6 +16,8 @@ export default function Page() {
     const [graph, setGraph] = useState<Graph>(Graph.empty())
     const [queries, setQueries] = useState<Query[]>([])
     const [historyQuery, setHistoryQuery] = useState<string>("")
+    const [selectedElement, setSelectedElement] = useState<ElementDataDefinition>();
+
 
     const fetchCount = useCallback(async () => {
         if (!graphName) return
@@ -53,15 +56,16 @@ export default function Page() {
             Toast("Select a graph first")
             return null
         }
-
+        
         const result = await securedFetch(`api/graph/${prepareArg(graphName)}/?query=${prepareArg(defaultQuery(query))}`, {
             method: "GET"
         })
-
+        
         if (!result.ok) return null
-
+        
         const json = await result.json()
         fetchCount()
+        setSelectedElement(undefined)
         return json.result
     }
 
@@ -98,6 +102,8 @@ export default function Page() {
                 />
                 <GraphView
                     graph={graph}
+                    selectedElement={selectedElement}
+                    setSelectedElement={setSelectedElement}
                     runQuery={runQuery}
                     historyQuery={historyQuery}
                     fetchCount={fetchCount}
