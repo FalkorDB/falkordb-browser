@@ -18,16 +18,14 @@ export default function Page() {
 
     const fetchCount = useCallback(async () => {
         if (!graphName) return
-        const q = [
-            "MATCH (n) RETURN COUNT(n) as nodes",
-            "MATCH ()-[e]->() RETURN COUNT(e) as edges"
-        ]
+        const q1 = "MATCH (n) RETURN COUNT(n) as nodes"
+        const q2 = "MATCH ()-[e]->() RETURN COUNT(e) as edges"
 
-        const nodes = await (await securedFetch(`api/graph/${prepareArg(graphName)}/?query=${q[0]}`, {
+        const nodes = await (await securedFetch(`api/graph/${prepareArg(graphName)}/?query=${q1}`, {
             method: "GET"
         })).json()
 
-        const edges = await (await securedFetch(`api/graph/${prepareArg(graphName)}/?query=${q[1]}`, {
+        const edges = await (await securedFetch(`api/graph/${prepareArg(graphName)}/?query=${q2}`, {
             method: "GET"
         })).json()
 
@@ -42,7 +40,8 @@ export default function Page() {
             const colors = localStorage.getItem(graphName)?.split(/[[\]",]/).filter(c => c)
             setGraph(Graph.empty(graphName, colors))
         }
-    }, [graph.Id, graphName])
+        fetchCount()
+    }, [fetchCount, graph.Id, graphName])
 
     useEffect(() => {
         fetchCount()

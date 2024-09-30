@@ -69,7 +69,7 @@ export default function Combobox({ isSelectGraph, disabled = false, inTable, typ
     if (!setOptions) return
     if (e.key !== "Enter") return
 
-    const result = await securedFetch(`api/graph/${prepareArg(optionName)}/?sourceName=${option}`, {
+    const result = await securedFetch(`api/graph/${prepareArg(optionName)}/?sourceName=${prepareArg(option)}`, {
       method: "PATCH",
       headers: {
         "Content-Type": "application/json"
