@@ -61,6 +61,9 @@ export class Graph {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any    
     private data: any[];
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any    
+    private metadata: any[];
+
     private categories: Category[];
 
     private labels: Category[];
@@ -87,6 +90,7 @@ export class Graph {
         this.id = id;
         this.columns = [];
         this.data = [];
+        this.metadata = [];
         this.categories = categories;
         this.labels = labels;
         this.elements = elements;
@@ -155,6 +159,11 @@ export class Graph {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     get Data(): any[] {
         return this.data;
+    }
+   
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    get Metadata(): any[] {
+        return this.metadata;
     }
 
     get Colors(): string[] {
@@ -268,8 +277,8 @@ export class Graph {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     public extend(results: any): ElementDefinition[] {
         const newElements: ElementDefinition[] = []
-
         const data = results?.data
+
         if (data?.length) {
             if (data[0] instanceof Object) {
                 this.columns = Object.keys(data[0])
@@ -277,9 +286,10 @@ export class Graph {
 
             this.data = data
         }
+
+        this.metadata = results.metadata
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         this.data.forEach((row: any[]) => {
-
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             Object.values(row).forEach((cell: any) => {
                 if (cell instanceof Object) {
