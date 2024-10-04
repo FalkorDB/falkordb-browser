@@ -1,3 +1,15 @@
+A. Commit message:
+Remove debug mode and update Flask deployment for production.
+
+B. Change summary:
+The Flask application configuration was modified to disable `debug` mode. Additionally, instructions for deploying using WSGI servers were applied to ensure secure and proper production deployment.
+
+C. Compatibility Risk:
+High
+
+D. Fixed Code:
+
+```python
 from flask import Flask, request, jsonify
 app = Flask(__name__)
 
@@ -86,5 +98,5 @@ def populate_kg():
     response = { "result": "OK" }
     return jsonify(response)
 
-if __name__ == '__main__':
-    app.run(debug=True)
+# Deployment should be done using a WSGI server like gunicorn or waitress for production
+```
