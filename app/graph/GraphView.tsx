@@ -8,13 +8,16 @@ import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/componen
 import { ImperativePanelHandle } from "react-resizable-panels";
 import { ChevronLeft, Maximize2, Minimize2 } from "lucide-react"
 import { cn, ElementDataDefinition, prepareArg, securedFetch } from "@/lib/utils";
+import dynamic from "next/dynamic";
 import { Category, Graph } from "../api/graph/model";
 import DataPanel from "./GraphDataPanel";
 import Labels from "./labels";
 import Toolbar from "./toolbar";
 import Button from "../components/ui/Button";
-import EditorComponent from "../components/EditorComponent";
 
+const EditorComponent = dynamic(() => import("../components/EditorComponent"), {
+    ssr: false
+})
 
 const LAYOUT = {
     name: "fcose",
@@ -92,10 +95,11 @@ function getStyle() {
 
 const getElementId = (element: ElementDataDefinition) => element.source ? { id: element.id?.slice(1), query: "()-[e]-()" } : { id: element.id, query: "(e)" }
 
-const GraphView = forwardRef(({ graph, runQuery, historyQuery, fetchCount }: {
+const GraphView = forwardRef(({ graph, runQuery, historyQuery, historyQueries, fetchCount }: {
     graph: Graph
     runQuery: (query: string) => Promise<void>
     historyQuery: string
+    historyQueries: string[]
     fetchCount: () => void
 }, ref) => {
 
@@ -368,9 +372,10 @@ const GraphView = forwardRef(({ graph, runQuery, historyQuery, fetchCount }: {
                     graph={graph}
                     isCollapsed={isCollapsed}
                     maximize={maximize}
-                    query={query}
+                    currentQuery={query}
+                    historyQueries={historyQueries}
                     runQuery={runQuery}
-                    setQuery={setQuery}
+                    setCurrentQuery={setQuery}
                 />
                 <div className="flex items-center justify-between">
                     <Toolbar

@@ -18,8 +18,9 @@ type Suggestions = {
 }
 
 interface Props {
-    query: string
-    setQuery: (query: string) => void
+    currentQuery: string
+    historyQueries: string[]
+    setCurrentQuery: (query: string) => void
     maximize: boolean
     runQuery: (query: string) => void
     graph: Graph
@@ -178,7 +179,8 @@ const FUNCTIONS = [
     "vec.cosineDistance",
 ]
 
-const MAX_LINE_NUMBER = 2
+const MAX_HEIGHT = 20
+const LINE_HEIGHT = 38
 
 const getEmptySuggestions = (): Suggestions => ({
     keywords: KEYWORDS.map(key => ({
@@ -194,8 +196,9 @@ const getEmptySuggestions = (): Suggestions => ({
     functions: []
 })
 
-export default function EditorComponent({ query, setQuery, maximize, runQuery, graph, isCollapsed }: Props) {
+export default function EditorComponent({ currentQuery, historyQueries, setCurrentQuery, maximize, runQuery, graph, isCollapsed }: Props) {
 
+    const [query, setQuery] = useState(currentQuery)
     const [monacoInstance, setMonacoInstance] = useState<Monaco>()
     const [prevGraphName, setPrevGraphName] = useState<string>("")
     const [sugProvider, setSugProvider] = useState<monaco.IDisposable>()
@@ -203,11 +206,21 @@ export default function EditorComponent({ query, setQuery, maximize, runQuery, g
     const [lineNumber, setLineNumber] = useState(0)
     const submitQuery = useRef<HTMLButtonElement>(null)
     const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null)
+    const [blur, setBlur] = useState(false)
+    const [historyCounter, setHistoryCounter] = useState(0)
+
+    useEffect(() => {
+        console.log("historyQueries", historyQueries);
+    }, [historyCounter])
 
     useEffect(() => {
         if (!editorRef.current) return
         editorRef.current.layout();
     }, [isCollapsed])
+
+    useEffect(() => {
+        setCurrentQuery(currentQuery)
+    }, [currentQuery])
 
     const setTheme = (monacoI: Monaco) => {
         monacoI.editor.defineTheme('custom-theme', {
@@ -510,6 +523,14 @@ export default function EditorComponent({ query, setQuery, maximize, runQuery, g
 
         editorRef.current = e
 
+        e.onDidBlurEditorText(() => {
+            setBlur(true)
+        })
+
+        e.onDidFocusEditorText(() => {
+            setBlur(false)
+        })
+
         e.addAction({
             id: 'submit',
             label: 'Submit Query',
@@ -519,6 +540,34 @@ export default function EditorComponent({ query, setQuery, maximize, runQuery, g
             run: async () => {
                 submitQuery.current?.click()
             }
+        });
+
+        e.addAction({
+            id: 'history up',
+            label: 'history up',
+            keybindings: [monaco.KeyCode.UpArrow],
+            contextMenuOrder: 1.5,
+            run: async () => {
+                if (historyQueries.length === 0) return
+                const counter = (historyCounter + 1) % historyQueries.length
+                setHistoryCounter(counter)
+                setCurrentQuery(counter ? historyQueries[counter - 1] : currentQuery)
+            },
+            precondition: '!suggestWidgetVisible',
+        });
+        
+        e.addAction({
+            id: 'history down',
+            label: 'history down',
+            keybindings: [monaco.KeyCode.DownArrow],
+            contextMenuOrder: 1.5,
+            run: async () => {
+                if (historyQueries.length === 0) return
+                const counter = historyCounter ? historyCounter - 1 : historyCounter
+                setHistoryCounter(counter)
+                setCurrentQuery(counter ? historyQueries[counter - 1] : currentQuery)
+            },
+            precondition: '!suggestWidgetVisible',
         });
     }
 
@@ -542,11 +591,12 @@ export default function EditorComponent({ query, setQuery, maximize, runQuery, g
                         >
                             <div className="relative border border-[#343459] flex grow w-1">
                                 <Editor
-                                    height={lineNumber > MAX_LINE_NUMBER ? MAX_LINE_NUMBER * 38 : lineNumber * 38}
+                                    // eslint-disable-next-line no-nested-ternary
+                                    height={blur ? LINE_HEIGHT : lineNumber * LINE_HEIGHT > document.body.clientHeight / 100 * MAX_HEIGHT ? document.body.clientHeight / 100 * MAX_HEIGHT : lineNumber * LINE_HEIGHT}
                                     className="Editor"
                                     language="custom-language"
                                     options={monacoOptions}
-                                    value={query}
+                                    value={blur ? query.trim() : query}
                                     onChange={(val) => setQuery(val || "")}
                                     theme="custom-theme"
                                     beforeMount={handleEditorWillMount}

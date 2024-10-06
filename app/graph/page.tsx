@@ -2,12 +2,10 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { Toast, defaultQuery, prepareArg, securedFetch } from "@/lib/utils";
-import dynamic from "next/dynamic";
 import Selector from "./Selector";
 import Header from "../components/Header";
 import { Graph, Query } from "../api/graph/model";
-
-const GraphView = dynamic(() => import("./GraphView"), { ssr: false })
+import GraphView from "./GraphView";
 
 export default function Page() {
 
@@ -38,6 +36,10 @@ export default function Page() {
         setEdgesCount(edges.result?.data[0].edges)
         setNodesCount(nodes.result?.data[0].nodes)
     }, [graphName])
+
+    useEffect(() => {
+        fetchCount()
+    }, [graphName, fetchCount])
 
     useEffect(() => {
         if (graphName !== graph.Id) {
@@ -98,6 +100,7 @@ export default function Page() {
                     graph={graph}
                     runQuery={runQuery}
                     historyQuery={historyQuery}
+                    historyQueries={queries.map(({ text }) => text)}
                     fetchCount={fetchCount}
                 />
             </div>

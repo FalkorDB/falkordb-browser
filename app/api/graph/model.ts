@@ -70,7 +70,9 @@ export class Graph {
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     private elements: ElementDefinition[];
-
+    
+    private fakeNodes: Map<number, number>;
+    
     private categoriesMap: Map<string, Category>;
 
     private categoriesColorIndex: number = 0;
@@ -91,6 +93,7 @@ export class Graph {
         this.columns = [];
         this.data = [];
         this.metadata = [];
+        this.fakeNodes = new Map<number, number>();
         this.categories = categories;
         this.labels = labels;
         this.elements = elements;
@@ -188,6 +191,13 @@ export class Graph {
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     public extendNode(cell: any) {
+        this.fakeNodes.delete(cell.id)
+        if (this.fakeNodes.size === 0 && this.categoriesMap.has("")) {
+            this.categories = this.categories.filter(c => c.name !== "")
+            this.categoriesMap.delete("")
+            this.categoriesColorIndex -= 1
+        }
+
         // check if category already exists in categories
         const category = this.createCategory(cell.labels[0] || "")
 
@@ -254,10 +264,11 @@ export class Graph {
                     category: category.name,
                     color: this.getCategoryColorValue()
                 }
+                this.fakeNodes.set(cell.sourceId, cell.sourceId)
                 this.nodesMap.set(cell.sourceId, source)
                 this.elements.push({ data: source })
             }
-
+            
             let destination = this.nodesMap.get(cell.destinationId)
             if (!destination) {
                 destination = {
@@ -266,6 +277,7 @@ export class Graph {
                     category: category.name,
                     color: this.getCategoryColorValue()
                 }
+                this.fakeNodes.set(cell.destinationId, cell.destinationId)
                 this.nodesMap.set(cell.destinationId, destination)
                 this.elements.push({ data: destination })
             }
