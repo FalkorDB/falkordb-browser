@@ -241,7 +241,7 @@ export class Graph {
             
             // creates a fakeS node for the source and target
             if (createNode) {
-                const category = this.createCategory("")
+                const [category] = this.createCategory([""])
                 let source = this.nodesMap.get(cell.sourceId)
         
                 if (!source) {

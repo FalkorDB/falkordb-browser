@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState } from "react";
-import { Toast, defaultQuery, prepareArg, securedFetch } from "@/lib/utils";
+import { Toast, prepareArg, securedFetch } from "@/lib/utils";
 import { ElementDataDefinition } from "cytoscape";
 import Selector from "./Selector";
 import Header from "../components/Header";

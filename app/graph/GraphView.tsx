@@ -148,11 +148,6 @@ const GraphView = forwardRef(({ graph, selectedElement, setSelectedElement, runQ
         chartRef?.current?.layout(LAYOUT).run();
     }, [graph.Elements.length]);
 
-    useEffect(() => {
-        if (!editorRef.current) return
-        editorRef.current.layout();
-    }, [isCollapsed])
-
     const onExpand = (expand?: boolean) => {
         if (!dataPanel.current) return
         const panel = dataPanel.current
