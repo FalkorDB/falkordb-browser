@@ -61,21 +61,18 @@ test.describe('Graph Tests', () => {
             expect(fs.existsSync(downloadPath)).toBe(true);
         });
     });
-
-    roles.forEach(role => {
-        test(`@${role.name} Query Test: Create a graph via API -> run a query via API and validate that the response data is correct`, async () => {
-            const apiCall = new ApiCalls();
-            const graphName = `graph_${Date.now()}`;
-            await apiCall.addGraph(graphName);
-            const query = graphName + queryData.queries[0].query;
-            const res = await apiCall.runQuery(query);
-            
-            expect(
-                res.result &&
-                Array.isArray(res.result.metadata) &&
-                res.result.metadata.length >= 5 &&
-                Array.isArray(res.result.data)
-            ).toBe(true);
-        });
-    });
+  
+    test("Query Test: Create a graph via api -> run a query via api and validate that the response data is correct", async () => {
+        const apiCall = new ApiCalls()
+        const graphName = `graph_${Date.now()}`
+        await apiCall.addGraph(graphName)
+        const query = graphName + queryData.queries[0].query
+        const res = await apiCall.runQuery(query)  
+        expect(
+            res.result &&
+            Array.isArray(res.result.metadata) &&
+            res.result.metadata.length >= 5 &&
+            Array.isArray(res.result.data)
+        ).toBe(true);      
+    })
 })

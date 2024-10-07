@@ -134,10 +134,10 @@ export async function GET(request: NextRequest, { params }: { params: { graph: s
         const create = request.nextUrl.searchParams.get("create")
 
         if (!query) throw new Error("Missing parameter 'query'")
-        if (create === "false") {
-            const type = await (await client.connection).type(graphId)
-            if (type === "none") return NextResponse.json({}, { status: 200 })
-        }
+
+        if (create === "false" && (await client.list()).some((g) => g === graphId))
+            return NextResponse.json({}, { status: 200 })
+        
         const graph = client.selectGraph(graphId)
         const result = await graph.query(query)
 
