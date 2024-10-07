@@ -61,8 +61,6 @@ export class Graph {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any    
     private data: any[];
     
-    private maxLengthCategories: number;
-
     private categories: Category[];
 
     private labels: Category[];
@@ -88,7 +86,6 @@ export class Graph {
         categoriesMap: Map<string, Category>, labelsMap: Map<string, Category>, nodesMap: Map<number, NodeDataDefinition>, edgesMap: Map<number, EdgeDataDefinition>, colors?: string[]) {
         this.id = id;
         this.columns = [];
-        this.maxLengthCategories = 0;
         this.data = [];
         this.categories = categories;
         this.labels = labels;
@@ -160,10 +157,6 @@ export class Graph {
         return this.data;
     }
 
-    get MaxLengthCategories(): number {
-        return this.maxLengthCategories;
-    }
-
     get Colors(): string[] {
         return this.COLORS_ORDER_VALUE;
     }
@@ -188,7 +181,6 @@ export class Graph {
     public extendNode(cell: any) {
         // check if category already exists in categories
         const categories = this.createCategory(cell.labels || [])
-        this.maxLengthCategories = cell.labels.length > this.maxLengthCategories ? cell.labels.length : this.maxLengthCategories
         // check if node already exists in nodes or fake node was created
         const currentNode = this.nodesMap.get(cell.id)
 
