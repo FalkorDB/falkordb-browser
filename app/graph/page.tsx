@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Toast, prepareArg, securedFetch } from "@/lib/utils";
 import { ElementDataDefinition } from "cytoscape";
+import { useSession } from "next-auth/react";
 import Selector from "./Selector";
 import Header from "../components/Header";
 import { Graph, Query } from "../api/graph/model";
@@ -17,6 +18,7 @@ export default function Page() {
     const [queries, setQueries] = useState<Query[]>([])
     const [historyQuery, setHistoryQuery] = useState<string>("")
     const [selectedElement, setSelectedElement] = useState<ElementDataDefinition>();
+    const { data } = useSession() 
 
 
     const fetchCount = useCallback(async () => {
@@ -24,11 +26,11 @@ export default function Page() {
         const q1 = "MATCH (n) RETURN COUNT(n) as nodes"
         const q2 = "MATCH ()-[e]->() RETURN COUNT(e) as edges"
 
-        const nodes = await (await securedFetch(`api/graph/${prepareArg(graphName)}/?query=${q1}`, {
+        const nodes = await (await securedFetch(`api/graph/${prepareArg(graphName)}/?query=${q1}&role=${data?.user.role}`, {
             method: "GET"
         })).json()
 
-        const edges = await (await securedFetch(`api/graph/${prepareArg(graphName)}/?query=${q2}`, {
+        const edges = await (await securedFetch(`api/graph/${prepareArg(graphName)}/?query=${q2}&role=${data?.user.role}`, {
             method: "GET"
         })).json()
 
@@ -56,7 +58,7 @@ export default function Page() {
             return null
         }
 
-        const result = await securedFetch(`api/graph/${prepareArg(graphName)}/?query=${prepareArg(query)}`, {
+        const result = await securedFetch(`api/graph/${prepareArg(graphName)}/?query=${prepareArg(query)}&role=${data?.user.role}`, {
 
             method: "GET"
         })
@@ -99,6 +101,7 @@ export default function Page() {
                     nodesCount={nodesCount}
                     setGraph={setGraph}
                     graph={graph}
+                    data={data}
 
                 />
                 <GraphView
@@ -109,6 +112,7 @@ export default function Page() {
                     historyQuery={historyQuery}
                     historyQueries={queries.map(({ text }) => text)}
                     fetchCount={fetchCount}
+                    data={data}
                 />
             </div>
         </div>
