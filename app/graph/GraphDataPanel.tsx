@@ -1,20 +1,20 @@
 'use client'
 
-import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ElementDataDefinition, Toast, cn } from "@/lib/utils";
-import { ChevronRight, MinusCircle, PlusCircle, Trash2 } from "lucide-react";
-import { KeyboardEvent, useEffect, useRef, useState } from "react";
+/* eslint-disable no-param-reassign */
+
+import { ElementDataDefinition, prepareArg, securedFetch, Toast } from "@/lib/utils";
+import { Dispatch, SetStateAction, useEffect, useState } from "react";
+import { ChevronRight, PlusCircle, Trash2 } from "lucide-react";
 import Button from "../components/ui/Button";
 import Input from "../components/ui/Input";
+import { Graph } from "../api/graph/model";
 
 /* eslint-disable react/require-default-props */
 interface Props {
-    inSchema?: boolean;
     obj: ElementDataDefinition;
+    setObj: Dispatch<SetStateAction<ElementDataDefinition>>;
     onExpand: () => void;
-    setProperty?: (key: string, newVal: string) => Promise<boolean>;
-    setPropertySchema?: (key: string, newVal: string[]) => Promise<boolean>;
-    removeProperty?: (key: string) => Promise<boolean>;
+    graph: Graph;
     onDeleteElement?: () => Promise<void>;
 }
 
@@ -28,353 +28,192 @@ const excludedProperties = new Set([
     "source",
 ]);
 
-export default function GraphDataPanel({ inSchema, obj, onExpand, setProperty, setPropertySchema, removeProperty, onDeleteElement }: Props) {
+export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement, graph }: Props) {
 
-    const [isAddValue, setIsAddValue] = useState<boolean>(false)
-    const [hover, setHover] = useState<string>("")
-    const [editable, setEditable] = useState<string>("")
-    const [val, setVal] = useState<string>("")
-    const [schemaVal, setSchemaVal] = useState<string[]>([])
-    const [key, setKey] = useState<string>("")
-    const addValueRef = useRef<HTMLDivElement>(null)
-    const type = obj.source ? "edge" : "node"
-    const label = (type === "edge" ? obj.label : obj.category) || "label"
+    const [attributes, setAttributes] = useState<string[]>([]);
+    const [editable, setEditable] = useState<string>("");
+    const [mouseEnter, setMouseEnter] = useState<string>("");
+    const [isAddValue, setIsAddValue] = useState<boolean>(false);
+    const [newKey, setNewKey] = useState<string>("");
+    const [newVal, setNewVal] = useState<string>("");
+    const [label, setLabel] = useState("");
+    const type = !("source" in obj)
 
     useEffect(() => {
-        if (!isAddValue) return
-        addValueRef.current?.focus()
-    }, [isAddValue])
+        setAttributes(Object.keys(obj).filter((key) => !excludedProperties.has(key)));
+        setLabel(type ? obj.category : obj.label);
+    }, [obj, type]);
 
-    const onKeyDownSchema = async (e: KeyboardEvent<HTMLDivElement>) => {
-
-        if (!setPropertySchema) return
-
-        if (e.code === "Escape") {
-            e.preventDefault()
-            setEditable("")
-            setIsAddValue(false)
-        }
-
-        if (e.code !== "Enter") return
-
-        e.preventDefault()
-
-        if (schemaVal.length === 4 || !key) {
-            Toast("Error", `${!key ? "Key" : "Value"} cannot be empty`)
-            return
-        }
-        const success = await setPropertySchema(key, schemaVal)
+    const setProperty = async (key: string, val: string) => {
+        const { id } = obj
+        const q = `MATCH ${type ? "(e)" : "()-[e]-()"} WHERE id(e) = ${id} SET e.${key} = '${val}'`
+        const success = (await securedFetch(`api/graph/${prepareArg(graph.Id)}/?query=${prepareArg(q)}`, {
+            method: "GET"
+        })).ok
 
         if (success) {
-            const ob = obj
-            ob[key] = schemaVal
+            graph.Elements.forEach(({ data }) => {
+                if (data.id !== id) return
+                data[key] = val
+            })
+            setObj((prev) => ({ ...prev, [key]: val }))
+            setNewVal("")
         }
 
-        setSchemaVal([])
-        setEditable("")
-        setKey("")
-        setIsAddValue(false)
+        return success
     }
 
-    const onKeyDown = async (e: KeyboardEvent<HTMLDivElement>) => {
-
-        if (!setProperty) return
-
-        if (e.code === "Escape") {
-            e.preventDefault()
-            setEditable("")
-            setIsAddValue(false)
-        }
-
-        if (e.code !== "Enter") return
-
-        e.preventDefault()
-
-        if (!val || !key) {
-            Toast("Error", `${!key ? "Key" : "Value"} cannot be empty`)
-            return
-        }
-
-        const success = await setProperty(key, val)
+    const removeProperty = async (key: string) => {
+        const { id } = obj
+        const q = `MATCH ${type ? "(e)" : "()-[e]-()"} WHERE id(e) = ${id} SET e.${key} = NULL`
+        const success = (await securedFetch(`api/graph/${prepareArg(graph.Id)}/?query=${prepareArg(q)}`, {
+            method: "GET"
+        })).ok
 
         if (success) {
-            const ob = obj
-            ob[key] = val
+            graph.Elements.forEach(element => {
+                if (element.data.id !== id) return
+                const e = element
+                delete e.data[key]
+            })
+
+            const newObj = { ...obj }
+            delete newObj[key]
+            setObj(newObj)
         }
 
-        setVal("")
-        setKey("")
-        setEditable("")
-        setIsAddValue(false)
+        return success
     }
 
-    const onDelete = async (k: string) => {
-        if (!removeProperty) return
-        const success = await removeProperty(k)
-        if (!success) return
-        const ob = obj
-        delete ob[k]
-    }
-
-    // const onSetLabel = async (e: KeyboardEvent<HTMLParagraphElement>) => {
-    //     if (!setLabel) return
-    //     if (e.code === "Escape") {
-    //         e.preventDefault()
-    //         setLabelEditable(false)
-    //     }
-    //     if (e.code !== "Enter") return
-    //     e.preventDefault()
-    //     const success = await setLabel(newLabel)
-    //     if (!success) return
-    //     const ob = obj
-    //     if (type === "edge") {
-    //         ob.label = newLabel
-    //         return
-    //     }
-    //     ob.category = newLabel
-    // }
 
     return (
         <div className="DataPanel">
-            <div className="w-full flex justify-between items-center bg-[#7167F6] p-4">
-                <div className="flex gap-4 items-center">
+            <div className="flex justify-between items-center bg-[#7167F6] p-4">
+                <div className="flex gap-2">
                     <Button
                         variant="button"
                         icon={<ChevronRight />}
                         onClick={() => onExpand()}
                     />
-                    {label}
+                    <p>{Array.isArray(label) ? label.join(", ") : label}</p>
                 </div>
-                <p className="flex text-white">{Object.entries(obj).filter(([k, v]) => !excludedProperties.has(k) && !(k === "name" && v === obj.id)).length} Attributes</p>
+                <div>
+                    <p>Attributes {attributes.length}</p>
+                </div>
             </div>
-            <div className="w-full h-1 grow flex flex-col justify-between items-start font-medium">
-                <Table>
+            <div className="grow flex flex-col justify-between p-8">
+                <ul className="flex flex-col">
                     {
-                        (setProperty || setPropertySchema) &&
-                        <TableCaption className="mt-11 py-2.5 px-6 text-start">
-                            <Button
-                                className="border border-[#232341]"
-                                variant="Secondary"
-                                label="Add Attribute"
-                                icon={isAddValue ? <MinusCircle /> : <PlusCircle />}
-                                onClick={() => setIsAddValue(prev => !prev)}
+                        attributes.map((key) => (
+                            <div
+                                key={key}
+                                className="flex gap-2 items-center p-4"
+                                onMouseEnter={() => setMouseEnter(key)}
+                                onMouseLeave={() => setMouseEnter("")}
+                            >
+                                <div>
+                                    <p>{key}:</p>
+                                </div>
+                                <div className="w-1 grow flex gap-2">
+                                    {
+                                        editable === key ?
+                                            <Input
+                                                ref={(ref) => ref?.focus()}
+                                                variant="Small"
+                                                value={newVal}
+                                                onChange={(e) => setNewVal(e.target.value)}
+                                                onBlur={() => setEditable("")}
+                                                onKeyDown={(e) => {
+                                                    if (e.key === "Escape") {
+                                                        setEditable("")
+                                                    }
+
+                                                    if (e.key !== "Enter") return
+
+                                                    setProperty(key, newVal)
+                                                    setEditable("")
+                                                }}
+                                            />
+                                            : <Button
+                                                className="max-w-full"
+                                                label={obj[key]}
+                                                onClick={() => setEditable(key)}
+                                            />
+                                    }
+                                    {
+                                        mouseEnter === key &&
+                                        <Button
+                                            icon={<Trash2 />}
+                                            onClick={() => removeProperty(key)}
+                                        />
+                                    }
+                                </div>
+                            </div>
+                        ))
+                    }
+                    {isAddValue && (
+                        <div key="Add Value" className="w-full flex gap-2 p-4">
+                            <Input
+                                className="w-1/2"
+                                variant="Small"
+                                value={newKey}
+                                onChange={(e) => setNewKey(e.target.value)}
+                                onKeyDown={(e) => {
+                                    if (e.key === "Escape") {
+                                        setIsAddValue(false)
+                                    }
+
+                                    if (e.key !== "Enter") return
+
+                                    if (!newKey || !newVal) {
+                                        Toast("Please fill in both fields")
+                                    }
+
+                                    setProperty(newKey, newVal)
+                                    setIsAddValue(false)
+                                }}
                             />
-                        </TableCaption>
-                    }
-                    {
-                        inSchema &&
-                        <TableHeader>
-                            <TableRow className="border-[#57577B] text-[#ACACC2] text-lg font-black">
-                                <TableHead className="p-8">Name</TableHead>
-                                <TableHead className="p-8">Type</TableHead>
-                                <TableHead className="p-8">Description</TableHead>
-                                <TableHead className="p-8">Unique</TableHead>
-                                <TableHead className="p-8">aaa</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                    }
-                    <TableBody>
-                        {
-                            Object.entries(obj).filter((row) => !excludedProperties.has(row[0]) && !(row[0] === "name" && row[1] === obj.id)).map((row, index) => {
-                                const strKey = JSON.parse(JSON.stringify(row[0]))
-                                const strCell = JSON.parse(JSON.stringify(row[1]))
-                                const isEditable = !inSchema && editable === `${index}`
-                                return (
-                                    <TableRow
-                                        // eslint-disable-next-line react/no-array-index-key
-                                        key={index}
-                                        className="border-none"
-                                        onMouseEnter={() => {
-                                            if (strKey === "id" || !removeProperty) return
-                                            setHover(row[0])
-                                        }}
-                                        onMouseLeave={() => {
-                                            setHover("")
-                                        }}
-                                    >
-                                        <TableCell
-                                            key={row[0]}
-                                            className={cn("p-8", !inSchema && "w-1/2")}
-                                        >
-                                            <div className="text-[#ACACC2] flex gap-2 items-center">
-                                                {
-                                                    hover === strKey &&
-                                                    <Button
-                                                        icon={<Trash2 />}
-                                                        onClick={() => onDelete(strKey)}
-                                                    />
-                                                }
-                                                {strKey}:
-                                            </div>
-                                        </TableCell>
-                                        {
-                                            inSchema ?
-                                                strCell.map((cell: string | boolean, i: number) => {
-                                                    const isEdit = editable === `${index}-${i}`
-                                                    return (
-                                                        <TableCell
-                                                            // eslint-disable-next-line react/no-array-index-key
-                                                            key={i}
-                                                            className="p-4"
-                                                            onClick={() => {
-                                                                if (!setPropertySchema) return
-                                                                setEditable(`${index}-${i}`)
-                                                            }}
-                                                        >
-                                                            {
-                                                                isEdit ?
-                                                                    <Input
-                                                                        ref={ref => {
-                                                                            ref?.focus()
-                                                                        }}
-                                                                        variant="Small"
-                                                                        onChange={e => setSchemaVal(prev => {
-                                                                            const p = prev
-                                                                            p[i] = e.target.value
-                                                                            return p
-                                                                        })}
-                                                                        onKeyDown={(e) => {
-                                                                            setKey(strKey)
-                                                                            onKeyDownSchema(e)
-                                                                        }}
-                                                                        onBlur={() => setEditable("")}
-                                                                    />
-                                                                    :
-                                                                    <p>
-                                                                        {cell.toString()}
-                                                                    </p>}
-                                                        </TableCell>
-                                                    )
-                                                })
-                                                : <TableCell
-                                                    className="p-4"
-                                                    onClick={() => {
-                                                        if (!setProperty) return
-                                                        setEditable(`${index}`)
-                                                    }}
-                                                >
-                                                    {
-                                                        isEditable ?
-                                                            <Input
-                                                                className="w-40"
-                                                                ref={ref => {
-                                                                    ref?.focus()
-                                                                }}
-                                                                variant="Small"
-                                                                onKeyDown={(e) => {
-                                                                    setKey(strKey)
-                                                                    onKeyDown(e)
-                                                                }}
-                                                                onChange={(e) => setVal(e.target.value)}
-                                                                onBlur={() => setEditable("")}
-                                                            />
-                                                            : <p>
-                                                                {strCell.toString()}
-                                                            </p>}
-                                                </TableCell>
-                                        }
-                                    </TableRow>
-                                )
-                            })
-                        }
-                        {
-                            isAddValue && inSchema ?
-                                <TableRow className="border-none">
-                                    <TableCell className="p-4">
-                                        <Input
-                                            variant="Small"
-                                            onChange={(e) => setKey(e.target.value)}
-                                            onKeyDown={onKeyDownSchema}
-                                        />
-                                    </TableCell>
-                                    <TableCell
-                                        className="p-4"
-                                    >
-                                        <Input
-                                            variant="Small"
-                                            onChange={(e) => setSchemaVal(prev => {
-                                                const p = prev
-                                                p[0] = e.target.value
-                                                return p
-                                            })}
-                                            onKeyDown={onKeyDownSchema}
-                                        />
-                                    </TableCell>
-                                    <TableCell
-                                        className="p-4"
-                                    >
-                                        <Input
-                                            variant="Small"
-                                            onChange={(e) => setSchemaVal(prev => {
-                                                const p = prev
-                                                p[1] = e.target.value
-                                                return p
-                                            })}
-                                            onKeyDown={onKeyDownSchema}
-                                        />
-                                    </TableCell>
-                                    <TableCell
-                                        className="p-4"
-                                    >
-                                        <Input
-                                            variant="Small"
-                                            onChange={(e) => setSchemaVal(prev => {
-                                                const p = prev
-                                                p[2] = e.target.value
-                                                return p
-                                            })}
-                                            onKeyDown={onKeyDownSchema}
-                                        />
-                                    </TableCell>
-                                    <TableCell
-                                        className="p-4"
-                                    >
-                                        <Input
-                                            variant="Small"
-                                            onChange={(e) => setSchemaVal(prev => {
-                                                const p = prev
-                                                p[3] = e.target.value
-                                                return p
-                                            })}
-                                            onKeyDown={onKeyDownSchema}
-                                        />
-                                    </TableCell>
-                                </TableRow>
-                                : isAddValue &&
-                                <TableRow>
-                                    <TableCell className="p-4">
-                                        <Input
-                                            className="w-40"
-                                            variant="Small"
-                                            onChange={(e) => setKey(e.target.value)}
-                                            onKeyDown={onKeyDown}
-                                        />
-                                    </TableCell>
-                                    <TableCell
-                                        className="p-4"
-                                    >
-                                        <Input
-                                            className="w-40"
-                                            variant="Small"
-                                            onChange={(e) => setVal(e.target.value)}
-                                            onKeyDown={onKeyDown}
-                                        />
-                                    </TableCell>
-                                </TableRow>
-                        }
-                    </TableBody>
-                </Table>
-                {
-                    onDeleteElement &&
+                            <Input
+                                className="w-1/2"
+                                variant="Small"
+                                value={newVal}
+                                onChange={(e) => setNewVal(e.target.value)}
+                                onBlur={() => setIsAddValue(false)}
+                                onKeyDown={(e) => {
+                                    if (e.key === "Escape") {
+                                        setIsAddValue(false)
+                                    }
+
+                                    if (e.key !== "Enter") return
+
+                                    if (!newKey || !newVal) {
+                                        Toast("Please fill in both fields")
+                                    }
+
+                                    setProperty(newKey, newVal)
+                                    setIsAddValue(false)
+                                }}
+                            />
+                        </div>
+                    )}
+                    <div key="Is Add" className="p-3">
+                        <Button
+                            variant="Secondary"
+                            label="Add Value"
+                            icon={<PlusCircle />}
+                            onClick={() => setIsAddValue(true)}
+                        />
+                    </div>
+                </ul>
+                <div>
                     <Button
-                        className="m-8 border border-[#232341]"
                         variant="Secondary"
-                        label="Delete"
                         icon={<Trash2 />}
-                        onClick={() => onDeleteElement()}
+                        label="Delete"
+                        onClick={onDeleteElement}
                     />
-                }
+                </div>
             </div>
-        </div >
+        </div>
     )
 }

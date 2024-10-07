@@ -11,7 +11,7 @@ async function newClient(credentials: { host: string, port: string, password: st
     const connectionOptions: FalkorDBOptions = credentials.ca === "undefined" ?
         {
             socket: {
-                host: credentials.host ?? "localhost",
+                host: credentials.host || "localhost",
                 port: credentials.port ? parseInt(credentials.port, 10) : 6379,
             },
             password: credentials.password ?? undefined,
@@ -48,27 +48,28 @@ async function newClient(credentials: { host: string, port: string, password: st
     });
 
     // Verify connection and Role
-    try {
-        await client.connection.aclGetUser(credentials.username || "default")
-        return { role: "Admin", client }
-    } catch (error: unknown) {
-        if (error instanceof ErrorReply && (error as ErrorReply).message.startsWith("NOPERM")) {
-            console.debug(error);
+    const connection = await client.connection
 
-        } else throw error
+    try {
+        await connection.aclGetUser(credentials.username || "default")
+        return { role: "Admin", client }
+    } catch (err) {
+        if (err instanceof ErrorReply && (err as ErrorReply).message.startsWith("NOPERM")) {
+            console.debug(err);
+        } else throw err
     }
 
     try {
-        await client.connection.sendCommand(["GRAPH.QUERY"])
-    } catch (error: unknown) {
-        if ((error as Error).message.includes("permissions")) {
-            console.debug(error);
+        await connection.sendCommand(["GRAPH.QUERY"])
+    } catch (err) {
+        if ((err as Error).message.includes("permissions")) {
+            console.debug(err);
             return { role: "Read-Only", client }
         }
-        console.debug(error);
+        console.debug(err);
         return { role: "Read-Write", client }
     }
-    
+
     return { role: "Admin", client }
 }
 

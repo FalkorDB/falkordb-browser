@@ -1,7 +1,8 @@
 'use client'
 
 import { useCallback, useEffect, useState } from "react";
-import { Toast, prepareArg, securedFetch } from "@/lib/utils";
+import { Toast, defaultQuery, prepareArg, securedFetch } from "@/lib/utils";
+import { ElementDataDefinition } from "cytoscape";
 import Selector from "./Selector";
 import Header from "../components/Header";
 import { Graph, Query } from "../api/graph/model";
@@ -15,19 +16,19 @@ export default function Page() {
     const [graph, setGraph] = useState<Graph>(Graph.empty())
     const [queries, setQueries] = useState<Query[]>([])
     const [historyQuery, setHistoryQuery] = useState<string>("")
+    const [selectedElement, setSelectedElement] = useState<ElementDataDefinition>();
+
 
     const fetchCount = useCallback(async () => {
         if (!graphName) return
-        const q = [
-            "MATCH (n) RETURN COUNT(n) as nodes",
-            "MATCH ()-[e]->() RETURN COUNT(e) as edges"
-        ]
+        const q1 = "MATCH (n) RETURN COUNT(n) as nodes"
+        const q2 = "MATCH ()-[e]->() RETURN COUNT(e) as edges"
 
-        const nodes = await (await securedFetch(`api/graph/${prepareArg(graphName)}/?query=${q[0]}`, {
+        const nodes = await (await securedFetch(`api/graph/${prepareArg(graphName)}/?query=${q1}`, {
             method: "GET"
         })).json()
 
-        const edges = await (await securedFetch(`api/graph/${prepareArg(graphName)}/?query=${q[1]}`, {
+        const edges = await (await securedFetch(`api/graph/${prepareArg(graphName)}/?query=${q2}`, {
             method: "GET"
         })).json()
 
@@ -46,7 +47,8 @@ export default function Page() {
             const colors = localStorage.getItem(graphName)?.split(/[[\]",]/).filter(c => c)
             setGraph(Graph.empty(graphName, colors))
         }
-    }, [graph.Id, graphName])
+        fetchCount()
+    }, [fetchCount, graph.Id, graphName])
 
     const run = async (query: string) => {
         if (!graphName) {
@@ -55,13 +57,15 @@ export default function Page() {
         }
 
         const result = await securedFetch(`api/graph/${prepareArg(graphName)}/?query=${prepareArg(query)}`, {
+
             method: "GET"
         })
-
+        
         if (!result.ok) return null
-
+        
         const json = await result.json()
         fetchCount()
+        setSelectedElement(undefined)
         return json.result
     }
 
@@ -99,6 +103,8 @@ export default function Page() {
                 />
                 <GraphView
                     graph={graph}
+                    selectedElement={selectedElement}
+                    setSelectedElement={setSelectedElement}
                     runQuery={runQuery}
                     historyQuery={historyQuery}
                     historyQueries={queries.map(({ text }) => text)}

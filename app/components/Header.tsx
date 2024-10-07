@@ -36,9 +36,9 @@ export default function Header({ inCreate = false, onSetGraphName }: Props) {
         e.preventDefault()
 
         const name = `${graphName}${type === "Schema" ? "_schema" : ""}`
-
+        
         const q = `RETURN 1`
-        const result = await securedFetch(`api/graph/${name}/?query=${prepareArg(q)}`, {
+        const result = await securedFetch(`api/graph/${prepareArg(name)}/?query=${prepareArg(q)}`, {
             method: "GET"
         })
 

@@ -5,7 +5,7 @@ import { Dialog, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Editor } from "@monaco-editor/react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { editor } from "monaco-editor";
-import { Toast, cn, securedFetch } from "@/lib/utils";
+import { Toast, cn, prepareArg, securedFetch } from "@/lib/utils";
 import Combobox from "../components/ui/combobox";
 import { Graph, Query } from "../api/graph/model";
 import UploadGraph from "../components/graph/UploadGraph";
@@ -64,7 +64,7 @@ export default function Selector({ onChange, graphName, queries, runQuery, edges
     const handleOnChange = async (name: string) => {
         if (runQuery) {
             const q = 'MATCH (n)-[e]-(m) return n,e,m'
-            const result = await securedFetch(`api/graph/${name}_schema/?query=${q}&create=false`, {
+            const result = await securedFetch(`api/graph/${prepareArg(name)}_schema/?query=${prepareArg(q)}&create=false`, {
                 method: "GET"
             })
 
@@ -81,7 +81,7 @@ export default function Selector({ onChange, graphName, queries, runQuery, edges
 
     const onExport = async () => {
         const name = `${selectedValue}${!runQuery ? "_schema" : ""}`
-        const result = await securedFetch(`api/graph/${name}/export`, {
+        const result = await securedFetch(`api/graph/${prepareArg(name)}/export`, {
             method: "GET"
         })
 

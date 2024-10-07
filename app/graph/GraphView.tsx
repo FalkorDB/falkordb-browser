@@ -2,7 +2,7 @@
 
 import CytoscapeComponent from "react-cytoscapejs";
 import cytoscape, { ElementDefinition, EventObject, NodeDataDefinition } from "cytoscape";
-import { useRef, useState, useImperativeHandle, forwardRef, useEffect } from "react";
+import { useRef, useState, useImperativeHandle, forwardRef, useEffect, Dispatch, SetStateAction } from "react";
 import fcose from 'cytoscape-fcose';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { ImperativePanelHandle } from "react-resizable-panels";
@@ -95,8 +95,10 @@ function getStyle() {
 
 const getElementId = (element: ElementDataDefinition) => element.source ? { id: element.id?.slice(1), query: "()-[e]-()" } : { id: element.id, query: "(e)" }
 
-const GraphView = forwardRef(({ graph, runQuery, historyQuery, historyQueries, fetchCount }: {
+const GraphView = forwardRef(({ graph, selectedElement, setSelectedElement, runQuery, historyQuery, historyQueries, fetchCount }: {
     graph: Graph
+    selectedElement: ElementDataDefinition | undefined
+    setSelectedElement: Dispatch<SetStateAction<ElementDataDefinition | undefined>>
     runQuery: (query: string) => Promise<void>
     historyQuery: string
     historyQueries: string[]
@@ -105,7 +107,6 @@ const GraphView = forwardRef(({ graph, runQuery, historyQuery, historyQueries, f
 
     const [query, setQuery] = useState<string>("")
     const [selectedElements, setSelectedElements] = useState<(ElementDataDefinition)[]>([]);
-    const [selectedElement, setSelectedElement] = useState<ElementDataDefinition>();
     const [isCollapsed, setIsCollapsed] = useState<boolean>(true);
     const chartRef = useRef<cytoscape.Core | null>(null)
     const dataPanel = useRef<ImperativePanelHandle>(null)
@@ -128,19 +129,11 @@ const GraphView = forwardRef(({ graph, runQuery, historyQuery, historyQueries, f
     useEffect(() => {
         setSelectedElement(undefined)
         setSelectedElements([])
-        dataPanel.current?.collapse()
-    }, [graph.Id])
+    }, [graph.Id, setSelectedElement])
 
     useEffect(() => {
         setQuery(historyQuery)
     }, [historyQuery])
-
-    const handelSetSelectedElement = (element?: ElementDataDefinition) => {
-        setSelectedElement(element)
-        if (element) {
-            dataPanel.current?.expand()
-        } else dataPanel.current?.collapse()
-    }
 
     useEffect(() => {
         const chart = chartRef.current
@@ -156,18 +149,35 @@ const GraphView = forwardRef(({ graph, runQuery, historyQuery, historyQueries, f
     }, [graph.Elements.length]);
 
     useEffect(() => {
-        dataPanel.current?.collapse()
-    }, [])
+        if (!editorRef.current) return
+        editorRef.current.layout();
+    }, [isCollapsed])
 
-    const onExpand = () => {
+    const onExpand = (expand?: boolean) => {
         if (!dataPanel.current) return
         const panel = dataPanel.current
+        if (expand !== undefined) {
+            if (expand && panel?.isCollapsed()) {
+                panel?.expand()
+            } else if (!expand && panel?.isExpanded()) {
+                panel?.collapse()
+            }
+            return
+        }
         if (panel.isCollapsed()) {
             panel.expand()
         } else {
             panel.collapse()
         }
     }
+
+    useEffect(() => {
+        dataPanel.current?.collapse()
+    }, [])
+
+    useEffect(() => {
+        onExpand(!!selectedElement)
+    }, [selectedElement])
 
     // Send the user query to the server to expand a node
     const onFetchNode = async (node: NodeDataDefinition) => {
@@ -189,16 +199,16 @@ const GraphView = forwardRef(({ graph, runQuery, historyQuery, historyQueries, f
     const onCategoryClick = (category: Category) => {
         const chart = chartRef.current
         if (chart) {
-            const elements = chart.elements(`node[category = "${category.name}"]`)
+            const elements = chart.nodes(`[category.0 = "${category.name}"]`)
 
             // eslint-disable-next-line no-param-reassign
             category.show = !category.show
-
             if (category.show) {
                 elements.style({ display: 'element' })
             } else {
                 elements.style({ display: 'none' })
             }
+
             chart.elements().layout(LAYOUT).run();
         }
     }
@@ -206,7 +216,7 @@ const GraphView = forwardRef(({ graph, runQuery, historyQuery, historyQueries, f
     const onLabelClick = (label: Category) => {
         const chart = chartRef.current
         if (chart) {
-            const elements = chart.elements(`edge[label = "${label.name}"]`)
+            const elements = chart.edges(`[label = "${label.name}"]`)
 
             // eslint-disable-next-line no-param-reassign
             label.show = !label.show
@@ -236,7 +246,7 @@ const GraphView = forwardRef(({ graph, runQuery, historyQuery, historyQueries, f
         } else target.style("border-width", 0.7);
 
         const obj: ElementDataDefinition = target.json().data;
-        handelSetSelectedElement(obj);
+        setSelectedElement(obj);
     }
 
     const handleBoxSelected = (evt: EventObject) => {
@@ -263,7 +273,7 @@ const GraphView = forwardRef(({ graph, runQuery, historyQuery, historyQueries, f
             target.style("arrow-scale", 0.7);
         } else target.style("border-width", 0.3);
 
-        handelSetSelectedElement();
+        setSelectedElement(undefined);
         setSelectedElements([]);
     }
 
@@ -288,36 +298,6 @@ const GraphView = forwardRef(({ graph, runQuery, historyQuery, historyQueries, f
             target.style("arrow-scale", 0.7);
         } else target.style("border-width", 0.3);
     };
-
-    const setProperty = async (key: string, newVal: string) => {
-        const id = selectedElement?.id
-        const q = `MATCH (e) WHERE id(e) = ${id} SET e.${key} = '${newVal}'`
-        const success = (await securedFetch(`api/graph/${prepareArg(graph.Id)}/?query=${prepareArg(q)}`, {
-            method: "GET"
-        })).ok
-        if (success)
-            graph.Elements.forEach(e => {
-                const el = e
-                if (el.data.id !== id) return
-                el.data[key] = newVal
-            })
-        return success
-    }
-
-    const removeProperty = async (key: string) => {
-        const id = selectedElement?.id
-        const q = `MATCH (e) WHERE id(e) = ${id} SET e.${key} = NULL`
-        const success = (await securedFetch(`api/graph/${prepareArg(graph.Id)}/?query=${prepareArg(q)}`, {
-            method: "GET"
-        })).ok
-        if (success)
-            graph.Elements.forEach(element => {
-                if (element.data.id !== id) return
-                const e = element
-                delete e.data[key]
-            })
-        return success
-    }
 
     const handelDeleteElement = async () => {
         if (selectedElements.length === 0 && selectedElement) {
@@ -358,15 +338,13 @@ const GraphView = forwardRef(({ graph, runQuery, historyQuery, historyQueries, f
 
         setSelectedElements([])
         setSelectedElement(undefined)
-
-        dataPanel.current?.collapse()
     }
 
     return (
         <ResizablePanelGroup direction="horizontal" className={cn(maximize && "h-full p-10 bg-background fixed left-[50%] top-[50%] z-50 grid translate-x-[-50%] translate-y-[-50%]")}>
             <ResizablePanel
                 className={cn("flex flex-col gap-8", !isCollapsed && "mr-8")}
-                defaultSize={100}
+                defaultSize={selectedElement ? 75 : 100}
             >
                 <EditorComponent
                     graph={graph}
@@ -444,15 +422,12 @@ const GraphView = forwardRef(({ graph, runQuery, historyQuery, historyQueries, f
                     }
                 </div>
             </ResizablePanel>
-            {
-                !isCollapsed &&
-                <ResizableHandle className="w-3" />
-            }
+            <ResizableHandle className={!isCollapsed ? "w-3" : "w-0"} />
             <ResizablePanel
                 className="rounded-lg"
                 collapsible
                 ref={dataPanel}
-                defaultSize={25}
+                defaultSize={selectedElement ? 25 : 0}
                 minSize={25}
                 maxSize={50}
                 onCollapse={() => setIsCollapsed(true)}
@@ -461,10 +436,10 @@ const GraphView = forwardRef(({ graph, runQuery, historyQuery, historyQueries, f
                 {
                     selectedElement &&
                     <DataPanel
-                        removeProperty={removeProperty}
-                        setProperty={setProperty}
                         obj={selectedElement}
+                        setObj={setSelectedElement}
                         onExpand={onExpand}
+                        graph={graph}
                         onDeleteElement={handelDeleteElement}
                     />
                 }

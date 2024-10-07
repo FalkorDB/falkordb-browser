@@ -1,7 +1,8 @@
 
 import { Locator } from "playwright";
 import BasePage from "@/e2e/infra/ui/basePage";
-import { waitForTimeOut } from "@/e2e/infra/utils";
+import { waitForTimeOut, waitForURL } from "@/e2e/infra/utils";
+import urls  from '../../config/urls.json'
 
 export default class NavBarComponent extends BasePage {
 
@@ -72,10 +73,10 @@ export default class NavBarComponent extends BasePage {
     }
 
     async Logout(): Promise<void> {
+        await this.page.waitForLoadState('networkidle'); 
         await this.DefaultButton.click()
         await this.LogoutButton.click()
-        await this.initPage()
-        await waitForTimeOut(this.page, 2000);
+        await waitForURL(this.page, urls.loginUrl);
     }
 
 }

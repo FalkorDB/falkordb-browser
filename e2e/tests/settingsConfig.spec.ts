@@ -4,7 +4,8 @@ import { roles } from '../config/roles.json'
 import  BrowserWrapper  from "../infra/ui/browserWrapper";
 import SettingsConfigPage from "../logic/POM/settingsConfigPage";
 import { ApiCalls } from "../logic/api/apiCalls";
-
+import Data from '../config/settingsConfigData.json';
+ 
 test.describe('Settings Tests', () => {
     let browser : BrowserWrapper;
 
@@ -15,26 +16,8 @@ test.describe('Settings Tests', () => {
     test.afterAll(async () => {
         await browser.closeBrowser();
     })
-
-    const inputData1 = [
-        { input: 'aa', description: "invalid input - character", expected: false},
-        { input: "-3", description: "invalid input - negative number", expected: false},
-        { input: "0", description: "invalid input - zero value", expected: false},
-        { input: "00-1", description: "invalid input", expected: false},
-        { input: "10s", description: "invalid input", expected: false},
-        { input: "12", description: "valid input", expected: true},
-    ];
-
-    const inputData2 = [
-        { input: 'aa', description: "invalid input - character", expected: false},
-        { input: "-3", description: "invalid input - negative number", expected: false},
-        { input: "00-1", description: "invalid input", expected: false},
-        { input: "10s", description: "invalid input", expected: false},
-        { input: "0", description: "valid input - zero value", expected: true},
-        { input: "12", description: "valid input", expected: true},
-    ];
-
-    inputData1.forEach(({ input, description, expected }) => {
+    
+    Data.inputDataRejectsZero.forEach(({ input, description, expected }) => {
         test(`Modify ${roles.maxQueuedQueries} via API validation via UI: Input value: ${input} description: ${description}`, async () => {
             const settingsConfigPage = await browser.createNewPage(SettingsConfigPage, urls.settingsUrl)
             const apiCall = new ApiCalls()
@@ -44,41 +27,30 @@ test.describe('Settings Tests', () => {
             expect(value === input).toBe(expected)
         });
     })
-
-    inputData2.forEach(({ input, description, expected }) => {
-        test(`Modify ${roles.TimeOut} via API validation via UI: Input value: ${input} description: ${description}`, async () => {
-            const settingsConfigPage = await browser.createNewPage(SettingsConfigPage, urls.settingsUrl)
-            const apiCall = new ApiCalls()
-            await apiCall.modifySettingsRole(roles.TimeOut, input)
-            await settingsConfigPage.refreshPage()
-            const value = await settingsConfigPage.getRoleContentValue(roles.TimeOut)      
-            expect(value === input).toBe(expected)
-        });
-    })
     
-    inputData2.forEach(({ input, description, expected }) => {
+    Data.maxTimeOut.forEach(({ input, description, expected }) => {
         test(`Modify ${roles.maxTimeOut} via API validation via UI: Input value: ${input} description: ${description}`, async () => {
             const settingsConfigPage = await browser.createNewPage(SettingsConfigPage, urls.settingsUrl)
             const apiCall = new ApiCalls()
             await apiCall.modifySettingsRole(roles.maxTimeOut, input)
             await settingsConfigPage.refreshPage()
-            const value = await settingsConfigPage.getRoleContentValue(roles.maxTimeOut)      
+            const value = await settingsConfigPage.getRoleContentValue(roles.maxTimeOut)  
             expect(value === input).toBe(expected)
         });
     })
 
-    inputData2.forEach(({ input, description, expected }) => {
+    Data.inputDataAcceptsZero.forEach(({ input, description, expected }) => {
         test(`Modify ${roles.defaultTimeOut} via API validation via UI: Input value: ${input} description: ${description}`, async () => {
             const settingsConfigPage = await browser.createNewPage(SettingsConfigPage, urls.settingsUrl)
             const apiCall = new ApiCalls()
             await apiCall.modifySettingsRole(roles.defaultTimeOut, input)
             await settingsConfigPage.refreshPage()
-            const value = await settingsConfigPage.getRoleContentValue(roles.defaultTimeOut)      
+            const value = await settingsConfigPage.getRoleContentValue(roles.defaultTimeOut)    
             expect(value === input).toBe(expected)
         });
     })
 
-    inputData2.forEach(({ input, description, expected }) => {
+    Data.inputDataAcceptsZero.forEach(({ input, description, expected }) => {
         test(`Modify ${roles.resultSetSize} via API validation via UI: Input value: ${input} description: ${description}`, async () => {
             const settingsConfigPage = await browser.createNewPage(SettingsConfigPage, urls.settingsUrl)
             const apiCall = new ApiCalls()
@@ -89,18 +61,19 @@ test.describe('Settings Tests', () => {
         });
     })
 
-    inputData2.forEach(({ input, description, expected }) => {
+    Data.inputDataAcceptsZero.forEach(({ input, description, expected }) => {
         test(`Modify ${roles.queryMemCapacity} via API validation via UI: Input value: ${input} description: ${description}`, async () => {
             const settingsConfigPage = await browser.createNewPage(SettingsConfigPage, urls.settingsUrl)
             const apiCall = new ApiCalls()
             await apiCall.modifySettingsRole(roles.queryMemCapacity, input)
             await settingsConfigPage.refreshPage()
-            const value = await settingsConfigPage.getRoleContentValue(roles.queryMemCapacity)      
+            const value = await settingsConfigPage.getRoleContentValue(roles.queryMemCapacity)
+            await apiCall.modifySettingsRole(roles.queryMemCapacity, "0")//update to default values    
             expect(value === input).toBe(expected)
         });
     })
 
-    inputData2.forEach(({ input, description, expected }) => {
+    Data.inputDataAcceptsZero.forEach(({ input, description, expected }) => {
         test(`Modify ${roles.vKeyMaxEntityCount} via API validation via UI: Input value: ${input} description: ${description}`, async () => {
             const settingsConfigPage = await browser.createNewPage(SettingsConfigPage, urls.settingsUrl)
             const apiCall = new ApiCalls()
@@ -111,7 +84,7 @@ test.describe('Settings Tests', () => {
         });
     })
 
-    inputData1.forEach(({ input, description, expected }) => {
+    Data.CMDData.forEach(({ input, description, expected }) => {
         test(`Modify ${roles.cmdInfo} via API validation via UI: Input value: ${input} description: ${description}`, async () => {
             const settingsConfigPage = await browser.createNewPage(SettingsConfigPage, urls.settingsUrl)
             const apiCall = new ApiCalls()
@@ -122,7 +95,7 @@ test.describe('Settings Tests', () => {
         });
     })
 
-    inputData2.forEach(({ input, description, expected }) => {
+    Data.inputDataAcceptsZero.forEach(({ input, description, expected }) => {
         test(`Modify ${roles.maxInfoQueries} via API validation via UI: Input value: ${input} description: ${description}`, async () => {
             const settingsConfigPage = await browser.createNewPage(SettingsConfigPage, urls.settingsUrl)
             const apiCall = new ApiCalls()
@@ -132,4 +105,18 @@ test.describe('Settings Tests', () => {
             expect(value === input).toBe(expected)
         });
     })
+
+    Data.roleModificationData.forEach(({ role, input, description, expected }) => {
+        test(`Modify ${role} via UI validation via API: Input value: ${input} description: ${description}`, async () => {
+            const settingsConfigPage = await browser.createNewPage(SettingsConfigPage, urls.settingsUrl)
+            await settingsConfigPage.modifyRoleValue(role, input)
+            const apiCall = new ApiCalls()
+            let value = String((await apiCall.getSettingsRoleValue(role)).config[1]);
+            value = value === '1' ? 'yes' : value === '0' ? 'no' : value;
+            await apiCall.modifySettingsRole(roles.queryMemCapacity, "0")//update to default values   
+            expect(value === input).toBe(expected)
+        });
+    })
+
+    
 })

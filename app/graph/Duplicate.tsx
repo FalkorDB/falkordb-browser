@@ -1,5 +1,5 @@
 import { FormEvent, useState } from "react";
-import { Toast, securedFetch } from "@/lib/utils";
+import { Toast, prepareArg, securedFetch } from "@/lib/utils";
 import { Dialog } from "@/components/ui/dialog";
 import DialogComponent from "../components/DialogComponent";
 import Input from "../components/ui/Input";
@@ -18,7 +18,7 @@ export default function Duplicate({ open, onOpenChange, selectedValue, onDuplica
 
         e.preventDefault()
 
-        const result = await securedFetch(`api/graph/${duplicateName}/?sourceName=${selectedValue}`, {
+        const result = await securedFetch(`api/graph/${prepareArg(duplicateName)}/?sourceName=${prepareArg(selectedValue)}`, {
             method: "POST"
         })
 

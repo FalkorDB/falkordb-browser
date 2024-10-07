@@ -3,6 +3,7 @@ import urls  from '../config/urls.json'
 import  BrowserWrapper  from "../infra/ui/browserWrapper";
 import  SettingsUsersPage  from "../logic/POM/settingsUsersPage";
 import { user } from '../config/user.json'
+import { ApiCalls } from "../logic/api/apiCalls";
 
 test.describe('Settings Tests', () => {
     let browser : BrowserWrapper;
@@ -136,5 +137,43 @@ test.describe('Settings Tests', () => {
         expect(isVisible).toBe(true)
     })
 
+    test("API Test:Add user via API -> Validated user existing via API -> Delete user via API.", async () => {
+        const apiCall = new ApiCalls()
+        const username = `user_${Date.now()}` 
+        const password = user.password;
+        const role = user.ReadOnly
+        await apiCall.createUsers({username, password, role})
+        const users = await apiCall.getUsers()
+        await apiCall.deleteUsers({"users":[{"username":`${username}`}]})
+        const User = users.result.find(user => user.username === username);
+        expect(User?.username === username).toBe(true)
+    })
+    // fail tests
+    test(`API Test: without passing a username, Attempt to add a user and validate the user was not added`, async () => {
+        const apiCall = new ApiCalls()
+        const username = ''
+        await apiCall.createUsers({ username: username, password: user.password, role: user.ReadOnly });
+        const users = await apiCall.getUsers()
+        const User = users.result.find(user => user.username === username);
+        expect(User).toBeUndefined();
+    });
+
+    test(`API Test: without passing a role, Attempt to add a user and validate the user was not added`, async () => {
+        const apiCall = new ApiCalls()
+        const username = `user_${Date.now()}` 
+        await apiCall.createUsers({ username: username, password: '', role: user.ReadOnly });
+        const users = await apiCall.getUsers()
+        const User = users.result.find(user => user.username === username);
+        expect(User).toBeUndefined();
+    });
+
+    test(`API Test: without passing a password, Attempt to add a user and validate the user was not added`, async () => {
+        const apiCall = new ApiCalls()
+        const username = `user_${Date.now()}` 
+        await apiCall.createUsers({username: username, password: user.password, role: ''})
+        const users = await apiCall.getUsers()
+        const User = users.result.find(user => user.username === username);
+        expect(User).toBeUndefined();
+    });
 
 })

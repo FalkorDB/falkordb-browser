@@ -17,8 +17,8 @@ export default function DeleteUser({ isDeleteSelected, users, setUsers }: Delete
     const deleteSelected = async () => {
         if (!users) return
 
-        const response = await securedFetch(`/api/user/`, {
-            method: 'DELETE',
+        const response = await securedFetch('/api/user/?isDelete=true', {
+            method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
             },
