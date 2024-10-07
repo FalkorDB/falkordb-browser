@@ -554,7 +554,6 @@ export default function EditorComponent({ currentQuery, historyQueries, setCurre
             keybindings: [monaco.KeyCode.UpArrow],
             contextMenuOrder: 1.5,
             run: async () => {
-                debugger
                 const counter = historyRef.current.historyCounter ? historyRef.current.historyCounter - 1 : historyRef.current.historyQueries.length
                 historyRef.current.historyCounter = counter
                 setQuery(counter ? historyRef.current.historyQueries[counter - 1] : historyRef.current.currentQuery)
@@ -568,7 +567,6 @@ export default function EditorComponent({ currentQuery, historyQueries, setCurre
             keybindings: [monaco.KeyCode.DownArrow],
             contextMenuOrder: 1.5,
             run: async () => {
-                debugger
                 if (historyRef.current.historyQueries.length === 0) return
                 const counter = (historyRef.current.historyCounter + 1) % (historyRef.current.historyQueries.length + 1)
                 historyRef.current.historyCounter = counter
