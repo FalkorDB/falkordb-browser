@@ -60,7 +60,7 @@ export class Graph {
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any    
     private data: any[];
-
+    
     private categories: Category[];
 
     private labels: Category[];
@@ -180,8 +180,7 @@ export class Graph {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     public extendNode(cell: any) {
         // check if category already exists in categories
-        const category = this.createCategory(cell.labels[0] || "")
-
+        const categories = this.createCategory(cell.labels || [])
         // check if node already exists in nodes or fake node was created
         const currentNode = this.nodesMap.get(cell.id)
 
@@ -189,8 +188,8 @@ export class Graph {
             const node: NodeDataDefinition = {
                 id: cell.id.toString(),
                 name: cell.id.toString(),
-                category: category.name,
-                color: this.getCategoryColorValue(category.index),
+                category: categories.map(c => c.name),
+                color: this.getCategoryColorValue(categories[0]?.index),
             }
             Object.entries(cell.properties).forEach(([key, value]) => {
                 node[nodeSafeKey(key)] = value as string;
@@ -204,8 +203,8 @@ export class Graph {
             // set values in a fake node
             currentNode.id = cell.id.toString();
             currentNode.name = cell.id.toString();
-            currentNode.category = category.name;
-            currentNode.color = this.getCategoryColorValue(category.index)
+            currentNode.category = categories.map(c => c.name);
+            currentNode.color = this.getCategoryColorValue(categories[0].index)
             Object.entries(cell.properties).forEach(([key, value]) => {
                 currentNode[nodeSafeKey(key)] = value as string;
             });
@@ -322,17 +321,19 @@ export class Graph {
         return false
     }
 
-    public createCategory(category: string): Category {
-        let c = this.categoriesMap.get(category)
+    public createCategory(categories: string[]): Category[] {
+        return categories.map(category => {
+            let c = this.categoriesMap.get(category)
 
-        if (!c) {
-            c = { name: category, index: this.categoriesColorIndex, show: true }
-            this.categoriesColorIndex += 1
-            this.categoriesMap.set(c.name, c)
-            this.categories.push(c)
-        }
+            if (!c) {
+                c = { name: category, index: this.categoriesColorIndex, show: true }
+                this.categoriesColorIndex += 1
+                this.categoriesMap.set(c.name, c)
+                this.categories.push(c)
+            }
 
-        return c
+            return c
+        })
     }
 
     public createLabel(category: string): Category {

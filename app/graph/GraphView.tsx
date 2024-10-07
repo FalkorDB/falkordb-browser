@@ -270,16 +270,16 @@ const GraphView = forwardRef(({ graph, selectedElement, setSelectedElement, runQ
     const onCategoryClick = (category: Category) => {
         const chart = chartRef.current
         if (chart) {
-            const elements = chart.elements(`node[category = "${category.name}"]`)
+            const elements = chart.nodes(`[category.0 = "${category.name}"]`)
 
             // eslint-disable-next-line no-param-reassign
             category.show = !category.show
-
             if (category.show) {
                 elements.style({ display: 'element' })
             } else {
                 elements.style({ display: 'none' })
             }
+
             chart.elements().layout(LAYOUT).run();
         }
     }
@@ -287,7 +287,7 @@ const GraphView = forwardRef(({ graph, selectedElement, setSelectedElement, runQ
     const onLabelClick = (label: Category) => {
         const chart = chartRef.current
         if (chart) {
-            const elements = chart.elements(`edge[label = "${label.name}"]`)
+            const elements = chart.edges(`[label = "${label.name}"]`)
 
             // eslint-disable-next-line no-param-reassign
             label.show = !label.show
@@ -475,7 +475,6 @@ const GraphView = forwardRef(({ graph, selectedElement, setSelectedElement, runQ
                 }
                 <div className="flex items-center justify-between">
                     <Toolbar
-                        addDisabled
                         disabled={!graph.Id}
                         deleteDisabled={Object.values(selectedElements).length === 0 && !selectedElement}
                         onDeleteElement={handelDeleteElement}
