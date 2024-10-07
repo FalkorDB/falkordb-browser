@@ -5,6 +5,7 @@
 import { ElementDataDefinition, prepareArg, securedFetch, Toast } from "@/lib/utils";
 import { Dispatch, SetStateAction, useEffect, useState } from "react";
 import { ChevronRight, PlusCircle, Trash2 } from "lucide-react";
+import { Session } from "next-auth";
 import Button from "../components/ui/Button";
 import Input from "../components/ui/Input";
 import { Graph } from "../api/graph/model";
@@ -16,6 +17,7 @@ interface Props {
     onExpand: () => void;
     graph: Graph;
     onDeleteElement?: () => Promise<void>;
+    data: Session | null;
 }
 
 const excludedProperties = new Set([
@@ -26,9 +28,10 @@ const excludedProperties = new Set([
     "label",
     "target",
     "source",
+    "name",
 ]);
 
-export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement, graph }: Props) {
+export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement, graph, data }: Props) {
 
     const [attributes, setAttributes] = useState<string[]>([]);
     const [editable, setEditable] = useState<string>("");
@@ -40,7 +43,7 @@ export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement,
     const type = !("source" in obj)
 
     useEffect(() => {
-        setAttributes(Object.keys(obj).filter((key) => !excludedProperties.has(key)));
+        setAttributes(Object.keys(obj).filter((key) => !excludedProperties.has(key) || (key === "name" && obj.name !== obj.id)));
         setLabel(type ? obj.category : obj.label);
     }, [obj, type]);
 
@@ -52,9 +55,9 @@ export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement,
         })).ok
 
         if (success) {
-            graph.Elements.forEach(({ data }) => {
-                if (data.id !== id) return
-                data[key] = val
+            graph.Elements.forEach(({ data: d }) => {
+                if (d.id !== id) return
+                d[key] = val
             })
             setObj((prev) => ({ ...prev, [key]: val }))
             setNewVal("")
@@ -202,6 +205,7 @@ export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement,
                             label="Add Value"
                             icon={<PlusCircle />}
                             onClick={() => setIsAddValue(true)}
+                            disabled={data!.user.role === "Read-Only"}
                         />
                     </div>
                 </ul>
@@ -211,6 +215,7 @@ export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement,
                         icon={<Trash2 />}
                         label="Delete"
                         onClick={onDeleteElement}
+                        disabled={data!.user.role === "Read-Only"}
                     />
                 </div>
             </div>

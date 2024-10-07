@@ -9,6 +9,7 @@ import { ImperativePanelHandle } from "react-resizable-panels";
 import { ChevronLeft, Maximize2, Minimize2 } from "lucide-react"
 import { cn, ElementDataDefinition, prepareArg, securedFetch } from "@/lib/utils";
 import dynamic from "next/dynamic";
+import { Session } from "next-auth";
 import { Category, Graph } from "../api/graph/model";
 import DataPanel from "./GraphDataPanel";
 import Labels from "./labels";
@@ -95,7 +96,7 @@ function getStyle() {
 
 const getElementId = (element: ElementDataDefinition) => element.source ? { id: element.id?.slice(1), query: "()-[e]-()" } : { id: element.id, query: "(e)" }
 
-const GraphView = forwardRef(({ graph, selectedElement, setSelectedElement, runQuery, historyQuery, historyQueries, fetchCount }: {
+const GraphView = forwardRef(({ graph, selectedElement, setSelectedElement, runQuery, historyQuery, historyQueries, fetchCount, data }: {
     graph: Graph
     selectedElement: ElementDataDefinition | undefined
     setSelectedElement: Dispatch<SetStateAction<ElementDataDefinition | undefined>>
@@ -103,6 +104,7 @@ const GraphView = forwardRef(({ graph, selectedElement, setSelectedElement, runQ
     historyQuery: string
     historyQueries: string[]
     fetchCount: () => void
+    data: Session | null
 }, ref) => {
 
     const [query, setQuery] = useState<string>("")
@@ -349,13 +351,15 @@ const GraphView = forwardRef(({ graph, selectedElement, setSelectedElement, runQ
                     historyQueries={historyQueries}
                     runQuery={runQuery}
                     setCurrentQuery={setQuery}
+                    data={data}
                 />
                 <div className="flex items-center justify-between">
                     <Toolbar
                         disabled={!graph.Id}
-                        deleteDisabled={Object.values(selectedElements).length === 0 && !selectedElement}
+                        deleteDisabled={(Object.values(selectedElements).length === 0 && !selectedElement) || data!.user.role === "Read-Only"}
                         onDeleteElement={handelDeleteElement}
                         chartRef={chartRef}
+                        addDisabled
                     />
                     {
                         isCollapsed && graph.Id &&
@@ -436,6 +440,7 @@ const GraphView = forwardRef(({ graph, selectedElement, setSelectedElement, runQ
                         onExpand={onExpand}
                         graph={graph}
                         onDeleteElement={handelDeleteElement}
+                        data={data}
                     />
                 }
             </ResizablePanel>

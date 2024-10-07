@@ -132,14 +132,18 @@ export async function GET(request: NextRequest, { params }: { params: { graph: s
 
         const query = request.nextUrl.searchParams.get("query")
         const create = request.nextUrl.searchParams.get("create")
+        const role = request.nextUrl.searchParams.get("role")
 
         if (!query) throw new Error("Missing parameter 'query'")
 
         if (create === "false" && (await client.list()).some((g) => g === graphId))
             return NextResponse.json({}, { status: 200 })
-        
+
         const graph = client.selectGraph(graphId)
-        const result = await graph.query(query)
+
+        const result = role === "Read-Only"
+            ? await graph.roQuery(query)
+            : await graph.query(query)
 
         if (!result) throw new Error("something went wrong")
 
