@@ -2,7 +2,6 @@ import { test as setup } from "@playwright/test"
 import urls from '../config/urls.json'
 import BrowserWrapper from "../infra/ui/browserWrapper";
 import { LoginPage } from "../logic/POM/loginPage";
-import { ApiCalls } from "../logic/api/apiCalls";
 import {user} from '../config/user.json'
 import SettingsUsersPage from "../logic/POM/settingsUsersPage";
 
@@ -27,27 +26,21 @@ setup("admin authentication", async () => {
     }
 });
 
+const userRoles = [
+    { name: 'readwrite', file: readWriteAuthFile, userName: 'readwriteuser' },
+    { name: 'readonly', file: readOnlyAuthFile, userName: 'readonlyuser' }
+];
 
-setup("readwrite authentication", async () => {
-    try {
-        const browserWrapper = new BrowserWrapper();
-        const loginPage = await browserWrapper.createNewPage(LoginPage, urls.loginUrl);
-        await loginPage.connectWithCredentials("readwriteuser", user.password)
-        const context = browserWrapper.getContext();
-        await context!.storageState({ path: readWriteAuthFile });
-    } catch (error) {
-        console.error("Error during additional setup:", error);
-    }
-});
-
-setup("readOnly authentication", async () => {
-    try {
-        const browserWrapper = new BrowserWrapper();
-        const loginPage = await browserWrapper.createNewPage(LoginPage, urls.loginUrl);
-        await loginPage.connectWithCredentials("readonlyuser", user.password)
-        const context = browserWrapper.getContext();
-        await context!.storageState({ path: readOnlyAuthFile });
-    } catch (error) {
-        console.error("Error during additional setup:", error);
-    }
+userRoles.forEach(({ name, file, userName }) => {
+    setup(`${name} authentication`, async () => {
+        try {
+            const browserWrapper = new BrowserWrapper();
+            const loginPage = await browserWrapper.createNewPage(LoginPage, urls.loginUrl);
+            await loginPage.connectWithCredentials(userName, user.password);
+            const context = browserWrapper.getContext();
+            await context!.storageState({ path: file });
+        } catch (error) {
+            console.error(`Error during ${name} authentication setup:`, error);
+        }
+    });
 });
