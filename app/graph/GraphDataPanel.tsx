@@ -95,7 +95,7 @@ export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement,
                         icon={<ChevronRight />}
                         onClick={() => onExpand()}
                     />
-                    <p>{label}</p>
+                    <p>{Array.isArray(label) ? label.join(", ") : label}</p>
                 </div>
                 <div>
                     <p>Attributes {attributes.length}</p>

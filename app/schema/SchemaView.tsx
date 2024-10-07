@@ -144,7 +144,7 @@ export default function SchemaView({ schema, fetchCount }: Props) {
     const onCategoryClick = (category: Category) => {
         const chart = chartRef.current
         if (chart) {
-            const nodes = chart.elements(`node[category = "${category.name}"]`)
+            const nodes = chart.elements(`node[category.0 = "${category.name}"]`)
 
             // eslint-disable-next-line no-param-reassign
             category.show = !category.show
@@ -374,7 +374,7 @@ export default function SchemaView({ schema, fetchCount }: Props) {
 
                 schema.updateCategories(prevCategory.name, true)
 
-                const c = schema.createCategory(category)
+                const [c] = schema.createCategory([category])
 
                 chartRef.current?.elements().forEach(n => {
                     if (n.data().category === category) {
@@ -431,7 +431,7 @@ export default function SchemaView({ schema, fetchCount }: Props) {
                 chartRef?.current?.add({ data: schema.extendNode(json.result.data[0].n) })
                 setIsAddEntity(false)
             } else {
-                chartRef?.current?.add({ data: schema.extendEdge(json.result.data[0].e) })
+                chartRef?.current?.add({ data: schema.extendEdge(json.result.data[0].e, true) })
                 setIsAddRelation(false)
             }
 

@@ -1,12 +1,12 @@
 'use client'
 
 import { useCallback, useEffect, useState } from "react";
-import { Toast, defaultQuery, prepareArg, securedFetch } from "@/lib/utils";
+import { Toast, prepareArg, securedFetch } from "@/lib/utils";
 import { ElementDataDefinition } from "cytoscape";
-import GraphView from "./GraphView";
 import Selector from "./Selector";
 import Header from "../components/Header";
 import { Graph, Query } from "../api/graph/model";
+import GraphView from "./GraphView";
 
 export default function Page() {
 
@@ -39,6 +39,10 @@ export default function Page() {
     }, [graphName])
 
     useEffect(() => {
+        fetchCount()
+    }, [graphName, fetchCount])
+
+    useEffect(() => {
         if (graphName !== graph.Id) {
             const colors = localStorage.getItem(graphName)?.split(/[[\]",]/).filter(c => c)
             setGraph(Graph.empty(graphName, colors))
@@ -46,17 +50,14 @@ export default function Page() {
         fetchCount()
     }, [fetchCount, graph.Id, graphName])
 
-    useEffect(() => {
-        fetchCount()
-    }, [fetchCount, graphName])
-
     const run = async (query: string) => {
         if (!graphName) {
             Toast("Select a graph first")
             return null
         }
-        
-        const result = await securedFetch(`api/graph/${prepareArg(graphName)}/?query=${prepareArg(defaultQuery(query))}`, {
+
+        const result = await securedFetch(`api/graph/${prepareArg(graphName)}/?query=${prepareArg(query)}`, {
+
             method: "GET"
         })
         
@@ -69,16 +70,17 @@ export default function Page() {
     }
 
     const runQuery = async (query: string) => {
+        if (!query) return
         const result = await run(query)
         if (!result) return
-        setQueries(prev => [...prev, { text: defaultQuery(query), metadata: result.metadata }])
+        setQueries(prev => [...prev, { text: query, metadata: result.metadata }])
         setGraph(Graph.create(graphName, result, graph.Colors))
     }
 
     const runHistoryQuery = async (query: string, setQueriesOpen: (open: boolean) => void) => {
         const result = await run(query)
         if (!result) return
-        setQueries(prev => prev.filter(q => q.text === query).length > 0 ? prev : [...prev, { text: query, metadata: result.metadata }])
+        setQueries(prev => prev.some(q => q.text === query) ? prev : [...prev, { text: query, metadata: result.metadata }])
         setGraph(Graph.create(graphName, result))
         setHistoryQuery(query)
         setQueriesOpen(false)
@@ -105,6 +107,7 @@ export default function Page() {
                     setSelectedElement={setSelectedElement}
                     runQuery={runQuery}
                     historyQuery={historyQuery}
+                    historyQueries={queries.map(({ text }) => text)}
                     fetchCount={fetchCount}
                 />
             </div>

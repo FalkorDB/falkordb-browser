@@ -88,9 +88,14 @@ input[type="number"]::-webkit-inner-spin-button {
     -webkit-appearance: none;
     margin: 0;
 }
+
 input[type="number"] {
     -moz-appearance: textfield;
 
+}
+
+.monaco-editor .suggest-widget {
+    margin-top: 0.5rem;
 }
 
 @font-face {
