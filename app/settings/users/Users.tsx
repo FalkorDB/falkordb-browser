@@ -4,7 +4,7 @@ import React, { useEffect, useState } from "react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { CheckedState } from "@radix-ui/react-checkbox";
 import { User } from "@/app/api/user/model";
-import { cn, securedFetch } from "@/lib/utils";
+import { cn, prepareArg, securedFetch } from "@/lib/utils";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import Combobox from "@/app/components/ui/combobox";
 import DeleteUser from "./DeleteUser";
@@ -46,7 +46,7 @@ export default function Users() {
 
             if (!selected) return user
 
-            const result = await securedFetch(`api/user/${user.username}/?role=${role}`, {
+            const result = await securedFetch(`api/user/${prepareArg(user.username)}/?role=${role}`, {
                 method: 'PATCH'
             })
 

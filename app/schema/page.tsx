@@ -16,23 +16,21 @@ export default function Page() {
 
     const fetchCount = useCallback(async () => {
         const name = `${schemaName}_schema`
-            const q = [
-                "MATCH (n) RETURN COUNT(n) as nodes",
-                "MATCH ()-[e]->() RETURN COUNT(e) as edges"
-            ]
+        const q1 = "MATCH (n) RETURN COUNT(n) as nodes"
+        const q2 = "MATCH ()-[e]->() RETURN COUNT(e) as edges"
 
-            const nodes = await (await securedFetch(`api/graph/${prepareArg(name)}/?query=${q[0]}`, {
-                method: "GET"
-            })).json()
+        const nodes = await (await securedFetch(`api/graph/${prepareArg(name)}/?query=${q1}`, {
+            method: "GET"
+        })).json()
 
-            const edges = await (await securedFetch(`api/graph/${prepareArg(name)}/?query=${q[1]}`, {
-                method: "GET"
-            })).json()
+        const edges = await (await securedFetch(`api/graph/${prepareArg(name)}/?query=${q2}`, {
+            method: "GET"
+        })).json()
 
-            if (!edges || !nodes) return
+        if (!edges || !nodes) return
 
-            setEdgesCount(edges.result?.data[0].edges)
-            setNodesCount(nodes.result?.data[0].nodes)
+        setEdgesCount(edges.result?.data[0].edges)
+        setNodesCount(nodes.result?.data[0].nodes)
     }, [schemaName])
 
     useEffect(() => {

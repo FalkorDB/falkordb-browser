@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getClient } from "@/app/api/auth/[...nextauth]/options";
-import { securedFetch } from "@/lib/utils";
+import { prepareArg, securedFetch } from "@/lib/utils";
 
 // eslint-disable-next-line import/prefer-default-export
 export async function DELETE(request: NextRequest, { params }: { params: { graph: string } }) {
@@ -68,7 +68,7 @@ export async function POST(request: NextRequest, { params }: { params: { graph: 
 
         if (!type) console.error("Missing parameter 'type'")
 
-        const res = await securedFetch(`http://localhost:5000/${type}`, {
+        const res = await securedFetch(`http://localhost:5000/${prepareArg(type!)}`, {
             method: "POST",
             headers: {
                 'Content-Type': 'application/json'
@@ -134,10 +134,10 @@ export async function GET(request: NextRequest, { params }: { params: { graph: s
         const create = request.nextUrl.searchParams.get("create")
 
         if (!query) throw new Error("Missing parameter 'query'")
-        if (create === "false") {
-            const type = await (await client.connection).type(graphId)
-            if (type === "none") return NextResponse.json({}, { status: 200 })
-        }
+
+        if (create === "false" && (await client.list()).some((g) => g === graphId))
+            return NextResponse.json({}, { status: 200 })
+        
         const graph = client.selectGraph(graphId)
         const result = await graph.query(query)
 

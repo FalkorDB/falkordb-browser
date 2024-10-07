@@ -69,7 +69,7 @@ export default function Combobox({ isSelectGraph, disabled = false, inTable, typ
     if (!setOptions) return
     if (e.key !== "Enter") return
 
-    const result = await securedFetch(`api/graph/${prepareArg(optionName)}/?sourceName=${option}`, {
+    const result = await securedFetch(`api/graph/${prepareArg(optionName)}/?sourceName=${prepareArg(option)}`, {
       method: "PATCH",
       headers: {
         "Content-Type": "application/json"
@@ -102,22 +102,25 @@ export default function Combobox({ isSelectGraph, disabled = false, inTable, typ
             open={open}
           />
         </DropdownMenuTrigger>
-        <DropdownMenuContent side="bottom" className="min-w-52">
+        <DropdownMenuContent side="bottom" className="min-w-52 max-h-[30lvh] flex flex-col">
           {
             options.length > 0 &&
-            options.map((option, index) => (
-              // eslint-disable-next-line react/no-array-index-key
-              <DropdownMenuItem key={index}>
-                <Button
-                  className="w-full p-2"
-                  label={option}
-                  onClick={() => {
-                    setSelectedValue(option)
-                    setOpen(false)
-                  }}
-                />
-              </DropdownMenuItem>
-            ))
+            <ul className="shrink grow overflow-auto">
+              {
+                options.map((option) => (
+                  <DropdownMenuItem key={option}>
+                    <Button
+                      className="w-full p-2"
+                      label={option}
+                      onClick={() => {
+                        setSelectedValue(option)
+                        setOpen(false)
+                      }}
+                    />
+                  </DropdownMenuItem>
+                ))
+              }
+            </ul>
           }
           {
             isSelectGraph &&
