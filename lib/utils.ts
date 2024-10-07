@@ -23,8 +23,8 @@ export async function securedFetch(input: string | URL | globalThis.Request, ini
   const response = await fetch(input, init)
   const { status } = response
   if (status >= 300) {
-    response.text().then((message) => {
-      Toast(message)
+    response.json().then((err) => {
+      Toast(err.message)
     }).then(() => {
       if (status === 401 || status >= 500) {
         signOut({ callbackUrl: '/login' })
