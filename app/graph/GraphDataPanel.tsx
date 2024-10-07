@@ -119,7 +119,7 @@ export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement,
                                 </div>
                                 <div className="w-1 grow flex gap-2">
                                     {
-                                        editable === key ?
+                                        editable === key && data?.user.role !== "Read-Only" ?
                                             <Input
                                                 ref={(ref) => ref?.focus()}
                                                 variant="Small"
@@ -205,7 +205,7 @@ export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement,
                             label="Add Value"
                             icon={<PlusCircle />}
                             onClick={() => setIsAddValue(true)}
-                            disabled={data!.user.role === "Read-Only"}
+                            disabled={data?.user.role === "Read-Only"}
                         />
                     </div>
                 </ul>
@@ -215,7 +215,7 @@ export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement,
                         icon={<Trash2 />}
                         label="Delete"
                         onClick={onDeleteElement}
-                        disabled={data!.user.role === "Read-Only"}
+                        disabled={data?.user.role === "Read-Only"}
                     />
                 </div>
             </div>

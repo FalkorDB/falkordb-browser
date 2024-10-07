@@ -66,7 +66,7 @@ export default function Selector({ onChange, graphName, queries, runQuery, edges
     const handleOnChange = async (name: string) => {
         if (runQuery) {
             const q = 'MATCH (n)-[e]-(m) return n,e,m'
-            const result = await securedFetch(`api/graph/${prepareArg(name)}_schema/?query=${prepareArg(q)}&create=false&role=${data!.user.role}`, {
+            const result = await securedFetch(`api/graph/${prepareArg(name)}_schema/?query=${prepareArg(q)}&create=false&role=${data?.user.role}`, {
                 method: "GET"
             })
 
@@ -258,7 +258,7 @@ export default function Selector({ onChange, graphName, queries, runQuery, edges
                                 />
                             </DialogTrigger>
                             <DialogComponent className="h-[90%] w-[90%]" title={`${selectedValue} Schema`}>
-                                <SchemaView schema={schema} />
+                                <SchemaView schema={schema} data={data}/>
                             </DialogComponent>
                         </Dialog>
                     </div>

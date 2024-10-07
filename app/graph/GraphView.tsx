@@ -356,7 +356,7 @@ const GraphView = forwardRef(({ graph, selectedElement, setSelectedElement, runQ
                 <div className="flex items-center justify-between">
                     <Toolbar
                         disabled={!graph.Id}
-                        deleteDisabled={(Object.values(selectedElements).length === 0 && !selectedElement) || data!.user.role === "Read-Only"}
+                        deleteDisabled={(Object.values(selectedElements).length === 0 && !selectedElement) || data?.user.role === "Read-Only"}
                         onDeleteElement={handelDeleteElement}
                         chartRef={chartRef}
                         addDisabled
