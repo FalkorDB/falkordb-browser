@@ -165,7 +165,6 @@ export default function Selector({ onChange, graphName, queries, runQuery, edges
                         <Dialog open={queriesOpen} onOpenChange={setQueriesOpen}>
                             <DialogTrigger disabled={!selectedValue || !queries || queries.length === 0} asChild>
                                 <Button
-                                    disabled={!selectedValue || !queries || queries.length === 0}
                                     label="Query History"
                                 />
                             </DialogTrigger>

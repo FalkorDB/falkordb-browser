@@ -431,7 +431,7 @@ export default function SchemaView({ schema, fetchCount }: Props) {
                 chartRef?.current?.add({ data: schema.extendNode(json.result.data[0].n) })
                 setIsAddEntity(false)
             } else {
-                chartRef?.current?.add({ data: schema.extendEdge(json.result.data[0].e) })
+                chartRef?.current?.add({ data: schema.extendEdge(json.result.data[0].e, true) })
                 setIsAddRelation(false)
             }
 
