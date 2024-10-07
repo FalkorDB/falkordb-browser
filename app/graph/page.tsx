@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState } from "react";
-import { Toast, defaultQuery, prepareArg, securedFetch } from "@/lib/utils";
+import { Toast, prepareArg, securedFetch } from "@/lib/utils";
 import Selector from "./Selector";
 import Header from "../components/Header";
 import { Graph, Query } from "../api/graph/model";
@@ -54,7 +54,7 @@ export default function Page() {
             return null
         }
 
-        const result = await securedFetch(`api/graph/${prepareArg(graphName)}/?query=${prepareArg(defaultQuery(query))}`, {
+        const result = await securedFetch(`api/graph/${prepareArg(graphName)}/?query=${prepareArg(query)}`, {
             method: "GET"
         })
 
@@ -66,16 +66,17 @@ export default function Page() {
     }
 
     const runQuery = async (query: string) => {
+        if (!query) return
         const result = await run(query)
         if (!result) return
-        setQueries(prev => [...prev, { text: defaultQuery(query), metadata: result.metadata }])
+        setQueries(prev => [...prev, { text: query, metadata: result.metadata }])
         setGraph(Graph.create(graphName, result, graph.Colors))
     }
 
     const runHistoryQuery = async (query: string, setQueriesOpen: (open: boolean) => void) => {
         const result = await run(query)
         if (!result) return
-        setQueries(prev => prev.filter(q => q.text === query).length > 0 ? prev : [...prev, { text: query, metadata: result.metadata }])
+        setQueries(prev => prev.some(q => q.text === query) ? prev : [...prev, { text: query, metadata: result.metadata }])
         setGraph(Graph.create(graphName, result))
         setHistoryQuery(query)
         setQueriesOpen(false)

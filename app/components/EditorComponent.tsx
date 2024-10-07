@@ -51,7 +51,7 @@ const monacoOptions: monaco.editor.IStandaloneEditorConstructionOptions = {
     },
     automaticLayout: true,
     fontSize: 30,
-    fontWeight: "normal",
+    fontWeight: "200",
     wordWrap: "off",
     lineHeight: 38,
     lineNumbers: "on",
@@ -207,11 +207,15 @@ export default function EditorComponent({ currentQuery, historyQueries, setCurre
     const submitQuery = useRef<HTMLButtonElement>(null)
     const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null)
     const [blur, setBlur] = useState(false)
-    const [historyCounter, setHistoryCounter] = useState(0)
+    const historyRef = useRef({
+        historyQueries,
+        currentQuery,
+        historyCounter: historyQueries.length
+    })
 
     useEffect(() => {
-        console.log("historyQueries", historyQueries);
-    }, [historyCounter])
+        historyRef.current.historyQueries = historyQueries
+    }, [historyQueries, currentQuery])
 
     useEffect(() => {
         if (!editorRef.current) return
@@ -219,7 +223,8 @@ export default function EditorComponent({ currentQuery, historyQueries, setCurre
     }, [isCollapsed])
 
     useEffect(() => {
-        setCurrentQuery(currentQuery)
+        setQuery(currentQuery)
+        historyRef.current.currentQuery = currentQuery
     }, [currentQuery])
 
     const setTheme = (monacoI: Monaco) => {
@@ -255,7 +260,7 @@ export default function EditorComponent({ currentQuery, historyQueries, setCurre
                     suggestions: [
                         ...(sug || []).map(s => ({ ...s, range })),
                         ...suggestions.keywords.map(s => ({ ...s, range })),
-                        ...(procedures || []).map(s => ({ ...s, range }))
+                        ...(procedures || []).map(s => ({ ...s, range,  }))
                     ]
                 }
             },
@@ -327,7 +332,8 @@ export default function EditorComponent({ currentQuery, historyQueries, setCurre
                 functions.push({
                     label: name,
                     kind: monaco.languages.CompletionItemKind.Function,
-                    insertText: `${name}()`,
+                    insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+                    insertText: `${name}($0)`,
                     range: new monaco.Range(1, 1, 1, 1),
                     detail: "(function)"
                 })
@@ -548,10 +554,10 @@ export default function EditorComponent({ currentQuery, historyQueries, setCurre
             keybindings: [monaco.KeyCode.UpArrow],
             contextMenuOrder: 1.5,
             run: async () => {
-                if (historyQueries.length === 0) return
-                const counter = (historyCounter + 1) % historyQueries.length
-                setHistoryCounter(counter)
-                setCurrentQuery(counter ? historyQueries[counter - 1] : currentQuery)
+                debugger
+                const counter = historyRef.current.historyCounter ? historyRef.current.historyCounter - 1 : historyRef.current.historyQueries.length
+                historyRef.current.historyCounter = counter
+                setQuery(counter ? historyRef.current.historyQueries[counter - 1] : historyRef.current.currentQuery)
             },
             precondition: '!suggestWidgetVisible',
         });
@@ -562,10 +568,11 @@ export default function EditorComponent({ currentQuery, historyQueries, setCurre
             keybindings: [monaco.KeyCode.DownArrow],
             contextMenuOrder: 1.5,
             run: async () => {
-                if (historyQueries.length === 0) return
-                const counter = historyCounter ? historyCounter - 1 : historyCounter
-                setHistoryCounter(counter)
-                setCurrentQuery(counter ? historyQueries[counter - 1] : currentQuery)
+                debugger
+                if (historyRef.current.historyQueries.length === 0) return
+                const counter = (historyRef.current.historyCounter + 1) % (historyRef.current.historyQueries.length + 1)
+                historyRef.current.historyCounter = counter
+                setQuery(counter ? historyRef.current.historyQueries[counter - 1] : historyRef.current.currentQuery)
             },
             precondition: '!suggestWidgetVisible',
         });
@@ -597,7 +604,7 @@ export default function EditorComponent({ currentQuery, historyQueries, setCurre
                                     language="custom-language"
                                     options={monacoOptions}
                                     value={blur ? query.trim() : query}
-                                    onChange={(val) => setQuery(val || "")}
+                                    onChange={(val) => historyRef.current.historyCounter ? setQuery(val || "") : setCurrentQuery(val || "")}
                                     theme="custom-theme"
                                     beforeMount={handleEditorWillMount}
                                     onMount={handleEditorDidMount}
