@@ -6,6 +6,7 @@ import { Editor } from "@monaco-editor/react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { editor } from "monaco-editor";
 import { Toast, cn, prepareArg, securedFetch } from "@/lib/utils";
+import { Session } from "next-auth";
 import Combobox from "../components/ui/combobox";
 import { Graph, Query } from "../api/graph/model";
 import UploadGraph from "../components/graph/UploadGraph";
@@ -15,7 +16,7 @@ import Duplicate from "./Duplicate";
 import SchemaView from "../schema/SchemaView";
 import View from "./View";
 
-export default function Selector({ onChange, graphName, queries, runQuery, edgesCount, nodesCount, setGraph, graph }: {
+export default function Selector({ onChange, graphName, queries, runQuery, edgesCount, nodesCount, setGraph, graph, data }: {
     /* eslint-disable react/require-default-props */
     onChange: (selectedGraphName: string) => void
     graphName: string
@@ -25,6 +26,7 @@ export default function Selector({ onChange, graphName, queries, runQuery, edges
     nodesCount: number
     setGraph: (graph: Graph) => void
     graph: Graph
+    data: Session | null
 }) {
 
     const [options, setOptions] = useState<string[]>([]);
@@ -64,7 +66,7 @@ export default function Selector({ onChange, graphName, queries, runQuery, edges
     const handleOnChange = async (name: string) => {
         if (runQuery) {
             const q = 'MATCH (n)-[e]-(m) return n,e,m'
-            const result = await securedFetch(`api/graph/${prepareArg(name)}_schema/?query=${prepareArg(q)}&create=false`, {
+            const result = await securedFetch(`api/graph/${prepareArg(name)}_schema/?query=${prepareArg(q)}&create=false&role=${data?.user.role}`, {
                 method: "GET"
             })
 
@@ -256,7 +258,7 @@ export default function Selector({ onChange, graphName, queries, runQuery, edges
                                 />
                             </DialogTrigger>
                             <DialogComponent className="h-[90%] w-[90%]" title={`${selectedValue} Schema`}>
-                                <SchemaView schema={schema} />
+                                <SchemaView schema={schema} data={data}/>
                             </DialogComponent>
                         </Dialog>
                     </div>

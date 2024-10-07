@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { cn, ElementDataDefinition, Toast } from "@/lib/utils";
 import { ChevronRight, Trash2 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Session } from "next-auth";
 import Input from "../components/ui/Input";
 import Button from "../components/ui/Button";
 import Combobox from "../components/ui/combobox";
@@ -31,11 +32,12 @@ interface Props {
     onSetAttribute: (key: string, val: Attribute) => Promise<boolean>
     onRemoveAttribute: (key: string) => Promise<boolean>
     onSetCategory: (label: string) => Promise<boolean>
+    data: Session | null
 }
 
 const emptyAttribute = (): Attribute => [undefined, "", false, false]
 
-export default function SchemaCreateElement({ obj, onExpand, onDelete, onSetAttribute, onRemoveAttribute, onSetCategory }: Props) {
+export default function SchemaCreateElement({ obj, onExpand, onDelete, onSetAttribute, onRemoveAttribute, onSetCategory, data }: Props) {
 
     const [attribute, setAttribute] = useState<Attribute>(emptyAttribute())
     const [newVal, setVal] = useState<string>("")
@@ -199,6 +201,7 @@ export default function SchemaCreateElement({ obj, onExpand, onDelete, onSetAttr
                             label="Add Attribute"
                             variant="Secondary"
                             onClick={() => setIsAddValue(prev => !prev)}
+                            disabled={data?.user.role === "Read-Only"}
                         />
                     </TableCaption>
                     <TableBody>
@@ -224,7 +227,7 @@ export default function SchemaCreateElement({ obj, onExpand, onDelete, onSetAttr
                                             />
                                         }
                                         {
-                                            editable === `${index}-key` ?
+                                            editable === `${index}-key` && data?.user.role !== "Read-Only" ?
                                                 <Input
                                                     ref={ref => ref?.focus()}
                                                     className="w-28"
@@ -245,7 +248,7 @@ export default function SchemaCreateElement({ obj, onExpand, onDelete, onSetAttr
                                     </TableCell>
                                     <TableCell>
                                         {
-                                            editable === `${index}-0` ?
+                                            editable === `${index}-0` && data?.user.role !== "Read-Only" ?
                                                 <Combobox
                                                     options={OPTIONS}
                                                     setSelectedValue={async (selectedValue) => {
@@ -276,7 +279,7 @@ export default function SchemaCreateElement({ obj, onExpand, onDelete, onSetAttr
                                     </TableCell>
                                     <TableCell>
                                         {
-                                            editable === `${index}-1` ?
+                                            editable === `${index}-1` && data?.user.role !== "Read-Only" ?
                                                 <Input
                                                     ref={ref => ref?.focus()}
                                                     className="w-28"
@@ -294,7 +297,7 @@ export default function SchemaCreateElement({ obj, onExpand, onDelete, onSetAttr
                                     </TableCell>
                                     <TableCell>
                                         {
-                                            editable === `${index}-2` ?
+                                            editable === `${index}-2` && data?.user.role !== "Read-Only" ?
                                                 <Checkbox
                                                     ref={ref => ref?.focus()}
                                                     className="h-6 w-6 border-[#57577B] data-[state=checked]:bg-[#57577B]"
@@ -317,7 +320,7 @@ export default function SchemaCreateElement({ obj, onExpand, onDelete, onSetAttr
                                     </TableCell>
                                     <TableCell>
                                         {
-                                            editable === `${index}-3` ?
+                                            editable === `${index}-3` && data?.user.role !== "Read-Only" ?
                                                 <Checkbox
                                                     ref={ref => ref?.focus()}
                                                     className="h-6 w-6 border-[#57577B] data-[state=checked]:bg-[#57577B]"
@@ -410,6 +413,7 @@ export default function SchemaCreateElement({ obj, onExpand, onDelete, onSetAttr
                         label="Delete"
                         variant="Secondary"
                         onClick={onDelete}
+                        disabled={data?.user.role === "Read-Only"}
                     />
                 </div>
             </div>
