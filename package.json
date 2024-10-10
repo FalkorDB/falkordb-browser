@@ -46,7 +46,7 @@
     "eslint-plugin-jsx-a11y": "^6.8.0",
     "eslint-plugin-react": "^7.33.2",
     "eslint-plugin-react-hooks": "^4.6.0",
-    "falkordb": "^6.2.2",
+    "falkordb": "^6.2.3",
     "formidable": "^3.5.1",
     "fs": "^0.0.1-security",
     "lodash": "^4.17.21",
