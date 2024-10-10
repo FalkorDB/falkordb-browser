@@ -16,7 +16,7 @@ test.describe('Settings Tests', () => {
         await browser.closeBrowser();
     })
 
-    test("Add one new user -> validating user exists in the users list", async () => {
+    test("@admin Add one new user -> validating user exists in the users list", async () => {
         const settingsUsersPage = await browser.createNewPage(SettingsUsersPage, urls.settingsUrl)
         await settingsUsersPage.navigateToUserTab();
         const username = `user_${Date.now()}`
@@ -26,7 +26,7 @@ test.describe('Settings Tests', () => {
         expect(isVisible).toBe(true)
     })
 
-    test("Add one user -> remove one user by hover -> Validate that the user has been removed", async () => {
+    test("@admin Add one user -> remove one user by hover -> Validate that the user has been removed", async () => {
         // Adding one user
         const settingsUsersPage = await browser.createNewPage(SettingsUsersPage, urls.settingsUrl)
         await settingsUsersPage.navigateToUserTab();
@@ -41,7 +41,7 @@ test.describe('Settings Tests', () => {
         
     })
 
-    test("Add one user -> change the role -> Validate that the user role have been changed", async () => {
+    test("@admin Add one user -> change the role -> Validate that the user role have been changed", async () => {
         // Adding one user
         const settingsUsersPage = await browser.createNewPage(SettingsUsersPage, urls.settingsUrl)
         await settingsUsersPage.navigateToUserTab();
@@ -56,7 +56,7 @@ test.describe('Settings Tests', () => {
             
     })
 
-    test("Add two users -> change their roles via checkbox -> Validate that the users roles have been changed", async () => {
+    test("@admin Add two users -> change their roles via checkbox -> Validate that the users roles have been changed", async () => {
         // Adding two user
         const settingsUsersPage = await browser.createNewPage(SettingsUsersPage, urls.settingsUrl)
         await settingsUsersPage.navigateToUserTab();
@@ -77,7 +77,7 @@ test.describe('Settings Tests', () => {
         expect([userName1Role, userName2Role]).toEqual(["Read-Only", "Read-Only"])   
     })
 
-    test("Add two users -> delete the two users by checkbox -> Validate that the users have been deleted", async () => {
+    test("@admin Add two users -> delete the two users by checkbox -> Validate that the users have been deleted", async () => {
         // Adding two user
         const settingsUsersPage = await browser.createNewPage(SettingsUsersPage, urls.settingsUrl)
         await settingsUsersPage.navigateToUserTab();
@@ -106,7 +106,7 @@ test.describe('Settings Tests', () => {
     ];
 
     searchData.forEach(({ invalidPassword, description }) => {
-        test(`Enter password for new user: ${invalidPassword} reason: ${description} `, async () => {
+        test(`@admin Enter password for new user: ${invalidPassword} reason: ${description} `, async () => {
             const settingsUsersPage = await browser.createNewPage(SettingsUsersPage, urls.settingsUrl)
             await settingsUsersPage.navigateToUserTab();
             const username = `user_${Date.now()}`
@@ -118,7 +118,7 @@ test.describe('Settings Tests', () => {
         });
     })
 
-    test("Attempt to add a user without assigning a role -> Verify that the user has not been added", async () => {
+    test("@admin Attempt to add a user without assigning a role -> Verify that the user has not been added", async () => {
         const settingsUsersPage = await browser.createNewPage(SettingsUsersPage, urls.settingsUrl)
         await settingsUsersPage.navigateToUserTab();
         const username = `user_${Date.now()}`
@@ -129,7 +129,7 @@ test.describe('Settings Tests', () => {
         expect(isVisible).toBe(false)
     })
 
-    test("Attempt to delete the default admin user -> Verify that the user has not been deleted.", async () => {
+    test("@admin Attempt to delete the default admin user -> Verify that the user has not been deleted.", async () => {
         const settingsUsersPage = await browser.createNewPage(SettingsUsersPage, urls.settingsUrl)
         await settingsUsersPage.navigateToUserTab();
         await settingsUsersPage.removeUserByCheckbox('default')
@@ -137,19 +137,17 @@ test.describe('Settings Tests', () => {
         expect(isVisible).toBe(true)
     })
 
-    test("API Test:Add user via API -> Validated user existing via API -> Delete user via API.", async () => {
+    test("@admin API Test:Add user via API -> Validated user existing via API -> Delete user via API.", async () => {
         const apiCall = new ApiCalls()
         const username = `user_${Date.now()}` 
-        const password = user.password;
-        const role = user.ReadOnly
-        await apiCall.createUsers({username, password, role})
+        await apiCall.createUsers({username, password: user.password, role: user.ReadOnly})
         const users = await apiCall.getUsers()
         await apiCall.deleteUsers({"users":[{"username":`${username}`}]})
         const User = users.result.find(user => user.username === username);
         expect(User?.username === username).toBe(true)
     })
     // fail tests
-    test(`API Test: without passing a username, Attempt to add a user and validate the user was not added`, async () => {
+    test(`@admin API Test: without passing a username, Attempt to add a user and validate the user was not added`, async () => {
         const apiCall = new ApiCalls()
         const username = ''
         await apiCall.createUsers({ username: username, password: user.password, role: user.ReadOnly });
@@ -158,7 +156,7 @@ test.describe('Settings Tests', () => {
         expect(User).toBeUndefined();
     });
 
-    test(`API Test: without passing a role, Attempt to add a user and validate the user was not added`, async () => {
+    test(`@admin API Test: without passing a role, Attempt to add a user and validate the user was not added`, async () => {
         const apiCall = new ApiCalls()
         const username = `user_${Date.now()}` 
         await apiCall.createUsers({ username: username, password: '', role: user.ReadOnly });
@@ -167,7 +165,7 @@ test.describe('Settings Tests', () => {
         expect(User).toBeUndefined();
     });
 
-    test(`API Test: without passing a password, Attempt to add a user and validate the user was not added`, async () => {
+    test(`@admin API Test: without passing a password, Attempt to add a user and validate the user was not added`, async () => {
         const apiCall = new ApiCalls()
         const username = `user_${Date.now()}` 
         await apiCall.createUsers({username: username, password: user.password, role: ''})

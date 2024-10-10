@@ -1,5 +1,5 @@
 
-import { Locator } from "playwright";
+import { Locator, Page } from "playwright";
 import BasePage from "@/e2e/infra/ui/basePage";
 import { waitForTimeOut, waitForURL } from "@/e2e/infra/utils";
 import urls  from '../../config/urls.json'
@@ -34,8 +34,8 @@ export default class NavBarComponent extends BasePage {
         return this.page.locator("//button[@title='Settings']")
     }
 
-    private get DefaultButton(): Locator {
-        return this.page.getByRole("button", { name : "Default"})
+    private get clickOnUser(): (user: string) => Locator {
+        return (user: string) => this.page.getByRole("button", { name : `${user}`})
     }
     
     private get LogoutButton(): Locator {
@@ -52,7 +52,7 @@ export default class NavBarComponent extends BasePage {
     
     async clickOnSchemasButton(): Promise<void> {
         await this.schemaButton.click();
-        await waitForTimeOut(this.page, 2000)
+        await waitForURL(this.page, urls.schemaUrl);
     }
 
     async clickOnHelpBtn(): Promise<void> {
@@ -69,14 +69,47 @@ export default class NavBarComponent extends BasePage {
 
     async clickOnSettingsBtn(): Promise<void> {
         await this.settingsButton.click();
-        await waitForTimeOut(this.page, 2000);
+        await waitForURL(this.page, urls.settingsUrl);
     }
 
-    async Logout(): Promise<void> {
+    async isSettingsButtonEnabled(): Promise<Boolean> {
+        return await this.settingsButton.isEnabled();
+    }
+
+    async Logout(user: string): Promise<void> {
         await this.page.waitForLoadState('networkidle'); 
-        await this.DefaultButton.click()
+        await this.clickOnUser(user).click()
         await this.LogoutButton.click()
         await waitForURL(this.page, urls.loginUrl);
+    }
+
+    async clickOnFalkor(): Promise<Page> {
+        await this.page.waitForLoadState('networkidle'); 
+        const [newPage] = await Promise.all([
+            this.page.waitForEvent('popup'),
+            this.clickOnFalkorLogo(),
+        ]);
+        return newPage
+    }
+
+    async clickOnDocumentation(): Promise<Page> {
+        await this.page.waitForLoadState('networkidle'); 
+        const [newPage] = await Promise.all([
+            this.page.waitForEvent('popup'),
+            this.clickOnHelpBtn(),
+            this.clickOnDocumentationBtn(),
+        ]);
+        return newPage
+    }
+
+    async clickOnSupport(): Promise<Page> {
+        await this.page.waitForLoadState('networkidle'); 
+        const [newPage] = await Promise.all([
+            this.page.waitForEvent('popup'),
+            this.clickOnHelpBtn(),
+            this.clickOnSupportBtn(),
+        ]);
+        return newPage
     }
 
 }

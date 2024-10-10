@@ -2,63 +2,23 @@
 
 import CytoscapeComponent from "react-cytoscapejs";
 import cytoscape, { ElementDefinition, EventObject, NodeDataDefinition } from "cytoscape";
-import { useRef, useState, useImperativeHandle, forwardRef, useEffect } from "react";
+import { useRef, useState, useImperativeHandle, forwardRef, useEffect, Dispatch, SetStateAction } from "react";
 import fcose from 'cytoscape-fcose';
-import Editor, { Monaco } from "@monaco-editor/react";
-import * as monaco from "monaco-editor";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { ImperativePanelHandle } from "react-resizable-panels";
 import { ChevronLeft, Maximize2, Minimize2 } from "lucide-react"
 import { cn, ElementDataDefinition, prepareArg, securedFetch } from "@/lib/utils";
-import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
+import dynamic from "next/dynamic";
+import { Session } from "next-auth";
 import { Category, Graph } from "../api/graph/model";
 import DataPanel from "./GraphDataPanel";
 import Labels from "./labels";
 import Toolbar from "./toolbar";
 import Button from "../components/ui/Button";
 
-const monacoOptions: monaco.editor.IStandaloneEditorConstructionOptions = {
-    renderLineHighlight: "none",
-    quickSuggestions: false,
-    glyphMargin: false,
-    lineDecorationsWidth: 0,
-    folding: false,
-    fixedOverflowWidgets: true,
-    occurrencesHighlight: "off",
-    acceptSuggestionOnEnter: "on",
-    hover: {
-        delay: 100,
-    },
-    roundedSelection: false,
-    contextmenu: false,
-    cursorStyle: "line-thin",
-    links: false,
-    minimap: { enabled: false },
-    // see: https://github.com/microsoft/monaco-editor/issues/1746
-    wordBasedSuggestions: "off",
-    // disable `Find`
-    find: {
-        addExtraSpaceOnTop: false,
-        autoFindInSelection: "never",
-        seedSearchStringFromSelection: "never",
-    },
-    fontSize: 30,
-    fontWeight: "normal",
-    wordWrap: "off",
-    lineHeight: 42,
-    lineNumbers: "off",
-    lineNumbersMinChars: 0,
-    overviewRulerLanes: 0,
-    overviewRulerBorder: false,
-    hideCursorInOverviewRuler: true,
-    scrollBeyondLastColumn: 0,
-    scrollbar: {
-        horizontal: "hidden",
-        vertical: "hidden",
-        // avoid can not scroll page when hover monaco
-        alwaysConsumeMouseWheel: false,
-    },
-};
+const EditorComponent = dynamic(() => import("../components/EditorComponent"), {
+    ssr: false
+})
 
 const LAYOUT = {
     name: "fcose",
@@ -136,22 +96,26 @@ function getStyle() {
 
 const getElementId = (element: ElementDataDefinition) => element.source ? { id: element.id?.slice(1), query: "()-[e]-()" } : { id: element.id, query: "(e)" }
 
-const GraphView = forwardRef(({ graph, runQuery, historyQuery, fetchCount }: {
+const GraphView = forwardRef(({ graph, selectedElement, setSelectedElement, runQuery, historyQuery, historyQueries, fetchCount, data }: {
     graph: Graph
+    selectedElement: ElementDataDefinition | undefined
+    setSelectedElement: Dispatch<SetStateAction<ElementDataDefinition | undefined>>
     runQuery: (query: string) => Promise<void>
     historyQuery: string
+    historyQueries: string[]
     fetchCount: () => void
+    data: Session | null
 }, ref) => {
 
     const [query, setQuery] = useState<string>("")
     const [selectedElements, setSelectedElements] = useState<(ElementDataDefinition)[]>([]);
-    const [selectedElement, setSelectedElement] = useState<ElementDataDefinition>();
     const [isCollapsed, setIsCollapsed] = useState<boolean>(true);
     const chartRef = useRef<cytoscape.Core | null>(null)
-    const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null)
     const dataPanel = useRef<ImperativePanelHandle>(null)
-    const submitQuery = useRef<HTMLButtonElement>(null)
     const [maximize, setMaximize] = useState<boolean>(false)
+
+
+
 
     useImperativeHandle(ref, () => ({
         expand: (elements: ElementDefinition[]) => {
@@ -167,56 +131,11 @@ const GraphView = forwardRef(({ graph, runQuery, historyQuery, fetchCount }: {
     useEffect(() => {
         setSelectedElement(undefined)
         setSelectedElements([])
-        dataPanel.current?.collapse()
-    }, [graph.Id])
+    }, [graph.Id, setSelectedElement])
 
     useEffect(() => {
         setQuery(historyQuery)
     }, [historyQuery])
-
-    useEffect(() => {
-        setSelectedElement(undefined)
-        setSelectedElements([])
-    }, [graph.Id])
-
-    const handelSetSelectedElement = (element?: ElementDataDefinition) => {
-        setSelectedElement(element)
-        if (element) {
-            dataPanel.current?.expand()
-        } else dataPanel.current?.collapse()
-    }
-
-    const handleEditorWillMount = (monacoInstance: Monaco) => {
-        monacoInstance.editor.defineTheme('custom-theme', {
-            base: 'vs-dark',
-            inherit: false,
-            rules: [
-                { token: 'keyword', foreground: '#99E4E5' },
-                { token: 'type', foreground: '#89D86D' },
-            ],
-            colors: {
-                'editor.background': '#1F1F3D',
-                'editor.foreground': 'ffffff',
-            },
-        });
-    };
-
-    const handleEditorDidMount = (e: monaco.editor.IStandaloneCodeEditor) => {
-
-        editorRef.current = e
-
-        // if (typeof window !== "undefined") return
-        // e.addAction({
-        //     id: 'submit',
-        //     label: 'Submit Query',
-        //     // eslint-disable-next-line no-bitwise
-        //     keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter],
-        //     contextMenuOrder: 1.5,
-        //     run: async () => {
-        //         submitQuery.current?.click()
-        //     }
-        // });
-    }
 
     useEffect(() => {
         const chart = chartRef.current
@@ -231,24 +150,31 @@ const GraphView = forwardRef(({ graph, runQuery, historyQuery, fetchCount }: {
         chartRef?.current?.layout(LAYOUT).run();
     }, [graph.Elements.length]);
 
-    useEffect(() => {
-        if (!editorRef.current) return
-        editorRef.current.layout();
-    }, [isCollapsed])
-
-    useEffect(() => {
-        dataPanel.current?.collapse()
-    }, [])
-
-    const onExpand = () => {
+    const onExpand = (expand?: boolean) => {
         if (!dataPanel.current) return
         const panel = dataPanel.current
+        if (expand !== undefined) {
+            if (expand && panel?.isCollapsed()) {
+                panel?.expand()
+            } else if (!expand && panel?.isExpanded()) {
+                panel?.collapse()
+            }
+            return
+        }
         if (panel.isCollapsed()) {
             panel.expand()
         } else {
             panel.collapse()
         }
     }
+
+    useEffect(() => {
+        dataPanel.current?.collapse()
+    }, [])
+
+    useEffect(() => {
+        onExpand(!!selectedElement)
+    }, [selectedElement])
 
     // Send the user query to the server to expand a node
     const onFetchNode = async (node: NodeDataDefinition) => {
@@ -270,16 +196,16 @@ const GraphView = forwardRef(({ graph, runQuery, historyQuery, fetchCount }: {
     const onCategoryClick = (category: Category) => {
         const chart = chartRef.current
         if (chart) {
-            const elements = chart.elements(`node[category = "${category.name}"]`)
+            const elements = chart.nodes(`[category.0 = "${category.name}"]`)
 
             // eslint-disable-next-line no-param-reassign
             category.show = !category.show
-
             if (category.show) {
                 elements.style({ display: 'element' })
             } else {
                 elements.style({ display: 'none' })
             }
+
             chart.elements().layout(LAYOUT).run();
         }
     }
@@ -287,7 +213,7 @@ const GraphView = forwardRef(({ graph, runQuery, historyQuery, fetchCount }: {
     const onLabelClick = (label: Category) => {
         const chart = chartRef.current
         if (chart) {
-            const elements = chart.elements(`edge[label = "${label.name}"]`)
+            const elements = chart.edges(`[label = "${label.name}"]`)
 
             // eslint-disable-next-line no-param-reassign
             label.show = !label.show
@@ -317,7 +243,7 @@ const GraphView = forwardRef(({ graph, runQuery, historyQuery, fetchCount }: {
         } else target.style("border-width", 0.7);
 
         const obj: ElementDataDefinition = target.json().data;
-        handelSetSelectedElement(obj);
+        setSelectedElement(obj);
     }
 
     const handleBoxSelected = (evt: EventObject) => {
@@ -344,7 +270,7 @@ const GraphView = forwardRef(({ graph, runQuery, historyQuery, fetchCount }: {
             target.style("arrow-scale", 0.7);
         } else target.style("border-width", 0.3);
 
-        handelSetSelectedElement();
+        setSelectedElement(undefined);
         setSelectedElements([]);
     }
 
@@ -369,36 +295,6 @@ const GraphView = forwardRef(({ graph, runQuery, historyQuery, fetchCount }: {
             target.style("arrow-scale", 0.7);
         } else target.style("border-width", 0.3);
     };
-
-    const setProperty = async (key: string, newVal: string) => {
-        const id = selectedElement?.id
-        const q = `MATCH (e) WHERE id(e) = ${id} SET e.${key} = '${newVal}'`
-        const success = (await securedFetch(`api/graph/${prepareArg(graph.Id)}/?query=${prepareArg(q)}`, {
-            method: "GET"
-        })).ok
-        if (success)
-            graph.Elements.forEach(e => {
-                const el = e
-                if (el.data.id !== id) return
-                el.data[key] = newVal
-            })
-        return success
-    }
-
-    const removeProperty = async (key: string) => {
-        const id = selectedElement?.id
-        const q = `MATCH (e) WHERE id(e) = ${id} SET e.${key} = NULL`
-        const success = (await securedFetch(`api/graph/${prepareArg(graph.Id)}/?query=${prepareArg(q)}`, {
-            method: "GET"
-        })).ok
-        if (success)
-            graph.Elements.forEach(element => {
-                if (element.data.id !== id) return
-                const e = element
-                delete e.data[key]
-            })
-        return success
-    }
 
     const handelDeleteElement = async () => {
         if (selectedElements.length === 0 && selectedElement) {
@@ -439,8 +335,6 @@ const GraphView = forwardRef(({ graph, runQuery, historyQuery, fetchCount }: {
 
         setSelectedElements([])
         setSelectedElement(undefined)
-
-        dataPanel.current?.collapse()
     }
 
     return (
@@ -449,69 +343,23 @@ const GraphView = forwardRef(({ graph, runQuery, historyQuery, fetchCount }: {
                 className={cn("flex flex-col gap-8", !isCollapsed && "mr-8")}
                 defaultSize={selectedElement ? 75 : 100}
             >
-                {
-                    !maximize &&
-                    <Dialog>
-                        <div className="w-full flex items-center gap-8">
-                            <p>Query</p>
-                            <form
-                                className="w-1 grow flex rounded-lg overflow-hidden"
-                                onSubmit={(e) => {
-                                    e.preventDefault()
-                                    runQuery(query)
-                                }}
-                            >
-                                <div className="relative border border-[#343459] flex grow w-1">
-                                    <Editor
-                                        className="Editor"
-                                        language="cypher"
-                                        options={monacoOptions}
-                                        value={query}
-                                        onChange={(val) => setQuery(val || "")}
-                                        theme="custom-theme"
-                                        beforeMount={handleEditorWillMount}
-                                        onMount={handleEditorDidMount}
-                                    />
-                                    <DialogTrigger asChild>
-                                        <Button
-                                            className="absolute top-0 right-0 p-2.5"
-                                            title="Maximize"
-                                            icon={<Maximize2 size={20} />}
-                                        />
-                                    </DialogTrigger>
-                                </div>
-                                <Button
-                                    ref={submitQuery}
-                                    className="rounded-none px-8"
-                                    variant="Secondary"
-                                    label="Run"
-                                    type="submit"
-                                />
-                            </form>
-                            <DialogContent closeSize={30} className="w-full h-full">
-                                <Editor
-                                    className="w-full h-full"
-                                    beforeMount={handleEditorWillMount}
-                                    theme="custom-theme"
-                                    options={{
-                                        lineHeight: 30,
-                                        fontSize: 25
-                                    }}
-                                    value={query}
-                                    onChange={(val) => setQuery(val || "")}
-                                    language="cypher"
-                                />
-                            </DialogContent>
-                        </div>
-                    </Dialog>
-                }
+                <EditorComponent
+                    graph={graph}
+                    isCollapsed={isCollapsed}
+                    maximize={maximize}
+                    currentQuery={query}
+                    historyQueries={historyQueries}
+                    runQuery={runQuery}
+                    setCurrentQuery={setQuery}
+                    data={data}
+                />
                 <div className="flex items-center justify-between">
                     <Toolbar
-                        addDisabled
                         disabled={!graph.Id}
-                        deleteDisabled={Object.values(selectedElements).length === 0 && !selectedElement}
+                        deleteDisabled={(Object.values(selectedElements).length === 0 && !selectedElement) || data?.user.role === "Read-Only"}
                         onDeleteElement={handelDeleteElement}
                         chartRef={chartRef}
+                        addDisabled
                     />
                     {
                         isCollapsed && graph.Id &&
@@ -587,11 +435,12 @@ const GraphView = forwardRef(({ graph, runQuery, historyQuery, fetchCount }: {
                 {
                     selectedElement &&
                     <DataPanel
-                        removeProperty={removeProperty}
-                        setProperty={setProperty}
                         obj={selectedElement}
+                        setObj={setSelectedElement}
                         onExpand={onExpand}
+                        graph={graph}
                         onDeleteElement={handelDeleteElement}
+                        data={data}
                     />
                 }
             </ResizablePanel>

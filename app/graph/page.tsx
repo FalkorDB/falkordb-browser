@@ -1,11 +1,13 @@
 'use client'
 
 import { useCallback, useEffect, useState } from "react";
-import { Toast, defaultQuery, prepareArg, securedFetch } from "@/lib/utils";
-import GraphView from "./GraphView";
+import { Toast, prepareArg, securedFetch } from "@/lib/utils";
+import { ElementDataDefinition } from "cytoscape";
+import { useSession } from "next-auth/react";
 import Selector from "./Selector";
 import Header from "../components/Header";
 import { Graph, Query } from "../api/graph/model";
+import GraphView from "./GraphView";
 
 export default function Page() {
 
@@ -15,19 +17,20 @@ export default function Page() {
     const [graph, setGraph] = useState<Graph>(Graph.empty())
     const [queries, setQueries] = useState<Query[]>([])
     const [historyQuery, setHistoryQuery] = useState<string>("")
+    const [selectedElement, setSelectedElement] = useState<ElementDataDefinition>();
+    const { data } = useSession() 
+
 
     const fetchCount = useCallback(async () => {
         if (!graphName) return
-        const q = [
-            "MATCH (n) RETURN COUNT(n) as nodes",
-            "MATCH ()-[e]->() RETURN COUNT(e) as edges"
-        ]
+        const q1 = "MATCH (n) RETURN COUNT(n) as nodes"
+        const q2 = "MATCH ()-[e]->() RETURN COUNT(e) as edges"
 
-        const nodes = await (await securedFetch(`api/graph/${prepareArg(graphName)}/?query=${q[0]}`, {
+        const nodes = await (await securedFetch(`api/graph/${prepareArg(graphName)}/?query=${q1}&role=${data?.user.role}`, {
             method: "GET"
         })).json()
 
-        const edges = await (await securedFetch(`api/graph/${prepareArg(graphName)}/?query=${q[1]}`, {
+        const edges = await (await securedFetch(`api/graph/${prepareArg(graphName)}/?query=${q2}&role=${data?.user.role}`, {
             method: "GET"
         })).json()
 
@@ -38,15 +41,16 @@ export default function Page() {
     }, [graphName])
 
     useEffect(() => {
+        fetchCount()
+    }, [graphName, fetchCount])
+
+    useEffect(() => {
         if (graphName !== graph.Id) {
             const colors = localStorage.getItem(graphName)?.split(/[[\]",]/).filter(c => c)
             setGraph(Graph.empty(graphName, colors))
         }
-    }, [graph.Id, graphName])
-
-    useEffect(() => {
         fetchCount()
-    }, [fetchCount, graphName])
+    }, [fetchCount, graph.Id, graphName])
 
     const run = async (query: string) => {
         if (!graphName) {
@@ -54,28 +58,31 @@ export default function Page() {
             return null
         }
 
-        const result = await securedFetch(`api/graph/${prepareArg(graphName)}/?query=${prepareArg(defaultQuery(query))}`, {
+        const result = await securedFetch(`api/graph/${prepareArg(graphName)}/?query=${prepareArg(query)}&role=${data?.user.role}`, {
+
             method: "GET"
         })
-
+        
         if (!result.ok) return null
-
+        
         const json = await result.json()
         fetchCount()
+        setSelectedElement(undefined)
         return json.result
     }
 
     const runQuery = async (query: string) => {
+        if (!query) return
         const result = await run(query)
         if (!result) return
-        setQueries(prev => [...prev, { text: defaultQuery(query), metadata: result.metadata }])
+        setQueries(prev => [...prev, { text: query, metadata: result.metadata }])
         setGraph(Graph.create(graphName, result, graph.Colors))
     }
 
     const runHistoryQuery = async (query: string, setQueriesOpen: (open: boolean) => void) => {
         const result = await run(query)
         if (!result) return
-        setQueries(prev => prev.filter(q => q.text === query).length > 0 ? prev : [...prev, { text: query, metadata: result.metadata }])
+        setQueries(prev => prev.some(q => q.text === query) ? prev : [...prev, { text: query, metadata: result.metadata }])
         setGraph(Graph.create(graphName, result))
         setHistoryQuery(query)
         setQueriesOpen(false)
@@ -94,13 +101,18 @@ export default function Page() {
                     nodesCount={nodesCount}
                     setGraph={setGraph}
                     graph={graph}
+                    data={data}
 
                 />
                 <GraphView
                     graph={graph}
+                    selectedElement={selectedElement}
+                    setSelectedElement={setSelectedElement}
                     runQuery={runQuery}
                     historyQuery={historyQuery}
+                    historyQueries={queries.map(({ text }) => text)}
                     fetchCount={fetchCount}
+                    data={data}
                 />
             </div>
         </div>

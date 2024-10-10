@@ -9,5 +9,10 @@
             "readWrite": 2,
             "readOnly": 3
         }
-    }
+    },
+    "userRoles": [
+        { "name": "Default", "role": "admin" },
+        { "name": "readwriteuser", "role": "readwrite" },
+        { "name": "readonlyuser", "role": "readonly" }
+    ]
 }

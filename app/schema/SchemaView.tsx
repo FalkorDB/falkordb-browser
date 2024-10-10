@@ -8,6 +8,7 @@ import { ImperativePanelHandle } from "react-resizable-panels"
 import { useEffect, useRef, useState } from "react"
 import fcose from "cytoscape-fcose";
 import { ElementDataDefinition, Toast, cn, prepareArg, securedFetch } from "@/lib/utils"
+import { Session } from "next-auth"
 import Toolbar from "../graph/toolbar"
 import SchemaDataPanel, { Attribute } from "./SchemaDataPanel"
 import Labels from "../graph/labels"
@@ -19,6 +20,7 @@ import CreateElement from "./SchemaCreateElement"
 interface Props {
     schema: Graph
     fetchCount?: () => void
+    data: Session | null
 }
 
 const LAYOUT = {
@@ -104,7 +106,7 @@ const getCreateQuery = (type: boolean, selectedNodes: NodeDataDefinition[], attr
     return `MATCH (a), (b) WHERE ID(a) = ${selectedNodes[0].id} AND ID(b) = ${selectedNodes[1].id} CREATE (a)-[e${label ? `:${label}` : ""}${attributes?.length > 0 ? ` {${attributes.map(([k, [t, d, u, un]]) => `${k}: ["${t}", "${d}", "${u}", "${un}"]`).join(",")}}` : ""}]->(b) RETURN e`
 }
 
-export default function SchemaView({ schema, fetchCount }: Props) {
+export default function SchemaView({ schema, fetchCount, data }: Props) {
     const [selectedElement, setSelectedElement] = useState<ElementDataDefinition>();
     const [selectedElements, setSelectedElements] = useState<ElementDataDefinition[]>([]);
     const [selectedNodes, setSelectedNodes] = useState<NodeDataDefinition[]>([]);
@@ -144,7 +146,7 @@ export default function SchemaView({ schema, fetchCount }: Props) {
     const onCategoryClick = (category: Category) => {
         const chart = chartRef.current
         if (chart) {
-            const nodes = chart.elements(`node[category = "${category.name}"]`)
+            const nodes = chart.elements(`node[category.0 = "${category.name}"]`)
 
             // eslint-disable-next-line no-param-reassign
             category.show = !category.show
@@ -362,11 +364,11 @@ export default function SchemaView({ schema, fetchCount }: Props) {
         })).ok
 
         if (success) {
-            schema.Elements.forEach(({ data }) => {
-                if (data.id !== id) return
+            schema.Elements.forEach(({ data: d }) => {
+                if (d.id !== id) return
 
                 // eslint-disable-next-line no-param-reassign
-                data.category = category
+                d.category = category
 
                 setSelectedElement({ ...selectedElement, category })
 
@@ -374,7 +376,7 @@ export default function SchemaView({ schema, fetchCount }: Props) {
 
                 schema.updateCategories(prevCategory.name, true)
 
-                const c = schema.createCategory(category)
+                const [c] = schema.createCategory([category])
 
                 chartRef.current?.elements().forEach(n => {
                     if (n.data().category === category) {
@@ -431,7 +433,7 @@ export default function SchemaView({ schema, fetchCount }: Props) {
                 chartRef?.current?.add({ data: schema.extendNode(json.result.data[0].n) })
                 setIsAddEntity(false)
             } else {
-                chartRef?.current?.add({ data: schema.extendEdge(json.result.data[0].e) })
+                chartRef?.current?.add({ data: schema.extendEdge(json.result.data[0].e, true) })
                 setIsAddRelation(false)
             }
 
@@ -471,6 +473,7 @@ export default function SchemaView({ schema, fetchCount }: Props) {
                         }}
                         onDeleteElement={handelDeleteElement}
                         chartRef={chartRef}
+                        addDisabled={data?.user.role === "Read-Only"}
                     />
                     {
                         isCollapsed &&
@@ -552,6 +555,7 @@ export default function SchemaView({ schema, fetchCount }: Props) {
                             onSetAttribute={handelSetAttribute}
                             onDelete={handelDeleteElement}
                             onSetCategory={handelSetCategory}
+                            data={data}
                         />
                         : (isAddEntity || isAddRelation) &&
                         <CreateElement

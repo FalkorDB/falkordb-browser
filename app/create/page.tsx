@@ -17,7 +17,7 @@ export default function Create() {
 
     const [currentTab, setCurrentTab] = useState<CurrentTab | null>()
     // const [schema, setSchema] = useState<Graph>(Graph.empty())
-    const [ID, setID] = useState()
+    const [ID, setID] = useState<undefined | string>()
     const [files, setFiles] = useState<File[]>([])
     const [filesPath, setFilesPath] = useState<string[]>()
     const [nodesCount, setNodesCount] = useState<number>(0)
@@ -77,7 +77,7 @@ export default function Create() {
         setProgress(prev => json.progress + prev)
     }
 
-    useSWR((currentTab === "loadSchema" && progress < 100) && `api/graph/${graphName}/?ID=${ID}`, fetcher, { refreshInterval: 2500 })
+    useSWR((currentTab === "loadSchema" && progress < 100) && ID && `api/graph/${prepareArg(graphName)}/?ID=${prepareArg(ID)}`, fetcher, { refreshInterval: 2500 })
 
     const handleCreateSchema = async (e: FormEvent) => {
 
@@ -133,7 +133,7 @@ export default function Create() {
 
     const handleCreateGraph = async () => {
 
-        const result = await securedFetch(`api/graph/${prepareArg(graphName)}/?type=populate_kg/?key=${openaiKey}`, {
+        const result = await securedFetch(`api/graph/${prepareArg(graphName)}/?type=populate_kg/?key=${prepareArg(openaiKey)}`, {
             method: "POST",
             body: JSON.stringify(filesPath)
         })
