@@ -4,7 +4,7 @@ import { Dialog, DialogTrigger } from "@/components/ui/dialog"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Toast, cn, prepareArg, securedFetch } from "@/lib/utils"
 import { Trash2, UploadIcon } from "lucide-react"
-import { Dispatch, SetStateAction, useState } from "react"
+import { Dispatch, SetStateAction, useEffect, useState } from "react"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import UploadGraph from "../graph/UploadGraph"
 import DeleteGraph from "../graph/DeleteGraph"
@@ -35,6 +35,12 @@ export default function Combobox({ isSelectGraph, disabled = false, inTable, typ
   const [editable, setEditable] = useState<string>("")
   const [isUploadOpen, setIsUploadOpen] = useState<string>()
   const [isDeleteOpen, setIsDeleteOpen] = useState<string>()
+  
+  useEffect(() => {
+    if (options.length !== 1) return
+    setSelectedValue(options[0])
+  }, [options, setSelectedValue])
+  
   const onExport = async (graphName: string) => {
     const result = await securedFetch(`api/graph/${prepareArg(graphName)}/export`, {
       method: "GET"
