@@ -292,7 +292,7 @@ export class Graph {
         this.metadata = results.metadata
         this.data.forEach((row: any[]) => {
             Object.values(row).forEach((cell: any) => {
-                const nodes = Object.values(row).filter((c: any) => "labels" in c)
+                const nodes = Object.values(row).filter((c: any) => c instanceof Object && "labels" in c)
                 if (cell instanceof Object) {
                     if (cell.nodes) {
                         cell.nodes.forEach((node: any) => {

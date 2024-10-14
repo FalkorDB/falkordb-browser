@@ -603,7 +603,7 @@ export default function EditorComponent({ currentQuery, historyQueries, setCurre
                                     className="Editor"
                                     language="custom-language"
                                     options={monacoOptions}
-                                    value={blur ? query.trim() : query}
+                                    value={blur ? query.replace(/\s+/g, ' ').trim() : query}
                                     onChange={(val) => historyRef.current.historyCounter ? setQuery(val || "") : setCurrentQuery(val || "")}
                                     theme="custom-theme"
                                     beforeMount={handleEditorWillMount}
