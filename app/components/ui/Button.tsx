@@ -9,6 +9,7 @@ interface Props extends React.DetailedHTMLProps<React.ButtonHTMLAttributes<HTMLB
     label?: string
     variant?: Variant
     icon?: JSX.Element
+    iconSide?: "left" | "right"
     open?: boolean
     side?: "down" | "left" | "right"
 }
@@ -51,7 +52,7 @@ const getClassName = (variant: Variant, disable: boolean | undefined, open: bool
     return className
 }
 
-const Button = forwardRef<HTMLButtonElement, Props>(({ label, variant = "button", icon, open, side = "down", className, type = "button", disabled, ...props }, ref) => (
+const Button = forwardRef<HTMLButtonElement, Props>(({ label, variant = "button", icon, iconSide = "left", open, side = "down", className, type = "button", disabled, ...props }, ref) => (
     <button
         ref={ref}
         className={cn(
@@ -65,10 +66,11 @@ const Button = forwardRef<HTMLButtonElement, Props>(({ label, variant = "button"
         // eslint-disable-next-line react/jsx-props-no-spreading
         {...props}
     >
-        {icon}
+        {iconSide === "left" && icon}
         {side === "left" && getChevron(open, side)}
         {label && <p className="truncate">{label}</p>}
         {side !== "left" && getChevron(open, side)}
+        {iconSide === "right" && icon}
     </button>
 ))
 
