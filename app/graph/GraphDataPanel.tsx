@@ -114,6 +114,15 @@ export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement,
                                 onMouseEnter={() => setMouseEnter(key)}
                                 onMouseLeave={() => setMouseEnter("")}
                             >
+                                <div className="w-6">
+                                    {
+                                        mouseEnter === key &&
+                                        <Button
+                                            icon={<Trash2 />}
+                                            onClick={() => removeProperty(key)}
+                                        />
+                                    }
+                                </div>
                                 <div>
                                     <p>{key}:</p>
                                 </div>
@@ -140,15 +149,11 @@ export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement,
                                             : <Button
                                                 className="max-w-full"
                                                 label={obj[key]?.toString()}
-                                                onClick={() => setEditable(key)}
+                                                onClick={() => {
+                                                    setEditable(key)
+                                                    setNewVal(obj[key])
+                                                }}
                                             />
-                                    }
-                                    {
-                                        mouseEnter === key &&
-                                        <Button
-                                            icon={<Trash2 />}
-                                            onClick={() => removeProperty(key)}
-                                        />
                                     }
                                 </div>
                             </div>

@@ -27,7 +27,7 @@ test.describe('Graph Tests', () => {
             const graphName = `graph_${Date.now()}`;
             await apiCall.addGraph(graphName);
             await graph.refreshPage();
-            const isVisible = await graph.verifyGraphExists(graphName);   
+            const isVisible = await graph.verifyGraphExistsByName(graphName);   
             await graph.refreshPage();
             await graph.deleteGraph(graphName);
             expect(isVisible).toBe(true);
