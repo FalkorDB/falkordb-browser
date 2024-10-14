@@ -18,7 +18,7 @@ export default function Labels({ graph, categories, onClick, label, className = 
     // fake state to force reload
     const [, setReload] = useState(false)
     const listRef = useRef<HTMLUListElement>(null)
-    const isScrollable = listRef.current && listRef.current.scrollHeight > (listRef.current.clientHeight + 10)
+    const isScrollable = listRef.current && listRef.current.scrollHeight > listRef.current.clientHeight
 
     const handelScroll = (scrollTo: number) => {
         listRef.current?.scrollBy({
@@ -28,7 +28,7 @@ export default function Labels({ graph, categories, onClick, label, className = 
     }
 
     return (
-        <div className={cn(className, "absolute top-10 flex flex-col gap-2 p-4 h-[96%] w-[15%]", label === "RelationshipTypes" && "items-end")}>
+        <div className={cn(className, "absolute top-10 flex flex-col gap-2 p-4 h-[95%] pointer-events-none", label === "RelationshipTypes" ? "items-end right-2" : "left-2")}>
             {
                 label &&
                 <h1>{label}</h1>
@@ -37,6 +37,7 @@ export default function Labels({ graph, categories, onClick, label, className = 
                 {
                     isScrollable &&
                     <Button
+                        className="pointer-events-auto"
                         icon={<ChevronUp />}
                         title="Scroll up"
                         onClick={() => handelScroll(-200)}
@@ -45,7 +46,7 @@ export default function Labels({ graph, categories, onClick, label, className = 
                 <ul ref={listRef} className={cn("flex flex-col gap-4 w-full overflow-auto hide-scrollbar", label === "RelationshipTypes" && "items-end")}>
                     {
                         categories.map((category) => (
-                            <li key={category.index}>
+                            <li key={category.index} className="pointer-events-auto">
                                 <Button
                                     className={cn(category.name && "flex gap-2 items-center")}
                                     label={category.name}
@@ -60,15 +61,16 @@ export default function Labels({ graph, categories, onClick, label, className = 
                             </li>
                         ))
                     }
-                    {
-                        isScrollable &&
-                        <Button
-                            icon={<ChevronDown />}
-                            title="Scroll down"
-                            onClick={() => handelScroll(200)}
-                        />
-                    }
                 </ul>
+                {
+                    isScrollable &&
+                    <Button
+                    className="pointer-events-auto"
+                        icon={<ChevronDown />}
+                        title="Scroll down"
+                        onClick={() => handelScroll(200)}
+                    />
+                }
             </div>
         </div>
     )
