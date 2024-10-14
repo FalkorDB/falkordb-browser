@@ -187,10 +187,10 @@ const GraphView = forwardRef(({ graph, selectedElement, setSelectedElement, runQ
 
         if (result.ok) {
             const json = await result.json()
-            return graph.extend(json.result)
+            return { elements: Graph.empty().extend(json.result), res: json.result }
         }
 
-        return []
+        return { elements: [], res: {} }
     }
 
     const onCategoryClick = (category: Category) => {
@@ -212,25 +212,49 @@ const GraphView = forwardRef(({ graph, selectedElement, setSelectedElement, runQ
 
     const onLabelClick = (label: Category) => {
         const chart = chartRef.current
-        if (chart) {
-            const elements = chart.edges(`[label = "${label.name}"]`)
+        if (!chart) return
+        const elements = chart.edges(`[label = "${label.name}"]`)
 
-            // eslint-disable-next-line no-param-reassign
-            label.show = !label.show
+        // eslint-disable-next-line no-param-reassign
+        label.show = !label.show
 
-            if (label.show) {
-                elements.style({ display: 'element' })
-            } else {
-                elements.style({ display: 'none' })
-            }
-            chart.elements().layout(LAYOUT).run();
+        if (label.show) {
+            elements.style({ display: 'element' })
+        } else {
+            elements.style({ display: 'none' })
         }
+        chart.elements().layout(LAYOUT).run();
     }
 
     const handleDoubleTap = async (evt: EventObject) => {
+        const chart = chartRef.current
+
+        if (!chart) return
+
         const node = evt.target.json().data;
-        const elements = await onFetchNode(node);
-        chartRef.current?.add(elements);
+        const { elements, res } = await onFetchNode(node);
+
+        if (elements.every(e => graph.Elements.some(el => el.data.id === e.data.id))) {
+            elements.forEach(e => {
+                const index = graph.Elements.findIndex(el => el.data.collapsed && el.data.id === e.data.id)
+
+                if (index === -1) return
+
+                graph.Elements.splice(index, 1)
+
+                if ("category" in e.data) {
+                    graph.NodesMap.delete(Number(e.data.id))
+                } else {
+                    graph.EdgesMap.delete(Number(e.data.id?.split("_")[1]))
+                }
+
+                chart.remove(`#${e.data.id}`)
+            });
+        } else {
+            chart.add(graph.extend(res, true));
+        }
+
+        chart.layout(LAYOUT).run();
     }
 
     const handleSelected = (evt: EventObject) => {
