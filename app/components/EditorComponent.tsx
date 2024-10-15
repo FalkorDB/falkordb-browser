@@ -262,7 +262,7 @@ export default function EditorComponent({ currentQuery, historyQueries, setCurre
                     suggestions: [
                         ...(sug || []).map(s => ({ ...s, range })),
                         ...suggestions.keywords.map(s => ({ ...s, range })),
-                        ...(procedures || []).map(s => ({ ...s, range,  }))
+                        ...(procedures || []).map(s => ({ ...s, range, }))
                     ]
                 }
             },
@@ -343,10 +343,10 @@ export default function EditorComponent({ currentQuery, historyQueries, setCurre
         })
     }
 
-    const getSuggestions = async () => {
+    const getSuggestions = async (monacoI?: Monaco) => {
 
-        if (!graph.Id || !monacoInstance) return
-
+        if (!graph.Id || (!monacoInstance && !monacoI)) return
+        const m = monacoI || monacoInstance
         const sug: Suggestions = getEmptySuggestions()
 
         await Promise.all([
@@ -366,7 +366,7 @@ export default function EditorComponent({ currentQuery, historyQueries, setCurre
             })
         })
 
-        monacoInstance.languages.setMonarchTokensProvider('custom-language', {
+        m!.languages.setMonarchTokensProvider('custom-language', {
             tokenizer: {
                 root: [
                     [new RegExp(`\\b(${Array.from(namespaces.keys()).join('|')})\\b`), "keyword"],
@@ -399,7 +399,7 @@ export default function EditorComponent({ currentQuery, historyQueries, setCurre
             ignoreCase: true,
         })
 
-        monacoInstance.languages.setLanguageConfiguration('custom-language', {
+        m!.languages.setLanguageConfiguration('custom-language', {
             brackets: [
                 ['{', '}'],
                 ['[', ']'],
@@ -421,9 +421,9 @@ export default function EditorComponent({ currentQuery, historyQueries, setCurre
             ]
         });
 
-        monacoInstance.editor.setTheme('custom-theme');
+        m!.editor.setTheme('custom-theme');
 
-        addSuggestions(monacoInstance, [...sug.labels, ...sug.propertyKeys, ...sug.relationshipTypes], sug.functions)
+        addSuggestions(m!, [...sug.labels, ...sug.propertyKeys, ...sug.relationshipTypes], sug.functions)
 
         setSuggestions(sug)
     }
@@ -522,7 +522,11 @@ export default function EditorComponent({ currentQuery, historyQueries, setCurre
 
         monacoI.editor.setTheme('custom-theme');
 
-        addSuggestions(monacoI)
+        if (graph.Id) {
+            getSuggestions(monacoI)
+        }else {   
+            addSuggestions(monacoI)
+        }
     };
 
     const handleEditorDidMount = (e: monaco.editor.IStandaloneCodeEditor, monacoI: Monaco) => {
@@ -538,6 +542,16 @@ export default function EditorComponent({ currentQuery, historyQueries, setCurre
         e.onDidFocusEditorText(() => {
             setBlur(false)
         })
+
+        const isFirstLine = e.createContextKey('isFirstLine', false as boolean);
+        
+        // Update the context key value based on the cursor position
+        e.onDidChangeCursorPosition(() => {
+            const position = e.getPosition();
+            if (position) {
+                isFirstLine.set(position.lineNumber === 1);
+            }
+        });
 
         e.addAction({
             id: 'submit',
@@ -556,13 +570,14 @@ export default function EditorComponent({ currentQuery, historyQueries, setCurre
             keybindings: [monaco.KeyCode.UpArrow],
             contextMenuOrder: 1.5,
             run: async () => {
-                const counter = historyRef.current.historyCounter ? historyRef.current.historyCounter - 1 : historyRef.current.historyQueries.length
-                historyRef.current.historyCounter = counter
-                setQuery(counter ? historyRef.current.historyQueries[counter - 1] : historyRef.current.currentQuery)
+                if (historyRef.current.historyQueries.length === 0) return
+                const counter = historyRef.current.historyCounter ? historyRef.current.historyCounter - 1 : historyRef.current.historyQueries.length;
+                historyRef.current.historyCounter = counter;
+                setQuery(counter ? historyRef.current.historyQueries[counter - 1] : historyRef.current.currentQuery);
             },
-            precondition: '!suggestWidgetVisible',
+            precondition: 'isFirstLine && !suggestWidgetVisible',
         });
-        
+
         e.addAction({
             id: 'history down',
             label: 'history down',
@@ -574,7 +589,7 @@ export default function EditorComponent({ currentQuery, historyQueries, setCurre
                 historyRef.current.historyCounter = counter
                 setQuery(counter ? historyRef.current.historyQueries[counter - 1] : historyRef.current.currentQuery)
             },
-            precondition: '!suggestWidgetVisible',
+            precondition: 'isFirstLine && !suggestWidgetVisible',
         });
     }
 
@@ -603,7 +618,7 @@ export default function EditorComponent({ currentQuery, historyQueries, setCurre
                                     className="Editor"
                                     language="custom-language"
                                     options={monacoOptions}
-                                    value={blur ? query.trim() : query}
+                                    value={blur ? query.replace(/\s+/g, ' ').trim() : query}
                                     onChange={(val) => historyRef.current.historyCounter ? setQuery(val || "") : setCurrentQuery(val || "")}
                                     theme="custom-theme"
                                     beforeMount={handleEditorWillMount}

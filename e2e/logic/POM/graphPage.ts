@@ -8,6 +8,10 @@ export class graphPage extends BasePage {
         return this.page.getByRole("button", { name : "Select Graph"});
     }
 
+    private graphsMenuByName(graph: string): Locator {
+        return this.page.getByRole("button", { name : `${graph}`});
+    }
+
     private get dropDownMenuGraphs(): Locator {
         return this.page.locator("//div[@role='menuitem']");
     }
@@ -96,8 +100,14 @@ export class graphPage extends BasePage {
         return await this.findGraphInMenu(graph).isVisible();
     }
 
+    async verifyGraphExistsByName(graph : string): Promise<Boolean>{
+        await this.graphsMenuByName(graph).click();
+        await this.manageGraphBtn.click();
+        return await this.findGraphInMenu(graph).isVisible();
+    }
+
     async deleteGraph(graph : string): Promise<void> {
-        await this.graphsMenu.click();
+        await this.graphsMenuByName(graph).click();
         await this.manageGraphBtn.click();
         await this.deleteGraphInMenu(graph).click();
         await this.deleteIconSvg.click()

@@ -28,7 +28,8 @@ const excludedProperties = new Set([
     "label",
     "target",
     "source",
-    "name",
+    "collapsed",
+    "expand",
 ]);
 
 export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement, graph, data }: Props) {
@@ -43,7 +44,7 @@ export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement,
     const type = !("source" in obj)
 
     useEffect(() => {
-        setAttributes(Object.keys(obj).filter((key) => !excludedProperties.has(key) || (key === "name" && obj.name !== obj.id)));
+        setAttributes(Object.keys(obj).filter((key) => !excludedProperties.has(key) && (key !== "name" || obj.name !== obj.id)));
         setLabel(type ? obj.category : obj.label);
     }, [obj, type]);
 
@@ -114,6 +115,15 @@ export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement,
                                 onMouseEnter={() => setMouseEnter(key)}
                                 onMouseLeave={() => setMouseEnter("")}
                             >
+                                <div className="w-6">
+                                    {
+                                        mouseEnter === key &&
+                                        <Button
+                                            icon={<Trash2 />}
+                                            onClick={() => removeProperty(key)}
+                                        />
+                                    }
+                                </div>
                                 <div>
                                     <p>{key}:</p>
                                 </div>
@@ -139,16 +149,12 @@ export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement,
                                             />
                                             : <Button
                                                 className="max-w-full"
-                                                label={obj[key]}
-                                                onClick={() => setEditable(key)}
+                                                label={obj[key]?.toString()}
+                                                onClick={() => {
+                                                    setEditable(key)
+                                                    setNewVal(obj[key])
+                                                }}
                                             />
-                                    }
-                                    {
-                                        mouseEnter === key &&
-                                        <Button
-                                            icon={<Trash2 />}
-                                            onClick={() => removeProperty(key)}
-                                        />
                                     }
                                 </div>
                             </div>

@@ -148,7 +148,7 @@ const GraphView = forwardRef(({ graph, selectedElement, setSelectedElement, runQ
 
     useEffect(() => {
         chartRef?.current?.layout(LAYOUT).run();
-    }, [graph.Elements.length]);
+    }, [graph.Elements.length, graph.Elements]);
 
     const onExpand = (expand?: boolean) => {
         if (!dataPanel.current) return
@@ -187,7 +187,7 @@ const GraphView = forwardRef(({ graph, selectedElement, setSelectedElement, runQ
 
         if (result.ok) {
             const json = await result.json()
-            return graph.extend(json.result)
+            return graph.extend(json.result, true)
         }
 
         return []
@@ -212,26 +212,50 @@ const GraphView = forwardRef(({ graph, selectedElement, setSelectedElement, runQ
 
     const onLabelClick = (label: Category) => {
         const chart = chartRef.current
-        if (chart) {
-            const elements = chart.edges(`[label = "${label.name}"]`)
+        if (!chart) return
+        const elements = chart.edges(`[label = "${label.name}"]`)
 
-            // eslint-disable-next-line no-param-reassign
-            label.show = !label.show
+        // eslint-disable-next-line no-param-reassign
+        label.show = !label.show
 
-            if (label.show) {
-                elements.style({ display: 'element' })
-            } else {
-                elements.style({ display: 'none' })
-            }
-            chart.elements().layout(LAYOUT).run();
+        if (label.show) {
+            elements.style({ display: 'element' })
+        } else {
+            elements.style({ display: 'none' })
         }
+        chart.elements().layout(LAYOUT).run();
     }
 
     const handleDoubleTap = async (evt: EventObject) => {
+        const chart = chartRef.current
+
+        if (!chart) return
+
         const node = evt.target.json().data;
-        const elements = await onFetchNode(node);
-        chartRef.current?.add(elements);
+        const graphNode = graph.Elements.find(e => e.data.id === node.id);
+
+        if (!graphNode) return
+
+        if (!graphNode.data.expand) {
+            chart.add(await onFetchNode(node));
+        } else {
+            const neighbors = chart.elements(`#${node.id}`).neighborhood()
+            neighbors.forEach((n) => {
+                const id = n.id()
+                const index = graph.Elements.findIndex(e => e.data.id === id)
+                chart.remove(`#${id}`)
+                
+                if (index === -1) return
+
+                graph.Elements.splice(index, 1)
+            })
+        }
+
+        graphNode.data.expand = !graphNode.data.expand;
+
+        chart.elements().layout(LAYOUT).run();
     }
+
 
     const handleSelected = (evt: EventObject) => {
         const { target } = evt
@@ -415,8 +439,8 @@ const GraphView = forwardRef(({ graph, selectedElement, setSelectedElement, runQ
                     {
                         (graph.Categories.length > 0 || graph.Labels.length > 0) &&
                         <>
-                            <Labels className="left-2" categories={graph.Categories} onClick={onCategoryClick} label="Labels" graph={graph} />
-                            <Labels className="right-2 text-end" categories={graph.Labels} onClick={onLabelClick} label="RelationshipTypes" graph={graph} />
+                            <Labels categories={graph.Categories} onClick={onCategoryClick} label="Labels" graph={graph} />
+                            <Labels categories={graph.Labels} onClick={onLabelClick} label="RelationshipTypes" graph={graph} />
                         </>
                     }
                 </div>
