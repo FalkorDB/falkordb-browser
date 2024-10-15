@@ -29,6 +29,7 @@ const excludedProperties = new Set([
     "target",
     "source",
     "collapsed",
+    "expand",
 ]);
 
 export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement, graph, data }: Props) {
