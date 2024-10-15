@@ -543,10 +543,11 @@ export default function EditorComponent({ currentQuery, historyQueries, setCurre
             setBlur(false)
         })
 
+        const isFirstLine = e.createContextKey('isFirstLine', false as boolean);
+        
         // Update the context key value based on the cursor position
         e.onDidChangeCursorPosition(() => {
             const position = e.getPosition();
-            const isFirstLine = e.createContextKey('isFirstLine', false as boolean);
             if (position) {
                 isFirstLine.set(position.lineNumber === 1);
             }
