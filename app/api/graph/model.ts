@@ -185,14 +185,15 @@ export class Graph {
         const categories = this.createCategory(cell.labels.length === 0 ? [""] : cell.labels)
         // check if node already exists in nodes or fake node was created
         const currentNode = this.nodesMap.get(cell.id)
-
+        
         if (!currentNode) {
             const node: NodeDataDefinition = {
                 id: cell.id.toString(),
                 name: cell.id.toString(),
                 category: categories.map(c => c.name),
                 color: this.getCategoryColorValue(categories[0].index),
-                collapsed
+                expand: false,
+                collapsed,
             }
             Object.entries(cell.properties).forEach(([key, value]) => {
                 node[nodeSafeKey(key)] = value as string;
@@ -201,27 +202,28 @@ export class Graph {
             this.elements.push({ data: node })
             return node
         }
-
+        
         if (currentNode.category === "") {
             // set values in a fake node
             currentNode.id = cell.id.toString();
             currentNode.name = cell.id.toString();
             currentNode.category = categories.map(c => c.name);
             currentNode.color = this.getCategoryColorValue(categories[0].index)
+            currentNode.expand = false
             currentNode.collapsed = collapsed
             Object.entries(cell.properties).forEach(([key, value]) => {
                 currentNode[nodeSafeKey(key)] = value as string;
             });
         }
-
+        
         return currentNode
     }
-
+    
     public extendEdge(cell: any, createNode: boolean, collapsed = false) {
         const label = this.createLabel(cell.relationshipType)
-
+        
         const currentEdge = this.edgesMap.get(cell.id)
-
+        
         if (!currentEdge) {
             const sourceId = cell.sourceId.toString();
             const destinationId = cell.destinationId.toString()
@@ -231,42 +233,47 @@ export class Graph {
                 target: destinationId,
                 label: cell.relationshipType,
                 color: this.getCategoryColorValue(label.index),
-                collapsed
+                expand: false,
+                collapsed,
             }
-
+            
             Object.entries(cell.properties).forEach(([key, value]) => {
                 edge[edgeSafeKey(key)] = value as string;
             });
-
+            
             this.edgesMap.set(cell.id, edge)
             this.elements.push({ data: edge })
-
-
+            
+            
             // creates a fakeS node for the source and target
             if (createNode) {
                 const [category] = this.createCategory([""])
                 let source = this.nodesMap.get(cell.sourceId)
-
+                
                 if (!source) {
                     source = {
                         id: cell.sourceId.toString(),
                         name: cell.sourceId.toString(),
                         category: category.name,
-                        color: this.getCategoryColorValue()
+                        color: this.getCategoryColorValue(),
+                        expand: false,
+                        collapsed,
                     }
-
+                    
                     this.nodesMap.set(cell.sourceId, source)
                     this.elements.push({ data: source })
                 }
-
+                
                 let destination = this.nodesMap.get(cell.destinationId)
-
+                
                 if (!destination) {
                     destination = {
                         id: cell.destinationId.toString(),
                         name: cell.destinationId.toString(),
                         category: category.name,
-                        color: this.getCategoryColorValue()
+                        color: this.getCategoryColorValue(),
+                        expand: false,
+                        collapsed,
                     }
 
                     this.nodesMap.set(cell.destinationId, destination)
