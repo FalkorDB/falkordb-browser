@@ -239,7 +239,7 @@ const GraphView = forwardRef(({ graph, selectedElement, setSelectedElement, runQ
             if (type) {
                 graph.NodesMap.delete(Number(id))
             } else {
-                graph.NodesMap.delete(Number(id.split('')[1]))
+                graph.EdgesMap.delete(Number(id.split('')[1]))
             }
 
             chart.remove(`#${id}`)
