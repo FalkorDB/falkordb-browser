@@ -15,7 +15,7 @@ export async function GET(request: NextRequest, { params }: { params: { graph: s
     const graph = client.selectGraph(graphId);
 
     // Get node's neighbors    
-    const query = `MATCH (src)-[e]-(n)
+    const query = `MATCH (src)-[e]->(n)
                       WHERE ID(src) = $nodeId
                       RETURN e, n`;
 

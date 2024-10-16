@@ -94,7 +94,7 @@ function getStyle() {
     return style
 }
 
-const getElementId = (element: ElementDataDefinition) => element.source ? { id: element.id?.slice(1), query: "()-[e]-()" } : { id: element.id, query: "(e)" }
+const getElementId = (element: ElementDataDefinition) => element.source ? { id: element.id!.slice(1), query: "()-[e]-()" } : { id: element.id!, query: "(e)" }
 
 const GraphView = forwardRef(({ graph, selectedElement, setSelectedElement, runQuery, historyQuery, historyQueries, fetchCount, data }: {
     graph: Graph
@@ -113,9 +113,6 @@ const GraphView = forwardRef(({ graph, selectedElement, setSelectedElement, runQ
     const chartRef = useRef<cytoscape.Core | null>(null)
     const dataPanel = useRef<ImperativePanelHandle>(null)
     const [maximize, setMaximize] = useState<boolean>(false)
-
-
-
 
     useImperativeHandle(ref, () => ({
         expand: (elements: ElementDefinition[]) => {
@@ -145,10 +142,6 @@ const GraphView = forwardRef(({ graph, selectedElement, setSelectedElement, runQ
             chart.center()
         }
     }, [maximize])
-
-    useEffect(() => {
-        chartRef?.current?.layout(LAYOUT).run();
-    }, [graph.Elements.length, graph.Elements]);
 
     const onExpand = (expand?: boolean) => {
         if (!dataPanel.current) return
@@ -226,6 +219,34 @@ const GraphView = forwardRef(({ graph, selectedElement, setSelectedElement, runQ
         chart.elements().layout(LAYOUT).run();
     }
 
+    const deleteNeighbors = (node: NodeDataDefinition, chart: cytoscape.Core) => {
+        const neighbors = chart.elements(`#${node.id}`).outgoers()
+        neighbors.forEach((n) => {
+            const id = n.id()
+            const index = graph.Elements.findIndex(e => e.data.id === id);
+            const element = graph.Elements[index]
+            
+            if (index === -1 || !element.data.collapsed) return
+            
+            const type = "category" in element.data
+            
+            if (element.data.expand) {
+                deleteNeighbors(element.data, chart)
+            }
+
+            graph.Elements.splice(index, 1);
+
+            if (type) {
+                graph.NodesMap.delete(Number(id))
+            } else {
+                graph.NodesMap.delete(Number(id.split('')[1]))
+            }
+
+            chart.remove(`#${id}`)
+        })
+
+    }
+
     const handleDoubleTap = async (evt: EventObject) => {
         const chart = chartRef.current
 
@@ -239,16 +260,7 @@ const GraphView = forwardRef(({ graph, selectedElement, setSelectedElement, runQ
         if (!graphNode.data.expand) {
             chart.add(await onFetchNode(node));
         } else {
-            const neighbors = chart.elements(`#${node.id}`).neighborhood()
-            neighbors.forEach((n) => {
-                const id = n.id()
-                const index = graph.Elements.findIndex(e => e.data.id === id)
-                chart.remove(`#${id}`)
-                
-                if (index === -1) return
-
-                graph.Elements.splice(index, 1)
-            })
+            deleteNeighbors(node, chart)
         }
 
         graphNode.data.expand = !graphNode.data.expand;
@@ -350,6 +362,12 @@ const GraphView = forwardRef(({ graph, selectedElement, setSelectedElement, runQ
             const type = !element.source
             const { id } = getElementId(element)
             graph.Elements.splice(graph.Elements.findIndex(e => e.data.id === id), 1)
+            if (type) {
+                graph.NodesMap.delete(Number(id))
+            } else {
+                graph.EdgesMap.delete(Number(id.split('')[1]))
+            }
+
             chartRef.current?.remove(`#${id} `)
 
             fetchCount()
@@ -359,6 +377,8 @@ const GraphView = forwardRef(({ graph, selectedElement, setSelectedElement, runQ
 
         setSelectedElements([])
         setSelectedElement(undefined)
+
+        chartRef.current?.elements().layout(LAYOUT).run()
     }
 
     return (
