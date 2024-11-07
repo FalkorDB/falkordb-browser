@@ -7,7 +7,7 @@ import fcose from 'cytoscape-fcose';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { ImperativePanelHandle } from "react-resizable-panels";
 import { ChevronLeft, Maximize2, Minimize2 } from "lucide-react"
-import { cn, ElementDataDefinition, prepareArg, securedFetch } from "@/lib/utils";
+import { cn, ElementDataDefinition, prepareArg, securedFetch, Toast } from "@/lib/utils";
 import dynamic from "next/dynamic";
 import { Session } from "next-auth";
 import { Category, Graph } from "../api/graph/model";
@@ -258,7 +258,12 @@ const GraphView = forwardRef(({ graph, selectedElement, setSelectedElement, runQ
         if (!graphNode) return
 
         if (!graphNode.data.expand) {
-            chart.add(await onFetchNode(node));
+            const elements = await onFetchNode(node)
+            if (elements.length === 0) {
+                Toast("No neighbors found", "error")
+                return
+            }
+            chart.add(elements);
         } else {
             deleteNeighbors(node, chart)
         }
@@ -365,7 +370,7 @@ const GraphView = forwardRef(({ graph, selectedElement, setSelectedElement, runQ
             if (type) {
                 graph.NodesMap.delete(Number(id))
             } else {
-                graph.EdgesMap.delete(Number(id.split('')[1]))
+                graph.EdgesMap.delete(Number(id.split('_')[1]))
             }
 
             chartRef.current?.remove(`#${id} `)
