@@ -214,7 +214,7 @@ export class Graph {
             Object.entries(cell.properties).forEach(([key, value]) => {
                 currentNode[nodeSafeKey(key)] = value as string;
             });
-            
+
             // remove empty category if there are no more empty nodes category
             if (this.nodesMap.values().every(n => n.category !== "")) {
                 this.categories = this.categories.filter(l => l.name !== "")
@@ -250,16 +250,19 @@ export class Graph {
             this.edgesMap.set(cell.id, edge)
             this.elements.push({ data: edge })
 
-
-            // creates a fakeS node for the source and target
-            const [category] = this.createCategory([""])
+            let category
             let source = this.nodesMap.get(cell.sourceId)
+            let destination = this.nodesMap.get(cell.destinationId)
+
+            if (!source || !destination) {
+                [category] = this.createCategory([""])
+            }
 
             if (!source) {
                 source = {
                     id: cell.sourceId.toString(),
                     name: cell.sourceId.toString(),
-                    category: category.name,
+                    category: category!.name,
                     color: this.getCategoryColorValue(),
                     expand: false,
                     collapsed,
@@ -269,13 +272,12 @@ export class Graph {
                 this.elements.push({ data: source })
             }
 
-            let destination = this.nodesMap.get(cell.destinationId)
 
             if (!destination) {
                 destination = {
                     id: cell.destinationId.toString(),
                     name: cell.destinationId.toString(),
-                    category: category.name,
+                    category: category!.name,
                     color: this.getCategoryColorValue(),
                     expand: false,
                     collapsed,
