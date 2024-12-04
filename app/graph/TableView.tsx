@@ -9,7 +9,7 @@ interface Props {
 
 export default function TableView({ data }: Props) {
     return (
-        <div className="h-full w-full flex flex-col overflow-auto border">
+        <div className="max-h-full w-full flex flex-col overflow-auto border">
             <div key={-1} className={cn("flex")}>
                 {
                     Object.keys(data[0]).map((key, i) => (
