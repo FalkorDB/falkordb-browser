@@ -27,6 +27,10 @@
 
 @layer components {
 
+    .tabs-trigger {
+        @apply p-2 data-[state=active]:!bg-white data-[state=active]:font-bold data-[state=active]:!text-background;
+    }
+
     .hide-scrollbar {
         scrollbar-width: none;
         -ms-overflow-style: none;

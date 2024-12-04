@@ -8,13 +8,12 @@ interface Props {
 }
 
 export default function TableView({ data }: Props) {
-
     return (
-        <div className="h-full flex flex-col overflow-auto border">
+        <div className="h-full w-full flex flex-col overflow-auto border">
             <div key={-1} className={cn("flex")}>
                 {
                     Object.keys(data[0]).map((key, i) => (
-                        <div key={i} className={cn("w-[33%] flex justify-center items-center p-4", i !== 0 && "border-l")}>
+                        <div key={i} className={cn("flex-1 flex justify-center items-center p-4", i !== 0 && "border-l")}>
                             <span className="text-xl font-bold">{key}</span>
                         </div>
                     ))
@@ -25,7 +24,7 @@ export default function TableView({ data }: Props) {
                     <div key={i} className={cn("flex border-t")}>
                         {
                             Object.entries(row).map((val, j) => (
-                                <div key={`${i}${j}`} className={cn("w-[33%] flex justify-center items-center p-4", j !== 0 && "border-l")}>
+                                <div key={`${i}${j}`} className={cn("flex-1 flex justify-center items-center p-4", j !== 0 && "border-l")}>
                                     <pre className="w-fit">{typeof val === "object" ? JSON.stringify(val[1], null, 2) : val}</pre>
                                 </div>
                             ))

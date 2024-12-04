@@ -6,7 +6,7 @@ import { useRef, useState, useImperativeHandle, forwardRef, useEffect, Dispatch,
 import fcose from 'cytoscape-fcose';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { ImperativePanelHandle } from "react-resizable-panels";
-import { ChevronLeft, Maximize2, Minimize2 } from "lucide-react"
+import { ChevronLeft, GitGraph, Maximize2, Minimize2, Table } from "lucide-react"
 import { cn, ElementDataDefinition, prepareArg, securedFetch } from "@/lib/utils";
 import dynamic from "next/dynamic";
 import { Session } from "next-auth";
@@ -115,10 +115,12 @@ const GraphView = forwardRef(({ graph, selectedElement, setSelectedElement, runQ
     const chartRef = useRef<cytoscape.Core | null>(null)
     const dataPanel = useRef<ImperativePanelHandle>(null)
     const [maximize, setMaximize] = useState<boolean>(false)
+    const [tabsValue, setTabsValue] = useState<string>("")
 
-
-
-
+    useEffect(() => {
+        const defaultChecked = graph.Data.length !== 0 ? "Table" : ""
+        setTabsValue(graph.Elements.length !== 0 ? "Graph" : defaultChecked)
+    }, [graph.Elements.length, graph.Data.length])
     useImperativeHandle(ref, () => ({
         expand: (elements: ElementDefinition[]) => {
             const chart = chartRef.current
@@ -147,12 +149,12 @@ const GraphView = forwardRef(({ graph, selectedElement, setSelectedElement, runQ
             chart.center()
         }
     }, [maximize])
-    
+
     useEffect(() => {
         const chart = chartRef.current
-        if (chart) {
-            chart.layout(LAYOUT).run();
-        }
+        if (!chart || tabsValue !== "Graph") return
+        chart.layout(LAYOUT).run();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [graph.Elements.length, graph.Elements]);
 
     const onExpand = (expand?: boolean) => {
@@ -372,22 +374,44 @@ const GraphView = forwardRef(({ graph, selectedElement, setSelectedElement, runQ
                 className={cn("flex flex-col gap-4", !isCollapsed && "mr-8")}
                 defaultSize={selectedElement ? 75 : 100}
             >
-                <EditorComponent
-                    graph={graph}
-                    isCollapsed={isCollapsed}
-                    maximize={maximize}
-                    currentQuery={query}
-                    historyQueries={historyQueries}
-                    runQuery={runQuery}
-                    setCurrentQuery={setQuery}
-                    data={data}
-                />
-                <Tabs defaultValue="Graph" className="grow flex flex-col">
-                    <TabsList className="bg-background flex justify-center">
-                        <TabsTrigger className="p-2 data-[state=active]:bg-white data-[state=active]:font-bold data-[state=active]:text-background" value="Graph">Graph View</TabsTrigger>
-                        <TabsTrigger className="p-2 data-[state=active]:bg-white data-[state=active]:font-bold data-[state=active]:text-background" value="Table">Table View</TabsTrigger>
+                {
+                    graph.Id &&
+                    <EditorComponent
+                        graph={graph}
+                        isCollapsed={isCollapsed}
+                        maximize={maximize}
+                        currentQuery={query}
+                        historyQueries={historyQueries}
+                        runQuery={runQuery}
+                        setCurrentQuery={setQuery}
+                        data={data}
+                    />
+                }
+                <Tabs value={tabsValue} className="h-1 grow flex">
+                    <TabsList className="h-full bg-background flex flex-col justify-center">
+                        {
+                            graph.Elements.length !== 0 &&
+                            <TabsTrigger
+                                className="tabs-trigger"
+                                value="Graph"
+                                onClick={() => setTabsValue("Graph")}
+                                title="Graph">
+                                <GitGraph />
+                            </TabsTrigger>
+                        }
+                        {
+                            graph.Data.length !== 0 &&
+                            <TabsTrigger
+                                className="tabs-trigger"
+                                value="Table"
+                                onClick={() => setTabsValue("Table")}
+                                title="Table"
+                            >
+                                <Table />
+                            </TabsTrigger>
+                        }
                     </TabsList>
-                    <TabsContent value="Graph" className="h-1 grow">
+                    <TabsContent value="Graph" className="grow h-full mt-0">
                         <div className="h-full flex flex-col gap-4">
                             <div className="flex items-center justify-between">
                                 <Toolbar
@@ -458,7 +482,7 @@ const GraphView = forwardRef(({ graph, selectedElement, setSelectedElement, runQ
                             </div>
                         </div>
                     </TabsContent>
-                    <TabsContent value="Table" className="h-1 grow">
+                    <TabsContent value="Table" className="mt-0 grow h-full">
                         <TableView
                             data={graph.Data}
                         />
