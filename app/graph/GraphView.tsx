@@ -10,11 +10,13 @@ import { ChevronLeft, Maximize2, Minimize2 } from "lucide-react"
 import { cn, ElementDataDefinition, prepareArg, securedFetch } from "@/lib/utils";
 import dynamic from "next/dynamic";
 import { Session } from "next-auth";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Category, Graph } from "../api/graph/model";
 import DataPanel from "./GraphDataPanel";
 import Labels from "./labels";
 import Toolbar from "./toolbar";
 import Button from "../components/ui/Button";
+import TableView from "./TableView";
 
 const EditorComponent = dynamic(() => import("../components/EditorComponent"), {
     ssr: false
@@ -145,9 +147,12 @@ const GraphView = forwardRef(({ graph, selectedElement, setSelectedElement, runQ
             chart.center()
         }
     }, [maximize])
-
+    
     useEffect(() => {
-        chartRef?.current?.layout(LAYOUT).run();
+        const chart = chartRef.current
+        if (chart) {
+            chart.layout(LAYOUT).run();
+        }
     }, [graph.Elements.length, graph.Elements]);
 
     const onExpand = (expand?: boolean) => {
@@ -244,7 +249,7 @@ const GraphView = forwardRef(({ graph, selectedElement, setSelectedElement, runQ
                 const id = n.id()
                 const index = graph.Elements.findIndex(e => e.data.id === id)
                 chart.remove(`#${id}`)
-                
+
                 if (index === -1) return
 
                 graph.Elements.splice(index, 1)
@@ -364,7 +369,7 @@ const GraphView = forwardRef(({ graph, selectedElement, setSelectedElement, runQ
     return (
         <ResizablePanelGroup direction="horizontal" className={cn(maximize && "h-full p-10 bg-background fixed left-[50%] top-[50%] z-50 grid translate-x-[-50%] translate-y-[-50%]")}>
             <ResizablePanel
-                className={cn("flex flex-col gap-8", !isCollapsed && "mr-8")}
+                className={cn("flex flex-col gap-4", !isCollapsed && "mr-8")}
                 defaultSize={selectedElement ? 75 : 100}
             >
                 <EditorComponent
@@ -377,73 +382,88 @@ const GraphView = forwardRef(({ graph, selectedElement, setSelectedElement, runQ
                     setCurrentQuery={setQuery}
                     data={data}
                 />
-                <div className="flex items-center justify-between">
-                    <Toolbar
-                        disabled={!graph.Id}
-                        deleteDisabled={(Object.values(selectedElements).length === 0 && !selectedElement) || data?.user.role === "Read-Only"}
-                        onDeleteElement={handelDeleteElement}
-                        chartRef={chartRef}
-                        addDisabled
-                    />
-                    {
-                        isCollapsed && graph.Id &&
-                        <Button
-                            className="p-3 bg-[#7167F6] rounded-lg"
-                            icon={<ChevronLeft />}
-                            onClick={() => onExpand()}
-                            disabled={!selectedElement}
+                <Tabs defaultValue="Graph" className="grow flex flex-col">
+                    <TabsList className="bg-background flex justify-center">
+                        <TabsTrigger className="p-2 data-[state=active]:bg-white data-[state=active]:font-bold data-[state=active]:text-background" value="Graph">Graph View</TabsTrigger>
+                        <TabsTrigger className="p-2 data-[state=active]:bg-white data-[state=active]:font-bold data-[state=active]:text-background" value="Table">Table View</TabsTrigger>
+                    </TabsList>
+                    <TabsContent value="Graph" className="h-1 grow">
+                        <div className="h-full flex flex-col gap-4">
+                            <div className="flex items-center justify-between">
+                                <Toolbar
+                                    disabled={!graph.Id}
+                                    deleteDisabled={(Object.values(selectedElements).length === 0 && !selectedElement) || data?.user.role === "Read-Only"}
+                                    onDeleteElement={handelDeleteElement}
+                                    chartRef={chartRef}
+                                    addDisabled
+                                />
+                                {
+                                    isCollapsed && graph.Id &&
+                                    <Button
+                                        className="p-3 bg-[#7167F6] rounded-lg"
+                                        icon={<ChevronLeft />}
+                                        onClick={() => onExpand()}
+                                        disabled={!selectedElement}
+                                    />
+                                }
+                            </div>
+                            <div className="relative h-1 grow rounded-lg overflow-hidden">
+                                {
+                                    !maximize ?
+                                        <Button
+                                            className="z-10 absolute top-4 right-4"
+                                            icon={<Maximize2 />}
+                                            title="Maximize"
+                                            onClick={() => setMaximize(true)}
+
+                                        /> : <Button
+                                            className="z-10 absolute top-4 right-4"
+                                            icon={<Minimize2 />}
+                                            title="Minimize"
+                                            onClick={() => setMaximize(false)}
+                                            onKeyDown={(e) => e.code === "Escape" && setMaximize(false)}
+                                        />
+                                }
+                                <CytoscapeComponent
+                                    className="Canvas"
+                                    cy={(cy) => {
+
+                                        chartRef.current = cy
+
+                                        cy.removeAllListeners()
+
+                                        cy.on('dbltap', 'node', handleDoubleTap)
+                                        cy.on('mouseover', 'node', handleMouseOver)
+                                        cy.on('mouseover', 'edge', handleMouseOver)
+                                        cy.on('mouseout', 'node', handleMouseOut)
+                                        cy.on('mouseout', 'edge', handleMouseOut)
+                                        cy.on('tapunselect', 'node', handleUnselected)
+                                        cy.on('tapunselect', 'edge', handleUnselected)
+                                        cy.on('tapselect', 'node', handleSelected)
+                                        cy.on('tapselect', 'edge', handleSelected)
+                                        cy.on('boxselect', 'node', handleBoxSelected)
+                                        cy.on('boxselect', 'edge', handleBoxSelected)
+                                    }}
+                                    elements={graph.Elements}
+                                    layout={LAYOUT}
+                                    stylesheet={getStyle()}
+                                />
+                                {
+                                    (graph.Categories.length > 0 || graph.Labels.length > 0) &&
+                                    <>
+                                        <Labels categories={graph.Categories} onClick={onCategoryClick} label="Labels" graph={graph} />
+                                        <Labels categories={graph.Labels} onClick={onLabelClick} label="RelationshipTypes" graph={graph} />
+                                    </>
+                                }
+                            </div>
+                        </div>
+                    </TabsContent>
+                    <TabsContent value="Table" className="h-1 grow">
+                        <TableView
+                            data={graph.Data}
                         />
-                    }
-                </div>
-                <div className="relative h-1 grow rounded-lg overflow-hidden">
-                    {
-                        !maximize ?
-                            <Button
-                                className="z-10 absolute top-4 right-4"
-                                icon={<Maximize2 />}
-                                title="Maximize"
-                                onClick={() => setMaximize(true)}
-
-                            /> : <Button
-                                className="z-10 absolute top-4 right-4"
-                                icon={<Minimize2 />}
-                                title="Minimize"
-                                onClick={() => setMaximize(false)}
-                                onKeyDown={(e) => e.code === "Escape" && setMaximize(false)}
-                            />
-                    }
-                    <CytoscapeComponent
-                        className="Canvas"
-                        cy={(cy) => {
-
-                            chartRef.current = cy
-
-                            cy.removeAllListeners()
-
-                            cy.on('dbltap', 'node', handleDoubleTap)
-                            cy.on('mouseover', 'node', handleMouseOver)
-                            cy.on('mouseover', 'edge', handleMouseOver)
-                            cy.on('mouseout', 'node', handleMouseOut)
-                            cy.on('mouseout', 'edge', handleMouseOut)
-                            cy.on('tapunselect', 'node', handleUnselected)
-                            cy.on('tapunselect', 'edge', handleUnselected)
-                            cy.on('tapselect', 'node', handleSelected)
-                            cy.on('tapselect', 'edge', handleSelected)
-                            cy.on('boxselect', 'node', handleBoxSelected)
-                            cy.on('boxselect', 'edge', handleBoxSelected)
-                        }}
-                        elements={graph.Elements}
-                        layout={LAYOUT}
-                        stylesheet={getStyle()}
-                    />
-                    {
-                        (graph.Categories.length > 0 || graph.Labels.length > 0) &&
-                        <>
-                            <Labels categories={graph.Categories} onClick={onCategoryClick} label="Labels" graph={graph} />
-                            <Labels categories={graph.Labels} onClick={onLabelClick} label="RelationshipTypes" graph={graph} />
-                        </>
-                    }
-                </div>
+                    </TabsContent>
+                </Tabs>
             </ResizablePanel>
             <ResizableHandle className={!isCollapsed ? "w-3" : "w-0"} />
             <ResizablePanel
@@ -468,7 +488,7 @@ const GraphView = forwardRef(({ graph, selectedElement, setSelectedElement, runQ
                     />
                 }
             </ResizablePanel>
-        </ResizablePanelGroup>
+        </ResizablePanelGroup >
     )
 });
 
