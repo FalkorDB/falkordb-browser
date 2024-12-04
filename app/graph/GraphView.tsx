@@ -387,8 +387,8 @@ const GraphView = forwardRef(({ graph, selectedElement, setSelectedElement, runQ
                         data={data}
                     />
                 }
-                <Tabs value={tabsValue} className="h-1 grow flex">
-                    <TabsList className="h-full bg-background flex flex-col justify-center">
+                <Tabs value={tabsValue} className="h-1 grow flex gap-2">
+                    <TabsList className="h-full bg-background flex flex-col justify-center gap-2">
                         {
                             graph.Elements.length !== 0 &&
                             <TabsTrigger

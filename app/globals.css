@@ -28,7 +28,7 @@
 @layer components {
 
     .tabs-trigger {
-        @apply p-2 data-[state=active]:!bg-white data-[state=active]:font-bold data-[state=active]:!text-background;
+        @apply !p-3 hover:bg-[#444466] bg-[#57577B] data-[state=active]:!bg-[#444466] data-[state=active]:font-bold;
     }
 
     .hide-scrollbar {
