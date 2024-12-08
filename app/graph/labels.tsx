@@ -45,6 +45,7 @@ export default function Labels({ graph, categories, onClick, label, className = 
                 }
                 <ul ref={listRef} className={cn("flex flex-col gap-4 w-full overflow-auto hide-scrollbar", label === "RelationshipTypes" && "items-end")}>
                     {
+                        categories.length > 0 &&
                         categories.map((category) => (
                             <li key={category.index} className="pointer-events-auto">
                                 <Button

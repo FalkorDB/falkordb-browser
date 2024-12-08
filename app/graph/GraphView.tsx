@@ -118,9 +118,10 @@ const GraphView = forwardRef(({ graph, selectedElement, setSelectedElement, runQ
     const [tabsValue, setTabsValue] = useState<string>("")
 
     useEffect(() => {
-        const defaultChecked = graph.Data.length !== 0 ? "Table" : ""
+        const defaultChecked = graph.Data.length !== 0 ? "Table" : "Graph"
         setTabsValue(graph.Elements.length !== 0 ? "Graph" : defaultChecked)
     }, [graph.Elements.length, graph.Data.length])
+    
     useImperativeHandle(ref, () => ({
         expand: (elements: ElementDefinition[]) => {
             const chart = chartRef.current
@@ -154,7 +155,7 @@ const GraphView = forwardRef(({ graph, selectedElement, setSelectedElement, runQ
         const chart = chartRef.current
         if (!chart || tabsValue !== "Graph") return
         chart.layout(LAYOUT).run();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [graph.Elements.length, graph.Elements]);
 
     const onExpand = (expand?: boolean) => {
@@ -374,42 +375,35 @@ const GraphView = forwardRef(({ graph, selectedElement, setSelectedElement, runQ
                 className={cn("flex flex-col gap-4", !isCollapsed && "mr-8")}
                 defaultSize={selectedElement ? 75 : 100}
             >
-                {
-                    graph.Id &&
-                    <EditorComponent
-                        graph={graph}
-                        isCollapsed={isCollapsed}
-                        maximize={maximize}
-                        currentQuery={query}
-                        historyQueries={historyQueries}
-                        runQuery={runQuery}
-                        setCurrentQuery={setQuery}
-                        data={data}
-                    />
-                }
+                <EditorComponent
+                    graph={graph}
+                    isCollapsed={isCollapsed}
+                    maximize={maximize}
+                    currentQuery={query}
+                    historyQueries={historyQueries}
+                    runQuery={runQuery}
+                    setCurrentQuery={setQuery}
+                    data={data}
+                />
                 <Tabs value={tabsValue} className="h-1 grow flex gap-2">
                     <TabsList className="h-full bg-background flex flex-col justify-center gap-2">
-                        {
-                            graph.Elements.length !== 0 &&
-                            <TabsTrigger
-                                className="tabs-trigger"
-                                value="Graph"
-                                onClick={() => setTabsValue("Graph")}
-                                title="Graph">
-                                <GitGraph />
-                            </TabsTrigger>
-                        }
-                        {
-                            graph.Data.length !== 0 &&
-                            <TabsTrigger
-                                className="tabs-trigger"
-                                value="Table"
-                                onClick={() => setTabsValue("Table")}
-                                title="Table"
-                            >
-                                <Table />
-                            </TabsTrigger>
-                        }
+                        <TabsTrigger
+                            disabled={graph.Data.length === 0}
+                            className="tabs-trigger"
+                            value="Graph"
+                            onClick={() => setTabsValue("Graph")}
+                            title="Graph">
+                            <GitGraph />
+                        </TabsTrigger>
+                        <TabsTrigger
+                            disabled={graph.Data.length === 0}
+                            className="tabs-trigger"
+                            value="Table"
+                            onClick={() => setTabsValue("Table")}
+                            title="Table"
+                        >
+                            <Table />
+                        </TabsTrigger>
                     </TabsList>
                     <TabsContent value="Graph" className="grow h-full mt-0">
                         <div className="h-full flex flex-col gap-4">

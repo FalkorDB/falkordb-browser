@@ -35,7 +35,7 @@
         scrollbar-width: none;
         -ms-overflow-style: none;
     }
-    
+
     .hide-scrollbar {
         scrollbar-width: none;
         -ms-overflow-style: none;
@@ -56,6 +56,12 @@
 
     .LoginForm>form>p {
         font-family: "Obviously Narrow" !important;
+    }
+
+    .Text {
+        background: linear-gradient(90deg, #EC806C 0%, #B66EBD 43.41%, #7568F2 100%);
+        background-clip: text;
+        color: transparent;
     }
 
     .Top {
