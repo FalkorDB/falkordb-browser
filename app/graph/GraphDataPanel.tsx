@@ -4,7 +4,7 @@
 
 import { ElementDataDefinition, prepareArg, securedFetch, Toast } from "@/lib/utils";
 import { Dispatch, SetStateAction, useEffect, useState } from "react";
-import { ChevronRight, PlusCircle, Trash2 } from "lucide-react";
+import { Check, ChevronRight, MinusCircle, Pencil, PlusCircle, Trash2, X } from "lucide-react";
 import { Session } from "next-auth";
 import Button from "../components/ui/Button";
 import Input from "../components/ui/Input";
@@ -20,23 +20,11 @@ interface Props {
     data: Session | null;
 }
 
-const excludedProperties = new Set([
-    "category",
-    "color",
-    "_id",
-    "id",
-    "label",
-    "target",
-    "source",
-    "collapsed",
-    "expand",
-]);
-
 export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement, graph, data }: Props) {
 
     const [attributes, setAttributes] = useState<string[]>([]);
     const [editable, setEditable] = useState<string>("");
-    const [mouseEnter, setMouseEnter] = useState<string>("");
+    const [hover, setHover] = useState<string>("");
     const [isAddValue, setIsAddValue] = useState<boolean>(false);
     const [newKey, setNewKey] = useState<string>("");
     const [newVal, setNewVal] = useState<string>("");
@@ -44,7 +32,7 @@ export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement,
     const type = !("source" in obj)
 
     useEffect(() => {
-        setAttributes(Object.keys(obj).filter((key) => !excludedProperties.has(key) && (key !== "name" || obj.name !== obj.id)));
+        setAttributes(Object.keys(obj.data).filter((key) => (key !== "name" || obj.data.name !== obj.id)));
         setLabel(type ? obj.category : obj.label);
     }, [obj, type]);
 
@@ -56,11 +44,11 @@ export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement,
         })).ok
 
         if (success) {
-            graph.Elements.forEach(({ data: d }) => {
-                if (d.id !== id) return
-                d[key] = val
+            graph.Elements.forEach(({ data: e }) => {
+                if (e.id !== id) return
+                e.data[key] = val
             })
-            setObj((prev) => ({ ...prev, [key]: val }))
+            setObj((prev) => ({ ...prev, data: { ...prev.data, [key]: val } }))
             setNewVal("")
         }
 
@@ -75,18 +63,36 @@ export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement,
         })).ok
 
         if (success) {
-            graph.Elements.forEach(element => {
-                if (element.data.id !== id) return
-                const e = element
+            graph.Elements.forEach(({ data: e }) => {
+                if (e.id !== id) return
                 delete e.data[key]
             })
 
             const newObj = { ...obj }
-            delete newObj[key]
+            delete newObj.data[key]
             setObj(newObj)
         }
 
         return success
+    }
+
+    const handelAddValue = async (e: React.KeyboardEvent<HTMLInputElement>) => {
+        if (e.key === "Escape") {
+            setIsAddValue(false)
+            setNewKey("")
+            setNewVal("")
+        }
+
+        if (e.key !== "Enter") return
+
+        if (!newKey || !newVal) {
+            Toast("Please fill in both fields")
+        }
+
+        const success = await setProperty(newKey, newVal)
+        if (!success) return
+        setIsAddValue(false)
+        setNewKey("")
     }
 
 
@@ -112,16 +118,49 @@ export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement,
                             <div
                                 key={key}
                                 className="flex gap-2 items-center p-4"
-                                onMouseEnter={() => setMouseEnter(key)}
-                                onMouseLeave={() => setMouseEnter("")}
+                                onMouseEnter={() => setHover(key)}
+                                onMouseLeave={() => setHover("")}
                             >
-                                <div className="w-6">
+                                <div className="w-6 h-12">
                                     {
-                                        mouseEnter === key &&
-                                        <Button
-                                            icon={<Trash2 />}
-                                            onClick={() => removeProperty(key)}
-                                        />
+                                        editable === key ?
+                                            <div className="flex flex-col gap-2">
+                                                <Button
+                                                    variant="button"
+                                                    icon={<Check size={20} />}
+                                                    onClick={(e) => {
+                                                        e.stopPropagation()
+                                                        setProperty(key, newVal)
+                                                        setEditable("")
+                                                    }}
+                                                />
+                                                <Button
+                                                    variant="button"
+                                                    icon={<X size={20} />}
+                                                    onClick={(e) => {
+                                                        e.stopPropagation()
+                                                        setEditable("")
+                                                    }}
+                                                />
+                                            </div>
+                                            : hover === key &&
+                                            <div className="flex flex-col gap-2">
+                                                <Button
+                                                    icon={<Trash2 size={20} />}
+                                                    variant="button"
+                                                    onClick={() => {
+                                                        removeProperty(key)
+                                                    }}
+                                                />
+                                                <Button
+                                                    variant="button"
+                                                    icon={<Pencil size={20} />}
+                                                    onClick={() => {
+                                                        setEditable(key)
+                                                        setNewVal(obj.data[key])
+                                                    }}
+                                                />
+                                            </div>
                                     }
                                 </div>
                                 <div>
@@ -135,7 +174,6 @@ export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement,
                                                 variant="Small"
                                                 value={newVal}
                                                 onChange={(e) => setNewVal(e.target.value)}
-                                                onBlur={() => setEditable("")}
                                                 onKeyDown={(e) => {
                                                     if (e.key === "Escape") {
                                                         setEditable("")
@@ -149,10 +187,11 @@ export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement,
                                             />
                                             : <Button
                                                 className="max-w-full"
-                                                label={obj[key]?.toString()}
-                                                onClick={() => {
+                                                label={obj.data[key]?.toString()}
+                                                onClick={(e) => {
+                                                    e.stopPropagation()
                                                     setEditable(key)
-                                                    setNewVal(obj[key])
+                                                    setNewVal(obj.data[key])
                                                 }}
                                             />
                                     }
@@ -167,20 +206,7 @@ export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement,
                                 variant="Small"
                                 value={newKey}
                                 onChange={(e) => setNewKey(e.target.value)}
-                                onKeyDown={(e) => {
-                                    if (e.key === "Escape") {
-                                        setIsAddValue(false)
-                                    }
-
-                                    if (e.key !== "Enter") return
-
-                                    if (!newKey || !newVal) {
-                                        Toast("Please fill in both fields")
-                                    }
-
-                                    setProperty(newKey, newVal)
-                                    setIsAddValue(false)
-                                }}
+                                onKeyDown={handelAddValue}
                             />
                             <Input
                                 className="w-1/2"
@@ -188,29 +214,16 @@ export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement,
                                 value={newVal}
                                 onChange={(e) => setNewVal(e.target.value)}
                                 onBlur={() => setIsAddValue(false)}
-                                onKeyDown={(e) => {
-                                    if (e.key === "Escape") {
-                                        setIsAddValue(false)
-                                    }
-
-                                    if (e.key !== "Enter") return
-
-                                    if (!newKey || !newVal) {
-                                        Toast("Please fill in both fields")
-                                    }
-
-                                    setProperty(newKey, newVal)
-                                    setIsAddValue(false)
-                                }}
+                                onKeyDown={handelAddValue}
                             />
                         </div>
                     )}
-                    <div key="Is Add" className="p-3">
+                    <div key="Add Value Toggle" className="p-3">
                         <Button
                             variant="Secondary"
                             label="Add Value"
-                            icon={<PlusCircle />}
-                            onClick={() => setIsAddValue(true)}
+                            icon={isAddValue ? <MinusCircle /> : <PlusCircle />}
+                            onClick={() => setIsAddValue(prev => !prev)}
                             disabled={data?.user.role === "Read-Only"}
                         />
                     </div>

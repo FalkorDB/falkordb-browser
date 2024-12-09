@@ -1,422 +1,343 @@
-'use client'
-
-import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+/* eslint-disable react/no-array-index-key */
+import { Check, ChevronRight, MinusCircle, Pencil, PlusCircle, Trash2, X } from "lucide-react";
+import { ElementDataDefinition, Toast } from "@/lib/utils";
 import { useEffect, useState } from "react";
-import { cn, ElementDataDefinition, Toast } from "@/lib/utils";
-import { ChevronRight, Trash2 } from "lucide-react";
+import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Session } from "next-auth";
-import Input from "../components/ui/Input";
 import Button from "../components/ui/Button";
+import { ATTRIBUTES, getDefaultAttribute, OPTIONS } from "./SchemaCreateElement";
+import Input from "../components/ui/Input";
 import Combobox from "../components/ui/combobox";
-
-export const OPTIONS = ["String", "Integer", "Float", "Geospatial", "Boolean"]
-
-export type Type = "String" | "Integer" | "Float" | "Geospatial" | "Boolean" | undefined
-export type Attribute = [Type, string, boolean, boolean]
-
-const excludedProperties = new Set([
-    "category",
-    "color",
-    "_id",
-    "id",
-    "label",
-    "target",
-    "source",
-]);
 
 interface Props {
     obj: ElementDataDefinition
-    onExpand: () => void
-    onDelete: () => void
-    onSetAttribute: (key: string, val: Attribute) => Promise<boolean>
-    onRemoveAttribute: (key: string) => Promise<boolean>
-    onSetCategory: (label: string) => Promise<boolean>
-    data: Session | null
+    onExpand: () => void;
+    onSetAttributes: (attribute: [string, string[]]) => Promise<boolean>;
+    onRemoveAttribute: (key: string) => Promise<boolean>;
 }
 
-const emptyAttribute = (): Attribute => [undefined, "", false, false]
+export default function SchemaDataPanel({ obj, onExpand, onSetAttributes, onRemoveAttribute }: Props) {
 
-export default function SchemaCreateElement({ obj, onExpand, onDelete, onSetAttribute, onRemoveAttribute, onSetCategory, data }: Props) {
-
-    const [attribute, setAttribute] = useState<Attribute>(emptyAttribute())
-    const [newVal, setVal] = useState<string>("")
-    const [newKey, setNewKey] = useState<string>("")
-    const [labelEditable, setLabelEditable] = useState<boolean>(false)
+    const [attribute, setAttribute] = useState<[string, string[]]>(getDefaultAttribute())
+    const [attributes, setAttributes] = useState<[string, string[]][]>([])
+    const [label, setLabel] = useState<string>("")
     const [editable, setEditable] = useState<string>("")
     const [hover, setHover] = useState<string>("")
     const [isAddValue, setIsAddValue] = useState<boolean>(false)
-    const [attributes, setAttributes] = useState<[string, Attribute][]>(Object.entries(obj).filter(([k, v]) => !excludedProperties.has(k) && !(k === "name" && v === obj.id)).map(([k, v]) => [k, Array.isArray(v) ? v : v.split(",")] as [string, Attribute]))
-    const [label, setLabel] = useState<string>(obj.source ? obj.label : obj.category)
-    const [newLabel, setNewLabel] = useState<string>("")
 
     useEffect(() => {
-        setAttributes(Object.entries(obj).filter(([k, v]) => !excludedProperties.has(k) && !(k === "name" && v === obj.id)).map(([k, v]) => [k, Array.isArray(v) ? v : v.split(",")] as [string, Attribute]))
-        setLabel(obj.source ? obj.label : obj.category)
+        setAttributes(Object.entries(obj.data).filter(([key, val]) => !(key === "name" && val === obj.id)).map(([key, val]) => [key, Array.isArray(val) ? val : (val as string).split(',')]))
+        setLabel("source" in obj ? obj.label : obj.category)
     }, [obj])
 
-    const handelAddAttribute = async (e: React.KeyboardEvent<HTMLInputElement>) => {
-        if (e.code === "Escape") {
-            e.preventDefault()
-            setAttribute(emptyAttribute())
-            return
+    const handelSetEditable = ([key, val]: [string, string[]] = getDefaultAttribute()) => {
+        if (key !== "") {
+            setIsAddValue(false)
         }
 
-        if (e.key !== 'Enter') return
-
-        e.preventDefault()
-        if (!newKey || !attribute[0] || !attribute[1]) {
-            Toast('Please fill all the fields')
-            return
-        }
-
-        const success = await onSetAttribute(newKey, attribute)
-
-        if (!success) return
-
-        setAttributes(prev => [...prev, [newKey, attribute]])
-        setAttribute(emptyAttribute())
-        setNewKey("")
-        setIsAddValue(false)
+        setAttribute([key, val])
+        setEditable(key)
     }
 
-    const handelSetAttribute = async (e: React.KeyboardEvent<HTMLInputElement>) => {
-        if (e.code === "Escape") {
-            e.preventDefault()
-            setVal("")
-            setEditable("")
+    const handelSetAttributes = async () => {
+        if (attribute[0] === "" || attribute[1].some(v => v === "")) {
+            Toast("Please fill all the fields")
             return
         }
 
-        if (e.key !== 'Enter') return
+        const ok = await onSetAttributes(attribute)
 
-        e.preventDefault()
+        if (ok) {
+            setAttributes(prev => prev.map((att) => att[0] === attribute[0] ? attribute : att))
+            handelSetEditable()
+        }
+    }
 
-        const [index, i] = editable.split("-")
-        const isKey = i === "key"
+    const handelRemoveAttribute = async (key: string) => {
 
-        if (isKey ? !newKey : !newVal) {
-            Toast("Please fill the field")
+        const ok = await onRemoveAttribute(key)
+
+        if (ok) {
+            setAttributes(prev => prev.filter(([k]) => k !== key))
+        }
+    }
+
+    const handelAddAttribute = async () => {
+        if (attribute[0] === "" || attribute[1].some(v => v === "")) {
+            Toast("Please fill all the fields")
             return
         }
 
-        const attr = attributes[Number(index)][1]
+        const ok = await onSetAttributes(attribute)
 
-        const success = await onSetAttribute(isKey ? newKey as string : attributes[Number(index)][0], [attr[0], isKey ? attr[1] : newVal as string, attr[2], attr[3]])
-
-        if (!success) return
-
-        setAttributes(prev => {
-            const p = [...prev]
-
-            if (i === "key") {
-                p[Number(index)][0] = newKey as string
-            }
-
-            p[Number(index)][1][Number(i)] = newVal
-
-            return p
-        })
-        setVal("")
-        setNewKey("")
-        setEditable("")
+        if (ok) {
+            setAttributes(prev => [...prev, attribute])
+            setAttribute(getDefaultAttribute())
+            setIsAddValue(false)
+        }
     }
 
-    const handelLabelCancel = () => {
-        setNewLabel("")
-        setLabelEditable(false)
-    }
-
-    const handelCancel = () => {
-        setVal("")
-        setEditable("")
-    }
-
-    const handelSetLabel = async (e: React.KeyboardEvent<HTMLInputElement>) => {
-
-        if (e.key === "Escape") {
-            handelLabelCancel()
+    const handelKeyDown = (evt: React.KeyboardEvent, func: () => void) => {
+        if (evt.code === "Escape") {
+            evt.preventDefault()
+            handelSetEditable()
         }
 
-        if (e.key !== "Enter") return
+        if (evt.code !== "Enter") return
 
-        if (!newLabel) {
-            Toast("Label can't be empty")
-            return
-        }
-
-        const success = await onSetCategory(newLabel)
-
-        if (!success) return
-
-        setLabel(newLabel)
-        setNewLabel("")
-        setLabelEditable(false)
+        evt.preventDefault()
+        func()
     }
 
     return (
         <div className="DataPanel">
-            <div className="w-full flex justify-between items-center bg-[#7167F6] p-4">
-                <div className="flex gap-4 items-center">
+            <div className="flex justify-between items-center bg-[#7167F6] p-4">
+                <div className="flex gap-2">
                     <Button
                         variant="button"
                         icon={<ChevronRight />}
                         onClick={() => onExpand()}
                     />
-                    {
-                        labelEditable ?
-                            <Input
-                                ref={ref => ref?.focus()}
-                                className="w-28"
-                                variant="Small"
-                                onChange={(e) => setNewLabel(e.target.value)}
-                                value={newLabel}
-                                onBlur={handelLabelCancel}
-                                onKeyDown={handelSetLabel}
-                            /> : <Button
-                                className={cn(!obj.source ? "underline underline-offset-2" : "cursor-default")}
-                                label={label || "Edit Label"}
-                                onClick={() => !obj.source && setLabelEditable(true)}
-                            />
-                    }
+                    <p>{label}</p>
                 </div>
-                <p className="flex text-white">{attributes.length} Attributes</p>
+                <div>
+                    <p>Attributes {attributes.length}</p>
+                </div>
             </div>
-            <div className="w-full h-1 grow flex flex-col justify-between items-start font-medium">
-                <Table>
-                    {
-                        (attributes.length > 0 || isAddValue) &&
-                        <TableHeader>
-                            <TableRow className="border-none">
-                                <TableHead>Name</TableHead>
-                                <TableHead>Type</TableHead>
-                                <TableHead>Description</TableHead>
-                                <TableHead>Unique</TableHead>
-                                <TableHead>Unique</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                    }<TableCaption className="p-8">
-                        <Button
-                            className="border border-[#232341]"
-                            label="Add Attribute"
-                            variant="Secondary"
-                            onClick={() => setIsAddValue(prev => !prev)}
-                            disabled={data?.user.role === "Read-Only"}
-                        />
-                    </TableCaption>
-                    <TableBody>
+            <Table>
+                <TableHeader>
+                    <TableRow className="border-none">
                         {
-                            attributes.map(([key, val], index) => (
-                                <TableRow
-                                    // eslint-disable-next-line react/no-array-index-key
-                                    key={index}
-                                    className="border-none"
-                                    onMouseEnter={() => setHover(`${index}`)}
-                                    onMouseLeave={() => setHover("")}
-                                >
-                                    <TableCell className={cn(hover === `${index}` && "flex gap-2")}>
+                            (attributes.length > 0 || isAddValue) &&
+                            <>
+                                <TableHead key="Key" className="flex-1">Key</TableHead>
+                                {ATTRIBUTES.map((att) => (
+                                    <TableHead key={att} className="flex-1">{att}</TableHead>
+                                ))}
+                            </>
+                        }
+                    </TableRow>
+                </TableHeader>
+                <TableBody>
+                    {
+                        attributes.length > 0 &&
+                        attributes.map(([key, val]) => (
+                            <TableRow
+                                className="cursor-pointer border-none"
+                                onClick={() => {
+                                    if (editable === key) return
+                                    handelSetEditable([key, [...val]])
+                                }}
+                                // onBlur={(e) => !e.currentTarget.contains(e.relatedTarget as Node) && handelSetEditable()}
+                                onMouseEnter={() => setHover(key)}
+                                onMouseLeave={() => setHover("")}
+                                key={key}
+                                tabIndex={0} // Added to make the row focusable
+                            >
+                                <TableCell className="flex items-center gap-2">
+                                    <div className="w-6 h-12">
                                         {
-                                            hover === `${index}` &&
-                                            <Button
-                                                className="text-[#ACACC2]"
-                                                icon={<Trash2 />}
-                                                onClick={() => {
-                                                    onRemoveAttribute(key)
-                                                    setAttributes(prev => prev.filter(([k]) => k !== key))
-                                                }}
-                                            />
+                                            editable === key ?
+                                                <div className="flex flex-col gap-2">
+                                                    <Button
+                                                        variant="button"
+                                                        icon={<Check size={20} />}
+                                                        onClick={(e) => {
+                                                            e.stopPropagation()
+                                                            handelSetAttributes()
+                                                        }}
+                                                    />
+                                                    <Button
+                                                        variant="button"
+                                                        icon={<X size={20} />}
+                                                        onClick={(e) => {
+                                                            e.stopPropagation()
+                                                            handelSetEditable()
+                                                        }}
+                                                    />
+                                                </div>
+                                                : hover === key &&
+                                                <div className="flex flex-col gap-2">
+                                                    <Button
+                                                        icon={<Trash2 size={20} />}
+                                                        variant="button"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation()
+                                                            handelRemoveAttribute(key)
+                                                        }}
+                                                    />
+                                                    <Button
+                                                        variant="button"
+                                                        icon={<Pencil size={20} />}
+                                                        onClick={(e) => {
+                                                            e.stopPropagation()
+                                                            handelSetEditable([key, [...val]])
+                                                        }}
+                                                    />
+                                                </div>
                                         }
-                                        {
-                                            editable === `${index}-key` && data?.user.role !== "Read-Only" ?
-                                                <Input
-                                                    ref={ref => ref?.focus()}
-                                                    className="w-28"
-                                                    variant="Small"
-                                                    value={newKey}
-                                                    onChange={(e) => setNewKey(e.target.value)}
-                                                    onKeyDown={handelSetAttribute}
-                                                    onBlur={() => handelCancel()}
-                                                />
-                                                : <Button
-                                                    className="text-[#ACACC2]"
-                                                    label={`${key}:`}
-                                                    onClick={() => {
-                                                        setEditable(`${index}-key`)
-                                                    }}
-                                                />
-                                        }
-                                    </TableCell>
-                                    <TableCell>
-                                        {
-                                            editable === `${index}-0` && data?.user.role !== "Read-Only" ?
+                                    </div>
+                                    {key}:
+                                </TableCell>
+                                {
+                                    editable === key ?
+                                        <>
+                                            <TableCell>
                                                 <Combobox
                                                     options={OPTIONS}
-                                                    setSelectedValue={async (selectedValue) => {
-                                                        const attr = attributes[index][1]
-                                                        const success = await onSetAttribute(key, [selectedValue as Type, attr[1], attr[2], attr[3]])
-
-                                                        if (!success) return
-
-                                                        setAttributes(prev => {
-                                                            const p = [...prev]
-                                                            p[index][1][0] = selectedValue as Type
-                                                            return p
-                                                        })
-
-                                                        setEditable("")
-                                                    }}
+                                                    setSelectedValue={(v) => setAttribute(prev => {
+                                                        const p: [string, string[]] = [...prev]
+                                                        p[1][0] = v
+                                                        return p
+                                                    })}
                                                     inTable
                                                     type="Type"
-                                                    selectedValue={val[0]}
-                                                    onOpenChange={(o) => !o && setEditable("")}
-                                                    defaultOpen
+                                                    selectedValue={attribute[1][0]}
                                                 />
-                                                : <Button
-                                                    label={val[0]}
-                                                    onClick={() => setEditable(`${index}-0`)}
-                                                />
-                                        }
-                                    </TableCell>
-                                    <TableCell>
-                                        {
-                                            editable === `${index}-1` && data?.user.role !== "Read-Only" ?
+                                            </TableCell>
+                                            <TableCell>
                                                 <Input
-                                                    ref={ref => ref?.focus()}
                                                     className="w-28"
+                                                    onKeyDown={(e) => handelKeyDown(e, handelSetAttributes)}
                                                     variant="Small"
-                                                    value={newVal}
-                                                    onChange={(e) => setVal(e.target.value)}
-                                                    onKeyDown={handelSetAttribute}
-                                                    onBlur={() => setEditable("")}
+                                                    onChange={(e) => setAttribute(prev => {
+                                                        const p: [string, string[]] = [...prev]
+                                                        p[1][1] = e.target.value
+                                                        return p
+                                                    })}
+                                                    value={attribute[1][1]}
                                                 />
-                                                : <Button
-                                                    label={val[1]}
-                                                    onClick={() => setEditable(`${index}-1`)}
-                                                />
-                                        }
-                                    </TableCell>
-                                    <TableCell>
-                                        {
-                                            editable === `${index}-2` && data?.user.role !== "Read-Only" ?
+                                            </TableCell>
+                                            <TableCell>
                                                 <Checkbox
-                                                    ref={ref => ref?.focus()}
                                                     className="h-6 w-6 border-[#57577B] data-[state=checked]:bg-[#57577B]"
-                                                    onCheckedChange={(checked) => {
-                                                        setAttributes(prev => {
-                                                            const p = [...prev]
-                                                            p[index][1][2] = checked as boolean
-                                                            return p
-                                                        })
-                                                        onSetAttribute(key, attributes[index][1])
-                                                    }}
-                                                    checked={val[2]}
-                                                    onBlur={() => setEditable("")}
+                                                    onCheckedChange={(checked) => setAttribute(prev => {
+                                                        const p: [string, string[]] = [...prev]
+                                                        p[1][2] = checked ? "true" : "false"
+                                                        return p
+                                                    })}
+                                                    checked={attribute[1][2] === "true"}
                                                 />
-                                                : <Button
-                                                    label={val[2].toString()}
-                                                    onClick={() => setEditable(`${index}-2`)}
-                                                />
-                                        }
-                                    </TableCell>
-                                    <TableCell>
-                                        {
-                                            editable === `${index}-3` && data?.user.role !== "Read-Only" ?
+                                            </TableCell>
+                                            <TableCell>
                                                 <Checkbox
-                                                    ref={ref => ref?.focus()}
                                                     className="h-6 w-6 border-[#57577B] data-[state=checked]:bg-[#57577B]"
-                                                    onCheckedChange={(checked) => {
-                                                        setAttributes(prev => {
-                                                            const p = [...prev]
-                                                            p[index][1][3] = checked as boolean
-                                                            return p
-                                                        })
-                                                        onSetAttribute(key, attributes[index][1])
-                                                    }}
-                                                    checked={val[3]}
-                                                    onBlur={() => setEditable("")}
+                                                    onCheckedChange={(checked) => setAttribute(prev => {
+                                                        const p: [string, string[]] = [...prev]
+                                                        p[1][3] = checked ? "true" : "false"
+                                                        return p
+                                                    })}
+                                                    checked={attribute[1][3] === "true"}
                                                 />
-                                                : <Button
-                                                    label={val[3].toString()}
-                                                    onClick={() => setEditable(`${index}-3`)}
-                                                />
-                                        }
-                                    </TableCell>
-                                </TableRow>
-                            ))
-                        }
-                        {
-                            isAddValue &&
-                            <TableRow className="border-none">
-                                <TableCell>
-                                    <Input
-                                        className="w-28"
-                                        onKeyDown={handelAddAttribute}
-                                        variant="Small"
-                                        onChange={(e) => setNewKey(e.target.value)}
-                                        value={newKey}
+                                            </TableCell>
+                                        </>
+                                        : val.map((v, i) => (
+                                            <TableCell key={i}>{v}</TableCell>
+                                        ))
+                                }
+                            </TableRow>
+                        ))
+                    }
+                    {
+                        isAddValue &&
+                        <TableRow key="Add Value" className="border-none">
+                            <TableCell className="flex items-center gap-2">
+                                <div className="flex flex-col gap-2">
+                                    <Button
+                                        variant="button"
+                                        icon={<Check size={20} />}
+                                        onClick={(e) => {
+                                            e.stopPropagation()
+                                            handelAddAttribute()
+                                        }}
                                     />
-                                </TableCell>
-                                <TableCell>
-                                    <Combobox
-                                        options={OPTIONS}
-                                        setSelectedValue={(v) => setAttribute(prev => {
-                                            const p = [...prev] as Attribute
-                                            p[0] = v as Type
-                                            return p
-                                        })}
-                                        inTable
-                                        type="Type"
-                                        selectedValue={attribute[0]}
+                                    <Button
+                                        variant="button"
+                                        icon={<X size={20} />}
+                                        onClick={(e) => {
+                                            e.stopPropagation()
+                                            handelSetEditable()
+                                        }}
                                     />
-                                </TableCell>
-                                <TableCell>
-                                    <Input
-                                        className="w-28"
-                                        onKeyDown={handelAddAttribute}
-                                        variant="Small"
-                                        onChange={(e) => setAttribute(prev => {
-                                            const p = [...prev] as Attribute
-                                            p[1] = e.target.value
-                                            return p
-                                        })}
-                                        value={attribute[1]}
-                                    />
-                                </TableCell>
-                                <TableCell>
-                                    <Checkbox
-                                        className="h-6 w-6 border-[#57577B] data-[state=checked]:bg-[#57577B]"
-                                        onCheckedChange={(checked) => setAttribute(prev => {
-                                            const p = [...prev] as Attribute
-                                            p[2] = checked as boolean
-                                            return p
-                                        })}
-                                        checked={attribute[2]}
-                                    />
-                                </TableCell>
-                                <TableCell>
-                                    <Checkbox
-                                        className="h-6 w-6 border-[#57577B] data-[state=checked]:bg-[#57577B]"
-                                        onCheckedChange={(checked) => setAttribute(prev => {
-                                            const p = [...prev] as Attribute
-                                            p[3] = checked as boolean
-                                            return p
-                                        })}
-                                        checked={attribute[3]}
-                                    />
-                                </TableCell>
-                            </TableRow>}
-                    </TableBody>
-                </Table>
-                <div className="p-8">
+                                </div>
+                                <Input
+                                    className="w-28"
+                                    onKeyDown={(e) => handelKeyDown(e, handelAddAttribute)}
+                                    variant="Small"
+                                    onChange={(e) => setAttribute(prev => {
+                                        const p: [string, string[]] = [...prev]
+                                        p[0] = e.target.value
+                                        return p
+                                    })}
+                                    value={attribute[0]}
+                                />
+                            </TableCell>
+                            <TableCell>
+                                <Combobox
+                                    options={OPTIONS}
+                                    setSelectedValue={(v) => setAttribute(prev => {
+                                        const p: [string, string[]] = [...prev]
+                                        p[1][0] = v
+                                        return p
+                                    })}
+                                    inTable
+                                    type="Type"
+                                    selectedValue={attribute[1][0]}
+                                />
+                            </TableCell>
+                            <TableCell>
+                                <Input
+                                    className="w-28"
+                                    onKeyDown={(e) => handelKeyDown(e, handelAddAttribute)}
+                                    variant="Small"
+                                    onChange={(e) => setAttribute(prev => {
+                                        const p: [string, string[]] = [...prev]
+                                        p[1][1] = e.target.value
+                                        return p
+                                    })}
+                                    value={attribute[1][1]}
+                                />
+                            </TableCell>
+                            <TableCell>
+                                <Checkbox
+                                    className="h-6 w-6 border-[#57577B] data-[state=checked]:bg-[#57577B]"
+                                    onCheckedChange={(checked) => setAttribute(prev => {
+                                        const p: [string, string[]] = [...prev]
+                                        p[1][2] = checked ? "true" : "false"
+                                        return p
+                                    })}
+                                    checked={attribute[1][2] === "true"}
+                                />
+                            </TableCell>
+                            <TableCell>
+                                <Checkbox
+                                    className="h-6 w-6 border-[#57577B] data-[state=checked]:bg-[#57577B]"
+                                    onCheckedChange={(checked) => setAttribute(prev => {
+                                        const p: [string, string[]] = [...prev]
+                                        p[1][3] = checked ? "true" : "false"
+                                        return p
+                                    })}
+                                    checked={attribute[1][3] === "true"}
+                                />
+                            </TableCell>
+                        </TableRow>
+                    }
+                </TableBody>
+                <TableCaption>
                     <Button
-                        className="border border-[#232341]"
-                        label="Delete"
                         variant="Secondary"
-                        onClick={onDelete}
-                        disabled={data?.user.role === "Read-Only"}
+                        label="Add Value"
+                        icon={isAddValue ? <MinusCircle /> : <PlusCircle />}
+                        onClick={() => setIsAddValue(prev => {
+                            if (!prev) {
+                                setAttribute(getDefaultAttribute())
+                                setEditable("")
+                            }
+                            return !prev
+                        })}
                     />
-                </div>
-            </div>
+                </TableCaption>
+            </Table>
         </div>
     )
 }
