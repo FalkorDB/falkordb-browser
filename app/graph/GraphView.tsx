@@ -50,7 +50,7 @@ function getStyle() {
         {
             selector: "node",
             style: {
-                label: "data(name)",
+                label: "data(data.name)",
                 "color": "black",
                 "text-valign": "center",
                 "text-wrap": "ellipsis",
