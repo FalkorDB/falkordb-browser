@@ -30,6 +30,7 @@ export default function TableView({ data }: Props) {
                                         {
                                             typeof val === "object" ?
                                                 <JSONTree
+                                                    shouldExpandNodeInitially={() => false}
                                                     keyPath={[key]}
                                                     theme={{
                                                         base00: !(i % 2) ? "#57577B" : "#272746", // background
