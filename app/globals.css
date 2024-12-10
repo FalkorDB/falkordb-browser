@@ -27,11 +27,15 @@
 
 @layer components {
 
+    .tabs-trigger {
+        @apply !p-3 rounded-lg hover:bg-[#444466] bg-[#57577B] data-[state=active]:!bg-[#444466] data-[state=active]:font-bold;
+    }
+
     .hide-scrollbar {
         scrollbar-width: none;
         -ms-overflow-style: none;
     }
-    
+
     .hide-scrollbar {
         scrollbar-width: none;
         -ms-overflow-style: none;
@@ -52,6 +56,12 @@
 
     .LoginForm>form>p {
         font-family: "Obviously Narrow" !important;
+    }
+
+    .Text {
+        background: linear-gradient(90deg, #EC806C 0%, #B66EBD 43.41%, #7568F2 100%);
+        background-clip: text;
+        color: transparent;
     }
 
     .Top {

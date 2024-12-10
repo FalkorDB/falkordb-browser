@@ -237,6 +237,8 @@ export default function EditorComponent({ currentQuery, historyQueries, setCurre
                 { token: 'keyword', foreground: '#99E4E5' },
                 { token: 'function', foreground: '#DCDCAA' },
                 { token: 'type', foreground: '#89D86D' },
+                { token: 'string', foreground: '#CE9178' },
+                { token: 'number', foreground: '#b5cea8' },
             ],
             colors: {
                 'editor.background': '#1F1F3D',

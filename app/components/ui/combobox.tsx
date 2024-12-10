@@ -39,7 +39,7 @@ export default function Combobox({ isSelectGraph, disabled = false, inTable, typ
   useEffect(() => {
     if (options.length !== 1) return
     setSelectedValue(options[0])
-  }, [options, setSelectedValue])
+  }, [options])
   
   const onExport = async (graphName: string) => {
     const result = await securedFetch(`api/graph/${prepareArg(graphName)}/export`, {

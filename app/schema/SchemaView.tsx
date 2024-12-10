@@ -10,7 +10,7 @@ import fcose from "cytoscape-fcose";
 import { ElementDataDefinition, Toast, cn, prepareArg, securedFetch } from "@/lib/utils"
 import { Session } from "next-auth"
 import Toolbar from "../graph/toolbar"
-import SchemaDataPanel, { Attribute } from "./SchemaDataPanel"
+import SchemaDataPanel from "./SchemaDataPanel"
 import Labels from "../graph/labels"
 import { Category, Graph } from "../api/graph/model"
 import Button from "../components/ui/Button"
@@ -99,9 +99,9 @@ function getStyle() {
 
 const getElementId = (element: ElementDataDefinition) => element.source ? { id: element.id?.slice(1), query: "()-[e]-()" } : { id: element.id, query: "(e)" }
 
-const getCreateQuery = (type: boolean, selectedNodes: NodeDataDefinition[], attributes: [string, Attribute][], label?: string) => {
+const getCreateQuery = (type: boolean, selectedNodes: NodeDataDefinition[], attributes: [string, string[]][], label?: string) => {
     if (type) {
-        return `CREATE (n${label ? `:${label}` : ""}${attributes?.length > 0 ? ` {${attributes.map(([k, [t, d, u, un]]) => `${k}: ["${t}", "${d}", "${u}", "${un}"]`).join(",")}}` : ""}) RETURN n`
+        return `CREATE (n${label ? `:${label}` : ""}${attributes?.length > 0 ? ` {${attributes.map(([k, [t, d, u, r]]) => `${k}: ["${t}", "${d}", "${u}", "${r}"]`).join(",")}}` : ""}) RETURN n`
     }
     return `MATCH (a), (b) WHERE ID(a) = ${selectedNodes[0].id} AND ID(b) = ${selectedNodes[1].id} CREATE (a)-[e${label ? `:${label}` : ""}${attributes?.length > 0 ? ` {${attributes.map(([k, [t, d, u, un]]) => `${k}: ["${t}", "${d}", "${u}", "${un}"]`).join(",")}}` : ""}]->(b) RETURN e`
 }
@@ -333,19 +333,20 @@ export default function SchemaView({ schema, fetchCount, data }: Props) {
         dataPanel.current?.collapse()
     }
 
-    const handelSetAttribute = async (key: string, newVal: Attribute) => {
+    const handelSetAttributes = async (attribute: [string, string[]]) => {
+        const [key, value] = attribute;
         if (!selectedElement) return false
 
         const { id, query } = getElementId(selectedElement)
-        const q = `MATCH ${query} WHERE ID(e) = ${id} SET e.${key} = "${newVal}"`
+        const q = `MATCH ${query} WHERE ID(e) = ${id} SET e.${key} = "${value.join(",")}"`
         const { ok } = await securedFetch(`api/graph/${prepareArg(schema.Id)}_schema/?query=${prepareArg(q)}`, {
             method: "GET"
         })
 
         if (ok) {
-            schema.Elements.forEach(e => {
+            schema.Elements.forEach(({ data: e }) => {
                 if (e.data.id !== selectedElement.id) return
-                e.data[key] = newVal
+                e.data[key] = value;
             })
         } else {
             Toast("Failed to set property")
@@ -354,59 +355,58 @@ export default function SchemaView({ schema, fetchCount, data }: Props) {
         return ok
     }
 
-    const handelSetCategory = async (category: string) => {
-        if (!selectedElement) return false
+    // const handelSetCategory = async (category: string) => {
+    //     if (!selectedElement) return false
 
-        const { id } = getElementId(selectedElement)
-        const q = `MATCH (n) WHERE ID(n) = ${id} REMOVE n:${selectedElement.category} SET n:${category}`
-        const success = (await securedFetch(`api/graph/${prepareArg(schema.Id)}_schema/?query=${prepareArg(q)}`, {
-            method: "GET"
-        })).ok
+    //     const { id } = getElementId(selectedElement)
+    //     const q = `MATCH (n) WHERE ID(n) = ${id} REMOVE n:${selectedElement.category} SET n:${category}`
+    //     const success = (await securedFetch(`api/graph/${prepareArg(schema.Id)}_schema/?query=${prepareArg(q)}`, {
+    //         method: "GET"
+    //     })).ok
 
-        if (success) {
-            schema.Elements.forEach(({ data: d }) => {
-                if (d.id !== id) return
+    //     if (success) {
+    //         schema.Elements.forEach(({ data: d }) => {
+    //             if (d.id !== id) return
 
-                // eslint-disable-next-line no-param-reassign
-                d.category = category
+    //             // eslint-disable-next-line no-param-reassign
+    //             d.category = category
 
-                setSelectedElement({ ...selectedElement, category })
+    //             setSelectedElement({ ...selectedElement, category })
 
-                const prevCategory = schema.CategoriesMap.get(selectedElement.category) as Category
+    //             const prevCategory = schema.CategoriesMap.get(selectedElement.category) as Category
 
-                schema.updateCategories(prevCategory.name, true)
+    //             schema.updateCategories(prevCategory.name, true)
 
-                const [c] = schema.createCategory([category])
+    //             const [c] = schema.createCategory([category])
 
-                chartRef.current?.elements().forEach(n => {
-                    if (n.data().category === category) {
-                        // eslint-disable-next-line no-param-reassign
-                        n.data().category = category
-                        // eslint-disable-next-line no-param-reassign
-                        n.data().color = schema.getCategoryColorValue(c.index)
-                    }
-                });
-                chartRef.current?.elements().layout(LAYOUT).run();
+    //             chartRef.current?.elements().forEach(n => {
+    //                 if (n.data().category === category) {
+    //                     // eslint-disable-next-line no-param-reassign
+    //                     n.data().category = category
+    //                     // eslint-disable-next-line no-param-reassign
+    //                     n.data().color = schema.getCategoryColorValue(c.index)
+    //                 }
+    //             });
+    //             chartRef.current?.elements().layout(LAYOUT).run();
 
-            })
-        }
-        return success
-    }
+    //         })
+    //     }
+    //     return success
+    // }
 
     const handelRemoveProperty = async (key: string) => {
         if (!selectedElement) return false
 
         const { id, query } = getElementId(selectedElement)
-        const q = `MATCH ${query} WHERE ID(e) = ${id} SET e.${key} = null`
+        const q = `MATCH ${query} WHERE ID(e) = ${id} SET e.${key} = NULL`
         const { ok } = await securedFetch(`api/graph/${prepareArg(schema.Id)}_schema/?query=${prepareArg(q)}`, {
             method: "GET"
         })
 
         if (!ok) return ok
 
-        const s = schema
-        s.Elements = schema.Elements.map(e => {
-            if (e.data.id === id) {
+        schema.Elements.forEach(({ data: e }) => {
+            if (e.id === id) {
                 delete e.data[key]
             }
 
@@ -416,7 +416,7 @@ export default function SchemaView({ schema, fetchCount, data }: Props) {
         return ok
     }
 
-    const onCreateElement = async (attributes: [string, Attribute][], label?: string) => {
+    const onCreateElement = async (attributes: [string, string[]][], label?: string) => {
         if (!isAddEntity && selectedNodes.length === 0) {
             Toast("Select nodes to create a relation")
             return false
@@ -532,10 +532,7 @@ export default function SchemaView({ schema, fetchCount, data }: Props) {
                     }
                 </div>
             </ResizablePanel>
-            {
-                !isCollapsed &&
-                <ResizableHandle className="w-3" />
-            }
+            <ResizableHandle className={!isCollapsed ? "w-3" : "w-0"} />
             <ResizablePanel
                 className="rounded-lg"
                 collapsible
@@ -551,11 +548,8 @@ export default function SchemaView({ schema, fetchCount, data }: Props) {
                         <SchemaDataPanel
                             obj={selectedElement}
                             onExpand={onExpand}
+                            onSetAttributes={handelSetAttributes}
                             onRemoveAttribute={handelRemoveProperty}
-                            onSetAttribute={handelSetAttribute}
-                            onDelete={handelDeleteElement}
-                            onSetCategory={handelSetCategory}
-                            data={data}
                         />
                         : (isAddEntity || isAddRelation) &&
                         <CreateElement
