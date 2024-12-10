@@ -43,13 +43,13 @@ export default function Labels({ graph, categories, onClick, label, className = 
                         onClick={() => handelScroll(-200)}
                     />
                 }
-                <ul ref={listRef} className={cn("flex flex-col gap-4 w-full overflow-auto hide-scrollbar", label === "RelationshipTypes" && "items-end")}>
+                <ul ref={listRef} className={cn("flex flex-col gap-4 w-full overflow-auto hide-scrollbar")}>
                     {
                         categories.length > 0 &&
                         categories.map((category) => (
-                            <li key={category.index} className="pointer-events-auto">
+                            <li key={category.index}>
                                 <Button
-                                    className={cn(category.name && "flex gap-2 items-center")}
+                                className={cn(category.name && "flex gap-2 items-center pointer-events-auto")}
                                     label={category.name}
                                     icon={
                                         <div style={{ backgroundColor: `${graph.getCategoryColorValue(category.index)}` }} className={cn("w-6 h-6 rounded-full", label === "RelationshipTypes" && "opacity-50")} />
@@ -66,7 +66,7 @@ export default function Labels({ graph, categories, onClick, label, className = 
                 {
                     isScrollable &&
                     <Button
-                    className="pointer-events-auto"
+                        className="pointer-events-auto"
                         icon={<ChevronDown />}
                         title="Scroll down"
                         onClick={() => handelScroll(200)}
