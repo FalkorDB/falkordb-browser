@@ -22,29 +22,6 @@ export interface Category {
     show: boolean,
 }
 
-
-const NODE_RESERVED_KEYS = ["parent", "id", "position"]
-const NODE_ALTERNATIVE_RESERVED_KEYS = ["_parent_", "_id_", "_position_"]
-// Used to avoid using reserved words in cytoscape `NodeDataDefinition`
-function nodeSafeKey(key: string): string {
-    const index = NODE_RESERVED_KEYS.indexOf(key);
-    if (index === -1) {
-        return key;
-    }
-    return NODE_ALTERNATIVE_RESERVED_KEYS[index];
-}
-
-const EDGE_RESERVED_KEYS = ["source", "target", "id", "position"]
-const EDGE_ALTERNATIVE_RESERVED_KEYS = ["_source_", "_target_", "_parent_", "_id_", "_position_"]
-// Used to avoid using reserved words in cytoscape `EdgeDataDefinition`
-function edgeSafeKey(key: string): string {
-    const index = EDGE_RESERVED_KEYS.indexOf(key);
-    if (index === -1) {
-        return key;
-    }
-    return EDGE_ALTERNATIVE_RESERVED_KEYS[index];
-}
-
 export interface ExtractedData {
     data: any[][],
     columns: string[],
@@ -189,14 +166,16 @@ export class Graph {
         if (!currentNode) {
             const node: NodeDataDefinition = {
                 id: cell.id.toString(),
-                name: cell.id.toString(),
                 category: categories.map(c => c.name),
                 color: this.getCategoryColorValue(categories[0].index),
                 expand: false,
                 collapsed,
+                data: {
+                    name: cell.id.toString(),
+                }
             }
             Object.entries(cell.properties).forEach(([key, value]) => {
-                node[nodeSafeKey(key)] = value as string;
+                node.data[key] = value as string;
             });
             this.nodesMap.set(cell.id, node)
             this.elements.push({ data: node })
@@ -206,13 +185,13 @@ export class Graph {
         if (currentNode.category === "") {
             // set values in a fake node
             currentNode.id = cell.id.toString();
-            currentNode.name = cell.id.toString();
             currentNode.category = categories.map(c => c.name);
             currentNode.color = this.getCategoryColorValue(categories[0].index)
             currentNode.expand = false
             currentNode.collapsed = collapsed
+            currentNode.data.name = cell.id.toString();
             Object.entries(cell.properties).forEach(([key, value]) => {
-                currentNode[nodeSafeKey(key)] = value as string;
+                currentNode.data[key] = value as string;
             });
 
             // remove empty category if there are no more empty nodes category
@@ -244,7 +223,7 @@ export class Graph {
             }
 
             Object.entries(cell.properties).forEach(([key, value]) => {
-                edge[edgeSafeKey(key)] = value as string;
+                edge.data[key] = value as string;
             });
 
             this.edgesMap.set(cell.id, edge)
