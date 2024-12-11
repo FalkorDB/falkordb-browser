@@ -84,7 +84,7 @@ function getStyle() {
                 "arrow-scale": 0.7,
                 "target-arrow-color": "data(color)",
                 "target-arrow-shape": "triangle",
-                'curve-style': 'straight',
+                'curve-style': 'bezier',
             },
         },
         {

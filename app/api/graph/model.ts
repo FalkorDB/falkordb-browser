@@ -189,7 +189,9 @@ export class Graph {
             currentNode.color = this.getCategoryColorValue(categories[0].index)
             currentNode.expand = false
             currentNode.collapsed = collapsed
-            currentNode.data.name = cell.id.toString();
+            currentNode.data = {
+                name: cell.id.toString()
+            }
             Object.entries(cell.properties).forEach(([key, value]) => {
                 currentNode.data[key] = value as string;
             });
@@ -220,6 +222,7 @@ export class Graph {
                 color: this.getCategoryColorValue(label.index),
                 expand: false,
                 collapsed,
+                data: {}
             }
 
             Object.entries(cell.properties).forEach(([key, value]) => {
