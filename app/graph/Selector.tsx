@@ -36,6 +36,7 @@ export default function Selector({ onChange, graphName, queries, runQuery, edges
     const [dropOpen, setDropOpen] = useState<boolean>(false);
     const [queriesOpen, setQueriesOpen] = useState<boolean>(false);
     const [query, setQuery] = useState<Query>();
+    const [reload, setReload] = useState<boolean>(false);
     const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null)
 
     useEffect(() => {
@@ -48,7 +49,7 @@ export default function Selector({ onChange, graphName, queries, runQuery, edges
             setOptions(!runQuery ? res.filter(name => name.includes("_schema")).map(name => name.split("_")[0]) : res.filter(name => !name.includes("_schema")))
         }
         run()
-    }, [runQuery])
+    }, [runQuery ,reload])
 
     useEffect(() => {
         if (!graphName) return
@@ -108,7 +109,7 @@ export default function Selector({ onChange, graphName, queries, runQuery, edges
     return (
         <div className="flex flex-col gap-4">
             <div className="flex justify-between items-center">
-                <Combobox isSelectGraph options={options} setOptions={setOptions} selectedValue={selectedValue} setSelectedValue={handleOnChange} isSchema={!runQuery} />
+                <Combobox isSelectGraph options={options} setOptions={setOptions} selectedValue={selectedValue} setSelectedValue={handleOnChange} isSchema={!runQuery} setReload={setReload}/>
                 <div className="flex gap-16 text-[#7167F6]">
                     <UploadGraph disabled />
                     <Button
