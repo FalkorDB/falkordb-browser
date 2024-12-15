@@ -550,7 +550,6 @@ export default function SchemaView({ schema, fetchCount, data }: Props) {
                             onExpand={onExpand}
                             onSetAttributes={handelSetAttributes}
                             onRemoveAttribute={handelRemoveProperty}
-                            onDeleteElement={handelDeleteElement}
                         />
                         : (isAddEntity || isAddRelation) &&
                         <CreateElement

@@ -132,16 +132,15 @@ export default function SchemaCreateElement({ onCreate, onExpand, selectedNodes,
         <Table>
           <TableHeader>
             <TableRow className="border-none">
-              <TableHead key="buttons" />
-              <TableHead key="Key">Key</TableHead>
+              <TableHead key="Key" className="flex-1">Key</TableHead>
               {
                 ATTRIBUTES.map((att) => (
-                  <TableHead key={att}>{att}</TableHead>
+                  <TableHead key={att} className="flex-1">{att}</TableHead>
                 ))
               }
             </TableRow>
           </TableHeader>
-          <TableBody className="px-2">
+          <TableBody>
             {
               attributes.length > 0 &&
               attributes.map(([key, val]) => (
@@ -157,14 +156,13 @@ export default function SchemaCreateElement({ onCreate, onExpand, selectedNodes,
                   key={key}
                   tabIndex={0} // Added to make the row focusable
                 >
-                  <TableCell className="px-1 py-0">
-                    <div className="w-5 h-12 flex flex-col gap-2">
+                  <TableCell className="flex items-center gap-2">
+                    <div className="w-6 h-12">
                       {
                         editable === key ?
-                          <>
+                          <div className="flex flex-col gap-2">
                             <Button
                               variant="button"
-                              title="Save"
                               icon={<Check size={20} />}
                               onClick={(e) => {
                                 e.stopPropagation()
@@ -173,45 +171,40 @@ export default function SchemaCreateElement({ onCreate, onExpand, selectedNodes,
                             />
                             <Button
                               variant="button"
-                              title="Cancel"
                               icon={<X size={20} />}
                               onClick={(e) => {
                                 e.stopPropagation()
                                 handelSetEditable()
                               }}
                             />
-                          </>
+                          </div>
                           : hover === key &&
-                          <>
+                          <div className="flex flex-col gap-2">
                             <Button
                               icon={<Trash2 size={20} />}
-                              title="Remove"
                               variant="button"
                               onClick={(e) => {
                                 e.stopPropagation()
                                 setAttributes(prev => prev.filter(([k]) => k !== key))
                               }}
-                              />
+                            />
                             <Button
                               variant="button"
-                              title="Edit"
                               icon={<Pencil size={20} />}
                               onClick={(e) => {
                                 e.stopPropagation()
                                 handelSetEditable([key, [...val]])
                               }}
                             />
-                          </>
+                          </div>
                       }
                     </div>
-                  </TableCell>
-                  <TableCell className="px-1 py-0">
                     {key}:
                   </TableCell>
                   {
                     editable === key ?
                       <>
-                        <TableCell className="px-1 py-0">
+                        <TableCell>
                           <Combobox
                             options={OPTIONS}
                             setSelectedValue={(v) => setAttribute(prev => {
@@ -224,7 +217,7 @@ export default function SchemaCreateElement({ onCreate, onExpand, selectedNodes,
                             selectedValue={attribute[1][0]}
                           />
                         </TableCell>
-                        <TableCell className="px-1 py-0">
+                        <TableCell>
                           <Input
                             className="w-28"
                             onKeyDown={(e) => handelKeyDown(e, handelSetAttributes, handelSetEditable)}
@@ -237,7 +230,7 @@ export default function SchemaCreateElement({ onCreate, onExpand, selectedNodes,
                             value={attribute[1][1]}
                           />
                         </TableCell>
-                        <TableCell className="px-1 py-0">
+                        <TableCell>
                           <Checkbox
                             className="h-6 w-6 border-[#57577B] data-[state=checked]:bg-[#57577B]"
                             onCheckedChange={(checked) => setAttribute(prev => {
@@ -248,7 +241,7 @@ export default function SchemaCreateElement({ onCreate, onExpand, selectedNodes,
                             checked={attribute[1][2] === "true"}
                           />
                         </TableCell>
-                        <TableCell className="px-1 py-0">
+                        <TableCell>
                           <Checkbox
                             className="h-6 w-6 border-[#57577B] data-[state=checked]:bg-[#57577B]"
                             onCheckedChange={(checked) => setAttribute(prev => {
@@ -261,34 +254,32 @@ export default function SchemaCreateElement({ onCreate, onExpand, selectedNodes,
                         </TableCell>
                       </>
                       : val.map((v, i) => (
-                        <TableCell className="px-1 py-0" key={i}>{v}</TableCell>
+                        <TableCell key={i}>{v}</TableCell>
                       ))
                   }
                 </TableRow>
               ))
             }
             <TableRow className="border-none">
-              <TableCell className="flex flex-col gap-1 px-1 py-0">
-                <Button
-                  variant="button"
-                  title="Add"
-                  icon={<Check size={20} />}
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    handelAddAttribute()
-                  }}
-                />
-                <Button
-                  variant="button"
-                  title="Cancel"
-                  icon={<X size={20} />}
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    setNewAttribute(getDefaultAttribute())
-                  }}
-                />
-              </TableCell>
-              <TableCell className="px-1 py-0">
+              <TableCell className="flex items-center gap-2">
+                <div className="flex flex-col gap-2">
+                  <Button
+                    variant="button"
+                    icon={<Check size={20} />}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      handelAddAttribute()
+                    }}
+                  />
+                  <Button
+                    variant="button"
+                    icon={<X size={20} />}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setNewAttribute(getDefaultAttribute())
+                    }}
+                  />
+                </div>
                 <Input
                   className="w-28"
                   onKeyDown={(e) => handelKeyDown(e, handelAddAttribute, () => setNewAttribute(getDefaultAttribute()))}
@@ -301,7 +292,7 @@ export default function SchemaCreateElement({ onCreate, onExpand, selectedNodes,
                   value={newAttribute[0]}
                 />
               </TableCell>
-              <TableCell className="px-1 py-0">
+              <TableCell>
                 <Combobox
                   options={OPTIONS}
                   setSelectedValue={(v) => setNewAttribute(prev => {
@@ -314,7 +305,7 @@ export default function SchemaCreateElement({ onCreate, onExpand, selectedNodes,
                   selectedValue={newAttribute[1][0]}
                 />
               </TableCell>
-              <TableCell className="px-1 py-0">
+              <TableCell>
                 <Input
                   className="w-28"
                   onKeyDown={(e) => handelKeyDown(e, handelAddAttribute, () => setNewAttribute(getDefaultAttribute()))}
@@ -327,7 +318,7 @@ export default function SchemaCreateElement({ onCreate, onExpand, selectedNodes,
                   value={newAttribute[1][1]}
                 />
               </TableCell>
-              <TableCell className="px-1 py-0">
+              <TableCell>
                 <Checkbox
                   className="h-6 w-6 border-[#57577B] data-[state=checked]:bg-[#57577B]"
                   onCheckedChange={(checked) => setNewAttribute(prev => {
@@ -338,7 +329,7 @@ export default function SchemaCreateElement({ onCreate, onExpand, selectedNodes,
                   checked={newAttribute[1][2] === "true"}
                 />
               </TableCell>
-              <TableCell className="px-1 py-0">
+              <TableCell>
                 <Checkbox
                   className="h-6 w-6 border-[#57577B] data-[state=checked]:bg-[#57577B]"
                   onCheckedChange={(checked) => setNewAttribute(prev => {
