@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/ban-ts-comment */
+
 'use client'
 
 import { useCallback, useEffect, useState } from "react";
@@ -76,14 +78,20 @@ export default function Page() {
         const result = await run(query)
         if (!result) return
         setQueries(prev => [...prev, { text: query, metadata: result.metadata }])
-        setGraph(Graph.create(graphName, result, graph.Colors))
+        const g = Graph.create(graphName, result, graph.Colors)
+        setGraph(g)
+        // @ts-ignore
+        window.graph = g 
     }
-
+    
     const runHistoryQuery = async (query: string, setQueriesOpen: (open: boolean) => void) => {
         const result = await run(query)
         if (!result) return
         setQueries(prev => prev.some(q => q.text === query) ? prev : [...prev, { text: query, metadata: result.metadata }])
-        setGraph(Graph.create(graphName, result))
+        const g = Graph.create(graphName, result)
+        setGraph(g)
+        // @ts-ignore
+        window.graph = g
         setHistoryQuery(query)
         setQueriesOpen(false)
     }
