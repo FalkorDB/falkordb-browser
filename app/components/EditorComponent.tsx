@@ -56,7 +56,6 @@ const monacoOptions: monaco.editor.IStandaloneEditorConstructionOptions = {
     fontWeight: "200",
     wordWrap: "off",
     lineHeight: 38,
-    lineNumbers: "on",
     lineNumbersMinChars: 2,
     overviewRulerLanes: 0,
     overviewRulerBorder: false,
@@ -526,7 +525,7 @@ export default function EditorComponent({ currentQuery, historyQueries, setCurre
 
         if (graph.Id) {
             getSuggestions(monacoI)
-        }else {   
+        } else {
             addSuggestions(monacoI)
         }
     };
@@ -546,7 +545,7 @@ export default function EditorComponent({ currentQuery, historyQueries, setCurre
         })
 
         const isFirstLine = e.createContextKey('isFirstLine', false as boolean);
-        
+
         // Update the context key value based on the cursor position
         e.onDidChangeCursorPosition(() => {
             const position = e.getPosition();
@@ -619,7 +618,10 @@ export default function EditorComponent({ currentQuery, historyQueries, setCurre
                                     height={blur ? LINE_HEIGHT : lineNumber * LINE_HEIGHT > document.body.clientHeight / 100 * MAX_HEIGHT ? document.body.clientHeight / 100 * MAX_HEIGHT : lineNumber * LINE_HEIGHT}
                                     className="Editor"
                                     language="custom-language"
-                                    options={monacoOptions}
+                                    options={{
+                                        ...monacoOptions,
+                                        lineNumbers: lineNumber > 1 ? "on" : "off",
+                                    }}
                                     value={blur ? query.replace(/\s+/g, ' ').trim() : query}
                                     onChange={(val) => historyRef.current.historyCounter ? setQuery(val || "") : setCurrentQuery(val || "")}
                                     theme="custom-theme"
