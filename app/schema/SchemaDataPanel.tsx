@@ -2,7 +2,7 @@
 import { Check, ChevronRight, MinusCircle, Pencil, PlusCircle, Trash2, X } from "lucide-react";
 import { ElementDataDefinition, Toast } from "@/lib/utils";
 import { useEffect, useState } from "react";
-import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
 import Button from "../components/ui/Button";
 import { ATTRIBUTES, getDefaultAttribute, OPTIONS } from "./SchemaCreateElement";
@@ -14,9 +14,10 @@ interface Props {
     onExpand: () => void;
     onSetAttributes: (attribute: [string, string[]]) => Promise<boolean>;
     onRemoveAttribute: (key: string) => Promise<boolean>;
+    onDeleteElement: () => Promise<void>;
 }
 
-export default function SchemaDataPanel({ obj, onExpand, onSetAttributes, onRemoveAttribute }: Props) {
+export default function SchemaDataPanel({ obj, onExpand, onSetAttributes, onRemoveAttribute, onDeleteElement }: Props) {
 
     const [attribute, setAttribute] = useState<[string, string[]]>(getDefaultAttribute())
     const [attributes, setAttributes] = useState<[string, string[]][]>([])
@@ -110,15 +111,16 @@ export default function SchemaDataPanel({ obj, onExpand, onSetAttributes, onRemo
                         {
                             (attributes.length > 0 || isAddValue) &&
                             <>
-                                <TableHead key="Key" className="flex-1">Key</TableHead>
+                                <TableHead key="buttons" className="p-0" />
+                                <TableHead key="Key" className="p-0">Key</TableHead>
                                 {ATTRIBUTES.map((att) => (
-                                    <TableHead key={att} className="flex-1">{att}</TableHead>
+                                    <TableHead key={att} className="p-0">{att}</TableHead>
                                 ))}
                             </>
                         }
                     </TableRow>
                 </TableHeader>
-                <TableBody>
+                <TableBody className="px-2">
                     {
                         attributes.length > 0 &&
                         attributes.map(([key, val]) => (
@@ -134,13 +136,13 @@ export default function SchemaDataPanel({ obj, onExpand, onSetAttributes, onRemo
                                 key={key}
                                 tabIndex={0} // Added to make the row focusable
                             >
-                                <TableCell className="flex items-center gap-2">
-                                    <div className="w-6 h-12">
+                                <TableCell className="px-1 py-0">
+                                    <div className="flex flex-col gap-2 w-5 h-12">
                                         {
                                             editable === key ?
-                                                <div className="flex flex-col gap-2">
+                                                <>
                                                     <Button
-                                                        variant="button"
+                                                        title="Save"
                                                         icon={<Check size={20} />}
                                                         onClick={(e) => {
                                                             e.stopPropagation()
@@ -148,41 +150,43 @@ export default function SchemaDataPanel({ obj, onExpand, onSetAttributes, onRemo
                                                         }}
                                                     />
                                                     <Button
-                                                        variant="button"
+                                                        title="Cancel"
                                                         icon={<X size={20} />}
                                                         onClick={(e) => {
                                                             e.stopPropagation()
                                                             handelSetEditable()
                                                         }}
                                                     />
-                                                </div>
+                                                </>
                                                 : hover === key &&
-                                                <div className="flex flex-col gap-2">
+                                                <>
                                                     <Button
                                                         icon={<Trash2 size={20} />}
-                                                        variant="button"
+                                                        title="Remove"
                                                         onClick={(e) => {
                                                             e.stopPropagation()
                                                             handelRemoveAttribute(key)
                                                         }}
                                                     />
                                                     <Button
-                                                        variant="button"
+                                                        title="Edit"
                                                         icon={<Pencil size={20} />}
                                                         onClick={(e) => {
                                                             e.stopPropagation()
                                                             handelSetEditable([key, [...val]])
                                                         }}
                                                     />
-                                                </div>
+                                                </>
                                         }
                                     </div>
+                                </TableCell>
+                                <TableCell className="px-1 py-0">
                                     {key}:
                                 </TableCell>
                                 {
                                     editable === key ?
                                         <>
-                                            <TableCell>
+                                            <TableCell className="px-1 py-0">
                                                 <Combobox
                                                     options={OPTIONS}
                                                     setSelectedValue={(v) => setAttribute(prev => {
@@ -195,7 +199,7 @@ export default function SchemaDataPanel({ obj, onExpand, onSetAttributes, onRemo
                                                     selectedValue={attribute[1][0]}
                                                 />
                                             </TableCell>
-                                            <TableCell>
+                                            <TableCell className="px-1 py-0">
                                                 <Input
                                                     className="w-28"
                                                     onKeyDown={(e) => handelKeyDown(e, handelSetAttributes)}
@@ -208,7 +212,7 @@ export default function SchemaDataPanel({ obj, onExpand, onSetAttributes, onRemo
                                                     value={attribute[1][1]}
                                                 />
                                             </TableCell>
-                                            <TableCell>
+                                            <TableCell className="px-1 py-0">
                                                 <Checkbox
                                                     className="h-6 w-6 border-[#57577B] data-[state=checked]:bg-[#57577B]"
                                                     onCheckedChange={(checked) => setAttribute(prev => {
@@ -219,7 +223,7 @@ export default function SchemaDataPanel({ obj, onExpand, onSetAttributes, onRemo
                                                     checked={attribute[1][2] === "true"}
                                                 />
                                             </TableCell>
-                                            <TableCell>
+                                            <TableCell className="px-1 py-0">
                                                 <Checkbox
                                                     className="h-6 w-6 border-[#57577B] data-[state=checked]:bg-[#57577B]"
                                                     onCheckedChange={(checked) => setAttribute(prev => {
@@ -232,7 +236,7 @@ export default function SchemaDataPanel({ obj, onExpand, onSetAttributes, onRemo
                                             </TableCell>
                                         </>
                                         : val.map((v, i) => (
-                                            <TableCell key={i}>{v}</TableCell>
+                                            <TableCell className="px-1 py-0" key={i}>{v}</TableCell>
                                         ))
                                 }
                             </TableRow>
@@ -241,25 +245,25 @@ export default function SchemaDataPanel({ obj, onExpand, onSetAttributes, onRemo
                     {
                         isAddValue &&
                         <TableRow key="Add Value" className="border-none">
-                            <TableCell className="flex items-center gap-2">
-                                <div className="flex flex-col gap-2">
-                                    <Button
-                                        variant="button"
-                                        icon={<Check size={20} />}
-                                        onClick={(e) => {
-                                            e.stopPropagation()
-                                            handelAddAttribute()
-                                        }}
-                                    />
-                                    <Button
-                                        variant="button"
-                                        icon={<X size={20} />}
-                                        onClick={(e) => {
-                                            e.stopPropagation()
-                                            handelSetEditable()
-                                        }}
-                                    />
-                                </div>
+                            <TableCell className="flex flex-col gap-1 px-1 py-0">
+                                <Button
+                                    title="Save"
+                                    icon={<Check size={20} />}
+                                    onClick={(e) => {
+                                        e.stopPropagation()
+                                        handelAddAttribute()
+                                    }}
+                                />
+                                <Button
+                                    title="Cancel"
+                                    icon={<X size={20} />}
+                                    onClick={(e) => {
+                                        e.stopPropagation()
+                                        handelSetEditable()
+                                    }}
+                                />
+                            </TableCell>
+                            <TableCell className="px-1 py-0">
                                 <Input
                                     className="w-28"
                                     onKeyDown={(e) => handelKeyDown(e, handelAddAttribute)}
@@ -272,7 +276,7 @@ export default function SchemaDataPanel({ obj, onExpand, onSetAttributes, onRemo
                                     value={attribute[0]}
                                 />
                             </TableCell>
-                            <TableCell>
+                            <TableCell className="px-1 py-0">
                                 <Combobox
                                     options={OPTIONS}
                                     setSelectedValue={(v) => setAttribute(prev => {
@@ -285,7 +289,7 @@ export default function SchemaDataPanel({ obj, onExpand, onSetAttributes, onRemo
                                     selectedValue={attribute[1][0]}
                                 />
                             </TableCell>
-                            <TableCell>
+                            <TableCell className="px-1 py-0">
                                 <Input
                                     className="w-28"
                                     onKeyDown={(e) => handelKeyDown(e, handelAddAttribute)}
@@ -298,7 +302,7 @@ export default function SchemaDataPanel({ obj, onExpand, onSetAttributes, onRemo
                                     value={attribute[1][1]}
                                 />
                             </TableCell>
-                            <TableCell>
+                            <TableCell className="px-1 py-0">
                                 <Checkbox
                                     className="h-6 w-6 border-[#57577B] data-[state=checked]:bg-[#57577B]"
                                     onCheckedChange={(checked) => setAttribute(prev => {
@@ -309,7 +313,7 @@ export default function SchemaDataPanel({ obj, onExpand, onSetAttributes, onRemo
                                     checked={attribute[1][2] === "true"}
                                 />
                             </TableCell>
-                            <TableCell>
+                            <TableCell className="px-1 py-0">
                                 <Checkbox
                                     className="h-6 w-6 border-[#57577B] data-[state=checked]:bg-[#57577B]"
                                     onCheckedChange={(checked) => setAttribute(prev => {
@@ -323,21 +327,30 @@ export default function SchemaDataPanel({ obj, onExpand, onSetAttributes, onRemo
                         </TableRow>
                     }
                 </TableBody>
-                <TableCaption>
-                    <Button
-                        variant="Secondary"
-                        label="Add Value"
-                        icon={isAddValue ? <MinusCircle /> : <PlusCircle />}
-                        onClick={() => setIsAddValue(prev => {
-                            if (!prev) {
-                                setAttribute(getDefaultAttribute())
-                                setEditable("")
-                            }
-                            return !prev
-                        })}
-                    />
-                </TableCaption>
             </Table>
+            <div className="p-4">
+                <Button
+                    className="border border-[#232341]"
+                    variant="Secondary"
+                    label="Add Value"
+                    icon={isAddValue ? <MinusCircle /> : <PlusCircle />}
+                    onClick={() => setIsAddValue(prev => {
+                        if (!prev) {
+                            setAttribute(getDefaultAttribute())
+                            setEditable("")
+                        }
+                        return !prev
+                    })}
+                />
+            </div>
+            <div className="p-4">
+                <Button
+                    className="border border-[#232341]"
+                    label="Delete"
+                    variant="Secondary"
+                    onClick={() => onDeleteElement()}
+                />
+            </div>
         </div>
     )
 }
