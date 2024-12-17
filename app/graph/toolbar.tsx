@@ -4,19 +4,36 @@
 
 import { Link, PlusCircle, Shrink, Trash2, ZoomIn, ZoomOut } from "lucide-react";
 import { Dialog, DialogTrigger } from "@/components/ui/dialog";
-import { useState } from "react";
+import { Dispatch, SetStateAction, useState } from "react";
 import Button from "../components/ui/Button";
 import DialogComponent from "../components/DialogComponent";
 
-export default function Toolbar({ disabled, addDisabled, chartRef, onDeleteElement, onAddEntity, onAddRelation, deleteDisabled }: {
+interface Props {
     addDisabled?: boolean,
     disabled?: boolean,
-    chartRef: React.RefObject<cytoscape.Core>,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    chartRef: React.RefObject<any>,
     onDeleteElement?: () => Promise<void>,
     onAddEntity?: () => void,
     onAddRelation?: () => void,
     deleteDisabled?: boolean,
-}) {
+    cooldownTime: number | undefined
+    setCooldownTime: Dispatch<SetStateAction<number | undefined>>
+    handelCooldown: () => void
+}
+
+export default function Toolbar({
+    disabled,
+    addDisabled,
+    chartRef,
+    onDeleteElement,
+    onAddEntity,
+    onAddRelation,
+    deleteDisabled,
+    cooldownTime,
+    setCooldownTime,
+    handelCooldown,
+}: Props) {
 
     const [deleteOpen, setDeleteOpen] = useState(false)
 
@@ -30,8 +47,7 @@ export default function Toolbar({ disabled, addDisabled, chartRef, onDeleteEleme
     const handleCenterClick = () => {
         const chart = chartRef.current
         if (chart) {
-            chart.fit()
-            chart.center()
+            chart.zoomToFit(1000, 40)
         }
     }
 
@@ -115,6 +131,17 @@ export default function Toolbar({ disabled, addDisabled, chartRef, onDeleteEleme
                     label="Fit To Size"
                     icon={<Shrink />}
                     onClick={() => handleCenterClick()}
+                />
+                <Button
+                    disabled={disabled}
+                    variant="Secondary"
+                    label={cooldownTime !== undefined ? "Move" : "Stay"}
+                    onClick={() => {
+                        setCooldownTime(cooldownTime !== undefined ? undefined : 2000)
+                        if (cooldownTime !== undefined) {
+                            handelCooldown()
+                        }
+                    }}
                 />
             </div>
         </div>
