@@ -25,6 +25,7 @@ export type Link = LinkObject<Node, {
     visible: boolean,
     expand: boolean,
     collapsed: boolean,
+    curve: number,
     data: {
         [key: string]: any
     }
@@ -303,6 +304,7 @@ export class Graph {
                 expand: false,
                 collapsed,
                 visible: true,
+                curve: 0,
                 data: {}
             }
 
@@ -400,10 +402,32 @@ export class Graph {
         return l
     }
 
-    public removeLinks() {
+    public visibleLinks(visible: boolean) {
+        this.elements.links.forEach(link => {
+            if (visible && (this.elements.nodes.map(n => n.id).includes(link.source.id) && link.source.visible) && (this.elements.nodes.map(n => n.id).includes(link.target.id) && link.target.visible)) {
+                // eslint-disable-next-line no-param-reassign
+                link.visible = true
+            }
+
+            if (!visible && ((this.elements.nodes.map(n => n.id).includes(link.source.id) && !link.source.visible) || (this.elements.nodes.map(n => n.id).includes(link.target.id) && !link.target.visible))) {
+                // eslint-disable-next-line no-param-reassign
+                link.visible = false
+            }
+        })
+    }
+
+    public removeLinks(ids: number[] = []) {
+        const elements = this.elements.links.filter(link => ids.includes(link.source.id) || ids.includes(link.target.id))
+
         this.elements = {
             nodes: this.elements.nodes,
             links: this.elements.links.map(link => {
+                if (ids.length !== 0 && elements.includes(link)) {
+                    this.linksMap.delete(link.id)
+
+                    return undefined
+                }
+
                 if (this.elements.nodes.map(n => n.id).includes(link.source.id) && this.elements.nodes.map(n => n.id).includes(link.target.id)) {
                     return link
                 }

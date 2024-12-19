@@ -105,6 +105,9 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
                 node.visible = false
             }
         })
+
+        graph.visibleLinks(category.show)
+
         setData({ ...graph.Elements })
     }
 
@@ -118,6 +121,7 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
                 link.visible = false
             }
         })
+
         setData({ ...graph.Elements })
     }
 
@@ -163,6 +167,9 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
 
         setSelectedElements([])
         setSelectedElement(undefined)
+
+        graph.removeLinks(selectedElements.map((element) => element.id))
+
         setData({ ...graph.Elements })
         handelCooldown()
     }

@@ -47,7 +47,7 @@ export default function Labels({ graph, categories, onClick, label, className = 
                     {
                         categories.length > 0 &&
                         categories.map((category) => (
-                            <li key={category.index}>
+                            <li key={category.name}>
                                 <Button
                                     className={cn(category.name && "w-full pointer-events-auto")}
                                     label={category.name}

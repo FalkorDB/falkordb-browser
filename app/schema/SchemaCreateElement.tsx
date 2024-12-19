@@ -7,16 +7,16 @@ import { Dispatch, SetStateAction, useState } from "react";
 import { Toast } from "@/lib/utils";
 import { ArrowRight, ArrowRightLeft, Check, ChevronRight, Pencil, Trash2, X } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
-import { NodeDataDefinition } from "cytoscape";
 import Input from "../components/ui/Input";
 import Button from "../components/ui/Button";
 import Combobox from "../components/ui/combobox";
+import { Node } from "../api/graph/model";
 
 interface Props {
   onCreate: (element: [string, string[]][], label?: string) => Promise<boolean>
   onExpand: () => void
-  selectedNodes: NodeDataDefinition[]
-  setSelectedNodes: Dispatch<SetStateAction<NodeDataDefinition[]>>
+  selectedNodes: [Node | undefined, Node | undefined]
+  setSelectedNodes: Dispatch<SetStateAction<[Node | undefined, Node | undefined]>>
   type: boolean
 }
 
@@ -191,7 +191,7 @@ export default function SchemaCreateElement({ onCreate, onExpand, selectedNodes,
                                 e.stopPropagation()
                                 setAttributes(prev => prev.filter(([k]) => k !== key))
                               }}
-                              />
+                            />
                             <Button
                               variant="button"
                               title="Edit"
@@ -364,10 +364,17 @@ export default function SchemaCreateElement({ onCreate, onExpand, selectedNodes,
                 <p>{selectedNodes[1]?.category}</p>
               </div>
             </div>
-            <div className="w-full flex justify-center">
+            <div className="w-full flex justify-center gap-8">
               <Button
-                icon={<ArrowRightLeft size={70} />}
-                title="Swap"
+                className="flex-col-reverse"
+                icon={<Trash2 size={40} />}
+                label="Clear"
+                onClick={() => setSelectedNodes([undefined, undefined])}
+              />
+              <Button
+                className="flex-col-reverse"
+                icon={<ArrowRightLeft size={40} />}
+                label="Swap"
                 onClick={() => setSelectedNodes(prev => [prev[1], prev[0]])}
               />
             </div>
