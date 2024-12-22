@@ -5,7 +5,7 @@ import { waitForTimeOut } from "@/e2e/infra/utils";
 export class graphPage extends BasePage {
 
     private get graphsMenu(): Locator {
-        return this.page.getByRole("button", { name : "Select Graph"});
+        return this.page.locator("//button[@data-type='selectGraph']");
     }
 
     private graphsMenuByName(graph: string): Locator {
@@ -56,10 +56,17 @@ export class graphPage extends BasePage {
         return (graph: string) => this.page.locator(`//tbody//tr/td[1][contains(text(), '${graph}')]/parent::tr//td[3]/button`);
     }
 
+    private get graphMenuElements(): Locator {
+        return this.page.locator("//tbody/tr");
+    }
+
     async countGraphsInMenu(): Promise<number> {
         await waitForTimeOut(this.page, 1000);
-        await this.graphsMenu.click()
-        return await this.dropDownMenuGraphs.count() - 1;
+        await this.graphsMenu.click();
+        await this.manageGraphBtn.click();
+        const count = await this.graphMenuElements.count();
+        await this.refreshPage();
+        return count;
     }
     
     async removeGraph(): Promise<void> {
@@ -71,7 +78,7 @@ export class graphPage extends BasePage {
     async removeAllGraphs(): Promise<void> {
         await waitForTimeOut(this.page, 1000);
         const graphCount = await this.countGraphsInMenu();
-        
+        await this.graphsMenu.click();
         await this.manageGraphBtn.click()
         for(let i = graphCount; i >= 1; i--){
             await this.removeGraph();
