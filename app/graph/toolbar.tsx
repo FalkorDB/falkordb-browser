@@ -11,7 +11,7 @@ import DialogComponent from "../components/DialogComponent";
 export default function Toolbar({ disabled, addDisabled, chartRef, onDeleteElement, onAddEntity, onAddRelation, deleteDisabled }: {
     addDisabled?: boolean,
     disabled?: boolean,
-    chartRef: React.RefObject<cytoscape.Core>,
+    chartRef: React.RefObject<cytoscape.Core | null>,
     onDeleteElement?: () => Promise<void>,
     onAddEntity?: () => void,
     onAddRelation?: () => void,

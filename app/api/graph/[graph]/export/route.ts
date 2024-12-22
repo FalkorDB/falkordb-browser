@@ -3,7 +3,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { commandOptions } from "redis";
 
 // eslint-disable-next-line import/prefer-default-export
-export async function GET(request: NextRequest, { params } : { params : { graph: string } }) {
+export async function GET(request: NextRequest, props: { params : Promise<{ graph: string }> }) {
+    const params = await props.params;
 
     const client = await getClient()
     if (client instanceof NextResponse) {

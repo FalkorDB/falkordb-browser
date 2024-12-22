@@ -1,6 +1,6 @@
 import { cn } from "@/lib/utils"
 import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp } from "lucide-react"
-import { forwardRef } from "react"
+import { forwardRef, type JSX } from "react";
 
 type Variant = "Large" | "Primary" | "Secondary" | "button"
 

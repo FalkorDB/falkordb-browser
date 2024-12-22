@@ -3,7 +3,8 @@ import { getClient } from "../../auth/[...nextauth]/options"
 import { ROLE } from "../options"
 
 // eslint-disable-next-line import/prefer-default-export
-export async function PATCH(req: NextRequest, { params }: { params: { user: string } }) {
+export async function PATCH(req: NextRequest, props: { params: Promise<{ user: string }> }) {
+    const params = await props.params;
 
     const client = await getClient()
     if (client instanceof NextResponse) {

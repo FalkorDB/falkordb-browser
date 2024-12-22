@@ -3,6 +3,7 @@
 import { DialogClose } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { X } from "lucide-react";
+import type { JSX } from "react";
 import Button from "./ui/Button";
 
 /* eslint-disable react/require-default-props */

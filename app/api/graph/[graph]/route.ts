@@ -3,7 +3,8 @@ import { getClient } from "@/app/api/auth/[...nextauth]/options";
 import { prepareArg, securedFetch } from "@/lib/utils";
 
 // eslint-disable-next-line import/prefer-default-export
-export async function DELETE(request: NextRequest, { params }: { params: { graph: string } }) {
+export async function DELETE(request: NextRequest, props: { params: Promise<{ graph: string }> }) {
+    const params = await props.params;
 
     const client = await getClient()
     if (client instanceof NextResponse) {
@@ -27,7 +28,8 @@ export async function DELETE(request: NextRequest, { params }: { params: { graph
 }
 
 // eslint-disable-next-line import/prefer-default-export
-export async function POST(request: NextRequest, { params }: { params: { graph: string } }) {
+export async function POST(request: NextRequest, props: { params: Promise<{ graph: string }> }) {
+    const params = await props.params;
 
     const client = await getClient()
     if (client instanceof NextResponse) {
@@ -87,7 +89,8 @@ export async function POST(request: NextRequest, { params }: { params: { graph: 
 }
 
 // eslint-disable-next-line import/prefer-default-export
-export async function PATCH(request: NextRequest, { params }: { params: { graph: string } }) {
+export async function PATCH(request: NextRequest, props: { params: Promise<{ graph: string }> }) {
+    const params = await props.params;
 
     const client = await getClient()
     if (client instanceof NextResponse) {
@@ -110,7 +113,8 @@ export async function PATCH(request: NextRequest, { params }: { params: { graph:
     }
 }
 
-export async function GET(request: NextRequest, { params }: { params: { graph: string } }) {
+export async function GET(request: NextRequest, props: { params: Promise<{ graph: string }> }) {
+    const params = await props.params;
 
     const client = await getClient()
     if (client instanceof NextResponse) {
