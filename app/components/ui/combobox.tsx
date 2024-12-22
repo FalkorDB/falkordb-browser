@@ -25,9 +25,10 @@ interface ComboboxProps {
   isSchema?: boolean
   defaultOpen?: boolean
   onOpenChange?: (open: boolean) => void
+  setReload?: Dispatch<SetStateAction<boolean>>
 }
 
-export default function Combobox({ isSelectGraph, disabled = false, inTable, type, options, setOptions, selectedValue = "", setSelectedValue, isSchema = false, defaultOpen = false, onOpenChange }: ComboboxProps) {
+export default function Combobox({ isSelectGraph, disabled = false, inTable, type, options, setOptions, selectedValue = "", setSelectedValue, isSchema = false, defaultOpen = false, onOpenChange, setReload }: ComboboxProps) {
 
   const [openDialog, setOpenDialog] = useState<boolean>(false)
   const [open, setOpen] = useState<boolean>(defaultOpen)
@@ -35,12 +36,12 @@ export default function Combobox({ isSelectGraph, disabled = false, inTable, typ
   const [editable, setEditable] = useState<string>("")
   const [isUploadOpen, setIsUploadOpen] = useState<string>()
   const [isDeleteOpen, setIsDeleteOpen] = useState<string>()
-  
+
   useEffect(() => {
     if (options.length !== 1) return
     setSelectedValue(options[0])
   }, [options])
-  
+
   const onExport = async (graphName: string) => {
     const result = await securedFetch(`api/graph/${prepareArg(graphName)}/export`, {
       method: "GET"
@@ -103,6 +104,7 @@ export default function Combobox({ isSelectGraph, disabled = false, inTable, typ
       }}>
         <DropdownMenuTrigger disabled={disabled} asChild>
           <Button
+            data-type="selectGraph"
             className={cn(inTable ? "text-sm font-light" : "text-2xl")}
             label={selectedValue || `Select ${type || "Graph"}`}
             open={open}
@@ -140,6 +142,23 @@ export default function Combobox({ isSelectGraph, disabled = false, inTable, typ
                   />
                 </DialogTrigger>
               </DropdownMenuItem>
+              {
+                setReload &&
+                <>
+                  <DropdownMenuSeparator className="bg-gray-300" />
+                  <DropdownMenuItem>
+                    <Button
+                      className="w-full p-2"
+                      label="Refresh List"
+                      onClick={(e) => {
+                        e.preventDefault()
+                        e.stopPropagation()
+                        setReload(prev => !prev)
+                      }}
+                    />
+                  </DropdownMenuItem>
+                </>
+              }
             </>
           }
         </DropdownMenuContent>
