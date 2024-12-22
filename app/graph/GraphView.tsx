@@ -48,6 +48,20 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
     const [cooldownTime, setCooldownTime] = useState<number | undefined>(2000)
 
     useEffect(() => {
+        let timeout: NodeJS.Timeout
+        if (tabsValue === "Graph" && selectedElement) {
+            timeout = setTimeout(() => {
+                dataPanel.current?.expand()
+            }, 0)
+        }
+        dataPanel.current?.collapse()
+
+        return () => {
+            clearInterval(timeout)
+        }
+    }, [tabsValue])
+
+    useEffect(() => {
         setData({ ...graph.Elements })
     }, [graph.getElements().length, graph.Elements])
 
@@ -216,7 +230,7 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
                             <Table />
                         </TabsTrigger>
                     </TabsList>
-                    <TabsContent value="Graph" className="grow h-full mt-0">
+                    <TabsContent value="Graph" className="w-1 grow h-full mt-0">
                         <div className="h-full flex flex-col gap-4">
                             <div className="flex items-center justify-between">
                                 <Toolbar
@@ -278,7 +292,7 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
                             </div>
                         </div>
                     </TabsContent>
-                    <TabsContent value="Table" className="mt-0 grow h-full">
+                    <TabsContent value="Table" className="mt-0 w-1 grow h-full">
                         <TableView
                             data={graph.Data}
                         />

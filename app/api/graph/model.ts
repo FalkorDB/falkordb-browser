@@ -253,59 +253,99 @@ export class Graph {
 
         if (!currentEdge) {
             let category
-            let source = this.nodesMap.get(cell.sourceId)
-            let target = this.nodesMap.get(cell.destinationId)
-
-            if (!source || !target) {
-                [category] = this.createCategory([""])
-            }
-
-            if (!source) {
-                source = {
-                    id: cell.sourceId,
-                    category: [category!.name],
-                    color: this.getCategoryColorValue(),
+            let link: Link
+            
+            if (cell.sourceId === cell.destinationId) {
+                let source = this.nodesMap.get(cell.sourceId)
+                
+                if (!source) {
+                    [category] = this.createCategory([""])
+                }
+                
+                if (!source) {
+                    source = {
+                        id: cell.sourceId,
+                        category: [category!.name],
+                        color: this.getCategoryColorValue(),
+                        expand: false,
+                        collapsed,
+                        visible: true,
+                        data: {
+                            name: cell.sourceId.toString(),
+                        },
+                    }
+                    
+                    this.nodesMap.set(cell.sourceId, source)
+                    this.elements.nodes.push(source)
+                }
+                
+                link = {
+                    id: cell.id,
+                    source,
+                    target: source,
+                    label: cell.relationshipType,
+                    color: this.getCategoryColorValue(label.index),
                     expand: false,
                     collapsed,
                     visible: true,
-                    data: {
-                        name: cell.sourceId.toString(),
-                    },
+                    curve: 0,
+                    data: {}
+                }
+            } else {
+                let source = this.nodesMap.get(cell.sourceId)
+                let target = this.nodesMap.get(cell.destinationId)
+                
+                if (!source || !target) {
+                    [category] = this.createCategory([""])
                 }
 
-                this.nodesMap.set(cell.sourceId, source)
-                this.elements.nodes.push(source)
-            }
+                if (!source) {
+                    source = {
+                        id: cell.sourceId,
+                        category: [category!.name],
+                        color: this.getCategoryColorValue(),
+                        expand: false,
+                        collapsed,
+                        visible: true,
+                        data: {
+                            name: cell.sourceId.toString(),
+                        },
+                    }
+
+                    this.nodesMap.set(cell.sourceId, source)
+                    this.elements.nodes.push(source)
+                }
 
 
-            if (!target) {
-                target = {
-                    id: cell.destinationId,
-                    category: [category!.name],
-                    color: this.getCategoryColorValue(),
-                    expand: false,
-                    collapsed,
-                    visible: true,
-                    data: {
-                        name: cell.destinationId.toString(),
+                if (!target) {
+                    target = {
+                        id: cell.destinationId,
+                        category: [category!.name],
+                        color: this.getCategoryColorValue(),
+                        expand: false,
+                        collapsed,
+                        visible: true,
+                        data: {
+                            name: cell.destinationId.toString(),
+                        }
                     }
                 }
 
                 this.nodesMap.set(cell.destinationId, target)
                 this.elements.nodes.push(target)
-            }
 
-            const link: Link = {
-                id: cell.id,
-                source,
-                target,
-                label: cell.relationshipType,
-                color: this.getCategoryColorValue(label.index),
-                expand: false,
-                collapsed,
-                visible: true,
-                curve: 0,
-                data: {}
+                link = {
+                    id: cell.id,
+                    source,
+                    target,
+                    label: cell.relationshipType,
+                    color: this.getCategoryColorValue(label.index),
+                    expand: false,
+                    collapsed,
+                    visible: true,
+                    curve: 0,
+                    data: {}
+                }
             }
 
             Object.entries(cell.properties).forEach(([key, value]) => {

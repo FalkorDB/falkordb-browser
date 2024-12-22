@@ -150,8 +150,10 @@ export default function ForceGraph({
                 height={parentHeight}
                 graphData={data}
                 nodeRelSize={NODE_SIZE}
-                nodeCanvasObjectMode={() => 'replace'}
-                linkCanvasObjectMode={() => 'replace'}
+                nodeCanvasObjectMode={() => 'after'}
+                linkCanvasObjectMode={() => 'after'}
+                linkWidth={(link) => (selectedElement && ("source" in selectedElement) && selectedElement.id === link.id
+                    || hoverElement && ("source" in hoverElement) && hoverElement.id === link.id) ? 2 : 1}
                 nodeCanvasObject={(node, ctx) => {
                     if (!node.x || !node.y) return
 
@@ -188,14 +190,6 @@ export default function ForceGraph({
                     // add label
                     ctx.fillText(name, node.x, node.y);
                 }}
-                nodePointerAreaPaint={(node, paintColor, ctx) => {
-                    if (!node.x || !node.y) return;
-
-                    ctx.fillStyle = paintColor;
-                    ctx.beginPath();
-                    ctx.arc(node.x, node.y, NODE_SIZE, 0, 2 * Math.PI, false);
-                    ctx.fill();
-                }}
                 linkCanvasObject={(link, ctx) => {
                     const start = link.source;
                     const end = link.target;
@@ -205,138 +199,59 @@ export default function ForceGraph({
                     ctx.strokeStyle = link.color;
                     ctx.globalAlpha = 0.5;
 
-                    ctx.beginPath();
-
-                    ctx.lineWidth = (selectedElement && ("source" in selectedElement) && selectedElement.id === link.id
-                        || hoverElement && ("source" in hoverElement) && hoverElement.id === link.id) ? 1 : 0.5
-                    if (start.id === end.id) {
-                        const sameNodesLinks = graph.Elements.links.filter(l => (l.source.id === start.id && l.target.id === end.id)
-                            || (l.target.id === start.id && l.source.id === end.id))
-                        const index = sameNodesLinks.findIndex(l => l.id === link.id) || 0
-                        const s = index * 5
-                        // handel self closing link
-                        ctx.moveTo(end.x, end.y);
-                        ctx.arcTo(end.x + 10 + s * 2, end.y + 18 + s, end.x - 10 - s * 2, end.y + 18 + s, 6 + s / 1.5);
-                        ctx.arcTo(end.x - 10 - s * 2, end.y + 18 + s, end.x, end.y, 6 + s / 1.5);
-                        ctx.lineTo(end.x, end.y);
-                        ctx.stroke();
-
-                        // add label
-                        ctx.globalAlpha = 1;
-                        ctx.fillStyle = 'black';
-                        ctx.font = '4px Arial';
-                        ctx.fillText(link.label, end.x, end.y + 18 + s);
-                    } else {
-                        const sameNodesLinks = graph.Elements.links.filter(l => (l.source.id === start.id && l.target.id === end.id) || (l.target.id === start.id && l.source.id === end.id))
-                        const index = sameNodesLinks.findIndex(l => l.id === link.id) || 0
-                        let curve
-
-                        if (index % 2 === 0) {
-                            curve = Math.floor(-(index / 2))
-                        } else {
-                            curve = Math.floor((index + 1) / 2)
-                        }
-
-                        link.curve = curve * 0.2
-
-                        ctx.moveTo(start.x, start.y);
-
-                        const midX = (start.x + end.x) / 2;
-                        const midY = (start.y + end.y) / 2;
-
-                        if (curve !== 0) {
-                            const dx = end.x - start.x;
-                            const dy = end.y - start.y;
-
-                            // Add some curvature
-                            const curvature = link.curve
-                            const cpX = midX - curvature * dy;
-                            const cpY = midY + curvature * dx;
-
-                            ctx.quadraticCurveTo(cpX, cpY, end.x, end.y);
-
-                            ctx.stroke();
-
-                            // add label
-                            ctx.globalAlpha = 1;
-                            ctx.fillStyle = 'black';
-                            ctx.textAlign = 'center';
-                            ctx.font = '4px Arial';
-                            const labelX = (start.x + end.x + 2 * cpX) / 4;
-                            const labelY = (start.y + end.y + 2 * cpY) / 4;
-                            ctx.fillText(link.label, labelX, labelY);
-                        } else {
-                            // add link
-                            ctx.lineTo(end.x, end.y);
-
-                            ctx.stroke();
-
-                            // add label
-                            ctx.globalAlpha = 1;
-                            ctx.fillStyle = 'black';
-                            ctx.textAlign = 'center';
-                            ctx.textBaseline = 'middle';
-                            ctx.font = '4px Arial';
-                            ctx.fillText(link.label, midX, midY);
-                        }
-
-                    }
-                }}
-                linkPointerAreaPaint={(link, paintColor, ctx) => {
-                    const start = link.source;
-                    const end = link.target;
-
-                    if (!start.x || !start.y || !end.x || !end.y) return;
-                    ctx.strokeStyle = paintColor;
-                    ctx.beginPath();
+                    const sameNodesLinks = graph.Elements.links.filter(l => (l.source.id === start.id && l.target.id === end.id) || (l.target.id === start.id && l.source.id === end.id))
+                    const index = sameNodesLinks.findIndex(l => l.id === link.id) || 0
+                    const even = index % 2 === 0
+                    let curve
 
                     if (start.id === end.id) {
-                        const sameNodesLinks = graph.Elements.links.filter(l => (l.source.id === start.id && l.target.id === end.id)
-                            || (l.target.id === start.id && l.source.id === end.id))
-                        const index = sameNodesLinks.findIndex(l => l.id === link.id) || 0
-                        const s = index * 5
+                        if (even) {
+                            curve = Math.floor(-(index / 2)) - 3
+                        } else {
+                            curve = Math.floor((index + 1) / 2) + 2
+                        }
+
+                        link.curve = curve * 0.1
                         
-                        // handel self closing link
-                        ctx.moveTo(end.x, end.y);
-                        ctx.arcTo(end.x + 10 + s * 2, end.y + 18 + s, end.x - 10 - s * 2, end.y + 18 + s, 6 + s / 1.5);
-                        ctx.arcTo(end.x - 10 - s * 2, end.y + 18 + s, end.x, end.y, 6 + s / 1.5);
-                        ctx.lineTo(end.x, end.y);
-                        ctx.stroke();
-                    } else {
-                        const sameNodesLinks = graph.Elements.links.filter(l => (l.source.id === start.id && l.target.id === end.id)
-                            || (l.target.id === start.id && l.source.id === end.id))
-                        const index = sameNodesLinks.findIndex(l => l.id === link.id) || 0
-                        let curve
+                        const radius = NODE_SIZE * link.curve * 6.2;
+                        const angleOffset = -Math.PI / 4; // 45 degrees offset for text alignment
+                        const textX = start.x + radius * Math.cos(angleOffset);
+                        const textY = start.y + radius * Math.sin(angleOffset);
 
-                        if (index % 2 === 0) {
+                        ctx.save();
+                        ctx.translate(textX, textY);
+                        ctx.rotate(-angleOffset);
+                    } else {
+                        if (even) {
                             curve = Math.floor(-(index / 2))
                         } else {
                             curve = Math.floor((index + 1) / 2)
                         }
 
-                        link.curve = curve * 0.2
+                        link.curve = curve * 0.1
+                        
+                        const midX = (start.x + end.x) / 2 + (end.y - start.y) * (link.curve / 2);
+                        const midY = (start.y + end.y) / 2 + (start.x - end.x) * (link.curve / 2);
 
-                        ctx.moveTo(start.x, start.y);
+                        let textAngle = Math.atan2(end.y - start.y, end.x - start.x)
 
-                        if (curve !== 0) {
-                            const midX = (start.x + end.x) / 2;
-                            const midY = (start.y + end.y) / 2;
-                            const dx = end.x - start.x;
-                            const dy = end.y - start.y;
+                        // maintain label vertical orientation for legibility
+                        if (textAngle > Math.PI / 2) textAngle = -(Math.PI - textAngle);
+                        if (textAngle < -Math.PI / 2) textAngle = -(-Math.PI - textAngle);
 
-                            // Add some curvature
-                            const curvature = link.curve
-                            const cpX = midX - curvature * dy;
-                            const cpY = midY + curvature * dx;
-
-                            ctx.quadraticCurveTo(cpX, cpY, end.x, end.y);
-
-                        } else {
-                            // add link
-                            ctx.lineTo(end.x, end.y);
-                        }
+                        ctx.save();
+                        ctx.translate(midX, midY);
+                        ctx.rotate(textAngle);
                     }
-                    ctx.stroke();
+
+                    // add label
+                    ctx.globalAlpha = 1;
+                    ctx.fillStyle = 'black';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.font = '2px Arial';
+                    ctx.fillText(link.label, 0, 0);
+                    ctx.restore()
                 }}
                 onNodeClick={handleClick}
                 onLinkClick={handleClick}
