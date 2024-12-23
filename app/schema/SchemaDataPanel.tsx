@@ -1,6 +1,6 @@
 /* eslint-disable react/no-array-index-key */
 import { Check, ChevronRight, MinusCircle, Pencil, PlusCircle, Trash2, X } from "lucide-react";
-import { ElementDataDefinition, Toast } from "@/lib/utils";
+import { Toast } from "@/lib/utils";
 import { useEffect, useState } from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -8,9 +8,10 @@ import Button from "../components/ui/Button";
 import { ATTRIBUTES, getDefaultAttribute, OPTIONS } from "./SchemaCreateElement";
 import Input from "../components/ui/Input";
 import Combobox from "../components/ui/combobox";
+import { Link, Node } from "../api/graph/model";
 
 interface Props {
-    obj: ElementDataDefinition
+    obj: Node | Link
     onExpand: () => void;
     onSetAttributes: (attribute: [string, string[]]) => Promise<boolean>;
     onRemoveAttribute: (key: string) => Promise<boolean>;
@@ -27,7 +28,7 @@ export default function SchemaDataPanel({ obj, onExpand, onSetAttributes, onRemo
     const [isAddValue, setIsAddValue] = useState<boolean>(false)
 
     useEffect(() => {
-        setAttributes(Object.entries(obj.data).filter(([key, val]) => !(key === "name" && val === obj.id)).map(([key, val]) => [key, Array.isArray(val) ? val : (val as string).split(',')]))
+        setAttributes(Object.entries(obj.data).filter(([key, val]) => !(key === "name" && Number(val) === obj.id)).map(([key, val]) => [key, Array.isArray(val) ? val : (val as string).split(',')]))
         setLabel("source" in obj ? obj.label : obj.category)
     }, [obj])
 

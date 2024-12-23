@@ -2,11 +2,10 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { Toast, prepareArg, securedFetch } from "@/lib/utils";
-import { ElementDataDefinition } from "cytoscape";
 import { useSession } from "next-auth/react";
 import Selector from "./Selector";
 import Header from "../components/Header";
-import { Graph, Query } from "../api/graph/model";
+import { Graph, Link, Node, Query } from "../api/graph/model";
 import GraphView from "./GraphView";
 
 export default function Page() {
@@ -17,7 +16,7 @@ export default function Page() {
     const [graph, setGraph] = useState<Graph>(Graph.empty())
     const [queries, setQueries] = useState<Query[]>([])
     const [historyQuery, setHistoryQuery] = useState<string>("")
-    const [selectedElement, setSelectedElement] = useState<ElementDataDefinition>();
+    const [selectedElement, setSelectedElement] = useState<Node | Link>();
     const { data } = useSession()
 
 
@@ -76,7 +75,11 @@ export default function Page() {
         const result = await run(query)
         if (!result) return
         setQueries(prev => [...prev, { text: query, metadata: result.metadata }])
-        setGraph(Graph.create(graphName, result, graph.Colors))
+        const g = Graph.create(graphName, result, graph.Colors)
+        setGraph(g)
+        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+        // @ts-ignore
+        window.graph = g
     }
 
     const runHistoryQuery = async (query: string, setQueriesOpen: (open: boolean) => void) => {
@@ -112,7 +115,7 @@ export default function Page() {
                     historyQuery={historyQuery}
                     historyQueries={queries.map(({ text }) => text)}
                     fetchCount={fetchCount}
-                    data={data}
+                    session={data}
                 />
             </div>
         </div >
