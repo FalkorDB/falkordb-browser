@@ -21,7 +21,7 @@ export default function Page() {
     const { data } = useSession()
 
     useEffect(() => {
-        setQueries(JSON.parse(localStorage.getItem("query history") || "[]"))
+        setQueries(JSON.parse(localStorage.getItem(`query history`) || "[]"))
     }, [])
 
     const fetchCount = useCallback(async () => {
@@ -78,8 +78,9 @@ export default function Page() {
         if (!query) return
         const result = await run(query)
         if (!result) return
-        setQueries(prev => [...prev, { text: query, metadata: result.metadata }])
-        localStorage.setItem("query history", JSON.stringify(queries))
+        const queryArr = [...queries, { text: query, metadata: result.metadata }]
+        setQueries(queryArr)
+        localStorage.setItem("query history", JSON.stringify(queryArr))
         setGraph(Graph.create(graphName, result, graph.Colors))
     }
 

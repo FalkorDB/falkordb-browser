@@ -1,20 +1,28 @@
 "use client"
 
 import { signOut, useSession } from "next-auth/react"
-import { usePathname } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import { useEffect } from "react"
 
 export default function LoginVerification({ children }: { children: React.ReactNode }) {
 
+    const router = useRouter()
     const { status } = useSession()
     const url = usePathname()
-    
+    const { data } = useSession()
+
     useEffect(() => {
-        if (url === "/login") return
-        if (status === "unauthenticated") {
+        if (data) return
+        localStorage.clear()
+    }, [data])
+
+    useEffect(() => {
+        if ((url === "/login" || url === "/") && status === "authenticated") {
+            router.push("/graph")
+        } else if (status === "unauthenticated" && url !== "/login") {
             signOut({ callbackUrl: "/login" })
         }
-    }, [status, url])
+    }, [status, url, router])
 
     return children
 } 

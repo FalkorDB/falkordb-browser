@@ -154,6 +154,12 @@ const authOptions: AuthOptions = {
             }
             return session;
         }
+    },
+    events: {
+        signOut: async ({ session, token }) => {
+            // Only do server-side cleanup here if needed
+            console.log('User signed out', session, token);
+        },
     }
 }
 
