@@ -20,6 +20,9 @@ export default function Page() {
     const [selectedElement, setSelectedElement] = useState<ElementDataDefinition>();
     const { data } = useSession()
 
+    useEffect(() => {
+        setQueries(JSON.parse(localStorage.getItem("query history") || "[]"))
+    }, [])
 
     const fetchCount = useCallback(async () => {
         if (!graphName) return
@@ -76,13 +79,16 @@ export default function Page() {
         const result = await run(query)
         if (!result) return
         setQueries(prev => [...prev, { text: query, metadata: result.metadata }])
+        localStorage.setItem("query history", JSON.stringify(queries))
         setGraph(Graph.create(graphName, result, graph.Colors))
     }
 
     const runHistoryQuery = async (query: string, setQueriesOpen: (open: boolean) => void) => {
         const result = await run(query)
         if (!result) return
-        setQueries(prev => prev.some(q => q.text === query) ? prev : [...prev, { text: query, metadata: result.metadata }])
+        const queryArr = queries.some(q => q.text === query) ? queries : [...queries, { text: query, metadata: result.metadata }]
+        setQueries(queryArr)
+        localStorage.setItem("query history", JSON.stringify(queryArr))
         setGraph(Graph.create(graphName, result))
         setHistoryQuery(query)
         setQueriesOpen(false)

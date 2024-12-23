@@ -43,7 +43,10 @@ export default function AvatarButton({ setUserStatus }: { setUserStatus: (status
             <DropdownMenuContent>
                 <DropdownMenuLabel className="text-center">My Account</DropdownMenuLabel>
                 <DropdownMenuSeparator/>
-                <DropdownMenuItem className="p-2" onClick={() => signOut({ callbackUrl: '/' })}>Logout</DropdownMenuItem>
+                <DropdownMenuItem className="p-2" onClick={() => {
+                    localStorage.removeItem("query history")
+                    signOut({ redirect: true, callbackUrl: '/' })
+                    }}>Logout</DropdownMenuItem>
             </DropdownMenuContent>
         </DropdownMenu>
     )
