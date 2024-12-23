@@ -1,10 +1,7 @@
 import { toast } from "@/components/ui/use-toast"
 import { type ClassValue, clsx } from "clsx"
-import { EdgeDataDefinition, NodeDataDefinition } from "cytoscape"
 import { signOut } from "next-auth/react"
 import { twMerge } from "tailwind-merge"
-
-export type ElementDataDefinition = NodeDataDefinition | EdgeDataDefinition
 
 // eslint-disable-next-line import/prefer-default-export
 export function cn(...inputs: ClassValue[]) {
