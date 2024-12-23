@@ -2,18 +2,18 @@
 
 /* eslint-disable no-param-reassign */
 
-import { ElementDataDefinition, prepareArg, securedFetch, Toast } from "@/lib/utils";
+import { prepareArg, securedFetch, Toast } from "@/lib/utils";
 import { Dispatch, SetStateAction, useEffect, useState } from "react";
 import { Check, ChevronRight, MinusCircle, Pencil, PlusCircle, Trash2, X } from "lucide-react";
 import { Session } from "next-auth";
 import Button from "../components/ui/Button";
 import Input from "../components/ui/Input";
-import { Graph } from "../api/graph/model";
+import { Graph, Link, Node } from "../api/graph/model";
 
 /* eslint-disable react/require-default-props */
 interface Props {
-    obj: ElementDataDefinition;
-    setObj: Dispatch<SetStateAction<ElementDataDefinition>>;
+    obj: Node | Link;
+    setObj: Dispatch<SetStateAction<Node | Link | undefined>>;
     onExpand: () => void;
     graph: Graph;
     onDeleteElement?: () => Promise<void>;
@@ -28,12 +28,12 @@ export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement,
     const [isAddValue, setIsAddValue] = useState<boolean>(false);
     const [newKey, setNewKey] = useState<string>("");
     const [newVal, setNewVal] = useState<string>("");
-    const [label, setLabel] = useState("");
+    const [label, setLabel] = useState([""]);
     const type = !("source" in obj)
 
     useEffect(() => {
         setAttributes(Object.keys(obj.data).filter((key) => (key !== "name" || obj.data.name !== obj.id)));
-        setLabel(type ? obj.category : obj.label);
+        setLabel(type ? obj.category : [obj.label]);
     }, [obj, type]);
 
     const setProperty = async (key: string, val: string) => {
@@ -44,11 +44,29 @@ export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement,
         })).ok
 
         if (success) {
-            graph.Elements.forEach(({ data: e }) => {
+            graph.getElements().forEach(e => {
                 if (e.id !== id) return
                 e.data[key] = val
             })
-            setObj((prev) => ({ ...prev, data: { ...prev.data, [key]: val } }))
+            setObj((prev) => {
+                if (!prev) return prev
+                if ("source" in prev) {
+                    return {
+                        ...prev,
+                        data: {
+                            ...prev.data,
+                            [key]: val
+                        }
+                    } as Link
+                }
+                return {
+                    ...prev,
+                    data: {
+                        ...prev.data,
+                        [key]: val
+                    }
+                } as Node
+            })
             setNewVal("")
         }
 
@@ -63,7 +81,7 @@ export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement,
         })).ok
 
         if (success) {
-            graph.Elements.forEach(({ data: e }) => {
+            graph.getElements().forEach((e) => {
                 if (e.id !== id) return
                 delete e.data[key]
             })
