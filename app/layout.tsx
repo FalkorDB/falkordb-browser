@@ -6,7 +6,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { cn } from "@/lib/utils";
 import { Metadata } from "next";
 import NextAuthProvider from "./providers";
-import GoogleAnalytics from "./components/GoogleAnalytics";
+import GTMProvider from "./GTM";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -20,19 +20,15 @@ export default function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
-
+  
   // Setting suppressHydrationWarning on html tag to prevent warning
   // caused by mismatched client/server content caused by next-themes
   return (
     <html className="w-screen h-screen" lang="en" suppressHydrationWarning>
       <body className={cn("h-full LandingPage", inter.className)}>
-        {
-          process.env.NEXT_PUBLIC_GOOGLE_ANALYTICS ? (
-            <GoogleAnalytics ga_id=
-              {process.env.NEXT_PUBLIC_GOOGLE_ANALYTICS} />
-          ) : null
-        }
-        <NextAuthProvider>{children}</NextAuthProvider>
+        <GTMProvider>
+          <NextAuthProvider>{children}</NextAuthProvider>
+        </GTMProvider>
         <Toaster />
       </body>
     </html>

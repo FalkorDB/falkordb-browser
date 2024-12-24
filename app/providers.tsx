@@ -6,9 +6,10 @@ import LoginVerification from "./loginVerification";
 
 export default function NextAuthProvider({ children }: { children: React.ReactNode }) {
 
+
   return (
     <SessionProvider>
-      <ThemeProvider attribute="class" enableSystem>
+      <ThemeProvider>
         <LoginVerification>{children}</LoginVerification>
       </ThemeProvider>
     </SessionProvider>
