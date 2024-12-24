@@ -19,6 +19,9 @@ export default function Page() {
     const [selectedElement, setSelectedElement] = useState<Node | Link>();
     const { data } = useSession()
 
+    useEffect(() => {
+        setQueries(JSON.parse(localStorage.getItem(`query history`) || "[]"))
+    }, [])
 
     const fetchCount = useCallback(async () => {
         if (!graphName) return
@@ -74,7 +77,9 @@ export default function Page() {
         if (!query) return
         const result = await run(query)
         if (!result) return
-        setQueries(prev => [...prev, { text: query, metadata: result.metadata }])
+        const queryArr = [...queries, { text: query, metadata: result.metadata }]
+        setQueries(queryArr)
+        localStorage.setItem("query history", JSON.stringify(queryArr))
         const g = Graph.create(graphName, result, graph.Colors)
         setGraph(g)
         // eslint-disable-next-line @typescript-eslint/ban-ts-comment
@@ -85,7 +90,9 @@ export default function Page() {
     const runHistoryQuery = async (query: string, setQueriesOpen: (open: boolean) => void) => {
         const result = await run(query)
         if (!result) return
-        setQueries(prev => prev.some(q => q.text === query) ? prev : [...prev, { text: query, metadata: result.metadata }])
+        const queryArr = queries.some(q => q.text === query) ? queries : [...queries, { text: query, metadata: result.metadata }]
+        setQueries(queryArr)
+        localStorage.setItem("query history", JSON.stringify(queryArr))
         setGraph(Graph.create(graphName, result))
         setHistoryQuery(query)
         setQueriesOpen(false)

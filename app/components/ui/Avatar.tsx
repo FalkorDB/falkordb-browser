@@ -42,8 +42,8 @@ export default function AvatarButton({ setUserStatus }: { setUserStatus: (status
             </DropdownMenuTrigger>
             <DropdownMenuContent>
                 <DropdownMenuLabel className="text-center">My Account</DropdownMenuLabel>
-                <DropdownMenuSeparator/>
-                <DropdownMenuItem className="p-2" onClick={() => signOut({ callbackUrl: '/' })}>Logout</DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem className="p-2" onClick={() => signOut({ callbackUrl: "/login" })}>Logout</DropdownMenuItem>
             </DropdownMenuContent>
         </DropdownMenu>
     )
