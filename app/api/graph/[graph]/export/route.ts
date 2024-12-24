@@ -3,14 +3,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { commandOptions } from "redis";
 
 // eslint-disable-next-line import/prefer-default-export
-export async function GET(request: NextRequest, { params }: { params: Promise<{ graphId: string }> }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ graph: string }> }) {
 
     const client = await getClient()
     if (client instanceof NextResponse) {
         return client
     }
 
-    const { graphId } = await params
+    const { graph: graphId } = await params
 
     try {
 

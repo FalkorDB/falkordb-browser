@@ -3,14 +3,14 @@ import { getClient } from "../../auth/[...nextauth]/options"
 import { ROLE } from "../options"
 
 // eslint-disable-next-line import/prefer-default-export
-export async function PATCH(req: NextRequest, { params }: { params: Promise<{ username: string }> }) {
+export async function PATCH(req: NextRequest, { params }: { params: Promise<{ user: string }> }) {
 
     const client = await getClient()
     if (client instanceof NextResponse) {
         return client
     }
 
-    const { username } = await params
+    const { user: username } = await params
     const role = ROLE.get(req.nextUrl.searchParams.get("role") || "")
     try {
         if (!role) throw new Error("Role is missing")
