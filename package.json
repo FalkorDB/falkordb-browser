@@ -74,6 +74,7 @@
     "@types/react": "^18",
     "@types/react-cytoscapejs": "^1.2.5",
     "@types/react-dom": "^18",
+    "@types/react-gtm-module": "^2.0.4",
     "@typescript-eslint/eslint-plugin": "^6.19.1",
     "@typescript-eslint/parser": "^6.19.1",
     "eslint": "^8.56.0",
