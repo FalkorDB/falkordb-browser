@@ -2,7 +2,7 @@ import { cn } from "@/lib/utils"
 import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp } from "lucide-react"
 import { forwardRef } from "react"
 
-type Variant = "Large" | "Primary" | "Secondary" | "button"
+type Variant = "Large" | "Primary" | "Secondary" | "Cancel" | "button"
 
 /* eslint-disable react/require-default-props */
 interface Props extends React.DetailedHTMLProps<React.ButtonHTMLAttributes<HTMLButtonElement>, HTMLButtonElement> {
@@ -23,42 +23,41 @@ const getChevron = (open: boolean | undefined, side: string) => {
     }
 }
 
-const getClassName = (variant: Variant, disable: boolean | undefined, open: boolean | undefined, icon: boolean) => {
-    
-    let className = "disabled:opacity-50 disabled:cursor-not-allowed"
-    className += variant !== "button" ? " rounded-lg" : ""
-    className += icon ? " gap-2" : ""
-    className += (open !== undefined || icon) ? " flex items-center" : ""
-    className += open !== undefined ? " gap-4" : ""
-    
+const getClassName = (variant: Variant, disable: boolean | undefined, open: boolean | undefined, icon: boolean, classN: string | undefined) => {
+
+    let className = cn(
+        "disabled:opacity-50 disabled:cursor-not-allowed",
+        variant !== "button" && "rounded-lg",
+        icon && "gap-2",
+        (open !== undefined || icon) && "flex items-center",
+        open !== undefined && "gap-4",
+        classN,
+    )
+
     switch (variant) {
-        case "Large":
-            className += " p-4 bg-[#7167F6]"
-            className += !disable ? " hover:bg-[#6157E9]" : ""
-            className += icon ? " gap-5" : ""
-            break
         case "Primary":
-            className += " px-4 py-2 bg-[#7167F6]"
-            className += !disable ? " hover:bg-[#6157E9]" : ""
-            className += icon ? " gap-3.5" : ""
+            className = cn(
+                "px-4 py-2 bg-primary",
+                !disable && "hover:bg-primary hover:opacity-90",
+                icon && "gap-3.5",
+                className
+            )
             break
         case "Secondary":
-            className += " px-3 py-2 bg-[#57577B]"
-            className += !disable ? " hover:bg-[#444466]" : ""
+            className = cn("px-12 py-1 bg-transparent border-[3px] border-primary hover:opacity-90", className)
+            break
+        case "Cancel":
+            className = cn("px-12 py-1 bg-transparent border-2 border-secondary hover:opacity-90", className)
             break
         default:
     }
-
     return className
 }
 
 const Button = forwardRef<HTMLButtonElement, Props>(({ label, variant = "button", icon, iconSide = "left", open, side = "down", className, type = "button", disabled, ...props }, ref) => (
     <button
         ref={ref}
-        className={cn(
-            getClassName(variant, disabled, open, !!icon),
-            className
-        )}
+        className={getClassName(variant, disabled, open, !!icon, className)}
         disabled={disabled}
         title={label}
         // eslint-disable-next-line react/button-has-type

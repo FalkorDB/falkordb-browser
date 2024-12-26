@@ -3,7 +3,7 @@
 
 "use client"
 
-import { Dispatch, RefObject, SetStateAction, useState } from "react"
+import { Dispatch, RefObject, SetStateAction, useEffect, useRef, useState } from "react"
 import ForceGraph2D from "react-force-graph-2d"
 import { securedFetch } from "@/lib/utils"
 import { Graph, GraphData, Link, Node } from "../api/graph/model"
@@ -49,6 +49,14 @@ export default function ForceGraph({
     const [parentWidth, setParentWidth] = useState<number>(0)
     const [parentHeight, setParentHeight] = useState<number>(0)
     const [hoverElement, setHoverElement] = useState<Node | Link | undefined>()
+    const parentRef = useRef<HTMLDivElement>(null)
+
+
+    useEffect(() => {
+        if (!parentRef.current) return
+        setParentWidth(parentRef.current.clientWidth)
+        setParentHeight(parentRef.current.clientHeight)
+    }, [parentRef.current?.clientWidth, parentRef.current?.clientHeight])
 
     const onFetchNode = async (node: Node) => {
         const result = await securedFetch(`/api/graph/${graph.Id}/${node.id}`, {
@@ -138,14 +146,10 @@ export default function ForceGraph({
     }
 
     return (
-        <div ref={ref => {
-            if (!ref) return
-            setParentWidth(ref.clientWidth)
-            setParentHeight(ref.clientHeight)
-        }} className="w-full h-full relative">
+        <div ref={parentRef} className="w-full h-full relative">
             <ForceGraph2D
                 ref={chartRef}
-                backgroundColor="#434366"
+                backgroundColor="#191919"
                 width={parentWidth}
                 height={parentHeight}
                 graphData={data}
@@ -212,7 +216,7 @@ export default function ForceGraph({
                         }
 
                         link.curve = curve * 0.1
-                        
+
                         const radius = NODE_SIZE * link.curve * 6.2;
                         const angleOffset = -Math.PI / 4; // 45 degrees offset for text alignment
                         const textX = start.x + radius * Math.cos(angleOffset);
@@ -229,7 +233,7 @@ export default function ForceGraph({
                         }
 
                         link.curve = curve * 0.1
-                        
+
                         const midX = (start.x + end.x) / 2 + (end.y - start.y) * (link.curve / 2);
                         const midY = (start.y + end.y) / 2 + (start.x - end.x) * (link.curve / 2);
 

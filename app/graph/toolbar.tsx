@@ -62,15 +62,15 @@ export default function Toolbar({
             <div className="flex gap-4">
                 <Button
                     disabled={addDisabled}
-                    variant="Secondary"
-                    label="Add Entity"
+                    variant="Primary"
+                    label="Add Node"
                     className="flex items-center gap-2"
                     onClick={onAddEntity}
                     icon={<PlusCircle />}
                 />
                 <Button
                     disabled={addDisabled}
-                    variant="Secondary"
+                    variant="Primary"
                     className="flex items-center gap-2"
                     label="Add Relation"
                     onClick={onAddRelation}
@@ -78,16 +78,14 @@ export default function Toolbar({
                     // eslint-disable-next-line jsx-a11y/anchor-is-valid
                     icon={<Link />}
                 />
-                <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
-                    <DialogTrigger asChild>
+                    <DialogComponent onOpenChange={setDeleteOpen} open={deleteOpen} title="Delete Elements" description={`Are you sure ???\nThis action will delete all selected elements`} trigger={
                         <Button
-                            variant="Secondary"
+                            variant="Primary"
                             label="Delete"
                             icon={<Trash2 />}
                             disabled={deleteDisabled}
                         />
-                    </DialogTrigger>
-                    <DialogComponent title="Delete Elements" description={`Are you sure ???\nThis action will delete all selected elements`}>
+                    }>
                         <div className="flex justify-end gap-4">
                             <Button
                                 variant="Primary"
@@ -103,8 +101,6 @@ export default function Toolbar({
                             />
                         </div>
                     </DialogComponent>
-                </Dialog>
-
             </div>
             {
                 (onAddEntity || onAddRelation || onDeleteElement) &&

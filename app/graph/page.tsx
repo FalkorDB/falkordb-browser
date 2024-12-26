@@ -100,9 +100,10 @@ export default function Page() {
 
     return (
         <div className="Page">
-            <Header onSetGraphName={setGraphName} />
+            <Header />
             <div className="h-1 grow p-8 px-10 flex flex-col gap-4">
                 <Selector
+                    setGraphName={setGraphName}
                     queries={queries}
                     onChange={setGraphName}
                     graphName={graphName}

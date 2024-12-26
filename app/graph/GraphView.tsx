@@ -210,8 +210,8 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
                     setCurrentQuery={setQuery}
                     data={session}
                 />
-                <Tabs value={tabsValue} className="h-1 grow flex gap-2">
-                    <TabsList className="h-full bg-background flex flex-col justify-center gap-2">
+                <Tabs value={tabsValue} className="h-1 grow flex gap-2 items-center">
+                    <TabsList className="h-fit bg-foreground p-1 flex flex-col gap-2">
                         <TabsTrigger
                             disabled={graph.getElements().length === 0}
                             className="tabs-trigger"
@@ -299,7 +299,7 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
                     </TabsContent>
                 </Tabs>
             </ResizablePanel>
-            <ResizableHandle className={!isCollapsed ? "w-3" : "w-0"} />
+            <ResizableHandle disabled={isCollapsed} className={cn(isCollapsed ? "w-0 !cursor-default" : "w-3")} />
             <ResizablePanel
                 className="rounded-lg"
                 collapsible

@@ -1,11 +1,12 @@
 "use client"
 
-import { Dialog, DialogTrigger } from "@/components/ui/dialog"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Toast, cn, prepareArg, securedFetch } from "@/lib/utils"
 import { Trash2, UploadIcon } from "lucide-react"
 import { Dispatch, SetStateAction, useEffect, useState } from "react"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Select, SelectContent, SelectGroup, SelectItem, SelectSeparator, SelectTrigger, SelectValue } from "@/components/ui/select"
 import UploadGraph from "../graph/UploadGraph"
 import DeleteGraph from "../graph/DeleteGraph"
 import Button from "./Button"
@@ -21,7 +22,7 @@ interface ComboboxProps {
   options: string[],
   setOptions?: Dispatch<SetStateAction<string[]>>,
   selectedValue?: string,
-  setSelectedValue: (value: string) => void,
+  setSelectedValue?: (value: string) => void,
   isSchema?: boolean
   defaultOpen?: boolean
   onOpenChange?: (open: boolean) => void
@@ -30,7 +31,7 @@ interface ComboboxProps {
 
 export default function Combobox({ isSelectGraph, disabled = false, inTable, type, options, setOptions, selectedValue = "", setSelectedValue, isSchema = false, defaultOpen = false, onOpenChange, setReload }: ComboboxProps) {
 
-  const [openDialog, setOpenDialog] = useState<boolean>(false)
+  const [openMenage, setOpenMenage] = useState<boolean>(false)
   const [open, setOpen] = useState<boolean>(defaultOpen)
   const [optionName, setOptionName] = useState<string>("")
   const [editable, setEditable] = useState<string>("")
@@ -38,7 +39,7 @@ export default function Combobox({ isSelectGraph, disabled = false, inTable, typ
   const [isDeleteOpen, setIsDeleteOpen] = useState<string>()
 
   useEffect(() => {
-    if (options.length !== 1) return
+    if (options.length !== 1 || !setSelectedValue) return
     setSelectedValue(options[0])
   }, [options])
 
@@ -67,9 +68,9 @@ export default function Combobox({ isSelectGraph, disabled = false, inTable, typ
   const handelDelete = (option: string) => {
     if (!setOptions) return
     setOptions(prev => prev.filter(name => name !== option))
-    if (selectedValue !== option) return
+    if (selectedValue !== option || !setSelectedValue) return
     setSelectedValue("")
-    setOpenDialog(false)
+    setOpenMenage(false)
   }
 
   const handelSetOption = async (e: React.KeyboardEvent<HTMLInputElement>, option: string) => {
@@ -92,80 +93,68 @@ export default function Combobox({ isSelectGraph, disabled = false, inTable, typ
 
     const newOptions = options.map((opt) => opt === option ? optionName : opt)
     setOptions(newOptions)
-    setSelectedValue(optionName)
+    if (setSelectedValue) setSelectedValue(optionName)
     setEditable("")
   }
 
   return (
-    <Dialog open={openDialog} onOpenChange={setOpenDialog}>
-      <DropdownMenu open={open} onOpenChange={(o) => {
+    <Dialog open={openMenage} onOpenChange={setOpenMenage}>
+      <Select open={open} onOpenChange={(o) => {
         setOpen(o)
         if (onOpenChange) onOpenChange(o)
       }}>
-        <DropdownMenuTrigger disabled={disabled} asChild>
-          <Button
-            data-type="selectGraph"
-            className={cn(inTable ? "text-sm font-light" : "text-2xl")}
-            label={selectedValue || `Select ${type || "Graph"}`}
-            open={open}
-          />
-        </DropdownMenuTrigger>
-        <DropdownMenuContent side="bottom" className="min-w-52 max-h-[30lvh] flex flex-col">
+        <SelectTrigger disabled={disabled} className={cn("gap-2 border-none", inTable ? "text-sm font-light" : "text-xl font-medium")}>
+          <SelectValue placeholder={`Select ${type || "Graph"}`} />
+        </SelectTrigger>
+        <SelectContent className="min-w-52 max-h-[30lvh] bg-foreground">
           {
             options.length > 0 &&
-            <ul className="shrink grow overflow-auto">
-              {
-                options.map((option) => (
-                  <DropdownMenuItem key={option}>
-                    <Button
-                      className="w-full p-2"
-                      label={option}
-                      onClick={() => {
-                        setSelectedValue(option)
-                        setOpen(false)
-                      }}
-                    />
-                  </DropdownMenuItem>
-                ))
-              }
-            </ul>
-          }
-          {
-            isSelectGraph &&
             <>
-              <DropdownMenuSeparator className="bg-gray-300" />
-              <DropdownMenuItem>
-                <DialogTrigger asChild>
-                  <Button
-                    className="w-full p-2"
-                    label="Manage Graphs"
-                  />
-                </DialogTrigger>
-              </DropdownMenuItem>
+              <SelectGroup>
+                <ul className="shrink grow overflow-auto">
+                  {
+                    options.map((option) => (
+                      <SelectItem
+                        onClick={() => {
+                          if (setSelectedValue) setSelectedValue(option)
+                          setOpen(false)
+                        }}
+                        value={option}
+                        key={option}
+                      >
+                        {option}
+                      </SelectItem>
+                    ))
+                  }
+                </ul>
+              </SelectGroup>
+              <SelectSeparator className="bg-secondary" />
+              <DialogTrigger asChild>
+                <Button
+                  className="w-full p-2"
+                  label="Manage Graphs"
+                />
+              </DialogTrigger>
               {
                 setReload &&
                 <>
-                  <DropdownMenuSeparator className="bg-gray-300" />
-                  <DropdownMenuItem>
-                    <Button
-                      className="w-full p-2"
-                      label="Refresh List"
-                      onClick={(e) => {
-                        e.preventDefault()
-                        e.stopPropagation()
-                        setReload(prev => !prev)
-                      }}
-                    />
-                  </DropdownMenuItem>
+                  <SelectSeparator className="bg-secondary" />
+                  <Button
+                    className="w-full p-2"
+                    label="Refresh List"
+                    onClick={(e) => {
+                      e.preventDefault()
+                      e.stopPropagation()
+                      setReload(prev => !prev)
+                    }}
+                  />
                 </>
               }
             </>
           }
-        </DropdownMenuContent>
-      </DropdownMenu>
-      <DialogComponent
-        title="Manage Graphs"
-      >
+        </SelectContent>
+      </Select>
+      <DialogContent>
         <div className="h-full w-full border border-[#57577B] rounded-lg overflow-auto">
           <Table>
             <TableHeader>
@@ -248,7 +237,7 @@ export default function Combobox({ isSelectGraph, disabled = false, inTable, typ
             </TableBody>
           </Table>
         </div>
-      </DialogComponent>
+      </DialogContent>
     </Dialog >
   )
 }

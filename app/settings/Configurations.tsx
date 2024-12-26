@@ -203,7 +203,7 @@ export default function Configurations() {
                 <TableHeader>
                     <TableRow className="border-none p-4">
                         {
-                            ["Name", "Description", "Value"].map((header) => (
+                            ["Name", "Description", `Value \n (Click to edit)`].map((header) => (
                                 <TableHead key={header}>{header}</TableHead>
                             ))
                         }

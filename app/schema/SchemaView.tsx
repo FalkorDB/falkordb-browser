@@ -78,14 +78,14 @@ export default function SchemaView({ schema, fetchCount, session }: Props) {
 
         setData({ ...schema.Elements })
     }
-    
+
     const onLabelClick = (label: Category) => {
         label.show = !label.show
         schema.Elements.links.forEach((link) => {
             if (link.label !== label.name) return
             link.visible = label.show
         })
-        
+
         setData({ ...schema.Elements })
     }
 
@@ -300,11 +300,10 @@ export default function SchemaView({ schema, fetchCount, session }: Props) {
         return result.ok
     }
 
-
     return (
         <ResizablePanelGroup direction="horizontal" className={cn(maximize && "h-full p-10 bg-background fixed left-[50%] top-[50%] z-50 grid translate-x-[-50%] translate-y-[-50%]")}>
             <ResizablePanel
-                defaultSize={selectedElement ? 75 : 100}
+                defaultSize={50}
                 className={cn("flex flex-col gap-10", !isCollapsed && "mr-8")}
             >
                 <div className="flex items-center justify-between">
@@ -382,12 +381,12 @@ export default function SchemaView({ schema, fetchCount, session }: Props) {
                     }
                 </div>
             </ResizablePanel>
-            <ResizableHandle className={!isCollapsed ? "w-3" : "w-0"} />
+            <ResizableHandle disabled={isCollapsed} className={cn(isCollapsed ? "w-0 !cursor-default" : "w-3")} />
             <ResizablePanel
                 className="rounded-lg"
                 collapsible
                 ref={dataPanel}
-                defaultSize={selectedElement ? 25 : 0}
+                defaultSize={50}
                 minSize={25}
                 maxSize={50}
                 onCollapse={() => setIsCollapsed(true)}

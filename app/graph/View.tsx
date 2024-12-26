@@ -21,7 +21,7 @@ export default function View({ graph, setGraph, selectedValue }: {
     const [editable, setEditable] = useState<string>("")
 
     const handelPreferencesChange = (colors?: string[]) => {
-        setGraph(Graph.create(graph.Id, { data: graph.Data }, colors || colorsArr))
+        setGraph(Graph.create(graph.Id, { data: graph.Data, metadata: graph.Metadata }, colors || colorsArr))
         if (colors) return
         localStorage.setItem(graph.Id, JSON.stringify(colorsArr));
     }
@@ -38,7 +38,7 @@ export default function View({ graph, setGraph, selectedValue }: {
                     disabled={!selectedValue}
                 />
             </DialogTrigger>
-            <DialogComponent className="w-[25%] h-[50%]" title="Preferences">
+            <DialogComponent className="w-[30%] h-[50%]" title="Preferences">
                 <div className="h-full flex flex-col gap-8">
                     <p className="text-xl">Legends</p>
                     <ul className="flex flex-col gap-4 overflow-auto">
@@ -140,7 +140,7 @@ export default function View({ graph, setGraph, selectedValue }: {
                             }}
                         />
                         <Button
-                            disabled={DEFAULT_COLORS.filter((c, i) => c === graph.Colors[i]).length === graph.Colors.length && DEFAULT_COLORS.length === graph.Colors.length}
+                            disabled={DEFAULT_COLORS.every((c, i) => c === graph.Colors[i]) && DEFAULT_COLORS.length === graph.Colors.length}
                             variant="Secondary"
                             label="Reset"
                             icon={<RotateCcw />}
@@ -150,7 +150,7 @@ export default function View({ graph, setGraph, selectedValue }: {
                             }}
                         />
                         <CloseDialog
-                            disabled={DEFAULT_COLORS.filter((c, i) => c === colorsArr[i]).length === colorsArr.length && DEFAULT_COLORS.length === colorsArr.length}
+                            disabled={graph.Colors.filter((c, i) => c === colorsArr[i]).length === colorsArr.length && DEFAULT_COLORS.length === colorsArr.length}
                             variant="Primary"
                             label="Apply"
                             icon={<FileCheck2 />}

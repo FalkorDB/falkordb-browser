@@ -5,22 +5,17 @@ import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuIte
 import { LifeBuoy, PlusCircle, Settings } from "lucide-react";
 import { FormEvent, useState } from "react";
 import Image from "next/image";
-import { Toast, cn, prepareArg, securedFetch } from "@/lib/utils";
+import { cn, prepareArg, securedFetch, Toast } from "@/lib/utils";
 import { useRouter, usePathname } from "next/navigation";
 import { Role } from "next-auth";
-import { Dialog, DialogTrigger } from "@/components/ui/dialog";
 import Button from "./ui/Button";
 import Avatar from "./ui/Avatar";
-import DialogComponent from "./DialogComponent";
-import Input from "./ui/Input";
+import CreateGraph from "./CreateGraph";
 
-/* eslint-disable react/require-default-props */
-interface Props {
-    inCreate?: boolean
+/* eslint-disable react/require-default-props */interface Props {
     onSetGraphName?: (graphName: string) => void
 }
-
-export default function Header({ inCreate = false, onSetGraphName }: Props) {
+export default function Header({ onSetGraphName }: Props) {
     const [helpOpen, setHelpOpen] = useState<boolean>(false)
     const [createOpen, setCreateOpen] = useState<boolean>(false)
     const router = useRouter()
@@ -28,15 +23,16 @@ export default function Header({ inCreate = false, onSetGraphName }: Props) {
     const [userStatus, setUserStatus] = useState<Role>()
     const [graphName, setGraphName] = useState<string>("")
     const type = pathname.includes("/schema") ? "Schema" : "Graph"
+    const inCreate = pathname.includes("/create")
 
-    const handelCreateGraph = async (e: FormEvent) => {
+    const handelCreateGraph = async (e: FormEvent<HTMLFormElement>) => {
 
         if (!onSetGraphName) return
 
         e.preventDefault()
 
         const name = `${graphName}${type === "Schema" ? "_schema" : ""}`
-        
+
         const q = `RETURN 1`
         const result = await securedFetch(`api/graph/${prepareArg(name)}/?query=${prepareArg(q)}`, {
             method: "GET"
@@ -52,26 +48,25 @@ export default function Header({ inCreate = false, onSetGraphName }: Props) {
 
     return (
         <div className="flex flex-col">
-            <div className="h-2 rounded-t-lg Top" />
-            <div className="py-4 px-11 flex justify-between items-center Header">
+            <div className="py-5 px-10 flex justify-between items-center Header">
                 <div className="flex gap-4 items-center">
                     <a
                         aria-label="FalkorDB"
                         href="https://www.falkordb.com"
                         target="_blank" rel="noreferrer"
                     >
-                        <Image width={103} height={29} src="/ColorLogo.svg" alt="" />
+                        <Image priority width={103} height={29} src="/ColorLogo.svg" alt="" />
                     </a>
                     <p className="text-neutral-200" >|</p>
-                    <div className="flex gap-6">
+                    <div className="flex gap-2 bg-foreground rounded-lg p-2">
                         <Button
                             label="Graphs"
-                            className={cn(pathname.includes("/graph") && "text-[#7167F6]")}
+                            className={cn("px-4 py-1 rounded-lg", pathname.includes("/graph") && "bg-background")}
                             onClick={() => router.push("/graph")}
                         />
                         <Button
                             label="Schemas"
-                            className={cn(pathname.includes("/schema") && "text-[#7167F6]")}
+                            className={cn("px-4 py-1 rounded-lg", pathname.includes("/schema") && "bg-background")}
                             onClick={() => router.push("/schema")}
                         />
                     </div>
@@ -79,34 +74,20 @@ export default function Header({ inCreate = false, onSetGraphName }: Props) {
                 <div className="flex items-center gap-12">
                     {
                         !inCreate &&
-                        <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-                            <DialogTrigger asChild>
+                        <CreateGraph
+                            open={createOpen}
+                            setOpen={setCreateOpen}
+                            trigger={
                                 <Button
-                                    className="text-white"
                                     variant="Primary"
-                                    label={`New ${type}`}
+                                    label={`Create New ${type}`}
                                     icon={<PlusCircle />}
                                 />
-                            </DialogTrigger>
-                            <DialogComponent className="w-[40%]" title={`Add ${type}`} description={`Enter new ${type} name`}>
-                                <form className="flex flex-col gap-12" onSubmit={handelCreateGraph}>
-                                    <div className="flex flex-col gap-2">
-                                        <p>Name:</p>
-                                        <Input
-                                            ref={ref => ref?.focus()}
-                                            variant="Default"
-                                            value={graphName}
-                                            onChange={(e) => setGraphName(e.target.value)}
-                                        />
-                                    </div>
-                                    <Button
-                                        variant="Large"
-                                        label="Create"
-                                        type="submit"
-                                    />
-                                </form>
-                            </DialogComponent>
-                        </Dialog>
+                            }
+                            graphName={graphName}
+                            setGraphName={setGraphName}
+                            handleCreateGraph={handelCreateGraph}
+                        />
                     }
                     {/* <Dialog>
                             <DialogTrigger asChild>
@@ -154,7 +135,7 @@ export default function Header({ inCreate = false, onSetGraphName }: Props) {
                         <DropdownMenuTrigger asChild>
                             <Button
                                 className="flex gap-1 items-center focus-visible:outline-none"
-                                label="help"
+                                label="Help"
                                 icon={<LifeBuoy size={20} />}
                                 open={helpOpen}
                             />
@@ -193,6 +174,7 @@ export default function Header({ inCreate = false, onSetGraphName }: Props) {
                     <Avatar setUserStatus={setUserStatus} />
                 </div>
             </div>
+            <div className="h-2 Top" />
         </div>
     )
 }

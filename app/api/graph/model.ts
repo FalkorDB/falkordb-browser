@@ -1,3 +1,4 @@
+/* eslint-disable no-param-reassign */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 import { EdgeDataDefinition, NodeDataDefinition } from 'cytoscape';
@@ -37,12 +38,10 @@ export type GraphData = {
 }
 
 export const DEFAULT_COLORS = [
-    "#7167F6",
-    "#ED70B1",
-    "#EF8759",
-    "#99E4E5",
-    "#F2EB47",
-    "#89D86D"
+    "#7466FF",
+    "#FF66B3",
+    "#FF804D",
+    "#80E6E6"
 ]
 
 export interface Query {
@@ -106,14 +105,7 @@ export class Graph {
         this.labelsMap = labelsMap;
         this.nodesMap = nodesMap;
         this.linksMap = edgesMap;
-        this.COLORS_ORDER_VALUE = colors || [
-            "#7167F6",
-            "#ED70B1",
-            "#EF8759",
-            "#99E4E5",
-            "#F2EB47",
-            "#89D86D"
-        ]
+        this.COLORS_ORDER_VALUE = colors || DEFAULT_COLORS
     }
 
     get Id(): string {
@@ -236,10 +228,20 @@ export class Graph {
             });
 
             // remove empty category if there are no more empty nodes category
-            if (this.nodesMap.values().every(n => n.category.some(c => c !== ""))) {
-                this.categories = this.categories.filter(l => l.name !== "")
+            if (Array.from(this.nodesMap.values()).every(n => n.category.some(c => c !== ""))) {
+                this.categories = this.categories.filter(l => l.name !== "").map(c => {
+                    // eslint-disable-next-line @typescript-eslint/no-non-null-asserted-optional-chain
+                    if (this.categoriesMap.get("")?.index! < c.index) {
+                        c.index -= 1
+                        this.categoriesMap.get(c.name)!.index = c.index
+                    }
+                    return c
+                })
                 this.categoriesMap.delete("")
                 this.categoriesColorIndex -= 1
+                this.elements.nodes.forEach(n => {
+                    n.color = this.getCategoryColorValue(this.categoriesMap.get(n.category[0])?.index)
+                })
             }
         }
 
@@ -254,14 +256,14 @@ export class Graph {
         if (!currentEdge) {
             let category
             let link: Link
-            
+
             if (cell.sourceId === cell.destinationId) {
                 let source = this.nodesMap.get(cell.sourceId)
-                
+
                 if (!source) {
                     [category] = this.createCategory([""])
                 }
-                
+
                 if (!source) {
                     source = {
                         id: cell.sourceId,
@@ -274,11 +276,11 @@ export class Graph {
                             name: cell.sourceId.toString(),
                         },
                     }
-                    
+
                     this.nodesMap.set(cell.sourceId, source)
                     this.elements.nodes.push(source)
                 }
-                
+
                 link = {
                     id: cell.id,
                     source,
@@ -294,7 +296,7 @@ export class Graph {
             } else {
                 let source = this.nodesMap.get(cell.sourceId)
                 let target = this.nodesMap.get(cell.destinationId)
-                
+
                 if (!source || !target) {
                     [category] = this.createCategory([""])
                 }

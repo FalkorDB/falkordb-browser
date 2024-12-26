@@ -81,7 +81,7 @@ export default function LoginForm() {
   }
   return (
     <div className="w-full h-full flex items-center justify-center gap-80 LoginForm">
-      <Image src="/Logo.svg" alt="" width={451} height={126} />
+      <Image priority src="/Logo.svg" alt="" width={451} height={126} />
       <form
         className="flex flex-col gap-4 p-2"
         onSubmit={onSubmit}

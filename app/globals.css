@@ -4,12 +4,12 @@
 
 @layer base {
     :root {
-        --background: 240 28% 21%;
-        --foreground: 0 0% 100%;
-        --popover: 240 28% 21%;
+        --background: 0 0% 14%;
+        --foreground: 0 0% 10%;
+        --primary: 243 91% 68%;
+        --secondary: 39 33% 96%;
+        --popover: var(--primary);
         --popover-foreground: 0 0% 100%;
-        --secondary: 240 17% 41%;
-        --primary: 244 89% 68%;
         --radius: 0.5rem;
         --muted: 0 0% 100%;
     }
@@ -27,8 +27,20 @@
 
 @layer components {
 
+    @font-face {
+        font-family: 'Fira Code';
+        src: url('/fonts/fira_code.ttf') format('truetype');
+        font-display: swap;
+    }
+    
+    @font-face {
+        font-family: 'Oswald';
+        src: url('/fonts/oswald.ttf') format('truetype');
+        font-display: swap;
+    }
+
     .tabs-trigger {
-        @apply !p-3 rounded-lg hover:bg-[#444466] bg-[#57577B] data-[state=active]:!bg-[#444466] data-[state=active]:font-bold;
+        @apply !p-2 rounded-lg data-[state=active]:bg-foreground data-[state=active]:!text-white !text-white;
     }
 
     .hide-scrollbar {
@@ -68,21 +80,21 @@
         background: linear-gradient(90deg, #EC806C 0%, #B66EBD 43.41%, #7568F2 100%);
     }
 
-    .Header {
-        @apply bg-white text-black
-    }
-
     .DataPanel {
         @apply h-full w-full flex flex-col shadow-lg;
-        background-color: #434366;
+        background-color: #232323;
     }
-    
+
     .Dropzone {
         display: flex;
         flex: 1 1 0%;
-        background-color: #434366;
+        background-color: #232323;
         align-items: center;
         justify-content: center;
+    }
+
+    .monaco-placeholder {
+        @apply text-[#666] absolute select-none top-2 left-2;
     }
 }
 
@@ -101,17 +113,31 @@ input[type="number"] {
     margin-top: 0.5rem;
 }
 
-@font-face {
-    font-family: 'Obviously Narrow';
-    src: url('/fonts/obviously_narrow.woff2') format('woff2'),
-        url('/fonts/obviously_narrow.woff') format('woff');
-}
-
-@font-face {
-    font-family: 'Fira Code';
-    src: url('/fonts/fira_code.ttf') format('truetype'),
-}
-
 * {
-    font-family: 'Fira Code';
+    font-family: font-FiraCode, 'monospace';
 }
+
+.Title {
+    font-family: font-Oswald, 'monospace';
+}
+
+
+::-webkit-scrollbar {
+    width: 20px;
+    height: 20px;
+  }
+  
+  ::-webkit-scrollbar-corner {
+    background-color: transparent;
+  }
+  
+  ::-webkit-scrollbar-thumb {
+    background-color: #d6dee1;
+    border-radius: 20px;
+    border: 6px solid transparent;
+    background-clip: content-box;
+  }
+  
+  ::-webkit-scrollbar-thumb:hover {
+    background-color: #a8bbbf;
+  }

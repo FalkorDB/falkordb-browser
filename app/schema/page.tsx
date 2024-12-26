@@ -48,7 +48,7 @@ export default function Page() {
             const json = await result.json()
             const colors = localStorage.getItem(schemaName)?.split(/[[\]",]/).filter(c => c)
             setSchema(Graph.create(schemaName, json.result, colors))
-            
+
             fetchCount()
 
         }
@@ -57,9 +57,10 @@ export default function Page() {
 
     return (
         <div className="Page">
-            <Header onSetGraphName={setSchemaName} />
+            <Header />
             <div className="h-1 grow p-8 px-10 flex flex-col gap-8">
                 <Selector
+                    setGraphName={setSchemaName}
                     edgesCount={edgesCount}
                     nodesCount={nodesCount}
                     onChange={setSchemaName}
