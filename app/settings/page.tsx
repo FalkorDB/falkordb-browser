@@ -1,9 +1,9 @@
 'use client'
 
 import { useEffect, useState } from "react"
-import { cn } from "@/lib/utils"
 import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
+import { cn } from "@/lib/utils"
 import Header from "../components/Header"
 import Users from "./users/Users"
 import Configurations from "./Configurations"
@@ -33,15 +33,15 @@ export default function Settings() {
             <Header />
             <div className="grow flex flex-col gap-8 p-16">
                 <h1 className="text-2xl font-medium px-6">Settings</h1>
-                <div className="flex gap-16">
+                <div className="w-fit bg-foreground flex gap-2 p-2 rounded-lg">
                     <Button
+                        className={cn("p-2 rounded-lg", current === "DB" && "bg-background")}
                         label="DB Configuration"
-                        className={cn("py-2 px-6", current === "DB" && "border-b-2 border-[#7167F6] text-[#7167F6] text-sm font-normal")}
                         onClick={() => setCurrent("DB")}
-                    />
+                        />
                     <Button
+                        className={cn("p-2 rounded-lg", current === "Users" && "bg-background")}
                         label="Users"
-                        className={cn("py-2 px-6", current === "Users" && "border-b-2 border-[#7167F6] text-[#7167F6] text-sm font-normal")}
                         onClick={() => setCurrent("Users")}
                     />
                 </div>

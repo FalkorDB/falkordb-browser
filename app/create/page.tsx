@@ -199,7 +199,7 @@ export default function Create() {
                                 onClick={() => setCurrentTab(null)}
                             />
                             <Button
-                                variant="Large"
+                                variant="Primary"
                                 label="Create Graph"
                                 type="button"
                                 onClick={() => handleCreateGraph()}
@@ -240,7 +240,7 @@ export default function Create() {
                             />
                             <Button
                                 className="w-1/4"
-                                variant="Large"
+                                variant="Primary"
                                 label="Go To Main Screen"
                                 onClick={handleGoToMain}
                             />
@@ -285,7 +285,7 @@ export default function Create() {
                         </div>
                         <div className="flex justify-end">
                             <Button
-                                variant="Large"
+                                variant="Primary"
                                 icon={<PlusCircle />}
                                 label="Create Schema"
                                 type="submit"

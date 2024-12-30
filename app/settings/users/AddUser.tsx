@@ -5,7 +5,6 @@ import { User } from "@/app/api/user/model";
 import Button from "@/app/components/ui/Button";
 import Input from "@/app/components/ui/Input";
 import DialogComponent from "@/app/components/DialogComponent";
-import { Dialog, DialogTrigger } from "@/components/ui/dialog";
 import Combobox from "../../components/ui/combobox";
 
 // eslint-disable-next-line no-useless-escape
@@ -57,62 +56,62 @@ export default function AddUser({ setUsers }: {
     };
 
     return (
-        <Dialog
+        <DialogComponent
             open={open}
             onOpenChange={(o) => {
                 setOpen(o)
                 handelClose()
             }}
-        >
-            <DialogTrigger asChild>
+            trigger={
                 <Button
                     variant="Primary"
-                    icon={<PlusCircle />}
                     label="Add User"
-                />
-            </DialogTrigger>
-            <DialogComponent
-                title="Add User"
-                description="Select a roll for the user and Enter username and password"
-            >
-                <form className="flex flex-col gap-16" onSubmit={addUser} >
-                    <Combobox type="Role" options={["Admin", "Read-Write", "Read-Only"]} selectedValue={role} setSelectedValue={setRole} />
-                    <div className="flex flex-col gap-2">
-                        <p>Username</p>
-                        <Input
-                            type="text"
-                            variant="Small"
-                            onChange={(e) => {
-                                setUsername(e.target.value)
-                                e.currentTarget.setCustomValidity("")
-                                e.currentTarget.reportValidity()
-                            }}
-                            onInvalid={(e) => e.currentTarget.setCustomValidity("Username is required")}
-                            required
-                        />
-                    </div>
-                    <div className="relative flex flex-col gap-2">
-                        <p title="Password">Password</p>
-                        <Button
-                            className="absolute top-10 right-2 p-0"
-                            icon={<Eye strokeWidth={0.5} />}
-                            onClick={() => setShowPassword(prev => !prev)}
-                        />
-                        <Input
-                            pattern={PATTERN}
-                            variant="Small"
-                            type={showPassword ? "text" : "password"}
-                            onChange={(e) => {
-                                setPassword(e.target.value)
-                                e.currentTarget.setCustomValidity("")
-                                e.currentTarget.reportValidity()
-                            }}
-                            value={password}
-                            onInvalid={(e) => {
-                                if (!e.currentTarget.value) {
-                                    e.currentTarget.setCustomValidity("Password is required");
-                                } else if (e.currentTarget.validity.patternMismatch) {
-                                    e.currentTarget.setCustomValidity(`
+                >
+                    <PlusCircle size={20} />
+                </Button>
+            }
+            title="Add User"
+            description="Select a roll for the user and Enter username and password"
+        >
+            <form className="flex flex-col gap-16" onSubmit={addUser} >
+                <Combobox type="Role" options={["Admin", "Read-Write", "Read-Only"]} selectedValue={role} setSelectedValue={setRole} />
+                <div className="flex flex-col gap-2">
+                    <p>Username</p>
+                    <Input
+                        type="text"
+                        variant="Small"
+                        onChange={(e) => {
+                            setUsername(e.target.value)
+                            e.currentTarget.setCustomValidity("")
+                            e.currentTarget.reportValidity()
+                        }}
+                        onInvalid={(e) => e.currentTarget.setCustomValidity("Username is required")}
+                        required
+                    />
+                </div>
+                <div className="relative flex flex-col gap-2">
+                    <p title="Password">Password</p>
+                    <Button
+                        className="absolute top-10 right-2 p-0"
+                        onClick={() => setShowPassword(prev => !prev)}
+                    >
+                        <Eye strokeWidth={0.5} />
+                    </Button>
+                    <Input
+                        pattern={PATTERN}
+                        variant="Small"
+                        type={showPassword ? "text" : "password"}
+                        onChange={(e) => {
+                            setPassword(e.target.value)
+                            e.currentTarget.setCustomValidity("")
+                            e.currentTarget.reportValidity()
+                        }}
+                        value={password}
+                        onInvalid={(e) => {
+                            if (!e.currentTarget.value) {
+                                e.currentTarget.setCustomValidity("Password is required");
+                            } else if (e.currentTarget.validity.patternMismatch) {
+                                e.currentTarget.setCustomValidity(`
                                             password must contain:
                                             - At least one lowercase letter
                                             - At least one uppercase letter
@@ -120,38 +119,39 @@ export default function AddUser({ setUsers }: {
                                             - At least one special (@$!%*?&)
                                             - At least 8 characters
                                             `);
-                                }
-                            }}
-                            required
-                        />
-                    </div>
-                    <div className="relative flex flex-col gap-2">
-                        <p title="Confirm Password">Confirm Password</p>
-                        <Button
-                            className="absolute top-10 right-2 p-0"
-                            icon={<Eye strokeWidth={0.5} />}
-                            onClick={() => setConfirmShowPassword(prev => !prev)}
-                        />
-                        <Input
-                            pattern={PATTERN}
-                            variant="Small"
-                            type={showConfirmPassword ? "text" : "password"}
-                            onChange={(e) => {
-                                const val = e.target.value
-                                setConfirmPassword(val)
-                                e.currentTarget.setCustomValidity("")
-                                const valid = e.target.reportValidity()
-                                if (valid && password !== val) {
-                                    e.currentTarget.setCustomValidity("password do not match")
-                                }
-                            }}
-                            value={confirmPassword}
-                            onInvalid={(e) => {
-                                const val = e.currentTarget.value
-                                if (!val) {
-                                    e.currentTarget.setCustomValidity("Confirm Password is required");
-                                } else if (e.currentTarget.validity.patternMismatch) {
-                                    e.currentTarget.setCustomValidity(`
+                            }
+                        }}
+                        required
+                    />
+                </div>
+                <div className="relative flex flex-col gap-2">
+                    <p title="Confirm Password">Confirm Password</p>
+                    <Button
+                        className="absolute top-10 right-2 p-0"
+                        onClick={() => setConfirmShowPassword(prev => !prev)}
+                    >
+                        <Eye strokeWidth={0.5} />
+                    </Button>
+                    <Input
+                        pattern={PATTERN}
+                        variant="Small"
+                        type={showConfirmPassword ? "text" : "password"}
+                        onChange={(e) => {
+                            const val = e.target.value
+                            setConfirmPassword(val)
+                            e.currentTarget.setCustomValidity("")
+                            const valid = e.target.reportValidity()
+                            if (valid && password !== val) {
+                                e.currentTarget.setCustomValidity("password do not match")
+                            }
+                        }}
+                        value={confirmPassword}
+                        onInvalid={(e) => {
+                            const val = e.currentTarget.value
+                            if (!val) {
+                                e.currentTarget.setCustomValidity("Confirm Password is required");
+                            } else if (e.currentTarget.validity.patternMismatch) {
+                                e.currentTarget.setCustomValidity(`
                                             password must contain:
                                             - At least one lowercase letter
                                             - At least one uppercase letter
@@ -159,21 +159,21 @@ export default function AddUser({ setUsers }: {
                                             - At least one special (@$!%*?&)
                                             - At least 8 characters
                                             `);
-                                }
-                            }}
-                            required
-                        />
-                    </div>
-                    <div className="flex justify-end">
-                        <Button
-                            variant="Primary"
-                            label="Add User"
-                            icon={<PlusCircle />}
-                            type="submit"
-                        />
-                    </div>
-                </form>
-            </DialogComponent>
-        </Dialog >
+                            }
+                        }}
+                        required
+                    />
+                </div>
+                <div className="flex justify-end">
+                    <Button
+                        variant="Primary"
+                        label="Add User"
+                        type="submit"
+                    >
+                        <PlusCircle size={20} />
+                    </Button>
+                </div>
+            </form>
+        </DialogComponent>
     )
 }

@@ -335,29 +335,27 @@ export default function SchemaView({ schema, fetchCount, session }: Props) {
                         isCollapsed &&
                         <Button
                             className="p-3 bg-[#7167F6] rounded-lg"
-                            icon={<ChevronLeft />}
                             onClick={() => onExpand()}
                             disabled={!selectedElement}
-                        />
+                        >
+                            <ChevronLeft size={20} />
+                        </Button>
                     }
                 </div>
                 <div className="relative h-1 grow rounded-lg overflow-hidden">
-                    {
-                        !maximize ?
-                            <Button
-                                className="z-10 absolute top-4 right-4"
-                                icon={<Maximize2 />}
-                                title="Maximize"
-                                onClick={() => setMaximize(true)}
-
-                            /> : <Button
-                                className="z-10 absolute top-4 right-4"
-                                icon={<Minimize2 />}
-                                title="Minimize"
-                                onClick={() => setMaximize(false)}
-                            />
-                    }
+                    <Button
+                        className="z-10 absolute top-4 right-4"
+                        title={maximize ? "Minimize" : "Maximize"}
+                        onClick={() => setMaximize(prev => !prev)}
+                    >
+                        {
+                            maximize ?
+                                <Minimize2 size={20} />
+                                : <Maximize2 size={20} />
+                        }
+                    </Button>
                     <ForceGraph
+                        isCollapsed={isCollapsed}
                         chartRef={chartRef}
                         data={data}
                         graph={schema}
@@ -383,7 +381,7 @@ export default function SchemaView({ schema, fetchCount, session }: Props) {
             </ResizablePanel>
             <ResizableHandle disabled={isCollapsed} className={cn(isCollapsed ? "w-0 !cursor-default" : "w-3")} />
             <ResizablePanel
-                className="rounded-lg"
+                className={cn("rounded-lg", !isCollapsed && "border-[3px] border-foreground")}
                 collapsible
                 ref={dataPanel}
                 defaultSize={50}

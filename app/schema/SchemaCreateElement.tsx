@@ -114,10 +114,10 @@ export default function SchemaCreateElement({ onCreate, onExpand, selectedNodes,
       <div className="w-full flex justify-between items-center p-4">
         <div className="flex gap-4 items-center">
           <Button
-            variant="button"
-            icon={<ChevronRight />}
             onClick={() => onExpand()}
-          />
+          >
+            <ChevronRight size={20} />
+          </Button>
           {
             labelEditable ?
               <Input
@@ -234,45 +234,49 @@ export default function SchemaCreateElement({ onCreate, onExpand, selectedNodes,
                               className="p-2 justify-center border border-[#232341]"
                               variant="Secondary"
                               label="Save"
-                              icon={<Check size={20} />}
                               onClick={(e) => {
                                 e.stopPropagation()
                                 handelSetAttributes()
-                              }}
-                            />
+                              }}  
+                            >
+                              <Check size={20} />
+                            </Button>
                             <Button
                               className="p-2 justify-center border border-[#232341]"
                               variant="Secondary"
                               label="Cancel"
-                              icon={<X size={20} />}
                               onClick={(e) => {
                                 e.stopPropagation()
                                 handelSetEditable()
                               }}
-                            />
+                            >
+                              <X size={20} />
+                            </Button>
                           </>
                           : hover === key &&
                           <>
                             <Button
                               className="p-2 justify-center border border-[#232341]"
-                              icon={<Trash2 size={20} />}
-                              label="Remove"
                               variant="Secondary"
+                              label="Remove"
                               onClick={(e) => {
                                 e.stopPropagation()
                                 setAttributes(prev => prev.filter(([k]) => k !== key))
                               }}
-                            />
+                            >
+                              <Trash2 size={20} />
+                            </Button>
                             <Button
                               className="p-2 justify-center border border-[#232341]"
                               variant="Secondary"
                               label="Edit"
-                              icon={<Pencil size={20} />}
                               onClick={(e) => {
                                 e.stopPropagation()
                                 handelSetEditable([key, [...val]])
                               }}
-                            />
+                            >
+                              <Pencil size={20} />
+                            </Button>
                           </>
                       }
                     </div>
@@ -348,22 +352,24 @@ export default function SchemaCreateElement({ onCreate, onExpand, selectedNodes,
                     className="p-2 justify-center border border-[#232341]"
                     variant="Secondary"
                     label="Add"
-                    icon={<Plus size={20} />}
                     onClick={(e) => {
                       e.stopPropagation()
                       handelAddAttribute()
                     }}
-                  />
+                  >
+                    <Plus size={20} />
+                  </Button>
                   <Button
                     className="p-2 justify-center border border-[#232341]"
                     variant="Secondary"
                     label="Cancel"
-                    icon={<X size={20} />}
                     onClick={(e) => {
                       e.stopPropagation()
                       setNewAttribute(getDefaultAttribute())
                     }}
-                  />
+                  >
+                    <X size={20} />
+                  </Button>
                 </div>
               </TableCell>
             </TableRow>
@@ -409,15 +415,17 @@ export default function SchemaCreateElement({ onCreate, onExpand, selectedNodes,
                     disabled
                     variant="Secondary"
                     label="Add"
-                    icon={<Plus size={20} />}
-                  />
+                  >
+                    <Plus size={20} />
+                  </Button>
                   <Button
                     className="p-2 justify-center border border-[#232341]"
                     disabled
                     variant="Secondary"
                     label="Cancel"
-                    icon={<X size={20} />}
-                  />
+                  >
+                    <X size={20} />
+                  </Button>
                 </div>
               </TableCell>
             </TableRow>
@@ -438,16 +446,18 @@ export default function SchemaCreateElement({ onCreate, onExpand, selectedNodes,
             <div className="w-full flex justify-center gap-8">
               <Button
                 className="flex-col-reverse border border-[#232341]"
-                icon={<Trash2 size={40} />}
                 label="Clear"
                 onClick={() => setSelectedNodes([undefined, undefined])}
-              />
+              >
+                <Trash2 size={40} />
+              </Button>
               <Button
                 className="flex-col-reverse border border-[#232341]"
-                icon={<ArrowRightLeft size={40} />}
                 label="Swap"
                 onClick={() => setSelectedNodes(prev => [prev[1], prev[0]])}
-              />
+              >
+                <ArrowRightLeft size={40} />
+              </Button>
             </div>
           </div>
         }

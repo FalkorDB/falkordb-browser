@@ -8,6 +8,7 @@
         --foreground: 0 0% 10%;
         --primary: 243 91% 68%;
         --secondary: 39 33% 96%;
+        --accent: var(--background);
         --popover: var(--primary);
         --popover-foreground: 0 0% 100%;
         --radius: 0.5rem;
@@ -93,6 +94,10 @@
         justify-content: center;
     }
 
+    .Secondary {
+        border-image: linear-gradient(90deg, #EC806C 0%, #B66EBD 43.41%, #7568F2 100%) 1;
+    }
+            
     .monaco-placeholder {
         @apply text-[#666] absolute select-none top-2 left-2;
     }

@@ -10,7 +10,6 @@ import { Select, SelectContent, SelectGroup, SelectItem, SelectSeparator, Select
 import UploadGraph from "../graph/UploadGraph"
 import DeleteGraph from "../graph/DeleteGraph"
 import Button from "./Button"
-import DialogComponent from "../DialogComponent"
 import Input from "./Input"
 
 /* eslint-disable react/require-default-props */
@@ -26,10 +25,9 @@ interface ComboboxProps {
   isSchema?: boolean
   defaultOpen?: boolean
   onOpenChange?: (open: boolean) => void
-  setReload?: Dispatch<SetStateAction<boolean>>
 }
 
-export default function Combobox({ isSelectGraph, disabled = false, inTable, type, options, setOptions, selectedValue = "", setSelectedValue, isSchema = false, defaultOpen = false, onOpenChange, setReload }: ComboboxProps) {
+export default function Combobox({ isSelectGraph, disabled = false, inTable, type, options, setOptions, selectedValue = "", setSelectedValue, isSchema = false, defaultOpen = false, onOpenChange }: ComboboxProps) {
 
   const [openMenage, setOpenMenage] = useState<boolean>(false)
   const [open, setOpen] = useState<boolean>(defaultOpen)
@@ -99,11 +97,11 @@ export default function Combobox({ isSelectGraph, disabled = false, inTable, typ
 
   return (
     <Dialog open={openMenage} onOpenChange={setOpenMenage}>
-      <Select open={open} onOpenChange={(o) => {
+      <Select value={selectedValue} onValueChange={setSelectedValue} open={open} onOpenChange={(o) => {
         setOpen(o)
         if (onOpenChange) onOpenChange(o)
       }}>
-        <SelectTrigger disabled={disabled} className={cn("gap-2 border-none", inTable ? "text-sm font-light" : "text-xl font-medium")}>
+        <SelectTrigger disabled={disabled} className={cn("w-fit gap-2 border-none p-0", inTable ? "text-sm font-light" : "text-xl font-medium")}>
           <SelectValue placeholder={`Select ${type || "Graph"}`} />
         </SelectTrigger>
         <SelectContent className="min-w-52 max-h-[30lvh] bg-foreground">
@@ -128,26 +126,16 @@ export default function Combobox({ isSelectGraph, disabled = false, inTable, typ
                   }
                 </ul>
               </SelectGroup>
-              <SelectSeparator className="bg-secondary" />
-              <DialogTrigger asChild>
-                <Button
-                  className="w-full p-2"
-                  label="Manage Graphs"
-                />
-              </DialogTrigger>
               {
-                setReload &&
+                isSelectGraph &&
                 <>
                   <SelectSeparator className="bg-secondary" />
-                  <Button
-                    className="w-full p-2"
-                    label="Refresh List"
-                    onClick={(e) => {
-                      e.preventDefault()
-                      e.stopPropagation()
-                      setReload(prev => !prev)
-                    }}
-                  />
+                  <DialogTrigger asChild>
+                    <Button
+                      className="w-full p-2"
+                      label="Manage Graphs"
+                    />
+                  </DialogTrigger>
                 </>
               }
             </>

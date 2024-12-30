@@ -2,6 +2,7 @@ import { Dispatch, SetStateAction } from "react"
 import { AlertCircle } from "lucide-react"
 import DialogComponent from "./DialogComponent"
 import Button from "./ui/Button"
+import CloseDialog from "./CloseDialog"
 
 interface Props {
     open: boolean
@@ -26,10 +27,12 @@ export default function CreateGraph({ open, setOpen, graphName, setGraphName, ha
             }}>
                 <div className="flex gap-2 items-center">
                     <Button
+                        className="text-nowrap"
                         type="button"
                         title="Graph names can be edited later"
-                        icon={<AlertCircle size={20} />}
-                    />
+                    >
+                        <AlertCircle size={20} />
+                    </Button>
                     <p className="font-normal text-2xl">Name your graph:</p>
                     <input
                         className="bg-background border text-white rounded-lg p-2"
@@ -43,13 +46,10 @@ export default function CreateGraph({ open, setOpen, graphName, setGraphName, ha
                         label="Create your graph"
                         type="submit"
                     />
-                    <Button
+                    <CloseDialog
                         variant="Cancel"
                         label="Cancel"
                         type="button"
-                        onClick={() => {
-                            setOpen(false)
-                        }}
                     />
                 </div>
             </form>

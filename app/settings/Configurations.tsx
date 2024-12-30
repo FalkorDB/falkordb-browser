@@ -204,7 +204,7 @@ export default function Configurations() {
                     <TableRow className="border-none p-4">
                         {
                             ["Name", "Description", `Value \n (Click to edit)`].map((header) => (
-                                <TableHead key={header}>{header}</TableHead>
+                                <TableHead className="text-center" key={header}><pre>{header}</pre></TableHead>
                             ))
                         }
                     </TableRow>
@@ -213,9 +213,9 @@ export default function Configurations() {
                     {
                         configs.map(({ name, description, value }, index) => (
                             <TableRow key={name} data-id={name} className={cn("border-none", !(index % 2) && "bg-[#57577B] hover:bg-[#57577B]")}>
-                                <TableCell className="w-[20%] py-8">{name}</TableCell>
-                                <TableCell className="w-[70%]">{description}</TableCell>
-                                <TableCell className="w-[15%]">
+                                <TableCell>{name}</TableCell>
+                                <TableCell>{description}</TableCell>
+                                <TableCell>
                                     {
                                         editable === name && !disableRunTimeConfigs.has(name) ?
                                             <div className="flex gap-2">
@@ -235,15 +235,17 @@ export default function Configurations() {
                                                             }}
                                                         />
                                                 <Button
-                                                    icon={<XCircle color={!(index % 2) ? "#272746" : "#57577B"} />}
                                                     onClick={() => setEditable("")}
                                                     onMouseDown={(e) => e.preventDefault()}
-                                                />
+                                                >
+                                                    <XCircle />
+                                                </Button>
                                                 <Button
-                                                    icon={<CheckCircle2 color={!(index % 2) ? "#272746" : "#57577B"} />}
                                                     onClick={() => handelSetConfig(name)}
                                                     onMouseDown={(e) => e.preventDefault()}
-                                                />
+                                                >
+                                                    <CheckCircle2 />
+                                                </Button>
                                             </div>
                                             : <Button
                                                 label={typeof value === "number" ? value.toString() : value}

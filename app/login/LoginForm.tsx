@@ -127,9 +127,10 @@ export default function LoginForm() {
             <p title="Password">{host !== DEFAULT_HOST && "* "}Password</p>
             <Button
               className="absolute top-10 right-2 p-0"
-              icon={<Eye strokeWidth={0.5} color="black" />}
               onClick={() => setShowPassword(prev => !prev)}
-            />
+            >
+              <Eye strokeWidth={0.5} color="black" />
+            </Button>
             <Input
               id="password"
               variant="Default"
@@ -151,8 +152,9 @@ export default function LoginForm() {
             <Dropzone onFileDrop={onFileDrop} disabled={!TLS} />
           </div>
           <Button
+            className="p-4 text-center"
             label="Connect"
-            variant="Large"
+            variant="Primary"
             type="submit"
           />
           {error && (

@@ -7,7 +7,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { editor } from "monaco-editor";
 import { Toast, cn, prepareArg, securedFetch } from "@/lib/utils";
 import { Session } from "next-auth";
-import { PlusCircle } from "lucide-react";
+import { PlusCircle, RefreshCcw } from "lucide-react";
 import { usePathname } from "next/navigation";
 import Combobox from "../components/ui/combobox";
 import { Graph, Query } from "../api/graph/model";
@@ -18,6 +18,7 @@ import Duplicate from "./Duplicate";
 import SchemaView from "../schema/SchemaView";
 import View from "./View";
 import CreateGraph from "../components/CreateGraph";
+import CloseDialog from "../components/CloseDialog";
 
 interface Props {
     /* eslint-disable react/require-default-props */
@@ -45,7 +46,6 @@ export default function Selector({ onChange, graphName, setGraphName, queries, r
     const [dropOpen, setDropOpen] = useState<boolean>(false);
     const [queriesOpen, setQueriesOpen] = useState<boolean>(false);
     const [query, setQuery] = useState<Query>();
-    const [reload, setReload] = useState<boolean>(false);
     const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null)
     const pathname = usePathname()
     const type = pathname.includes("/schema") ? "Schema" : "Graph"
@@ -56,18 +56,6 @@ export default function Selector({ onChange, graphName, setGraphName, queries, r
     }, [createOpen])
 
     useEffect(() => {
-        const run = async () => {
-            const result = await securedFetch("api/graph", {
-                method: "GET"
-            })
-            if (!result.ok) return
-            const res = (await result.json()).result as string[]
-            setOptions(!runQuery ? res.filter(name => name.includes("_schema")).map(name => name.split("_")[0]) : res.filter(name => !name.includes("_schema")))
-        }
-        run()
-    }, [runQuery, reload])
-
-    useEffect(() => {
         if (!graphName) return
         setOptions(prev => {
             if (prev.includes(graphName)) return prev
@@ -75,6 +63,19 @@ export default function Selector({ onChange, graphName, setGraphName, queries, r
             return [...prev, graphName]
         })
     }, [graphName])
+
+    const getOptions = async () => {
+        const result = await securedFetch("api/graph", {
+            method: "GET"
+        })
+        if (!result.ok) return
+        const res = (await result.json()).result as string[]
+        setOptions(!runQuery ? res.filter(name => name.includes("_schema")).map(name => name.split("_")[0]) : res.filter(name => !name.includes("_schema")))
+    }
+
+    useEffect(() => {
+        getOptions()
+    }, [])
 
     const handleEditorDidMount = (e: editor.IStandaloneCodeEditor) => {
         editorRef.current = e
@@ -148,18 +149,19 @@ export default function Selector({ onChange, graphName, setGraphName, queries, r
                     <CreateGraph
                         open={createOpen}
                         setOpen={setCreateOpen}
-                        graphName={graphName}
-                        setGraphName={setGraphName}
+                        graphName={newGraphName}
+                        setGraphName={setNewGraphName}
                         handleCreateGraph={handleCreateGraph}
                         trigger={
                             <Button
                                 variant="Primary"
                                 title={`Create New ${type}`}
-                                icon={<PlusCircle />}
-                            />
+                            >
+                                <PlusCircle size={20} />
+                            </Button>
                         }
                     />
-                    <p className="text-[#57577B]">|</p>
+                    <p className="text-secondary">|</p>
                     <Combobox
                         isSelectGraph
                         options={options}
@@ -167,8 +169,16 @@ export default function Selector({ onChange, graphName, setGraphName, queries, r
                         selectedValue={selectedValue}
                         setSelectedValue={handleOnChange}
                         isSchema={!runQuery}
-                        setReload={setReload}
                     />
+                    <p className="text-secondary">|</p>
+                    <Button
+                        variant="Secondary"
+                        label="Refresh"
+                        title="Refresh List"
+                        onClick={getOptions}
+                    >
+                        <RefreshCcw size={20} />
+                    </Button>
                 </div>
                 <div className="flex gap-16 text-[#e5e7eb]">
                     <UploadGraph disabled />
@@ -187,17 +197,14 @@ export default function Selector({ onChange, graphName, setGraphName, queries, r
                             <div className="flex gap-4">
                                 <Button
                                     className="flex-1"
-                                    variant="Large"
+                                    variant="Primary"
                                     label="Download"
                                     onClick={handleExport}
                                 />
-                                <Button
+                                <CloseDialog
                                     className="flex-1"
                                     variant="Secondary"
                                     label="Cancel"
-                                    onClick={() => {
-                                        setExportOpen(false)
-                                    }}
                                 />
                             </div>
                         </DialogContent>
@@ -242,15 +249,16 @@ export default function Selector({ onChange, graphName, setGraphName, queries, r
                     selectedValue &&
                     <div className="flex gap-6">
                         <p>Created on 2/2 24</p>
-                        <span><span className="text-[#7167F6]">{nodesCount}</span>&ensp;Nodes</span>
-                        <p className="text-[#57577B]">|</p>
-                        <span><span className="text-[#7167F6]">{edgesCount}</span>&ensp;Edges</span>
+                        <span><span className="text-primary">{nodesCount}</span>&ensp;Nodes</span>
+                        <p className="text-secondary">|</p>
+                        <span><span className="text-primary">{edgesCount}</span>&ensp;Edges</span>
                     </div>
                 }
                 {
                     runQuery &&
                     <div className="flex gap-4 items-center">
                         <DialogComponent
+                            className="h-[80dvh] w-[90dvw]"
                             open={queriesOpen}
                             onOpenChange={setQueriesOpen}
                             trigger={
@@ -265,7 +273,7 @@ export default function Selector({ onChange, graphName, setGraphName, queries, r
                                 <div className="h-1 grow flex">
                                     {
                                         queries && queries.length > 0 &&
-                                        <ul className="h-full flex-col border overflow-auto">
+                                        <ul className="min-w-[50%] flex-col border overflow-auto">
                                             {
                                                 queries.map((q, index) => (
                                                     // eslint-disable-next-line react/no-array-index-key
@@ -332,7 +340,7 @@ export default function Selector({ onChange, graphName, setGraphName, queries, r
                                     <Button
                                         className="text-white w-1/3"
                                         onClick={() => runQuery(query?.text || "", setQueriesOpen)}
-                                        variant="Large"
+                                        variant="Primary"
                                         label="Run"
                                     />
                                 </div>

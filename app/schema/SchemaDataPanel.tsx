@@ -97,9 +97,10 @@ export default function SchemaDataPanel({ obj, onExpand, onSetAttributes, onRemo
                 <div className="flex gap-2">
                     <Button
                         variant="button"
-                        icon={<ChevronRight />}
                         onClick={() => onExpand()}
-                    />
+                    >
+                        <ChevronRight size={20} />
+                    </Button>
                     <p>{label}</p>
                 </div>
                 <div>
@@ -144,39 +145,43 @@ export default function SchemaDataPanel({ obj, onExpand, onSetAttributes, onRemo
                                                 <>
                                                     <Button
                                                         title="Save"
-                                                        icon={<Check size={20} />}
                                                         onClick={(e) => {
                                                             e.stopPropagation()
                                                             handelSetAttributes()
                                                         }}
-                                                    />
+                                                    >
+                                                        <Check size={20} />
+                                                    </Button>
                                                     <Button
                                                         title="Cancel"
-                                                        icon={<X size={20} />}
                                                         onClick={(e) => {
                                                             e.stopPropagation()
                                                             handelSetEditable()
                                                         }}
-                                                    />
+                                                    >
+                                                        <X size={20} />
+                                                    </Button>
                                                 </>
                                                 : hover === key &&
                                                 <>
                                                     <Button
-                                                        icon={<Trash2 size={20} />}
                                                         title="Remove"
                                                         onClick={(e) => {
                                                             e.stopPropagation()
                                                             handelRemoveAttribute(key)
                                                         }}
-                                                    />
+                                                    >
+                                                        <Trash2 size={20} />
+                                                    </Button>
                                                     <Button
                                                         title="Edit"
-                                                        icon={<Pencil size={20} />}
                                                         onClick={(e) => {
                                                             e.stopPropagation()
                                                             handelSetEditable([key, [...val]])
                                                         }}
-                                                    />
+                                                    >
+                                                        <Pencil size={20} />
+                                                    </Button>
                                                 </>
                                         }
                                     </div>
@@ -249,20 +254,22 @@ export default function SchemaDataPanel({ obj, onExpand, onSetAttributes, onRemo
                             <TableCell className="flex flex-col gap-1 px-1 py-0">
                                 <Button
                                     title="Save"
-                                    icon={<Check size={20} />}
                                     onClick={(e) => {
                                         e.stopPropagation()
                                         handelAddAttribute()
                                     }}
-                                />
+                                >
+                                    <Check size={20} />
+                                </Button>
                                 <Button
                                     title="Cancel"
-                                    icon={<X size={20} />}
                                     onClick={(e) => {
                                         e.stopPropagation()
                                         handelSetEditable()
                                     }}
-                                />
+                                >
+                                    <X size={20} />
+                                </Button>
                             </TableCell>
                             <TableCell className="px-1 py-0">
                                 <Input
@@ -334,7 +341,6 @@ export default function SchemaDataPanel({ obj, onExpand, onSetAttributes, onRemo
                     className="border border-[#232341]"
                     variant="Secondary"
                     label="Add Value"
-                    icon={isAddValue ? <MinusCircle /> : <PlusCircle />}
                     onClick={() => setIsAddValue(prev => {
                         if (!prev) {
                             setAttribute(getDefaultAttribute())
@@ -342,7 +348,9 @@ export default function SchemaDataPanel({ obj, onExpand, onSetAttributes, onRemo
                         }
                         return !prev
                     })}
-                />
+                >
+                    {isAddValue ? <MinusCircle size={20} /> : <PlusCircle size={20} />}
+                </Button>
             </div>
             <div className="p-4">
                 <Button
@@ -350,7 +358,9 @@ export default function SchemaDataPanel({ obj, onExpand, onSetAttributes, onRemo
                     label="Delete"
                     variant="Secondary"
                     onClick={() => onDeleteElement()}
-                />
+                >
+                    <Trash2 size={20} />
+                </Button>
             </div>
         </div>
     )

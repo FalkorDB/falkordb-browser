@@ -3,13 +3,13 @@
 import { DialogClose } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { X } from "lucide-react";
-import Button from "./ui/Button";
+import Button, { Variant } from "./ui/Button";
 
 /* eslint-disable react/require-default-props */
 interface Props extends React.DetailedHTMLProps<React.ButtonHTMLAttributes<HTMLButtonElement>, HTMLButtonElement> {
     icon?: JSX.Element
     label?: string
-    variant?: "Large" | "Primary" | "Secondary" | "button"
+    variant?: Variant
 }
 
 export default function CloseDialog({ className, label, variant, icon, ...props }: Props) {

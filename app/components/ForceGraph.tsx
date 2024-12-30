@@ -23,6 +23,7 @@ interface Props {
     type?: "schema" | "graph"
     isAddElement?: boolean
     setSelectedNodes?: Dispatch<SetStateAction<[Node | undefined, Node | undefined]>>
+    isCollapsed: boolean
 }
 
 
@@ -44,6 +45,7 @@ export default function ForceGraph({
     type = "graph",
     isAddElement = false,
     setSelectedNodes,
+    isCollapsed
 }: Props) {
 
     const [parentWidth, setParentWidth] = useState<number>(0)
@@ -56,7 +58,7 @@ export default function ForceGraph({
         if (!parentRef.current) return
         setParentWidth(parentRef.current.clientWidth)
         setParentHeight(parentRef.current.clientHeight)
-    }, [parentRef.current?.clientWidth, parentRef.current?.clientHeight])
+    }, [parentRef.current?.clientWidth, parentRef.current?.clientHeight, isCollapsed])
 
     const onFetchNode = async (node: Node) => {
         const result = await securedFetch(`/api/graph/${graph.Id}/${node.id}`, {

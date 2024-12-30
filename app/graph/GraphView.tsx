@@ -211,7 +211,7 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
                     data={session}
                 />
                 <Tabs value={tabsValue} className="h-1 grow flex gap-2 items-center">
-                    <TabsList className="h-fit bg-foreground p-1 flex flex-col gap-2">
+                    <TabsList className="h-fit bg-foreground p-2 flex flex-col gap-2">
                         <TabsTrigger
                             disabled={graph.getElements().length === 0}
                             className="tabs-trigger"
@@ -247,10 +247,11 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
                                     isCollapsed && graph.Id &&
                                     <Button
                                         className="p-3 bg-[#7167F6] rounded-lg"
-                                        icon={<ChevronLeft />}
                                         onClick={() => onExpand()}
                                         disabled={!selectedElement}
-                                    />
+                                    >
+                                        <ChevronLeft />
+                                    </Button>
                                 }
                             </div>
                             <div className="relative h-1 grow rounded-lg overflow-hidden">
@@ -258,19 +259,22 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
                                     !maximize ?
                                         <Button
                                             className="z-10 absolute top-4 right-4"
-                                            icon={<Maximize2 />}
                                             title="Maximize"
                                             onClick={() => setMaximize(true)}
-
-                                        /> : <Button
+                                        >
+                                            <Maximize2 />
+                                        </Button> 
+                                        : <Button
                                             className="z-10 absolute top-4 right-4"
-                                            icon={<Minimize2 />}
                                             title="Minimize"
                                             onClick={() => setMaximize(false)}
                                             onKeyDown={(e) => e.code === "Escape" && setMaximize(false)}
-                                        />
+                                        >
+                                            <Minimize2 />
+                                        </Button>
                                 }
                                 <ForceGraph
+                                    isCollapsed={isCollapsed}
                                     graph={graph}
                                     chartRef={chartRef}
                                     data={data}

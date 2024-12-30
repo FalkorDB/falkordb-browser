@@ -1,35 +1,23 @@
+/* eslint-disable react/button-has-type */
+/* eslint-disable react/jsx-props-no-spreading */
 import { cn } from "@/lib/utils"
-import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp } from "lucide-react"
 import { forwardRef } from "react"
 
-type Variant = "Large" | "Primary" | "Secondary" | "Cancel" | "button"
+export type Variant = "Large" | "Primary" | "Secondary" | "Cancel" | "button"
 
 /* eslint-disable react/require-default-props */
 interface Props extends React.DetailedHTMLProps<React.ButtonHTMLAttributes<HTMLButtonElement>, HTMLButtonElement> {
     label?: string
     variant?: Variant
-    icon?: JSX.Element
-    iconSide?: "left" | "right"
     open?: boolean
     side?: "down" | "left" | "right"
 }
 
-const getChevron = (open: boolean | undefined, side: string) => {
-    if (open === undefined) return null
-    switch (side) {
-        case "left": return open ? <ChevronRight /> : <ChevronLeft />
-        case "right": return open ? <ChevronLeft /> : <ChevronRight />
-        default: return open ? <ChevronUp /> : <ChevronDown />
-    }
-}
-
-const getClassName = (variant: Variant, disable: boolean | undefined, open: boolean | undefined, icon: boolean, classN: string | undefined) => {
+const getClassName = (variant: Variant, disable: boolean | undefined, open: boolean | undefined, classN: string | undefined) => {
 
     let className = cn(
-        "disabled:opacity-50 disabled:cursor-not-allowed",
-        variant !== "button" && "rounded-lg",
-        icon && "gap-2",
-        (open !== undefined || icon) && "flex items-center",
+        "disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2",
+        variant !== "button" && "rounded-lg hover:opacity-90",
         open !== undefined && "gap-4",
         classN,
     )
@@ -38,38 +26,32 @@ const getClassName = (variant: Variant, disable: boolean | undefined, open: bool
         case "Primary":
             className = cn(
                 "px-4 py-2 bg-primary",
-                !disable && "hover:bg-primary hover:opacity-90",
-                icon && "gap-3.5",
+                !disable && "hover:bg-primary",
                 className
             )
             break
         case "Secondary":
-            className = cn("px-12 py-1 bg-transparent border-[3px] border-primary hover:opacity-90", className)
+            className = cn("px-12 py-1 bg-transparent border-[3px] border-primary", className)
             break
         case "Cancel":
-            className = cn("px-12 py-1 bg-transparent border-2 border-secondary hover:opacity-90", className)
+            className = cn("px-12 py-1 bg-transparent border-2 border-secondary", className)
             break
         default:
     }
     return className
 }
 
-const Button = forwardRef<HTMLButtonElement, Props>(({ label, variant = "button", icon, iconSide = "left", open, side = "down", className, type = "button", disabled, ...props }, ref) => (
+const Button = forwardRef<HTMLButtonElement, Props>(({ label, variant = "button", open, className, type = "button", disabled, ...props }, ref) => (
     <button
         ref={ref}
-        className={getClassName(variant, disabled, open, !!icon, className)}
+        className={getClassName(variant, disabled, open, className)}
         disabled={disabled}
         title={label}
-        // eslint-disable-next-line react/button-has-type
         type={type}
-        // eslint-disable-next-line react/jsx-props-no-spreading
         {...props}
     >
-        {iconSide === "left" && icon}
-        {side === "left" && getChevron(open, side)}
-        {label && <p className="truncate">{label}</p>}
-        {side !== "left" && getChevron(open, side)}
-        {iconSide === "right" && icon}
+        {props.children}
+        {label}
     </button>
 ))
 
