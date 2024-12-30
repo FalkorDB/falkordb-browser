@@ -658,8 +658,9 @@ export default function EditorComponent({ currentQuery, historyQueries, setCurre
                                     <Button
                                         className="absolute top-0 right-3 p-2.5"
                                         title="Maximize"
-                                        icon={<Maximize2 size={20} />}
-                                    />
+                                    >
+                                        <Maximize2 size={20} />
+                                    </Button>
                                 </DialogTrigger>
                                 <div ref={placeholderRef} className="absolute top-2 left-2 pointer-events-none">
                                     {PLACEHOLDER}
@@ -669,6 +670,7 @@ export default function EditorComponent({ currentQuery, historyQueries, setCurre
                                 ref={submitQuery}
                                 className="rounded-none py-2 px-8"
                                 variant="Primary"
+                                title="Run (Ctrl + Enter)"
                                 label="Run"
                                 type="submit"
                             />
