@@ -1,19 +1,21 @@
 import { FormEvent, useState } from "react";
-import { Toast, prepareArg, securedFetch } from "@/lib/utils";
-import { Dialog } from "@/components/ui/dialog";
+import { prepareArg, securedFetch } from "@/lib/utils";
+import { useToast } from "@/components/ui/use-toast";
 import DialogComponent from "../components/DialogComponent";
-import Input from "../components/ui/Input";
 import Button from "../components/ui/Button";
+import Input from "../components/ui/Input";
 
-export default function Duplicate({ open, onOpenChange, selectedValue, onDuplicate }: {
+export default function Duplicate({ open, onOpenChange, selectedValue, onDuplicate, disabled }: {
     selectedValue: string,
     open: boolean,
     onOpenChange: (open: boolean) => void
     onDuplicate: (duplicateName: string) => void
+    disabled: boolean
 }) {
 
     const [duplicateName, setDuplicateName] = useState("");
-
+    const { toast } = useToast()
+    
     const handelDuplicate = async (e: FormEvent) => {
 
         e.preventDefault()
@@ -23,7 +25,11 @@ export default function Duplicate({ open, onOpenChange, selectedValue, onDuplica
         })
 
         if (!result.ok) {
-            Toast()
+            toast({
+                title: "Error",
+                description: "Error while duplicating graph",
+                variant: "destructive"
+            })
             return
         }
 
@@ -32,20 +38,30 @@ export default function Duplicate({ open, onOpenChange, selectedValue, onDuplica
     }
 
     return (
-        <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogComponent className="w-[25%]" description="Enter a new graph name" title="Duplicate Graph">
-                <form onSubmit={handelDuplicate} className="flex flex-col gap-12">
-                    <div className="flex flex-col gap-4">
-                        <p className="font-medium text-xl">Graph Name</p>
-                        <Input variant="Small" onChange={(e) => setDuplicateName(e.target.value)} required />
-                    </div>
+        <DialogComponent
+            open={open}
+            onOpenChange={onOpenChange}
+            trigger={<Button label="Duplicate" disabled={disabled} />}
+            className="w-[25%]"
+            description="Enter a new graph name"
+            title="Duplicate Graph"
+        >
+            <form onSubmit={handelDuplicate} className="flex flex-col gap-12">
+                <div className="flex flex-col gap-4">
+                    <p className="font-medium text-xl">Graph Name</p>
+                    <Input
+                        onChange={(e) => setDuplicateName(e.target.value)}
+                        required
+                    />
+                </div>
+                <div className="flex justify-end">
                     <Button
                         variant="Primary"
                         label="Duplicate"
                         type="submit"
                     />
-                </form>
-            </DialogComponent>
-        </Dialog>
+                </div>
+            </form>
+        </DialogComponent>
     )
 }

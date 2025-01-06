@@ -1,12 +1,13 @@
+/* eslint-disable react/require-default-props */
+
 'use client';
 
-import { Toast } from "@/lib/utils";
 import { Trash2 } from "lucide-react";
 import { DialogClose } from "@/components/ui/dialog";
+import { useToast } from "@/components/ui/use-toast";
 import Button from "../ui/Button";
 import DialogComponent from "../DialogComponent";
 
-/* eslint-disable react/require-default-props */
 interface Props {
     disabled?: boolean
     onDelete: () => void
@@ -14,9 +15,14 @@ interface Props {
 
 export default function DeleteNode({ disabled, onDelete }: Props) {
 
+    const { toast } = useToast()
+
     const onDeleteNode = async () => {
         onDelete()
-        Toast("Success", "Node deleted")
+        toast({
+            title: "Success",
+            description: "Node deleted",
+        })
     }
 
     return (
@@ -25,7 +31,6 @@ export default function DeleteNode({ disabled, onDelete }: Props) {
                 <Button
                     variant="Secondary"
                     label="Delete"
-                    icon={<Trash2 />}
                     disabled={disabled}
                 >
                     <Trash2 />

@@ -16,7 +16,15 @@ interface Props {
     className?: string
 }
 
-export default function DialogComponent({ children, open, onOpenChange, trigger, title, description, className }: Props) {
+export default function DialogComponent({
+    children,
+    open,
+    onOpenChange,
+    trigger,
+    title,
+    description,
+    className,
+}: Props) {
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogTrigger asChild>

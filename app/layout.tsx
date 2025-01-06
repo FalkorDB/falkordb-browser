@@ -3,7 +3,6 @@
 import "./globals.css";
 import { Inter } from "next/font/google";
 import { Toaster } from "@/components/ui/toaster";
-import { cn } from "@/lib/utils";
 import { Metadata } from "next";
 import NextAuthProvider from "./providers";
 import GoogleAnalytics from "./components/GoogleAnalytics";
@@ -25,7 +24,7 @@ export default function RootLayout({
   // caused by mismatched client/server content caused by next-themes
   return (
     <html className="w-screen h-screen" lang="en" suppressHydrationWarning>
-      <body className={cn("h-full LandingPage", inter.className)}>
+      <body className={`h-full LandingPage ${inter.className}`}>
         {
           process.env.NEXT_PUBLIC_GOOGLE_ANALYTICS ? (
             <GoogleAnalytics ga_id=

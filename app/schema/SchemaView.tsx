@@ -6,9 +6,10 @@ import { ResizablePanel, ResizablePanelGroup, ResizableHandle } from "@/componen
 import { ChevronLeft, Maximize2, Minimize2 } from "lucide-react"
 import { ImperativePanelHandle } from "react-resizable-panels"
 import { useEffect, useRef, useState } from "react"
-import { Toast, cn, prepareArg, securedFetch } from "@/lib/utils"
+import { cn, prepareArg, securedFetch } from "@/lib/utils"
 import { Session } from "next-auth"
 import dynamic from "next/dynamic"
+import { useToast } from "@/components/ui/use-toast"
 import Toolbar from "../graph/toolbar"
 import SchemaDataPanel from "./SchemaDataPanel"
 import Labels from "../graph/labels"
@@ -45,6 +46,7 @@ export default function SchemaView({ schema, fetchCount, session }: Props) {
     const [cooldownTicks, setCooldownTicks] = useState<number | undefined>(0)
     const [cooldownTime, setCooldownTime] = useState<number | undefined>(2000)
     const [data, setData] = useState<GraphData>(schema.Elements)
+    const { toast } = useToast()
 
     useEffect(() => {
         setData({ ...schema.Elements })
@@ -186,7 +188,11 @@ export default function SchemaView({ schema, fetchCount, session }: Props) {
                 })
             }
         } else {
-            Toast("Failed to set property")
+            toast({
+                title: "Error",
+                description: "Failed to set property",
+                variant: "destructive"
+            })
         }
 
         setData({ ...schema.Elements })
@@ -270,7 +276,11 @@ export default function SchemaView({ schema, fetchCount, session }: Props) {
 
     const onCreateElement = async (attributes: [string, string[]][], label?: string) => {
         if (!isAddEntity && selectedNodes[0] === undefined && selectedNodes[1] === undefined) {
-            Toast("Select nodes to create a relation")
+            toast({
+                title: "Error",
+                description: "Select nodes to create a relation",
+                variant: "destructive"
+            })
             return false
         }
 

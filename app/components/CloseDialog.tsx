@@ -1,7 +1,6 @@
 'use client';
 
 import { DialogClose } from "@/components/ui/dialog";
-import { cn } from "@/lib/utils";
 import { X } from "lucide-react";
 import Button, { Variant } from "./ui/Button";
 
@@ -12,17 +11,17 @@ interface Props extends React.DetailedHTMLProps<React.ButtonHTMLAttributes<HTMLB
     variant?: Variant
 }
 
-export default function CloseDialog({ className, label, variant, icon, ...props }: Props) {
+export default function CloseDialog({ className, label, icon, ...props }: Props) {
     return (
         <DialogClose asChild >
             <Button
-                icon={icon || (!label ? <X /> : undefined)}
-                className={cn("", className)}
-                variant={variant}
+                className={className}
                 label={label}
                 // eslint-disable-next-line react/jsx-props-no-spreading
                 {...props}
-            />
+            >
+                {!label && <X />}
+            </Button>
         </DialogClose>
     )
 }

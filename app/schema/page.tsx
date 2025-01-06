@@ -1,8 +1,9 @@
 'use client'
 
 import { useCallback, useEffect, useState } from "react";
-import { Toast, defaultQuery, prepareArg, securedFetch } from "@/lib/utils";
+import { defaultQuery, prepareArg, securedFetch } from "@/lib/utils";
 import { useSession } from "next-auth/react";
+import { useToast } from "@/components/ui/use-toast";
 import Header from "../components/Header";
 import Selector from "../graph/Selector";
 import SchemaView from "./SchemaView";
@@ -15,6 +16,7 @@ export default function Page() {
     const [edgesCount, setEdgesCount] = useState<number>(0)
     const [nodesCount, setNodesCount] = useState<number>(0)
     const { data: session } = useSession()
+    const { toast } = useToast()
 
     const fetchCount = useCallback(async () => {
         const name = `${schemaName}_schema`
@@ -42,7 +44,11 @@ export default function Page() {
                 method: "GET"
             })
             if (!result.ok) {
-                Toast("Failed fetching schema")
+                toast({
+                    title: "Error",
+                    description: "Failed fetching schema",
+                    variant: "destructive"
+                })
                 return
             }
             const json = await result.json()

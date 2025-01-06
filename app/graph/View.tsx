@@ -5,9 +5,8 @@ import { useEffect, useState } from "react"
 import { cn } from "@/lib/utils"
 import { DEFAULT_COLORS, Graph } from "../api/graph/model"
 import Button from "../components/ui/Button"
-import Input from "../components/ui/Input"
 import DialogComponent from "../components/DialogComponent"
-import CloseDialog from "../components/CloseDialog"
+import Input from "../components/ui/Input"
 
 export default function View({ graph, setGraph, selectedValue }: {
     graph: Graph,
@@ -59,9 +58,10 @@ export default function View({ graph, setGraph, selectedValue }: {
                                                     return newArr;
                                                 });
                                             }}
-                                            icon={<ChevronUp />}
                                             title="Up"
-                                        />
+                                        >
+                                            <ChevronUp />
+                                        </Button>
                                     }
                                     {
                                         i !== colorsArr.length - 1 &&
@@ -74,9 +74,10 @@ export default function View({ graph, setGraph, selectedValue }: {
                                                     return newArr;
                                                 });
                                             }}
-                                            icon={<ChevronDown />}
                                             title="Down"
-                                        />
+                                        >
+                                            <ChevronDown />
+                                        </Button>
                                     }
                                 </div>
                                 {
@@ -86,7 +87,6 @@ export default function View({ graph, setGraph, selectedValue }: {
                                             <Input
                                                 ref={ref => ref?.focus()}
                                                 className="w-24"
-                                                variant="Small"
                                                 value={editable === c ? editable : newColor}
                                                 onChange={(e) => {
                                                     setColorsArr(prev => {
@@ -123,9 +123,10 @@ export default function View({ graph, setGraph, selectedValue }: {
                                         onClick={() => {
                                             setColorsArr(prev => [...prev.filter(color => color !== c)]);
                                         }}
-                                        icon={<Trash2 />}
                                         title="Delete"
-                                    />
+                                    >
+                                        <Trash2 />
+                                    </Button>
                                 }
                             </li>
                         ))
@@ -133,31 +134,33 @@ export default function View({ graph, setGraph, selectedValue }: {
                 </ul>
                 <div className="flex justify-around">
                     <Button
-                        variant="Primary"
                         disabled={colorsArr.length > graph.Colors.length}
                         label="Add Color"
-                        icon={<PlusCircle />}
                         onClick={() => {
                             setColorsArr(prev => [...prev, ""])
                         }}
-                    />
+                    >
+                        <PlusCircle />
+                    </Button>
                     <Button
                         disabled={DEFAULT_COLORS.every((c, i) => c === graph.Colors[i]) && DEFAULT_COLORS.length === graph.Colors.length}
                         variant="Secondary"
                         label="Reset"
-                        icon={<RotateCcw />}
                         onClick={() => {
                             localStorage.removeItem(graph.Id)
                             handelPreferencesChange(DEFAULT_COLORS)
                         }}
-                    />
-                    <CloseDialog
+                    >
+                        <RotateCcw />
+                    </Button>
+                    <Button
                         disabled={graph.Colors.filter((c, i) => c === colorsArr[i]).length === colorsArr.length && DEFAULT_COLORS.length === colorsArr.length}
                         variant="Primary"
                         label="Apply"
-                        icon={<FileCheck2 />}
                         onClick={() => handelPreferencesChange()}
-                    />
+                    >
+                        <FileCheck2 />
+                    </Button>
                 </div>
             </div>
         </DialogComponent>

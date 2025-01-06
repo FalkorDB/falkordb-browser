@@ -12,7 +12,6 @@ export type Node = NodeObject<{
     expand: boolean,
     collapsed: boolean,
     data: {
-        name: string,
         [key: string]: any
     }
 }>
@@ -201,9 +200,7 @@ export class Graph {
                 visible: true,
                 expand: false,
                 collapsed,
-                data: {
-                    name: cell.id.toString(),
-                }
+                data: {}
             }
             Object.entries(cell.properties).forEach(([key, value]) => {
                 node.data[key] = value as string;
@@ -220,9 +217,6 @@ export class Graph {
             currentNode.color = this.getCategoryColorValue(categories[0].index)
             currentNode.expand = false
             currentNode.collapsed = collapsed
-            currentNode.data = {
-                name: cell.id.toString()
-            }
             Object.entries(cell.properties).forEach(([key, value]) => {
                 currentNode.data[key] = value as string;
             });
@@ -272,9 +266,7 @@ export class Graph {
                         expand: false,
                         collapsed,
                         visible: true,
-                        data: {
-                            name: cell.sourceId.toString(),
-                        },
+                        data: {},
                     }
 
                     this.nodesMap.set(cell.sourceId, source)
@@ -309,9 +301,7 @@ export class Graph {
                         expand: false,
                         collapsed,
                         visible: true,
-                        data: {
-                            name: cell.sourceId.toString(),
-                        },
+                        data: {},
                     }
 
                     this.nodesMap.set(cell.sourceId, source)
@@ -327,9 +317,7 @@ export class Graph {
                         expand: false,
                         collapsed,
                         visible: true,
-                        data: {
-                            name: cell.destinationId.toString(),
-                        }
+                        data: {},
                     }
                 }
 

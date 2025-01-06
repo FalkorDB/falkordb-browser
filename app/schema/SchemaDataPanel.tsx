@@ -1,14 +1,14 @@
 /* eslint-disable react/no-array-index-key */
 import { Check, ChevronRight, MinusCircle, Pencil, PlusCircle, Trash2, X } from "lucide-react";
-import { Toast } from "@/lib/utils";
 import { useEffect, useState } from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
+import { useToast } from "@/components/ui/use-toast";
 import Button from "../components/ui/Button";
 import { ATTRIBUTES, getDefaultAttribute, OPTIONS } from "./SchemaCreateElement";
-import Input from "../components/ui/Input";
 import Combobox from "../components/ui/combobox";
 import { Link, Node } from "../api/graph/model";
+import Input from "../components/ui/Input";
 
 interface Props {
     obj: Node | Link
@@ -26,6 +26,7 @@ export default function SchemaDataPanel({ obj, onExpand, onSetAttributes, onRemo
     const [editable, setEditable] = useState<string>("")
     const [hover, setHover] = useState<string>("")
     const [isAddValue, setIsAddValue] = useState<boolean>(false)
+    const { toast } = useToast()
 
     useEffect(() => {
         setAttributes(Object.entries(obj.data).filter(([key, val]) => !(key === "name" && Number(val) === obj.id)).map(([key, val]) => [key, Array.isArray(val) ? val : (val as string).split(',')]))
@@ -43,7 +44,10 @@ export default function SchemaDataPanel({ obj, onExpand, onSetAttributes, onRemo
 
     const handelSetAttributes = async () => {
         if (attribute[0] === "" || attribute[1].some(v => v === "")) {
-            Toast("Please fill all the fields")
+            toast({
+                title: "Error",
+                description: "Please fill all the fields",
+            })
             return
         }
 
@@ -66,7 +70,10 @@ export default function SchemaDataPanel({ obj, onExpand, onSetAttributes, onRemo
 
     const handelAddAttribute = async () => {
         if (attribute[0] === "" || attribute[1].some(v => v === "")) {
-            Toast("Please fill all the fields")
+            toast({
+                title: "Error",
+                description: "Please fill all the fields",
+            })
             return
         }
 
@@ -207,9 +214,8 @@ export default function SchemaDataPanel({ obj, onExpand, onSetAttributes, onRemo
                                             </TableCell>
                                             <TableCell className="px-1 py-0">
                                                 <Input
-                                                    className="w-28"
+                                                    className="w-full"
                                                     onKeyDown={(e) => handelKeyDown(e, handelSetAttributes)}
-                                                    variant="Small"
                                                     onChange={(e) => setAttribute(prev => {
                                                         const p: [string, string[]] = [...prev]
                                                         p[1][1] = e.target.value
@@ -273,9 +279,8 @@ export default function SchemaDataPanel({ obj, onExpand, onSetAttributes, onRemo
                             </TableCell>
                             <TableCell className="px-1 py-0">
                                 <Input
-                                    className="w-28"
+                                    className="w-full"
                                     onKeyDown={(e) => handelKeyDown(e, handelAddAttribute)}
-                                    variant="Small"
                                     onChange={(e) => setAttribute(prev => {
                                         const p: [string, string[]] = [...prev]
                                         p[0] = e.target.value
@@ -299,9 +304,8 @@ export default function SchemaDataPanel({ obj, onExpand, onSetAttributes, onRemo
                             </TableCell>
                             <TableCell className="px-1 py-0">
                                 <Input
-                                    className="w-28"
+                                    className="w-full"
                                     onKeyDown={(e) => handelKeyDown(e, handelAddAttribute)}
-                                    variant="Small"
                                     onChange={(e) => setAttribute(prev => {
                                         const p: [string, string[]] = [...prev]
                                         p[1][1] = e.target.value

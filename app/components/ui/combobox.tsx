@@ -1,25 +1,24 @@
+/* eslint-disable @typescript-eslint/no-use-before-define */
+/* eslint-disable react/require-default-props */
+
 "use client"
 
-import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { Toast, cn, prepareArg, securedFetch } from "@/lib/utils"
-import { Trash2, UploadIcon } from "lucide-react"
-import { Dispatch, SetStateAction, useEffect, useState } from "react"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { cn, prepareArg, securedFetch } from "@/lib/utils"
+import { useEffect, useState } from "react"
 import { Select, SelectContent, SelectGroup, SelectItem, SelectSeparator, SelectTrigger, SelectValue } from "@/components/ui/select"
-import UploadGraph from "../graph/UploadGraph"
-import DeleteGraph from "../graph/DeleteGraph"
+import { useToast } from "@/components/ui/use-toast"
 import Button from "./Button"
-import Input from "./Input"
+import TableComponent, { Row } from "../TableComponent"
+import CloseDialog from "../CloseDialog"
 
-/* eslint-disable react/require-default-props */
 interface ComboboxProps {
   isSelectGraph?: boolean,
   disabled?: boolean,
   inTable?: boolean,
   type?: string | undefined,
   options: string[],
-  setOptions?: Dispatch<SetStateAction<string[]>>,
+  setOptions?: (value: string[]) => void,
   selectedValue?: string,
   setSelectedValue?: (value: string) => void,
   isSchema?: boolean
@@ -27,72 +26,95 @@ interface ComboboxProps {
   onOpenChange?: (open: boolean) => void
 }
 
-export default function Combobox({ isSelectGraph, disabled = false, inTable, type, options, setOptions, selectedValue = "", setSelectedValue, isSchema = false, defaultOpen = false, onOpenChange }: ComboboxProps) {
+export default function Combobox({ isSelectGraph = false, disabled = false, inTable, type, options, setOptions, selectedValue = "", setSelectedValue, isSchema = false, defaultOpen = false, onOpenChange }: ComboboxProps) {
 
   const [openMenage, setOpenMenage] = useState<boolean>(false)
   const [open, setOpen] = useState<boolean>(defaultOpen)
-  const [optionName, setOptionName] = useState<string>("")
-  const [editable, setEditable] = useState<string>("")
-  const [isUploadOpen, setIsUploadOpen] = useState<string>()
-  const [isDeleteOpen, setIsDeleteOpen] = useState<string>()
+  const [rows, setRows] = useState<Row[]>([])
+  const { toast } = useToast()
 
-  useEffect(() => {
-    if (options.length !== 1 || !setSelectedValue) return
-    setSelectedValue(options[0])
-  }, [options])
 
-  const onExport = async (graphName: string) => {
-    const result = await securedFetch(`api/graph/${prepareArg(graphName)}/export`, {
-      method: "GET"
-    })
-
-    if (!result.ok) return
-
-    const blob = await result.blob()
-    const url = window.URL.createObjectURL(blob)
-    try {
-      const link = document.createElement('a')
-      link.href = url
-      link.setAttribute('download', `${selectedValue}.dump`)
-      document.body.appendChild(link)
-      link.click()
-      link.parentNode?.removeChild(link)
-      window.URL.revokeObjectURL(url)
-    } catch (e) {
-      Toast((e as Error).message)
-    }
-  }
-
-  const handelDelete = (option: string) => {
-    if (!setOptions) return
-    setOptions(prev => prev.filter(name => name !== option))
-    if (selectedValue !== option || !setSelectedValue) return
-    setSelectedValue("")
-    setOpenMenage(false)
-  }
-
-  const handelSetOption = async (e: React.KeyboardEvent<HTMLInputElement>, option: string) => {
-    if (!setOptions) return
-    if (e.key !== "Enter") return
-
+  const handelSetOption = async (option: string, optionName: string) => {
     const result = await securedFetch(`api/graph/${prepareArg(optionName)}/?sourceName=${prepareArg(option)}`, {
       method: "PATCH",
       headers: {
         "Content-Type": "application/json"
       },
       body: JSON.stringify({ name: optionName })
-    })
+    }, toast)
 
-    if (!result.ok) {
-      const json = await result.json()
-      Toast(json.message)
-      return
+    if (result.ok) {
+
+      const newOptions = options.map((opt) => opt === option ? optionName : opt)
+      setOptions!(newOptions)
+
+      if (setSelectedValue) setSelectedValue(optionName)
+
+      handelSetRows(newOptions)
     }
 
-    const newOptions = options.map((opt) => opt === option ? optionName : opt)
-    setOptions(newOptions)
-    if (setSelectedValue) setSelectedValue(optionName)
-    setEditable("")
+    return result.ok
+  }
+
+  const handelSetRows = (opts: string[]) => {
+    setRows(opts.map(opt => ({ checked: false, name: opt, cells: [{ value: opt, onChange: (value: string) => handelSetOption(value, opt) }] })))
+  }
+
+  useEffect(() => {
+    setRows(options.map(opt => ({ checked: false, name: opt, cells: [{ value: opt, onChange: (value: string) => handelSetOption(value, opt) }] })))
+
+    if (options.length !== 1 || !setSelectedValue) return
+
+    setSelectedValue(options[0])
+  }, [options])
+
+  const onExport = async (graphName: string) => {
+    const name = isSchema ? `${graphName}_schema` : graphName
+    const result = await securedFetch(`api/graph/${prepareArg(name)}/export`, {
+      method: "GET"
+    }, toast)
+
+    if (!result.ok) return
+
+    const blob = await result.blob()
+    const url = window.URL.createObjectURL(blob)
+
+    try {
+      const link = document.createElement('a')
+      link.href = url
+      link.setAttribute('download', `${name}.dump`)
+      document.body.appendChild(link)
+      link.click()
+      link.parentNode?.removeChild(link)
+      window.URL.revokeObjectURL(url)
+    } catch (e) {
+      toast({
+        title: "Error",
+        description: "Error while exporting data",
+        variant: "destructive"
+      })
+    }
+  }
+
+  const handelDelete = async (opts: string[]) => {
+    const names = opts.map(opt => isSchema ? `${opt}_schema` : opt)
+
+    names.forEach(async (name) => {
+      const result = await securedFetch(`api/graph/${prepareArg(name)}`, {
+        method: "DELETE"
+      }, toast)
+
+      if (!result.ok) return
+
+      setOptions!(options.filter(opt => opt !== name))
+
+      if (selectedValue !== name || !setSelectedValue) return
+
+      setSelectedValue(names[0])
+    })
+
+    setOpenMenage(false)
+    handelSetRows(options.filter(opt => !opts.includes(opt)))
   }
 
   return (
@@ -101,130 +123,60 @@ export default function Combobox({ isSelectGraph, disabled = false, inTable, typ
         setOpen(o)
         if (onOpenChange) onOpenChange(o)
       }}>
-        <SelectTrigger disabled={disabled} className={cn("w-fit gap-2 border-none p-0", inTable ? "text-sm font-light" : "text-xl font-medium")}>
+        <SelectTrigger disabled={disabled || options.length === 0} title={options.length === 0 ? "There is no graphs" : ""} className={cn("w-fit gap-2 border-none p-2", inTable ? "text-sm font-light" : "text-xl font-medium")}>
           <SelectValue placeholder={`Select ${type || "Graph"}`} />
         </SelectTrigger>
         <SelectContent className="min-w-52 max-h-[30lvh] bg-foreground">
-          {
-            options.length > 0 &&
-            <>
-              <SelectGroup>
-                <ul className="shrink grow overflow-auto">
-                  {
-                    options.map((option) => (
-                      <SelectItem
-                        onClick={() => {
-                          if (setSelectedValue) setSelectedValue(option)
-                          setOpen(false)
-                        }}
-                        value={option}
-                        key={option}
-                      >
-                        {option}
-                      </SelectItem>
-                    ))
-                  }
-                </ul>
-              </SelectGroup>
+          <SelectGroup>
+            <ul className="shrink grow overflow-auto">
               {
-                isSelectGraph &&
-                <>
-                  <SelectSeparator className="bg-secondary" />
-                  <DialogTrigger asChild>
-                    <Button
-                      className="w-full p-2"
-                      label="Manage Graphs"
-                    />
-                  </DialogTrigger>
-                </>
+                options.map((option) => (
+                  <SelectItem
+                    value={option}
+                    key={option}
+                  >
+                    {option}
+                  </SelectItem>
+                ))
               }
+            </ul>
+          </SelectGroup>
+          {
+            isSelectGraph &&
+            <>
+              <SelectSeparator className="bg-secondary" />
+              <DialogTrigger asChild>
+                <Button
+                  onClick={() => setOpen(false)}
+                  className="w-full p-2"
+                  label="Manage Graphs"
+                />
+              </DialogTrigger>
             </>
           }
         </SelectContent>
       </Select>
-      <DialogContent>
-        <div className="h-full w-full border border-[#57577B] rounded-lg overflow-auto">
-          <Table>
-            <TableHeader>
-              <TableRow className="border-none">
-                {
-                  ["GRAPH NAME", "EXPORT", ""].map((header) => (
-                    <TableHead key={header}>{header}</TableHead>
-                  ))
-                }
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {
-                options.length > 0 &&
-                options.map((option, index) => (
-                  <TableRow key={option} className={cn("border-none", !(index % 2) && "bg-[#57577B] hover:bg-[#57577B]")}>
-                    <TableCell onClick={() => {
-                      setEditable(option)
-                      setOptionName(option)
-                    }}>
-                      {
-                        option === editable ?
-                          <Input
-                            className="w-20"
-                            variant="Small"
-                            ref={ref => ref?.focus()}
-                            value={optionName}
-                            onChange={(e) => setOptionName(e.target.value)}
-                            onBlur={() => setEditable("")}
-                            onKeyDown={(e) => handelSetOption(e, option)}
-                          />
-                          : option
-                      }
-                    </TableCell>
-                    <TableCell className="py-8">
-                      <Button
-                        key="export"
-                        label="Export"
-                        onClick={() => onExport(option)}
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button
-                            className="rotate-90"
-                            label="..."
-                          />
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent side="right" className="flex min-w-0">
-                          <DropdownMenuItem className="p-2">
-                            <Button
-                              disabled
-                              variant="button"
-                              icon={<UploadIcon />}
-                              onClick={() => setIsUploadOpen(option)}
-                            />
-                          </DropdownMenuItem>
-                          <DropdownMenuItem className="p-2">
-                            <Button
-                              variant="button"
-                              icon={<Trash2 />}
-                              onClick={() => setIsDeleteOpen(option)}
-                            />
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                      <UploadGraph open={isUploadOpen === option} onOpenChange={(o) => setIsUploadOpen(o ? option : "")} />
-                      <DeleteGraph
-                        graphName={option}
-                        isOpen={isDeleteOpen === option}
-                        onOpen={(o) => setIsDeleteOpen(o ? option : "")}
-                        onDeleteGraph={handelDelete}
-                        isSchema={isSchema}
-                      />
-                    </TableCell>
-                  </TableRow>
-                ))
-              }
-            </TableBody>
-          </Table>
-        </div>
+      <DialogContent disableClose className="border-none rounded-lg max-w-none max-h-nones">
+        <DialogHeader className="flex-row justify-between items-center border-b border-secondary pb-4">
+          <DialogTitle className="text-2xl font-medium">Manage Graphs</DialogTitle>
+          <CloseDialog />
+        </DialogHeader>
+        <TableComponent
+          headers={["Name"]}
+          rows={rows}
+          setRows={setRows}
+        >
+          <Button
+            disabled={rows.filter(opt => opt.checked).length === 0}
+            label="Delete"
+            onClick={() => handelDelete(rows.filter(opt => opt.checked).map(opt => opt.cells[0].value))}
+          />
+          <Button
+            disabled={rows.filter(opt => opt.checked).length === 0}
+            label="Export"
+            onClick={() => rows.filter(opt => opt.checked).map((opt) => onExport(opt.cells[0].value))}
+          />
+        </TableComponent>
       </DialogContent>
     </Dialog >
   )

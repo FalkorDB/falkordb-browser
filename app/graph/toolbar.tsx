@@ -5,7 +5,7 @@
 import { Link, Move, Pause, PlusCircle, Shrink, Trash2, ZoomIn, ZoomOut } from "lucide-react";
 import { Dispatch, SetStateAction, useState } from "react";
 import Button from "../components/ui/Button";
-import DialogComponent from "../components/DialogComponent";
+import DeleteElement from "./DeleteElement";
 
 interface Props {
     addDisabled?: boolean,
@@ -19,6 +19,7 @@ interface Props {
     cooldownTime: number | undefined
     setCooldownTime: Dispatch<SetStateAction<number | undefined>>
     handelCooldown: () => void
+    selectedElementsLength: number
 }
 
 export default function Toolbar({
@@ -32,6 +33,7 @@ export default function Toolbar({
     cooldownTime,
     setCooldownTime,
     handelCooldown,
+    selectedElementsLength
 }: Props) {
 
     const [deleteOpen, setDeleteOpen] = useState(false)
@@ -79,33 +81,22 @@ export default function Toolbar({
                     {/* eslint-disable-next-line jsx-a11y/anchor-is-valid */}
                     <Link size={20} />
                 </Button>
-                <DialogComponent onOpenChange={setDeleteOpen} open={deleteOpen} title="Delete Elements" description={`Are you sure ???\nThis action will delete all selected elements`} trigger={
-                    <Button
-                    className="text-nowrap"
-                        variant="Primary"
-                        label="Delete"
-                        disabled={deleteDisabled}
-                    >
-                        <Trash2 size={20} />
-                    </Button>
-                }>
-                    <div className="flex justify-end gap-4">
+                <DeleteElement
+                    description={`Are you sure you want to delete this ${selectedElementsLength > 1 ? "elements" : "element"}?`}
+                    open={deleteOpen}
+                    setOpen={setDeleteOpen}
+                    onDeleteElement={handelDeleteElement}
+                    trigger={
                         <Button
                             className="text-nowrap"
                             variant="Primary"
                             label="Delete"
-                            onClick={handelDeleteElement}
                             disabled={deleteDisabled}
-                        />
-                        <Button
-                            className="text-nowrap"
-                            variant="Primary"
-                            label="Cancel"
-                            onClick={() => setDeleteOpen(false)}
-                            disabled={deleteDisabled}
-                        />
-                    </div>
-                </DialogComponent>
+                        >
+                            <Trash2 size={20} />
+                        </Button>
+                    }
+                />
             </div>
             {
                 (onAddEntity || onAddRelation || onDeleteElement) &&

@@ -11,6 +11,7 @@ interface Props extends React.DetailedHTMLProps<React.ButtonHTMLAttributes<HTMLB
     variant?: Variant
     open?: boolean
     side?: "down" | "left" | "right"
+    children?: React.ReactNode
 }
 
 const getClassName = (variant: Variant, disable: boolean | undefined, open: boolean | undefined, classN: string | undefined) => {
@@ -41,16 +42,16 @@ const getClassName = (variant: Variant, disable: boolean | undefined, open: bool
     return className
 }
 
-const Button = forwardRef<HTMLButtonElement, Props>(({ label, variant = "button", open, className, type = "button", disabled, ...props }, ref) => (
+const Button = forwardRef<HTMLButtonElement, Props>(({ label, variant = "button", open, className, title, type = "button", disabled, children, ...props }, ref) => (
     <button
         ref={ref}
         className={getClassName(variant, disabled, open, className)}
         disabled={disabled}
-        title={label}
+        title={title || label}
         type={type}
         {...props}
     >
-        {props.children}
+        {children}
         {label}
     </button>
 ))

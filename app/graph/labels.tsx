@@ -38,10 +38,11 @@ export default function Labels({ graph, categories, onClick, label, className = 
                     isScrollable &&
                     <Button
                         className="pointer-events-auto"
-                        icon={<ChevronUp />}
                         title="Scroll up"
                         onClick={() => handelScroll(-200)}
-                    />
+                    >
+                        <ChevronUp />
+                    </Button>
                 }
                 <ul ref={listRef} className={cn("flex flex-col gap-4 w-full overflow-auto hide-scrollbar")}>
                     {
@@ -51,14 +52,13 @@ export default function Labels({ graph, categories, onClick, label, className = 
                                 <Button
                                     className={cn(category.name && "w-full pointer-events-auto")}
                                     label={category.name}
-                                    icon={
-                                        <div style={{ backgroundColor: `${graph.getCategoryColorValue(category.index)}` }} className={cn("min-w-6 min-h-6 rounded-full", label === "RelationshipTypes" && "opacity-50")} />
-                                    }
                                     onClick={() => {
                                         onClick(category)
                                         setReload(prev => !prev)
                                     }}
-                                />
+                                >
+                                    <div style={{ backgroundColor: `${graph.getCategoryColorValue(category.index)}` }} className={cn("min-w-6 min-h-6 rounded-full", label === "RelationshipTypes" && "opacity-50")} />
+                                </Button>
                             </li>
                         ))
                     }
@@ -67,10 +67,11 @@ export default function Labels({ graph, categories, onClick, label, className = 
                     isScrollable &&
                     <Button
                         className="pointer-events-auto"
-                        icon={<ChevronDown />}
                         title="Scroll down"
                         onClick={() => handelScroll(200)}
-                    />
+                    >
+                        <ChevronDown />
+                    </Button>
                 }
             </div>
         </div>

@@ -11,6 +11,7 @@ import { cn, prepareArg, securedFetch } from "@/lib/utils";
 import dynamic from "next/dynamic";
 import { Session } from "next-auth";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useToast } from "@/components/ui/use-toast";
 import { Category, Graph, GraphData, Link, Node } from "../api/graph/model";
 import DataPanel from "./GraphDataPanel";
 import Labels from "./labels";
@@ -46,6 +47,7 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
     const [tabsValue, setTabsValue] = useState<string>("")
     const [cooldownTicks, setCooldownTicks] = useState<number | undefined>(0)
     const [cooldownTime, setCooldownTime] = useState<number | undefined>(2000)
+    const { toast } = useToast()
 
     useEffect(() => {
         let timeout: NodeJS.Timeout
@@ -161,7 +163,7 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
 
         const result = await securedFetch(`api/graph/${prepareArg(graph.Id)}/?query=${prepareArg(q)} `, {
             method: "GET"
-        })
+        }, toast)
 
         if (!result.ok) return
 
@@ -185,6 +187,10 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
         graph.removeLinks(selectedElements.map((element) => element.id))
 
         setData({ ...graph.Elements })
+        toast({
+            title: "Success",
+            description: `${selectedElements.length > 1 ? "Elements" : "Element"} deleted`,
+        })
         handelCooldown()
     }
 
@@ -234,6 +240,7 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
                         <div className="h-full flex flex-col gap-4">
                             <div className="flex items-center justify-between">
                                 <Toolbar
+                                    selectedElementsLength={selectedElements.length + (selectedElement ? 1 : 0)}
                                     disabled={!graph.Id}
                                     deleteDisabled={(Object.values(selectedElements).length === 0 && !selectedElement) || session?.user.role === "Read-Only"}
                                     onDeleteElement={handelDeleteElement}
@@ -263,7 +270,7 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
                                             onClick={() => setMaximize(true)}
                                         >
                                             <Maximize2 />
-                                        </Button> 
+                                        </Button>
                                         : <Button
                                             className="z-10 absolute top-4 right-4"
                                             title="Minimize"

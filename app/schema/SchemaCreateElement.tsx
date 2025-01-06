@@ -4,13 +4,13 @@
 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dispatch, SetStateAction, useState } from "react";
-import { Toast } from "@/lib/utils";
 import { ArrowRight, ArrowRightLeft, Check, ChevronRight, Pencil, Plus, Trash2, X } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
-import Input from "../components/ui/Input";
+import { useToast } from "@/components/ui/use-toast";
 import Button from "../components/ui/Button";
 import Combobox from "../components/ui/combobox";
 import { Node } from "../api/graph/model";
+import Input from "../components/ui/Input";
 
 interface Props {
   onCreate: (element: [string, string[]][], label?: string) => Promise<boolean>
@@ -36,15 +36,19 @@ export default function SchemaCreateElement({ onCreate, onExpand, selectedNodes,
   const [labelEditable, setLabelEditable] = useState<boolean>(false)
   const [editable, setEditable] = useState<string>("")
   const [hover, setHover] = useState<string>("")
-
+  const { toast } = useToast()
+  
   const handelSetEditable = (att: [string, string[]] = getDefaultAttribute()) => {
     setAttribute(att)
     setEditable(att[0])
   }
 
   const handelAddAttribute = () => {
-    if (!newAttribute[0] || !newAttribute[1].some((v) => v !== "")) {
-      Toast("You must type a key, type and a description in order to add a new property")
+    if (!newAttribute[0] || newAttribute[1].some((v) => !v)) {
+      toast({
+        title: "Error",
+        description: "You must type a key, type and a description in order to add a new property",
+      })
       return
     }
     setAttributes(prev => [...prev, newAttribute])
@@ -52,8 +56,11 @@ export default function SchemaCreateElement({ onCreate, onExpand, selectedNodes,
   }
 
   const handelSetAttributes = () => {
-    if (!attribute[0] || !attribute[1].some((v) => v !== "")) {
-      Toast("You must type a key, type and a description in order to edit a property")
+    if (!attribute[0] || attribute[1].some((v) => !v)) {
+      toast({
+        title: "Error",
+        description: "You must type a key, type and a description in order to edit a property",
+      })
       return
     }
 
@@ -77,7 +84,10 @@ export default function SchemaCreateElement({ onCreate, onExpand, selectedNodes,
 
   const handelOnCreate = async () => {
     if (!label && !type) {
-      Toast("You must type a label")
+      toast({
+        title: "Error",
+        description: "You must type a label",
+      })
       return
     }
     const ok = await onCreate(attributes, label)
@@ -101,7 +111,10 @@ export default function SchemaCreateElement({ onCreate, onExpand, selectedNodes,
     if (e.key !== "Enter") return
 
     if (!newLabel) {
-      Toast("You must type a label")
+      toast({
+        title: "Error",
+        description: "You must type a label",
+      })
       return
     }
 
@@ -122,8 +135,7 @@ export default function SchemaCreateElement({ onCreate, onExpand, selectedNodes,
             labelEditable ?
               <Input
                 ref={ref => ref?.focus()}
-                className="w-28"
-                variant="Small"
+                className="w-full"
                 onChange={(e) => setNewLabel(e.target.value)}
                 value={newLabel}
                 onBlur={handelLabelCancel}
@@ -187,9 +199,8 @@ export default function SchemaCreateElement({ onCreate, onExpand, selectedNodes,
                         </TableCell>
                         <TableCell>
                           <Input
-                            className="w-28"
+                            className="w-full"
                             onKeyDown={(e) => handelKeyDown(e, handelSetAttributes, handelSetEditable)}
-                            variant="Small"
                             onChange={(e) => setAttribute(prev => {
                               const p: [string, string[]] = [...prev]
                               p[1][1] = e.target.value
@@ -237,7 +248,7 @@ export default function SchemaCreateElement({ onCreate, onExpand, selectedNodes,
                               onClick={(e) => {
                                 e.stopPropagation()
                                 handelSetAttributes()
-                              }}  
+                              }}
                             >
                               <Check size={20} />
                             </Button>
@@ -287,9 +298,8 @@ export default function SchemaCreateElement({ onCreate, onExpand, selectedNodes,
             <TableRow>
               <TableCell>
                 <Input
-                  className="w-28"
+                  className="w-full"
                   onKeyDown={(e) => handelKeyDown(e, handelAddAttribute, () => setNewAttribute(getDefaultAttribute()))}
-                  variant="Small"
                   onChange={(e) => setNewAttribute(prev => {
                     const p: [string, string[]] = [...prev]
                     p[0] = e.target.value
@@ -313,9 +323,8 @@ export default function SchemaCreateElement({ onCreate, onExpand, selectedNodes,
               </TableCell>
               <TableCell>
                 <Input
-                  className="w-28"
+                  className="w-full"
                   onKeyDown={(e) => handelKeyDown(e, handelAddAttribute, () => setNewAttribute(getDefaultAttribute()))}
-                  variant="Small"
                   onChange={(e) => setNewAttribute(prev => {
                     const p: [string, string[]] = [...prev]
                     p[1][1] = e.target.value
@@ -377,8 +386,7 @@ export default function SchemaCreateElement({ onCreate, onExpand, selectedNodes,
               <TableCell>
                 <Input
                   disabled
-                  className="w-28"
-                  variant="Small"
+                  className="w-full"
                 />
               </TableCell>
               <TableCell>
@@ -391,9 +399,8 @@ export default function SchemaCreateElement({ onCreate, onExpand, selectedNodes,
               </TableCell>
               <TableCell>
                 <Input
+                  className="w-full"
                   disabled
-                  className="w-28"
-                  variant="Small"
                 />
               </TableCell>
               <TableCell>
@@ -435,11 +442,11 @@ export default function SchemaCreateElement({ onCreate, onExpand, selectedNodes,
           !type &&
           <div className="w-full flex flex-col gap-4">
             <div className="w-full flex justify-between p-8 items-center">
-              <div style={{ backgroundColor: selectedNodes[0]?.color }} className="flex h-16 w-16 rounded-full bg-[#57577B] justify-center items-center">
+              <div style={{ backgroundColor: selectedNodes[0]?.color }} className="flex h-16 w-16 rounded-full border-2 border-foreground justify-center items-center">
                 <p>{selectedNodes[0]?.category}</p>
               </div>
               <ArrowRight strokeWidth={1} size={40} />
-              <div style={{ backgroundColor: selectedNodes[1]?.color }} className="flex h-16 w-16 rounded-full bg-[#57577B] justify-center items-center">
+              <div style={{ backgroundColor: selectedNodes[1]?.color }} className="flex h-16 w-16 rounded-full border-2 border-foreground justify-center items-center">
                 <p>{selectedNodes[1]?.category}</p>
               </div>
             </div>

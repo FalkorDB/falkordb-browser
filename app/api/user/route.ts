@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getClient } from "@/app/api/auth/[...nextauth]/options";
-import { User } from "./model"
-import { CreateUser, ROLE } from "./options";
+import { User, CreateUser, ROLE } from "./model";
 
 export async function GET() {
 
@@ -26,12 +25,13 @@ export async function GET() {
                 return {
                     username: userDetails[1],
                     role: role ? role[0] : "Unknown",
-                    checked: false
+                    selected: false,
                 }
             })
 
         return NextResponse.json({ result }, { status: 200 })
     } catch (err: unknown) {
+        console.log(err)
         return NextResponse.json({ message: (err as Error).message }, { status: 400 })
     }
 }
@@ -44,20 +44,10 @@ export async function POST(req: NextRequest) {
     }
 
     const connection = await client.connection
-    const isDelete = req.nextUrl.searchParams.get("isDelete")
-    
-    if (isDelete === "true") {
-        const { users } = await req.json()
-        
-        await Promise.all(users.map(async (user: CreateUser) => {
-            await connection.aclDelUser(user.username)
-        }))
-
-        return NextResponse.json({ message: "Users deleted" }, { status: 200 })
-    }
-
     const { username, password, role } = await req.json() as CreateUser
+    
     const roleValue = ROLE.get(role)
+
     try {
         if (!username || !password || !roleValue) throw (new Error("Missing parameters"))
 
@@ -73,7 +63,7 @@ export async function POST(req: NextRequest) {
 
         await connection.aclSetUser(username, roleValue.concat(`>${password}`))
         return NextResponse.json(
-            { message: "User created" },
+            { message: "Success" },
             {
                 status: 201,
                 headers: {
@@ -82,6 +72,30 @@ export async function POST(req: NextRequest) {
             }
         )
     } catch (err: unknown) {
+        console.log(err)
+        return NextResponse.json({ message: (err as Error).message }, { status: 400 })
+    }
+}
+
+export async function DELETE(req: NextRequest) {
+
+    const client = await getClient()
+
+    if (client instanceof NextResponse) {
+        return client
+    }
+
+    const connection = await client.connection
+    const { users } = await req.json()
+
+    try {
+        await Promise.all(users.map(async (user: User) => {
+            await connection.aclDelUser(user.username)
+        }))
+
+        return NextResponse.json({ message: "Users deleted" }, { status: 200 })
+    } catch (err: unknown) {
+        console.log(err)
         return NextResponse.json({ message: (err as Error).message }, { status: 400 })
     }
 }

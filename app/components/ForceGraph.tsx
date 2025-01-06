@@ -6,6 +6,7 @@
 import { Dispatch, RefObject, SetStateAction, useEffect, useRef, useState } from "react"
 import ForceGraph2D from "react-force-graph-2d"
 import { securedFetch } from "@/lib/utils"
+import { useToast } from "@/components/ui/use-toast"
 import { Graph, GraphData, Link, Node } from "../api/graph/model"
 
 interface Props {
@@ -25,8 +26,6 @@ interface Props {
     setSelectedNodes?: Dispatch<SetStateAction<[Node | undefined, Node | undefined]>>
     isCollapsed: boolean
 }
-
-
 
 const NODE_SIZE = 6
 const PADDING = 2;
@@ -52,7 +51,7 @@ export default function ForceGraph({
     const [parentHeight, setParentHeight] = useState<number>(0)
     const [hoverElement, setHoverElement] = useState<Node | Link | undefined>()
     const parentRef = useRef<HTMLDivElement>(null)
-
+    const toast = useToast()
 
     useEffect(() => {
         if (!parentRef.current) return
@@ -66,7 +65,7 @@ export default function ForceGraph({
             headers: {
                 'Content-Type': 'application/json'
             }
-        });
+        }, toast);
 
         if (result.ok) {
             const json = await result.json()
@@ -163,10 +162,10 @@ export default function ForceGraph({
                 nodeCanvasObject={(node, ctx) => {
                     if (!node.x || !node.y) return
 
-                    ctx.lineWidth = (selectedElement && !("source" in selectedElement) && selectedElement.id === node.id
-                        || hoverElement && !("source" in hoverElement) && hoverElement.id === node.id) ? 1 : 0.5
-                    ctx.fillStyle = node.color;
-                    ctx.strokeStyle = 'black';
+                    ctx.lineWidth = ((selectedElement && !("source" in selectedElement) && selectedElement.id === node.id)
+                        || (hoverElement && !("source" in hoverElement) && hoverElement.id === node.id)
+                        || (selectedElements.length > 0 && selectedElements.some(el => el.id === node.id && !("source" in el)))) ? 1 : 0.5
+                    ctx.strokeStyle = 'white';
 
                     ctx.beginPath();
                     ctx.arc(node.x, node.y, NODE_SIZE, 0, 2 * Math.PI, false);
@@ -177,13 +176,18 @@ export default function ForceGraph({
                     ctx.fillStyle = 'black';
                     ctx.textAlign = 'center';
                     ctx.textBaseline = 'middle';
-                    ctx.font = '4px Arial';
+                    ctx.font = '3px Arial';
                     const ellipsis = '...';
                     const ellipsisWidth = ctx.measureText(ellipsis).width;
                     const nodeSize = NODE_SIZE * 2 - PADDING;
-                    let { name } = type === "graph"
-                        ? { ...node.data }
-                        : { name: node.category[0] }
+
+                    let name
+
+                    if (type === "graph") {
+                        name = node.data.name || node.id.toString()
+                    } else {
+                        [name] = node.category
+                    }
 
                     // truncate text if it's too long
                     if (ctx.measureText(name).width > nodeSize) {
@@ -255,7 +259,7 @@ export default function ForceGraph({
                     ctx.fillStyle = 'black';
                     ctx.textAlign = 'center';
                     ctx.textBaseline = 'middle';
-                    ctx.font = '2px Arial';
+                    ctx.font = "2px Arial"
                     ctx.fillText(link.label, 0, 0);
                     ctx.restore()
                 }}

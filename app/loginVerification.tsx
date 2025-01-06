@@ -12,8 +12,8 @@ export default function LoginVerification({ children }: { children: React.ReactN
     const { data } = useSession()
 
     useEffect(() => {
-        if (data) return
-        localStorage.clear()
+        if (data?.user || data === undefined) return
+        localStorage.removeItem("query history")
     }, [data])
 
     useEffect(() => {

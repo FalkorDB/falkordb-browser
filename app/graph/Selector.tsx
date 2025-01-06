@@ -1,24 +1,23 @@
 'use client'
 
 import { SetStateAction, Dispatch, useEffect, useRef, useState } from "react";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { DialogTitle } from "@/components/ui/dialog";
 import { Editor } from "@monaco-editor/react";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { editor } from "monaco-editor";
-import { Toast, cn, prepareArg, securedFetch } from "@/lib/utils";
+import { cn, prepareArg, securedFetch } from "@/lib/utils";
 import { Session } from "next-auth";
 import { PlusCircle, RefreshCcw } from "lucide-react";
 import { usePathname } from "next/navigation";
+import { useToast } from "@/components/ui/use-toast";
 import Combobox from "../components/ui/combobox";
 import { Graph, Query } from "../api/graph/model";
-import UploadGraph from "../components/graph/UploadGraph";
 import DialogComponent from "../components/DialogComponent";
 import Button from "../components/ui/Button";
 import Duplicate from "./Duplicate";
 import SchemaView from "../schema/SchemaView";
 import View from "./View";
 import CreateGraph from "../components/CreateGraph";
-import CloseDialog from "../components/CloseDialog";
+import ExportGraph from "../components/ExportGraph";
 
 interface Props {
     /* eslint-disable react/require-default-props */
@@ -36,25 +35,18 @@ interface Props {
 
 export default function Selector({ onChange, graphName, setGraphName, queries, runQuery, edgesCount, nodesCount, setGraph, graph, data: session }: Props) {
 
-    const [createOpen, setCreateOpen] = useState<boolean>(false);
-    const [exportOpen, setExportOpen] = useState<boolean>(false);
     const [options, setOptions] = useState<string[]>([]);
-    const [newGraphName, setNewGraphName] = useState<string>("");
     const [schema, setSchema] = useState<Graph>(Graph.empty());
     const [selectedValue, setSelectedValue] = useState<string>("");
     const [duplicateOpen, setDuplicateOpen] = useState<boolean>(false);
-    const [dropOpen, setDropOpen] = useState<boolean>(false);
     const [queriesOpen, setQueriesOpen] = useState<boolean>(false);
     const [query, setQuery] = useState<Query>();
     const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null)
     const pathname = usePathname()
     const type = pathname.includes("/schema") ? "Schema" : "Graph"
-
-    useEffect(() => {
-        if (createOpen) return
-        setNewGraphName("")
-    }, [createOpen])
-
+    const [isRotating, setIsRotating] = useState(false);
+    const { toast } = useToast()
+    
     useEffect(() => {
         if (!graphName) return
         setOptions(prev => {
@@ -67,7 +59,7 @@ export default function Selector({ onChange, graphName, setGraphName, queries, r
     const getOptions = async () => {
         const result = await securedFetch("api/graph", {
             method: "GET"
-        })
+        }, toast)
         if (!result.ok) return
         const res = (await result.json()).result as string[]
         setOptions(!runQuery ? res.filter(name => name.includes("_schema")).map(name => name.split("_")[0]) : res.filter(name => !name.includes("_schema")))
@@ -86,7 +78,7 @@ export default function Selector({ onChange, graphName, setGraphName, queries, r
             const q = 'MATCH (n)-[e]-(m) return n,e,m'
             const result = await securedFetch(`api/graph/${prepareArg(name)}_schema/?query=${prepareArg(q)}&create=false&role=${session?.user.role}`, {
                 method: "GET"
-            })
+            }, toast)
 
             if (!result.ok) return
 
@@ -99,59 +91,19 @@ export default function Selector({ onChange, graphName, setGraphName, queries, r
         setSelectedValue(name)
     }
 
-    const handleExport = async () => {
-        const name = `${selectedValue}${!runQuery ? "_schema" : ""}`
-        const result = await securedFetch(`api/graph/${prepareArg(name)}/export`, {
-            method: "GET"
-        })
-
-        if (!result.ok) return
-
-        const blob = await result.blob()
-        const url = window.URL.createObjectURL(blob)
-        try {
-            const link = document.createElement('a')
-            link.href = url
-            link.setAttribute('download', `${name}.dump`)
-            document.body.appendChild(link)
-            link.click()
-            link.parentNode?.removeChild(link)
-            window.URL.revokeObjectURL(url)
-        } catch (e) {
-            Toast("Error while exporting data")
-        }
-    }
-
-    const handleCreateGraph = async (e: React.FormEvent<HTMLFormElement>) => {
-        e.preventDefault()
-        if (!newGraphName) {
-            Toast("Graph name cannot be empty")
-            return
-        }
-        const q = 'RETURN 1'
-        const result = await securedFetch(`api/graph/${prepareArg(newGraphName)}/?query=${prepareArg(q)}`, {
-            method: "GET",
-        })
-        if (!result.ok) {
-            Toast("Error while creating graph")
-            return
-        }
-
-        setOptions(prev => [...prev, newGraphName])
-        setGraphName(newGraphName)
-        setCreateOpen(false)
-    }
+    const handleReloadClick = () => {
+        setIsRotating(true);
+        getOptions();
+        setTimeout(() => setIsRotating(false), 1000);
+    };
 
     return (
         <div className="flex flex-col gap-4">
             <div className="flex justify-between items-center">
                 <div className="flex items-center gap-4">
                     <CreateGraph
-                        open={createOpen}
-                        setOpen={setCreateOpen}
-                        graphName={newGraphName}
-                        setGraphName={setNewGraphName}
-                        handleCreateGraph={handleCreateGraph}
+                        type={type}
+                        onSetGraphName={setGraphName}
                         trigger={
                             <Button
                                 variant="Primary"
@@ -162,6 +114,16 @@ export default function Selector({ onChange, graphName, setGraphName, queries, r
                         }
                     />
                     <p className="text-secondary">|</p>
+                    <Button
+                        className={cn(
+                            "transition-transform",
+                            isRotating && "animate-spin duration-1000"
+                        )}
+                        onClick={handleReloadClick}
+                    >
+                        <RefreshCcw size={20} />
+                    </Button>
+                    <p className="text-secondary">|</p>
                     <Combobox
                         isSelectGraph
                         options={options}
@@ -170,69 +132,14 @@ export default function Selector({ onChange, graphName, setGraphName, queries, r
                         setSelectedValue={handleOnChange}
                         isSchema={!runQuery}
                     />
-                    <p className="text-secondary">|</p>
-                    <Button
-                        variant="Secondary"
-                        label="Refresh"
-                        title="Refresh List"
-                        onClick={getOptions}
-                    >
-                        <RefreshCcw size={20} />
-                    </Button>
                 </div>
                 <div className="flex gap-16 text-[#e5e7eb]">
-                    <UploadGraph disabled />
-                    <Dialog open={exportOpen} onOpenChange={setExportOpen}>
-                        <DialogTrigger disabled={!selectedValue} asChild>
-                            <Button
-                                label="Export Data"
-                                disabled={!selectedValue}
-                            />
-                        </DialogTrigger>
-                        <DialogContent className="gap-8 border-none rounded-lg">
-                            <DialogHeader className="border-b p-4">
-                                <DialogTitle className="font-Oswald font-normal text-4xl tracking-normal">Export your graph</DialogTitle>
-                            </DialogHeader>
-                            <DialogDescription className="text-xl">Export a .dump file of your data</DialogDescription>
-                            <div className="flex gap-4">
-                                <Button
-                                    className="flex-1"
-                                    variant="Primary"
-                                    label="Download"
-                                    onClick={handleExport}
-                                />
-                                <CloseDialog
-                                    className="flex-1"
-                                    variant="Secondary"
-                                    label="Cancel"
-                                />
-                            </div>
-                        </DialogContent>
-                    </Dialog>
-                    <DropdownMenu onOpenChange={setDropOpen}>
-                        <DropdownMenuTrigger disabled={!selectedValue} asChild>
-                            <Button
-                                label="Duplicate"
-                                open={dropOpen}
-                            />
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent>
-                            <DropdownMenuItem>
-                                <Button
-                                    className="w-full p-2 text-start"
-                                    label="Duplicate Graph"
-                                    onClick={() => setDuplicateOpen(true)}
-                                />
-                            </DropdownMenuItem >
-                            <DropdownMenuItem>
-                                <Button
-                                    className="w-full p-2 text-start"
-                                    label="New graph from schema"
-                                />
-                            </DropdownMenuItem>
-                        </DropdownMenuContent >
-                    </DropdownMenu >
+                    <ExportGraph
+                        type={type}
+                        selectedValue={selectedValue}
+                    />
                     <Duplicate
+                        disabled={!selectedValue}
                         open={duplicateOpen}
                         onOpenChange={setDuplicateOpen}
                         onDuplicate={(name) => {
@@ -263,6 +170,8 @@ export default function Selector({ onChange, graphName, setGraphName, queries, r
                             onOpenChange={setQueriesOpen}
                             trigger={
                                 <Button
+                                    disabled={!queries || queries.length === 0}
+                                    title={!queries || queries.length === 0 ? "No queries" : undefined}
                                     label="Query History"
                                 />
                             }
@@ -271,23 +180,20 @@ export default function Selector({ onChange, graphName, setGraphName, queries, r
                             <div className="grow flex flex-col p-8 gap-8">
                                 <DialogTitle>Queries</DialogTitle>
                                 <div className="h-1 grow flex">
-                                    {
-                                        queries && queries.length > 0 &&
-                                        <ul className="min-w-[50%] flex-col border overflow-auto">
-                                            {
-                                                queries.map((q, index) => (
-                                                    // eslint-disable-next-line react/no-array-index-key
-                                                    <li key={index} className="w-full text-sm border-b py-3 px-12">
-                                                        <Button
-                                                            className="w-full truncate"
-                                                            label={q.text}
-                                                            onClick={() => setQuery(q)}
-                                                        />
-                                                    </li>
-                                                ))
-                                            }
-                                        </ul>
-                                    }
+                                    <ul className="min-w-[50%] flex-col border overflow-auto">
+                                        {
+                                            queries && queries.map((q, index) => (
+                                                // eslint-disable-next-line react/no-array-index-key
+                                                <li key={index} className="w-full text-sm border-b py-3 px-12">
+                                                    <Button
+                                                        className="w-full truncate"
+                                                        label={q.text}
+                                                        onClick={() => setQuery(q)}
+                                                    />
+                                                </li>
+                                            ))
+                                        }
+                                    </ul>
                                     <div className="w-1 grow flex flex-col gap-2 p-4 border">
                                         <div className="h-1 grow flex">
                                             <Editor
@@ -338,7 +244,7 @@ export default function Selector({ onChange, graphName, setGraphName, queries, r
                                         disabled
                                     />
                                     <Button
-                                        className="text-white w-1/3"
+                                        className="text-white flex justify-center w-1/3"
                                         onClick={() => runQuery(query?.text || "", setQueriesOpen)}
                                         variant="Primary"
                                         label="Run"

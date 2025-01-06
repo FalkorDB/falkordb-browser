@@ -3,29 +3,66 @@
 import { SignInOptions, SignInResponse, signIn } from "next-auth/react";
 import { FormEvent, useEffect, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
-import Dropzone from "@/app/components/ui/Dropzone";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Eye } from "lucide-react";
-import Input from "@/app/components/ui/Input";
-import Button from "@/app/components/ui/Button";
 import Image from "next/image";
+import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
+import FormComponent, { Field } from "../components/FormComponent";
+import Dropzone from "../components/ui/Dropzone";
 
 const DEFAULT_HOST = "localhost";
 const DEFAULT_PORT = "6379";
 
+
 export default function LoginForm() {
   const router = useRouter();
-  const [error, setError] = useState(false);
   const [host, setHost] = useState("");
   const [port, setPort] = useState("");
   const [TLS, setTLS] = useState(false);
   const [CA, setCA] = useState<string>();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
-
+  const [error, setError] = useState<{
+    message: string
+    show: boolean
+  }>({
+    message: "Invalid credentials",
+    show: false
+  });
   const searchParams = useSearchParams();
+
+  const fields: Field[] = [
+    {
+      value: host,
+      onChange: (e) => setHost(e.target.value),
+      label: "Host",
+      type: "text",
+      placeholder: DEFAULT_HOST,
+      required: true
+    },
+    {
+      value: port,
+      onChange: (e) => setPort(e.target.value),
+      label: "Port",
+      type: "text",
+      placeholder: DEFAULT_PORT,
+      required: true
+    },
+    {
+      value: username,
+      onChange: (e) => setUsername(e.target.value),
+      label: "Username",
+      type: "text",
+      required: false
+    },
+    {
+      value: password,
+      onChange: (e) => setPassword(e.target.value),
+      label: "Password",
+      type: "password",
+      show: false,
+      required: false
+    }
+  ]
 
   useEffect(() => {
     const hostParam = searchParams.get("host");
@@ -58,7 +95,10 @@ export default function LoginForm() {
 
     signIn("credentials", params).then((res?: SignInResponse) => {
       if (res?.error) {
-        setError(true);
+        setError(prev => ({
+          ...prev,
+          show: true
+        }))
       } else {
         router.push("/graph");
       }
@@ -75,75 +115,19 @@ export default function LoginForm() {
     reader.readAsDataURL(acceptedFiles[0])
   }
 
-  const onChangeSetError = (func: (val: string) => void, val: string) => {
-    func(val);
-    setError(false);
-  }
   return (
-    <div className="w-full h-full flex items-center justify-center gap-80 LoginForm">
-      <Image priority src="/Logo.svg" alt="" width={451} height={126} />
-      <form
-        className="flex flex-col gap-4 p-2"
-        onSubmit={onSubmit}
-      >
-        <p className="text-4xl text-white border-b border-slate-200 border-opacity-25 pb-6" title="Connect">Connect</p>
-        <div className="flex flex-col gap-8">
-          <div className="flex gap-6">
-            <div className="grow flex flex-col gap-2">
-              <p title="Host">* Host</p>
-              <Input
-                variant="Default"
-                id="server"
-                placeholder={DEFAULT_HOST}
-                type="text"
-                onChange={(e) => onChangeSetError(setHost, e.target.value)}
-                value={host}
-              />
-            </div>
-            <div className="w-1/3 flex flex-col gap-2">
-              <p title="Port" >* Port</p>
-              <Input
-                variant="Default"
-                id="port"
-                placeholder={DEFAULT_PORT}
-                min={1}
-                max={65535}
-                onChange={(e) => onChangeSetError(setPort, e.target.value)}
-                value={port}
-              />
-            </div>
-          </div>
-          <div className="flex flex-col gap-2">
-            <p title="User Name" >{host !== DEFAULT_HOST && "* "} User Name</p>
-            <Input
-              variant="Default"
-              id="username"
-              type="text"
-              onChange={(e) => onChangeSetError(setUsername, e.target.value)}
-              value={username}
-            />
-          </div>
-          <div className="relative flex flex-col gap-2">
-            <p title="Password">{host !== DEFAULT_HOST && "* "}Password</p>
-            <Button
-              className="absolute top-10 right-2 p-0"
-              onClick={() => setShowPassword(prev => !prev)}
-            >
-              <Eye strokeWidth={0.5} color="black" />
-            </Button>
-            <Input
-              id="password"
-              variant="Default"
-              type={showPassword ? "text" : "password"}
-              onChange={(e) => onChangeSetError(setPassword, e.target.value)}
-              value={password}
-            />
-          </div>
+    <div className="w-full h-full flex justify-center items-center bg-foreground">
+      <div className="flex gap-20 items-center border rounded-lg p-10">
+        <FormComponent
+          fields={fields}
+          handleSubmit={onSubmit}
+          error={error}
+          isFieldsRequired={false}
+        >
           <div className="flex gap-8">
             <div className="flex gap-2">
               <Checkbox
                 className={cn("w-6 h-6 rounded-lg", !TLS && "border-white")}
-                defaultChecked={false}
                 checked={TLS}
                 onCheckedChange={(checked) => setTLS(checked as boolean)}
               />
@@ -151,20 +135,9 @@ export default function LoginForm() {
             </div>
             <Dropzone onFileDrop={onFileDrop} disabled={!TLS} />
           </div>
-          <Button
-            className="p-4 text-center"
-            label="Connect"
-            variant="Primary"
-            type="submit"
-          />
-          {error && (
-            <div className="bg-red-400 text-center p-2 rounded-lg">
-              <p>Wrong credentials</p>
-            </div>
-
-          )}
-        </div>
-      </form>
+        </FormComponent>
+        <Image priority src="/Logo.svg" alt="" width={451} height={126} />
+      </div>
     </div >
   );
 }

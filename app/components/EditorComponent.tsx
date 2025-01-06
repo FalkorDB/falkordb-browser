@@ -536,18 +536,14 @@ export default function EditorComponent({ currentQuery, historyQueries, setCurre
 
     const handleEditorDidMount = (e: monaco.editor.IStandaloneCodeEditor, monacoI: Monaco) => {
         const updatePlaceholderVisibility = () => {
-            const hasContent = e.getValue();
+            const hasContent = !!e.getValue();
             if (placeholderRef.current) {
                 placeholderRef.current.style.display = hasContent ? 'none' : 'block';
             }
         };
 
-        e.onDidChangeModelContent(() => {
-            updatePlaceholderVisibility();
-        });
-
         e.onDidFocusEditorText(() => {
-            if (!e.getValue() && placeholderRef.current) {
+            if (placeholderRef.current) {
                 placeholderRef.current.style.display = 'none';
             }
         });

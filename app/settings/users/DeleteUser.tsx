@@ -3,7 +3,8 @@ import { User } from "@/app/api/user/model";
 import { Trash2 } from "lucide-react";
 import { Dispatch, SetStateAction } from "react";
 import Button from "@/app/components/ui/Button";
-import { Toast, securedFetch } from "@/lib/utils";
+import { securedFetch } from "@/lib/utils";
+import { useToast } from "@/components/ui/use-toast";
 
 interface DeleteUserProps {
     // eslint-disable-next-line react/require-default-props
@@ -13,20 +14,25 @@ interface DeleteUserProps {
 }
 
 export default function DeleteUser({ isDeleteSelected, users, setUsers }: DeleteUserProps) {
-
+    
+    const { toast } = useToast()
+    
     const deleteSelected = async () => {
         if (!users) return
 
-        const response = await securedFetch('/api/user/?isDelete=true', {
-            method: 'POST',
+        const response = await securedFetch('/api/user/', {
+            method: 'DELETE',
             headers: {
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({ users })
-        })
+        }, toast)
 
         if (response.ok) {
-            Toast("Success", "User deleted successfully")
+            toast({
+                title: "Success",
+                description: "User deleted successfully",
+            })
             setUsers(prev => prev.filter(user => !users.find(u => user.username === u.username)))
         }
     }
@@ -37,9 +43,10 @@ export default function DeleteUser({ isDeleteSelected, users, setUsers }: Delete
                 <Button
                     disabled={users.length === 0}
                     variant={isDeleteSelected ? "Primary" : "button"}
-                    icon={<Trash2 />}
                     label={isDeleteSelected ? "Delete Users" : undefined}
-                />
+                >
+                    <Trash2 />
+                </Button>
             </AlertDialogTrigger>
             <AlertDialogContent className="flex flex-col gap-10 p-4">
                 <AlertDialogHeader className="">

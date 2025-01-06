@@ -8,11 +8,13 @@
         --foreground: 0 0% 10%;
         --primary: 243 91% 68%;
         --secondary: 39 33% 96%;
+        --destructive: 0 84% 60%;
         --accent: var(--background);
         --popover: var(--primary);
         --popover-foreground: 0 0% 100%;
         --radius: 0.5rem;
-        --muted: 0 0% 100%;
+        --input: var(--popover-foreground);
+        --muted: var(--popover-foreground);
     }
 
     :focus-visible {
@@ -60,21 +62,6 @@
 
     .LandingPage {
         background: linear-gradient(180deg, #EC806C 0%, #B66EBD 43.41%, #7568F2 100%);
-    }
-
-    .LoginForm {
-        background: linear-gradient(180deg, #EC806C 0%, #B66EBD 43.41%, #7568F2 100%);
-        color: white;
-    }
-
-    .LoginForm>form>p {
-        font-family: "Obviously Narrow" !important;
-    }
-
-    .Text {
-        background: linear-gradient(90deg, #EC806C 0%, #B66EBD 43.41%, #7568F2 100%);
-        background-clip: text;
-        color: transparent;
     }
 
     .Top {
