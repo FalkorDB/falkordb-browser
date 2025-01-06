@@ -48,14 +48,8 @@ export default function CreateGraph({
         const result = await securedFetch(`api/graph/${prepareArg(graphName)}/?query=${prepareArg(q)}`, {
             method: "GET",
         }, toast)
-        if (!result.ok) {
-            toast({
-                title: "Error",
-                description: "Error while creating graph",
-                variant: "destructive"
-            })
-            return
-        }
+
+        if (!result.ok) return
 
         onSetGraphName(graphName)
         setGraphName("")

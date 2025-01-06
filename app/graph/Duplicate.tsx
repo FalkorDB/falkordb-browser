@@ -20,18 +20,9 @@ export default function Duplicate({ open, onOpenChange, selectedValue, onDuplica
 
         e.preventDefault()
 
-        const result = await securedFetch(`api/graph/${prepareArg(duplicateName)}/?sourceName=${prepareArg(selectedValue)}`, {
+        await securedFetch(`api/graph/${prepareArg(duplicateName)}/?sourceName=${prepareArg(selectedValue)}`, {
             method: "POST"
-        })
-
-        if (!result.ok) {
-            toast({
-                title: "Error",
-                description: "Error while duplicating graph",
-                variant: "destructive"
-            })
-            return
-        }
+        }, toast)
 
         onOpenChange(false)
         onDuplicate(duplicateName)

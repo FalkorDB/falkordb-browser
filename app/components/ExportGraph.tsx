@@ -6,40 +6,42 @@ import Button from "./ui/Button"
 import CloseDialog from "./CloseDialog"
 
 interface Props {
-    selectedValue: string
+    selectedValues: string[]
     type: string
 }
 
-export default function ExportGraph({ selectedValue, type }: Props) {
+export default function ExportGraph({ selectedValues, type }: Props) {
 
     const [open, setOpen] = useState(false)
     const { toast } = useToast()
 
-    const handleExport = async () => {
-        const name = `${selectedValue}${!type ? "_schema" : ""}`
-        const result = await securedFetch(`api/graph/${prepareArg(name)}/export`, {
-            method: "GET"
+    const handleExport = () => {
+        selectedValues.map(async value => {
+            const name = `${value}${!type ? "_schema" : ""}`
+            const result = await securedFetch(`api/graph/${prepareArg(name)}/export`, {
+                method: "GET"
+            }, toast)
+
+            if (!result.ok) return
+
+            const blob = await result.blob()
+            const url = window.URL.createObjectURL(blob)
+            try {
+                const link = document.createElement('a')
+                link.href = url
+                link.setAttribute('download', `${name}.dump`)
+                document.body.appendChild(link)
+                link.click()
+                link.parentNode?.removeChild(link)
+                window.URL.revokeObjectURL(url)
+            } catch (e) {
+                toast({
+                    title: "Error",
+                    description: "Error while exporting data",
+                    variant: "destructive"
+                })
+            }
         })
-
-        if (!result.ok) return
-
-        const blob = await result.blob()
-        const url = window.URL.createObjectURL(blob)
-        try {
-            const link = document.createElement('a')
-            link.href = url
-            link.setAttribute('download', `${name}.dump`)
-            document.body.appendChild(link)
-            link.click()
-            link.parentNode?.removeChild(link)
-            window.URL.revokeObjectURL(url)
-        } catch (e) {
-            toast({
-                title: "Error",
-                description: "Error while exporting data",
-                variant: "destructive"
-            })
-        }
     }
 
 
@@ -50,7 +52,7 @@ export default function ExportGraph({ selectedValue, type }: Props) {
             trigger={
                 <Button
                     label="Export Data"
-                    disabled={!selectedValue}
+                    disabled={selectedValues.length === 0}
                 />
             }
             title="Export your graph"

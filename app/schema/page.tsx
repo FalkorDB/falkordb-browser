@@ -25,11 +25,11 @@ export default function Page() {
 
         const nodes = await (await securedFetch(`api/graph/${prepareArg(name)}/?query=${q1}&role=${session?.user.role}`, {
             method: "GET"
-        })).json()
+        }, toast)).json()
 
         const edges = await (await securedFetch(`api/graph/${prepareArg(name)}/?query=${q2}&role=${session?.user.role}`, {
             method: "GET"
-        })).json()
+        }, toast)).json()
 
         if (!edges || !nodes) return
 
@@ -42,15 +42,8 @@ export default function Page() {
         const run = async () => {
             const result = await securedFetch(`/api/graph/${prepareArg(schemaName)}_schema/?query=${defaultQuery()}&role=${session?.user.role}`, {
                 method: "GET"
-            })
-            if (!result.ok) {
-                toast({
-                    title: "Error",
-                    description: "Failed fetching schema",
-                    variant: "destructive"
-                })
-                return
-            }
+            }, toast)
+            if (!result.ok) return
             const json = await result.json()
             const colors = localStorage.getItem(schemaName)?.split(/[[\]",]/).filter(c => c)
             setSchema(Graph.create(schemaName, json.result, colors))

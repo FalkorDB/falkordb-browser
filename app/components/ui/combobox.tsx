@@ -11,6 +11,7 @@ import { useToast } from "@/components/ui/use-toast"
 import Button from "./Button"
 import TableComponent, { Row } from "../TableComponent"
 import CloseDialog from "../CloseDialog"
+import ExportGraph from "../ExportGraph"
 
 interface ComboboxProps {
   isSelectGraph?: boolean,
@@ -67,34 +68,6 @@ export default function Combobox({ isSelectGraph = false, disabled = false, inTa
 
     setSelectedValue(options[0])
   }, [options])
-
-  const onExport = async (graphName: string) => {
-    const name = isSchema ? `${graphName}_schema` : graphName
-    const result = await securedFetch(`api/graph/${prepareArg(name)}/export`, {
-      method: "GET"
-    }, toast)
-
-    if (!result.ok) return
-
-    const blob = await result.blob()
-    const url = window.URL.createObjectURL(blob)
-
-    try {
-      const link = document.createElement('a')
-      link.href = url
-      link.setAttribute('download', `${name}.dump`)
-      document.body.appendChild(link)
-      link.click()
-      link.parentNode?.removeChild(link)
-      window.URL.revokeObjectURL(url)
-    } catch (e) {
-      toast({
-        title: "Error",
-        description: "Error while exporting data",
-        variant: "destructive"
-      })
-    }
-  }
 
   const handelDelete = async (opts: string[]) => {
     const names = opts.map(opt => isSchema ? `${opt}_schema` : opt)
@@ -171,11 +144,7 @@ export default function Combobox({ isSelectGraph = false, disabled = false, inTa
             label="Delete"
             onClick={() => handelDelete(rows.filter(opt => opt.checked).map(opt => opt.cells[0].value))}
           />
-          <Button
-            disabled={rows.filter(opt => opt.checked).length === 0}
-            label="Export"
-            onClick={() => rows.filter(opt => opt.checked).map((opt) => onExport(opt.cells[0].value))}
-          />
+          <ExportGraph selectedValues={rows.filter(opt => opt.checked).map(opt => opt.cells[0].value)} type={type!} />
         </TableComponent>
       </DialogContent>
     </Dialog >

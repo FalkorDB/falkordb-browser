@@ -136,7 +136,7 @@ export default function Selector({ onChange, graphName, setGraphName, queries, r
                 <div className="flex gap-16 text-[#e5e7eb]">
                     <ExportGraph
                         type={type}
-                        selectedValue={selectedValue}
+                        selectedValues={[selectedValue]}
                     />
                     <Duplicate
                         disabled={!selectedValue}

@@ -48,6 +48,7 @@ export default function SchemaCreateElement({ onCreate, onExpand, selectedNodes,
       toast({
         title: "Error",
         description: "You must type a key, type and a description in order to add a new property",
+        variant: "destructive"
       })
       return
     }
@@ -60,6 +61,7 @@ export default function SchemaCreateElement({ onCreate, onExpand, selectedNodes,
       toast({
         title: "Error",
         description: "You must type a key, type and a description in order to edit a property",
+        variant: "destructive"
       })
       return
     }
@@ -87,6 +89,7 @@ export default function SchemaCreateElement({ onCreate, onExpand, selectedNodes,
       toast({
         title: "Error",
         description: "You must type a label",
+        variant: "destructive"
       })
       return
     }
@@ -114,6 +117,7 @@ export default function SchemaCreateElement({ onCreate, onExpand, selectedNodes,
       toast({
         title: "Error",
         description: "You must type a label",
+        variant: "destructive"
       })
       return
     }

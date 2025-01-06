@@ -49,7 +49,7 @@ export async function POST(req: NextRequest) {
     const roleValue = ROLE.get(role)
 
     try {
-        if (!username || !password || !roleValue) throw (new Error("Missing parameters"))
+        if (!username || !password || !roleValue) return console.log("Missing parameters")
 
         try {
             const user = await connection.aclGetUser(username)

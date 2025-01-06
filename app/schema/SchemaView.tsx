@@ -136,7 +136,7 @@ export default function SchemaView({ schema, fetchCount, session }: Props) {
         const q = `${conditionsNodes.length > 0 ? `MATCH (n) WHERE ${conditionsNodes.join(" OR ")} DELETE n` : ""}${conditionsEdges.length > 0 && conditionsNodes.length > 0 ? " WITH * " : ""}${conditionsEdges.length > 0 ? `MATCH ()-[e]-() WHERE ${conditionsEdges.join(" OR ")} DELETE e` : ""}`
         const result = await securedFetch(`api/graph/${prepareArg(schema.Id)}_schema/?query=${prepareArg(q)} `, {
             method: "GET"
-        })
+        }, toast)
 
         if (!result.ok) return
 
@@ -173,7 +173,7 @@ export default function SchemaView({ schema, fetchCount, session }: Props) {
         const q = `MATCH ${type ? "(e)" : "()-[e]-()"} WHERE ID(e) = ${id} SET e.${key} = "${value.join(",")}"`
         const { ok } = await securedFetch(`api/graph/${prepareArg(schema.Id)}_schema/?query=${prepareArg(q)}`, {
             method: "GET"
-        })
+        }, toast)
 
         if (ok) {
             if (type) {
@@ -247,7 +247,7 @@ export default function SchemaView({ schema, fetchCount, session }: Props) {
         const q = `MATCH ${type ? "(e)" : "()-[e]-()"} WHERE ID(e) = ${id} SET e.${key} = NULL`
         const { ok } = await securedFetch(`api/graph/${prepareArg(schema.Id)}_schema/?query=${prepareArg(q)}`, {
             method: "GET"
-        })
+        }, toast)
 
         if (ok) {
             if (type) {
@@ -286,7 +286,7 @@ export default function SchemaView({ schema, fetchCount, session }: Props) {
 
         const result = await securedFetch(`api/graph/${prepareArg(schema.Id)}_schema/?query=${getCreateQuery(isAddEntity, selectedNodes as [Node, Node], attributes, label)}`, {
             method: "GET"
-        })
+        }, toast)
 
         if (result.ok) {
             const json = await result.json()
@@ -318,6 +318,7 @@ export default function SchemaView({ schema, fetchCount, session }: Props) {
             >
                 <div className="flex items-center justify-between">
                     <Toolbar
+                        selectedElementsLength={selectedElements.length}
                         disabled={!schema.Id}
                         deleteDisabled={Object.values(selectedElements).length === 0 && !selectedElement}
                         onAddEntity={() => {

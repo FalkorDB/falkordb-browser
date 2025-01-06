@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getClient } from "@/app/api/auth/[...nextauth]/options";
 import { prepareArg, securedFetch } from "@/lib/utils";
+import { useToast } from "@/components/ui/use-toast";
 
 // eslint-disable-next-line import/prefer-default-export
 export async function DELETE(request: NextRequest, { params }: { params: { graph: string } }) {
@@ -29,10 +30,12 @@ export async function DELETE(request: NextRequest, { params }: { params: { graph
 // eslint-disable-next-line import/prefer-default-export
 export async function POST(request: NextRequest, { params }: { params: { graph: string } }) {
 
+    const toast = useToast()
     const client = await getClient()
     if (client instanceof NextResponse) {
         return client
     }
+
 
     const graphId = params.graph;
     const sourceName = request.nextUrl.searchParams.get("sourceName")
@@ -49,14 +52,14 @@ export async function POST(request: NextRequest, { params }: { params: { graph: 
         const key = request.nextUrl.searchParams.get("key")
         const srcs = await request.json()
 
-        if (!key) console.error("Missing parameter 'key'")
+        if (!key) return console.error("Missing parameter 'key'")
 
-        if (!srcs) console.error("Missing parameter 'srcs'")
+        if (!srcs) return console.error("Missing parameter 'srcs'")
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const socket = (await client.connection).options?.socket as any
 
-        if (!socket) console.error("socket not found")
+        if (!socket) return console.error("socket not found")
 
         const data = {
             host: socket.host,
@@ -66,7 +69,7 @@ export async function POST(request: NextRequest, { params }: { params: { graph: 
             openaikey: key,
         }
 
-        if (!type) console.error("Missing parameter 'type'")
+        if (!type) return console.error("Missing parameter 'type'")
 
         const res = await securedFetch(`http://localhost:5000/${prepareArg(type!)}`, {
             method: "POST",
@@ -74,7 +77,7 @@ export async function POST(request: NextRequest, { params }: { params: { graph: 
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify(data)
-        })
+        }, toast)
 
         const result = await res.json()
 
@@ -98,7 +101,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { graph:
     const sourceName = request.nextUrl.searchParams.get("sourceName")
 
     try {
-        if (!sourceName) throw (new Error("Missing parameter 'sourceName'"))
+        if (!sourceName) return console.error("Missing parameter sourceName")
 
         const data = await (await client.connection).renameNX(sourceName, graphId);
 
@@ -134,7 +137,7 @@ export async function GET(request: NextRequest, { params }: { params: { graph: s
         const create = request.nextUrl.searchParams.get("create")
         const role = request.nextUrl.searchParams.get("role")
 
-        if (!query) throw new Error("Missing parameter 'query'")
+        if (!query) return console.log("Missing parameter query")
 
         if (create === "false" && !(await client.list()).some((g) => g === graphId))
             return NextResponse.json({}, { status: 200 })
@@ -145,7 +148,7 @@ export async function GET(request: NextRequest, { params }: { params: { graph: s
             ? await graph.roQuery(query)
             : await graph.query(query)
 
-        if (!result) throw new Error("something went wrong")
+        if (!result) throw new Error("Something went wrong")
 
         return NextResponse.json({ result }, { status: 200 })
     } catch (err: unknown) {

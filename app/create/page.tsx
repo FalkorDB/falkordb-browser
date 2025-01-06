@@ -36,7 +36,7 @@ export default function Create() {
 
             const res = await securedFetch(`api/graph/${prepareArg(graphName)}_schema/?query=${prepareArg(q)}`, {
                 method: "GET"
-            })
+            }, toast)
 
             if (!res.ok) {
                 toast({
@@ -75,7 +75,7 @@ export default function Create() {
 
         const result = await securedFetch(url, {
             method: "GET",
-        })
+        }, toast)
 
         if (!result.ok) {
             toast({
@@ -109,7 +109,7 @@ export default function Create() {
             const result = await securedFetch(`api/upload`, {
                 method: "POST",
                 body: formData
-            });
+            }, toast);
 
             if (!result.ok) {
                 toast({
@@ -133,7 +133,7 @@ export default function Create() {
                 "Content-Type": "application/json"
             },
             body: JSON.stringify(newFilesPath)
-        })
+        }, toast)
 
 
         if (!result.ok) {
@@ -158,7 +158,7 @@ export default function Create() {
         const result = await securedFetch(`api/graph/${prepareArg(graphName)}/?type=populate_kg/?key=${prepareArg(openaiKey)}`, {
             method: "POST",
             body: JSON.stringify(filesPath)
-        })
+        }, toast)
 
         if (!result.ok) {
             toast({
@@ -238,7 +238,7 @@ export default function Create() {
 
                 securedFetch(`api/graph/${prepareArg(graphName)}/?query=${prepareArg(q)}`, {
                     method: "GET",
-                }).then((response) => response.json()).then((json) => {
+                }, toast).then((response) => response.json()).then((json) => {
                     const data = json.result.data[0]
                     setNodesCount(data.nodes)
                     setEdgesCount(data.edges)

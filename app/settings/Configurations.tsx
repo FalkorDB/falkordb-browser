@@ -134,14 +134,7 @@ export default function Configurations() {
                     method: 'GET',
                 }, toast)
 
-                if (!result.ok) {
-                    toast({
-                        title: "Error",
-                        description: "Failed to fetch configurations value",
-                        variant: "destructive"
-                    })
-                    return config
-                }
+                if (!result.ok) return config
 
                 let value = (await result.json()).config[1]
 
@@ -211,12 +204,6 @@ export default function Configurations() {
                 title: "Success",
                 description: "Configuration value set successfully",
                 action: isUndo ? <ToastButton onClick={() => handelSetConfig(name, oldValue.toString(), false)} /> : undefined
-            })
-        } else {
-            toast({
-                title: "Error",
-                description: "Failed to set configuration value",
-                variant: "destructive"
             })
         }
 

@@ -13,7 +13,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { user: stri
     const username = params.user
     const role = ROLE.get(req.nextUrl.searchParams.get("role") || "")
     try {
-        if (!role) throw new Error("Role is missing")
+        if (!role) return console.log("Role is missing")
 
         await (await client.connection).aclSetUser(username, role)
         return NextResponse.json({ message: "User created" },{status: 200})

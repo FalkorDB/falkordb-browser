@@ -17,7 +17,7 @@ export default function DeleteGraph({ graphName, isOpen, onOpen, onDeleteGraph, 
         const name = `${graphName}${isSchema ? "_schema" : ""}`
         const result = await securedFetch(`/api/graph/${prepareArg(name)}`, {
             method: "DELETE",
-        });
+        }, toast);
 
         if (result.ok) {
             toast({
