@@ -1,5 +1,8 @@
 /* eslint-disable consistent-return */
 /* eslint-disable react-hooks/exhaustive-deps */
+
+"use client";
+
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import { Editor, Monaco } from "@monaco-editor/react"
 import { useEffect, useRef, useState } from "react"
@@ -7,6 +10,7 @@ import * as monaco from "monaco-editor";
 import { prepareArg, securedFetch } from "@/lib/utils";
 import { Maximize2 } from "lucide-react";
 import { Session } from "next-auth";
+import { useToast } from "@/components/ui/use-toast";
 import { Graph } from "../api/graph/model";
 import Button from "./ui/Button";
 
@@ -216,6 +220,7 @@ export default function EditorComponent({ currentQuery, historyQueries, setCurre
         currentQuery,
         historyCounter: historyQueries.length
     })
+    const { toast } = useToast()
 
     useEffect(() => {
         historyRef.current.historyQueries = historyQueries
@@ -280,7 +285,7 @@ export default function EditorComponent({ currentQuery, historyQueries, setCurre
 
         await securedFetch(`api/graph/${prepareArg(graph.Id)}/?query=${prepareArg(labelsQuery)}&role=${data?.user.role}`, {
             method: "GET"
-        }).then((res) => res.json()).then((json) => {
+        }, toast).then((res) => res.json()).then((json) => {
             json.result.data.forEach(({ label }: { label: string }) => {
                 sug.push({
                     label,
@@ -298,7 +303,7 @@ export default function EditorComponent({ currentQuery, historyQueries, setCurre
 
         await securedFetch(`api/graph/${prepareArg(graph.Id)}/?query=${prepareArg(relationshipTypeQuery)}&role=${data?.user.role}`, {
             method: "GET"
-        }).then((res) => res.json()).then((json) => {
+        }, toast).then((res) => res.json()).then((json) => {
             json.result.data.forEach(({ relationshipType }: { relationshipType: string }) => {
                 sug.push({
                     label: relationshipType,
@@ -316,7 +321,7 @@ export default function EditorComponent({ currentQuery, historyQueries, setCurre
 
         await securedFetch(`api/graph/${prepareArg(graph.Id)}/?query=${prepareArg(propertyKeysQuery)}&role=${data?.user.role}`, {
             method: "GET"
-        }).then((res) => res.json()).then((json) => {
+        }, toast).then((res) => res.json()).then((json) => {
             json.result.data.forEach(({ propertyKey }: { propertyKey: string }) => {
                 sug.push({
                     label: propertyKey,
@@ -333,7 +338,7 @@ export default function EditorComponent({ currentQuery, historyQueries, setCurre
         const proceduresQuery = `CALL dbms.procedures() YIELD name`
         await securedFetch(`api/graph/${prepareArg(graph.Id)}/?query=${prepareArg(proceduresQuery)}&role=${data?.user.role}`, {
             method: "GET"
-        }).then((res) => res.json()).then((json) => {
+        }, toast).then((res) => res.json()).then((json) => {
             [...json.result.data.map(({ name }: { name: string }) => name), ...FUNCTIONS].forEach((name: string) => {
                 functions.push({
                     label: name,
