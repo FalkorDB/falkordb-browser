@@ -18,7 +18,7 @@ interface Props {
     deleteDisabled?: boolean,
     cooldownTime: number | undefined
     setCooldownTime: Dispatch<SetStateAction<number | undefined>>
-    handelCooldown: () => void
+    handleCooldown: () => void
     selectedElementsLength: number
 }
 
@@ -32,7 +32,7 @@ export default function Toolbar({
     deleteDisabled,
     cooldownTime,
     setCooldownTime,
-    handelCooldown,
+    handleCooldown,
     selectedElementsLength
 }: Props) {
 
@@ -52,7 +52,7 @@ export default function Toolbar({
         }
     }
 
-    const handelDeleteElement = async () => {
+    const handleDeleteElement = async () => {
         if (!onDeleteElement) return
         await onDeleteElement()
         setDeleteOpen(false)
@@ -85,7 +85,7 @@ export default function Toolbar({
                     description={`Are you sure you want to delete this ${selectedElementsLength > 1 ? "elements" : "element"}?`}
                     open={deleteOpen}
                     setOpen={setDeleteOpen}
-                    onDeleteElement={handelDeleteElement}
+                    onDeleteElement={handleDeleteElement}
                     trigger={
                         <Button
                             className="text-nowrap"
@@ -138,7 +138,7 @@ export default function Toolbar({
                     onClick={() => {
                         setCooldownTime(cooldownTime !== undefined ? undefined : 2000)
                         if (cooldownTime !== undefined) {
-                            handelCooldown()
+                            handleCooldown()
                         }
                     }}
                 >

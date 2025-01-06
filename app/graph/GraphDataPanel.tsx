@@ -40,7 +40,7 @@ export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement,
     const type = !("source" in obj)
     const { toast } = useToast()
 
-    const handelSetEditable = (key: string, val: string) => {
+    const handleSetEditable = (key: string, val: string) => {
         if (key !== "") {
             setIsAddValue(false)
         }
@@ -94,7 +94,7 @@ export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement,
                     }
                 } as Node
             })
-            handelSetEditable("", "")
+            handleSetEditable("", "")
             toast({
                 title: "Success",
                 description: `Attribute ${actionType}`,
@@ -106,7 +106,7 @@ export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement,
         return success
     }
 
-    const handelAddValue = async (key: string, value: string) => {
+    const handleAddValue = async (key: string, value: string) => {
         if (!key || key === "" || !value || value === "") {
             toast({
                 title: "Error",
@@ -144,7 +144,7 @@ export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement,
             toast({
                 title: "Success",
                 description: "Attribute removed",
-                action: <ToastButton onClick={() => handelAddValue(key, value)} />,
+                action: <ToastButton onClick={() => handleAddValue(key, value)} />,
                 variant: "default"
             })
         }
@@ -152,7 +152,7 @@ export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement,
         return success
     }
 
-    const handelAddKeyDown = async (e: React.KeyboardEvent<HTMLInputElement>) => {
+    const handleAddKeyDown = async (e: React.KeyboardEvent<HTMLInputElement>) => {
         if (e.key === "Escape") {
             setIsAddValue(false)
             setNewKey("")
@@ -162,12 +162,12 @@ export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement,
 
         if (e.key !== "Enter") return
 
-        handelAddValue(newKey, newVal)
+        handleAddValue(newKey, newVal)
     }
 
-    const handelSetKeyDown = async (e: React.KeyboardEvent<HTMLInputElement>) => {
+    const handleSetKeyDown = async (e: React.KeyboardEvent<HTMLInputElement>) => {
         if (e.key === "Escape") {
-            handelSetEditable("", "")
+            handleSetEditable("", "")
             setNewKey("")
         }
 
@@ -220,14 +220,14 @@ export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement,
                                                     </Button>
                                                     <Button variant="button" onClick={(e) => {
                                                         e.stopPropagation()
-                                                        handelSetEditable("", "")
+                                                        handleSetEditable("", "")
                                                     }}>
                                                         <X size={20} />
                                                     </Button>
                                                 </>
                                                 : hover === key &&
                                                 <>
-                                                    <Button variant="button" onClick={() => handelSetEditable(key, obj.data[key])}>
+                                                    <Button variant="button" onClick={() => handleSetEditable(key, obj.data[key])}>
                                                         <Pencil size={20} />
                                                     </Button>
                                                     <DialogComponent
@@ -265,13 +265,13 @@ export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement,
                                                 className="w-full"
                                                 value={newVal}
                                                 onChange={(e) => setNewVal(e.target.value)}
-                                                onKeyDown={handelSetKeyDown}
-                                                onBlur={() => handelSetEditable("", "")}
+                                                onKeyDown={handleSetKeyDown}
+                                                onBlur={() => handleSetEditable("", "")}
                                             />
                                             : <Button
                                                 label={obj.data[key]}
                                                 variant="button"
-                                                onClick={() => handelSetEditable(key, obj.data[key])}
+                                                onClick={() => handleSetEditable(key, obj.data[key])}
                                             />
                                     }
                                 </TableCell>
@@ -284,7 +284,7 @@ export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement,
                             <TableCell className="flex flex-col items-center gap-2">
                                 <Button
                                     variant="button"
-                                    onClick={() => handelAddValue(newKey, newVal)}
+                                    onClick={() => handleAddValue(newKey, newVal)}
                                 >
                                     <Check size={20} />
                                 </Button>
@@ -297,7 +297,7 @@ export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement,
                                     className="w-full"
                                     value={newKey}
                                     onChange={(e) => setNewKey(e.target.value)}
-                                    onKeyDown={handelAddKeyDown}
+                                    onKeyDown={handleAddKeyDown}
                                 />
                             </TableCell>
                             <TableCell>
@@ -305,7 +305,7 @@ export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement,
                                     className="w-full"
                                     value={newVal}
                                     onChange={(e) => setNewVal(e.target.value)}
-                                    onKeyDown={handelAddKeyDown}
+                                    onKeyDown={handleAddKeyDown}
                                 />
                             </TableCell>
                         </TableRow>

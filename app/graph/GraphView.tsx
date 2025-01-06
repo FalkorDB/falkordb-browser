@@ -107,7 +107,7 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
         onExpand(!!selectedElement)
     }, [selectedElement])
 
-    const handelCooldown = () => {
+    const handleCooldown = () => {
         setCooldownTicks(1000)
     }
 
@@ -141,7 +141,7 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
         setData({ ...graph.Elements })
     }
 
-    const handelDeleteElement = async () => {
+    const handleDeleteElement = async () => {
         if (selectedElements.length === 0 && selectedElement) {
             selectedElements.push(selectedElement)
             setSelectedElement(undefined)
@@ -191,13 +191,13 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
             title: "Success",
             description: `${selectedElements.length > 1 ? "Elements" : "Element"} deleted`,
         })
-        handelCooldown()
+        handleCooldown()
     }
 
-    const handelRunQuery = async (q: string) => {
+    const handleRunQuery = async (q: string) => {
         await runQuery(q)
         chartRef.current?.zoomToFit(1000, 40)
-        handelCooldown()
+        handleCooldown()
     }
 
     return (
@@ -212,7 +212,7 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
                     maximize={maximize}
                     currentQuery={query}
                     historyQueries={historyQueries}
-                    runQuery={handelRunQuery}
+                    runQuery={handleRunQuery}
                     setCurrentQuery={setQuery}
                     data={session}
                 />
@@ -243,11 +243,11 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
                                     selectedElementsLength={selectedElements.length + (selectedElement ? 1 : 0)}
                                     disabled={!graph.Id}
                                     deleteDisabled={(Object.values(selectedElements).length === 0 && !selectedElement) || session?.user.role === "Read-Only"}
-                                    onDeleteElement={handelDeleteElement}
+                                    onDeleteElement={handleDeleteElement}
                                     chartRef={chartRef}
                                     cooldownTime={cooldownTime}
                                     setCooldownTime={setCooldownTime}
-                                    handelCooldown={handelCooldown}
+                                    handleCooldown={handleCooldown}
                                     addDisabled
                                 />
                                 {
@@ -328,7 +328,7 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
                         setObj={setSelectedElement}
                         onExpand={onExpand}
                         graph={graph}
-                        onDeleteElement={handelDeleteElement}
+                        onDeleteElement={handleDeleteElement}
                         data={session}
                     />
                 }

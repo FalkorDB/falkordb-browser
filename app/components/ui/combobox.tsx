@@ -35,7 +35,7 @@ export default function Combobox({ isSelectGraph = false, disabled = false, inTa
   const { toast } = useToast()
 
 
-  const handelSetOption = async (option: string, optionName: string) => {
+  const handleSetOption = async (option: string, optionName: string) => {
     const result = await securedFetch(`api/graph/${prepareArg(optionName)}/?sourceName=${prepareArg(option)}`, {
       method: "PATCH",
       headers: {
@@ -51,25 +51,25 @@ export default function Combobox({ isSelectGraph = false, disabled = false, inTa
 
       if (setSelectedValue) setSelectedValue(optionName)
 
-      handelSetRows(newOptions)
+      handleSetRows(newOptions)
     }
 
     return result.ok
   }
 
-  const handelSetRows = (opts: string[]) => {
-    setRows(opts.map(opt => ({ checked: false, name: opt, cells: [{ value: opt, onChange: (value: string) => handelSetOption(value, opt) }] })))
+  const handleSetRows = (opts: string[]) => {
+    setRows(opts.map(opt => ({ checked: false, name: opt, cells: [{ value: opt, onChange: (value: string) => handleSetOption(value, opt) }] })))
   }
 
   useEffect(() => {
-    setRows(options.map(opt => ({ checked: false, name: opt, cells: [{ value: opt, onChange: (value: string) => handelSetOption(value, opt) }] })))
+    setRows(options.map(opt => ({ checked: false, name: opt, cells: [{ value: opt, onChange: (value: string) => handleSetOption(value, opt) }] })))
 
     if (options.length !== 1 || !setSelectedValue) return
 
     setSelectedValue(options[0])
   }, [options])
 
-  const handelDelete = async (opts: string[]) => {
+  const handleDelete = async (opts: string[]) => {
     const names = opts.map(opt => isSchema ? `${opt}_schema` : opt)
 
     names.forEach(async (name) => {
@@ -87,7 +87,7 @@ export default function Combobox({ isSelectGraph = false, disabled = false, inTa
     })
 
     setOpenMenage(false)
-    handelSetRows(options.filter(opt => !opts.includes(opt)))
+    handleSetRows(options.filter(opt => !opts.includes(opt)))
   }
 
   return (
@@ -97,7 +97,7 @@ export default function Combobox({ isSelectGraph = false, disabled = false, inTa
         if (onOpenChange) onOpenChange(o)
       }}>
         <SelectTrigger disabled={disabled || options.length === 0} title={options.length === 0 ? "There is no graphs" : ""} className={cn("w-fit gap-2 border-none p-2", inTable ? "text-sm font-light" : "text-xl font-medium")}>
-          <SelectValue placeholder={`Select ${type || "Graph"}`} />
+          <SelectValue title={selectedValue || `Select ${type || "Graph"}`} placeholder={`Select ${type || "Graph"}`} />
         </SelectTrigger>
         <SelectContent className="min-w-52 max-h-[30lvh] bg-foreground">
           <SelectGroup>
@@ -142,7 +142,7 @@ export default function Combobox({ isSelectGraph = false, disabled = false, inTa
           <Button
             disabled={rows.filter(opt => opt.checked).length === 0}
             label="Delete"
-            onClick={() => handelDelete(rows.filter(opt => opt.checked).map(opt => opt.cells[0].value))}
+            onClick={() => handleDelete(rows.filter(opt => opt.checked).map(opt => opt.cells[0].value))}
           />
           <ExportGraph selectedValues={rows.filter(opt => opt.checked).map(opt => opt.cells[0].value)} type={type!} />
         </TableComponent>

@@ -16,6 +16,7 @@ import Labels from "../graph/labels"
 import { Category, Graph, Link, Node, GraphData } from "../api/graph/model"
 import Button from "../components/ui/Button"
 import CreateElement from "./SchemaCreateElement"
+import ToastButton from "../components/ToastButton"
 
 const ForceGraph = dynamic(() => import("../components/ForceGraph"), { ssr: false })
 
@@ -65,7 +66,7 @@ export default function SchemaView({ schema, fetchCount, session }: Props) {
         setSelectedNodes([undefined, undefined])
     }, [isAddRelation])
 
-    const handelCooldown = () => {
+    const handleCooldown = () => {
         setCooldownTicks(1000)
     }
 
@@ -91,7 +92,7 @@ export default function SchemaView({ schema, fetchCount, session }: Props) {
         setData({ ...schema.Elements })
     }
 
-    const handelSetSelectedElement = (element?: Node | Link | undefined) => {
+    const handleSetSelectedElement = (element?: Node | Link | undefined) => {
         setSelectedElement(element)
         if (isAddRelation || isAddEntity) return
         if (element) {
@@ -113,7 +114,7 @@ export default function SchemaView({ schema, fetchCount, session }: Props) {
         }
     }
 
-    const handelDeleteElement = async () => {
+    const handleDeleteElement = async () => {
         const stateSelectedElements = Object.values(selectedElements)
 
         if (stateSelectedElements.length === 0 && selectedElement) {
@@ -164,10 +165,10 @@ export default function SchemaView({ schema, fetchCount, session }: Props) {
         dataPanel.current?.collapse()
     }
 
-    const handelSetAttributes = async (attribute: [string, string[]]) => {
-        const [key, value] = attribute;
+    const handleSetAttributes = async (attribute: [string, string[]]) => {
         if (!selectedElement) return false
-
+        
+        const [key, value] = attribute;
         const type = !("source" in selectedElement)
         const { id } = selectedElement
         const q = `MATCH ${type ? "(e)" : "()-[e]-()"} WHERE ID(e) = ${id} SET e.${key} = "${value.join(",")}"`
@@ -200,7 +201,7 @@ export default function SchemaView({ schema, fetchCount, session }: Props) {
         return ok
     }
 
-    // const handelSetCategory = async (category: string) => {
+    // const handleSetCategory = async (category: string) => {
     //     if (!selectedElement) return false
 
     //     const { id } = getElementId(selectedElement)
@@ -239,7 +240,7 @@ export default function SchemaView({ schema, fetchCount, session }: Props) {
     //     return success
     // }
 
-    const handelRemoveProperty = async (key: string) => {
+    const handleRemoveProperty = async (key: string) => {
         if (!selectedElement) return false
 
         const type = !("source" in selectedElement)
@@ -335,12 +336,12 @@ export default function SchemaView({ schema, fetchCount, session }: Props) {
                             if (dataPanel.current?.isExpanded()) return
                             onExpand()
                         }}
-                        onDeleteElement={handelDeleteElement}
+                        onDeleteElement={handleDeleteElement}
                         chartRef={chartRef}
                         addDisabled={session?.user.role === "Read-Only"}
                         setCooldownTime={setCooldownTime}
                         cooldownTime={cooldownTime}
-                        handelCooldown={handelCooldown}
+                        handleCooldown={handleCooldown}
                     />
                     {
                         isCollapsed &&
@@ -371,14 +372,14 @@ export default function SchemaView({ schema, fetchCount, session }: Props) {
                         data={data}
                         graph={schema}
                         selectedElement={selectedElement}
-                        setSelectedElement={handelSetSelectedElement}
+                        setSelectedElement={handleSetSelectedElement}
                         selectedElements={selectedElements}
                         setSelectedElements={setSelectedElements}
                         cooldownTicks={cooldownTicks}
                         setCooldownTicks={setCooldownTicks}
                         cooldownTime={cooldownTime}
                         type="schema"
-                        isAddElement={isAddEntity || isAddRelation}
+                        isAddElement={isAddRelation}
                         setSelectedNodes={setSelectedNodes}
                     />
                     {
@@ -406,9 +407,9 @@ export default function SchemaView({ schema, fetchCount, session }: Props) {
                         <SchemaDataPanel
                             obj={selectedElement}
                             onExpand={onExpand}
-                            onSetAttributes={handelSetAttributes}
-                            onRemoveAttribute={handelRemoveProperty}
-                            onDeleteElement={handelDeleteElement}
+                            onSetAttributes={handleSetAttributes}
+                            onRemoveAttribute={handleRemoveProperty}
+                            onDeleteElement={handleDeleteElement}
                         />
                         : (isAddEntity || isAddRelation) &&
                         <CreateElement

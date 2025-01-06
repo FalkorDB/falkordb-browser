@@ -157,7 +157,7 @@ export default function Configurations() {
                     {
                         value: config.value.toString(),
                         onChange: !disableRunTimeConfigs.has(config.name) ?
-                            (value: string) => handelSetConfig(config.name, value, true)
+                            (value: string) => handleSetConfig(config.name, value, true)
                             : undefined
                     }
                 ],
@@ -166,7 +166,7 @@ export default function Configurations() {
         run()
     }, [])
 
-    const handelSetConfig = async (name: string, value: string, isUndo: boolean) => {
+    const handleSetConfig = async (name: string, value: string, isUndo: boolean) => {
 
         if (!value) {
             toast({
@@ -203,7 +203,7 @@ export default function Configurations() {
             toast({
                 title: "Success",
                 description: "Configuration value set successfully",
-                action: isUndo ? <ToastButton onClick={() => handelSetConfig(name, oldValue.toString(), false)} /> : undefined
+                action: isUndo ? <ToastButton onClick={() => handleSetConfig(name, oldValue.toString(), false)} /> : undefined
             })
         }
 

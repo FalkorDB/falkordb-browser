@@ -37,7 +37,7 @@ export default function TableComponent({ headers, rows, children, setRows }: Pro
     const [editable, setEditable] = useState<string>("")
     const [newValue, setNewValue] = useState<string>("")
 
-    const handelSetEditable = (editValue: string, value: string) => {
+    const handleSetEditable = (editValue: string, value: string) => {
         setEditable(editValue)
         setNewValue(value)
     }
@@ -155,13 +155,13 @@ export default function TableComponent({ headers, rows, children, setRows }: Pro
                                                                         ref={ref => ref?.focus()}
                                                                         variant="primary"
                                                                         className="grow"
-                                                                        onBlur={() => handelSetEditable("", cell.value)}
+                                                                        onBlur={() => handleSetEditable("", cell.value)}
                                                                         value={newValue}
                                                                         onChange={(e) => setNewValue(e.target.value)}
                                                                         onKeyDown={async (e) => {
                                                                             if (e.key === "Escape") {
                                                                                 e.preventDefault()
-                                                                                handelSetEditable("", cell.value)
+                                                                                handleSetEditable("", cell.value)
                                                                             }
 
                                                                             if (e.key !== "Enter") return
@@ -169,7 +169,7 @@ export default function TableComponent({ headers, rows, children, setRows }: Pro
                                                                             e.preventDefault()
                                                                             const result = await cell.onChange!(newValue)
                                                                             if (result) {
-                                                                                handelSetEditable("", cell.value)
+                                                                                handleSetEditable("", cell.value)
                                                                             }
                                                                         }}
                                                                     />
@@ -183,7 +183,7 @@ export default function TableComponent({ headers, rows, children, setRows }: Pro
                                                                         <Button
                                                                             title="Cancel"
                                                                             onClick={() => {
-                                                                                handelSetEditable("", cell.value)
+                                                                                handleSetEditable("", cell.value)
                                                                             }}
                                                                         >
                                                                             <XCircle className="w-4 h-4" />
@@ -193,7 +193,7 @@ export default function TableComponent({ headers, rows, children, setRows }: Pro
                                                                 : <button
                                                                     disabled={!cell.onChange}
                                                                     type="button"
-                                                                    onClick={() => handelSetEditable(`${i}-${j}`, cell.value)}
+                                                                    onClick={() => handleSetEditable(`${i}-${j}`, cell.value)}
                                                                 >
                                                                     {cell.value}
                                                                 </button>

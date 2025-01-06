@@ -99,7 +99,7 @@ export default function ForceGraph({
         graph.removeLinks()
     }
 
-    const handelNodeRightClick = async (node: Node) => {
+    const handleNodeRightClick = async (node: Node) => {
         if (!node.expand) {
             await onFetchNode(node)
         } else {
@@ -107,7 +107,7 @@ export default function ForceGraph({
         }
     }
 
-    const handelHover = (element: Node | Link | null) => {
+    const handleHover = (element: Node | Link | null) => {
         setHoverElement(element === null ? undefined : element)
     }
 
@@ -265,9 +265,9 @@ export default function ForceGraph({
                 }}
                 onNodeClick={handleClick}
                 onLinkClick={handleClick}
-                onNodeHover={handelHover}
-                onLinkHover={handelHover}
-                onNodeRightClick={handelNodeRightClick}
+                onNodeHover={handleHover}
+                onLinkHover={handleHover}
+                onNodeRightClick={handleNodeRightClick}
                 onBackgroundClick={handleUnselected}
                 onBackgroundRightClick={handleUnselected}
                 onEngineStop={() => {

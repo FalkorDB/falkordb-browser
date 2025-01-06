@@ -4,13 +4,14 @@
 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dispatch, SetStateAction, useState } from "react";
-import { ArrowRight, ArrowRightLeft, Check, ChevronRight, Pencil, Plus, Trash2, X } from "lucide-react";
+import { ArrowRight, ArrowRightLeft, Check, CheckCircle, ChevronRight, Pencil, Plus, Trash2, X, XCircle } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/components/ui/use-toast";
 import Button from "../components/ui/Button";
 import Combobox from "../components/ui/combobox";
 import { Node } from "../api/graph/model";
 import Input from "../components/ui/Input";
+import ToastButton from "../components/ToastButton";
 
 interface Props {
   onCreate: (element: [string, string[]][], label?: string) => Promise<boolean>
@@ -37,27 +38,33 @@ export default function SchemaCreateElement({ onCreate, onExpand, selectedNodes,
   const [editable, setEditable] = useState<string>("")
   const [hover, setHover] = useState<string>("")
   const { toast } = useToast()
-  
-  const handelSetEditable = (att: [string, string[]] = getDefaultAttribute()) => {
+
+  const handleSetEditable = (att: [string, string[]] = getDefaultAttribute()) => {
     setAttribute(att)
     setEditable(att[0])
   }
 
-  const handelAddAttribute = () => {
-    if (!newAttribute[0] || newAttribute[1].some((v) => !v)) {
+  const handleAddAttribute = (att?: [string, string[]]) => {
+    const newAtt = att || newAttribute
+
+    if (!newAtt[0] || newAtt[1].some((v) => !v)) {
       toast({
         title: "Error",
         description: "You must type a key, type and a description in order to add a new property",
         variant: "destructive"
       })
+
       return
     }
-    setAttributes(prev => [...prev, newAttribute])
+
+    setAttributes(prev => [...prev, newAtt])
     setNewAttribute(getDefaultAttribute())
   }
 
-  const handelSetAttributes = () => {
-    if (!attribute[0] || attribute[1].some((v) => !v)) {
+  const handleSetAttribute = (isUndo: boolean, att?: [string, string[]]) => {
+    const newAtt = att || attribute
+    
+    if (!newAtt[0] || newAtt[1].some((v) => !v)) {
       toast({
         title: "Error",
         description: "You must type a key, type and a description in order to edit a property",
@@ -66,14 +73,21 @@ export default function SchemaCreateElement({ onCreate, onExpand, selectedNodes,
       return
     }
 
-    setAttributes(prev => prev.map(([key, val]) => key === attribute[0] ? attribute : [key, val]))
+    const oldAttribute = attributes.find(([k]) => k === newAtt[0])
+    setAttributes(prev => prev.map(([key, val]) => key === newAtt[0] ? newAtt : [key, val]))
     setAttribute(getDefaultAttribute())
+    handleSetEditable()
+    toast({
+      title: "Success",
+      description: "Attribute set",
+      action: isUndo ? <ToastButton onClick={() => handleSetAttribute(false, oldAttribute)} /> : undefined
+    })
   }
 
-  const handelKeyDown = (e: React.KeyboardEvent<HTMLInputElement>, handel: () => void, setter: () => void) => {
+  const handleSetKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.code === "Escape") {
       e.preventDefault()
-      setter()
+      handleSetEditable()
       return
     }
 
@@ -81,10 +95,24 @@ export default function SchemaCreateElement({ onCreate, onExpand, selectedNodes,
 
     e.preventDefault()
 
-    handel()
+    handleSetAttribute(true)
   }
 
-  const handelOnCreate = async () => {
+  const handleAddKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.code === "Escape") {
+      e.preventDefault()
+      setNewAttribute(getDefaultAttribute())
+      return
+    }
+
+    if (e.key !== 'Enter') return
+
+    e.preventDefault()
+
+    handleAddAttribute()
+  }
+
+  const handleOnCreate = async () => {
     if (!label && !type) {
       toast({
         title: "Error",
@@ -101,18 +129,12 @@ export default function SchemaCreateElement({ onCreate, onExpand, selectedNodes,
     setLabelEditable(false)
   }
 
-  const handelLabelCancel = () => {
+  const handleLabelCancel = () => {
     setLabel("")
     setLabelEditable(false)
   }
 
-  const onSetLabel = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Escape") {
-      handelLabelCancel()
-    }
-
-    if (e.key !== "Enter") return
-
+  const handleSetLabel = () => {
     if (!newLabel) {
       toast({
         title: "Error",
@@ -126,6 +148,17 @@ export default function SchemaCreateElement({ onCreate, onExpand, selectedNodes,
     setLabelEditable(false)
   }
 
+  const handleSetLabelKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Escape") {
+      handleLabelCancel()
+    }
+
+    if (e.key !== "Enter") return
+
+    handleSetLabel()
+
+  }
+
   return (
     <div className="DataPanel">
       <div className="w-full flex justify-between items-center p-4">
@@ -137,14 +170,24 @@ export default function SchemaCreateElement({ onCreate, onExpand, selectedNodes,
           </Button>
           {
             labelEditable ?
-              <Input
-                ref={ref => ref?.focus()}
-                className="w-full"
-                onChange={(e) => setNewLabel(e.target.value)}
-                value={newLabel}
-                onBlur={handelLabelCancel}
-                onKeyDown={onSetLabel}
-              /> : <Button
+              <div className="flex gap-4 items-center">
+                <Input
+                  ref={ref => ref?.focus()}
+                  className="w-full"
+                  onChange={(e) => setNewLabel(e.target.value)}
+                  value={newLabel}
+                  onKeyDown={handleSetLabelKeyDown}
+
+                />
+                <div className="flex flex-col gap-1">
+                  <Button onClick={handleSetLabel}>
+                    <CheckCircle size={20} />
+                  </Button>
+                  <Button onClick={handleLabelCancel}>
+                    <XCircle size={20} />
+                  </Button>
+                </div>
+              </div> : <Button
                 className="underline underline-offset-2"
                 label={label || "Edit Label"}
                 onClick={() => setLabelEditable(true)}
@@ -171,12 +214,12 @@ export default function SchemaCreateElement({ onCreate, onExpand, selectedNodes,
               attributes.length > 0 &&
               attributes.map(([key, val]) => (
                 <TableRow
-                  className="cursor-pointer p-2"
+                  className="cursor-pointer p-2 h-20"
                   onClick={() => {
                     if (editable === key) return
-                    handelSetEditable([key, [...val]])
+                    handleSetEditable([key, [...val]])
                   }}
-                  // onBlur={(e) => !e.currentTarget.contains(e.relatedTarget as Node) && handelSetEditable()}
+                  // onBlur={(e) => !e.currentTarget.contains(e.relatedTarget as Node) && handleSetEditable()}
                   onMouseEnter={() => setHover(key)}
                   onMouseLeave={() => setHover("")}
                   key={key}
@@ -204,7 +247,7 @@ export default function SchemaCreateElement({ onCreate, onExpand, selectedNodes,
                         <TableCell>
                           <Input
                             className="w-full"
-                            onKeyDown={(e) => handelKeyDown(e, handelSetAttributes, handelSetEditable)}
+                            onKeyDown={handleSetKeyDown}
                             onChange={(e) => setAttribute(prev => {
                               const p: [string, string[]] = [...prev]
                               p[1][1] = e.target.value
@@ -241,28 +284,26 @@ export default function SchemaCreateElement({ onCreate, onExpand, selectedNodes,
                       ))
                   }
                   <TableCell>
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 w-44">
                       {
                         editable === key ?
                           <>
                             <Button
-                              className="p-2 justify-center border border-[#232341]"
-                              variant="Secondary"
+                              className="p-2 justify-center border border-foreground rounded-lg"
                               label="Save"
                               onClick={(e) => {
                                 e.stopPropagation()
-                                handelSetAttributes()
+                                handleSetAttribute(true)
                               }}
                             >
                               <Check size={20} />
                             </Button>
                             <Button
-                              className="p-2 justify-center border border-[#232341]"
-                              variant="Secondary"
+                              className="p-2 justify-center border border-foreground rounded-lg"
                               label="Cancel"
                               onClick={(e) => {
                                 e.stopPropagation()
-                                handelSetEditable()
+                                handleSetEditable()
                               }}
                             >
                               <X size={20} />
@@ -271,23 +312,27 @@ export default function SchemaCreateElement({ onCreate, onExpand, selectedNodes,
                           : hover === key &&
                           <>
                             <Button
-                              className="p-2 justify-center border border-[#232341]"
-                              variant="Secondary"
+                              className="p-2 justify-center border border-foreground rounded-lg"
                               label="Remove"
                               onClick={(e) => {
                                 e.stopPropagation()
+                                const oldAttribute = attributes.find(([k]) => k === key)
                                 setAttributes(prev => prev.filter(([k]) => k !== key))
+                                toast({
+                                  title: "Success",
+                                  description: "Attribute removed",
+                                  action: oldAttribute && <ToastButton onClick={() => handleAddAttribute(oldAttribute)} />
+                                })
                               }}
                             >
                               <Trash2 size={20} />
                             </Button>
                             <Button
-                              className="p-2 justify-center border border-[#232341]"
-                              variant="Secondary"
+                              className="p-2 justify-center border border-foreground rounded-lg"
                               label="Edit"
                               onClick={(e) => {
                                 e.stopPropagation()
-                                handelSetEditable([key, [...val]])
+                                handleSetEditable([key, [...val]])
                               }}
                             >
                               <Pencil size={20} />
@@ -303,7 +348,7 @@ export default function SchemaCreateElement({ onCreate, onExpand, selectedNodes,
               <TableCell>
                 <Input
                   className="w-full"
-                  onKeyDown={(e) => handelKeyDown(e, handelAddAttribute, () => setNewAttribute(getDefaultAttribute()))}
+                  onKeyDown={handleAddKeyDown}
                   onChange={(e) => setNewAttribute(prev => {
                     const p: [string, string[]] = [...prev]
                     p[0] = e.target.value
@@ -328,7 +373,7 @@ export default function SchemaCreateElement({ onCreate, onExpand, selectedNodes,
               <TableCell>
                 <Input
                   className="w-full"
-                  onKeyDown={(e) => handelKeyDown(e, handelAddAttribute, () => setNewAttribute(getDefaultAttribute()))}
+                  onKeyDown={handleAddKeyDown}
                   onChange={(e) => setNewAttribute(prev => {
                     const p: [string, string[]] = [...prev]
                     p[1][1] = e.target.value
@@ -362,19 +407,17 @@ export default function SchemaCreateElement({ onCreate, onExpand, selectedNodes,
               <TableCell>
                 <div className="flex gap-2">
                   <Button
-                    className="p-2 justify-center border border-[#232341]"
-                    variant="Secondary"
+                    className="p-2 justify-center border border-foreground rounded-lg"
                     label="Add"
                     onClick={(e) => {
                       e.stopPropagation()
-                      handelAddAttribute()
+                      handleAddAttribute()
                     }}
                   >
                     <Plus size={20} />
                   </Button>
                   <Button
-                    className="p-2 justify-center border border-[#232341]"
-                    variant="Secondary"
+                    className="p-2 justify-center border border-foreground rounded-lg"
                     label="Cancel"
                     onClick={(e) => {
                       e.stopPropagation()
@@ -422,7 +465,7 @@ export default function SchemaCreateElement({ onCreate, onExpand, selectedNodes,
               <TableCell>
                 <div className="flex gap-2">
                   <Button
-                    className="p-2 justify-center border border-[#232341]"
+                    className="p-2 justify-center border border-foreground"
                     disabled
                     variant="Secondary"
                     label="Add"
@@ -430,7 +473,7 @@ export default function SchemaCreateElement({ onCreate, onExpand, selectedNodes,
                     <Plus size={20} />
                   </Button>
                   <Button
-                    className="p-2 justify-center border border-[#232341]"
+                    className="p-2 justify-center border border-foreground"
                     disabled
                     variant="Secondary"
                     label="Cancel"
@@ -475,14 +518,14 @@ export default function SchemaCreateElement({ onCreate, onExpand, selectedNodes,
         <div className="p-8">
           <form onSubmit={(e) => {
             e.preventDefault();
-            handelOnCreate();
+            handleOnCreate();
           }}>
             <Button
               label={`Create new ${type ? "node" : "edge"}`}
               variant="Primary"
               onClick={(e) => {
                 e.preventDefault();
-                handelOnCreate();
+                handleOnCreate();
               }}
             />
           </form>

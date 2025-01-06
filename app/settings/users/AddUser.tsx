@@ -66,21 +66,21 @@ export default function AddUser({ onAddUser }: {
         }
     ]
 
-    const handelClose = () => {
+    const handleClose = () => {
         setPassword("")
         setConfirmPassword("")
         setUsername("")
         setRole("")
     }
 
-    const handelAddUser = async (e: FormEvent) => {
+    const handleAddUser = async (e: FormEvent) => {
         e.preventDefault();
 
         onAddUser({ username, password, role })
 
         setOpen(false)
 
-        handelClose()
+        handleClose()
     };
 
     return (
@@ -95,7 +95,7 @@ export default function AddUser({ onAddUser }: {
             </SheetTrigger>
             <SheetContent>
                 <FormComponent
-                    handleSubmit={handelAddUser}
+                    handleSubmit={handleAddUser}
                     fields={fields}
                 />
             </SheetContent>

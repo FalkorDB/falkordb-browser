@@ -53,7 +53,7 @@ export default function Users() {
                         value: user.username,
                     }, {
                         value: user.role,
-                        onChange: (value: string) => handelSetRole([user.username], [value])
+                        onChange: (value: string) => handleSetRole([user.username], [value], true)
                     }],
                     checked: false,
                 })))
@@ -62,7 +62,7 @@ export default function Users() {
 
     }, [])
 
-    const handelSetRole = async (usernames: string[], role: string[]) => {
+    const handleSetRole = async (usernames: string[], role: string[], isUndo: boolean) => {
         const oldRoles = usernames.map(username => users.find(user => user.username === username)!.role)
         const updatedUsers = await Promise.all(users.map(async (user, i) => {
 
@@ -94,12 +94,12 @@ export default function Users() {
         toast({
             title: "Success",
             description: `${usernames.join(", ")} role updated successfully`,
-            action: <ToastAction altText="Undo" onClick={() => handelSetRole(usernames, oldRoles)}>Undo</ToastAction>
+            action: isUndo ? <ToastAction altText="Undo" onClick={() => handleSetRole(usernames, oldRoles, false)}>Undo</ToastAction> : undefined
         })
         return true
     }
 
-    const handelAddUser = async ({ username, password, role }: CreateUser) => {
+    const handleAddUser = async ({ username, password, role }: CreateUser) => {
         if (!role) {
             toast({
                 title: "Error",
@@ -134,13 +134,13 @@ export default function Users() {
                 setRows={setRows}
             >
                 <div className="flex flex-row-reverse gap-4">
-                    <AddUser onAddUser={handelAddUser} />
+                    <AddUser onAddUser={handleAddUser} />
                     <DeleteUser users={rows.filter(row => row.checked).map(row => users.find(user => user.username === row.cells[0].value)!)} setUsers={setUsers} />
                     <Combobox
                         disabled={rows.filter(row => row.checked).length === 0}
                         type="Role"
                         options={ROLES}
-                        setSelectedValue={(role) => { handelSetRole(rows.filter(row => row.checked).map(row => row.cells[0].value), [role]) }}
+                        setSelectedValue={(role) => { handleSetRole(rows.filter(row => row.checked).map(row => row.cells[0].value), [role], true) }}
                     />
                 </div>
             </TableComponent>

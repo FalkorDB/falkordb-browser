@@ -18,7 +18,7 @@ export default function View({ graph, setGraph, selectedValue }: {
     const [hover, setHover] = useState<string>("")
     const [editable, setEditable] = useState<string>("")
 
-    const handelPreferencesChange = (colors?: string[]) => {
+    const handlePreferencesChange = (colors?: string[]) => {
         setGraph(Graph.create(graph.Id, { data: graph.Data, metadata: graph.Metadata }, colors || colorsArr))
         if (colors) return
         localStorage.setItem(graph.Id, JSON.stringify(colorsArr));
@@ -148,7 +148,7 @@ export default function View({ graph, setGraph, selectedValue }: {
                         label="Reset"
                         onClick={() => {
                             localStorage.removeItem(graph.Id)
-                            handelPreferencesChange(DEFAULT_COLORS)
+                            handlePreferencesChange(DEFAULT_COLORS)
                         }}
                     >
                         <RotateCcw />
@@ -157,7 +157,7 @@ export default function View({ graph, setGraph, selectedValue }: {
                         disabled={graph.Colors.filter((c, i) => c === colorsArr[i]).length === colorsArr.length && DEFAULT_COLORS.length === colorsArr.length}
                         variant="Primary"
                         label="Apply"
-                        onClick={() => handelPreferencesChange()}
+                        onClick={() => handlePreferencesChange()}
                     >
                         <FileCheck2 />
                     </Button>

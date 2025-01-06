@@ -16,7 +16,7 @@ export default function Duplicate({ open, onOpenChange, selectedValue, onDuplica
     const [duplicateName, setDuplicateName] = useState("");
     const { toast } = useToast()
     
-    const handelDuplicate = async (e: FormEvent) => {
+    const handleDuplicate = async (e: FormEvent) => {
 
         e.preventDefault()
 
@@ -37,7 +37,7 @@ export default function Duplicate({ open, onOpenChange, selectedValue, onDuplica
             description="Enter a new graph name"
             title="Duplicate Graph"
         >
-            <form onSubmit={handelDuplicate} className="flex flex-col gap-12">
+            <form onSubmit={handleDuplicate} className="flex flex-col gap-12">
                 <div className="flex flex-col gap-4">
                     <p className="font-medium text-xl">Graph Name</p>
                     <Input

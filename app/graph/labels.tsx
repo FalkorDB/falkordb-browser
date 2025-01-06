@@ -20,7 +20,7 @@ export default function Labels({ graph, categories, onClick, label, className = 
     const listRef = useRef<HTMLUListElement>(null)
     const isScrollable = listRef.current && listRef.current.scrollHeight > listRef.current.clientHeight
 
-    const handelScroll = (scrollTo: number) => {
+    const handleScroll = (scrollTo: number) => {
         listRef.current?.scrollBy({
             behavior: "smooth",
             top: scrollTo,
@@ -39,7 +39,7 @@ export default function Labels({ graph, categories, onClick, label, className = 
                     <Button
                         className="pointer-events-auto"
                         title="Scroll up"
-                        onClick={() => handelScroll(-200)}
+                        onClick={() => handleScroll(-200)}
                     >
                         <ChevronUp />
                     </Button>
@@ -68,7 +68,7 @@ export default function Labels({ graph, categories, onClick, label, className = 
                     <Button
                         className="pointer-events-auto"
                         title="Scroll down"
-                        onClick={() => handelScroll(200)}
+                        onClick={() => handleScroll(200)}
                     >
                         <ChevronDown />
                     </Button>
