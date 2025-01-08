@@ -2,15 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { getClient } from "@/app/api/auth/[...nextauth]/options";
 
 // eslint-disable-next-line import/prefer-default-export
-export async function GET(request: NextRequest, { params }: { params: { graph: string, node: string } }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ graph: string, node: string }> }) {
 
     const client = await getClient()
     if (client instanceof NextResponse) {
         return client
     }
 
-    const nodeId = parseInt(params.node, 10);
-    const graphId = params.graph;
+    const { graph: graphId, node: nodeId } = await params
 
     const graph = client.selectGraph(graphId);
 

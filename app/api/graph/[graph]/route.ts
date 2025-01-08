@@ -4,14 +4,14 @@ import { prepareArg, securedFetch } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
 
 // eslint-disable-next-line import/prefer-default-export
-export async function DELETE(request: NextRequest, { params }: { params: { graph: string } }) {
+export async function DELETE(request: NextRequest, { params }: { params: Promise<{ graph: string }> }) {
 
     const client = await getClient()
     if (client instanceof NextResponse) {
         return client
     }
 
-    const graphId = params.graph;
+    const { graph: graphId } = await params;
 
     try {
         if (graphId) {
@@ -28,7 +28,7 @@ export async function DELETE(request: NextRequest, { params }: { params: { graph
 }
 
 // eslint-disable-next-line import/prefer-default-export
-export async function POST(request: NextRequest, { params }: { params: { graph: string } }) {
+export async function POST(request: NextRequest, { params }: { params: Promise<{ graph: string }> }) {
 
     const toast = useToast()
     const client = await getClient()
@@ -36,8 +36,7 @@ export async function POST(request: NextRequest, { params }: { params: { graph: 
         return client
     }
 
-
-    const graphId = params.graph;
+    const { graph: graphId } = await params;
     const sourceName = request.nextUrl.searchParams.get("sourceName")
 
     try {
@@ -90,14 +89,14 @@ export async function POST(request: NextRequest, { params }: { params: { graph: 
 }
 
 // eslint-disable-next-line import/prefer-default-export
-export async function PATCH(request: NextRequest, { params }: { params: { graph: string } }) {
+export async function PATCH(request: NextRequest, { params }: { params: Promise<{ graph: string }> }) {
 
     const client = await getClient()
     if (client instanceof NextResponse) {
         return client
     }
 
-    const graphId = params.graph;
+    const { graph: graphId } = await params;
     const sourceName = request.nextUrl.searchParams.get("sourceName")
 
     try {
@@ -113,14 +112,15 @@ export async function PATCH(request: NextRequest, { params }: { params: { graph:
     }
 }
 
-export async function GET(request: NextRequest, { params }: { params: { graph: string } }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ graph: string }> }) {
 
     const client = await getClient()
     if (client instanceof NextResponse) {
         return client
     }
 
-    const graphId = params.graph
+    const { graph: graphId } = await params
+
     const ID = request.nextUrl.searchParams.get("ID")
 
     try {
