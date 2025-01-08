@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getClient } from "@/app/api/auth/[...nextauth]/options";
 import { prepareArg, securedFetch } from "@/lib/utils";
-import { useToast } from "@/components/ui/use-toast";
 
 // eslint-disable-next-line import/prefer-default-export
 export async function DELETE(request: NextRequest, { params }: { params: Promise<{ graph: string }> }) {
@@ -30,7 +29,6 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
 // eslint-disable-next-line import/prefer-default-export
 export async function POST(request: NextRequest, { params }: { params: Promise<{ graph: string }> }) {
 
-    const toast = useToast()
     const client = await getClient()
     if (client instanceof NextResponse) {
         return client
@@ -76,7 +74,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify(data)
-        }, toast)
+        })
 
         const result = await res.json()
 
