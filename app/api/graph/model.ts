@@ -236,7 +236,7 @@ export class Graph {
             });
 
             // remove empty category if there are no more empty nodes category
-            if (this.nodesMap.values().every(n => n.category.some(c => c !== ""))) {
+            if (Array.from(this.nodesMap.values()).every(n => n.category.some(c => c !== ""))) {
                 this.categories = this.categories.filter(l => l.name !== "")
                 this.categoriesMap.delete("")
                 this.categoriesColorIndex -= 1
