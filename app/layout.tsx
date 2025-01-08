@@ -5,7 +5,8 @@ import { Inter } from "next/font/google";
 import { Toaster } from "@/components/ui/toaster";
 import { Metadata } from "next";
 import NextAuthProvider from "./providers";
-import GoogleAnalytics from "./components/GoogleAnalytics";
+import GTM from "./GTM";
+import { cn } from "@/lib/utils";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -24,13 +25,8 @@ export default function RootLayout({
   // caused by mismatched client/server content caused by next-themes
   return (
     <html className="w-screen h-screen" lang="en" suppressHydrationWarning>
-      <body className={`h-full LandingPage ${inter.className}`}>
-        {
-          process.env.NEXT_PUBLIC_GOOGLE_ANALYTICS ? (
-            <GoogleAnalytics ga_id=
-              {process.env.NEXT_PUBLIC_GOOGLE_ANALYTICS} />
-          ) : null
-        }
+      <body className={cn("h-full LandingPage", inter.className)}>
+        <GTM />
         <NextAuthProvider>{children}</NextAuthProvider>
         <Toaster />
       </body>
