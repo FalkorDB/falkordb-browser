@@ -93,6 +93,7 @@ export default function FormComponent({ handleSubmit, fields, error = undefined,
                                         setSelectedValue={field.onSelectedValue}
                                     />
                                     : <Input
+                                        id={field.label}
                                         type={field.type === "password" ? passwordType : field.type}
                                         placeholder={field.placeholder}
                                         value={field.value}

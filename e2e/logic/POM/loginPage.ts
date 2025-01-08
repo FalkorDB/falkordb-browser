@@ -5,15 +5,15 @@ import urls from '../../config/urls.json'
 
 export class LoginPage extends BasePage {
     private get connectBtn(): Locator {
-        return this.page.getByRole("button", { name : "Connect"});
+        return this.page.getByRole("button", { name : "Submit"});
     }
 
     private get usernameInput(): Locator {
-        return this.page.locator("//input[@id='username']");
+        return this.page.locator("//input[@id='Username']");
     }
 
     private get passwordInput(): Locator {
-        return this.page.locator("//input[@id='password']");
+        return this.page.locator("//input[@id='Password']");
     }
 
     async clickOnConnect(): Promise<void> {

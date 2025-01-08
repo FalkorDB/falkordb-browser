@@ -31,7 +31,7 @@ export async function GET() {
 
         return NextResponse.json({ result }, { status: 200 })
     } catch (err: unknown) {
-        console.log(err)
+        console.error(err)
         return NextResponse.json({ message: (err as Error).message }, { status: 400 })
     }
 }
@@ -49,7 +49,7 @@ export async function POST(req: NextRequest) {
     const roleValue = ROLE.get(role)
 
     try {
-        if (!username || !password || !roleValue) return console.log("Missing parameters")
+        if (!username || !password || !roleValue) return console.error("Missing parameters")
 
         try {
             const user = await connection.aclGetUser(username)
@@ -72,7 +72,7 @@ export async function POST(req: NextRequest) {
             }
         )
     } catch (err: unknown) {
-        console.log(err)
+        console.error(err)
         return NextResponse.json({ message: (err as Error).message }, { status: 400 })
     }
 }
