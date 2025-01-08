@@ -33,13 +33,9 @@ export default class NavBarComponent extends BasePage {
     private get settingsButton(): Locator {
         return this.page.locator("//button[@title='Settings']")
     }
-
-    private get clickOnUser(): (user: string) => Locator {
-        return (user: string) => this.page.getByRole("button", { name : `${user}`})
-    }
     
     private get LogoutButton(): Locator {
-        return this.page.locator("//div[contains(text(), 'Logout')]")
+        return this.page.locator("//button[@title='Log Out']")
     }
 
     async clickOnFalkorLogo(): Promise<void> {
@@ -78,7 +74,6 @@ export default class NavBarComponent extends BasePage {
 
     async Logout(user: string): Promise<void> {
         await this.page.waitForLoadState('networkidle'); 
-        await this.clickOnUser(user).click()
         await this.LogoutButton.click()
         await waitForURL(this.page, urls.loginUrl);
     }

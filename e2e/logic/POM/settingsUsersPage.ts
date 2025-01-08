@@ -12,24 +12,28 @@ export default class SettingsUsersPage extends BasePage {
         return this.page.getByRole("button", { name: "Add User" });
     }
 
+    private get submitUserAddition(): Locator {
+        return this.page.getByRole("button", { name: "Submit" });
+    }
+
     private get selectRoleBtn(): Locator {
-        return this.page.getByRole("button", {name: "Select Role"})
+        return this.page.locator("//div[@role='dialog']//button[span[text()='Select Role']]")
     }
 
     private get selectUserRoleInAddUser(): (role: string) => Locator {
-        return (role: string) => this.page.getByRole("button", { name: role });
+        return (role: string) => this.page.locator(`//ul//div[@role='option'][span[contains(text(), '${role}')]]`)
     }
 
     private get userNameField(): Locator {
-        return this.page.locator("//p[contains(text(), 'Username')]/following-sibling::input");
+        return this.page.locator("//input[@id='Username']");
     }
 
     private get passwordField(): Locator {
-        return this.page.locator("//p[normalize-space(text()) = 'Password']/following::input[1]");
+        return this.page.locator("//input[@id='Password']");
     }
 
     private get confirmPasswordField(): Locator {
-        return this.page.locator("//p[contains(text(), 'Confirm Password')]/following-sibling::input");
+        return this.page.locator("//input[@id='Confirm Password']");
     }
 
     private get confirmUserDeleteMsg(): Locator {
@@ -81,12 +85,12 @@ export default class SettingsUsersPage extends BasePage {
     async addUser(userDetails: { [key: string]: string }): Promise<void> {
         await this.page.waitForLoadState('networkidle'); 
         await this.addUserButton.click();
-        await this.selectRoleBtn.click();
-        await this.selectUserRoleInAddUser(userDetails.role).click();
         await this.userNameField.fill(userDetails.userName);
         await this.passwordField.fill(userDetails.password);
         await this.confirmPasswordField.fill(userDetails.confirmPassword);
-        await this.addUserButton.click();
+        await this.selectRoleBtn.click();
+        await this.selectUserRoleInAddUser(userDetails.role).click();
+        await this.submitUserAddition.click();
         await waitForTimeOut(this.page, 1500)
     }
 
