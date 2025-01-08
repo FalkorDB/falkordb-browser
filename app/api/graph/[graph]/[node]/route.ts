@@ -22,6 +22,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         const result = await graph.query(query, { params: { nodeId } });
         return NextResponse.json({ result }, { status: 200 })
     } catch (err: unknown) {
+        console.error(err)
         return NextResponse.json({ message: (err as Error).message }, { status: 400 })
     }
 }

@@ -22,6 +22,7 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
             return NextResponse.json({ message: `${graphId} graph deleted` })
         }
     } catch (err: unknown) {
+        console.error(err)
         return NextResponse.json({ message: (err as Error).message }, { status: 400 })
     }
 }
@@ -49,14 +50,14 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         const key = request.nextUrl.searchParams.get("key")
         const srcs = await request.json()
 
-        if (!key) return console.error("Missing parameter 'key'")
+        if (!key) console.error("Missing parameter 'key'")
 
-        if (!srcs) return console.error("Missing parameter 'srcs'")
+        if (!srcs) console.error("Missing parameter 'srcs'")
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const socket = (await client.connection).options?.socket as any
 
-        if (!socket) return console.error("socket not found")
+        if (!socket) console.error("socket not found")
 
         const data = {
             host: socket.host,
@@ -66,7 +67,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
             openaikey: key,
         }
 
-        if (!type) return console.error("Missing parameter 'type'")
+        if (!type) console.error("Missing parameter 'type'")
 
         const res = await securedFetch(`http://localhost:5000/${prepareArg(type!)}`, {
             method: "POST",
@@ -82,6 +83,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
         return NextResponse.json({ result }, { status: 200 })
     } catch (err: unknown) {
+        console.error(err)
         return NextResponse.json({ message: (err as Error).message }, { status: 400 })
     }
 }
@@ -106,6 +108,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
         return NextResponse.json({ data })
     } catch (err: unknown) {
+        console.error(err)
         return NextResponse.json({ message: (err as Error).message }, { status: 400 })
     }
 }
@@ -135,7 +138,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         const create = request.nextUrl.searchParams.get("create")
         const role = request.nextUrl.searchParams.get("role")
 
-        if (!query) return console.log("Missing parameter query")
+        if (!query) return console.error("Missing parameter query")
 
         if (create === "false" && !(await client.list()).some((g) => g === graphId))
             return NextResponse.json({}, { status: 200 })
@@ -150,6 +153,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
         return NextResponse.json({ result }, { status: 200 })
     } catch (err: unknown) {
+        console.error(err)
         return NextResponse.json({ message: (err as Error).message }, { status: 400 })
     }
 }

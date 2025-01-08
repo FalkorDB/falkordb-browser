@@ -58,6 +58,7 @@ export async function POST(req: NextRequest) {
                 return NextResponse.json({ message: `User ${username} already exists` }, { status: 409 })
             }
         } catch (err: unknown) {
+            console.error(err)
             // Just a workaround for https://github.com/redis/node-redis/issues/2745
         }
 
@@ -95,7 +96,7 @@ export async function DELETE(req: NextRequest) {
 
         return NextResponse.json({ message: "Users deleted" }, { status: 200 })
     } catch (err: unknown) {
-        console.log(err)
+        console.error(err)
         return NextResponse.json({ message: (err as Error).message }, { status: 400 })
     }
 }
