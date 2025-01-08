@@ -2,7 +2,7 @@
 
 "use client"
 
-import { Dispatch, SetStateAction, useState } from "react"
+import { useState } from "react"
 import { AlertCircle, PlusCircle } from "lucide-react"
 import { prepareArg, securedFetch } from "@/lib/utils"
 import { useToast } from "@/components/ui/use-toast"
@@ -12,7 +12,7 @@ import CloseDialog from "./CloseDialog"
 import Input from "./ui/Input"
 
 interface Props {
-    onSetGraphName: Dispatch<SetStateAction<string>>
+    onSetGraphName: (name: string) => void
     type: string
     trigger?: React.ReactNode
 }

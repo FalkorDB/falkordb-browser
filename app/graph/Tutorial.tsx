@@ -1,8 +1,9 @@
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from "@/components/ui/carousel";
-import { Drawer, DrawerContent } from "@/components/ui/drawer";
+import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from "@/components/ui/drawer";
 import { Dispatch, SetStateAction, useEffect, useState } from "react";
 import Link from 'next/link'
 import { Checkbox } from "@/components/ui/checkbox";
+import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import CreateGraph from "../components/CreateGraph";
 
 interface Props {
@@ -18,6 +19,11 @@ export default function Tutorial({ onSetGraphName }: Props) {
         setOpen(localStorage.getItem("tutorial") !== "false")
     }, [])
 
+    const handleSetGraphName = (name: string) => {
+        onSetGraphName(name)
+        setOpen(false)
+    }
+
     return (
         <Drawer open={open} onOpenChange={(o) => {
             if (showAgain) {
@@ -26,6 +32,11 @@ export default function Tutorial({ onSetGraphName }: Props) {
             setOpen(o)
         }}>
             <DrawerContent className="flex flex-col">
+                <VisuallyHidden>
+                    <DrawerHeader>
+                        <DrawerTitle/>
+                    </DrawerHeader>
+                </VisuallyHidden>
                 <div className="flex justify-center items-center p-8">
                     <Carousel className="w-1/2 h-1/2">
                         <CarouselContent>
@@ -40,7 +51,7 @@ export default function Tutorial({ onSetGraphName }: Props) {
                             </CarouselItem>
                             <CarouselItem className="border flex flex-col gap-4 justify-center items-center">
                                 <CreateGraph
-                                    onSetGraphName={onSetGraphName}
+                                    onSetGraphName={handleSetGraphName}
                                     type="Graph"
                                 />
                                 <p>

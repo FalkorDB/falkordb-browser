@@ -8,6 +8,7 @@ import { CreateUser } from "@/app/api/user/model";
 import Button from "@/app/components/ui/Button";
 import FormComponent, { Error, Field } from "@/app/components/FormComponent";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 
 export default function AddUser({ onAddUser }: {
     onAddUser: (user: CreateUser) => void
@@ -94,9 +95,11 @@ export default function AddUser({ onAddUser }: {
                 </Button>
             </SheetTrigger>
             <SheetContent className="flex flex-col gap-6">
-                <SheetHeader>
-                    <SheetTitle className="text-2xl text-white">Add User</SheetTitle>
-                </SheetHeader>
+                <VisuallyHidden>
+                    <SheetHeader>
+                        <SheetTitle />
+                    </SheetHeader>
+                </VisuallyHidden>
                 <FormComponent
                     handleSubmit={handleAddUser}
                     fields={fields}
