@@ -6,7 +6,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { cn } from "@/lib/utils";
 import { Metadata } from "next";
 import NextAuthProvider from "./providers";
-import GoogleAnalytics from "./components/GoogleAnalytics";
+import GTM from "./GTM";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -26,12 +26,7 @@ export default function RootLayout({
   return (
     <html className="w-screen h-screen" lang="en" suppressHydrationWarning>
       <body className={cn("h-full LandingPage", inter.className)}>
-        {
-          process.env.NEXT_PUBLIC_GOOGLE_ANALYTICS ? (
-            <GoogleAnalytics ga_id=
-              {process.env.NEXT_PUBLIC_GOOGLE_ANALYTICS} />
-          ) : null
-        }
+        <GTM />
         <NextAuthProvider>{children}</NextAuthProvider>
         <Toaster />
       </body>
