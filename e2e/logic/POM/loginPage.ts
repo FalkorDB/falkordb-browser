@@ -16,6 +16,10 @@ export class LoginPage extends BasePage {
         return this.page.locator("//input[@id='Password']");
     }
 
+    private get dissmissDialogCheckbox(): Locator {
+        return this.page.locator("//div[p[text()=\"Don't show this again\"]]//button");
+    }
+
     async clickOnConnect(): Promise<void> {
         await this.connectBtn.click();
         await waitForURL(this.page, urls.graphUrl);   
@@ -27,5 +31,10 @@ export class LoginPage extends BasePage {
         await this.connectBtn.click();
         await waitForURL(this.page, urls.graphUrl);   
     } 
+
+    async dismissDialogAtStart(): Promise<void>{
+        await this.dissmissDialogCheckbox.click();
+        await this.page.mouse.click(10, 10);
+    }
 
 }

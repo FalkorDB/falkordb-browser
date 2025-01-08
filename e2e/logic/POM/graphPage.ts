@@ -44,10 +44,6 @@ export class graphPage extends BasePage {
         return this.page.locator("//div[@role='dialog']//form//button[@title='Create your Graph']");
     }
 
-    private get dissmissDialogCheckbox(): Locator {
-        return this.page.locator("//div[p[text()=\"Don't show this again\"]]//button");
-    }
-
     private get exportDataBtn(): Locator {
         return this.page.getByRole("button", { name : "Export Data"});
     }
@@ -125,8 +121,4 @@ export class graphPage extends BasePage {
         await this.confirmGraphDeleteBtn.click()
     }
 
-    async dismissDialogAtStart(): Promise<void>{
-        await this.dissmissDialogCheckbox.click();
-        await this.page.mouse.click(10, 10);
-    }
 }

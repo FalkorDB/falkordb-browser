@@ -13,7 +13,6 @@ test.describe('Graph Tests', () => {
     test.beforeAll(async () => {
         browser = new BrowserWrapper();
         const graph = await browser.createNewPage(graphPage, urls.graphUrl)
-        await graph.dismissDialogAtStart();
         await graph.removeAllGraphs();
     })
 
