@@ -7,13 +7,11 @@ import { securedFetch } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
 
 interface DeleteUserProps {
-    // eslint-disable-next-line react/require-default-props
-    isDeleteSelected?: boolean
     users: User[]
     setUsers: Dispatch<SetStateAction<User[]>>
 }
 
-export default function DeleteUser({ isDeleteSelected, users, setUsers }: DeleteUserProps) {
+export default function DeleteUser({ users, setUsers }: DeleteUserProps) {
     
     const { toast } = useToast()
     
@@ -42,8 +40,8 @@ export default function DeleteUser({ isDeleteSelected, users, setUsers }: Delete
             <AlertDialogTrigger disabled={users.length === 0} asChild>
                 <Button
                     disabled={users.length === 0}
-                    variant={isDeleteSelected ? "Primary" : "button"}
-                    label={isDeleteSelected ? "Delete Users" : undefined}
+                    variant="Primary"
+                    label="Delete Users"
                 >
                     <Trash2 />
                 </Button>

@@ -7,7 +7,7 @@ import { PlusCircle } from "lucide-react";
 import { CreateUser } from "@/app/api/user/model";
 import Button from "@/app/components/ui/Button";
 import FormComponent, { Error, Field } from "@/app/components/FormComponent";
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 
 export default function AddUser({ onAddUser }: {
     onAddUser: (user: CreateUser) => void
@@ -85,7 +85,7 @@ export default function AddUser({ onAddUser }: {
 
     return (
         <Sheet open={open} onOpenChange={setOpen}>
-            <SheetTrigger>
+            <SheetTrigger asChild>
                 <Button
                     variant="Primary"
                     label="Add User"
@@ -93,7 +93,10 @@ export default function AddUser({ onAddUser }: {
                     <PlusCircle size={20} />
                 </Button>
             </SheetTrigger>
-            <SheetContent>
+            <SheetContent className="flex flex-col gap-6">
+                <SheetHeader>
+                    <SheetTitle className="text-2xl text-white">Add User</SheetTitle>
+                </SheetHeader>
                 <FormComponent
                     handleSubmit={handleAddUser}
                     fields={fields}

@@ -129,7 +129,7 @@ export default function Configurations() {
 
     useEffect(() => {
         const run = async () => {
-            setConfigs(await Promise.all(Configs.map(async (config: Config) => {
+            const newConfigs = await Promise.all(Configs.map(async (config: Config) => {
                 const result = await securedFetch(`api/graph/?config=${prepareArg(config.name)}`, {
                     method: 'GET',
                 }, toast)
@@ -149,8 +149,11 @@ export default function Configurations() {
                     description: config.description,
                     value
                 }
-            })))
-            setRows(configs.map(config => ({
+            }))
+
+            setConfigs(newConfigs)
+
+            setRows(newConfigs.map(config => ({
                 cells: [
                     { value: config.name },
                     { value: config.description },
