@@ -16,7 +16,6 @@ import Labels from "../graph/labels"
 import { Category, Graph, Link, Node, GraphData } from "../api/graph/model"
 import Button from "../components/ui/Button"
 import CreateElement from "./SchemaCreateElement"
-import ToastButton from "../components/ToastButton"
 
 const ForceGraph = dynamic(() => import("../components/ForceGraph"), { ssr: false })
 

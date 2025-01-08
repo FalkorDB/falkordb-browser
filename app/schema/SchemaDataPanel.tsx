@@ -3,7 +3,7 @@
 
 "use client";
 
-import { Check, ChevronRight, MinusCircle, Pencil, PlusCircle, Trash2, X } from "lucide-react";
+import { Check, ChevronRight, Pencil, PlusCircle, Trash2, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -33,8 +33,6 @@ export default function SchemaDataPanel({ obj, onExpand, onSetAttributes, onRemo
     const [isAddValue, setIsAddValue] = useState<boolean>(false)
     const { toast } = useToast()
 
-    console.log(editable);
-
     useEffect(() => {
         setAttributes(Object.entries(obj.data).filter(([key, val]) => !(key === "name" && Number(val) === obj.id)).map(([key, val]) => [key, Array.isArray(val) ? val : (val as string).split(',')]))
         setLabel("source" in obj ? obj.label : obj.category)
@@ -46,7 +44,6 @@ export default function SchemaDataPanel({ obj, onExpand, onSetAttributes, onRemo
         }
 
         setAttribute([key, val])
-        debugger
         setEditable(key)
     }
 
@@ -65,7 +62,7 @@ export default function SchemaDataPanel({ obj, onExpand, onSetAttributes, onRemo
         const oldAttribute = attributes.find(([key]) => key === newAttribute[0])
 
         if (ok) {
-            setAttributes(prev => prev.map((att) => att[0] === newAttribute[0] ? newAttribute : att))
+            setAttributes(prev => prev.map((attr) => attr[0] === newAttribute[0] ? newAttribute : attr))
             handleSetEditable()
             toast({
                 title: "Success",
@@ -80,12 +77,12 @@ export default function SchemaDataPanel({ obj, onExpand, onSetAttributes, onRemo
         const ok = await onRemoveAttribute(key)
 
         if (ok) {
-            const attribute = attributes.find(([k]) => k === key)
+            const att = attributes.find(([k]) => k === key)
             setAttributes(prev => prev.filter(([k]) => k !== key))
             toast({
                 title: "Success",
                 description: "Attribute removed",
-                action: attribute && <ToastButton onClick={() => handleAddAttribute(attribute)} />,
+                action: att && <ToastButton onClick={() => handleAddAttribute(att)} />,
             })
             setAttribute(getDefaultAttribute())
         }
