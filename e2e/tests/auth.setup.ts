@@ -14,6 +14,7 @@ setup("admin authentication", async () => {
         const browserWrapper = new BrowserWrapper();
         const loginPage = await browserWrapper.createNewPage(LoginPage, urls.loginUrl);
         await loginPage.clickOnConnect();
+        await loginPage.dismissDialogAtStart();
         const context = browserWrapper.getContext();
         await context!.storageState({ path: adminAuthFile });
 
@@ -37,6 +38,7 @@ userRoles.forEach(({ name, file, userName }) => {
             const browserWrapper = new BrowserWrapper();
             const loginPage = await browserWrapper.createNewPage(LoginPage, urls.loginUrl);
             await loginPage.connectWithCredentials(userName, user.password);
+            await loginPage.dismissDialogAtStart();
             const context = browserWrapper.getContext();
             await context!.storageState({ path: file });
         } catch (error) {
