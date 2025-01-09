@@ -13,9 +13,10 @@ import { useState } from "react";
 import { CheckCircle, XCircle } from "lucide-react";
 import Button from "./ui/Button";
 import Input from "./ui/Input";
+import { DataCell } from "../api/graph/model";
 
 type Cell = {
-    value: any,
+    value: DataCell,
     onChange?: (value: string) => Promise<boolean>
 }
 
@@ -105,7 +106,7 @@ export default function TableComponent({ headers, rows, children, setRows }: Pro
                 <TableBody className="overflow-auto">
                     {
                         rows
-                            .filter((row) => typeof row.cells[0].value === "string" ? row.cells[0].value.toLowerCase().includes(search.toLowerCase()) : !search)
+                            .filter((row) => row.cells[0].value === "string" ? row.cells[0].value.toString().toLowerCase().includes(search.toLowerCase()) : !search)
                             .map((row, i) => (
                                 <TableRow key={i}>
                                     {
@@ -127,7 +128,7 @@ export default function TableComponent({ headers, rows, children, setRows }: Pro
                                                     typeof cell.value === "object" ?
                                                         <JSONTree
                                                             shouldExpandNodeInitially={() => false}
-                                                            keyPath={[headers[i]]}
+                                                            keyPath={[headers[j]]}
                                                             theme={{
                                                                 base00: "var(--background)", // background
                                                                 base01: '#000000',
@@ -148,7 +149,7 @@ export default function TableComponent({ headers, rows, children, setRows }: Pro
                                                             }}
                                                             data={cell.value}
                                                         />
-                                                        : typeof cell.value === "string" &&
+                                                        : cell.value &&
                                                             row.cells.some(c => c.onChange) ?
                                                             editable === `${i}-${j}` ?
                                                                 <div className="flex gap-2 items-center">
@@ -156,13 +157,13 @@ export default function TableComponent({ headers, rows, children, setRows }: Pro
                                                                         ref={ref => ref?.focus()}
                                                                         variant="primary"
                                                                         className="grow"
-                                                                        onBlur={() => handleSetEditable("", cell.value)}
+                                                                        onBlur={() => handleSetEditable("", cell.value!.toString())}
                                                                         value={newValue}
                                                                         onChange={(e) => setNewValue(e.target.value)}
                                                                         onKeyDown={async (e) => {
                                                                             if (e.key === "Escape") {
                                                                                 e.preventDefault()
-                                                                                handleSetEditable("", cell.value)
+                                                                                handleSetEditable("", cell.value!.toString())
                                                                             }
 
                                                                             if (e.key !== "Enter") return
@@ -170,7 +171,7 @@ export default function TableComponent({ headers, rows, children, setRows }: Pro
                                                                             e.preventDefault()
                                                                             const result = await cell.onChange!(newValue)
                                                                             if (result) {
-                                                                                handleSetEditable("", cell.value)
+                                                                                handleSetEditable("", cell.value!.toString())
                                                                             }
                                                                         }}
                                                                     />
@@ -184,7 +185,7 @@ export default function TableComponent({ headers, rows, children, setRows }: Pro
                                                                         <Button
                                                                             title="Cancel"
                                                                             onClick={() => {
-                                                                                handleSetEditable("", cell.value)
+                                                                                handleSetEditable("", cell.value!.toString())
                                                                             }}
                                                                         >
                                                                             <XCircle className="w-4 h-4" />
@@ -194,7 +195,7 @@ export default function TableComponent({ headers, rows, children, setRows }: Pro
                                                                 : <button
                                                                     disabled={!cell.onChange}
                                                                     type="button"
-                                                                    onClick={() => handleSetEditable(`${i}-${j}`, cell.value)}
+                                                                    onClick={() => handleSetEditable(`${i}-${j}`, cell.value!.toString())}
                                                                 >
                                                                     {cell.value}
                                                                 </button>

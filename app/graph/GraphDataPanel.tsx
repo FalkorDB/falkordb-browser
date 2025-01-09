@@ -94,6 +94,16 @@ export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement,
                     }
                 } as Node
             })
+
+            graph.Data = graph.Data.map(row => {
+                const newRow = Object.entries(row).map(([k, cell]) => {
+                    if (cell && typeof cell === "object" && cell.id === id) {
+                        return [k, { ...cell, properties: { ...cell.properties, [key]: val } }]
+                    }
+                    return [k, cell]
+                })
+                return Object.fromEntries(newRow)
+            })
             handleSetEditable("", "")
             toast({
                 title: "Success",
@@ -142,6 +152,17 @@ export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement,
 
             delete newObj.data[key]
             setObj(newObj)
+
+            graph.Data = graph.Data.map(row => {
+                const newRow = Object.entries(row).map(([k, cell]) => {
+                    if (cell && typeof cell === "object" && cell.id === id) {
+                        delete cell.properties[key]
+                        return [k, cell]
+                    }
+                    return [k, cell]
+                })
+                return Object.fromEntries(newRow)
+            })
 
             toast({
                 title: "Success",
@@ -202,6 +223,11 @@ export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement,
                     </TableRow>
                 </TableHeader>
                 <TableBody>
+                    <TableRow>
+                        <TableCell />
+                        <TableCell>id:</TableCell>
+                        <TableCell>{obj.id}</TableCell>
+                    </TableRow>
                     {
                         attributes.map((key) => (
                             <TableRow

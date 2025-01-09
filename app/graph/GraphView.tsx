@@ -6,12 +6,13 @@
 import { useRef, useState, useEffect, Dispatch, SetStateAction } from "react";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { ImperativePanelHandle } from "react-resizable-panels";
-import { ChevronLeft, GitGraph, Maximize2, Minimize2, Table } from "lucide-react"
+import { ChevronLeft, GitGraph, Maximize2, Minimize2, Pause, Play, Table } from "lucide-react"
 import { cn, prepareArg, securedFetch } from "@/lib/utils";
 import dynamic from "next/dynamic";
 import { Session } from "next-auth";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/components/ui/use-toast";
+import { Switch } from "@/components/ui/switch";
 import { Category, Graph, GraphData, Link, Node } from "../api/graph/model";
 import DataPanel from "./GraphDataPanel";
 import Labels from "./labels";
@@ -46,7 +47,6 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
     const [maximize, setMaximize] = useState<boolean>(false)
     const [tabsValue, setTabsValue] = useState<string>("")
     const [cooldownTicks, setCooldownTicks] = useState<number | undefined>(0)
-    const [cooldownTime, setCooldownTime] = useState<number | undefined>(2000)
     const { toast } = useToast()
 
     useEffect(() => {
@@ -71,6 +71,11 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
         const defaultChecked = graph.Data.length !== 0 ? "Table" : "Graph"
         setTabsValue(graph.getElements().length !== 0 ? "Graph" : defaultChecked)
     }, [graph.getElements().length, graph.Data.length])
+
+
+    const handleCooldown = (ticks?: number) => {
+        setCooldownTicks(ticks)
+    }
 
     useEffect(() => {
         setSelectedElement(undefined)
@@ -107,10 +112,6 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
         onExpand(!!selectedElement)
     }, [selectedElement])
 
-    const handleCooldown = () => {
-        setCooldownTicks(undefined)
-    }
-
     const onCategoryClick = (category: Category) => {
         category.show = !category.show
         graph.Elements.nodes.forEach((node) => {
@@ -140,7 +141,6 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
 
         setData({ ...graph.Elements })
     }
-
     const handleDeleteElement = async () => {
         if (selectedElements.length === 0 && selectedElement) {
             selectedElements.push(selectedElement)
@@ -179,6 +179,20 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
 
             graph.updateCategories(type ? element.category[0] : element.label, type)
             fetchCount()
+        })
+
+
+        graph.Data = graph.Data.map(row => {
+            const newRow = Object.entries(row).map(([key, cell]) => {
+                if (typeof cell === "object" && cell && selectedElements.some(element => element.id === cell.id)) {
+                    return [key, undefined]
+                }
+                return [key, cell]
+            })
+            if (newRow.every(([, cell]) => cell === undefined)) {
+                return undefined
+            }
+            return Object.fromEntries(newRow)
         })
 
         setSelectedElements([])
@@ -245,9 +259,6 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
                                     deleteDisabled={(Object.values(selectedElements).length === 0 && !selectedElement) || session?.user.role === "Read-Only"}
                                     onDeleteElement={handleDeleteElement}
                                     chartRef={chartRef}
-                                    cooldownTime={cooldownTime}
-                                    setCooldownTime={setCooldownTime}
-                                    handleCooldown={handleCooldown}
                                     addDisabled
                                 />
                                 {
@@ -262,24 +273,24 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
                                 }
                             </div>
                             <div className="relative h-1 grow rounded-lg overflow-hidden">
-                                {
-                                    !maximize ?
-                                        <Button
-                                            className="z-10 absolute top-4 right-4"
-                                            title="Maximize"
-                                            onClick={() => setMaximize(true)}
-                                        >
-                                            <Maximize2 />
-                                        </Button>
-                                        : <Button
-                                            className="z-10 absolute top-4 right-4"
-                                            title="Minimize"
-                                            onClick={() => setMaximize(false)}
-                                            onKeyDown={(e) => e.code === "Escape" && setMaximize(false)}
-                                        >
-                                            <Minimize2 />
-                                        </Button>
-                                }
+                                <Button
+                                    className="z-10 absolute top-4 right-4"
+                                    title={!maximize ? "Maximize" : "Minimize"}
+                                    onClick={() => setMaximize(prev => !prev)}
+                                >
+                                    {maximize ? <Maximize2 /> : <Minimize2 />}
+                                </Button>
+                                <div className="z-10 absolute top-4 left-4 flex items-center gap-2 pointer-events-none">
+                                    {cooldownTicks === undefined ? <Play size={20} /> : <Pause size={20} />}
+                                    <Switch
+                                        title="Animation Control"
+                                        className="pointer-events-auto"
+                                        checked={cooldownTicks === undefined}
+                                        onCheckedChange={() => {
+                                            handleCooldown(cooldownTicks === undefined ? 0 : undefined)
+                                        }}
+                                    />
+                                </div>
                                 <ForceGraph
                                     isCollapsed={isCollapsed}
                                     graph={graph}
@@ -290,8 +301,7 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
                                     selectedElements={selectedElements}
                                     setSelectedElements={setSelectedElements}
                                     cooldownTicks={cooldownTicks}
-                                    setCooldownTicks={setCooldownTicks}
-                                    cooldownTime={cooldownTime}
+                                    handleCooldown={handleCooldown}
                                 />
                                 {
                                     (graph.Categories.length > 0 || graph.Labels.length > 0) &&

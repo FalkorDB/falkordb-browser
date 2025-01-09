@@ -2,8 +2,8 @@
 
 /* eslint-disable react/require-default-props */
 
-import { Link, Move, Pause, PlusCircle, Shrink, Trash2, ZoomIn, ZoomOut } from "lucide-react";
-import { Dispatch, SetStateAction, useState } from "react";
+import { Link, PlusCircle, Shrink, Trash2, ZoomIn, ZoomOut } from "lucide-react";
+import { useState } from "react";
 import Button from "../components/ui/Button";
 import DeleteElement from "./DeleteElement";
 
@@ -16,9 +16,6 @@ interface Props {
     onAddEntity?: () => void,
     onAddRelation?: () => void,
     deleteDisabled?: boolean,
-    cooldownTime: number | undefined
-    setCooldownTime: Dispatch<SetStateAction<number | undefined>>
-    handleCooldown: () => void
     selectedElementsLength: number
 }
 
@@ -30,9 +27,6 @@ export default function Toolbar({
     onAddEntity,
     onAddRelation,
     deleteDisabled,
-    cooldownTime,
-    setCooldownTime,
-    handleCooldown,
     selectedElementsLength
 }: Props) {
 
@@ -129,20 +123,6 @@ export default function Toolbar({
                     onClick={() => handleCenterClick()}
                 >
                     <Shrink size={20} />
-                </Button>
-                <Button
-                    className="text-nowrap"
-                    disabled={disabled}
-                    variant="Secondary"
-                    label={cooldownTime !== undefined ? "Move" : "Stay"}
-                    onClick={() => {
-                        setCooldownTime(cooldownTime !== undefined ? undefined : 2000)
-                        if (cooldownTime !== undefined) {
-                            handleCooldown()
-                        }
-                    }}
-                >
-                    {cooldownTime !== undefined ? <Move size={20} /> : <Pause size={20} />}
                 </Button>
             </div>
         </div>

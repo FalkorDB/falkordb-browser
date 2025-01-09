@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable react/require-default-props */
 /* eslint-disable no-param-reassign */
 
@@ -12,15 +13,14 @@ import { Graph, GraphData, Link, Node } from "../api/graph/model"
 interface Props {
     graph: Graph
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    chartRef: RefObject<any>
+    chartRef: RefObject<any | null>
     data: GraphData
     selectedElement: Node | Link | undefined
     setSelectedElement: (element: Node | Link | undefined) => void
     selectedElements: (Node | Link)[]
     setSelectedElements: Dispatch<SetStateAction<(Node | Link)[]>>
-    cooldownTime: number | undefined
     cooldownTicks: number | undefined
-    setCooldownTicks: Dispatch<SetStateAction<number | undefined>>
+    handleCooldown: (ticks?: number) => void
     type?: "schema" | "graph"
     isAddElement?: boolean
     setSelectedNodes?: Dispatch<SetStateAction<[Node | undefined, Node | undefined]>>
@@ -38,9 +38,8 @@ export default function ForceGraph({
     setSelectedElement,
     selectedElements,
     setSelectedElements,
-    cooldownTime,
     cooldownTicks,
-    setCooldownTicks,
+    handleCooldown,
     type = "graph",
     isAddElement = false,
     setSelectedNodes,
@@ -52,6 +51,13 @@ export default function ForceGraph({
     const [hoverElement, setHoverElement] = useState<Node | Link | undefined>()
     const parentRef = useRef<HTMLDivElement>(null)
     const toast = useToast()
+
+    useEffect(() => {
+        if (!chartRef.current || data.nodes.length === 0 || data.links.length === 0) return
+        chartRef.current.d3Force('link').id((link: any) => link.id).distance(50)
+        chartRef.current.d3Force('charge').strength(-300)
+        chartRef.current.d3Force('center').strength(0.05)
+    }, [chartRef, data.links.length, data.nodes.length])
 
     useEffect(() => {
         if (!parentRef.current) return
@@ -210,20 +216,7 @@ export default function ForceGraph({
                     ctx.strokeStyle = link.color;
                     ctx.globalAlpha = 0.5;
 
-                    const sameNodesLinks = graph.Elements.links.filter(l => (l.source.id === start.id && l.target.id === end.id) || (l.target.id === start.id && l.source.id === end.id))
-                    const index = sameNodesLinks.findIndex(l => l.id === link.id) || 0
-                    const even = index % 2 === 0
-                    let curve
-
                     if (start.id === end.id) {
-                        if (even) {
-                            curve = Math.floor(-(index / 2)) - 3
-                        } else {
-                            curve = Math.floor((index + 1) / 2) + 2
-                        }
-
-                        link.curve = curve * 0.1
-
                         const radius = NODE_SIZE * link.curve * 6.2;
                         const angleOffset = -Math.PI / 4; // 45 degrees offset for text alignment
                         const textX = start.x + radius * Math.cos(angleOffset);
@@ -233,14 +226,6 @@ export default function ForceGraph({
                         ctx.translate(textX, textY);
                         ctx.rotate(-angleOffset);
                     } else {
-                        if (even) {
-                            curve = Math.floor(-(index / 2))
-                        } else {
-                            curve = Math.floor((index + 1) / 2)
-                        }
-
-                        link.curve = curve * 0.1
-
                         const midX = (start.x + end.x) / 2 + (end.y - start.y) * (link.curve / 2);
                         const midY = (start.y + end.y) / 2 + (start.x - end.x) * (link.curve / 2);
 
@@ -272,13 +257,13 @@ export default function ForceGraph({
                 onBackgroundClick={handleUnselected}
                 onBackgroundRightClick={handleUnselected}
                 onEngineStop={() => {
-                    setCooldownTicks(0)
+                    handleCooldown(0)
                 }}
                 linkCurvature="curve"
                 nodeVisibility="visible"
                 linkVisibility="visible"
                 cooldownTicks={cooldownTicks}
-                cooldownTime={cooldownTime}
+                cooldownTime={2000}
             />
         </div>
     )
