@@ -1,3 +1,4 @@
+/* eslint-disable react/no-array-index-key */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable no-nested-ternary */
 /* eslint-disable react/require-default-props */
@@ -106,7 +107,7 @@ export default function TableComponent({ headers, rows, children, setRows }: Pro
                         rows
                             .filter((row) => typeof row.cells[0].value === "string" ? row.cells[0].value.toLowerCase().includes(search.toLowerCase()) : !search)
                             .map((row, i) => (
-                                <TableRow key={row.cells[0].value}>
+                                <TableRow key={i}>
                                     {
                                         setRows ?
                                             <TableCell className="w-5 !pr-2">
@@ -121,7 +122,7 @@ export default function TableComponent({ headers, rows, children, setRows }: Pro
                                     }
                                     {
                                         row.cells.map((cell, j) => (
-                                            <TableCell className={cn(j === 0 ? setRows && "border-l" : "border-l", row.cells[0]?.value === editable && cell.onChange && "p-2")} key={cell.value}>
+                                            <TableCell className={cn(j === 0 ? setRows && "border-l" : "border-l", row.cells[0]?.value === editable && cell.onChange && "p-2")} key={j}>
                                                 {
                                                     typeof cell.value === "object" ?
                                                         <JSONTree

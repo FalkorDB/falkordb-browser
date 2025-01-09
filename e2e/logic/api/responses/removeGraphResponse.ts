@@ -1,4 +1,3 @@
 export interface RemoveGraphResponse {
-    message: string;
-  }
-  
+  message: string;
+}

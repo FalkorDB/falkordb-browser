@@ -131,13 +131,15 @@ export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement,
         }, toast)).ok
 
         if (success) {
+            const value = obj.data[key]
+
             graph.getElements().forEach((e) => {
                 if (e.id !== id) return
                 delete e.data[key]
             })
 
-            const value = obj.data[key]
             const newObj = { ...obj }
+
             delete newObj.data[key]
             setObj(newObj)
 
@@ -294,6 +296,7 @@ export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement,
                             </TableCell>
                             <TableCell>
                                 <Input
+                                    ref={ref => !newKey ? ref?.focus() : undefined}
                                     className="w-full"
                                     value={newKey}
                                     onChange={(e) => setNewKey(e.target.value)}

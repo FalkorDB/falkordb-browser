@@ -153,6 +153,7 @@ export default function ForceGraph({
                 backgroundColor="#191919"
                 width={parentWidth}
                 height={parentHeight}
+                nodeLabel={(node) => node.data.name || node.id.toString()}
                 graphData={data}
                 nodeRelSize={NODE_SIZE}
                 nodeCanvasObjectMode={() => 'after'}

@@ -96,7 +96,7 @@ export default function Combobox({ isSelectGraph = false, disabled = false, inTa
         setOpen(o)
         if (onOpenChange) onOpenChange(o)
       }}>
-        <SelectTrigger disabled={disabled || options.length === 0} title={options.length === 0 ? "There is no graphs" : ""} className={cn("w-fit gap-2 border-none p-2", inTable ? "text-sm font-light" : "text-xl font-medium")}>
+        <SelectTrigger data-type="select" disabled={disabled || options.length === 0} title={options.length === 0 ? "There is no graphs" : ""} className={cn("w-fit gap-2 border-none p-2", inTable ? "text-sm font-light" : "text-xl font-medium")}>
           <SelectValue title={selectedValue || `Select ${type || "Graph"}`} placeholder={`Select ${type || "Graph"}`} />
         </SelectTrigger>
         <SelectContent className="min-w-52 max-h-[30lvh] bg-foreground">

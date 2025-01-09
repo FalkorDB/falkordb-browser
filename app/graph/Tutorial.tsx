@@ -1,7 +1,6 @@
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from "@/components/ui/carousel";
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from "@/components/ui/drawer";
 import { Dispatch, SetStateAction, useEffect, useState } from "react";
-import Link from 'next/link'
 import { Checkbox } from "@/components/ui/checkbox";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import CreateGraph from "../components/CreateGraph";
@@ -39,7 +38,7 @@ export default function Tutorial({ onSetGraphName }: Props) {
                 </VisuallyHidden>
                 <div className="flex justify-center items-center p-8">
                     <Carousel className="w-1/2 h-1/2">
-                        <CarouselContent>
+                        <CarouselContent className="text-2xl">
                             <CarouselItem className="border text-center p-40">
                                 <p>Our Browser allows you to visualize, manipulate and explore your data.</p>
                             </CarouselItem>
@@ -49,21 +48,11 @@ export default function Tutorial({ onSetGraphName }: Props) {
                             <CarouselItem className="border text-center p-40">
                                 <p>Configure or export your graph with ease from the control center</p>
                             </CarouselItem>
-                            <CarouselItem className="border flex flex-col gap-4 justify-center items-center">
+                            <CarouselItem className="border flex justify-center items-center">
                                 <CreateGraph
                                     onSetGraphName={handleSetGraphName}
                                     type="Graph"
                                 />
-                                <p>
-                                    Need inspiration?{" "}
-                                    <Link
-                                        href="/examples"
-                                        target="_self"
-                                        className="text-primary underline underline-offset-2"
-                                    >
-                                        See Examples
-                                    </Link>
-                                </p>
                             </CarouselItem>
                         </CarouselContent>
                         <CarouselPrevious />

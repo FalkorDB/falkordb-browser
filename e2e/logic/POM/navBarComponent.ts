@@ -1,25 +1,25 @@
 
 import { Locator, Page } from "playwright";
 import BasePage from "@/e2e/infra/ui/basePage";
-import { waitForTimeOut, waitForURL } from "@/e2e/infra/utils";
-import urls  from '../../config/urls.json'
+import { waitForURL } from "@/e2e/infra/utils";
+import urls from '../../config/urls.json'
 
 export default class NavBarComponent extends BasePage {
 
     private get falkorDBLogo(): Locator {
         return this.page.locator("//a[@aria-label='FalkorDB']");
     }
-    
+
     private get graphsButton(): Locator {
-        return this.page.getByRole("button", { name: "Graphs"});
+        return this.page.getByRole("button", { name: "Graphs" });
     }
-    
+
     private get schemaButton(): Locator {
-        return this.page.getByRole("button", { name: "Schemas"});
+        return this.page.getByRole("button", { name: "Schemas" });
     }
 
     private get helpButton(): Locator {
-        return this.page.getByRole("button", { name : "help"})
+        return this.page.getByRole("button", { name: "help" })
     }
 
     private get documentationButton(): Locator {
@@ -33,7 +33,7 @@ export default class NavBarComponent extends BasePage {
     private get settingsButton(): Locator {
         return this.page.locator("//button[@title='Settings']")
     }
-    
+
     private get LogoutButton(): Locator {
         return this.page.locator("//button[@title='Log Out']")
     }
@@ -45,7 +45,7 @@ export default class NavBarComponent extends BasePage {
     async clickOnGraphsButton(): Promise<void> {
         await this.graphsButton.click();
     }
-    
+
     async clickOnSchemasButton(): Promise<void> {
         await this.schemaButton.click();
         await waitForURL(this.page, urls.schemaUrl);
@@ -68,18 +68,19 @@ export default class NavBarComponent extends BasePage {
         await waitForURL(this.page, urls.settingsUrl);
     }
 
-    async isSettingsButtonEnabled(): Promise<Boolean> {
-        return await this.settingsButton.isEnabled();
+    async isSettingsButtonEnabled(): Promise<boolean> {
+        const isEnabled = await this.settingsButton.isEnabled();
+        return isEnabled;
     }
 
-    async Logout(user: string): Promise<void> {
-        await this.page.waitForLoadState('networkidle'); 
+    async Logout(): Promise<void> {
+        await this.page.waitForLoadState('networkidle');
         await this.LogoutButton.click()
         await waitForURL(this.page, urls.loginUrl);
     }
 
     async clickOnFalkor(): Promise<Page> {
-        await this.page.waitForLoadState('networkidle'); 
+        await this.page.waitForLoadState('networkidle');
         const [newPage] = await Promise.all([
             this.page.waitForEvent('popup'),
             this.clickOnFalkorLogo(),
@@ -88,7 +89,7 @@ export default class NavBarComponent extends BasePage {
     }
 
     async clickOnDocumentation(): Promise<Page> {
-        await this.page.waitForLoadState('networkidle'); 
+        await this.page.waitForLoadState('networkidle');
         const [newPage] = await Promise.all([
             this.page.waitForEvent('popup'),
             this.clickOnHelpBtn(),
@@ -98,7 +99,7 @@ export default class NavBarComponent extends BasePage {
     }
 
     async clickOnSupport(): Promise<Page> {
-        await this.page.waitForLoadState('networkidle'); 
+        await this.page.waitForLoadState('networkidle');
         const [newPage] = await Promise.all([
             this.page.waitForEvent('popup'),
             this.clickOnHelpBtn(),

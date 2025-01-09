@@ -108,7 +108,7 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
     }, [selectedElement])
 
     const handleCooldown = () => {
-        setCooldownTicks(1000)
+        setCooldownTicks(undefined)
     }
 
     const onCategoryClick = (category: Category) => {

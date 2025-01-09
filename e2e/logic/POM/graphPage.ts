@@ -1,15 +1,15 @@
-import { Locator, Download  } from "@playwright/test";
+import { Locator, Download } from "@playwright/test";
 import BasePage from "@/e2e/infra/ui/basePage";
 import { waitForTimeOut } from "@/e2e/infra/utils";
 
-export class graphPage extends BasePage {
+export default class GraphPage extends BasePage {
 
     private get graphsMenu(): Locator {
-        return this.page.locator("//button[@data-type='selectGraph']");
+        return this.page.getByRole("combobox");
     }
 
     private graphsMenuByName(graph: string): Locator {
-        return this.page.getByRole("button", { name : `${graph}`});
+        return this.page.getByRole("combobox", { name: `${graph}` });
     }
 
     private get dropDownMenuGraphs(): Locator {
@@ -17,15 +17,15 @@ export class graphPage extends BasePage {
     }
 
     private get manageGraphBtn(): Locator {
-        return this.page.locator("//button[p[contains(text(), 'Manage Graphs')]]")
+        return this.page.getByRole("button", { name: "Manage Graphs" })
     }
 
     private get threeDotsBtn(): Locator {
         return this.page.locator("(//button[p[text()='...']])[1]")
     }
 
-    private get deleteIconSvg(): Locator {
-        return this.page.locator("//div[@role='menuitem'][2]//button")
+    private get deleteGraphBtn(): Locator {
+        return this.page.getByRole('button', { name: 'Delete' })
     }
 
     private get confirmGraphDeleteBtn(): Locator {
@@ -49,7 +49,7 @@ export class graphPage extends BasePage {
     }
 
     private get exportDataBtn(): Locator {
-        return this.page.getByRole("button", { name : "Export Data"});
+        return this.page.getByRole("button", { name: "Export Data" });
     }
 
     private get findGraphInMenu(): (graph: string) => Locator {
@@ -57,7 +57,11 @@ export class graphPage extends BasePage {
     }
 
     private get deleteGraphInMenu(): (graph: string) => Locator {
-        return (graph: string) => this.page.locator(`//tbody//tr/td[1][contains(text(), '${graph}')]/parent::tr//td[3]/button`);
+        return (graph: string) => this.page.getByRole('row', { name: graph }).getByRole('checkbox')
+    }
+
+    private get deleteAllGraphInMenu(): Locator {
+        return this.page.getByRole('row', { name: 'Name' }).getByRole('checkbox')
     }
 
     private get graphMenuElements(): Locator {
@@ -66,37 +70,33 @@ export class graphPage extends BasePage {
 
     async countGraphsInMenu(): Promise<number> {
         await waitForTimeOut(this.page, 1000);
-        await this.graphsMenu.click();
-        await this.manageGraphBtn.click();
-        const count = await this.graphMenuElements.count();
-        await this.refreshPage();
-        return count;
-    }
-    
-    async removeGraph(): Promise<void> {
-        await this.threeDotsBtn.click()
-        await this.deleteIconSvg.click()
-        await this.confirmGraphDeleteBtn.click()
+        if (await this.graphsMenu.isEnabled()) {
+            await this.graphsMenu.click();
+            await this.manageGraphBtn.click();
+            const count = await this.graphMenuElements.count();
+            await this.refreshPage();
+            return count;
+        }
+        return 0;
     }
 
     async removeAllGraphs(): Promise<void> {
         await waitForTimeOut(this.page, 1000);
-        const graphCount = await this.countGraphsInMenu();
         await this.graphsMenu.click();
-        await this.manageGraphBtn.click()
-        for(let i = graphCount; i >= 1; i--){
-            await this.removeGraph();
-        }
+        await this.manageGraphBtn.click();
+        await this.deleteAllGraphInMenu.click()
+        await this.deleteGraphBtn.click()
+        await this.confirmGraphDeleteBtn.click()
     }
 
-    async addGraph(graphName : string): Promise<void>{
+    async addGraph(graphName: string): Promise<void> {
         await this.addGraphBtnInNavBar.click()
         await this.graphNameInput.fill(graphName);
         await this.createGraphBtn.click()
     }
 
     async clickOnExportDataBtn(): Promise<Download> {
-        await this.page.waitForLoadState('networkidle'); 
+        await this.page.waitForLoadState('networkidle');
         const [download] = await Promise.all([
             this.page.waitForEvent('download'),
             this.exportDataBtn.click()
@@ -105,27 +105,29 @@ export class graphPage extends BasePage {
         return download;
     }
 
-    async verifyGraphExists(graph : string): Promise<Boolean>{
+    async verifyGraphExists(graph: string): Promise<boolean> {
         await this.graphsMenu.click();
         await this.manageGraphBtn.click();
-        return await this.findGraphInMenu(graph).isVisible();
+        const isVisible = await this.findGraphInMenu(graph).isVisible();
+        return isVisible;
     }
 
-    async verifyGraphExistsByName(graph : string): Promise<Boolean>{
+    async verifyGraphExistsByName(graph: string): Promise<boolean> {
         await this.graphsMenuByName(graph).click();
         await this.manageGraphBtn.click();
-        return await this.findGraphInMenu(graph).isVisible();
+        const isVisible = await this.findGraphInMenu(graph).isVisible();
+        return isVisible;
     }
 
-    async deleteGraph(graph : string): Promise<void> {
+    async deleteGraph(graph: string): Promise<void> {
         await this.graphsMenuByName(graph).click();
         await this.manageGraphBtn.click();
         await this.deleteGraphInMenu(graph).click();
-        await this.deleteIconSvg.click()
+        await this.deleteGraphBtn.click();
         await this.confirmGraphDeleteBtn.click()
     }
 
-    async dismissDialogAtStart(): Promise<void>{
+    async dismissDialogAtStart(): Promise<void> {
         await this.dissmissDialogCheckbox.click();
         await this.page.mouse.click(10, 10);
     }
