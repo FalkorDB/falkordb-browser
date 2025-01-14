@@ -1,8 +1,11 @@
+/* eslint-disable react-hooks/exhaustive-deps */
+/* eslint-disable no-param-reassign */
+/* eslint-disable no-nested-ternary */
 /* eslint-disable @typescript-eslint/no-use-before-define */
 
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { prepareArg, securedFetch } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
 import TableComponent, { Row } from "../components/TableComponent";
@@ -120,103 +123,107 @@ const Configs: Config[] = [
     },
 ]
 
-// Shows the details of a current database connection 
 export default function Configurations() {
+    const [configs, setConfigs] = useState<Row[]>([]);
+    const { toast } = useToast();
 
-    const [configs, setConfigs] = useState<Config[]>([])
-    const [rows, setRows] = useState<Row[]>([])
-    const { toast } = useToast()
-
-    useEffect(() => {
-        const run = async () => {
-            const newConfigs = await Promise.all(Configs.map(async (config: Config) => {
-                const result = await securedFetch(`api/graph/?config=${prepareArg(config.name)}`, {
-                    method: 'GET',
-                }, toast)
-
-                if (!result.ok) return config
-
-                let value = (await result.json()).config[1]
-
-                if (config.name === "CMD_INFO") {
-                    if (value === 0) {
-                        value = "no"
-                    } else value = "yes"
-                }
-
-                return {
-                    name: config.name,
-                    description: config.description,
-                    value
-                }
-            }))
-
-            setConfigs(newConfigs)
-
-            setRows(newConfigs.map(config => ({
-                cells: [
-                    { value: config.name },
-                    { value: config.description },
-                    {
-                        value: config.value.toString(),
-                        onChange: !disableRunTimeConfigs.has(config.name) ?
-                            (value: string) => handleSetConfig(config.name, value, true)
-                            : undefined
-                    }
-                ],
-            })))
-        }
-        run()
-    }, [])
-
-    const handleSetConfig = async (name: string, value: string, isUndo: boolean) => {
-
+    // Memoize the config update handler
+    const handleSetConfig = useCallback(async (name: string, value: string, isUndo: boolean) => {
         if (!value) {
             toast({
                 title: "Error",
                 description: "Please enter a value",
                 variant: "destructive"
-            })
-            return false
+            });
+            return false;
         }
 
-        const result = await securedFetch(`api/graph/?config=${prepareArg(name)}&value=${prepareArg(value)}`, {
-            method: 'POST',
-        }, toast)
+        const result = await securedFetch(
+            `api/graph/?config=${prepareArg(name)}&value=${prepareArg(value)}`,
+            { method: 'POST' },
+            toast
+        );
 
-        if (result.ok) {
-            setConfigs(prev => prev.map((config: Config) => {
-                if (config.name !== name) return config
-                return {
-                    ...config,
-                    value
+        if (!result.ok) return false;
+
+        const configToUpdate = configs.find(row => row.cells[0].value === name);
+        const oldValue = configToUpdate?.cells[2].value;
+
+        setConfigs(currentConfigs => {
+            const updatedConfigs = currentConfigs.map((config: Row) => {
+                if (config.cells[0].value !== name) return config;
+
+                const newConfig = { ...config }
+
+                newConfig.cells[2].value = value;
+
+                return newConfig;
+            });
+
+            return updatedConfigs;
+        });
+
+        toast({
+            title: "Success",
+            description: "Configuration value set successfully",
+            action: oldValue && isUndo
+                ? <ToastButton onClick={() => handleSetConfig(name, oldValue.toString(), false)} />
+                : undefined
+        });
+
+        return true;
+    }, [configs, toast]);
+
+    const fetchConfigs = useCallback(async () => {
+        const newConfigs = await Promise.all(
+            Configs.map(async (config) => {
+                const result = await securedFetch(
+                    `api/graph/?config=${prepareArg(config.name)}`,
+                    { method: 'GET' },
+                    toast
+                );
+
+                if (!result.ok) {
+                    return {
+                        cells: [
+                            { value: config.name },
+                            { value: config.description },
+                            { value: config.value.toString() }
+                        ]
+                    };
                 }
-            }))
 
-            setRows(prev => prev.map((row: Row) => {
-                if (row.cells[0].value !== name) return row
+                const { config: [, value] } = await result.json();
+                const formattedValue = config.name === "CMD_INFO"
+                    ? (value === 0 ? "no" : "yes")
+                    : value;
+
                 return {
-                    ...row,
-                    cells: [{ ...row.cells[0], value }],
-                }
-            }))
-
-            const { value: oldValue } = configs.find(config => config.name === name) || { value: "" }
-            
-            toast({
-                title: "Success",
-                description: "Configuration value set successfully",
-                action: isUndo ? <ToastButton onClick={() => handleSetConfig(name, oldValue.toString(), false)} /> : undefined
+                    cells: [
+                        { value: config.name },
+                        { value: config.description },
+                        {
+                            value: formattedValue.toString(),
+                            onChange: !disableRunTimeConfigs.has(config.name)
+                                ? (val: string) => handleSetConfig(config.name, val, true)
+                                : undefined
+                        }
+                    ]
+                };
             })
-        }
+        );
 
-        return result.ok
-    }
+        setConfigs(newConfigs);
+    }, [toast]);
+
+    useEffect(() => {
+        fetchConfigs();
+    }, [fetchConfigs]);
 
     return (
         <TableComponent
-            headers={["Name", "Description", "Value (click to edit)"]}
-            rows={rows}
+            headers={["Name", "Description", "Value"]}
+            rows={configs}
         />
     );
 }

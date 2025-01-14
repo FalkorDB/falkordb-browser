@@ -2,11 +2,11 @@
 
 "use client"
 
-import { FormEvent, useState } from "react"
+import { FormEvent, useEffect, useState } from "react"
 import { PlusCircle } from "lucide-react";
 import { CreateUser } from "@/app/api/user/model";
 import Button from "@/app/components/ui/Button";
-import FormComponent, { Error, Field } from "@/app/components/FormComponent";
+import FormComponent, { Field } from "@/app/components/FormComponent";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 
@@ -19,6 +19,17 @@ export default function AddUser({ onAddUser }: {
     const [confirmPassword, setConfirmPassword] = useState("")
     const [role, setRole] = useState("")
 
+    const handleClose = () => {
+        setPassword("")
+        setConfirmPassword("")
+        setUsername("")
+        setRole("")
+    }
+
+    useEffect(() => {
+        if (!open) handleClose()
+    }, [open])
+
     const fields: Field[] = [
         {
             value: username,
@@ -26,6 +37,12 @@ export default function AddUser({ onAddUser }: {
             label: "Username",
             type: "text",
             required: true,
+            errors: [
+                {
+                    message: "Username is required",
+                    condition: (value: string) => !value
+                }
+            ]
         },
         {
             value: password,
@@ -34,13 +51,32 @@ export default function AddUser({ onAddUser }: {
             type: "password",
             required: true,
             show: false,
-            error: {
-                message: "Password must be at least 8 characters long",
-                condition: (value: string, error: Error) => {
-                    error.message = "Password must be at least 8 characters long"
-                    return value.length < 8
-                }
-            }
+            errors: [
+                {
+                    message: "Password is required",
+                    condition: (value: string) => !value
+                },
+                {
+                    message: "Password must be at least 8 characters long",
+                    condition: (value: string) => value.length < 8
+                },
+                {
+                    message: "Password must contain at least one uppercase letter",
+                    condition: (value: string) => !/[A-Z]/.test(value)
+                },
+                {
+                    message: "Password must contain at least one lowercase letter",
+                    condition: (value: string) => !/[a-z]/.test(value)
+                },
+                {
+                    message: "Password must contain at least one number",
+                    condition: (value: string) => !/[0-9]/.test(value)
+                },
+                {
+                    message: "Password must contain at least one special character",
+                    condition: (value: string) => !/[!@#$%^&*]/.test(value)
+                },
+            ]
         },
         {
             value: confirmPassword,
@@ -49,13 +85,16 @@ export default function AddUser({ onAddUser }: {
             type: "password",
             required: true,
             show: false,
-            error: {
-                message: "Password don't match",
-                condition: (value: string, error: Error) => {
-                    error.message = "Password don't match"
-                    return value !== password
-                }
-            }
+            errors: [
+                {
+                    message: "Confirm password is required",
+                    condition: (value: string) => !value
+                },
+                {
+                    message: "Password don't match",
+                    condition: (value: string) => value !== password
+                },
+            ]
         },
         {
             value: role,
@@ -64,15 +103,14 @@ export default function AddUser({ onAddUser }: {
             type: "select",
             options: ["Admin", "Read-Write", "Read-Only"],
             required: true,
+            errors: [
+                {
+                    message: "Role is required",
+                    condition: (value: string) => !value
+                }
+            ]
         }
     ]
-
-    const handleClose = () => {
-        setPassword("")
-        setConfirmPassword("")
-        setUsername("")
-        setRole("")
-    }
 
     const handleAddUser = async (e: FormEvent) => {
         e.preventDefault();

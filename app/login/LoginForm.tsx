@@ -6,12 +6,11 @@ import { useSearchParams, useRouter } from "next/navigation";
 import Image from "next/image";
 import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
-import FormComponent, { Field } from "../components/FormComponent";
+import FormComponent from "../components/FormComponent";
 import Dropzone from "../components/ui/Dropzone";
 
 const DEFAULT_HOST = "localhost";
 const DEFAULT_PORT = "6379";
-
 
 export default function LoginForm() {
   const router = useRouter();
@@ -28,12 +27,12 @@ export default function LoginForm() {
     message: "Invalid credentials",
     show: false
   });
-  const searchParams = useSearchParams();
 
-  const fields: Field[] = [
+  const searchParams = useSearchParams();
+  const fields = [
     {
       value: host,
-      onChange: (e) => setHost(e.target.value),
+      onChange: (e: React.ChangeEvent<HTMLInputElement>) => setHost(e.target.value),
       label: "Host",
       type: "text",
       placeholder: DEFAULT_HOST,
@@ -41,7 +40,7 @@ export default function LoginForm() {
     },
     {
       value: port,
-      onChange: (e) => setPort(e.target.value),
+      onChange: (e: React.ChangeEvent<HTMLInputElement>) => setPort(e.target.value),
       label: "Port",
       type: "text",
       placeholder: DEFAULT_PORT,
@@ -49,20 +48,23 @@ export default function LoginForm() {
     },
     {
       value: username,
-      onChange: (e) => setUsername(e.target.value),
+      onChange: (e: React.ChangeEvent<HTMLInputElement>) => setUsername(e.target.value),
       label: "Username",
+      placeholder: "Default",
+      info: "You can skip entering your username when deploying a FalkorDB instance \n from localhost with default credentials.",
       type: "text",
       required: false
     },
     {
       value: password,
-      onChange: (e) => setPassword(e.target.value),
+      onChange: (e: React.ChangeEvent<HTMLInputElement>) => setPassword(e.target.value),
       label: "Password",
+      placeholder: "Default",
+      info: "You can skip entering your password when deploying a FalkorDB instance \n from localhost with default credentials.",
       type: "password",
-      show: false,
       required: false
     }
-  ]
+  ];
 
   useEffect(() => {
     const hostParam = searchParams.get("host");
@@ -116,28 +118,34 @@ export default function LoginForm() {
   }
 
   return (
-    <div className="w-full h-full flex justify-center items-center bg-foreground">
-      <div className="flex gap-20 items-center border rounded-lg p-10">
-        <FormComponent
-          fields={fields}
-          handleSubmit={onSubmit}
-          error={error}
-          isFieldsRequired={false}
-        >
-          <div className="flex gap-8">
-            <div className="flex gap-2">
-              <Checkbox
-                className={cn("w-6 h-6 rounded-lg", !TLS && "border-white")}
-                checked={TLS}
-                onCheckedChange={(checked) => setTLS(checked as boolean)}
-              />
-              <p >TLS Secured Connection</p>
-            </div>
-            <Dropzone onFileDrop={onFileDrop} disabled={!TLS} />
+    <div className="relative h-full w-full bg-foreground flex flex-col">
+      <div className="grow flex items-center justify-center">
+        <div className="flex flex-col gap-8 items-center">
+          <div className="bg-foreground">
+            <Image priority src="/BrowserLogo.svg" alt="Loading..." width={500} height={1} />
           </div>
-        </FormComponent>
-        <Image priority src="/Logo.svg" alt="" width={451} height={126} />
+          <FormComponent
+            fields={fields}
+            handleSubmit={onSubmit}
+            error={error}
+            isFieldsRequired={false}
+            submitButtonLabel="Log in"
+          >
+            <div className="flex gap-8">
+              <div className="flex gap-2">
+                <Checkbox
+                  className={cn("w-6 h-6 rounded-lg", !TLS && "border-white")}
+                  checked={TLS}
+                  onCheckedChange={(checked) => setTLS(checked as boolean)}
+                />
+                <p >TLS Secured Connection</p>
+              </div>
+              <Dropzone onFileDrop={onFileDrop} disabled={!TLS} />
+            </div>
+          </FormComponent>
+        </div>
       </div>
-    </div >
+      <div className="h-5 Top" />
+    </div>
   );
 }

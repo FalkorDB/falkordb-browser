@@ -84,10 +84,10 @@ export default function Users() {
 
         setUsers(updatedUsers)
         setRows(rows.map(row => {
-            if (!usernames.includes(row.cells[0].value)) return row
+            if (!usernames.includes(row.cells[0].value as string)) return row
             return {
                 ...row,
-                cells: [{ ...row.cells[0], value: role.length === 1 ? role[0] : role[usernames.indexOf(row.cells[0].value)] }],
+                cells: [{ ...row.cells[0], value: role.length === 1 ? role[0] : role[usernames.indexOf(row.cells[0].value as string)] }],
                 checked: false
             }
         }))
@@ -140,7 +140,7 @@ export default function Users() {
                         disabled={rows.filter(row => row.checked).length === 0}
                         type="Role"
                         options={ROLES}
-                        setSelectedValue={(role) => { handleSetRole(rows.filter(row => row.checked).map(row => row.cells[0].value), [role], true) }}
+                        setSelectedValue={(role) => { handleSetRole(rows.filter(row => row.checked).map(row => row.cells[0].value as string), [role], true) }}
                     />
                 </div>
             </TableComponent>

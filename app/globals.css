@@ -14,7 +14,7 @@
         --popover-foreground: 0 0% 100%;
         --radius: 0.5rem;
         --input: var(--popover-foreground);
-        --muted: var(--popover-foreground);
+        --muted: 0 0% 80%;
     }
 
     :focus-visible {

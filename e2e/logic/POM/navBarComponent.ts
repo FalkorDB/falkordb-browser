@@ -7,7 +7,7 @@ import urls from '../../config/urls.json'
 export default class NavBarComponent extends BasePage {
 
     private get falkorDBLogo(): Locator {
-        return this.page.locator("//a[@aria-label='FalkorDB']");
+        return this.page.getByLabel("FalkorDB");
     }
 
     private get graphsButton(): Locator {
@@ -19,23 +19,23 @@ export default class NavBarComponent extends BasePage {
     }
 
     private get helpButton(): Locator {
-        return this.page.getByRole("button", { name: "help" })
+        return this.page.getByRole("button", { name: "Help" })
     }
 
     private get documentationButton(): Locator {
-        return this.page.locator("//a[@title='Documentation']")
+        return this.page.getByRole("link", { name: "Documentation" })
     }
 
     private get supportButton(): Locator {
-        return this.page.locator("//a[@title='Support']")
+        return this.page.getByRole("link", { name: "Support" })
     }
 
     private get settingsButton(): Locator {
-        return this.page.locator("//button[@title='Settings']")
+        return this.page.getByRole("button", { name: "Settings" })
     }
 
     private get LogoutButton(): Locator {
-        return this.page.locator("//button[@title='Log Out']")
+        return this.page.getByRole("button", { name: "Log Out" })
     }
 
     async clickOnFalkorLogo(): Promise<void> {
@@ -44,6 +44,7 @@ export default class NavBarComponent extends BasePage {
 
     async clickOnGraphsButton(): Promise<void> {
         await this.graphsButton.click();
+        await waitForURL(this.page, urls.graphUrl);
     }
 
     async clickOnSchemasButton(): Promise<void> {

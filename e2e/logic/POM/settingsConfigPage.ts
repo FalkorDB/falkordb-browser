@@ -4,7 +4,7 @@ import BasePage from "@/e2e/infra/ui/basePage";
 export default class SettingsConfigPage extends BasePage {
 
     private get roleContentValue(): (role: string) => Locator {
-        return (role: string) => this.page.locator(`//tbody/tr[@data-id='${role}']/td/button`)
+        return (role: string) => this.page.locator(`//tbody/tr[@data-id='${role}']/td[3]/div/p`)
     }
 
     async getRoleContentValue(role: string): Promise<string | null> {
@@ -12,8 +12,8 @@ export default class SettingsConfigPage extends BasePage {
         return value
     }
 
-    private get clickOnRoleValue(): (role: string) => Locator {
-        return (role: string) => this.page.locator(`//tbody//tr[@data-id='${role}']/td[3]/button`)
+    private get EditRoleButton(): (role: string) => Locator {
+        return (role: string) => this.page.locator(`//tbody//tr[@data-id='${role}']/td[3]/div/div/button`)
     }
 
     private get roleValueInput(): (role: string) => Locator {
@@ -21,18 +21,15 @@ export default class SettingsConfigPage extends BasePage {
     }
 
     private get confirmValueInputBtn(): (role: string) => Locator {
-        return (role: string) => this.page.locator(`//tbody//tr[@data-id='${role}']/td[3]/div/button[2]`)
-    }
-
-    private get getRoleValue(): (role: string) => Locator {
-        return (role: string) => this.page.locator(`//tbody//tr[@data-id='${role}']/td[3]/button/p`)
+        return (role: string) => this.page.locator(`//tbody//tr[@data-id='${role}']/td[3]/div/div/button[1]`)
     }
 
     async modifyRoleValue(role: string, input: string): Promise<string | null> {
-        await this.clickOnRoleValue(role).click();
+        await this.roleContentValue(role).hover();
+        await this.EditRoleButton(role).click();
         await this.roleValueInput(role).fill(input);
         await this.confirmValueInputBtn(role).click();
-        const value = await this.getRoleValue(role).getAttribute('title')
+        const value = await this.getRoleContentValue(role)
         return value
     }
 

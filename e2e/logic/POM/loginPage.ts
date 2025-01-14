@@ -6,7 +6,7 @@ import urls from '../../config/urls.json'
 export default class LoginPage extends BasePage {
 
     private get connectBtn(): Locator {
-        return this.page.getByRole("button", { name: "Submit" });
+        return this.page.getByRole("button", { name: "Log in" });
     }
 
     private get usernameInput(): Locator {

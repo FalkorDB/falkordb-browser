@@ -45,18 +45,18 @@ export async function POST(req: NextRequest) {
 
     const connection = await client.connection
     const { username, password, role } = await req.json() as CreateUser
-    
+
     const roleValue = ROLE.get(role)
 
     try {
-        if (!username || !password || !roleValue) return console.error("Missing parameters")
+        if (!username || !password || !roleValue) throw new Error("Missing parameters")
 
-        try {
-            const user = await connection.aclGetUser(username)
-
-            if (user) {
-                return NextResponse.json({ message: `User ${username} already exists` }, { status: 409 })
-            }
+            try {
+                const user = await connection.aclGetUser(username)
+                
+                if (user) {
+                    return NextResponse.json({ message: `User ${username} already exists` }, { status: 409 })
+                }
         } catch (err: unknown) {
             console.error(err)
             // Just a workaround for https://github.com/redis/node-redis/issues/2745

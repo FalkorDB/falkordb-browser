@@ -15,6 +15,7 @@ export default function CloseDialog({ className, label, icon, ...props }: Props)
     return (
         <DialogClose asChild >
             <Button
+                variant={label === "Cancel" ? "Cancel" : undefined}
                 className={className}
                 label={label}
                 // eslint-disable-next-line react/jsx-props-no-spreading

@@ -21,16 +21,15 @@ test.describe('Graph Tests', () => {
     })
 
     roles.userRoles.slice(0, 2).forEach(role => {
-        test(`@${role.role} Add graph via API -> verify display in UI test`, async () => {
+        test(`@${role.role} Add graph via API -> verify display in UI test -> remove graph via UI`, async () => {
             const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
             const apiCall = new ApiCalls();
             const graphName = `graph_${Date.now()}`;
             await apiCall.addGraph(graphName);
             await graph.refreshPage();
-            const isVisible = await graph.verifyGraphExistsByName(graphName);
+            expect(await graph.verifyGraphExists(graphName)).toBe(true);
             await graph.refreshPage();
             await graph.deleteGraph(graphName);
-            expect(isVisible).toBe(true);
         });
     });
 
@@ -39,8 +38,8 @@ test.describe('Graph Tests', () => {
             const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
             const graphName = `graph_${Date.now()}`;
             await graph.addGraph(graphName);
-            const apiCall = new ApiCalls();
             await new Promise(resolve => { setTimeout(resolve, 1000) });
+            const apiCall = new ApiCalls();
             await apiCall.removeGraph(graphName);
             await graph.refreshPage();
             expect(await graph.verifyGraphExists(graphName)).toBe(false);
@@ -52,7 +51,7 @@ test.describe('Graph Tests', () => {
             const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
             const graphName = `graph_${Date.now()}`;
             await graph.addGraph(graphName);
-            const download = await graph.clickOnExportDataBtn();
+            const download = await graph.exportGraph();
             const downloadPath = await download.path();
             expect(fs.existsSync(downloadPath)).toBe(true);
         });

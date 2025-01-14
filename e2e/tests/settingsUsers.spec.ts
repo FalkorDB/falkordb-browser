@@ -22,18 +22,18 @@ test.describe('Settings Tests', () => {
         const username = `user_${Date.now()}`
         await settingsUsersPage.addUser({ userName: username, role: user.ReadWrite, password: user.password, confirmPassword: user.confirmPassword });
         const isVisible = await settingsUsersPage.verifyUserExists(username)
-        await settingsUsersPage.removeUserByHover(username)
+        await settingsUsersPage.removeUser(username)
         expect(isVisible).toBe(true)
     })
 
-    test("@admin Add one user -> remove one user by hover -> Validate that the user has been removed", async () => {
+    test("@admin Add one user -> remove one user -> Validate that the user has been removed", async () => {
         // Adding one user
         const settingsUsersPage = await browser.createNewPage(SettingsUsersPage, urls.settingsUrl)
         await settingsUsersPage.navigateToUserTab();
         const username = `user_${Date.now()}`
         await settingsUsersPage.addUser({ userName: username, role: user.ReadWrite, password: user.password, confirmPassword: user.confirmPassword });
         // Deleting one user
-        await settingsUsersPage.removeUserByHover(username)
+        await settingsUsersPage.removeUser(username)
         await settingsUsersPage.refreshPage()
         await settingsUsersPage.navigateToUserTab()
         const isVisible = await settingsUsersPage.verifyUserExists(username)
@@ -49,9 +49,9 @@ test.describe('Settings Tests', () => {
         await settingsUsersPage.addUser({ userName: username, role: user.ReadWrite, password: user.password, confirmPassword: user.confirmPassword });
 
         // modify user role
-        await settingsUsersPage.modifyUserRole(username, user.role.readOnly)
+        await settingsUsersPage.modifyUserRole(username, user.ReadOnly)
         const newUserRole = await settingsUsersPage.getUserRole(username)
-        await settingsUsersPage.removeUserByHover(username)
+        await settingsUsersPage.removeUser(username)
         expect(newUserRole).toBe("Read-Only")
 
     })
@@ -67,12 +67,12 @@ test.describe('Settings Tests', () => {
 
         // modify users roles
         const userRole = user.ReadOnly;
-        await settingsUsersPage.modifyTwoUsersRolesByCheckbox(username1, username2, userRole)
+        await settingsUsersPage.modifyTwoUsersRoles(username1, username2, userRole)
         await settingsUsersPage.refreshPage()
         await settingsUsersPage.navigateToUserTab()
         const userName1Role = await settingsUsersPage.getUserRole(username1)
         const userName2Role = await settingsUsersPage.getUserRole(username2)
-        await settingsUsersPage.deleteTwoUsersByCheckbox(username1, username2)
+        await settingsUsersPage.deleteTwoUsers(username1, username2)
 
         expect([userName1Role, userName2Role]).toEqual(["Read-Only", "Read-Only"])
     })
@@ -89,7 +89,7 @@ test.describe('Settings Tests', () => {
         await settingsUsersPage.addUser({ userName: username2, role: user.ReadWrite, password: user.password, confirmPassword: user.confirmPassword });
 
         // delete two users
-        await settingsUsersPage.deleteTwoUsersByCheckbox(username1, username2)
+        await settingsUsersPage.deleteTwoUsers(username1, username2)
         const isVisible1 = await settingsUsersPage.verifyUserExists(username1)
         const isVisible2 = await settingsUsersPage.verifyUserExists(username2)
         expect([isVisible1, isVisible2]).toEqual([false, false])
@@ -122,7 +122,7 @@ test.describe('Settings Tests', () => {
         const settingsUsersPage = await browser.createNewPage(SettingsUsersPage, urls.settingsUrl)
         await settingsUsersPage.navigateToUserTab();
         const username = `user_${Date.now()}`
-        await settingsUsersPage.attemptToAddUserWithoutRole({ userName: username, password: user.password, confirmPassword: user.confirmPassword });
+        await settingsUsersPage.addUser({ userName: username, password: user.password, confirmPassword: user.confirmPassword });
         await settingsUsersPage.refreshPage()
         await settingsUsersPage.navigateToUserTab()
         const isVisible = await settingsUsersPage.verifyUserExists(username)
@@ -132,7 +132,7 @@ test.describe('Settings Tests', () => {
     test("@admin Attempt to delete the default admin user -> Verify that the user has not been deleted.", async () => {
         const settingsUsersPage = await browser.createNewPage(SettingsUsersPage, urls.settingsUrl)
         await settingsUsersPage.navigateToUserTab();
-        await settingsUsersPage.removeUserByCheckbox('default')
+        await settingsUsersPage.removeUser('default')
         const isVisible = await settingsUsersPage.verifyUserExists('default');
         expect(isVisible).toBe(true)
     })
@@ -142,7 +142,7 @@ test.describe('Settings Tests', () => {
         const username = `user_${Date.now()}`
         await apiCall.createUsers({ username, password: user.password, role: user.ReadOnly })
         const users = await apiCall.getUsers()
-        await apiCall.deleteUsers({ "users": [{ "username": `${username}` }] })
+        await apiCall.deleteUsers({ users: [{ username }] })
         const User = users.result.find(u => u.username === username);
         expect(User?.username === username).toBe(true)
     })
@@ -159,16 +159,16 @@ test.describe('Settings Tests', () => {
     test(`@admin API Test: without passing a role, Attempt to add a user and validate the user was not added`, async () => {
         const apiCall = new ApiCalls()
         const username = `user_${Date.now()}`
-        await apiCall.createUsers({ username, password: '', role: user.ReadOnly });
+        await apiCall.createUsers({ username, password: user.password, role: '' })
         const users = await apiCall.getUsers()
         const User = users.result.find(u => u.username === username);
         expect(User).toBeUndefined();
     });
-
+    
     test(`@admin API Test: without passing a password, Attempt to add a user and validate the user was not added`, async () => {
         const apiCall = new ApiCalls()
         const username = `user_${Date.now()}`
-        await apiCall.createUsers({ username, password: user.password, role: '' })
+        await apiCall.createUsers({ username, password: '', role: user.ReadOnly });
         const users = await apiCall.getUsers()
         const User = users.result.find(u => u.username === username);
         expect(User).toBeUndefined();

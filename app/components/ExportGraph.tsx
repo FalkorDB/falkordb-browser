@@ -52,7 +52,7 @@ export default function ExportGraph({ selectedValues, type }: Props) {
             trigger={
                 <Button
                     label="Export Data"
-                    disabled={selectedValues.length === 0}
+                    disabled={selectedValues.filter(value => value !== "").length === 0}
                 />
             }
             title="Export your graph"

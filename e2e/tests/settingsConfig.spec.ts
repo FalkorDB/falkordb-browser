@@ -21,6 +21,7 @@ test.describe('Settings Tests', () => {
         test(`@admin Modify ${roles.maxQueuedQueries} via API validation via UI: Input value: ${input} description: ${description}`, async () => {
             const settingsConfigPage = await browser.createNewPage(SettingsConfigPage, urls.settingsUrl)
             const apiCall = new ApiCalls()
+            await new Promise(resolve => { setTimeout(resolve, 1000) });
             await apiCall.modifySettingsRole(roles.maxQueuedQueries, input)
             await settingsConfigPage.refreshPage()
             const value = await settingsConfigPage.getRoleContentValue(roles.maxQueuedQueries)

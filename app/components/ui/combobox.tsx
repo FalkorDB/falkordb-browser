@@ -12,6 +12,7 @@ import Button from "./Button"
 import TableComponent, { Row } from "../TableComponent"
 import CloseDialog from "../CloseDialog"
 import ExportGraph from "../ExportGraph"
+import DialogComponent from "../DialogComponent"
 
 interface ComboboxProps {
   isSelectGraph?: boolean,
@@ -32,11 +33,12 @@ export default function Combobox({ isSelectGraph = false, disabled = false, inTa
   const [openMenage, setOpenMenage] = useState<boolean>(false)
   const [open, setOpen] = useState<boolean>(defaultOpen)
   const [rows, setRows] = useState<Row[]>([])
+  const [openDelete, setOpenDelete] = useState<boolean>(false)
   const { toast } = useToast()
 
 
   const handleSetOption = async (option: string, optionName: string) => {
-    const result = await securedFetch(`api/graph/${prepareArg(optionName)}/?sourceName=${prepareArg(option)}`, {
+    const result = await securedFetch(`api/graph/${prepareArg(option)}/?sourceName=${prepareArg(optionName)}`, {
       method: "PATCH",
       headers: {
         "Content-Type": "application/json"
@@ -46,10 +48,10 @@ export default function Combobox({ isSelectGraph = false, disabled = false, inTa
 
     if (result.ok) {
 
-      const newOptions = options.map((opt) => opt === option ? optionName : opt)
+      const newOptions = options.map((opt) => opt === optionName ? option : opt)
       setOptions!(newOptions)
 
-      if (setSelectedValue) setSelectedValue(optionName)
+      if (setSelectedValue && optionName === selectedValue) setSelectedValue(option)
 
       handleSetRows(newOptions)
     }
@@ -62,7 +64,7 @@ export default function Combobox({ isSelectGraph = false, disabled = false, inTa
   }
 
   useEffect(() => {
-    setRows(options.map(opt => ({ checked: false, name: opt, cells: [{ value: opt, onChange: (value: string) => handleSetOption(value, opt) }] })))
+    handleSetRows(options)
 
     if (options.length !== 1 || !setSelectedValue) return
 
@@ -72,20 +74,22 @@ export default function Combobox({ isSelectGraph = false, disabled = false, inTa
   const handleDelete = async (opts: string[]) => {
     const names = opts.map(opt => isSchema ? `${opt}_schema` : opt)
 
-    names.forEach(async (name) => {
+    const newNames = await Promise.all(names.map(async (name) => {
       const result = await securedFetch(`api/graph/${prepareArg(name)}`, {
         method: "DELETE"
       }, toast)
 
-      if (!result.ok) return
+      if (!result.ok) return name
 
-      setOptions!(options.filter(opt => opt !== name))
+      return ""
 
-      if (selectedValue !== name || !setSelectedValue) return
+    })).then(graphNames => graphNames.filter(name => name !== ""))
 
-      setSelectedValue(names[0])
-    })
+    setOptions!(newNames)
 
+    if (opts.includes(selectedValue) && setSelectedValue) setSelectedValue("")
+
+    setOpenDelete(false)
     setOpenMenage(false)
     handleSetRows(options.filter(opt => !opts.includes(opt)))
   }
@@ -96,8 +100,8 @@ export default function Combobox({ isSelectGraph = false, disabled = false, inTa
         setOpen(o)
         if (onOpenChange) onOpenChange(o)
       }}>
-        <SelectTrigger data-type="select" disabled={disabled || options.length === 0} title={options.length === 0 ? "There is no graphs" : ""} className={cn("w-fit gap-2 border-none p-2", inTable ? "text-sm font-light" : "text-xl font-medium")}>
-          <SelectValue title={selectedValue || `Select ${type || "Graph"}`} placeholder={`Select ${type || "Graph"}`} />
+        <SelectTrigger data-type="select" disabled={disabled || options.length === 0} title={options.length === 0 ? "There is no graphs" : selectedValue || `Select ${type || "Graph"}`} className={cn("w-fit gap-2 border-none p-2", inTable ? "text-sm font-light" : "text-xl font-medium")}>
+          <SelectValue placeholder={`Select ${type || "Graph"}`} />
         </SelectTrigger>
         <SelectContent className="min-w-52 max-h-[30lvh] bg-foreground">
           <SelectGroup>
@@ -139,12 +143,26 @@ export default function Combobox({ isSelectGraph = false, disabled = false, inTa
           rows={rows}
           setRows={setRows}
         >
-          <Button
-            disabled={rows.filter(opt => opt.checked).length === 0}
-            label="Delete"
-            onClick={() => handleDelete(rows.filter(opt => opt.checked).map(opt => opt.cells[0].value))}
-          />
-          <ExportGraph selectedValues={rows.filter(opt => opt.checked).map(opt => opt.cells[0].value)} type={type!} />
+          <DialogComponent
+            open={openDelete}
+            onOpenChange={setOpenDelete}
+            title="Delete Graph"
+            trigger={<Button
+              disabled={rows.filter(opt => opt.checked).length === 0}
+              label="Delete"
+            />}
+            description="Are you sure you want to delete the selected graph?"
+          >
+            <div className="flex justify-end gap-2">
+              <Button
+                variant="Primary"
+                label="Delete Graph"
+                onClick={() => handleDelete(rows.filter(opt => opt.checked).map(opt => opt.cells[0].value as string))}
+              />
+              <CloseDialog label="Cancel" />
+            </div>
+          </DialogComponent>
+          <ExportGraph selectedValues={rows.filter(opt => opt.checked).map(opt => opt.cells[0].value as string)} type={type!} />
         </TableComponent>
       </DialogContent>
     </Dialog >

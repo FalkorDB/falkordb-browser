@@ -3,12 +3,7 @@
         "password": "Test111@",
         "confirmPassword": "Test111@",
         "ReadWrite":"Read-Write",
-        "ReadOnly":"Read-Only",
-        "role": {
-            "admin": 1,
-            "readWrite": 2,
-            "readOnly": 3
-        }
+        "ReadOnly":"Read-Only"
     },
     "userRoles": [
         { "name": "Default", "role": "admin" },
