@@ -124,8 +124,9 @@ export default function FormComponent({ handleSubmit, fields, error = undefined,
                                 }
                                 <p className="text-sm text-gray-500">{field.description}</p>
                                 {
-                                    field.errors && errors[field.label] &&
-                                    <p className="text-sm text-red-500">{field.errors.find((err) => err.condition(field.value))?.message}</p>
+                                    field.errors && errors[field.label] ?
+                                        <p className="text-sm text-red-500">{field.errors.find((err) => err.condition(field.value))?.message}</p>
+                                        : <p className="h-5" />
                                 }
                             </div>
                         </div>

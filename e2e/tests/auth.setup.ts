@@ -9,7 +9,7 @@ const adminAuthFile = 'playwright/.auth/admin.json'
 const readWriteAuthFile = 'playwright/.auth/readwriteuser.json'
 const readOnlyAuthFile = 'playwright/.auth/readonlyuser.json'
 
-setup.skip("admin authentication", async () => {
+setup("admin authentication", async () => {
     try {
         const browserWrapper = new BrowserWrapper();
         const loginPage = await browserWrapper.createNewPage(LoginPage, urls.loginUrl);
@@ -33,7 +33,7 @@ const userRoles = [
 ];
 
 userRoles.forEach(({ name, file, userName }) => {
-    setup.skip(`${name} authentication`, async () => {
+    setup(`${name} authentication`, async () => {
         try {
             const browserWrapper = new BrowserWrapper();
             const loginPage = await browserWrapper.createNewPage(LoginPage, urls.loginUrl);
