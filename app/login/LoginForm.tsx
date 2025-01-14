@@ -128,7 +128,6 @@ export default function LoginForm() {
             fields={fields}
             handleSubmit={onSubmit}
             error={error}
-            isFieldsRequired={false}
             submitButtonLabel="Log in"
           >
             <div className="flex gap-8">

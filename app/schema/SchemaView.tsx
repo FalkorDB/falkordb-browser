@@ -3,13 +3,14 @@
 'use client'
 
 import { ResizablePanel, ResizablePanelGroup, ResizableHandle } from "@/components/ui/resizable"
-import { ChevronLeft, Maximize2, Minimize2 } from "lucide-react"
+import { ChevronLeft, Maximize2, Minimize2, Pause, Play } from "lucide-react"
 import { ImperativePanelHandle } from "react-resizable-panels"
 import { useEffect, useRef, useState } from "react"
 import { cn, prepareArg, securedFetch } from "@/lib/utils"
 import { Session } from "next-auth"
 import dynamic from "next/dynamic"
 import { useToast } from "@/components/ui/use-toast"
+import { Switch } from "@/components/ui/switch"
 import Toolbar from "../graph/toolbar"
 import SchemaDataPanel from "./SchemaDataPanel"
 import Labels from "../graph/labels"
@@ -44,7 +45,6 @@ export default function SchemaView({ schema, fetchCount, session }: Props) {
     const [isAddEntity, setIsAddEntity] = useState(false)
     const [maximize, setMaximize] = useState<boolean>(false)
     const [cooldownTicks, setCooldownTicks] = useState<number | undefined>(0)
-    const [cooldownTime, setCooldownTime] = useState<number | undefined>(2000)
     const [data, setData] = useState<GraphData>(schema.Elements)
     const { toast } = useToast()
 
@@ -65,8 +65,8 @@ export default function SchemaView({ schema, fetchCount, session }: Props) {
         setSelectedNodes([undefined, undefined])
     }, [isAddRelation])
 
-    const handleCooldown = () => {
-        setCooldownTicks(1000)
+    const handleCooldown = (ticks?: number) => {
+        setCooldownTicks(ticks)
     }
 
     const onCategoryClick = (category: Category) => {
@@ -166,7 +166,7 @@ export default function SchemaView({ schema, fetchCount, session }: Props) {
 
     const handleSetAttributes = async (attribute: [string, string[]]) => {
         if (!selectedElement) return false
-        
+
         const [key, value] = attribute;
         const type = !("source" in selectedElement)
         const { id } = selectedElement
@@ -338,9 +338,6 @@ export default function SchemaView({ schema, fetchCount, session }: Props) {
                         onDeleteElement={handleDeleteElement}
                         chartRef={chartRef}
                         addDisabled={session?.user.role === "Read-Only"}
-                        setCooldownTime={setCooldownTime}
-                        cooldownTime={cooldownTime}
-                        handleCooldown={handleCooldown}
                     />
                     {
                         isCollapsed &&
@@ -365,6 +362,17 @@ export default function SchemaView({ schema, fetchCount, session }: Props) {
                                 : <Maximize2 size={20} />
                         }
                     </Button>
+                    <div className="z-10 absolute top-4 left-4 flex items-center gap-2 pointer-events-none">
+                        {cooldownTicks === undefined ? <Play size={20} /> : <Pause size={20} />}
+                        <Switch
+                            title="Animation Control"
+                            className="pointer-events-auto"
+                            checked={cooldownTicks === undefined}
+                            onCheckedChange={() => {
+                                handleCooldown(cooldownTicks === undefined ? 0 : undefined)
+                            }}
+                        />
+                    </div>
                     <ForceGraph
                         isCollapsed={isCollapsed}
                         chartRef={chartRef}
@@ -374,12 +382,11 @@ export default function SchemaView({ schema, fetchCount, session }: Props) {
                         setSelectedElement={handleSetSelectedElement}
                         selectedElements={selectedElements}
                         setSelectedElements={setSelectedElements}
-                        cooldownTicks={cooldownTicks}
-                        setCooldownTicks={setCooldownTicks}
-                        cooldownTime={cooldownTime}
                         type="schema"
                         isAddElement={isAddRelation}
                         setSelectedNodes={setSelectedNodes}
+                        cooldownTicks={cooldownTicks}
+                        handleCooldown={handleCooldown}
                     />
                     {
                         (schema.Categories.length > 0 || schema.Labels.length > 0) &&
