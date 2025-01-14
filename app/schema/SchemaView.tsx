@@ -3,12 +3,14 @@
 'use client'
 
 import { ResizablePanel, ResizablePanelGroup, ResizableHandle } from "@/components/ui/resizable"
-import { ChevronLeft, Maximize2, Minimize2 } from "lucide-react"
+import { ChevronLeft, Maximize2, Minimize2, Pause, Play } from "lucide-react"
 import { ImperativePanelHandle } from "react-resizable-panels"
 import { useEffect, useRef, useState } from "react"
-import { Toast, cn, prepareArg, securedFetch } from "@/lib/utils"
+import { cn, prepareArg, securedFetch } from "@/lib/utils"
 import { Session } from "next-auth"
 import dynamic from "next/dynamic"
+import { useToast } from "@/components/ui/use-toast"
+import { Switch } from "@/components/ui/switch"
 import Toolbar from "../graph/toolbar"
 import SchemaDataPanel from "./SchemaDataPanel"
 import Labels from "../graph/labels"
@@ -43,8 +45,8 @@ export default function SchemaView({ schema, fetchCount, session }: Props) {
     const [isAddEntity, setIsAddEntity] = useState(false)
     const [maximize, setMaximize] = useState<boolean>(false)
     const [cooldownTicks, setCooldownTicks] = useState<number | undefined>(0)
-    const [cooldownTime, setCooldownTime] = useState<number | undefined>(2000)
     const [data, setData] = useState<GraphData>(schema.Elements)
+    const { toast } = useToast()
 
     useEffect(() => {
         setData({ ...schema.Elements })
@@ -63,8 +65,8 @@ export default function SchemaView({ schema, fetchCount, session }: Props) {
         setSelectedNodes([undefined, undefined])
     }, [isAddRelation])
 
-    const handelCooldown = () => {
-        setCooldownTicks(1000)
+    const handleCooldown = (ticks?: number) => {
+        setCooldownTicks(ticks)
     }
 
     const onCategoryClick = (category: Category) => {
@@ -78,18 +80,18 @@ export default function SchemaView({ schema, fetchCount, session }: Props) {
 
         setData({ ...schema.Elements })
     }
-    
+
     const onLabelClick = (label: Category) => {
         label.show = !label.show
         schema.Elements.links.forEach((link) => {
             if (link.label !== label.name) return
             link.visible = label.show
         })
-        
+
         setData({ ...schema.Elements })
     }
 
-    const handelSetSelectedElement = (element?: Node | Link | undefined) => {
+    const handleSetSelectedElement = (element?: Node | Link | undefined) => {
         setSelectedElement(element)
         if (isAddRelation || isAddEntity) return
         if (element) {
@@ -111,7 +113,7 @@ export default function SchemaView({ schema, fetchCount, session }: Props) {
         }
     }
 
-    const handelDeleteElement = async () => {
+    const handleDeleteElement = async () => {
         const stateSelectedElements = Object.values(selectedElements)
 
         if (stateSelectedElements.length === 0 && selectedElement) {
@@ -134,7 +136,7 @@ export default function SchemaView({ schema, fetchCount, session }: Props) {
         const q = `${conditionsNodes.length > 0 ? `MATCH (n) WHERE ${conditionsNodes.join(" OR ")} DELETE n` : ""}${conditionsEdges.length > 0 && conditionsNodes.length > 0 ? " WITH * " : ""}${conditionsEdges.length > 0 ? `MATCH ()-[e]-() WHERE ${conditionsEdges.join(" OR ")} DELETE e` : ""}`
         const result = await securedFetch(`api/graph/${prepareArg(schema.Id)}_schema/?query=${prepareArg(q)} `, {
             method: "GET"
-        })
+        }, toast)
 
         if (!result.ok) return
 
@@ -162,16 +164,16 @@ export default function SchemaView({ schema, fetchCount, session }: Props) {
         dataPanel.current?.collapse()
     }
 
-    const handelSetAttributes = async (attribute: [string, string[]]) => {
-        const [key, value] = attribute;
+    const handleSetAttributes = async (attribute: [string, string[]]) => {
         if (!selectedElement) return false
 
+        const [key, value] = attribute;
         const type = !("source" in selectedElement)
         const { id } = selectedElement
         const q = `MATCH ${type ? "(e)" : "()-[e]-()"} WHERE ID(e) = ${id} SET e.${key} = "${value.join(",")}"`
         const { ok } = await securedFetch(`api/graph/${prepareArg(schema.Id)}_schema/?query=${prepareArg(q)}`, {
             method: "GET"
-        })
+        }, toast)
 
         if (ok) {
             if (type) {
@@ -186,7 +188,11 @@ export default function SchemaView({ schema, fetchCount, session }: Props) {
                 })
             }
         } else {
-            Toast("Failed to set property")
+            toast({
+                title: "Error",
+                description: "Failed to set property",
+                variant: "destructive"
+            })
         }
 
         setData({ ...schema.Elements })
@@ -194,7 +200,7 @@ export default function SchemaView({ schema, fetchCount, session }: Props) {
         return ok
     }
 
-    // const handelSetCategory = async (category: string) => {
+    // const handleSetCategory = async (category: string) => {
     //     if (!selectedElement) return false
 
     //     const { id } = getElementId(selectedElement)
@@ -233,7 +239,7 @@ export default function SchemaView({ schema, fetchCount, session }: Props) {
     //     return success
     // }
 
-    const handelRemoveProperty = async (key: string) => {
+    const handleRemoveProperty = async (key: string) => {
         if (!selectedElement) return false
 
         const type = !("source" in selectedElement)
@@ -241,7 +247,7 @@ export default function SchemaView({ schema, fetchCount, session }: Props) {
         const q = `MATCH ${type ? "(e)" : "()-[e]-()"} WHERE ID(e) = ${id} SET e.${key} = NULL`
         const { ok } = await securedFetch(`api/graph/${prepareArg(schema.Id)}_schema/?query=${prepareArg(q)}`, {
             method: "GET"
-        })
+        }, toast)
 
         if (ok) {
             if (type) {
@@ -270,13 +276,17 @@ export default function SchemaView({ schema, fetchCount, session }: Props) {
 
     const onCreateElement = async (attributes: [string, string[]][], label?: string) => {
         if (!isAddEntity && selectedNodes[0] === undefined && selectedNodes[1] === undefined) {
-            Toast("Select nodes to create a relation")
+            toast({
+                title: "Error",
+                description: "Select nodes to create a relation",
+                variant: "destructive"
+            })
             return false
         }
 
         const result = await securedFetch(`api/graph/${prepareArg(schema.Id)}_schema/?query=${getCreateQuery(isAddEntity, selectedNodes as [Node, Node], attributes, label)}`, {
             method: "GET"
-        })
+        }, toast)
 
         if (result.ok) {
             const json = await result.json()
@@ -300,15 +310,15 @@ export default function SchemaView({ schema, fetchCount, session }: Props) {
         return result.ok
     }
 
-
     return (
         <ResizablePanelGroup direction="horizontal" className={cn(maximize && "h-full p-10 bg-background fixed left-[50%] top-[50%] z-50 grid translate-x-[-50%] translate-y-[-50%]")}>
             <ResizablePanel
-                defaultSize={selectedElement ? 75 : 100}
+                defaultSize={50}
                 className={cn("flex flex-col gap-10", !isCollapsed && "mr-8")}
             >
                 <div className="flex items-center justify-between">
                     <Toolbar
+                        selectedElementsLength={selectedElements.length}
                         disabled={!schema.Id}
                         deleteDisabled={Object.values(selectedElements).length === 0 && !selectedElement}
                         onAddEntity={() => {
@@ -325,53 +335,58 @@ export default function SchemaView({ schema, fetchCount, session }: Props) {
                             if (dataPanel.current?.isExpanded()) return
                             onExpand()
                         }}
-                        onDeleteElement={handelDeleteElement}
+                        onDeleteElement={handleDeleteElement}
                         chartRef={chartRef}
                         addDisabled={session?.user.role === "Read-Only"}
-                        setCooldownTime={setCooldownTime}
-                        cooldownTime={cooldownTime}
-                        handelCooldown={handelCooldown}
                     />
                     {
                         isCollapsed &&
                         <Button
                             className="p-3 bg-[#7167F6] rounded-lg"
-                            icon={<ChevronLeft />}
                             onClick={() => onExpand()}
                             disabled={!selectedElement}
-                        />
+                        >
+                            <ChevronLeft size={20} />
+                        </Button>
                     }
                 </div>
                 <div className="relative h-1 grow rounded-lg overflow-hidden">
-                    {
-                        !maximize ?
-                            <Button
-                                className="z-10 absolute top-4 right-4"
-                                icon={<Maximize2 />}
-                                title="Maximize"
-                                onClick={() => setMaximize(true)}
-
-                            /> : <Button
-                                className="z-10 absolute top-4 right-4"
-                                icon={<Minimize2 />}
-                                title="Minimize"
-                                onClick={() => setMaximize(false)}
-                            />
-                    }
+                    <Button
+                        className="z-10 absolute top-4 right-4"
+                        title={maximize ? "Minimize" : "Maximize"}
+                        onClick={() => setMaximize(prev => !prev)}
+                    >
+                        {
+                            maximize ?
+                                <Minimize2 size={20} />
+                                : <Maximize2 size={20} />
+                        }
+                    </Button>
+                    <div className="z-10 absolute top-4 left-4 flex items-center gap-2 pointer-events-none">
+                        {cooldownTicks === undefined ? <Play size={20} /> : <Pause size={20} />}
+                        <Switch
+                            title="Animation Control"
+                            className="pointer-events-auto"
+                            checked={cooldownTicks === undefined}
+                            onCheckedChange={() => {
+                                handleCooldown(cooldownTicks === undefined ? 0 : undefined)
+                            }}
+                        />
+                    </div>
                     <ForceGraph
+                        isCollapsed={isCollapsed}
                         chartRef={chartRef}
                         data={data}
                         graph={schema}
                         selectedElement={selectedElement}
-                        setSelectedElement={handelSetSelectedElement}
+                        setSelectedElement={handleSetSelectedElement}
                         selectedElements={selectedElements}
                         setSelectedElements={setSelectedElements}
-                        cooldownTicks={cooldownTicks}
-                        setCooldownTicks={setCooldownTicks}
-                        cooldownTime={cooldownTime}
                         type="schema"
-                        isAddElement={isAddEntity || isAddRelation}
+                        isAddElement={isAddRelation}
                         setSelectedNodes={setSelectedNodes}
+                        cooldownTicks={cooldownTicks}
+                        handleCooldown={handleCooldown}
                     />
                     {
                         (schema.Categories.length > 0 || schema.Labels.length > 0) &&
@@ -382,12 +397,12 @@ export default function SchemaView({ schema, fetchCount, session }: Props) {
                     }
                 </div>
             </ResizablePanel>
-            <ResizableHandle className={!isCollapsed ? "w-3" : "w-0"} />
+            <ResizableHandle disabled={isCollapsed} className={cn(isCollapsed ? "w-0 !cursor-default" : "w-3")} />
             <ResizablePanel
-                className="rounded-lg"
+                className={cn("rounded-lg", !isCollapsed && "border-[3px] border-foreground")}
                 collapsible
                 ref={dataPanel}
-                defaultSize={selectedElement ? 25 : 0}
+                defaultSize={50}
                 minSize={25}
                 maxSize={50}
                 onCollapse={() => setIsCollapsed(true)}
@@ -398,9 +413,9 @@ export default function SchemaView({ schema, fetchCount, session }: Props) {
                         <SchemaDataPanel
                             obj={selectedElement}
                             onExpand={onExpand}
-                            onSetAttributes={handelSetAttributes}
-                            onRemoveAttribute={handelRemoveProperty}
-                            onDeleteElement={handelDeleteElement}
+                            onSetAttributes={handleSetAttributes}
+                            onRemoveAttribute={handleRemoveProperty}
+                            onDeleteElement={handleDeleteElement}
                         />
                         : (isAddEntity || isAddRelation) &&
                         <CreateElement

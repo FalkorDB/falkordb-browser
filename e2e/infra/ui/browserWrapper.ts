@@ -9,7 +9,7 @@ export default class BrowserWrapper {
 
     private page: Page | null = null;
 
-    async createNewPage<T extends BasePage>(pageClass: new (page: Page) => T, url?: string) {
+    async createNewPage<T extends BasePage>(PageClass: new (page: Page) => T, url?: string) {
         if (!this.browser) {
             this.browser = await chromium.launch();
         }
@@ -23,7 +23,7 @@ export default class BrowserWrapper {
             await this.navigateTo(url)
         }
 
-        const pageInstance = new pageClass(this.page);
+        const pageInstance = new PageClass(this.page);
         return pageInstance;
     }
 
@@ -52,11 +52,15 @@ export default class BrowserWrapper {
         await this.page.goto(url);
         await this.page.waitForLoadState('networkidle');
     }
-      
+
     async closePage() {
-        this.page ? await this.page.close() : this.page = null;
+        if (this.page) {
+            await this.page.close();
+        } else {
+            this.page = null;
+        }
     }
-    
+
     async closeBrowser() {
         if (this.browser) {
             await this.browser.close();

@@ -1,24 +1,33 @@
-import { cn } from "@/lib/utils"
-import { forwardRef } from "react"
+/* eslint-disable react/require-default-props */
+/* eslint-disable react/jsx-props-no-spreading */
+
+"use client"
+
+import { cn } from "@/lib/utils";
+import { forwardRef } from "react";
 
 interface Props extends React.InputHTMLAttributes<HTMLInputElement> {
-    variant: "Default" | "Small"
+    variant?: "primary" | "secondary" | "default";
+    className?: string;
 }
 
-const Input = forwardRef<HTMLInputElement, Props>(({ variant, className, ...props }: Props, ref) => (
-    <input
-        ref={ref}
-        className={cn(
-            "text-white p-2",
-            variant === "Default" && "bg-white text-black focus:border focus:border-[#5D5FEF] rounded-lg",
-            variant === "Small" && "bg-[#1F1F3D] hover:bg-[#2E2E51] focus:border focus:border-[#5D5FEF] rounded-lg",
-            className
-        )}
-        type="text"
-        // eslint-disable-next-line react/jsx-props-no-spreading
-        {...props}
-    />
-))
+const Input = forwardRef<HTMLInputElement, Props>(({ 
+    variant = "default", 
+    className, 
+    ...props 
+}, ref) => (
+        <input
+            ref={ref}
+            className={cn(
+                "border p-2 rounded-lg disabled:cursor-not-allowed disabled:opacity-50",
+                variant === "default" && "bg-input text-black",
+                variant === "primary" && "bg-background text-white",
+                variant === "secondary" && "bg-secondary",
+                className
+            )}
+            {...props}
+        />
+    ))
 
 Input.displayName = "Input"
 

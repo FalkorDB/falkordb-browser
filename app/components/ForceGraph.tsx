@@ -1,31 +1,31 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable react/require-default-props */
 /* eslint-disable no-param-reassign */
 
 "use client"
 
-import { Dispatch, RefObject, SetStateAction, useState } from "react"
+import { Dispatch, RefObject, SetStateAction, useEffect, useRef, useState } from "react"
 import ForceGraph2D from "react-force-graph-2d"
 import { securedFetch } from "@/lib/utils"
+import { useToast } from "@/components/ui/use-toast"
 import { Graph, GraphData, Link, Node } from "../api/graph/model"
 
 interface Props {
     graph: Graph
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    chartRef: RefObject<any>
+    chartRef: RefObject<any | null>
     data: GraphData
     selectedElement: Node | Link | undefined
     setSelectedElement: (element: Node | Link | undefined) => void
     selectedElements: (Node | Link)[]
     setSelectedElements: Dispatch<SetStateAction<(Node | Link)[]>>
-    cooldownTime: number | undefined
     cooldownTicks: number | undefined
-    setCooldownTicks: Dispatch<SetStateAction<number | undefined>>
+    handleCooldown: (ticks?: number) => void
     type?: "schema" | "graph"
     isAddElement?: boolean
     setSelectedNodes?: Dispatch<SetStateAction<[Node | undefined, Node | undefined]>>
+    isCollapsed: boolean
 }
-
-
 
 const NODE_SIZE = 6
 const PADDING = 2;
@@ -38,17 +38,32 @@ export default function ForceGraph({
     setSelectedElement,
     selectedElements,
     setSelectedElements,
-    cooldownTime,
     cooldownTicks,
-    setCooldownTicks,
+    handleCooldown,
     type = "graph",
     isAddElement = false,
     setSelectedNodes,
+    isCollapsed
 }: Props) {
 
     const [parentWidth, setParentWidth] = useState<number>(0)
     const [parentHeight, setParentHeight] = useState<number>(0)
     const [hoverElement, setHoverElement] = useState<Node | Link | undefined>()
+    const parentRef = useRef<HTMLDivElement>(null)
+    const toast = useToast()
+
+    useEffect(() => {
+        if (!chartRef.current || data.nodes.length === 0 || data.links.length === 0) return
+        chartRef.current.d3Force('link').id((link: any) => link.id).distance(50)
+        chartRef.current.d3Force('charge').strength(-300)
+        chartRef.current.d3Force('center').strength(0.05)
+    }, [chartRef, data.links.length, data.nodes.length])
+
+    useEffect(() => {
+        if (!parentRef.current) return
+        setParentWidth(parentRef.current.clientWidth)
+        setParentHeight(parentRef.current.clientHeight)
+    }, [parentRef.current?.clientWidth, parentRef.current?.clientHeight, isCollapsed])
 
     const onFetchNode = async (node: Node) => {
         const result = await securedFetch(`/api/graph/${graph.Id}/${node.id}`, {
@@ -56,7 +71,7 @@ export default function ForceGraph({
             headers: {
                 'Content-Type': 'application/json'
             }
-        });
+        }, toast);
 
         if (result.ok) {
             const json = await result.json()
@@ -90,7 +105,7 @@ export default function ForceGraph({
         graph.removeLinks()
     }
 
-    const handelNodeRightClick = async (node: Node) => {
+    const handleNodeRightClick = async (node: Node) => {
         if (!node.expand) {
             await onFetchNode(node)
         } else {
@@ -98,7 +113,7 @@ export default function ForceGraph({
         }
     }
 
-    const handelHover = (element: Node | Link | null) => {
+    const handleHover = (element: Node | Link | null) => {
         setHoverElement(element === null ? undefined : element)
     }
 
@@ -138,16 +153,13 @@ export default function ForceGraph({
     }
 
     return (
-        <div ref={ref => {
-            if (!ref) return
-            setParentWidth(ref.clientWidth)
-            setParentHeight(ref.clientHeight)
-        }} className="w-full h-full relative">
+        <div ref={parentRef} className="w-full h-full relative">
             <ForceGraph2D
                 ref={chartRef}
-                backgroundColor="#434366"
+                backgroundColor="#191919"
                 width={parentWidth}
                 height={parentHeight}
+                nodeLabel={(node) => node.data.name || node.id.toString()}
                 graphData={data}
                 nodeRelSize={NODE_SIZE}
                 nodeCanvasObjectMode={() => 'after'}
@@ -157,10 +169,10 @@ export default function ForceGraph({
                 nodeCanvasObject={(node, ctx) => {
                     if (!node.x || !node.y) return
 
-                    ctx.lineWidth = (selectedElement && !("source" in selectedElement) && selectedElement.id === node.id
-                        || hoverElement && !("source" in hoverElement) && hoverElement.id === node.id) ? 1 : 0.5
-                    ctx.fillStyle = node.color;
-                    ctx.strokeStyle = 'black';
+                    ctx.lineWidth = ((selectedElement && !("source" in selectedElement) && selectedElement.id === node.id)
+                        || (hoverElement && !("source" in hoverElement) && hoverElement.id === node.id)
+                        || (selectedElements.length > 0 && selectedElements.some(el => el.id === node.id && !("source" in el)))) ? 1 : 0.5
+                    ctx.strokeStyle = 'white';
 
                     ctx.beginPath();
                     ctx.arc(node.x, node.y, NODE_SIZE, 0, 2 * Math.PI, false);
@@ -171,13 +183,18 @@ export default function ForceGraph({
                     ctx.fillStyle = 'black';
                     ctx.textAlign = 'center';
                     ctx.textBaseline = 'middle';
-                    ctx.font = '4px Arial';
+                    ctx.font = '3px Arial';
                     const ellipsis = '...';
                     const ellipsisWidth = ctx.measureText(ellipsis).width;
                     const nodeSize = NODE_SIZE * 2 - PADDING;
-                    let { name } = type === "graph"
-                        ? { ...node.data }
-                        : { name: node.category[0] }
+
+                    let name
+
+                    if (type === "graph") {
+                        name = node.data.name || node.id.toString()
+                    } else {
+                        [name] = node.category
+                    }
 
                     // truncate text if it's too long
                     if (ctx.measureText(name).width > nodeSize) {
@@ -199,20 +216,7 @@ export default function ForceGraph({
                     ctx.strokeStyle = link.color;
                     ctx.globalAlpha = 0.5;
 
-                    const sameNodesLinks = graph.Elements.links.filter(l => (l.source.id === start.id && l.target.id === end.id) || (l.target.id === start.id && l.source.id === end.id))
-                    const index = sameNodesLinks.findIndex(l => l.id === link.id) || 0
-                    const even = index % 2 === 0
-                    let curve
-
                     if (start.id === end.id) {
-                        if (even) {
-                            curve = Math.floor(-(index / 2)) - 3
-                        } else {
-                            curve = Math.floor((index + 1) / 2) + 2
-                        }
-
-                        link.curve = curve * 0.1
-                        
                         const radius = NODE_SIZE * link.curve * 6.2;
                         const angleOffset = -Math.PI / 4; // 45 degrees offset for text alignment
                         const textX = start.x + radius * Math.cos(angleOffset);
@@ -222,14 +226,6 @@ export default function ForceGraph({
                         ctx.translate(textX, textY);
                         ctx.rotate(-angleOffset);
                     } else {
-                        if (even) {
-                            curve = Math.floor(-(index / 2))
-                        } else {
-                            curve = Math.floor((index + 1) / 2)
-                        }
-
-                        link.curve = curve * 0.1
-                        
                         const midX = (start.x + end.x) / 2 + (end.y - start.y) * (link.curve / 2);
                         const midY = (start.y + end.y) / 2 + (start.x - end.x) * (link.curve / 2);
 
@@ -249,25 +245,25 @@ export default function ForceGraph({
                     ctx.fillStyle = 'black';
                     ctx.textAlign = 'center';
                     ctx.textBaseline = 'middle';
-                    ctx.font = '2px Arial';
+                    ctx.font = "2px Arial"
                     ctx.fillText(link.label, 0, 0);
                     ctx.restore()
                 }}
                 onNodeClick={handleClick}
                 onLinkClick={handleClick}
-                onNodeHover={handelHover}
-                onLinkHover={handelHover}
-                onNodeRightClick={handelNodeRightClick}
+                onNodeHover={handleHover}
+                onLinkHover={handleHover}
+                onNodeRightClick={handleNodeRightClick}
                 onBackgroundClick={handleUnselected}
                 onBackgroundRightClick={handleUnselected}
                 onEngineStop={() => {
-                    setCooldownTicks(0)
+                    handleCooldown(0)
                 }}
                 linkCurvature="curve"
                 nodeVisibility="visible"
                 linkVisibility="visible"
                 cooldownTicks={cooldownTicks}
-                cooldownTime={cooldownTime}
+                cooldownTime={2000}
             />
         </div>
     )

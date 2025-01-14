@@ -6,11 +6,13 @@
 import { useRef, useState, useEffect, Dispatch, SetStateAction } from "react";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { ImperativePanelHandle } from "react-resizable-panels";
-import { ChevronLeft, GitGraph, Maximize2, Minimize2, Table } from "lucide-react"
+import { ChevronLeft, GitGraph, Maximize2, Minimize2, Pause, Play, Table } from "lucide-react"
 import { cn, prepareArg, securedFetch } from "@/lib/utils";
 import dynamic from "next/dynamic";
 import { Session } from "next-auth";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useToast } from "@/components/ui/use-toast";
+import { Switch } from "@/components/ui/switch";
 import { Category, Graph, GraphData, Link, Node } from "../api/graph/model";
 import DataPanel from "./GraphDataPanel";
 import Labels from "./labels";
@@ -45,7 +47,7 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
     const [maximize, setMaximize] = useState<boolean>(false)
     const [tabsValue, setTabsValue] = useState<string>("")
     const [cooldownTicks, setCooldownTicks] = useState<number | undefined>(0)
-    const [cooldownTime, setCooldownTime] = useState<number | undefined>(2000)
+    const { toast } = useToast()
 
     useEffect(() => {
         let timeout: NodeJS.Timeout
@@ -69,6 +71,11 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
         const defaultChecked = graph.Data.length !== 0 ? "Table" : "Graph"
         setTabsValue(graph.getElements().length !== 0 ? "Graph" : defaultChecked)
     }, [graph.getElements().length, graph.Data.length])
+
+
+    const handleCooldown = (ticks?: number) => {
+        setCooldownTicks(ticks)
+    }
 
     useEffect(() => {
         setSelectedElement(undefined)
@@ -105,10 +112,6 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
         onExpand(!!selectedElement)
     }, [selectedElement])
 
-    const handelCooldown = () => {
-        setCooldownTicks(1000)
-    }
-
     const onCategoryClick = (category: Category) => {
         category.show = !category.show
         graph.Elements.nodes.forEach((node) => {
@@ -138,8 +141,7 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
 
         setData({ ...graph.Elements })
     }
-
-    const handelDeleteElement = async () => {
+    const handleDeleteElement = async () => {
         if (selectedElements.length === 0 && selectedElement) {
             selectedElements.push(selectedElement)
             setSelectedElement(undefined)
@@ -161,7 +163,7 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
 
         const result = await securedFetch(`api/graph/${prepareArg(graph.Id)}/?query=${prepareArg(q)} `, {
             method: "GET"
-        })
+        }, toast)
 
         if (!result.ok) return
 
@@ -179,19 +181,37 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
             fetchCount()
         })
 
+
+        graph.Data = graph.Data.map(row => {
+            const newRow = Object.entries(row).map(([key, cell]) => {
+                if (typeof cell === "object" && cell && selectedElements.some(element => element.id === cell.id)) {
+                    return [key, undefined]
+                }
+                return [key, cell]
+            })
+            if (newRow.every(([, cell]) => cell === undefined)) {
+                return undefined
+            }
+            return Object.fromEntries(newRow)
+        })
+
         setSelectedElements([])
         setSelectedElement(undefined)
 
         graph.removeLinks(selectedElements.map((element) => element.id))
 
         setData({ ...graph.Elements })
-        handelCooldown()
+        toast({
+            title: "Success",
+            description: `${selectedElements.length > 1 ? "Elements" : "Element"} deleted`,
+        })
+        handleCooldown()
     }
 
-    const handelRunQuery = async (q: string) => {
+    const handleRunQuery = async (q: string) => {
         await runQuery(q)
         chartRef.current?.zoomToFit(1000, 40)
-        handelCooldown()
+        handleCooldown()
     }
 
     return (
@@ -206,12 +226,12 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
                     maximize={maximize}
                     currentQuery={query}
                     historyQueries={historyQueries}
-                    runQuery={handelRunQuery}
+                    runQuery={handleRunQuery}
                     setCurrentQuery={setQuery}
                     data={session}
                 />
-                <Tabs value={tabsValue} className="h-1 grow flex gap-2">
-                    <TabsList className="h-full bg-background flex flex-col justify-center gap-2">
+                <Tabs value={tabsValue} className="h-1 grow flex gap-2 items-center">
+                    <TabsList className="h-fit bg-foreground p-2 flex flex-col gap-2">
                         <TabsTrigger
                             disabled={graph.getElements().length === 0}
                             className="tabs-trigger"
@@ -234,43 +254,45 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
                         <div className="h-full flex flex-col gap-4">
                             <div className="flex items-center justify-between">
                                 <Toolbar
+                                    selectedElementsLength={selectedElements.length + (selectedElement ? 1 : 0)}
                                     disabled={!graph.Id}
                                     deleteDisabled={(Object.values(selectedElements).length === 0 && !selectedElement) || session?.user.role === "Read-Only"}
-                                    onDeleteElement={handelDeleteElement}
+                                    onDeleteElement={handleDeleteElement}
                                     chartRef={chartRef}
-                                    cooldownTime={cooldownTime}
-                                    setCooldownTime={setCooldownTime}
-                                    handelCooldown={handelCooldown}
                                     addDisabled
                                 />
                                 {
                                     isCollapsed && graph.Id &&
                                     <Button
                                         className="p-3 bg-[#7167F6] rounded-lg"
-                                        icon={<ChevronLeft />}
                                         onClick={() => onExpand()}
                                         disabled={!selectedElement}
-                                    />
+                                    >
+                                        <ChevronLeft />
+                                    </Button>
                                 }
                             </div>
                             <div className="relative h-1 grow rounded-lg overflow-hidden">
-                                {
-                                    !maximize ?
-                                        <Button
-                                            className="z-10 absolute top-4 right-4"
-                                            icon={<Maximize2 />}
-                                            title="Maximize"
-                                            onClick={() => setMaximize(true)}
-
-                                        /> : <Button
-                                            className="z-10 absolute top-4 right-4"
-                                            icon={<Minimize2 />}
-                                            title="Minimize"
-                                            onClick={() => setMaximize(false)}
-                                            onKeyDown={(e) => e.code === "Escape" && setMaximize(false)}
-                                        />
-                                }
+                                <Button
+                                    className="z-10 absolute top-4 right-4"
+                                    title={!maximize ? "Maximize" : "Minimize"}
+                                    onClick={() => setMaximize(prev => !prev)}
+                                >
+                                    {maximize ? <Maximize2 /> : <Minimize2 />}
+                                </Button>
+                                <div className="z-10 absolute top-4 left-4 flex items-center gap-2 pointer-events-none">
+                                    {cooldownTicks === undefined ? <Play size={20} /> : <Pause size={20} />}
+                                    <Switch
+                                        title="Animation Control"
+                                        className="pointer-events-auto"
+                                        checked={cooldownTicks === undefined}
+                                        onCheckedChange={() => {
+                                            handleCooldown(cooldownTicks === undefined ? 0 : undefined)
+                                        }}
+                                    />
+                                </div>
                                 <ForceGraph
+                                    isCollapsed={isCollapsed}
                                     graph={graph}
                                     chartRef={chartRef}
                                     data={data}
@@ -279,8 +301,7 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
                                     selectedElements={selectedElements}
                                     setSelectedElements={setSelectedElements}
                                     cooldownTicks={cooldownTicks}
-                                    setCooldownTicks={setCooldownTicks}
-                                    cooldownTime={cooldownTime}
+                                    handleCooldown={handleCooldown}
                                 />
                                 {
                                     (graph.Categories.length > 0 || graph.Labels.length > 0) &&
@@ -299,7 +320,7 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
                     </TabsContent>
                 </Tabs>
             </ResizablePanel>
-            <ResizableHandle className={!isCollapsed ? "w-3" : "w-0"} />
+            <ResizableHandle disabled={isCollapsed} className={cn(isCollapsed ? "w-0 !cursor-default" : "w-3")} />
             <ResizablePanel
                 className="rounded-lg"
                 collapsible
@@ -317,7 +338,7 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
                         setObj={setSelectedElement}
                         onExpand={onExpand}
                         graph={graph}
-                        onDeleteElement={handelDeleteElement}
+                        onDeleteElement={handleDeleteElement}
                         data={session}
                     />
                 }

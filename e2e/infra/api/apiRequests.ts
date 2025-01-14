@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
 import { APIRequestContext, request } from "@playwright/test"
 
 
@@ -8,7 +10,8 @@ const getRequest = async (url: string, body: any, availableRequest?: APIRequestC
   };
 
   const requestContext = availableRequest || (await request.newContext());
-  return await requestContext.get(url, requestOptions);
+  const response = await requestContext.get(url, requestOptions);
+  return response;
 };
 
 const postRequest = async (url: string, body: any, availableRequest?: APIRequestContext, headers?: Record<string, string>) => {
@@ -18,9 +21,10 @@ const postRequest = async (url: string, body: any, availableRequest?: APIRequest
   };
 
   const requestContext = availableRequest || (await request.newContext());
-  return await requestContext.post(url, requestOptions);
+  const response = await requestContext.post(url, requestOptions);
+  return response;
 };
-  
+
 const deleteRequest = async (url: string, body?: any, headers?: Record<string, string>) => {
   const requestOptions = {
     data: body,
@@ -28,9 +32,10 @@ const deleteRequest = async (url: string, body?: any, headers?: Record<string, s
   };
 
   const requestContext = await request.newContext();
-  return await requestContext.delete(url, requestOptions);
+  const response = await requestContext.delete(url, requestOptions);
+  return response;
 };
 
 
 
-export{ getRequest, deleteRequest, postRequest }
+export { getRequest, deleteRequest, postRequest }

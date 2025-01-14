@@ -7,15 +7,15 @@ export default class BasePage {
         this.page = page;
     }
 
-    async initPage(){
+    async initPage() {
         await this.page.waitForLoadState()
     }
 
-    getCurrentURL() : string {
+    getCurrentURL(): string {
         return this.page.url();
     }
 
-    async refreshPage(){
+    async refreshPage() {
         await this.page.reload({ waitUntil: 'networkidle' });
     }
 

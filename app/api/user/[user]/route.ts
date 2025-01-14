@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getClient } from "../../auth/[...nextauth]/options"
-import { ROLE } from "../options"
+import { ROLE } from "../model"
 
 // eslint-disable-next-line import/prefer-default-export
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ user: string }> }) {
@@ -18,6 +18,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ us
         await (await client.connection).aclSetUser(username, role)
         return NextResponse.json({ message: "User created" }, { status: 200 })
     } catch (err: unknown) {
+        console.error(err)
         return NextResponse.json({ message: (err as Error).message }, { status: 400 })
     }
 }

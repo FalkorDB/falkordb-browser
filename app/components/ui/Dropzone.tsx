@@ -61,7 +61,7 @@ function Dropzone({ filesCount = false, className = "", withTable = false, disab
             </div>
             {
                 withTable &&
-                <div className='grow bg-[#272746] flex flex-col gap-4 justify-center'>
+                <div className='grow bg-foreground flex flex-col gap-4 justify-center'>
                     <div className='text-lg'>
                         {`Uploaded Files ${filesCount ? `(${files.length})`: ''}`}
                     </div>

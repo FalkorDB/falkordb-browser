@@ -1,3 +1,3 @@
 export interface DeleteUsersResponse {
-    message: string;
-  }
+  message: string;
+}

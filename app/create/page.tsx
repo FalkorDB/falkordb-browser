@@ -5,7 +5,8 @@ import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Progress } from "@/components/ui/progress";
 import useSWR from "swr";
-import { Toast, prepareArg, securedFetch } from "@/lib/utils";
+import { prepareArg, securedFetch } from "@/lib/utils";
+import { useToast } from "@/components/ui/use-toast";
 import Header from "../components/Header";
 import Input from "../components/ui/Input";
 import Button from "../components/ui/Button";
@@ -26,6 +27,7 @@ export default function Create() {
     const [progress, setProgress] = useState<number>(0)
     const [openaiKey, setOpenaiKey] = useState<string>("")
     const router = useRouter()
+    const { toast } = useToast()
 
     useEffect(() => {
         if (progress !== 100) return
@@ -34,10 +36,14 @@ export default function Create() {
 
             const res = await securedFetch(`api/graph/${prepareArg(graphName)}_schema/?query=${prepareArg(q)}`, {
                 method: "GET"
-            })
+            }, toast)
 
             if (!res.ok) {
-                Toast()
+                toast({
+                    title: "Error",
+                    description: "Error while loading schema",
+                    variant: "destructive"
+                })
                 setProgress(0)
                 setCurrentTab(null)
                 setFilesPath([])
@@ -47,7 +53,11 @@ export default function Create() {
             const j = await res.json()
 
             if (!j.result.data.length) {
-                Toast()
+                toast({
+                    title: "Error",
+                    description: "Error while loading schema",
+                    variant: "destructive"
+                })
                 setProgress(0)
                 setCurrentTab(null)
                 setFilesPath([])
@@ -65,10 +75,14 @@ export default function Create() {
 
         const result = await securedFetch(url, {
             method: "GET",
-        })
+        }, toast)
 
         if (!result.ok) {
-            Toast()
+            toast({
+                title: "Error",
+                description: "Error while loading schema",
+                variant: "destructive"
+            })
             return
         }
 
@@ -95,10 +109,14 @@ export default function Create() {
             const result = await securedFetch(`api/upload`, {
                 method: "POST",
                 body: formData
-            });
+            }, toast);
 
             if (!result.ok) {
-                Toast()
+                toast({
+                    title: "Error",
+                    description: "Error while uploading file",
+                    variant: "destructive"
+                })
                 return ""
             }
 
@@ -115,11 +133,15 @@ export default function Create() {
                 "Content-Type": "application/json"
             },
             body: JSON.stringify(newFilesPath)
-        })
+        }, toast)
 
 
         if (!result.ok) {
-            Toast()
+            toast({
+                title: "Error",
+                description: "Error while creating schema",
+                variant: "destructive"
+            })
             setFilesPath([])
             setProgress(0)
             setCurrentTab(null)
@@ -136,10 +158,14 @@ export default function Create() {
         const result = await securedFetch(`api/graph/${prepareArg(graphName)}/?type=populate_kg/?key=${prepareArg(openaiKey)}`, {
             method: "POST",
             body: JSON.stringify(filesPath)
-        })
+        }, toast)
 
         if (!result.ok) {
-            Toast()
+            toast({
+                title: "Error",
+                description: "Error while creating graph",
+                variant: "destructive"
+            })
             return
         }
         setCurrentTab("graph")
@@ -158,7 +184,6 @@ export default function Create() {
     //     })
 
     //     if (!ok) {
-    //         Toast("Failed to set label")
     //         return ok
     //     }
 
@@ -199,7 +224,7 @@ export default function Create() {
                                 onClick={() => setCurrentTab(null)}
                             />
                             <Button
-                                variant="Large"
+                                variant="Primary"
                                 label="Create Graph"
                                 type="button"
                                 onClick={() => handleCreateGraph()}
@@ -213,12 +238,16 @@ export default function Create() {
 
                 securedFetch(`api/graph/${prepareArg(graphName)}/?query=${prepareArg(q)}`, {
                     method: "GET",
-                }).then((response) => response.json()).then((json) => {
+                }, toast).then((response) => response.json()).then((json) => {
                     const data = json.result.data[0]
                     setNodesCount(data.nodes)
                     setEdgesCount(data.edges)
                 }).catch(() => {
-                    Toast("Failed to get graph metadata")
+                    toast({
+                        title: "Error",
+                        description: "Failed to get graph metadata",
+                        variant: "destructive"
+                    })
                 })
 
                 return (
@@ -234,13 +263,13 @@ export default function Create() {
                             <Button
                                 className="flex gap-1 items-center text-[#7167F6]"
                                 label="Back"
-                                icon={<ChevronLeft size={25} />}
                                 onClick={() => setCurrentTab("schema")}
-
-                            />
+                            >
+                                <ChevronLeft size={25} />
+                            </Button>
                             <Button
                                 className="w-1/4"
-                                variant="Large"
+                                variant="Primary"
                                 label="Go To Main Screen"
                                 onClick={handleGoToMain}
                             />
@@ -257,7 +286,6 @@ export default function Create() {
                                     <p>Graph Name</p>
                                     <Input
                                         className="w-1/2"
-                                        variant="Small"
                                         title="GraphName"
                                         type="text"
                                         onChange={(e) => setGraphName(e.target.value)}
@@ -268,7 +296,6 @@ export default function Create() {
                                     <p className="flex gap-2 items-center">OpenAI Key <AlertCircle size={15} /></p>
                                     <Input
                                         className="w-1/2"
-                                        variant="Small"
                                         title="OpenAI Key"
                                         type="text"
                                         onChange={(e) => setOpenaiKey(e.target.value)}
@@ -285,11 +312,12 @@ export default function Create() {
                         </div>
                         <div className="flex justify-end">
                             <Button
-                                variant="Large"
-                                icon={<PlusCircle />}
+                                variant="Primary"
                                 label="Create Schema"
                                 type="submit"
-                            />
+                            >
+                                <PlusCircle />
+                            </Button>
                         </div>
                     </form>
                 )
@@ -298,7 +326,7 @@ export default function Create() {
 
     return (
         <div className="flex flex-col h-full w-full gap-4">
-            <Header inCreate />
+            <Header onSetGraphName={setGraphName} />
             <div className="grow flex flex-col p-8 gap-8">
                 <h1 className="text-2xl font-medium">Create New Graph</h1>
                 <div className="grow flex flex-col gap-16 p-6">

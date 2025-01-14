@@ -1,4 +1,6 @@
-export interface runQueryResponse {
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
+export interface RunQueryResponse {
     result: {
         metadata: {
             "Labels added": number;
