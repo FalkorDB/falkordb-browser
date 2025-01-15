@@ -374,7 +374,6 @@ export default function SchemaView({ schema, fetchCount, session }: Props) {
                         />
                     </div>
                     <ForceGraph
-                        isCollapsed={isCollapsed}
                         chartRef={chartRef}
                         data={data}
                         graph={schema}
