@@ -1,5 +1,8 @@
 /* eslint-disable consistent-return */
 /* eslint-disable react-hooks/exhaustive-deps */
+
+"use client";
+
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import { Editor, Monaco } from "@monaco-editor/react"
 import { useEffect, useRef, useState } from "react"
@@ -7,6 +10,7 @@ import * as monaco from "monaco-editor";
 import { prepareArg, securedFetch } from "@/lib/utils";
 import { Maximize2 } from "lucide-react";
 import { Session } from "next-auth";
+import { useToast } from "@/components/ui/use-toast";
 import { Graph } from "../api/graph/model";
 import Button from "./ui/Button";
 
@@ -52,11 +56,10 @@ const monacoOptions: monaco.editor.IStandaloneEditorConstructionOptions = {
         loop: false,
     },
     automaticLayout: true,
-    fontSize: 30,
+    fontSize: 26,
     fontWeight: "200",
     wordWrap: "off",
-    lineHeight: 38,
-    lineNumbers: "on",
+    lineHeight: 37,
     lineNumbersMinChars: 2,
     overviewRulerLanes: 0,
     overviewRulerBorder: false,
@@ -198,9 +201,12 @@ const getEmptySuggestions = (): Suggestions => ({
     functions: []
 })
 
+const PLACEHOLDER = "Type your query here to start"
+
 export default function EditorComponent({ currentQuery, historyQueries, setCurrentQuery, maximize, runQuery, graph, isCollapsed, data }: Props) {
 
     const [query, setQuery] = useState(currentQuery)
+    const placeholderRef = useRef<HTMLDivElement>(null)
     const [monacoInstance, setMonacoInstance] = useState<Monaco>()
     const [prevGraphName, setPrevGraphName] = useState<string>("")
     const [sugProvider, setSugProvider] = useState<monaco.IDisposable>()
@@ -214,6 +220,7 @@ export default function EditorComponent({ currentQuery, historyQueries, setCurre
         currentQuery,
         historyCounter: historyQueries.length
     })
+    const { toast } = useToast()
 
     useEffect(() => {
         historyRef.current.historyQueries = historyQueries
@@ -241,8 +248,8 @@ export default function EditorComponent({ currentQuery, historyQueries, setCurre
                 { token: 'number', foreground: '#b5cea8' },
             ],
             colors: {
-                'editor.background': '#1F1F3D',
-                'editor.foreground': 'ffffff',
+                'editor.background': '#191919',
+                'editor.foreground': '#ffffff',
                 'editorSuggestWidget.background': '#272745',
                 'editorSuggestWidget.foreground': '#FFFFFF',
                 'editorSuggestWidget.selectedBackground': '#57577B',
@@ -278,7 +285,7 @@ export default function EditorComponent({ currentQuery, historyQueries, setCurre
 
         await securedFetch(`api/graph/${prepareArg(graph.Id)}/?query=${prepareArg(labelsQuery)}&role=${data?.user.role}`, {
             method: "GET"
-        }).then((res) => res.json()).then((json) => {
+        }, toast).then((res) => res.json()).then((json) => {
             json.result.data.forEach(({ label }: { label: string }) => {
                 sug.push({
                     label,
@@ -296,7 +303,7 @@ export default function EditorComponent({ currentQuery, historyQueries, setCurre
 
         await securedFetch(`api/graph/${prepareArg(graph.Id)}/?query=${prepareArg(relationshipTypeQuery)}&role=${data?.user.role}`, {
             method: "GET"
-        }).then((res) => res.json()).then((json) => {
+        }, toast).then((res) => res.json()).then((json) => {
             json.result.data.forEach(({ relationshipType }: { relationshipType: string }) => {
                 sug.push({
                     label: relationshipType,
@@ -314,7 +321,7 @@ export default function EditorComponent({ currentQuery, historyQueries, setCurre
 
         await securedFetch(`api/graph/${prepareArg(graph.Id)}/?query=${prepareArg(propertyKeysQuery)}&role=${data?.user.role}`, {
             method: "GET"
-        }).then((res) => res.json()).then((json) => {
+        }, toast).then((res) => res.json()).then((json) => {
             json.result.data.forEach(({ propertyKey }: { propertyKey: string }) => {
                 sug.push({
                     label: propertyKey,
@@ -331,7 +338,7 @@ export default function EditorComponent({ currentQuery, historyQueries, setCurre
         const proceduresQuery = `CALL dbms.procedures() YIELD name`
         await securedFetch(`api/graph/${prepareArg(graph.Id)}/?query=${prepareArg(proceduresQuery)}&role=${data?.user.role}`, {
             method: "GET"
-        }).then((res) => res.json()).then((json) => {
+        }, toast).then((res) => res.json()).then((json) => {
             [...json.result.data.map(({ name }: { name: string }) => name), ...FUNCTIONS].forEach((name: string) => {
                 functions.push({
                     label: name,
@@ -435,15 +442,16 @@ export default function EditorComponent({ currentQuery, historyQueries, setCurre
 
         const run = async () => {
             const sug: Suggestions = getEmptySuggestions()
-
-            await Promise.all(graph.Metadata.map(async (meta: string) => {
-                if (meta.includes("Labels")) await addLabelsSuggestions(sug.labels)
-                if (meta.includes("RelationshipTypes")) await addRelationshipTypesSuggestions(sug.relationshipTypes)
-                if (meta.includes("PropertyKeys")) await addPropertyKeysSuggestions(sug.propertyKeys)
-            }))
+            if (graph.Metadata.length > 0) {
+                await Promise.all(graph.Metadata.map(async (meta: string) => {
+                    if (meta.includes("Labels")) await addLabelsSuggestions(sug.labels)
+                    if (meta.includes("RelationshipTypes")) await addRelationshipTypesSuggestions(sug.relationshipTypes)
+                    if (meta.includes("PropertyKeys")) await addPropertyKeysSuggestions(sug.propertyKeys)
+                }))
+            }
             Object.entries(sug).forEach(([key, value]) => {
                 if (value.length === 0) {
-                    sug[key as "labels" || "propertyKeys" || "relationshipTypes"] = suggestions[key as "labels" || "propertyKeys" || "relationshipTypes"]
+                    sug[key as keyof Suggestions] = suggestions[key as keyof Suggestions]
                 }
             })
 
@@ -526,12 +534,31 @@ export default function EditorComponent({ currentQuery, historyQueries, setCurre
 
         if (graph.Id) {
             getSuggestions(monacoI)
-        }else {   
+        } else {
             addSuggestions(monacoI)
         }
     };
 
     const handleEditorDidMount = (e: monaco.editor.IStandaloneCodeEditor, monacoI: Monaco) => {
+        const updatePlaceholderVisibility = () => {
+            const hasContent = !!e.getValue();
+            if (placeholderRef.current) {
+                placeholderRef.current.style.display = hasContent ? 'none' : 'block';
+            }
+        };
+
+        e.onDidFocusEditorText(() => {
+            if (placeholderRef.current) {
+                placeholderRef.current.style.display = 'none';
+            }
+        });
+
+        e.onDidBlurEditorText(() => {
+            updatePlaceholderVisibility();
+        });
+
+        // Initial check
+        updatePlaceholderVisibility();
 
         setMonacoInstance(monacoI)
 
@@ -546,7 +573,7 @@ export default function EditorComponent({ currentQuery, historyQueries, setCurre
         })
 
         const isFirstLine = e.createContextKey('isFirstLine', false as boolean);
-        
+
         // Update the context key value based on the cursor position
         e.onDidChangeCursorPosition(() => {
             const position = e.getPosition();
@@ -613,14 +640,16 @@ export default function EditorComponent({ currentQuery, historyQueries, setCurre
                                 runQuery(query)
                             }}
                         >
-                            <div className="relative border border-[#343459] flex grow w-1">
+                            <div className="relative grow w-1">
                                 <Editor
                                     // eslint-disable-next-line no-nested-ternary
                                     height={blur ? LINE_HEIGHT : lineNumber * LINE_HEIGHT > document.body.clientHeight / 100 * MAX_HEIGHT ? document.body.clientHeight / 100 * MAX_HEIGHT : lineNumber * LINE_HEIGHT}
-                                    className="Editor"
                                     language="custom-language"
-                                    options={monacoOptions}
-                                    value={blur ? query.replace(/\s+/g, ' ').trim() : query}
+                                    options={{
+                                        ...monacoOptions,
+                                        lineNumbers: lineNumber > 1 ? "on" : "off",
+                                    }}
+                                    value={(blur ? query.replace(/\s+/g, ' ').trim() : query)}
                                     onChange={(val) => historyRef.current.historyCounter ? setQuery(val || "") : setCurrentQuery(val || "")}
                                     theme="custom-theme"
                                     beforeMount={handleEditorWillMount}
@@ -630,14 +659,19 @@ export default function EditorComponent({ currentQuery, historyQueries, setCurre
                                     <Button
                                         className="absolute top-0 right-3 p-2.5"
                                         title="Maximize"
-                                        icon={<Maximize2 size={20} />}
-                                    />
+                                    >
+                                        <Maximize2 size={20} />
+                                    </Button>
                                 </DialogTrigger>
+                                <div ref={placeholderRef} className="absolute top-2 left-2 pointer-events-none">
+                                    {PLACEHOLDER}
+                                </div>
                             </div>
                             <Button
                                 ref={submitQuery}
-                                className="rounded-none px-8"
-                                variant="Secondary"
+                                className="rounded-none py-2 px-8"
+                                variant="Primary"
+                                title="Run (Ctrl + Enter)"
                                 label="Run"
                                 type="submit"
                             />

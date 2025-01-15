@@ -1,116 +1,119 @@
-import { Locator, Download  } from "@playwright/test";
+import { Locator, Download } from "@playwright/test";
 import BasePage from "@/e2e/infra/ui/basePage";
 import { waitForTimeOut } from "@/e2e/infra/utils";
 
-export class graphPage extends BasePage {
+export default class GraphPage extends BasePage {
 
     private get graphsMenu(): Locator {
-        return this.page.getByRole("button", { name : "Select Graph"});
-    }
-
-    private graphsMenuByName(graph: string): Locator {
-        return this.page.getByRole("button", { name : `${graph}`});
-    }
-
-    private get dropDownMenuGraphs(): Locator {
-        return this.page.locator("//div[@role='menuitem']");
+        return this.page.getByRole("combobox");
     }
 
     private get manageGraphBtn(): Locator {
-        return this.page.locator("//button[p[contains(text(), 'Manage Graphs')]]")
+        return this.page.getByRole("button", { name: "Manage Graphs" })
     }
 
-    private get threeDotsBtn(): Locator {
-        return this.page.locator("(//button[p[text()='...']])[1]")
-    }
-
-    private get deleteIconSvg(): Locator {
-        return this.page.locator("//div[@role='menuitem'][2]//button")
-    }
-
-    private get confirmGraphDeleteBtn(): Locator {
-        return this.page.locator("//button[contains(text(), 'Continue')]")
+    private get deleteGraphBtn(): Locator {
+        return this.page.getByRole('button', { name: 'Delete' })
     }
 
     private get addGraphBtnInNavBar(): Locator {
-        return this.page.getByRole("button", { name : "New Graph"});
+        return this.page.getByText("Create New Graph");
     }
 
     private get graphNameInput(): Locator {
-        return this.page.locator("//div/p[contains(text(), 'Name')]/following-sibling::input");
+        return this.page.getByRole("textbox");
     }
 
     private get createGraphBtn(): Locator {
-        return this.page.getByRole("button", { name : "Create"});
+        return this.page.getByRole("button", { name: "Create your Graph" });
     }
 
     private get exportDataBtn(): Locator {
-        return this.page.getByRole("button", { name : "Export Data"});
+        return this.page.getByRole("button", { name: "Export Data" });
+    }
+    
+    private get exportDataConfirmBtn(): Locator {
+        return this.page.getByRole("button", { name: "Download" });
     }
 
     private get findGraphInMenu(): (graph: string) => Locator {
-        return (graph: string) => this.page.locator(`//tbody//tr/td[1][contains(text(), '${graph}')]`);
+        return (graph: string) => this.page.getByRole('row', { name: graph, exact: true });
     }
 
-    private get deleteGraphInMenu(): (graph: string) => Locator {
-        return (graph: string) => this.page.locator(`//tbody//tr/td[1][contains(text(), '${graph}')]/parent::tr//td[3]/button`);
+    private get checkGraphInMenu(): (graph: string) => Locator {
+        return (graph: string) => this.findGraphInMenu(graph).getByRole('checkbox')
+    }
+
+    private get deleteAllGraphInMenu(): Locator {
+        return this.page.getByRole('row', { name: 'Name', exact: true }).getByRole('checkbox')
+    }
+
+    private get graphMenuElements(): Locator {
+        return this.page.getByRole('row');
+    }
+
+    private get deleteGraphConfirmBtn(): Locator {
+        return this.page.getByRole('button', { name: 'Delete Graph' })
     }
 
     async countGraphsInMenu(): Promise<number> {
         await waitForTimeOut(this.page, 1000);
-        await this.graphsMenu.click()
-        return await this.dropDownMenuGraphs.count() - 1;
-    }
-    
-    async removeGraph(): Promise<void> {
-        await this.threeDotsBtn.click()
-        await this.deleteIconSvg.click()
-        await this.confirmGraphDeleteBtn.click()
+        
+        if (await this.graphsMenu.isEnabled()) {
+            await this.graphsMenu.click();
+            await this.manageGraphBtn.click();
+            const count = await this.graphMenuElements.count();
+            await this.refreshPage();
+            return count;
+        }
+        
+        return 0;
     }
 
     async removeAllGraphs(): Promise<void> {
         await waitForTimeOut(this.page, 1000);
-        const graphCount = await this.countGraphsInMenu();
-        
-        await this.manageGraphBtn.click()
-        for(let i = graphCount; i >= 1; i--){
-            await this.removeGraph();
+        if (await this.graphsMenu.isEnabled()) {
+            await this.graphsMenu.click();
+            await this.manageGraphBtn.click();
+            await this.deleteAllGraphInMenu.click()
+            await this.deleteGraphBtn.click()
+            await this.deleteGraphConfirmBtn.click();
         }
     }
 
-    async addGraph(graphName : string): Promise<void>{
+    async addGraph(graphName: string): Promise<void> {
         await this.addGraphBtnInNavBar.click()
         await this.graphNameInput.fill(graphName);
         await this.createGraphBtn.click()
     }
 
-    async clickOnExportDataBtn(): Promise<Download> {
-        await this.page.waitForLoadState('networkidle'); 
+    async exportGraph(): Promise<Download> {
+        await this.page.waitForLoadState('networkidle');
         const [download] = await Promise.all([
             this.page.waitForEvent('download'),
-            this.exportDataBtn.click()
+            this.exportDataBtn.click(),
+            this.exportDataConfirmBtn.click()
         ]);
 
         return download;
     }
 
-    async verifyGraphExists(graph : string): Promise<Boolean>{
+    async verifyGraphExists(graph: string): Promise<boolean> {
+        if (await this.graphsMenu.isDisabled()) return false;
+        
         await this.graphsMenu.click();
         await this.manageGraphBtn.click();
-        return await this.findGraphInMenu(graph).isVisible();
+        const isVisible = await this.findGraphInMenu(graph).isVisible();
+        
+        return isVisible;
     }
 
-    async verifyGraphExistsByName(graph : string): Promise<Boolean>{
-        await this.graphsMenuByName(graph).click();
+    async deleteGraph(graph: string): Promise<void> {
+        await this.graphsMenu.click();
         await this.manageGraphBtn.click();
-        return await this.findGraphInMenu(graph).isVisible();
+        await this.checkGraphInMenu(graph).click();
+        await this.deleteGraphBtn.click();
+        await this.deleteGraphConfirmBtn.click();
     }
 
-    async deleteGraph(graph : string): Promise<void> {
-        await this.graphsMenuByName(graph).click();
-        await this.manageGraphBtn.click();
-        await this.deleteGraphInMenu(graph).click();
-        await this.deleteIconSvg.click()
-        await this.confirmGraphDeleteBtn.click()
-    }
 }

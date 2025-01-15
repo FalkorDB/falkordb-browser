@@ -1,6 +1,6 @@
 'use client';
 
-import { DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { ReactNode } from "react";
 import CloseDialog from "./CloseDialog";
@@ -9,26 +9,40 @@ import CloseDialog from "./CloseDialog";
 interface Props {
     children: React.ReactNode
     title: string
+    open?: boolean
+    onOpenChange?: (open: boolean) => void
+    trigger: React.ReactNode
     description?: ReactNode
     className?: string
 }
 
-export default function DialogComponent({ children, title, description, className }: Props) {
+export default function DialogComponent({
+    children,
+    open,
+    onOpenChange,
+    trigger,
+    title,
+    description,
+    className,
+}: Props) {
     return (
-        <DialogContent className={cn("max-h-[90%] p-0 flex flex-col gap-0 rounded-lg border-2 overflow-hidden", className)} disableClose>
-            <DialogHeader className="flex-row justify-between items-center p-8 bg-[#7167F6]">
-                <DialogTitle>{title}</DialogTitle>
-                <CloseDialog />               
-            </DialogHeader>
-            <div className="h-[90%] p-8 flex flex-col gap-10 overflow-auto">
+        <Dialog open={open} onOpenChange={onOpenChange}>
+            <DialogTrigger asChild>
+                {trigger}
+            </DialogTrigger>
+            <DialogContent className={cn("bg-foreground p-8 flex flex-col gap-8 rounded-lg border-none", className)} disableClose>
+                <DialogHeader className="flex-row justify-between items-center border-b border-secondary pb-4">
+                    <DialogTitle className="text-2xl font-medium">{title}</DialogTitle>
+                    <CloseDialog />
+                </DialogHeader>
                 {
                     description &&
-                    <DialogDescription className="text-xl">
+                    <DialogDescription className="p-4">
                         {description}
                     </DialogDescription>
                 }
                 {children}
-            </div>
-        </DialogContent>
+            </DialogContent>
+        </Dialog>
     )
 }

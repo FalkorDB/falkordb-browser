@@ -1,162 +1,90 @@
+/* eslint-disable no-param-reassign */
+/* eslint-disable react-hooks/exhaustive-deps */
+
 'use client'
 
-import CytoscapeComponent from "react-cytoscapejs";
-import cytoscape, { ElementDefinition, EventObject, NodeDataDefinition } from "cytoscape";
-import { useRef, useState, useImperativeHandle, forwardRef, useEffect, Dispatch, SetStateAction } from "react";
-import fcose from 'cytoscape-fcose';
+import { useRef, useState, useEffect, Dispatch, SetStateAction } from "react";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { ImperativePanelHandle } from "react-resizable-panels";
-import { ChevronLeft, GitGraph, Maximize2, Minimize2, Table } from "lucide-react"
-import { cn, ElementDataDefinition, prepareArg, securedFetch } from "@/lib/utils";
+import { ChevronLeft, GitGraph, Maximize2, Minimize2, Pause, Play, Table } from "lucide-react"
+import { cn, prepareArg, securedFetch } from "@/lib/utils";
 import dynamic from "next/dynamic";
 import { Session } from "next-auth";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Category, Graph } from "../api/graph/model";
+import { useToast } from "@/components/ui/use-toast";
+import { Switch } from "@/components/ui/switch";
+import { Category, Graph, GraphData, Link, Node } from "../api/graph/model";
 import DataPanel from "./GraphDataPanel";
 import Labels from "./labels";
 import Toolbar from "./toolbar";
 import Button from "../components/ui/Button";
 import TableView from "./TableView";
 
+const ForceGraph = dynamic(() => import("../components/ForceGraph"), { ssr: false });
+
 const EditorComponent = dynamic(() => import("../components/EditorComponent"), {
     ssr: false
 })
 
-const LAYOUT = {
-    name: "fcose",
-    fit: true,
-    padding: 30,
-}
-
-cytoscape.use(fcose);
-
-function getStyle() {
-
-    const style: cytoscape.Stylesheet[] = [
-        {
-            selector: "core",
-            style: {
-                'active-bg-size': 0,  // hide gray circle when panning
-                // All of the following styles are meaningless and are specified
-                // to satisfy the linter...
-                'active-bg-color': 'blue',
-                'active-bg-opacity': 0.3,
-                "selection-box-border-color": 'gray',
-                "selection-box-border-width": 3,
-                "selection-box-opacity": 0.5,
-                "selection-box-color": 'gray',
-                "outside-texture-bg-color": 'blue',
-                "outside-texture-bg-opacity": 1,
-            },
-        },
-        {
-            selector: "node",
-            style: {
-                label: "data(data.name)",
-                "color": "black",
-                "text-valign": "center",
-                "text-wrap": "ellipsis",
-                "text-max-width": "10rem",
-                shape: "ellipse",
-                height: "15rem",
-                width: "15rem",
-                "border-width": 0.3,
-                "border-color": "white",
-                "border-opacity": 1,
-                "background-color": "data(color)",
-                "font-size": "3rem",
-                "overlay-padding": "1rem",
-            },
-        },
-        {
-            selector: "node:active",
-            style: {
-                "overlay-opacity": 0,  // hide gray box around active node
-            },
-        },
-        {
-            selector: "edge",
-            style: {
-                width: 1,
-                "line-color": "data(color)",
-                "line-opacity": 0.7,
-                "arrow-scale": 0.7,
-                "target-arrow-color": "data(color)",
-                "target-arrow-shape": "triangle",
-                'curve-style': 'bezier',
-            },
-        },
-        {
-            selector: "edge:active",
-            style: {
-                "overlay-opacity": 0,
-            },
-        },
-    ]
-    return style
-}
-
-const getElementId = (element: ElementDataDefinition) => element.source ? { id: element.id?.slice(1), query: "()-[e]-()" } : { id: element.id, query: "(e)" }
-
-const GraphView = forwardRef(({ graph, selectedElement, setSelectedElement, runQuery, historyQuery, historyQueries, fetchCount, data }: {
+function GraphView({ graph, selectedElement, setSelectedElement, runQuery, historyQuery, historyQueries, fetchCount, session }: {
     graph: Graph
-    selectedElement: ElementDataDefinition | undefined
-    setSelectedElement: Dispatch<SetStateAction<ElementDataDefinition | undefined>>
+    selectedElement: Node | Link | undefined
+    setSelectedElement: Dispatch<SetStateAction<Node | Link | undefined>>
     runQuery: (query: string) => Promise<void>
     historyQuery: string
     historyQueries: string[]
     fetchCount: () => void
-    data: Session | null
-}, ref) => {
+    session: Session | null
+}) {
 
+    const [data, setData] = useState<GraphData>(graph.Elements)
     const [query, setQuery] = useState<string>("")
-    const [selectedElements, setSelectedElements] = useState<(ElementDataDefinition)[]>([]);
+    const [selectedElements, setSelectedElements] = useState<(Node | Link)[]>([]);
     const [isCollapsed, setIsCollapsed] = useState<boolean>(true);
-    const chartRef = useRef<cytoscape.Core | null>(null)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const chartRef = useRef<any>(null)
     const dataPanel = useRef<ImperativePanelHandle>(null)
     const [maximize, setMaximize] = useState<boolean>(false)
     const [tabsValue, setTabsValue] = useState<string>("")
+    const [cooldownTicks, setCooldownTicks] = useState<number | undefined>(0)
+    const { toast } = useToast()
+
+    useEffect(() => {
+        let timeout: NodeJS.Timeout
+        if (tabsValue === "Graph" && selectedElement) {
+            timeout = setTimeout(() => {
+                dataPanel.current?.expand()
+            }, 0)
+        }
+        dataPanel.current?.collapse()
+
+        return () => {
+            clearInterval(timeout)
+        }
+    }, [tabsValue])
+
+    useEffect(() => {
+        setData({ ...graph.Elements })
+    }, [graph.getElements().length, graph.Elements])
 
     useEffect(() => {
         const defaultChecked = graph.Data.length !== 0 ? "Table" : "Graph"
-        setTabsValue(graph.Elements.length !== 0 ? "Graph" : defaultChecked)
-    }, [graph.Elements.length, graph.Data.length])
-    
-    useImperativeHandle(ref, () => ({
-        expand: (elements: ElementDefinition[]) => {
-            const chart = chartRef.current
-            if (chart) {
-                chart.elements().remove()
-                chart.add(elements)
-                chart.elements().layout(LAYOUT).run();
-            }
-        }
-    }))
+        setTabsValue(graph.getElements().length !== 0 ? "Graph" : defaultChecked)
+    }, [graph.getElements().length, graph.Data.length])
+
+
+    const handleCooldown = (ticks?: number) => {
+        setCooldownTicks(ticks)
+    }
 
     useEffect(() => {
         setSelectedElement(undefined)
         setSelectedElements([])
-    }, [graph.Id, setSelectedElement])
+    }, [graph.Id])
 
     useEffect(() => {
         setQuery(historyQuery)
     }, [historyQuery])
-
-    useEffect(() => {
-        const chart = chartRef.current
-        if (chart) {
-            chart.resize()
-            chart.fit()
-            chart.center()
-        }
-    }, [maximize])
-
-    useEffect(() => {
-        const chart = chartRef.current
-        if (!chart || tabsValue !== "Graph") return
-        chart.layout(LAYOUT).run();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [graph.Elements.length, graph.Elements]);
 
     const onExpand = (expand?: boolean) => {
         if (!dataPanel.current) return
@@ -184,151 +112,36 @@ const GraphView = forwardRef(({ graph, selectedElement, setSelectedElement, runQ
         onExpand(!!selectedElement)
     }, [selectedElement])
 
-    // Send the user query to the server to expand a node
-    const onFetchNode = async (node: NodeDataDefinition) => {
-        const result = await securedFetch(`/api/graph/${graph.Id}/${node.id}`, {
-            method: 'GET',
-            headers: {
-                'Content-Type': 'application/json'
-            }
-        });
-
-        if (result.ok) {
-            const json = await result.json()
-            return graph.extend(json.result, true)
-        }
-
-        return []
-    }
-
     const onCategoryClick = (category: Category) => {
-        const chart = chartRef.current
-        if (chart) {
-            const elements = chart.nodes(`[category.0 = "${category.name}"]`)
-
-            // eslint-disable-next-line no-param-reassign
-            category.show = !category.show
+        category.show = !category.show
+        graph.Elements.nodes.forEach((node) => {
+            if (node.category[0] !== category.name) return
             if (category.show) {
-                elements.style({ display: 'element' })
+                node.visible = true
             } else {
-                elements.style({ display: 'none' })
+                node.visible = false
             }
+        })
 
-            chart.elements().layout(LAYOUT).run();
-        }
+        graph.visibleLinks(category.show)
+
+        setData({ ...graph.Elements })
     }
 
     const onLabelClick = (label: Category) => {
-        const chart = chartRef.current
-        if (!chart) return
-        const elements = chart.edges(`[label = "${label.name}"]`)
-
-        // eslint-disable-next-line no-param-reassign
         label.show = !label.show
+        graph.Elements.links.forEach((link) => {
+            if (link.label !== label.name) return
+            if (label.show) {
+                link.visible = true
+            } else {
+                link.visible = false
+            }
+        })
 
-        if (label.show) {
-            elements.style({ display: 'element' })
-        } else {
-            elements.style({ display: 'none' })
-        }
-        chart.elements().layout(LAYOUT).run();
+        setData({ ...graph.Elements })
     }
-
-    const handleDoubleTap = async (evt: EventObject) => {
-        const chart = chartRef.current
-
-        if (!chart) return
-
-        const node = evt.target.json().data;
-        const graphNode = graph.Elements.find(e => e.data.id === node.id);
-
-        if (!graphNode) return
-
-        if (!graphNode.data.expand) {
-            chart.add(await onFetchNode(node));
-        } else {
-            const neighbors = chart.elements(`#${node.id}`).neighborhood()
-            neighbors.forEach((n) => {
-                const id = n.id()
-                const index = graph.Elements.findIndex(e => e.data.id === id)
-                chart.remove(`#${id}`)
-
-                if (index === -1) return
-
-                graph.Elements.splice(index, 1)
-            })
-        }
-
-        graphNode.data.expand = !graphNode.data.expand;
-
-        chart.elements().layout(LAYOUT).run();
-    }
-
-
-    const handleSelected = (evt: EventObject) => {
-        const { target } = evt
-
-        if (target.isEdge()) {
-            target.style("line-opacity", 0.9);
-            target.style("width", 2);
-            target.style("arrow-scale", 1);
-        } else target.style("border-width", 0.7);
-
-        const obj: ElementDataDefinition = target.json().data;
-        setSelectedElement(obj);
-    }
-
-    const handleBoxSelected = (evt: EventObject) => {
-        const { target } = evt
-        const type = target.isEdge() ? "edge" : "node"
-
-        if (type === "edge") {
-            target.style("line-opacity", 0.9);
-            target.style("width", 2);
-            target.style("arrow-scale", 1);
-        } else target.style("border-width", 0.7);
-
-        const obj: ElementDataDefinition = target.json().data;
-
-        setSelectedElements(prev => [...prev, obj]);
-    }
-
-    const handleUnselected = (evt: EventObject) => {
-        const { target } = evt
-
-        if (target.isEdge()) {
-            target.style("line-opacity", 0.7);
-            target.style("width", 1);
-            target.style("arrow-scale", 0.7);
-        } else target.style("border-width", 0.3);
-
-        setSelectedElement(undefined);
-        setSelectedElements([]);
-    }
-
-    const handleMouseOver = (evt: EventObject) => {
-        const { target } = evt;
-
-        if (target.selected()) return
-        if (target.isEdge()) {
-            target.style("line-opacity", 0.9);
-            target.style("width", 2);
-            target.style("arrow-scale", 1);
-        } else target.style("border-width", 0.7);
-    };
-
-    const handleMouseOut = async (evt: EventObject) => {
-        const { target } = evt;
-
-        if (target.selected()) return
-        if (target.isEdge()) {
-            target.style("line-opacity", 0.7);
-            target.style("width", 1);
-            target.style("arrow-scale", 0.7);
-        } else target.style("border-width", 0.3);
-    };
-
-    const handelDeleteElement = async () => {
+    const handleDeleteElement = async () => {
         if (selectedElements.length === 0 && selectedElement) {
             selectedElements.push(selectedElement)
             setSelectedElement(undefined)
@@ -338,8 +151,8 @@ const GraphView = forwardRef(({ graph, selectedElement, setSelectedElement, runQ
         const conditionsEdges: string[] = []
 
         selectedElements.forEach((element) => {
-            const { id } = getElementId(element)
-            if (element.source) {
+            const { id } = element
+            if ("source" in element) {
                 conditionsEdges.push(`id(e) = ${id}`)
             } else {
                 conditionsNodes.push(`id(n) = ${id}`)
@@ -350,23 +163,55 @@ const GraphView = forwardRef(({ graph, selectedElement, setSelectedElement, runQ
 
         const result = await securedFetch(`api/graph/${prepareArg(graph.Id)}/?query=${prepareArg(q)} `, {
             method: "GET"
-        })
+        }, toast)
 
         if (!result.ok) return
 
         selectedElements.forEach((element) => {
-            const type = !element.source
-            const { id } = getElementId(element)
-            graph.Elements.splice(graph.Elements.findIndex(e => e.data.id === id), 1)
-            chartRef.current?.remove(`#${id} `)
+            const { id } = element
+            const type = !("source" in element)
 
+            if (type) {
+                graph.Elements.nodes.splice(graph.Elements.nodes.findIndex(n => n.id === id), 1)
+            } else {
+                graph.Elements.links.splice(graph.Elements.links.findIndex(l => l.id === id), 1)
+            }
+
+            graph.updateCategories(type ? element.category[0] : element.label, type)
             fetchCount()
+        })
 
-            graph.updateCategories(type ? element.category : element.label, type)
+
+        graph.Data = graph.Data.map(row => {
+            const newRow = Object.entries(row).map(([key, cell]) => {
+                if (typeof cell === "object" && cell && selectedElements.some(element => element.id === cell.id)) {
+                    return [key, undefined]
+                }
+                return [key, cell]
+            })
+            if (newRow.every(([, cell]) => cell === undefined)) {
+                return undefined
+            }
+            return Object.fromEntries(newRow)
         })
 
         setSelectedElements([])
         setSelectedElement(undefined)
+
+        graph.removeLinks(selectedElements.map((element) => element.id))
+
+        setData({ ...graph.Elements })
+        toast({
+            title: "Success",
+            description: `${selectedElements.length > 1 ? "Elements" : "Element"} deleted`,
+        })
+        handleCooldown()
+    }
+
+    const handleRunQuery = async (q: string) => {
+        await runQuery(q)
+        chartRef.current?.zoomToFit(1000, 40)
+        handleCooldown()
     }
 
     return (
@@ -381,14 +226,14 @@ const GraphView = forwardRef(({ graph, selectedElement, setSelectedElement, runQ
                     maximize={maximize}
                     currentQuery={query}
                     historyQueries={historyQueries}
-                    runQuery={runQuery}
+                    runQuery={handleRunQuery}
                     setCurrentQuery={setQuery}
-                    data={data}
+                    data={session}
                 />
-                <Tabs value={tabsValue} className="h-1 grow flex gap-2">
-                    <TabsList className="h-full bg-background flex flex-col justify-center gap-2">
+                <Tabs value={tabsValue} className="h-1 grow flex gap-2 items-center">
+                    <TabsList className="h-fit bg-foreground p-2 flex flex-col gap-2">
                         <TabsTrigger
-                            disabled={graph.Elements.length === 0}
+                            disabled={graph.getElements().length === 0}
                             className="tabs-trigger"
                             value="Graph"
                             onClick={() => setTabsValue("Graph")}
@@ -405,13 +250,14 @@ const GraphView = forwardRef(({ graph, selectedElement, setSelectedElement, runQ
                             <Table />
                         </TabsTrigger>
                     </TabsList>
-                    <TabsContent value="Graph" className="grow h-full mt-0">
+                    <TabsContent value="Graph" className="w-1 grow h-full mt-0">
                         <div className="h-full flex flex-col gap-4">
                             <div className="flex items-center justify-between">
                                 <Toolbar
+                                    selectedElementsLength={selectedElements.length + (selectedElement ? 1 : 0)}
                                     disabled={!graph.Id}
-                                    deleteDisabled={(Object.values(selectedElements).length === 0 && !selectedElement) || data?.user.role === "Read-Only"}
-                                    onDeleteElement={handelDeleteElement}
+                                    deleteDisabled={(Object.values(selectedElements).length === 0 && !selectedElement) || session?.user.role === "Read-Only"}
+                                    onDeleteElement={handleDeleteElement}
                                     chartRef={chartRef}
                                     addDisabled
                                 />
@@ -419,52 +265,43 @@ const GraphView = forwardRef(({ graph, selectedElement, setSelectedElement, runQ
                                     isCollapsed && graph.Id &&
                                     <Button
                                         className="p-3 bg-[#7167F6] rounded-lg"
-                                        icon={<ChevronLeft />}
                                         onClick={() => onExpand()}
                                         disabled={!selectedElement}
-                                    />
+                                    >
+                                        <ChevronLeft />
+                                    </Button>
                                 }
                             </div>
                             <div className="relative h-1 grow rounded-lg overflow-hidden">
-                                {
-                                    !maximize ?
-                                        <Button
-                                            className="z-10 absolute top-4 right-4"
-                                            icon={<Maximize2 />}
-                                            title="Maximize"
-                                            onClick={() => setMaximize(true)}
-
-                                        /> : <Button
-                                            className="z-10 absolute top-4 right-4"
-                                            icon={<Minimize2 />}
-                                            title="Minimize"
-                                            onClick={() => setMaximize(false)}
-                                            onKeyDown={(e) => e.code === "Escape" && setMaximize(false)}
-                                        />
-                                }
-                                <CytoscapeComponent
-                                    className="Canvas"
-                                    cy={(cy) => {
-
-                                        chartRef.current = cy
-
-                                        cy.removeAllListeners()
-
-                                        cy.on('dbltap', 'node', handleDoubleTap)
-                                        cy.on('mouseover', 'node', handleMouseOver)
-                                        cy.on('mouseover', 'edge', handleMouseOver)
-                                        cy.on('mouseout', 'node', handleMouseOut)
-                                        cy.on('mouseout', 'edge', handleMouseOut)
-                                        cy.on('tapunselect', 'node', handleUnselected)
-                                        cy.on('tapunselect', 'edge', handleUnselected)
-                                        cy.on('tapselect', 'node', handleSelected)
-                                        cy.on('tapselect', 'edge', handleSelected)
-                                        cy.on('boxselect', 'node', handleBoxSelected)
-                                        cy.on('boxselect', 'edge', handleBoxSelected)
-                                    }}
-                                    elements={graph.Elements}
-                                    layout={LAYOUT}
-                                    stylesheet={getStyle()}
+                                <Button
+                                    className="z-10 absolute top-4 right-4"
+                                    title={!maximize ? "Maximize" : "Minimize"}
+                                    onClick={() => setMaximize(prev => !prev)}
+                                >
+                                    {maximize ? <Maximize2 /> : <Minimize2 />}
+                                </Button>
+                                <div className="z-10 absolute top-4 left-4 flex items-center gap-2 pointer-events-none">
+                                    {cooldownTicks === undefined ? <Play size={20} /> : <Pause size={20} />}
+                                    <Switch
+                                        title="Animation Control"
+                                        className="pointer-events-auto"
+                                        checked={cooldownTicks === undefined}
+                                        onCheckedChange={() => {
+                                            handleCooldown(cooldownTicks === undefined ? 0 : undefined)
+                                        }}
+                                    />
+                                </div>
+                                <ForceGraph
+                                    isCollapsed={isCollapsed}
+                                    graph={graph}
+                                    chartRef={chartRef}
+                                    data={data}
+                                    selectedElement={selectedElement}
+                                    setSelectedElement={setSelectedElement}
+                                    selectedElements={selectedElements}
+                                    setSelectedElements={setSelectedElements}
+                                    cooldownTicks={cooldownTicks}
+                                    handleCooldown={handleCooldown}
                                 />
                                 {
                                     (graph.Categories.length > 0 || graph.Labels.length > 0) &&
@@ -476,14 +313,14 @@ const GraphView = forwardRef(({ graph, selectedElement, setSelectedElement, runQ
                             </div>
                         </div>
                     </TabsContent>
-                    <TabsContent value="Table" className="mt-0 grow h-full">
+                    <TabsContent value="Table" className="mt-0 w-1 grow h-full">
                         <TableView
                             data={graph.Data}
                         />
                     </TabsContent>
                 </Tabs>
             </ResizablePanel>
-            <ResizableHandle className={!isCollapsed ? "w-3" : "w-0"} />
+            <ResizableHandle disabled={isCollapsed} className={cn(isCollapsed ? "w-0 !cursor-default" : "w-3")} />
             <ResizablePanel
                 className="rounded-lg"
                 collapsible
@@ -501,14 +338,14 @@ const GraphView = forwardRef(({ graph, selectedElement, setSelectedElement, runQ
                         setObj={setSelectedElement}
                         onExpand={onExpand}
                         graph={graph}
-                        onDeleteElement={handelDeleteElement}
-                        data={data}
+                        onDeleteElement={handleDeleteElement}
+                        data={session}
                     />
                 }
             </ResizablePanel>
         </ResizablePanelGroup >
     )
-});
+}
 
 GraphView.displayName = "GraphView";
 

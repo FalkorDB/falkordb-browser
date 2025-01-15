@@ -3,20 +3,32 @@
 /* eslint-disable react/require-default-props */
 
 import { Link, PlusCircle, Shrink, Trash2, ZoomIn, ZoomOut } from "lucide-react";
-import { Dialog, DialogTrigger } from "@/components/ui/dialog";
 import { useState } from "react";
 import Button from "../components/ui/Button";
-import DialogComponent from "../components/DialogComponent";
+import DeleteElement from "./DeleteElement";
 
-export default function Toolbar({ disabled, addDisabled, chartRef, onDeleteElement, onAddEntity, onAddRelation, deleteDisabled }: {
+interface Props {
     addDisabled?: boolean,
     disabled?: boolean,
-    chartRef: React.RefObject<cytoscape.Core>,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    chartRef: React.RefObject<any>,
     onDeleteElement?: () => Promise<void>,
     onAddEntity?: () => void,
     onAddRelation?: () => void,
     deleteDisabled?: boolean,
-}) {
+    selectedElementsLength: number
+}
+
+export default function Toolbar({
+    disabled,
+    addDisabled,
+    chartRef,
+    onDeleteElement,
+    onAddEntity,
+    onAddRelation,
+    deleteDisabled,
+    selectedElementsLength
+}: Props) {
 
     const [deleteOpen, setDeleteOpen] = useState(false)
 
@@ -30,12 +42,11 @@ export default function Toolbar({ disabled, addDisabled, chartRef, onDeleteEleme
     const handleCenterClick = () => {
         const chart = chartRef.current
         if (chart) {
-            chart.fit()
-            chart.center()
+            chart.zoomToFit(1000, 40)
         }
     }
 
-    const handelDeleteElement = async () => {
+    const handleDeleteElement = async () => {
         if (!onDeleteElement) return
         await onDeleteElement()
         setDeleteOpen(false)
@@ -45,50 +56,41 @@ export default function Toolbar({ disabled, addDisabled, chartRef, onDeleteEleme
         <div className="flex items-center gap-6 p-1">
             <div className="flex gap-4">
                 <Button
+                    className="text-nowrap"
                     disabled={addDisabled}
-                    variant="Secondary"
-                    label="Add Entity"
-                    className="flex items-center gap-2"
+                    variant="Primary"
+                    label="Add Node"
                     onClick={onAddEntity}
-                    icon={<PlusCircle />}
-                />
+                >
+                    <PlusCircle size={20} />
+                </Button>
                 <Button
+                    className="text-nowrap"
                     disabled={addDisabled}
-                    variant="Secondary"
-                    className="flex items-center gap-2"
+                    variant="Primary"
                     label="Add Relation"
                     onClick={onAddRelation}
                     type="button"
-                    // eslint-disable-next-line jsx-a11y/anchor-is-valid
-                    icon={<Link />}
-                />
-                <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
-                    <DialogTrigger asChild>
+                >
+                    {/* eslint-disable-next-line jsx-a11y/anchor-is-valid */}
+                    <Link size={20} />
+                </Button>
+                <DeleteElement
+                    description={`Are you sure you want to delete this ${selectedElementsLength > 1 ? "elements" : "element"}?`}
+                    open={deleteOpen}
+                    setOpen={setDeleteOpen}
+                    onDeleteElement={handleDeleteElement}
+                    trigger={
                         <Button
-                            variant="Secondary"
+                            className="text-nowrap"
+                            variant="Primary"
                             label="Delete"
-                            icon={<Trash2 />}
                             disabled={deleteDisabled}
-                        />
-                    </DialogTrigger>
-                    <DialogComponent title="Delete Elements" description={`Are you sure ???\nThis action will delete all selected elements`}>
-                        <div className="flex justify-end gap-4">
-                            <Button
-                                variant="Primary"
-                                label="Delete"
-                                onClick={handelDeleteElement}
-                                disabled={deleteDisabled}
-                            />
-                            <Button
-                                variant="Primary"
-                                label="Cancel"
-                                onClick={() => setDeleteOpen(false)}
-                                disabled={deleteDisabled}
-                            />
-                        </div>
-                    </DialogComponent>
-                </Dialog>
-
+                        >
+                            <Trash2 size={20} />
+                        </Button>
+                    }
+                />
             </div>
             {
                 (onAddEntity || onAddRelation || onDeleteElement) &&
@@ -96,26 +98,32 @@ export default function Toolbar({ disabled, addDisabled, chartRef, onDeleteEleme
             }
             <div className="flex items-center gap-4">
                 <Button
+                    className="text-nowrap"
                     disabled={disabled}
                     variant="Secondary"
                     label="Zoom In"
-                    icon={<ZoomIn />}
                     onClick={() => handleZoomClick(1.1)}
-                />
+                >
+                    <ZoomIn size={20} />
+                </Button>
                 <Button
+                    className="text-nowrap"
                     disabled={disabled}
                     variant="Secondary"
                     label="Zoom Out"
-                    icon={<ZoomOut />}
                     onClick={() => handleZoomClick(0.9)}
-                />
+                >
+                    <ZoomOut size={20} />
+                </Button>
                 <Button
+                    className="text-nowrap"
                     disabled={disabled}
                     variant="Secondary"
                     label="Fit To Size"
-                    icon={<Shrink />}
                     onClick={() => handleCenterClick()}
-                />
+                >
+                    <Shrink size={20} />
+                </Button>
             </div>
         </div>
     )

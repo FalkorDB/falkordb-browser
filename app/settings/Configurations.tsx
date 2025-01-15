@@ -1,11 +1,15 @@
+/* eslint-disable react-hooks/exhaustive-deps */
+/* eslint-disable no-param-reassign */
+/* eslint-disable no-nested-ternary */
+/* eslint-disable @typescript-eslint/no-use-before-define */
+
 "use client";
 
-import React, { useEffect, useState, KeyboardEvent } from "react";
-import { Toast, cn, prepareArg, securedFetch } from "@/lib/utils";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { CheckCircle2, XCircle } from "lucide-react";
-import Input from "../components/ui/Input";
-import Button from "../components/ui/Button";
+import React, { useCallback, useEffect, useState } from "react";
+import { prepareArg, securedFetch } from "@/lib/utils";
+import { useToast } from "@/components/ui/use-toast";
+import TableComponent, { Row } from "../components/TableComponent";
+import ToastButton from "../components/ToastButton";
 
 type Config = {
     name: string,
@@ -119,147 +123,107 @@ const Configs: Config[] = [
     },
 ]
 
-// Shows the details of a current database connection 
 export default function Configurations() {
+    const [configs, setConfigs] = useState<Row[]>([]);
+    const { toast } = useToast();
 
-    const [configs, setConfigs] = useState<Config[]>([])
-    const [editable, setEditable] = useState<string>("")
-    const [configValue, setConfigValue] = useState<string>("")
+    // Memoize the config update handler
+    const handleSetConfig = useCallback(async (name: string, value: string, isUndo: boolean) => {
+        if (!value) {
+            toast({
+                title: "Error",
+                description: "Please enter a value",
+                variant: "destructive"
+            });
+            return false;
+        }
 
-    useEffect(() => {
-        const run = async () => {
-            setConfigs(await Promise.all(Configs.map(async (config: Config) => {
-                const result = await securedFetch(`api/graph/?config=${prepareArg(config.name)}`, {
-                    method: 'GET',
-                })
+        const result = await securedFetch(
+            `api/graph/?config=${prepareArg(name)}&value=${prepareArg(value)}`,
+            { method: 'POST' },
+            toast
+        );
+
+        if (!result.ok) return false;
+
+        const configToUpdate = configs.find(row => row.cells[0].value === name);
+        const oldValue = configToUpdate?.cells[2].value;
+
+        setConfigs(currentConfigs => {
+            const updatedConfigs = currentConfigs.map((config: Row) => {
+                if (config.cells[0].value !== name) return config;
+
+                const newConfig = { ...config }
+
+                newConfig.cells[2].value = value;
+
+                return newConfig;
+            });
+
+            return updatedConfigs;
+        });
+
+        toast({
+            title: "Success",
+            description: "Configuration value set successfully",
+            action: oldValue && isUndo
+                ? <ToastButton onClick={() => handleSetConfig(name, oldValue.toString(), false)} />
+                : undefined
+        });
+
+        return true;
+    }, [configs, toast]);
+
+    const fetchConfigs = useCallback(async () => {
+        const newConfigs = await Promise.all(
+            Configs.map(async (config) => {
+                const result = await securedFetch(
+                    `api/graph/?config=${prepareArg(config.name)}`,
+                    { method: 'GET' },
+                    toast
+                );
 
                 if (!result.ok) {
-                    Toast(`Failed to fetch configurations value`)
-                    return config
+                    return {
+                        cells: [
+                            { value: config.name },
+                            { value: config.description },
+                            { value: config.value.toString() }
+                        ]
+                    };
                 }
 
-                let value = (await result.json()).config[1]
-                
-                if (config.name === "CMD_INFO") {
-                    if(value === 0) {
-                        value = "no" 
-                    } else value = "yes"
-                }
-                
+                const { config: [, value] } = await result.json();
+                const formattedValue = config.name === "CMD_INFO"
+                    ? (value === 0 ? "no" : "yes")
+                    : value;
+
                 return {
-                    name: config.name,
-                    description: config.description,
-                    value
-                }
-            })))
-        }
-        run()
-    }, [])
+                    cells: [
+                        { value: config.name },
+                        { value: config.description },
+                        {
+                            value: formattedValue.toString(),
+                            onChange: !disableRunTimeConfigs.has(config.name)
+                                ? (val: string) => handleSetConfig(config.name, val, true)
+                                : undefined
+                        }
+                    ]
+                };
+            })
+        );
 
-    const handelSetConfig = async (name: string) => {
+        setConfigs(newConfigs);
+    }, [toast]);
 
-        if (!configValue) {
-            Toast(`Please enter a value`)
-            return
-        }
-
-        const result = await securedFetch(`api/graph/?config=${prepareArg(name)}&value=${prepareArg(configValue)}`, {
-            method: 'POST',
-        })
-
-        if (!result.ok) {
-            Toast(`Failed to set configuration value`)
-            return
-        }
-
-        setConfigs(prev => prev.map((config: Config) => {
-            if (config.name !== name) return config
-            return {
-                ...config,
-                value: configValue
-            }
-        }))
-
-        setEditable("")
-        setConfigValue("")
-    }
-
-    const onKeyDown = (e: KeyboardEvent<HTMLInputElement>, name: string) => {
-
-        if (e.code === "Escape") {
-            setEditable("")
-            setConfigValue("")
-            return
-        }
-
-        if (e.code !== "Enter") return
-
-        handelSetConfig(name)
-    }
+    useEffect(() => {
+        fetchConfigs();
+    }, [fetchConfigs]);
 
     return (
-        <div className="h-full w-full border border-[#57577B] rounded-lg overflow-auto">
-            <Table>
-                <TableHeader>
-                    <TableRow className="border-none p-4">
-                        {
-                            ["Name", "Description", "Value"].map((header) => (
-                                <TableHead key={header}>{header}</TableHead>
-                            ))
-                        }
-                    </TableRow>
-                </TableHeader>
-                <TableBody>
-                    {
-                        configs.map(({ name, description, value }, index) => (
-                            <TableRow key={name} data-id={name} className={cn("border-none", !(index % 2) && "bg-[#57577B] hover:bg-[#57577B]")}>
-                                <TableCell className="w-[20%] py-8">{name}</TableCell>
-                                <TableCell className="w-[70%]">{description}</TableCell>
-                                <TableCell className="w-[15%]">
-                                    {
-                                        editable === name && !disableRunTimeConfigs.has(name) ?
-                                            <div className="flex gap-2">
-                                                        <Input
-                                                            ref={(ref) => {
-                                                                ref?.focus()
-                                                            }}
-                                                            className="w-20"
-                                                            type={name === "CMD_INFO" ? "text" : "number"}
-                                                            variant="Small"
-                                                            onChange={(e) => setConfigValue(e.target.value)}
-                                                            onKeyDown={(e) => onKeyDown(e, name)}
-                                                            value={configValue}
-                                                            style={{
-                                                                WebkitAppearance: 'none',
-                                                                margin: 0,
-                                                            }}
-                                                        />
-                                                <Button
-                                                    icon={<XCircle color={!(index % 2) ? "#272746" : "#57577B"} />}
-                                                    onClick={() => setEditable("")}
-                                                    onMouseDown={(e) => e.preventDefault()}
-                                                />
-                                                <Button
-                                                    icon={<CheckCircle2 color={!(index % 2) ? "#272746" : "#57577B"} />}
-                                                    onClick={() => handelSetConfig(name)}
-                                                    onMouseDown={(e) => e.preventDefault()}
-                                                />
-                                            </div>
-                                            : <Button
-                                                label={typeof value === "number" ? value.toString() : value}
-                                                onClick={() => {
-                                                    setEditable(name)
-                                                    setConfigValue(value.toString())
-                                                }}
-                                            />
-
-                                    }
-                                </TableCell>
-                            </TableRow>
-                        ))
-                    }
-                </TableBody>
-            </Table>
-        </div>
+        <TableComponent
+            headers={["Name", "Description", "Value"]}
+            rows={configs}
+        />
     );
 }

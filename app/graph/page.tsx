@@ -1,13 +1,14 @@
 'use client'
 
 import { useCallback, useEffect, useState } from "react";
-import { Toast, prepareArg, securedFetch } from "@/lib/utils";
-import { ElementDataDefinition } from "cytoscape";
+import { prepareArg, securedFetch } from "@/lib/utils";
 import { useSession } from "next-auth/react";
+import { useToast } from "@/components/ui/use-toast";
 import Selector from "./Selector";
 import Header from "../components/Header";
-import { Graph, Query } from "../api/graph/model";
+import { Graph, Link, Node, Query } from "../api/graph/model";
 import GraphView from "./GraphView";
+import Tutorial from "./Tutorial";
 
 export default function Page() {
 
@@ -17,22 +18,27 @@ export default function Page() {
     const [graph, setGraph] = useState<Graph>(Graph.empty())
     const [queries, setQueries] = useState<Query[]>([])
     const [historyQuery, setHistoryQuery] = useState<string>("")
-    const [selectedElement, setSelectedElement] = useState<ElementDataDefinition>();
-    const { data } = useSession()
+    const [selectedElement, setSelectedElement] = useState<Node | Link>();
+    const { data: session } = useSession()
+    const { toast } = useToast()
 
+
+    useEffect(() => {
+        setQueries(JSON.parse(localStorage.getItem(`query history`) || "[]"))
+    }, [])
 
     const fetchCount = useCallback(async () => {
         if (!graphName) return
         const q1 = "MATCH (n) RETURN COUNT(n) as nodes"
         const q2 = "MATCH ()-[e]->() RETURN COUNT(e) as edges"
 
-        const nodes = await (await securedFetch(`api/graph/${prepareArg(graphName)}/?query=${q1}&role=${data?.user.role}`, {
+        const nodes = await (await securedFetch(`api/graph/${prepareArg(graphName)}/?query=${q1}&role=${session?.user.role}`, {
             method: "GET"
-        })).json()
+        }, toast)).json()
 
-        const edges = await (await securedFetch(`api/graph/${prepareArg(graphName)}/?query=${q2}&role=${data?.user.role}`, {
+        const edges = await (await securedFetch(`api/graph/${prepareArg(graphName)}/?query=${q2}&role=${session?.user.role}`, {
             method: "GET"
-        })).json()
+        }, toast)).json()
 
         if (!edges || !nodes) return
 
@@ -54,14 +60,17 @@ export default function Page() {
 
     const run = async (query: string) => {
         if (!graphName) {
-            Toast("Select a graph first")
+            toast({
+                title: "Error",
+                description: "Select a graph first",
+                variant: "destructive"
+            })
             return null
         }
 
-        const result = await securedFetch(`api/graph/${prepareArg(graphName)}/?query=${prepareArg(query)}&role=${data?.user.role}`, {
-
+        const result = await securedFetch(`api/graph/${prepareArg(graphName)}/?query=${prepareArg(query)}&role=${session?.user.role}`, {
             method: "GET"
-        })
+        }, toast)
 
         if (!result.ok) return null
 
@@ -75,14 +84,22 @@ export default function Page() {
         if (!query) return
         const result = await run(query)
         if (!result) return
-        setQueries(prev => [...prev, { text: query, metadata: result.metadata }])
-        setGraph(Graph.create(graphName, result, graph.Colors))
+        const queryArr = queries.some(q => q.text === query) ? queries : [...queries, { text: query, metadata: result.metadata }]
+        setQueries(queryArr)
+        localStorage.setItem("query history", JSON.stringify(queryArr))
+        const g = Graph.create(graphName, result, graph.Colors)
+        setGraph(g)
+        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+        // @ts-ignore
+        window.graph = g
     }
 
     const runHistoryQuery = async (query: string, setQueriesOpen: (open: boolean) => void) => {
         const result = await run(query)
         if (!result) return
-        setQueries(prev => prev.some(q => q.text === query) ? prev : [...prev, { text: query, metadata: result.metadata }])
+        const queryArr = queries.some(q => q.text === query) ? queries : [...queries, { text: query, metadata: result.metadata }]
+        setQueries(queryArr)
+        localStorage.setItem("query history", JSON.stringify(queryArr))
         setGraph(Graph.create(graphName, result))
         setHistoryQuery(query)
         setQueriesOpen(false)
@@ -93,6 +110,7 @@ export default function Page() {
             <Header onSetGraphName={setGraphName} />
             <div className="h-1 grow p-8 px-10 flex flex-col gap-4">
                 <Selector
+                    setGraphName={setGraphName}
                     queries={queries}
                     onChange={setGraphName}
                     graphName={graphName}
@@ -101,7 +119,7 @@ export default function Page() {
                     nodesCount={nodesCount}
                     setGraph={setGraph}
                     graph={graph}
-                    data={data}
+                    data={session}
 
                 />
                 <GraphView
@@ -112,8 +130,9 @@ export default function Page() {
                     historyQuery={historyQuery}
                     historyQueries={queries.map(({ text }) => text)}
                     fetchCount={fetchCount}
-                    data={data}
+                    session={session}
                 />
+                <Tutorial onSetGraphName={setGraphName} />
             </div>
         </div >
     )

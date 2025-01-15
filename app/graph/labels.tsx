@@ -20,7 +20,7 @@ export default function Labels({ graph, categories, onClick, label, className = 
     const listRef = useRef<HTMLUListElement>(null)
     const isScrollable = listRef.current && listRef.current.scrollHeight > listRef.current.clientHeight
 
-    const handelScroll = (scrollTo: number) => {
+    const handleScroll = (scrollTo: number) => {
         listRef.current?.scrollBy({
             behavior: "smooth",
             top: scrollTo,
@@ -28,37 +28,37 @@ export default function Labels({ graph, categories, onClick, label, className = 
     }
 
     return (
-        <div className={cn(className, "absolute top-10 flex flex-col gap-2 p-4 h-[95%] pointer-events-none", label === "RelationshipTypes" ? "items-end right-2" : "left-2")}>
+        <div className={cn(className, "absolute top-10 flex flex-col gap-2 p-4 max-w-[200px] h-[95%] pointer-events-none", label === "RelationshipTypes" ? "right-2" : "left-2")}>
             {
                 label &&
                 <h1>{label}</h1>
             }
-            <div className={cn("h-1 grow flex flex-col items-center gap-4 p-4")}>
+            <div className={cn("h-1 grow flex flex-col items-center gap-4")}>
                 {
                     isScrollable &&
                     <Button
                         className="pointer-events-auto"
-                        icon={<ChevronUp />}
                         title="Scroll up"
-                        onClick={() => handelScroll(-200)}
-                    />
+                        onClick={() => handleScroll(-200)}
+                    >
+                        <ChevronUp />
+                    </Button>
                 }
                 <ul ref={listRef} className={cn("flex flex-col gap-4 w-full overflow-auto hide-scrollbar")}>
                     {
                         categories.length > 0 &&
                         categories.map((category) => (
-                            <li key={category.index}>
+                            <li key={category.name}>
                                 <Button
-                                className={cn(category.name && "flex gap-2 items-center pointer-events-auto")}
+                                    className={cn(category.name && "w-full pointer-events-auto")}
                                     label={category.name}
-                                    icon={
-                                        <div style={{ backgroundColor: `${graph.getCategoryColorValue(category.index)}` }} className={cn("w-6 h-6 rounded-full", label === "RelationshipTypes" && "opacity-50")} />
-                                    }
                                     onClick={() => {
                                         onClick(category)
                                         setReload(prev => !prev)
                                     }}
-                                />
+                                >
+                                    <div style={{ backgroundColor: `${graph.getCategoryColorValue(category.index)}` }} className={cn("min-w-6 min-h-6 rounded-full", label === "RelationshipTypes" && "opacity-50")} />
+                                </Button>
                             </li>
                         ))
                     }
@@ -67,10 +67,11 @@ export default function Labels({ graph, categories, onClick, label, className = 
                     isScrollable &&
                     <Button
                         className="pointer-events-auto"
-                        icon={<ChevronDown />}
                         title="Scroll down"
-                        onClick={() => handelScroll(200)}
-                    />
+                        onClick={() => handleScroll(200)}
+                    >
+                        <ChevronDown />
+                    </Button>
                 }
             </div>
         </div>

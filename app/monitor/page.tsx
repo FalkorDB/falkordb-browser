@@ -3,18 +3,20 @@
 import useSWR from 'swr'
 import React, { useState } from 'react'
 import { securedFetch } from '@/lib/utils'
+import { useToast } from '@/components/ui/use-toast'
 import MonitorView from './MonitorView'
 
 export default function Page() {
 
     const [time, setTime] = useState<Date | null>(null)
+    const { toast } = useToast()
 
     const fetcher = (url: string) => securedFetch(url, {
         method: 'GET',
         headers: {
             'Content-Type': 'application/json'
         }
-    }).then((result) => {
+    }, toast).then((result) => {
         if (result.ok) {
             setTime(new Date())
             return result.json()

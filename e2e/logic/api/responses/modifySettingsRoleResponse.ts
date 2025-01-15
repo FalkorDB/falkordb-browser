@@ -1,3 +1,3 @@
 export interface ModifySettingsRoleResponse {
-    config: string;
-  }
+  config: string;
+}
