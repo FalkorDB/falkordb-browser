@@ -209,7 +209,7 @@ export class Graph {
         return new Graph(graphName || "", [], [], { nodes: [], links: [] }, new Map<string, Category>(), new Map<string, Category>(), new Map<number, Node>(), new Map<number, Link>(), colors)
     }
 
-    public static create(id: string, results: any, colors?: string[]): Graph {
+    public static create(id: string, results: { data: Data, metadata: any[] }, colors?: string[]): Graph {
         const graph = Graph.empty(undefined, colors)
         graph.extend(results)
         graph.id = id
