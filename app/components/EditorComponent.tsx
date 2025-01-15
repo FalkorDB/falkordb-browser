@@ -78,7 +78,7 @@ const KEYWORDS = [
     "ORDER BY",
     "SKIP",
     "LIMIT",
-    "MARGE",
+    "MERGE",
     "DELETE",
     "SET",
     "WITH",
@@ -357,6 +357,8 @@ export default function EditorComponent({ currentQuery, historyQueries, setCurre
         if (!graph.Id || (!monacoInstance && !monacoI)) return
         const m = monacoI || monacoInstance
         const sug: Suggestions = getEmptySuggestions()
+        
+        sugProvider?.dispose()
 
         await Promise.all([
             addLabelsSuggestions(sug.labels),
@@ -463,11 +465,6 @@ export default function EditorComponent({ currentQuery, historyQueries, setCurre
         run()
     }, [graph])
 
-
-    useEffect(() => {
-        getSuggestions()
-    }, [graph.Id])
-
     useEffect(() => {
         const interval = setInterval(() => {
             getSuggestions()
@@ -475,8 +472,9 @@ export default function EditorComponent({ currentQuery, historyQueries, setCurre
 
         return () => {
             clearInterval(interval)
+            sugProvider?.dispose()
         }
-    }, [])
+    }, [graph.Id])
 
     const handleEditorWillMount = (monacoI: Monaco) => {
         monacoI.languages.setMonarchTokensProvider('custom-language', {
@@ -557,7 +555,6 @@ export default function EditorComponent({ currentQuery, historyQueries, setCurre
             updatePlaceholderVisibility();
         });
 
-        // Initial check
         updatePlaceholderVisibility();
 
         setMonacoInstance(monacoI)
@@ -572,7 +569,7 @@ export default function EditorComponent({ currentQuery, historyQueries, setCurre
             setBlur(false)
         })
 
-        const isFirstLine = e.createContextKey('isFirstLine', false as boolean);
+        const isFirstLine = e.createContextKey<boolean>('isFirstLine', true);
 
         // Update the context key value based on the cursor position
         e.onDidChangeCursorPosition(() => {
