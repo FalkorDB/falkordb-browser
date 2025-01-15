@@ -337,7 +337,7 @@ export default function SchemaView({ schema, fetchCount, session }: Props) {
                         }}
                         onDeleteElement={handleDeleteElement}
                         chartRef={chartRef}
-                        addDisabled={session?.user.role === "Read-Only"}
+                        addDisabled={session?.user.role === "Read-Only" || !schema.Id}
                     />
                     {
                         isCollapsed &&
