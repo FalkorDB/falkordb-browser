@@ -84,7 +84,7 @@ export default function Selector({ onChange, graphName, setGraphName, queries, r
 
             const json = await result.json()
             if (json.result) {
-                setSchema(Graph.create(name, json.result))
+                setSchema(Graph.create(name, json.result, false, true))
             }
         }
         onChange(name)
