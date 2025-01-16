@@ -87,7 +87,7 @@ export default function Page() {
         const queryArr = queries.some(q => q.text === query) ? queries : [...queries, { text: query, metadata: result.metadata }]
         setQueries(queryArr)
         localStorage.setItem("query history", JSON.stringify(queryArr))
-        const g = Graph.create(graphName, result, graph.Colors)
+        const g = Graph.create(graphName, result, false, false, graph.Colors)
         setGraph(g)
         // eslint-disable-next-line @typescript-eslint/ban-ts-comment
         // @ts-ignore
@@ -100,7 +100,7 @@ export default function Page() {
         const queryArr = queries.some(q => q.text === query) ? queries : [...queries, { text: query, metadata: result.metadata }]
         setQueries(queryArr)
         localStorage.setItem("query history", JSON.stringify(queryArr))
-        setGraph(Graph.create(graphName, result))
+        setGraph(Graph.create(graphName, result, false, false, graph.Colors))
         setHistoryQuery(query)
         setQueriesOpen(false)
     }

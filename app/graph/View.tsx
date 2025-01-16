@@ -19,7 +19,7 @@ export default function View({ graph, setGraph, selectedValue }: {
     const [editable, setEditable] = useState<string>("")
 
     const handlePreferencesChange = (colors?: string[]) => {
-        setGraph(Graph.create(graph.Id, { data: graph.Data, metadata: graph.Metadata }, colors || colorsArr))
+        setGraph(Graph.create(graph.Id, { data: graph.Data, metadata: graph.Metadata }, false, true, colors || colorsArr))
         if (colors) {
             localStorage.removeItem(graph.Id)
         }
