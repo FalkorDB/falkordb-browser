@@ -63,7 +63,7 @@ export default function SchemaCreateElement({ onCreate, onExpand, selectedNodes,
 
   const handleSetAttribute = (isUndo: boolean, att?: [string, string[]]) => {
     const newAtt = att || attribute
-    
+
     if (!newAtt[0] || newAtt[1].some((v) => !v)) {
       toast({
         title: "Error",
@@ -194,7 +194,7 @@ export default function SchemaCreateElement({ onCreate, onExpand, selectedNodes,
               />
           }
         </div>
-        <p className="flex text-white">{attributes.length} Attributes</p>
+        <p className="font-medium text-xl"><span className="text-primary">{attributes.length}</span> Attributes</p>
       </div>
       <div className="w-full h-1 grow flex flex-col justify-between items-start font-medium">
         <Table>
