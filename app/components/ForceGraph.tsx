@@ -50,34 +50,26 @@ export default function ForceGraph({
     const parentRef = useRef<HTMLDivElement>(null)
     const toast = useToast()
 
-    useEffect(() => {
-        if (!chartRef.current || data.nodes.length === 0 || data.links.length === 0) return
-        chartRef.current.d3Force('link').id((link: any) => link.id).distance(50)
-        chartRef.current.d3Force('charge').strength(-300)
-        chartRef.current.d3Force('center').strength(0.05)
-    }, [chartRef, data.links.length, data.nodes.length])
-
-    useEffect(() => {
+    useEffect(() => {        
         const handleResize = () => {
             if (!parentRef.current) return
             setParentWidth(parentRef.current.clientWidth)
             setParentHeight(parentRef.current.clientHeight)
         }
 
-        handleResize()
-
-        const resizeObserver = new ResizeObserver(handleResize)
-        if (parentRef.current) {
-            resizeObserver.observe(parentRef.current)
-        }
-
         window.addEventListener('resize', handleResize)
+        
+        const observer = new ResizeObserver(handleResize)
+
+        if (parentRef.current) {
+            observer.observe(parentRef.current)
+        }
 
         return () => {
-            resizeObserver.disconnect()
             window.removeEventListener('resize', handleResize)
+            observer.disconnect()
         }
-    }, [])
+    }, [parentRef])
 
     const onFetchNode = async (node: Node) => {
         const result = await securedFetch(`/api/graph/${graph.Id}/${node.id}`, {
