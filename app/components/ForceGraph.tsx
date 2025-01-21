@@ -24,7 +24,6 @@ interface Props {
     type?: "schema" | "graph"
     isAddElement?: boolean
     setSelectedNodes?: Dispatch<SetStateAction<[Node | undefined, Node | undefined]>>
-    isCollapsed: boolean
 }
 
 const NODE_SIZE = 6
@@ -43,7 +42,6 @@ export default function ForceGraph({
     type = "graph",
     isAddElement = false,
     setSelectedNodes,
-    isCollapsed
 }: Props) {
 
     const [parentWidth, setParentWidth] = useState<number>(0)
@@ -60,10 +58,26 @@ export default function ForceGraph({
     }, [chartRef, data.links.length, data.nodes.length])
 
     useEffect(() => {
-        if (!parentRef.current) return
-        setParentWidth(parentRef.current.clientWidth)
-        setParentHeight(parentRef.current.clientHeight)
-    }, [parentRef.current?.clientWidth, parentRef.current?.clientHeight, isCollapsed])
+        const handleResize = () => {
+            if (!parentRef.current) return
+            setParentWidth(parentRef.current.clientWidth)
+            setParentHeight(parentRef.current.clientHeight)
+        }
+
+        handleResize()
+
+        const resizeObserver = new ResizeObserver(handleResize)
+        if (parentRef.current) {
+            resizeObserver.observe(parentRef.current)
+        }
+
+        window.addEventListener('resize', handleResize)
+
+        return () => {
+            resizeObserver.disconnect()
+            window.removeEventListener('resize', handleResize)
+        }
+    }, [])
 
     const onFetchNode = async (node: Node) => {
         const result = await securedFetch(`/api/graph/${graph.Id}/${node.id}`, {
