@@ -35,7 +35,7 @@
         {"role": "QUERY_MEM_CAPACITY", "description": "modify queryMemCapacity", "input": "20", "expected": true},
         {"role": "VKEY_MAX_ENTITY_COUNT", "description": "modify vKeyMaxEntityCount", "input": "20", "expected": true},
         {"role": "CMD_INFO", "description": "modify cmdInfo", "input": "yes", "expected": true},
-        {"role": "MAX_INFO_QUERIES", "description": "modify maxInfoQueries", "input": "20", "expected": true}
+        {"role": "MAX_INFO_QUERIES", "description": "modify maxInfoQueries", "input": "999", "expected": true}
   ]
 }
   

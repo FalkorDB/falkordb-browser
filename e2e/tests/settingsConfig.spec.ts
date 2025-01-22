@@ -25,6 +25,7 @@ test.describe('Settings Tests', () => {
             await apiCall.modifySettingsRole(roles.maxQueuedQueries, input)
             await settingsConfigPage.refreshPage()
             const value = await settingsConfigPage.getRoleContentValue(roles.maxQueuedQueries)
+            await apiCall.modifySettingsRole(roles.maxTimeOut, "25")
             expect(value === input).toBe(expected)
         });
     })
@@ -36,6 +37,7 @@ test.describe('Settings Tests', () => {
             await apiCall.modifySettingsRole(roles.maxTimeOut, input)
             await settingsConfigPage.refreshPage()
             const value = await settingsConfigPage.getRoleContentValue(roles.maxTimeOut)
+            await apiCall.modifySettingsRole(roles.maxTimeOut, "0")
             expect(value === input).toBe(expected)
         });
     })
@@ -47,6 +49,7 @@ test.describe('Settings Tests', () => {
             await apiCall.modifySettingsRole(roles.defaultTimeOut, input)
             await settingsConfigPage.refreshPage()
             const value = await settingsConfigPage.getRoleContentValue(roles.defaultTimeOut)
+            await apiCall.modifySettingsRole(roles.maxTimeOut, "0")
             expect(value === input).toBe(expected)
         });
     })
@@ -58,6 +61,7 @@ test.describe('Settings Tests', () => {
             await apiCall.modifySettingsRole(roles.resultSetSize, input)
             await settingsConfigPage.refreshPage()
             const value = await settingsConfigPage.getRoleContentValue(roles.resultSetSize)
+            await apiCall.modifySettingsRole(roles.maxTimeOut, "1000")
             expect(value === input).toBe(expected)
         });
     })
@@ -81,6 +85,7 @@ test.describe('Settings Tests', () => {
             await apiCall.modifySettingsRole(roles.vKeyMaxEntityCount, input)
             await settingsConfigPage.refreshPage()
             const value = await settingsConfigPage.getRoleContentValue(roles.vKeyMaxEntityCount)
+            await apiCall.modifySettingsRole(roles.queryMemCapacity, "100000")
             expect(value === input).toBe(expected)
         });
     })
@@ -92,6 +97,7 @@ test.describe('Settings Tests', () => {
             await apiCall.modifySettingsRole(roles.cmdInfo, input)
             await settingsConfigPage.refreshPage()
             const value = await settingsConfigPage.getRoleContentValue(roles.cmdInfo)
+            await apiCall.modifySettingsRole(roles.queryMemCapacity, "yes")
             expect(value === input).toBe(expected)
         });
     })
@@ -103,6 +109,7 @@ test.describe('Settings Tests', () => {
             await apiCall.modifySettingsRole(roles.maxInfoQueries, input)
             await settingsConfigPage.refreshPage()
             const value = await settingsConfigPage.getRoleContentValue(roles.maxInfoQueries)
+            await apiCall.modifySettingsRole(roles.queryMemCapacity, "1000")
             expect(value === input).toBe(expected)
         });
     })
