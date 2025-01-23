@@ -294,7 +294,6 @@ export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement,
                                                 value={newVal}
                                                 onChange={(e) => setNewVal(e.target.value)}
                                                 onKeyDown={handleSetKeyDown}
-                                                onBlur={() => handleSetEditable("", "")}
                                             />
                                             : <Button
                                                 label={obj.data[key]}
