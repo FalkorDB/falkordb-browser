@@ -97,7 +97,7 @@ export default function Header({ onSetGraphName }: Props) {
                     </NavigationMenu>
                 </div>
             </div>
-            <div className="h-2 Top" />
+            <div className="h-2 Gradient" />
         </div>
     )
 }
