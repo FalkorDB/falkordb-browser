@@ -6,7 +6,7 @@
 
 import { Dispatch, RefObject, SetStateAction, useEffect, useRef, useState } from "react"
 import ForceGraph2D from "react-force-graph-2d"
-import { securedFetch } from "@/lib/utils"
+import { lightenColor, securedFetch } from "@/lib/utils"
 import { useToast } from "@/components/ui/use-toast"
 import { Graph, GraphData, Link, Node } from "../api/graph/model"
 
@@ -227,9 +227,6 @@ export default function ForceGraph({
 
                     if (!start.x || !start.y || !end.x || !end.y) return
 
-                    ctx.strokeStyle = link.color;
-                    ctx.globalAlpha = 0.5;
-
                     if (start.id === end.id) {
                         const radius = NODE_SIZE * link.curve * 6.2;
                         const angleOffset = -Math.PI / 4; // 45 degrees offset for text alignment
@@ -261,7 +258,6 @@ export default function ForceGraph({
                     const boxHeight = 2; // Height of text
 
                     // Draw background block
-                    ctx.globalAlpha = 1;
                     ctx.fillStyle = '#191919';
 
                     // Draw block aligned with text
@@ -294,6 +290,14 @@ export default function ForceGraph({
                 linkVisibility="visible"
                 cooldownTicks={cooldownTicks}
                 cooldownTime={2000}
+                linkDirectionalArrowRelPos={1}
+                linkDirectionalArrowLength={(link) => link.source.id === link.target.id ? 0 : 2}
+                linkDirectionalArrowColor={(link) => link.id === selectedElement?.id || link.id === hoverElement?.id 
+                    ? link.color 
+                    : lightenColor(link.color)}
+                linkColor={(link) => link.id === selectedElement?.id || link.id === hoverElement?.id 
+                    ? link.color 
+                    : lightenColor(link.color)}
             />
         </div>
     )
