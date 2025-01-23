@@ -21,7 +21,7 @@ import Button from "../components/ui/Button";
 import TableView from "./TableView";
 
 const ForceGraph = dynamic(() => import("../components/ForceGraph"), { ssr: false });
-const EditorComponent = dynamic(() => import("../components/EditorComponent"), {ssr: false})
+const EditorComponent = dynamic(() => import("../components/EditorComponent"), { ssr: false })
 
 function GraphView({ graph, selectedElement, setSelectedElement, runQuery, historyQuery, historyQueries, fetchCount, session }: {
     graph: Graph
@@ -256,7 +256,7 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
                                     deleteDisabled={(Object.values(selectedElements).length === 0 && !selectedElement) || session?.user.role === "Read-Only"}
                                     onDeleteElement={handleDeleteElement}
                                     chartRef={chartRef}
-                                    addDisabled
+                                    displayAdd={false}
                                 />
                                 {
                                     isCollapsed && graph.Id &&
@@ -277,17 +277,20 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
                                 >
                                     {!maximize ? <Maximize2 /> : <Minimize2 />}
                                 </Button>
-                                <div className="z-10 absolute top-4 left-4 flex items-center gap-2 pointer-events-none">
-                                    {cooldownTicks === undefined ? <Play size={20} /> : <Pause size={20} />}
-                                    <Switch
-                                        title="Animation Control"
-                                        className="pointer-events-auto"
-                                        checked={cooldownTicks === undefined}
-                                        onCheckedChange={() => {
-                                            handleCooldown(cooldownTicks === undefined ? 0 : undefined)
-                                        }}
-                                    />
-                                </div>
+                                {
+                                    graph.getElements().length > 0 &&
+                                    <div className="z-10 absolute top-4 left-4 flex items-center gap-2 pointer-events-none">
+                                        {cooldownTicks === undefined ? <Play size={20} /> : <Pause size={20} />}
+                                        <Switch
+                                            title="Animation Control"
+                                            className="pointer-events-auto"
+                                            checked={cooldownTicks === undefined}
+                                            onCheckedChange={() => {
+                                                handleCooldown(cooldownTicks === undefined ? 0 : undefined)
+                                            }}
+                                        />
+                                    </div>
+                                }
                                 <ForceGraph
                                     graph={graph}
                                     chartRef={chartRef}

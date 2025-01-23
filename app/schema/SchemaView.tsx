@@ -328,7 +328,7 @@ export default function SchemaView({ schema, fetchCount, session }: Props) {
                 <div className="flex items-center justify-between">
                     <Toolbar
                         selectedElementsLength={selectedElements.length}
-                        disabled={!schema.Id}
+                        disabled={session?.user.role === "Read-Only" || !schema.Id}
                         deleteDisabled={Object.values(selectedElements).length === 0 && !selectedElement}
                         onAddEntity={() => {
                             setIsAddEntity(true)
@@ -346,7 +346,7 @@ export default function SchemaView({ schema, fetchCount, session }: Props) {
                         }}
                         onDeleteElement={handleDeleteElement}
                         chartRef={chartRef}
-                        addDisabled={session?.user.role === "Read-Only" || !schema.Id}
+                        displayAdd
                     />
                     {
                         isCollapsed &&
