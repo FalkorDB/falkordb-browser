@@ -243,7 +243,7 @@ export default function ForceGraph({
                         const midX = (start.x + end.x) / 2 + (end.y - start.y) * (link.curve / 2);
                         const midY = (start.y + end.y) / 2 + (start.x - end.x) * (link.curve / 2);
 
-                        let textAngle = Math.atan2(end.y - start.y, end.x - start.x)
+                        let textAngle = Math.atan2(end.y - start.y, end.x - start.x);
 
                         // maintain label vertical orientation for legibility
                         if (textAngle > Math.PI / 2) textAngle = -(Math.PI - textAngle);
@@ -254,14 +254,30 @@ export default function ForceGraph({
                         ctx.rotate(textAngle);
                     }
 
-                    // add label
+                    // Set text properties first to measure
+                    ctx.font = "2px Arial";
+                    const textMetrics = ctx.measureText(link.label);
+                    const boxWidth = textMetrics.width;
+                    const boxHeight = 2; // Height of text
+
+                    // Draw background block
                     ctx.globalAlpha = 1;
-                    ctx.fillStyle = 'black';
+                    ctx.fillStyle = '#191919';
+
+                    // Draw block aligned with text
+                    ctx.fillRect(
+                        -textMetrics.width / 2,
+                        -1,
+                        boxWidth,
+                        boxHeight
+                    );
+
+                    // add label
+                    ctx.fillStyle = 'white';
                     ctx.textAlign = 'center';
                     ctx.textBaseline = 'middle';
-                    ctx.font = "2px Arial"
                     ctx.fillText(link.label, 0, 0);
-                    ctx.restore()
+                    ctx.restore();
                 }}
                 onNodeClick={handleClick}
                 onLinkClick={handleClick}
