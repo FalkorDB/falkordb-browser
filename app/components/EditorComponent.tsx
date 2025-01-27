@@ -450,8 +450,10 @@ export default function EditorComponent({ currentQuery, historyQueries, setCurre
         setSugProvider(provider)
         setMonacoInstance(monacoI)
     }
-
+    
     const handleEditorDidMount = (e: monaco.editor.IStandaloneCodeEditor, monacoI: Monaco) => {
+        editorRef.current = e
+
         const updatePlaceholderVisibility = () => {
             const hasContent = !!e.getValue();
             if (placeholderRef.current) {
@@ -463,25 +465,18 @@ export default function EditorComponent({ currentQuery, historyQueries, setCurre
             if (placeholderRef.current) {
                 placeholderRef.current.style.display = 'none';
             }
+            setBlur(false)
         });
 
         e.onDidBlurEditorText(() => {
             updatePlaceholderVisibility();
+            setBlur(true)
         });
 
         updatePlaceholderVisibility();
 
         setMonacoInstance(monacoI)
 
-        editorRef.current = e
-
-        e.onDidBlurEditorText(() => {
-            setBlur(true)
-        })
-
-        e.onDidFocusEditorText(() => {
-            setBlur(false)
-        })
 
         const isFirstLine = e.createContextKey<boolean>('isFirstLine', true);
 
