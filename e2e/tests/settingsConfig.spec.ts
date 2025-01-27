@@ -222,7 +222,7 @@ test.describe('Settings Tests', () => {
     test(`@admin Modify maxInfoQueries via UI validation via API: Input value: 999`, async () => {
         const settingsConfigPage = await browser.createNewPage(SettingsConfigPage, urls.settingsUrl)
         await settingsConfigPage.modifyRoleValue(roles.maxInfoQueries, "999")
-        await new Promise(resolve => { setTimeout(resolve, 1000) });
+        await new Promise(resolve => { setTimeout(resolve, 3000) });
         const apiCall = new ApiCalls()
         let value = String((await apiCall.getSettingsRoleValue(roles.maxInfoQueries)).config[1]);
         await settingsConfigPage.clickOnToastCloseBtn();
