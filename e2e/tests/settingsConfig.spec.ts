@@ -225,6 +225,7 @@ test.describe('Settings Tests', () => {
         await new Promise(resolve => { setTimeout(resolve, 1000) });
         const apiCall = new ApiCalls()
         let value = String((await apiCall.getSettingsRoleValue(roles.maxInfoQueries)).config[1]);
+        await settingsConfigPage.clickOnToastCloseBtn();
         console.log(value);
         
         expect(value === "999").toBe(true);
