@@ -138,9 +138,10 @@ test.describe('Settings Tests', () => {
             await apiCall.modifySettingsRole(roles.maxInfoQueries, input)
             await settingsConfigPage.refreshPage()
             const value = await settingsConfigPage.getRoleContentValue(roles.maxInfoQueries)
+            console.log(value);
             expect(value === input).toBe(expected);
             if (index === Data.inputDataAcceptsZero.length - 1) {
-                await apiCall.modifySettingsRole(roles.queryMemCapacity, "1000");
+                await apiCall.modifySettingsRole(roles.maxInfoQueries, "1000");
             }
         });
     })
@@ -224,6 +225,8 @@ test.describe('Settings Tests', () => {
         await new Promise(resolve => { setTimeout(resolve, 1000) });
         const apiCall = new ApiCalls()
         let value = String((await apiCall.getSettingsRoleValue(roles.maxInfoQueries)).config[1]);
+        console.log(value);
+        
         expect(value === "999").toBe(true);
         await apiCall.modifySettingsRole(roles.maxInfoQueries, "1000")
     });
