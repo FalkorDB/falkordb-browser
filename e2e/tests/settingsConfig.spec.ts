@@ -32,6 +32,21 @@ test.describe('Settings Tests', () => {
         });
     })
 
+    Data.inputDataAcceptsZero.forEach(({ input, description, expected }, index) => {
+        test(`@admin Modify ${roles.maxQueuedQueries} via API validation via UI: Input value: ${input} description: ${description}`, async () => {
+            const settingsConfigPage = await browser.createNewPage(SettingsConfigPage, urls.settingsUrl)
+            const apiCall = new ApiCalls()
+            await new Promise(resolve => { setTimeout(resolve, 1000) });
+            await apiCall.modifySettingsRole(roles.TimeOut, input)
+            await settingsConfigPage.refreshPage()
+            const value = await settingsConfigPage.getRoleContentValue(roles.TimeOut)
+            expect(value === input).toBe(expected);
+            if (index === Data.inputDataAcceptsZero.length - 1) {
+                await apiCall.modifySettingsRole(roles.TimeOut, "1000")
+            }
+        });
+    })
+
     Data.maxTimeOut.forEach(({ input, description, expected }, index) => {
         test(`@admin Modify ${roles.maxTimeOut} via API validation via UI: Input value: ${input} description: ${description}`, async () => {
             const settingsConfigPage = await browser.createNewPage(SettingsConfigPage, urls.settingsUrl)
@@ -143,11 +158,10 @@ test.describe('Settings Tests', () => {
             expect(value === input).toBe(expected);
             if (index === Data.roleModificationData.length - 1) {
                 await apiCall.modifySettingsRole(roles.maxQueuedQueries, "25")
+                await apiCall.modifySettingsRole(roles.TimeOut, "1000")
                 await apiCall.modifySettingsRole(roles.maxTimeOut, "0")
                 await apiCall.modifySettingsRole(roles.defaultTimeOut, "0")
                 await apiCall.modifySettingsRole(roles.resultSetSize, "10000")
-                await apiCall.modifySettingsRole(roles.queryMemCapacity, "0")
-                await apiCall.modifySettingsRole(roles.vKeyMaxEntityCount, "100000")
                 await apiCall.modifySettingsRole(roles.queryMemCapacity, "0")
                 await apiCall.modifySettingsRole(roles.vKeyMaxEntityCount, "100000")
                 await apiCall.modifySettingsRole(roles.cmdInfo, "yes")

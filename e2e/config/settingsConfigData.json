@@ -29,6 +29,7 @@
     ],
     "roleModificationData": [
         {"role": "MAX_QUEUED_QUERIES", "description": "modify maxQueuedQueries", "input": "24", "expected": true},
+        {"role": "TIMEOUT", "description": "modify timeOut", "input": "1001", "expected": true},
         {"role": "TIMEOUT_MAX", "description": "modify maxTimeOut", "input": "1", "expected": true},
         {"role": "TIMEOUT_DEFAULT", "description": "modify defaultTimeOut", "input": "1", "expected": true},
         {"role": "RESULTSET_SIZE", "description": "modify resultSetSize", "input": "10001", "expected": true},
