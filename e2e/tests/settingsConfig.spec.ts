@@ -224,12 +224,16 @@ test.describe('Settings Tests', () => {
         await settingsConfigPage.modifyRoleValue(roles.maxInfoQueries, "999")
         await new Promise(resolve => { setTimeout(resolve, 3000) });
         const apiCall = new ApiCalls()
-        let value = String((await apiCall.getSettingsRoleValue(roles.maxInfoQueries)).config[1]);
-        await settingsConfigPage.clickOnToastCloseBtn();
+        let value;
+        for (let i = 0; i < 5; i++) {
+            value = String((await apiCall.getSettingsRoleValue(roles.maxInfoQueries)).config[1]);
+            if (value === "999") break;
+            await new Promise(resolve => setTimeout(resolve, 1500));
+        }
+
         console.log(value);
-        
-        expect(value === "999").toBe(true);
-        await apiCall.modifySettingsRole(roles.maxInfoQueries, "1000")
+        expect(value).toBe("999");
+        await apiCall.modifySettingsRole(roles.maxInfoQueries, "1000");
     });
 
 })
