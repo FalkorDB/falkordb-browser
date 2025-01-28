@@ -224,6 +224,9 @@ test.describe('Settings Tests', () => {
         await settingsConfigPage.modifyRoleValue(roles.maxInfoQueries, "999")
         await settingsConfigPage.refreshPage();
         await settingsConfigPage.scrollToBottomInTable();
+        const res = await settingsConfigPage.getRoleContentValue(roles.maxInfoQueries);
+        console.log("ui value: ", res);
+        
         await new Promise(resolve => { setTimeout(resolve, 3000) });
         const apiCall = new ApiCalls()
         let value;
@@ -233,7 +236,7 @@ test.describe('Settings Tests', () => {
             await new Promise(resolve => setTimeout(resolve, 1500));
         }
 
-        console.log(value);
+        console.log("api value:", value);
         expect(value).toBe("999");
         await apiCall.modifySettingsRole(roles.maxInfoQueries, "1000");
     });
