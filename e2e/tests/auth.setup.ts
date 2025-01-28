@@ -13,6 +13,7 @@ setup("admin authentication", async () => {
     try {
         const browserWrapper = new BrowserWrapper();
         const loginPage = await browserWrapper.createNewPage(LoginPage, urls.loginUrl);
+        await browserWrapper.setPageToFullScreen();
         await loginPage.clickOnConnect();
         await loginPage.dismissDialogAtStart();
         const context = browserWrapper.getContext();
@@ -37,6 +38,7 @@ userRoles.forEach(({ name, file, userName }) => {
         try {
             const browserWrapper = new BrowserWrapper();
             const loginPage = await browserWrapper.createNewPage(LoginPage, urls.loginUrl);
+            await browserWrapper.setPageToFullScreen();
             await loginPage.connectWithCredentials(userName, user.password);
             await loginPage.dismissDialogAtStart();
             const context = browserWrapper.getContext();
