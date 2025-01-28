@@ -46,7 +46,7 @@ export default function Selector({ onChange, graphName, setGraphName, queries, r
     const type = pathname.includes("/schema") ? "Schema" : "Graph"
     const [isRotating, setIsRotating] = useState(false);
     const { toast } = useToast()
-    
+
     useEffect(() => {
         if (!graphName) return
         setOptions(prev => {
@@ -135,6 +135,12 @@ export default function Selector({ onChange, graphName, setGraphName, queries, r
                 </div>
                 <div className="flex gap-16 text-[#e5e7eb]">
                     <ExportGraph
+                        trigger={
+                            <Button
+                                label="Export Data"
+                                disabled={!selectedValue}
+                            />
+                        }
                         type={type}
                         selectedValues={[selectedValue]}
                     />
@@ -145,6 +151,7 @@ export default function Selector({ onChange, graphName, setGraphName, queries, r
                         onDuplicate={(name) => {
                             setOptions(prev => [...prev, name])
                             setSelectedValue(name)
+                            setGraphName(name)
                         }}
                         selectedValue={selectedValue}
                     />
@@ -156,9 +163,9 @@ export default function Selector({ onChange, graphName, setGraphName, queries, r
                     selectedValue &&
                     <div className="flex gap-6">
                         <p>Created on 2/2 24</p>
-                        <span><span className="text-primary">{nodesCount}</span>&ensp;Nodes</span>
+                        <span>{nodesCount}&ensp;Nodes</span>
                         <p className="text-secondary">|</p>
-                        <span><span className="text-primary">{edgesCount}</span>&ensp;Edges</span>
+                        <span>{edgesCount}&ensp;Edges</span>
                     </div>
                 }
                 {

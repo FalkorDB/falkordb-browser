@@ -1,12 +1,11 @@
 /* eslint-disable no-param-reassign */
 
-import { ChevronDown, ChevronUp, FileCheck2, PlusCircle, RotateCcw, Trash2 } from "lucide-react"
+import { Check, ChevronDown, ChevronUp, FileCheck2, PlusCircle, RotateCcw, Trash2, X } from "lucide-react"
 import { useEffect, useState } from "react"
 import { cn } from "@/lib/utils"
 import { DEFAULT_COLORS, Graph } from "../api/graph/model"
 import Button from "../components/ui/Button"
 import DialogComponent from "../components/DialogComponent"
-import Input from "../components/ui/Input"
 
 export default function View({ graph, setGraph, selectedValue }: {
     graph: Graph,
@@ -22,8 +21,9 @@ export default function View({ graph, setGraph, selectedValue }: {
         setGraph(Graph.create(graph.Id, { data: graph.Data, metadata: graph.Metadata }, false, true, colors || colorsArr))
         if (colors) {
             localStorage.removeItem(graph.Id)
+        } else {
+            localStorage.setItem(graph.Id, JSON.stringify(colorsArr));
         }
-        localStorage.setItem(graph.Id, JSON.stringify(colorsArr));
     }
 
     useEffect(() => {
@@ -40,10 +40,10 @@ export default function View({ graph, setGraph, selectedValue }: {
                 />
             }
             className="w-[30%] h-[50%]"
-            title="Preferences"
+            title="Labels Legend"
+            description="Pick a color for each label"
         >
             <div className="h-full flex flex-col gap-8 overflow-hidden">
-                <p className="text-xl">Legends</p>
                 <ul className="flex flex-col gap-4 p-2 overflow-auto">
                     {
                         colorsArr.map((c, i) => (
@@ -86,9 +86,9 @@ export default function View({ graph, setGraph, selectedValue }: {
                                     c === newColor || c === editable ?
                                         <>
                                             <div style={{ backgroundColor: c }} className="h-6 w-6 rounded-full" />
-                                            <Input
+                                            <input
+                                                className="p-0 bg-transparent"
                                                 ref={ref => ref?.focus()}
-                                                className="w-24"
                                                 value={editable === c ? editable : newColor}
                                                 onChange={(e) => {
                                                     setColorsArr(prev => {
@@ -98,17 +98,16 @@ export default function View({ graph, setGraph, selectedValue }: {
                                                     });
                                                     if (editable === c) {
                                                         setEditable(e.target.value)
-                                                    } else setNewColor(e.target.value);
-                                                }}
-                                                onBlur={() => {
-                                                    setNewColor("");
-                                                    colorsArr.splice(i, 1);
+                                                    } else {
+                                                        setNewColor(e.target.value);
+                                                    }
                                                 }}
                                                 onKeyDown={(e) => {
                                                     if (e.key !== "Enter") return
                                                     setNewColor("");
                                                     setEditable("");
                                                 }}
+                                                type="color"
                                             />
                                         </>
                                         : <>
@@ -120,15 +119,36 @@ export default function View({ graph, setGraph, selectedValue }: {
                                         </>
                                 }
                                 {
-                                    hover === c && !(c === newColor || c === editable) &&
-                                    <Button
-                                        onClick={() => {
-                                            setColorsArr(prev => [...prev.filter(color => color !== c)]);
-                                        }}
-                                        title="Delete"
-                                    >
-                                        <Trash2 />
-                                    </Button>
+                                    (c === newColor || c === editable) ?
+                                        <div className="flex gap-2">
+                                            <Button
+                                                onClick={() => {
+                                                    setNewColor("");
+                                                    setEditable("");
+                                                }}
+                                                title="Save"
+                                            >
+                                                <Check />
+                                            </Button>
+                                            <Button
+                                                onClick={() => {
+                                                    setNewColor("");
+                                                    setEditable("");
+                                                }}
+                                                title="Cancel"
+                                            >
+                                                <X />
+                                            </Button>
+                                        </div>
+                                        : hover === c &&
+                                        <Button
+                                            onClick={() => {
+                                                setColorsArr(prev => [...prev.filter(color => color !== c)]);
+                                            }}
+                                            title="Delete"
+                                        >
+                                            <Trash2 />
+                                        </Button>
                                 }
                             </li>
                         ))
@@ -136,7 +156,7 @@ export default function View({ graph, setGraph, selectedValue }: {
                 </ul>
                 <div className="flex justify-around">
                     <Button
-                        disabled={colorsArr.length > graph.Colors.length}
+                        disabled={colorsArr.some(color => color === editable)}
                         label="Add Color"
                         onClick={() => {
                             setColorsArr(prev => [...prev, ""])
@@ -149,7 +169,6 @@ export default function View({ graph, setGraph, selectedValue }: {
                         variant="Secondary"
                         label="Reset"
                         onClick={() => {
-                            localStorage.removeItem(graph.Id)
                             handlePreferencesChange(DEFAULT_COLORS)
                         }}
                     >

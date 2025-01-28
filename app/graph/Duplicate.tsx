@@ -15,17 +15,23 @@ export default function Duplicate({ open, onOpenChange, selectedValue, onDuplica
 
     const [duplicateName, setDuplicateName] = useState("");
     const { toast } = useToast()
-    
+
     const handleDuplicate = async (e: FormEvent) => {
 
         e.preventDefault()
 
-        await securedFetch(`api/graph/${prepareArg(duplicateName)}/?sourceName=${prepareArg(selectedValue)}`, {
+        const result = await securedFetch(`api/graph/${prepareArg(duplicateName)}/?sourceName=${prepareArg(selectedValue)}`, {
             method: "POST"
         }, toast)
 
-        onOpenChange(false)
+        if (!result.ok) return
+
         onDuplicate(duplicateName)
+        onOpenChange(false)
+        toast({
+            title: "Graph duplicated successfully",
+            description: "The graph has been duplicated successfully",
+        })
     }
 
     return (

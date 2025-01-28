@@ -6,7 +6,7 @@
 
 import { Dispatch, RefObject, SetStateAction, useEffect, useRef, useState } from "react"
 import ForceGraph2D from "react-force-graph-2d"
-import { securedFetch } from "@/lib/utils"
+import { getComplementaryColor, securedFetch } from "@/lib/utils"
 import { useToast } from "@/components/ui/use-toast"
 import { Graph, GraphData, Link, Node } from "../api/graph/model"
 
@@ -227,9 +227,6 @@ export default function ForceGraph({
 
                     if (!start.x || !start.y || !end.x || !end.y) return
 
-                    ctx.strokeStyle = link.color;
-                    ctx.globalAlpha = 0.5;
-
                     if (start.id === end.id) {
                         const radius = NODE_SIZE * link.curve * 6.2;
                         const angleOffset = -Math.PI / 4; // 45 degrees offset for text alignment
@@ -255,7 +252,6 @@ export default function ForceGraph({
                     }
 
                     // add label
-                    ctx.globalAlpha = 1;
                     ctx.fillStyle = 'black';
                     ctx.textAlign = 'center';
                     ctx.textBaseline = 'middle';
@@ -273,6 +269,7 @@ export default function ForceGraph({
                 onEngineStop={() => {
                     handleCooldown(0)
                 }}
+                linkColor={link => getComplementaryColor(link.color)}
                 linkCurvature="curve"
                 nodeVisibility="visible"
                 linkVisibility="visible"

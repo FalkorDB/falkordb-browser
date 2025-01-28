@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { ReactNode, useState } from "react"
 import { prepareArg, securedFetch } from "@/lib/utils"
 import { useToast } from "@/components/ui/use-toast"
 import DialogComponent from "./DialogComponent"
@@ -8,9 +8,10 @@ import CloseDialog from "./CloseDialog"
 interface Props {
     selectedValues: string[]
     type: string
+    trigger: ReactNode
 }
 
-export default function ExportGraph({ selectedValues, type }: Props) {
+export default function ExportGraph({ selectedValues, type, trigger }: Props) {
 
     const [open, setOpen] = useState(false)
     const { toast } = useToast()
@@ -49,12 +50,7 @@ export default function ExportGraph({ selectedValues, type }: Props) {
         <DialogComponent
             open={open}
             onOpenChange={setOpen}
-            trigger={
-                <Button
-                    label="Export Data"
-                    disabled={selectedValues.filter(value => value !== "").length === 0}
-                />
-            }
+            trigger={trigger}
             title="Export your graph"
             description="Export a .dump file of your data"
         >

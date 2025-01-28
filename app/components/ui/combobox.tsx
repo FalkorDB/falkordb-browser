@@ -1,3 +1,4 @@
+/* eslint-disable import/no-cycle */
 /* eslint-disable @typescript-eslint/no-use-before-define */
 /* eslint-disable react/require-default-props */
 
@@ -92,6 +93,10 @@ export default function Combobox({ isSelectGraph = false, disabled = false, inTa
     setOpenDelete(false)
     setOpenMenage(false)
     handleSetRows(options.filter(opt => !opts.includes(opt)))
+    toast({
+      title: "Graph(s) deleted successfully",
+      description: "The graph(s) have been deleted successfully",
+    })
   }
 
   return (
@@ -148,10 +153,11 @@ export default function Combobox({ isSelectGraph = false, disabled = false, inTa
             onOpenChange={setOpenDelete}
             title="Delete Graph"
             trigger={<Button
+              variant="Primary"
               disabled={rows.filter(opt => opt.checked).length === 0}
               label="Delete"
             />}
-            description="Are you sure you want to delete the selected graph?"
+            description="Are you sure you want to delete the selected graph(s)?"
           >
             <div className="flex justify-end gap-2">
               <Button
@@ -162,7 +168,17 @@ export default function Combobox({ isSelectGraph = false, disabled = false, inTa
               <CloseDialog label="Cancel" />
             </div>
           </DialogComponent>
-          <ExportGraph selectedValues={rows.filter(opt => opt.checked).map(opt => opt.cells[0].value as string)} type={type!} />
+          <ExportGraph
+            trigger={
+              <Button
+                variant="Primary"
+                label="Export Data"
+                disabled={rows.filter(opt => opt.checked).length === 0}
+              />
+            }
+            selectedValues={rows.filter(opt => opt.checked).map(opt => opt.cells[0].value as string)}
+            type={type!}
+          />
         </TableComponent>
       </DialogContent>
     </Dialog >

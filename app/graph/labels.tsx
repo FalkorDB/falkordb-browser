@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { cn } from "@/lib/utils";
+import { cn, getComplementaryColor } from "@/lib/utils";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { Category, Graph } from "../api/graph/model";
 import Button from "../components/ui/Button";
@@ -57,7 +57,7 @@ export default function Labels({ graph, categories, onClick, label, className = 
                                         setReload(prev => !prev)
                                     }}
                                 >
-                                    <div style={{ backgroundColor: `${graph.getCategoryColorValue(category.index)}` }} className={cn("min-w-6 min-h-6 rounded-full", label === "RelationshipTypes" && "opacity-50")} />
+                                    <div style={{ backgroundColor: label === "RelationshipTypes" ? getComplementaryColor(graph.getCategoryColorValue(category.index)) : graph.getCategoryColorValue(category.index) }} className={cn("min-w-6 min-h-6 rounded-full")} />
                                 </Button>
                             </li>
                         ))

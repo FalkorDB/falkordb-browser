@@ -212,7 +212,7 @@ export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement,
                     </Button>
                     <p className="font-medium text-xl">{label}</p>
                 </div>
-                <p className="font-medium text-xl"><span className="text-primary">{attributes.length}</span> Attributes</p>
+                <p className="font-medium text-xl">{attributes.length}&ensp;Attributes</p>
             </div>
             <Table parentClassName="grow">
                 <TableHeader>

@@ -3,9 +3,10 @@
 "use client"
 
 import { useState } from "react"
-import { AlertCircle, PlusCircle } from "lucide-react"
+import { InfoIcon, PlusCircle } from "lucide-react"
 import { prepareArg, securedFetch } from "@/lib/utils"
 import { useToast } from "@/components/ui/use-toast"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import DialogComponent from "./DialogComponent"
 import Button from "./ui/Button"
 import CloseDialog from "./CloseDialog"
@@ -54,6 +55,10 @@ export default function CreateGraph({
         onSetGraphName(graphName)
         setGraphName("")
         setOpen(false)
+        toast({
+            title: "Graph created successfully",
+            description: "The graph has been created successfully",
+        })
     }
 
     return (
@@ -68,13 +73,14 @@ export default function CreateGraph({
                 handleCreateGraph(e)
             }}>
                 <div className="flex gap-2 items-center">
-                    <Button
-                        className="text-nowrap"
-                        type="button"
-                        title={`${type} names can be edited later`}
-                    >
-                        <AlertCircle size={20} />
-                    </Button>
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <InfoIcon size={20} />
+                        </TooltipTrigger>
+                        <TooltipContent>
+                            {`${type} names can be edited later`}
+                        </TooltipContent>
+                    </Tooltip>
                     <p className="font-normal text-2xl">Name your graph:</p>
                     <Input
                         variant="primary"

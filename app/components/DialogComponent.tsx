@@ -3,6 +3,7 @@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { ReactNode } from "react";
+import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import CloseDialog from "./CloseDialog";
 
 /* eslint-disable react/require-default-props */
@@ -36,10 +37,13 @@ export default function DialogComponent({
                     <CloseDialog />
                 </DialogHeader>
                 {
-                    description &&
-                    <DialogDescription className="p-4">
-                        {description}
-                    </DialogDescription>
+                    description ?
+                        <DialogDescription className="p-4">
+                            {description}
+                        </DialogDescription>
+                        : <VisuallyHidden>
+                            <DialogDescription />
+                        </VisuallyHidden>
                 }
                 {children}
             </DialogContent>
