@@ -223,6 +223,7 @@ test.describe('Settings Tests', () => {
         const settingsConfigPage = await browser.createNewPage(SettingsConfigPage, urls.settingsUrl)
         await settingsConfigPage.modifyRoleValue(roles.maxInfoQueries, "999")
         await settingsConfigPage.refreshPage();
+        await settingsConfigPage.scrollToBottomInTable();
         await new Promise(resolve => { setTimeout(resolve, 3000) });
         const apiCall = new ApiCalls()
         let value;
