@@ -118,12 +118,10 @@ export default function LoginForm() {
   }
 
   return (
-    <div className="relative h-full w-full bg-foreground flex flex-col">
+    <div className="relative h-full w-full flex flex-col">
       <div className="grow flex items-center justify-center">
         <div className="flex flex-col gap-8 items-center">
-          <div className="bg-foreground">
-            <Image priority src="/BrowserLogo.svg" alt="Loading..." width={500} height={1} />
-          </div>
+          <Image priority src="/BrowserLogo.svg" alt="Loading..." width={500} height={1} />
           <FormComponent
             fields={fields}
             handleSubmit={onSubmit}
@@ -144,7 +142,7 @@ export default function LoginForm() {
           </FormComponent>
         </div>
       </div>
-      <div className="h-5 Top" />
+      <div className="h-5 Gradient" />
     </div>
   );
 }
