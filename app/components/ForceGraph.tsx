@@ -6,7 +6,7 @@
 
 import { Dispatch, RefObject, SetStateAction, useEffect, useRef, useState } from "react"
 import ForceGraph2D from "react-force-graph-2d"
-import { securedFetch } from "@/lib/utils"
+import { lightenColor, securedFetch } from "@/lib/utils"
 import { useToast } from "@/components/ui/use-toast"
 import { Graph, GraphData, Link, Node } from "../api/graph/model"
 
@@ -230,9 +230,6 @@ export default function ForceGraph({
 
                     if (!start.x || !start.y || !end.x || !end.y) return
 
-                    ctx.strokeStyle = link.color;
-                    ctx.globalAlpha = 0.5;
-
                     if (start.id === end.id) {
                         const radius = NODE_SIZE * link.curve * 6.2;
                         const angleOffset = -Math.PI / 4; // 45 degrees offset for text alignment
@@ -246,7 +243,7 @@ export default function ForceGraph({
                         const midX = (start.x + end.x) / 2 + (end.y - start.y) * (link.curve / 2);
                         const midY = (start.y + end.y) / 2 + (start.x - end.x) * (link.curve / 2);
 
-                        let textAngle = Math.atan2(end.y - start.y, end.x - start.x)
+                        let textAngle = Math.atan2(end.y - start.y, end.x - start.x);
 
                         // maintain label vertical orientation for legibility
                         if (textAngle > Math.PI / 2) textAngle = -(Math.PI - textAngle);
@@ -257,14 +254,29 @@ export default function ForceGraph({
                         ctx.rotate(textAngle);
                     }
 
+                    // Set text properties first to measure
+                    ctx.font = "2px Arial";
+                    const textMetrics = ctx.measureText(link.label);
+                    const boxWidth = textMetrics.width;
+                    const boxHeight = 2; // Height of text
+
+                    // Draw background block
+                    ctx.fillStyle = '#191919';
+
+                    // Draw block aligned with text
+                    ctx.fillRect(
+                        -textMetrics.width / 2,
+                        -1,
+                        boxWidth,
+                        boxHeight
+                    );
+
                     // add label
-                    ctx.globalAlpha = 1;
-                    ctx.fillStyle = 'black';
+                    ctx.fillStyle = 'white';
                     ctx.textAlign = 'center';
                     ctx.textBaseline = 'middle';
-                    ctx.font = "2px Arial"
                     ctx.fillText(link.label, 0, 0);
-                    ctx.restore()
+                    ctx.restore();
                 }}
                 onNodeClick={handleNodeClick}
                 onNodeHover={handleHover}
@@ -281,6 +293,14 @@ export default function ForceGraph({
                 linkVisibility="visible"
                 cooldownTicks={cooldownTicks}
                 cooldownTime={2000}
+                linkDirectionalArrowRelPos={1}
+                linkDirectionalArrowLength={(link) => link.source.id === link.target.id ? 0 : 2}
+                linkDirectionalArrowColor={(link) => link.id === selectedElement?.id || link.id === hoverElement?.id 
+                    ? link.color 
+                    : lightenColor(link.color)}
+                linkColor={(link) => link.id === selectedElement?.id || link.id === hoverElement?.id 
+                    ? link.color 
+                    : lightenColor(link.color)}
             />
         </div>
     )
