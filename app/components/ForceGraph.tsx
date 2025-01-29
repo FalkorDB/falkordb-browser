@@ -48,6 +48,7 @@ export default function ForceGraph({
     const [parentHeight, setParentHeight] = useState<number>(0)
     const [hoverElement, setHoverElement] = useState<Node | Link | undefined>()
     const parentRef = useRef<HTMLDivElement>(null)
+    const lastClick = useRef<{ date: Date, name: string }>({ date: new Date(), name: "" })
     const toast = useToast()
 
     useEffect(() => {
@@ -119,19 +120,29 @@ export default function ForceGraph({
         graph.removeLinks()
     }
 
-    const handleNodeRightClick = async (node: Node) => {
+    const handleNodeClick = async (node: Node) => {
+        
+        const now = new Date()
+        const { date, name } = lastClick.current
+
+        if (now.getTime() - date.getTime() < 1000 && name === (node.data.name || node.id.toString())) {
+            return
+        }
+
         if (!node.expand) {
             await onFetchNode(node)
         } else {
             deleteNeighbors([node])
         }
+
+        lastClick.current = { date: new Date(), name: node.data.name || node.id.toString() }
     }
 
     const handleHover = (element: Node | Link | null) => {
         setHoverElement(element === null ? undefined : element)
     }
 
-    const handleClick = (element: Node | Link, evt: MouseEvent) => {
+    const handleRightClick = (element: Node | Link, evt: MouseEvent) => {
         if (!("source" in element) && isAddElement) {
             if (setSelectedNodes) {
                 setSelectedNodes(prev => {
@@ -263,11 +274,11 @@ export default function ForceGraph({
                     ctx.fillText(link.label, 0, 0);
                     ctx.restore()
                 }}
-                onNodeClick={handleClick}
-                onLinkClick={handleClick}
+                onNodeClick={handleNodeClick}
                 onNodeHover={handleHover}
                 onLinkHover={handleHover}
-                onNodeRightClick={handleNodeRightClick}
+                onNodeRightClick={handleRightClick}
+                onLinkRightClick={handleRightClick}
                 onBackgroundClick={handleUnselected}
                 onBackgroundRightClick={handleUnselected}
                 onEngineStop={() => {
