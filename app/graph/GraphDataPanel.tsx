@@ -262,6 +262,7 @@ export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement,
                                                         trigger={
                                                             <Button
                                                                 variant="button"
+                                                                title="Delete Attribute"
                                                             >
                                                                 <Trash2 size={20} />
                                                             </Button>

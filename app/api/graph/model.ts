@@ -127,13 +127,11 @@ export class Graph {
 
     private elements: GraphData;
 
+    private colorIndex: number = 0;
+
     private categoriesMap: Map<string, Category>;
 
-    private categoriesColorIndex: number = 0;
-
     private labelsMap: Map<string, Category>;
-
-    private labelsColorIndex: number = 0;
 
     private nodesMap: Map<number, Node>;
 
@@ -285,8 +283,15 @@ export class Graph {
                     }
                     return c
                 })
+                this.labels = this.labels.map(l => {
+                    if (this.labelsMap.get(l.name)!.index! < l.index) {
+                        l.index -= 1
+                        this.labelsMap.get(l.name)!.index = l.index
+                    }
+                    return l
+                })
                 this.categoriesMap.delete("")
-                this.categoriesColorIndex -= 1
+                this.colorIndex -= 1
                 this.elements.nodes.forEach(n => {
                     n.color = this.getCategoryColorValue(this.categoriesMap.get(n.category[0])?.index)
                 })
@@ -484,8 +489,8 @@ export class Graph {
             let c = this.categoriesMap.get(category)
 
             if (!c) {
-                c = { name: category, index: this.categoriesColorIndex, show: true }
-                this.categoriesColorIndex += 1
+                c = { name: category, index: this.colorIndex, show: true }
+                this.colorIndex += 1
                 this.categoriesMap.set(c.name, c)
                 this.categories.push(c)
             }
@@ -498,8 +503,8 @@ export class Graph {
         let l = this.labelsMap.get(category)
 
         if (!l) {
-            l = { name: category, index: this.labelsColorIndex, show: true }
-            this.labelsColorIndex += 1
+            l = { name: category, index: this.colorIndex, show: true }
+            this.colorIndex += 1
             this.labelsMap.set(l.name, l)
             this.labels.push(l)
         }

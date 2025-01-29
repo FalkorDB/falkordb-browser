@@ -9,6 +9,7 @@ import { cn, prepareArg, securedFetch } from "@/lib/utils"
 import { useEffect, useState } from "react"
 import { Select, SelectContent, SelectGroup, SelectItem, SelectSeparator, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useToast } from "@/components/ui/use-toast"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import Button from "./Button"
 import TableComponent, { Row } from "../TableComponent"
 import CloseDialog from "../CloseDialog"
@@ -105,9 +106,16 @@ export default function Combobox({ isSelectGraph = false, disabled = false, inTa
         setOpen(o)
         if (onOpenChange) onOpenChange(o)
       }}>
-        <SelectTrigger data-type="select" disabled={disabled || options.length === 0} title={options.length === 0 ? "There is no graphs" : selectedValue || `Select ${type || "Graph"}`} className={cn("w-fit gap-2 border-none p-2", inTable ? "text-sm font-light" : "text-xl font-medium")}>
-          <SelectValue placeholder={`Select ${type || "Graph"}`} />
-        </SelectTrigger>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <SelectTrigger data-type="select" disabled={disabled || options.length === 0} className={cn("w-fit gap-2 border-none p-2", inTable ? "text-sm font-light" : "text-xl font-medium")}>
+              <SelectValue placeholder={`Select ${type || "Graph"}`} />
+            </SelectTrigger>
+          </TooltipTrigger>
+          <TooltipContent>
+            {options.length === 0 ? "There is no graphs" : selectedValue || `Select ${type || "Graph"}`}
+          </TooltipContent>
+        </Tooltip>
         <SelectContent className="min-w-52 max-h-[30lvh] bg-foreground">
           <SelectGroup>
             <ul className="shrink grow overflow-auto">

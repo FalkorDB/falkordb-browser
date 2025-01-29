@@ -12,6 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { cn } from "@/lib/utils";
 import { useState } from "react";
 import { CheckCircle, Pencil, XCircle } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import Button from "./ui/Button";
 import Input from "./ui/Input";
 import { DataCell } from "../api/graph/model";
@@ -209,7 +210,14 @@ export default function TableComponent({ headers, rows, children, setRows, optio
                                                                     </div>
                                                                 </div>
                                                             : <div className="flex items-center gap-2">
-                                                                <p title={cell.value.toString()}>{cell.value}</p>
+                                                                <Tooltip>
+                                                                    <TooltipTrigger asChild>
+                                                                        <p>{cell.value}</p>
+                                                                    </TooltipTrigger>
+                                                                    <TooltipContent>
+                                                                        {cell.value}
+                                                                    </TooltipContent>
+                                                                </Tooltip>
                                                                 <div>
                                                                     {
                                                                         cell.onChange && hover === `${i}` &&

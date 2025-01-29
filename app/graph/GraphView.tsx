@@ -13,6 +13,7 @@ import { Session } from "next-auth";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/components/ui/use-toast";
 import { Switch } from "@/components/ui/switch";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Category, Graph, GraphData, Link, Node } from "../api/graph/model";
 import DataPanel from "./GraphDataPanel";
 import Labels from "./labels";
@@ -21,7 +22,7 @@ import Button from "../components/ui/Button";
 import TableView from "./TableView";
 
 const ForceGraph = dynamic(() => import("../components/ForceGraph"), { ssr: false });
-const EditorComponent = dynamic(() => import("../components/EditorComponent"), {ssr: false})
+const EditorComponent = dynamic(() => import("../components/EditorComponent"), { ssr: false })
 
 function GraphView({ graph, selectedElement, setSelectedElement, runQuery, historyQuery, historyQueries, fetchCount, session }: {
     graph: Graph
@@ -230,21 +231,30 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
                 <Tabs value={tabsValue} className="h-1 grow flex gap-2 items-center">
                     <TabsList className="h-fit bg-foreground p-2 flex flex-col gap-2">
                         <TabsTrigger
-                            disabled={graph.getElements().length === 0}
-                            className="tabs-trigger"
+                            asChild
                             value="Graph"
-                            onClick={() => setTabsValue("Graph")}
-                            title="Graph">
-                            <GitGraph />
+                        >
+                            <Button
+                                disabled={graph.getElements().length === 0}
+                                className="tabs-trigger"
+                                onClick={() => setTabsValue("Graph")}
+                                title="Graph"
+                            >
+                                <GitGraph />
+                            </Button>
                         </TabsTrigger>
                         <TabsTrigger
-                            disabled={graph.Data.length === 0}
-                            className="tabs-trigger"
+                            asChild
                             value="Table"
-                            onClick={() => setTabsValue("Table")}
-                            title="Table"
                         >
-                            <Table />
+                            <Button
+                                disabled={graph.Data.length === 0}
+                                className="tabs-trigger"
+                                onClick={() => setTabsValue("Table")}
+                                title="Table"
+                            >
+                                <Table />
+                            </Button>
                         </TabsTrigger>
                     </TabsList>
                     <TabsContent value="Graph" className="w-1 grow h-full mt-0">
@@ -277,16 +287,24 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
                                 >
                                     {!maximize ? <Maximize2 /> : <Minimize2 />}
                                 </Button>
-                                <div className="z-10 absolute top-4 left-4 flex items-center gap-2 pointer-events-none">
-                                    {cooldownTicks === undefined ? <Play size={20} /> : <Pause size={20} />}
-                                    <Switch
-                                        title="Animation Control"
-                                        className="pointer-events-auto"
-                                        checked={cooldownTicks === undefined}
-                                        onCheckedChange={() => {
-                                            handleCooldown(cooldownTicks === undefined ? 0 : undefined)
-                                        }}
-                                    />
+                                <div className="z-10 absolute top-4 left-4 pointer-events-none">
+                                    <Tooltip>
+                                        <TooltipTrigger asChild>
+                                            <div className="flex items-center gap-2">
+                                                {cooldownTicks === undefined ? <Play size={20} /> : <Pause size={20} />}
+                                                <Switch
+                                                    className="pointer-events-auto"
+                                                    checked={cooldownTicks === undefined}
+                                                    onCheckedChange={() => {
+                                                        handleCooldown(cooldownTicks === undefined ? 0 : undefined)
+                                                    }}
+                                                />
+                                            </div>
+                                        </TooltipTrigger>
+                                        <TooltipContent>
+                                            <p>Animation Control</p>
+                                        </TooltipContent>
+                                    </Tooltip>
                                 </div>
                                 <ForceGraph
                                     graph={graph}

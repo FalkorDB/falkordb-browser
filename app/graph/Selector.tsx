@@ -120,6 +120,7 @@ export default function Selector({ onChange, graphName, setGraphName, queries, r
                             isRotating && "animate-spin duration-1000"
                         )}
                         onClick={handleReloadClick}
+                        title="Reload Graphs List"
                     >
                         <RefreshCcw size={20} />
                     </Button>

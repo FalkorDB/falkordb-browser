@@ -24,7 +24,7 @@ export default function CreateGraph({
     trigger = (
         <Button
             variant="Primary"
-            label="Create New Graph"
+            label={`Create New ${type}`}
         >
             <PlusCircle />
         </Button>
@@ -81,7 +81,7 @@ export default function CreateGraph({
                             {`${type} names can be edited later`}
                         </TooltipContent>
                     </Tooltip>
-                    <p className="font-normal text-2xl">Name your graph:</p>
+                    <p className="font-normal text-2xl">Name your {type}:</p>
                     <Input
                         variant="primary"
                         ref={ref => ref?.focus()}
