@@ -24,6 +24,14 @@ export default class SettingsConfigPage extends BasePage {
         return (role: string) => this.page.locator(`//tbody//tr[@data-id='${role}']/td[3]/div/div/button[1]`)
     }
 
+    private get toastCloseBtn(): Locator {
+        return this.page.locator("//li[@role='status']/button");
+    }
+
+    private get tableContent(): Locator {
+        return this.page.locator("//div[@id='tableContent']");
+      }
+
     async modifyRoleValue(role: string, input: string): Promise<string | null> {
         await this.roleContentValue(role).hover();
         await this.EditRoleButton(role).click();
@@ -33,4 +41,11 @@ export default class SettingsConfigPage extends BasePage {
         return value
     }
 
+    async clickOnToastCloseBtn(): Promise<void>{
+        await this.toastCloseBtn.click();
+    }
+
+    async scrollToBottomInTable(): Promise<void> {
+        await this.tableContent.evaluate((el) => el.scrollTo(0, el.scrollHeight));
+    }
 }

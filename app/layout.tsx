@@ -25,7 +25,7 @@ export default function RootLayout({
   // caused by mismatched client/server content caused by next-themes
   return (
     <html className="w-screen h-screen" lang="en" suppressHydrationWarning>
-      <body className={`h-full LandingPage ${inter.className}`}>
+      <body className={`h-full bg-foreground ${inter.className}`}>
         <GTM />
         <NextAuthProvider>
           <TooltipProvider>

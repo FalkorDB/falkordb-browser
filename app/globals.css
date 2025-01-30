@@ -49,11 +49,7 @@
         @apply h-full w-full flex flex-col bg-background;
     }
 
-    .LandingPage {
-        background: linear-gradient(180deg, #EC806C 0%, #B66EBD 43.41%, #7568F2 100%);
-    }
-
-    .Top {
+    .Gradient {
         background: linear-gradient(90deg, #EC806C 0%, #B66EBD 43.41%, #7568F2 100%);
     }
 
