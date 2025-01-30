@@ -266,7 +266,7 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
                                     deleteDisabled={(Object.values(selectedElements).length === 0 && !selectedElement) || session?.user.role === "Read-Only"}
                                     onDeleteElement={handleDeleteElement}
                                     chartRef={chartRef}
-                                    addDisabled
+                                    displayAdd={false}
                                 />
                                 {
                                     isCollapsed && graph.Id &&
@@ -287,25 +287,28 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
                                 >
                                     {!maximize ? <Maximize2 /> : <Minimize2 />}
                                 </Button>
-                                <div className="z-10 absolute top-4 left-4 pointer-events-none">
-                                    <Tooltip>
-                                        <TooltipTrigger asChild>
-                                            <div className="flex items-center gap-2">
-                                                {cooldownTicks === undefined ? <Play size={20} /> : <Pause size={20} />}
-                                                <Switch
-                                                    className="pointer-events-auto"
-                                                    checked={cooldownTicks === undefined}
-                                                    onCheckedChange={() => {
-                                                        handleCooldown(cooldownTicks === undefined ? 0 : undefined)
-                                                    }}
-                                                />
-                                            </div>
-                                        </TooltipTrigger>
-                                        <TooltipContent>
-                                            <p>Animation Control</p>
-                                        </TooltipContent>
-                                    </Tooltip>
-                                </div>
+                                {
+                                    graph.getElements().length > 0 &&
+                                    <div className="z-10 absolute top-4 left-4 pointer-events-none">
+                                        <Tooltip>
+                                            <TooltipTrigger asChild>
+                                                <div className="flex items-center gap-2">
+                                                    {cooldownTicks === undefined ? <Play size={20} /> : <Pause size={20} />}
+                                                    <Switch
+                                                        className="pointer-events-auto"
+                                                        checked={cooldownTicks === undefined}
+                                                        onCheckedChange={() => {
+                                                            handleCooldown(cooldownTicks === undefined ? 0 : undefined)
+                                                        }}
+                                                    />
+                                                </div>
+                                            </TooltipTrigger>
+                                            <TooltipContent>
+                                                <p>Animation Control</p>
+                                            </TooltipContent>
+                                        </Tooltip>
+                                    </div>
+                                }
                                 <ForceGraph
                                     graph={graph}
                                     chartRef={chartRef}

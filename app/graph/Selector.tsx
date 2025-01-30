@@ -163,7 +163,6 @@ export default function Selector({ onChange, graphName, setGraphName, queries, r
                 {
                     selectedValue &&
                     <div className="flex gap-6">
-                        <p>Created on 2/2 24</p>
                         <span>{nodesCount}&ensp;Nodes</span>
                         <p className="text-secondary">|</p>
                         <span>{edgesCount}&ensp;Edges</span>

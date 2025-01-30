@@ -49,9 +49,9 @@ export default function ForceGraph({
     const [hoverElement, setHoverElement] = useState<Node | Link | undefined>()
     const parentRef = useRef<HTMLDivElement>(null)
     const lastClick = useRef<{ date: Date, name: string }>({ date: new Date(), name: "" })
-    const toast = useToast()
+    const { toast } = useToast()
 
-    useEffect(() => {        
+    useEffect(() => {
         const handleResize = () => {
             if (!parentRef.current) return
             setParentWidth(parentRef.current.clientWidth)
@@ -59,7 +59,7 @@ export default function ForceGraph({
         }
 
         window.addEventListener('resize', handleResize)
-        
+
         const observer = new ResizeObserver(handleResize)
 
         if (parentRef.current) {
@@ -82,7 +82,14 @@ export default function ForceGraph({
 
         if (result.ok) {
             const json = await result.json()
-            return graph.extend(json.result, true)
+            const elements = graph.extend(json.result, true)
+            if (elements.length > 0) {
+                toast({
+                    title: `No neighbors found`,
+                    description: `No neighbors found`,
+                })
+            }
+            return elements
         }
 
         return []
@@ -113,7 +120,7 @@ export default function ForceGraph({
     }
 
     const handleNodeClick = async (node: Node) => {
-        
+
         const now = new Date()
         const { date, name } = lastClick.current
 
@@ -295,11 +302,11 @@ export default function ForceGraph({
                 cooldownTime={2000}
                 linkDirectionalArrowRelPos={1}
                 linkDirectionalArrowLength={(link) => link.source.id === link.target.id ? 0 : 2}
-                linkDirectionalArrowColor={(link) => link.id === selectedElement?.id || link.id === hoverElement?.id 
-                    ? link.color 
+                linkDirectionalArrowColor={(link) => link.id === selectedElement?.id || link.id === hoverElement?.id
+                    ? link.color
                     : lightenColor(link.color)}
-                linkColor={(link) => link.id === selectedElement?.id || link.id === hoverElement?.id 
-                    ? link.color 
+                linkColor={(link) => link.id === selectedElement?.id || link.id === hoverElement?.id
+                    ? link.color
                     : lightenColor(link.color)}
             />
         </div>
