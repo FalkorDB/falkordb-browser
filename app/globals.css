@@ -31,24 +31,13 @@
 @layer components {
 
     @font-face {
-        font-family: 'Fira Code';
-        src: url('/fonts/fira_code.ttf') format('truetype');
-        font-display: swap;
-    }
-    
-    @font-face {
-        font-family: 'Oswald';
-        src: url('/fonts/oswald.ttf') format('truetype');
-        font-display: swap;
+        font-family: 'FiraCode';
+        src: url('/public/fonts/fira_code.ttf') format('truetype');
+        font-display: block;
     }
 
     .tabs-trigger {
         @apply !p-2 rounded-lg data-[state=active]:bg-foreground data-[state=active]:!text-white !text-white;
-    }
-
-    .hide-scrollbar {
-        scrollbar-width: none;
-        -ms-overflow-style: none;
     }
 
     .hide-scrollbar {
@@ -80,14 +69,6 @@
         align-items: center;
         justify-content: center;
     }
-
-    .Secondary {
-        border-image: linear-gradient(90deg, #EC806C 0%, #B66EBD 43.41%, #7568F2 100%) 1;
-    }
-            
-    .monaco-placeholder {
-        @apply text-[#666] absolute select-none top-2 left-2;
-    }
 }
 
 input[type="number"]::-webkit-outer-spin-button,
@@ -108,11 +89,6 @@ input[type="number"] {
 * {
     font-family: font-FiraCode, 'monospace';
 }
-
-.Title {
-    font-family: font-Oswald, 'monospace';
-}
-
 
 ::-webkit-scrollbar {
     width: 20px;
