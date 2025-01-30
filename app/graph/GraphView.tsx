@@ -219,7 +219,6 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
             >
                 <EditorComponent
                     graph={graph}
-                    isCollapsed={isCollapsed}
                     maximize={maximize}
                     currentQuery={query}
                     historyQueries={historyQueries}

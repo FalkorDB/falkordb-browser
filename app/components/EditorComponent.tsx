@@ -3,7 +3,7 @@
 
 "use client";
 
-import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Editor, Monaco } from "@monaco-editor/react"
 import { useEffect, useRef, useState } from "react"
 import * as monaco from "monaco-editor";
@@ -11,6 +11,7 @@ import { Maximize2 } from "lucide-react";
 import { prepareArg, securedFetch } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
 import { Session } from "next-auth";
+import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import { Graph } from "../api/graph/model";
 import Button from "./ui/Button";
 
@@ -175,13 +176,23 @@ const FUNCTIONS = [
     "vec.cosineDistance",
 ]
 
-const SUGGESTIONS: monaco.languages.CompletionItem[] = KEYWORDS.map(key => ({
-    insertText: key,
-    label: key,
-    kind: monaco.languages.CompletionItemKind.Keyword,
-    range: new monaco.Range(1, 1, 1, 1),
-    detail: "(keyword)"
-}))
+const SUGGESTIONS: monaco.languages.CompletionItem[] = [
+    ...KEYWORDS.map(key => ({
+        insertText: key,
+        label: key,
+        kind: monaco.languages.CompletionItemKind.Keyword,
+        range: new monaco.Range(1, 1, 1, 1),
+        detail: "(keyword)"
+    })),
+    ...FUNCTIONS.map(f => ({
+        insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+        insertText: `${f}(\${0})`,
+        label: `${f}()`,
+        kind: monaco.languages.CompletionItemKind.Function,
+        range: new monaco.Range(1, 1, 1, 1),
+        detail: "(function)"
+    }))
+]
 
 const MAX_HEIGHT = 20
 const LINE_HEIGHT = 38
@@ -192,10 +203,10 @@ export default function EditorComponent({ currentQuery, historyQueries, setCurre
 
     const [query, setQuery] = useState(currentQuery)
     const placeholderRef = useRef<HTMLDivElement>(null)
-    const [monacoInstance, setMonacoInstance] = useState<Monaco>()
-    const [sugProvider, setSugProvider] = useState<monaco.IDisposable>()
     const [lineNumber, setLineNumber] = useState(1)
+    const graphIdRef = useRef(graph.Id)
     const [blur, setBlur] = useState(false)
+    const [sugDisposed, setSugDisposed] = useState<monaco.IDisposable>()
     const { toast } = useToast()
     const submitQuery = useRef<HTMLButtonElement>(null)
     const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null)
@@ -205,6 +216,14 @@ export default function EditorComponent({ currentQuery, historyQueries, setCurre
         currentQuery,
         historyCounter: historyQueries.length
     })
+
+    useEffect(() => {
+        graphIdRef.current = graph.Id
+    }, [graph.Id])
+
+    useEffect(() => () => {
+        sugDisposed?.dispose()
+    }, [sugDisposed])
 
     useEffect(() => {
         historyRef.current.historyQueries = historyQueries
@@ -254,10 +273,12 @@ export default function EditorComponent({ currentQuery, historyQueries, setCurre
                 'editorSuggestWidget.hoverBackground': '#28283F',
             },
         });
+
+        monacoI.editor.setTheme('custom-theme')
     }
 
     const fetchSuggestions = async (q: string, detail: string): Promise<monaco.languages.CompletionItem[]> => {
-        const result = await securedFetch(`api/graph/${graph.Id}/?query=${prepareArg(q)}&role=${data?.user.role}`, {
+        const result = await securedFetch(`api/graph/${graphIdRef.current}/?query=${prepareArg(q)}&role=${data?.user.role}`, {
             method: 'GET',
         }, toast)
 
@@ -286,44 +307,109 @@ export default function EditorComponent({ currentQuery, historyQueries, setCurre
         }))
     }
 
-    const getSuggestions = async (): Promise<monaco.languages.CompletionItem[]> => {
-        const suggestions = await Promise.all([
-            ['CALL dbms.procedures() YIELD name as sug', '(function)'],
-            ['CALL db.propertyKeys() YIELD propertyKey as sug', '(property key)'],
-            ['CALL db.labels() YIELD label as sug', '(label)'],
-            ['CALL db.relationshipTypes() YIELD relationshipType as sug', '(relationship type)']
-        ].map(([q, detail]) => fetchSuggestions(q, detail)))
-
-        return [...suggestions.flatMap(arr => arr), ...FUNCTIONS.map(f => ({
-            insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
-            insertText: `${f}(\${0})`,
-            label: `${f}()`,
-            kind: monaco.languages.CompletionItemKind.Function,
-            range: new monaco.Range(1, 1, 1, 1),
-            detail: "(function)"
-        }))]
-    }
+    const getSuggestions = async () => (await Promise.all([
+        fetchSuggestions('CALL dbms.procedures() YIELD name as sug', '(function)'),
+        fetchSuggestions('CALL db.propertyKeys() YIELD propertyKey as sug', '(property key)'),
+        fetchSuggestions('CALL db.labels() YIELD label as sug', '(label)'),
+        fetchSuggestions('CALL db.relationshipTypes() YIELD relationshipType as sug', '(relationship type)')
+    ])).flat()
 
     const addSuggestions = async (monacoI: Monaco) => {
-        console.log("addSuggestions");
-        const suggestions = SUGGESTIONS
+        const sug = [
+            ...SUGGESTIONS,
+            ...(graphIdRef.current ? await getSuggestions() : [])
+        ];
 
-        if (graph.Id) {
-            console.log("getSuggestions");
-            suggestions.push(...(await getSuggestions()))
-        }
+        const functions = sug.filter(({ detail }) => detail === "(function)")
 
-        const functions = suggestions.filter(({ detail }) => detail === "(function)")
+        const namespaces = new Set(
+            functions
+                .filter(({ label }) => (label as string).includes("."))
+                .map(({ label }) => {
+                    const newNamespaces = (label as string).split(".")
+                    newNamespaces.pop()
+                    return newNamespaces
+                }).flat()
+        )
 
-        const namespaces = new Set(functions.filter(({ label }) => (label as string).includes(".")).map(({ label }) => {
-            const [namespace] = (label as string).split(".")
-            return namespace
-        }))
+        monacoI.languages.setMonarchTokensProvider('custom-language', {
+            tokenizer: {
+                root: graphIdRef.current ? [
+                    [new RegExp(`\\b(${Array.from(namespaces.keys()).join('|')})\\b`), "keyword"],
+                    [new RegExp(`\\b(${KEYWORDS.join('|')})\\b`), "keyword"],
+                    [
+                        new RegExp(`\\b(${functions.map(({ label }) => {
+                            if ((label as string).includes(".")) {
+                                const labels = (label as string).split(".")
+                                return labels[labels.length - 1]
+                            }
+                            return label
+                        }).join('|')})\\b`),
+                        "function"
+                    ],
+                    [/"([^"\\]|\\.)*"/, 'string'],
+                    [/'([^'\\]|\\.)*'/, 'string'],
+                    [/\d+/, 'number'],
+                    [/:(\w+)/, 'type'],
+                    [/\{/, { token: 'delimiter.curly', next: '@bracketCounting' }],
+                    [/\[/, { token: 'delimiter.square', next: '@bracketCounting' }],
+                    [/\(/, { token: 'delimiter.parenthesis', next: '@bracketCounting' }],
+                ] : [
+                    [new RegExp(`\\b(${KEYWORDS.join('|')})\\b`), "keyword"],
+                    [/"([^"\\]|\\.)*"/, 'string'],
+                    [/'([^'\\]|\\.)*'/, 'string'],
+                    [/\d+/, 'number'],
+                    [/:(\w+)/, 'type'],
+                    [/\{/, { token: 'delimiter.curly', next: '@bracketCounting' }],
+                    [/\[/, { token: 'delimiter.square', next: '@bracketCounting' }],
+                    [/\(/, { token: 'delimiter.parenthesis', next: '@bracketCounting' }],
+                ],
+                bracketCounting: [
+                    [/\{/, 'delimiter.curly', '@bracketCounting'],
+                    [/\}/, 'delimiter.curly', '@pop'],
+                    [/\[/, 'delimiter.square', '@bracketCounting'],
+                    [/\]/, 'delimiter.square', '@pop'],
+                    [/\(/, 'delimiter.parenthesis', '@bracketCounting'],
+                    [/\)/, 'delimiter.parenthesis', '@pop'],
+                    { include: 'root' }
+                ],
+            },
+            ignoreCase: true,
+        })
 
-        if (sugProvider) {
-            sugProvider.dispose()
-            console.log("dispose");
-        }
+        return sug
+    }
+
+    const handleEditorWillMount = async (monacoI: Monaco) => {
+
+        monacoI.languages.register({ id: "custom-language" })
+
+        monacoI.languages.setMonarchTokensProvider('custom-language', {
+            tokenizer: {
+                root: [
+                    [new RegExp(`\\b(${KEYWORDS.join('|')})\\b`), "keyword"],
+                    [/"([^"\\]|\\.)*"/, 'string'],
+                    [/'([^'\\]|\\.)*'/, 'string'],
+                    [/\d+/, 'number'],
+                    [/:(\w+)/, 'type'],
+                    [/\{/, { token: 'delimiter.curly', next: '@bracketCounting' }],
+                    [/\[/, { token: 'delimiter.square', next: '@bracketCounting' }],
+                    [/\(/, { token: 'delimiter.parenthesis', next: '@bracketCounting' }],
+                ],
+                bracketCounting: [
+                    [/\{/, 'delimiter.curly', '@bracketCounting'],
+                    [/\}/, 'delimiter.curly', '@pop'],
+                    [/\[/, 'delimiter.square', '@bracketCounting'],
+                    [/\]/, 'delimiter.square', '@pop'],
+                    [/\(/, 'delimiter.parenthesis', '@bracketCounting'],
+                    [/\)/, 'delimiter.parenthesis', '@pop'],
+                    { include: 'root' }
+                ],
+            },
+            ignoreCase: true,
+        })
+
+        setTheme(monacoI)
 
         monacoI.languages.setLanguageConfiguration('custom-language', {
             brackets: [
@@ -347,111 +433,20 @@ export default function EditorComponent({ currentQuery, historyQueries, setCurre
             ]
         });
 
-        if (graph.Id) {
-            monacoI.languages.setMonarchTokensProvider('custom-language', {
-                tokenizer: {
-                    root: [
-                        [new RegExp(`\\b(${Array.from(namespaces.keys()).join('|')})\\b`), "keyword"],
-                        [new RegExp(`\\b(${KEYWORDS.join('|')})\\b`), "keyword"],
-                        [
-                            new RegExp(`\\b(${functions.map(({ label }) => {
-                                if ((label as string).includes(".")) {
-                                    const labels = (label as string).split(".")
-                                    return labels[labels.length - 1]
-                                }
-                                return label
-                            }).join('|')})\\b`),
-                            "function"
-                        ],
-                        [/"([^"\\]|\\.)*"/, 'string'],
-                        [/'([^'\\]|\\.)*'/, 'string'],
-                        [/\d+/, 'number'],
-                        [/:(\w+)/, 'type'],
-                        [/\{/, { token: 'delimiter.curly', next: '@bracketCounting' }],
-                        [/\[/, { token: 'delimiter.square', next: '@bracketCounting' }],
-                        [/\(/, { token: 'delimiter.parenthesis', next: '@bracketCounting' }],
-                    ],
-                    bracketCounting: [
-                        [/\{/, 'delimiter.curly', '@bracketCounting'],
-                        [/\}/, 'delimiter.curly', '@pop'],
-                        [/\[/, 'delimiter.square', '@bracketCounting'],
-                        [/\]/, 'delimiter.square', '@pop'],
-                        [/\(/, 'delimiter.parenthesis', '@bracketCounting'],
-                        [/\)/, 'delimiter.parenthesis', '@pop'],
-                        { include: 'root' }
-                    ],
-                },
-                ignoreCase: true,
-            })
-        } else {
-            monacoI.languages.setMonarchTokensProvider('custom-language', {
-                tokenizer: {
-                    root: [
-                        [new RegExp(`\\b(${KEYWORDS.join('|')})\\b`), "keyword"],
-                        [/"([^"\\]|\\.)*"/, 'string'],
-                        [/'([^'\\]|\\.)*'/, 'string'],
-                        [/\d+/, 'number'],
-                        [/:(\w+)/, 'type'],
-                        [/\{/, { token: 'delimiter.curly', next: '@bracketCounting' }],
-                        [/\[/, { token: 'delimiter.square', next: '@bracketCounting' }],
-                        [/\(/, { token: 'delimiter.parenthesis', next: '@bracketCounting' }],
-                    ],
-                    bracketCounting: [
-                        [/\{/, 'delimiter.curly', '@bracketCounting'],
-                        [/\}/, 'delimiter.curly', '@pop'],
-                        [/\[/, 'delimiter.square', '@bracketCounting'],
-                        [/\]/, 'delimiter.square', '@pop'],
-                        [/\(/, 'delimiter.parenthesis', '@bracketCounting'],
-                        [/\)/, 'delimiter.parenthesis', '@pop'],
-                        { include: 'root' }
-                    ],
-                },
-                ignoreCase: true,
-            })
-        }
-
-        return monacoI.languages.registerCompletionItemProvider("custom-language", {
-            provideCompletionItems: (model, position) => {
+        const provider = monacoI.languages.registerCompletionItemProvider("custom-language", {
+            provideCompletionItems: async (model, position) => {
                 const word = model.getWordUntilPosition(position)
                 const range = new monaco.Range(position.lineNumber, word.startColumn, position.lineNumber, word.endColumn)
-                console.log(suggestions);
                 return {
-                    suggestions: suggestions.map(s => ({ ...s, range }))
+                    suggestions: (await addSuggestions(monacoI)).map(s => ({ ...s, range }))
                 }
             },
         })
+
+        setSugDisposed(provider)
     }
 
-    useEffect(() => {
-        const timeout = setTimeout(async () => {
-            if (!monacoInstance) return
-            const provider = await addSuggestions(monacoInstance)
-            setSugProvider(provider)
-        }, 5000)
-
-        return () => {
-            clearTimeout(timeout)
-            if (sugProvider) {
-                sugProvider.dispose()
-                console.log("cleanup dispose");
-            }
-            console.log("cleanup");
-        }
-    }, [graph.Id])
-
-    const handleEditorWillMount = async (monacoI: Monaco) => {
-
-        monacoI.languages.register({ id: "custom-language" })
-
-        setTheme(monacoI)
-
-        const provider = await addSuggestions(monacoI)
-
-        setSugProvider(provider)
-        setMonacoInstance(monacoI)
-    }
-    
-    const handleEditorDidMount = (e: monaco.editor.IStandaloneCodeEditor, monacoI: Monaco) => {
+    const handleEditorDidMount = (e: monaco.editor.IStandaloneCodeEditor) => {
         editorRef.current = e
 
         const updatePlaceholderVisibility = () => {
@@ -474,9 +469,6 @@ export default function EditorComponent({ currentQuery, historyQueries, setCurre
         });
 
         updatePlaceholderVisibility();
-
-        setMonacoInstance(monacoI)
-
 
         const isFirstLine = e.createContextKey<boolean>('isFirstLine', true);
 
@@ -586,6 +578,10 @@ export default function EditorComponent({ currentQuery, historyQueries, setCurre
                             />
                         </form>
                         <DialogContent closeSize={30} className="w-full h-full">
+                            <VisuallyHidden>
+                                <DialogTitle />
+                                <DialogDescription />
+                            </VisuallyHidden>
                             <Editor
                                 className="w-full h-full"
                                 onMount={handleEditorDidMount}
