@@ -6,7 +6,7 @@
 
 import { Dispatch, RefObject, SetStateAction, useEffect, useRef, useState } from "react"
 import ForceGraph2D from "react-force-graph-2d"
-import { securedFetch } from "@/lib/utils"
+import { lightenColor, securedFetch } from "@/lib/utils"
 import { useToast } from "@/components/ui/use-toast"
 import { Graph, GraphData, Link, Node } from "../api/graph/model"
 
@@ -48,36 +48,29 @@ export default function ForceGraph({
     const [parentHeight, setParentHeight] = useState<number>(0)
     const [hoverElement, setHoverElement] = useState<Node | Link | undefined>()
     const parentRef = useRef<HTMLDivElement>(null)
+    const lastClick = useRef<{ date: Date, name: string }>({ date: new Date(), name: "" })
     const toast = useToast()
 
-    useEffect(() => {
-        if (!chartRef.current || data.nodes.length === 0 || data.links.length === 0) return
-        chartRef.current.d3Force('link').id((link: any) => link.id).distance(50)
-        chartRef.current.d3Force('charge').strength(-300)
-        chartRef.current.d3Force('center').strength(0.05)
-    }, [chartRef, data.links.length, data.nodes.length])
-
-    useEffect(() => {
+    useEffect(() => {        
         const handleResize = () => {
             if (!parentRef.current) return
             setParentWidth(parentRef.current.clientWidth)
             setParentHeight(parentRef.current.clientHeight)
         }
 
-        handleResize()
-
-        const resizeObserver = new ResizeObserver(handleResize)
-        if (parentRef.current) {
-            resizeObserver.observe(parentRef.current)
-        }
-
         window.addEventListener('resize', handleResize)
+        
+        const observer = new ResizeObserver(handleResize)
+
+        if (parentRef.current) {
+            observer.observe(parentRef.current)
+        }
 
         return () => {
-            resizeObserver.disconnect()
             window.removeEventListener('resize', handleResize)
+            observer.disconnect()
         }
-    }, [])
+    }, [parentRef])
 
     const onFetchNode = async (node: Node) => {
         const result = await securedFetch(`/api/graph/${graph.Id}/${node.id}`, {
@@ -119,19 +112,29 @@ export default function ForceGraph({
         graph.removeLinks()
     }
 
-    const handleNodeRightClick = async (node: Node) => {
+    const handleNodeClick = async (node: Node) => {
+        
+        const now = new Date()
+        const { date, name } = lastClick.current
+
+        if (now.getTime() - date.getTime() < 1000 && name === (node.data.name || node.id.toString())) {
+            return
+        }
+
         if (!node.expand) {
             await onFetchNode(node)
         } else {
             deleteNeighbors([node])
         }
+
+        lastClick.current = { date: new Date(), name: node.data.name || node.id.toString() }
     }
 
     const handleHover = (element: Node | Link | null) => {
         setHoverElement(element === null ? undefined : element)
     }
 
-    const handleClick = (element: Node | Link, evt: MouseEvent) => {
+    const handleRightClick = (element: Node | Link, evt: MouseEvent) => {
         if (!("source" in element) && isAddElement) {
             if (setSelectedNodes) {
                 setSelectedNodes(prev => {
@@ -227,9 +230,6 @@ export default function ForceGraph({
 
                     if (!start.x || !start.y || !end.x || !end.y) return
 
-                    ctx.strokeStyle = link.color;
-                    ctx.globalAlpha = 0.5;
-
                     if (start.id === end.id) {
                         const radius = NODE_SIZE * link.curve * 6.2;
                         const angleOffset = -Math.PI / 4; // 45 degrees offset for text alignment
@@ -243,7 +243,7 @@ export default function ForceGraph({
                         const midX = (start.x + end.x) / 2 + (end.y - start.y) * (link.curve / 2);
                         const midY = (start.y + end.y) / 2 + (start.x - end.x) * (link.curve / 2);
 
-                        let textAngle = Math.atan2(end.y - start.y, end.x - start.x)
+                        let textAngle = Math.atan2(end.y - start.y, end.x - start.x);
 
                         // maintain label vertical orientation for legibility
                         if (textAngle > Math.PI / 2) textAngle = -(Math.PI - textAngle);
@@ -254,20 +254,35 @@ export default function ForceGraph({
                         ctx.rotate(textAngle);
                     }
 
+                    // Set text properties first to measure
+                    ctx.font = "2px Arial";
+                    const textMetrics = ctx.measureText(link.label);
+                    const boxWidth = textMetrics.width;
+                    const boxHeight = 2; // Height of text
+
+                    // Draw background block
+                    ctx.fillStyle = '#191919';
+
+                    // Draw block aligned with text
+                    ctx.fillRect(
+                        -textMetrics.width / 2,
+                        -1,
+                        boxWidth,
+                        boxHeight
+                    );
+
                     // add label
-                    ctx.globalAlpha = 1;
-                    ctx.fillStyle = 'black';
+                    ctx.fillStyle = 'white';
                     ctx.textAlign = 'center';
                     ctx.textBaseline = 'middle';
-                    ctx.font = "2px Arial"
                     ctx.fillText(link.label, 0, 0);
-                    ctx.restore()
+                    ctx.restore();
                 }}
-                onNodeClick={handleClick}
-                onLinkClick={handleClick}
+                onNodeClick={handleNodeClick}
                 onNodeHover={handleHover}
                 onLinkHover={handleHover}
-                onNodeRightClick={handleNodeRightClick}
+                onNodeRightClick={handleRightClick}
+                onLinkRightClick={handleRightClick}
                 onBackgroundClick={handleUnselected}
                 onBackgroundRightClick={handleUnselected}
                 onEngineStop={() => {
@@ -278,6 +293,14 @@ export default function ForceGraph({
                 linkVisibility="visible"
                 cooldownTicks={cooldownTicks}
                 cooldownTime={2000}
+                linkDirectionalArrowRelPos={1}
+                linkDirectionalArrowLength={(link) => link.source.id === link.target.id ? 0 : 2}
+                linkDirectionalArrowColor={(link) => link.id === selectedElement?.id || link.id === hoverElement?.id 
+                    ? link.color 
+                    : lightenColor(link.color)}
+                linkColor={(link) => link.id === selectedElement?.id || link.id === hoverElement?.id 
+                    ? link.color 
+                    : lightenColor(link.color)}
             />
         </div>
     )
