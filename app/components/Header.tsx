@@ -65,7 +65,7 @@ export default function Header({ onSetGraphName }: Props) {
                                     </Button>
                                 </NavigationMenuLink>
                                 <NavigationMenuItem>
-                                    <NavigationMenuTrigger className="gap-2 bg-foreground">
+                                    <NavigationMenuTrigger onClick={(e) => e.preventDefault()} className="gap-2 bg-foreground">
                                         <LifeBuoy size={25} />
                                         <p>Help</p>
                                     </NavigationMenuTrigger>
@@ -108,8 +108,10 @@ export default function Header({ onSetGraphName }: Props) {
                             </NavigationMenuList>
                         </NavigationMenu>
                         <SheetContent className="bg-popover-foreground flex flex-col gap-4 items-center text-foreground !max-w-[30rem]">
-                            <VisuallyHidden><SheetTitle /></VisuallyHidden>
-                            <VisuallyHidden><SheetDescription /></VisuallyHidden>
+                            <VisuallyHidden>
+                                <SheetTitle />
+                                <SheetDescription />
+                            </VisuallyHidden>
                             <div className="h-1 grow flex flex-col gap-8 items-center justify-center">
                                 <Image priority src="/ColorLogo.svg" alt="Loading..." width={120} height={1} />
                                 <h1 className="text-3xl font-bold">We Make AI Reliable</h1>
