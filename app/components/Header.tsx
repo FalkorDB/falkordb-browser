@@ -41,12 +41,12 @@ export default function Header({ onSetGraphName }: Props) {
                     <div className="flex gap-2 bg-foreground rounded-lg p-2">
                         <Button
                             label="Graphs"
-                            className={cn("px-4 py-1 rounded-lg", pathname.includes("/graph") && "bg-background")}
+                            className={cn("px-4 py-1 rounded-lg", pathname.includes("/graph") ? "bg-background" : "text-gray-500")}
                             onClick={() => router.push("/graph")}
                         />
                         <Button
                             label="Schemas"
-                            className={cn("px-4 py-1 rounded-lg", pathname.includes("/schema") && "bg-background")}
+                            className={cn("px-4 py-1 rounded-lg", pathname.includes("/schema") ? "bg-background" : "text-gray-500")}
                             onClick={() => router.push("/schema")}
                         />
                     </div>

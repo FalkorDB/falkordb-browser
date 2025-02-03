@@ -35,12 +35,12 @@ export default function Settings() {
                 <h1 className="text-2xl font-medium px-6">Settings</h1>
                 <div className="w-fit bg-foreground flex gap-2 p-2 rounded-lg">
                     <Button
-                        className={cn("p-2 rounded-lg", current === "DB" && "bg-background")}
+                        className={cn("p-2 rounded-lg", current === "DB" ? "bg-background" : "text-gray-500")}
                         label="DB Configuration"
                         onClick={() => setCurrent("DB")}
                         />
                     <Button
-                        className={cn("p-2 rounded-lg", current === "Users" && "bg-background")}
+                        className={cn("p-2 rounded-lg", current === "Users" ? "bg-background" : "text-gray-500")}
                         label="Users"
                         onClick={() => setCurrent("Users")}
                     />
