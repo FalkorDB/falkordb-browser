@@ -50,6 +50,8 @@ export default function TableComponent({ headers, rows, children, setRows, optio
         setNewValue(value)
     }
 
+    console.log(rows)
+
     return (
         <div className="h-full w-full flex flex-col gap-4">
             <div className="flex gap-4">

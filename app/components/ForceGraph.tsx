@@ -6,7 +6,7 @@
 
 import { Dispatch, RefObject, SetStateAction, useEffect, useRef, useState } from "react"
 import ForceGraph2D from "react-force-graph-2d"
-import { securedFetch } from "@/lib/utils"
+import { lightenColor, securedFetch } from "@/lib/utils"
 import { useToast } from "@/components/ui/use-toast"
 import { Graph, GraphData, Link, Node } from "../api/graph/model"
 
@@ -302,8 +302,12 @@ export default function ForceGraph({
                 cooldownTime={2000}
                 linkDirectionalArrowRelPos={1}
                 linkDirectionalArrowLength={(link) => link.source.id === link.target.id ? 0 : 2}
-                linkDirectionalArrowColor={(link) => link.color}
-                linkColor={(link) => link.color}
+                linkDirectionalArrowColor={(link) => link.id === selectedElement?.id || link.id === hoverElement?.id
+                    ? link.color
+                    : lightenColor(link.color)}
+                linkColor={(link) => link.id === selectedElement?.id || link.id === hoverElement?.id
+                    ? link.color
+                    : lightenColor(link.color)}
             />
         </div>
     )

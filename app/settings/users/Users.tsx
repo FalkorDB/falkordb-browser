@@ -25,6 +25,8 @@ export default function Users() {
     const { toast } = useToast()
 
     const handleSetRole = useCallback(async (username: string, role: string, isUndo: boolean) => {
+        console.log(users);
+        
         const oldRole = users.find(user => user.username === username)!.role
 
         const result = await securedFetch(`api/user/${prepareArg(username)}/?role=${role}`, {

@@ -1,8 +1,8 @@
 /* eslint-disable no-param-reassign */
 
-import { Check, ChevronDown, ChevronUp, FileCheck2, Pencil, PlusCircle, RotateCcw, Trash2, X } from "lucide-react"
+import { Check, ChevronDown, ChevronUp, FileCheck2, PlusCircle, RotateCcw, Trash2, X } from "lucide-react"
 import { useEffect, useState } from "react"
-import { cn, rgbToHSL } from "@/lib/utils"
+import { cn } from "@/lib/utils"
 import { DEFAULT_COLORS, Graph } from "../api/graph/model"
 import Button from "../components/ui/Button"
 import DialogComponent from "../components/DialogComponent"
@@ -91,16 +91,15 @@ export default function View({ graph, setGraph, selectedValue }: {
                                                 ref={ref => ref?.focus()}
                                                 value={editable === c ? editable : newColor}
                                                 onChange={(e) => {
-                                                    const newHslColor = rgbToHSL(e.target.value);
                                                     setColorsArr(prev => {
                                                         const newArr = [...prev];
-                                                        newArr[i] = newHslColor;
+                                                        newArr[i] = e.target.value;
                                                         return newArr;
                                                     });
                                                     if (editable === c) {
-                                                        setEditable(newHslColor)
+                                                        setEditable(e.target.value)
                                                     } else {
-                                                        setNewColor(newHslColor);
+                                                        setNewColor(e.target.value);
                                                     }
                                                 }}
                                                 onKeyDown={(e) => {
@@ -113,7 +112,10 @@ export default function View({ graph, setGraph, selectedValue }: {
                                         </>
                                         : <>
                                             <div style={{ backgroundColor: c }} className="h-6 w-6 rounded-full" />
-                                            <p>{c}</p>
+                                            <Button
+                                                label={c}
+                                                onClick={() => setEditable(c)}
+                                            />
                                         </>
                                 }
                                 {
@@ -139,21 +141,14 @@ export default function View({ graph, setGraph, selectedValue }: {
                                             </Button>
                                         </div>
                                         : hover === c &&
-                                        <div className="flex gap-2">
-                                            <Button
-                                                onClick={() => {
-                                                    setColorsArr(prev => [...prev.filter(color => color !== c)]);
-                                                }}
-                                                title="Delete"
-                                            >
-                                                <Trash2 />
-                                            </Button>
-                                            <Button
-                                                onClick={() => setEditable(c)}
-                                            >
-                                                <Pencil />
-                                            </Button>
-                                        </div>
+                                        <Button
+                                            onClick={() => {
+                                                setColorsArr(prev => [...prev.filter(color => color !== c)]);
+                                            }}
+                                            title="Delete"
+                                        >
+                                            <Trash2 />
+                                        </Button>
                                 }
                             </li>
                         ))
