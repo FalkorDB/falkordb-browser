@@ -18,6 +18,7 @@ import Button from "./ui/Button";
 interface Props {
     currentQuery: string
     historyQueries: string[]
+    setHistoryQueries: (queries: string[]) => void
     setCurrentQuery: (query: string) => void
     maximize: boolean
     runQuery: (query: string) => void
@@ -199,7 +200,7 @@ const LINE_HEIGHT = 38
 
 const PLACEHOLDER = "Type your query here to start"
 
-export default function EditorComponent({ currentQuery, historyQueries, setCurrentQuery, maximize, runQuery, graph, data }: Props) {
+export default function EditorComponent({ currentQuery, historyQueries, setHistoryQueries, setCurrentQuery, maximize, runQuery, graph, data }: Props) {
 
     const [query, setQuery] = useState(currentQuery)
     const placeholderRef = useRef<HTMLDivElement>(null)
@@ -214,7 +215,7 @@ export default function EditorComponent({ currentQuery, historyQueries, setCurre
     const historyRef = useRef({
         historyQueries,
         currentQuery,
-        historyCounter: historyQueries.length
+        historyCounter: 0
     })
 
     useEffect(() => {
@@ -498,9 +499,9 @@ export default function EditorComponent({ currentQuery, historyQueries, setCurre
             contextMenuOrder: 1.5,
             run: async () => {
                 if (historyRef.current.historyQueries.length === 0) return
-                const counter = historyRef.current.historyCounter ? historyRef.current.historyCounter - 1 : historyRef.current.historyQueries.length;
-                historyRef.current.historyCounter = counter;
-                setQuery(counter ? historyRef.current.historyQueries[counter - 1] : historyRef.current.currentQuery);
+                const counter = (historyRef.current.historyCounter + 1) % (historyRef.current.historyQueries.length + 1)
+                historyRef.current.historyCounter = counter
+                setQuery(counter ? historyRef.current.historyQueries[counter - 1] : historyRef.current.currentQuery)
             },
             precondition: 'isFirstLine && !suggestWidgetVisible',
         });
@@ -512,13 +513,23 @@ export default function EditorComponent({ currentQuery, historyQueries, setCurre
             contextMenuOrder: 1.5,
             run: async () => {
                 if (historyRef.current.historyQueries.length === 0) return
-                const counter = (historyRef.current.historyCounter + 1) % (historyRef.current.historyQueries.length + 1)
-                historyRef.current.historyCounter = counter
-                setQuery(counter ? historyRef.current.historyQueries[counter - 1] : historyRef.current.currentQuery)
+                const counter = historyRef.current.historyCounter ? historyRef.current.historyCounter - 1 : historyRef.current.historyQueries.length;
+                historyRef.current.historyCounter = counter;
+                setQuery(counter ? historyRef.current.historyQueries[counter - 1] : historyRef.current.currentQuery);
             },
             precondition: 'isFirstLine && !suggestWidgetVisible',
         });
     }
+
+    const handleSetHistoryQuery = (val: string) => {
+        setQuery(val)
+        historyRef.current.historyQueries[historyRef.current.historyCounter - 1] = val
+        setHistoryQueries(historyRef.current.historyQueries)
+    }
+
+    useEffect(() => {
+        setLineNumber(query.split("\n").length)
+    }, [query])
 
     return (
         <div>
@@ -544,14 +555,7 @@ export default function EditorComponent({ currentQuery, historyQueries, setCurre
                                         lineNumbers: lineNumber > 1 ? "on" : "off",
                                     }}
                                     value={(blur ? query.replace(/\s+/g, ' ').trim() : query)}
-                                    onChange={(val) => {
-                                        if (historyRef.current.historyCounter) {
-                                            setQuery(val || "");
-                                        } else {
-                                            setCurrentQuery(val || "");
-                                        }
-                                        setLineNumber(val?.split("\n").length || 1);
-                                    }}
+                                    onChange={(val) => historyRef.current.historyCounter ? handleSetHistoryQuery(val || "") : setCurrentQuery(val || "")}
                                     theme="custom-theme"
                                     beforeMount={handleEditorWillMount}
                                     onMount={handleEditorDidMount}
