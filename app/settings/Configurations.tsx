@@ -8,6 +8,7 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { prepareArg, securedFetch } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
+import { useSession } from "next-auth/react";
 import TableComponent, { Row } from "../components/TableComponent";
 import ToastButton from "../components/ToastButton";
 
@@ -101,7 +102,8 @@ const Configs: Config[] = [
 export default function Configurations() {
     const [configs, setConfigs] = useState<Row[]>([]);
     const { toast } = useToast();
-
+    const { data: session } = useSession()
+    
     // Memoize the config update handler
     const handleSetConfig = useCallback(async (name: string, value: string, isUndo: boolean) => {
         if (!value) {
@@ -116,7 +118,7 @@ export default function Configurations() {
         const result = await securedFetch(
             `api/graph/?config=${prepareArg(name)}&value=${prepareArg(value)}`,
             { method: 'POST' },
-            toast
+            session?.user?.role, toast
         );
 
         if (!result.ok) return false;
@@ -155,7 +157,7 @@ export default function Configurations() {
                 const result = await securedFetch(
                     `api/graph/?config=${prepareArg(config.name)}`,
                     { method: 'GET' },
-                    toast
+                    session?.user?.role, toast
                 );
 
                 if (!result.ok) {

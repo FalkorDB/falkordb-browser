@@ -8,6 +8,7 @@ import { prepareArg, securedFetch } from "@/lib/utils";
 import TableComponent, { Row } from "@/app/components/TableComponent";
 import { useToast } from "@/components/ui/use-toast";
 import { ToastAction } from "@/components/ui/toast";
+import { useSession } from "next-auth/react";
 import DeleteUser from "./DeleteUser";
 import AddUser from "./AddUser";
 
@@ -23,13 +24,14 @@ export default function Users() {
     const [users, setUsers] = useState<User[]>([])
     const [rows, setRows] = useState<Row[]>([])
     const { toast } = useToast()
-
+    const { data: session } = useSession()
+    
     const handleSetRole = useCallback(async (username: string, role: string, isUndo: boolean) => {
         const oldRole = users.find(user => user.username === username)!.role
 
         const result = await securedFetch(`api/user/${prepareArg(username)}/?role=${role}`, {
             method: 'PATCH'
-        }, toast)
+        }, session?.user?.role, toast)
 
         if (result.ok) {
             setUsers(users.map(user => user.username === username ? { ...user, role } : user))
@@ -50,7 +52,7 @@ export default function Users() {
                 headers: {
                     'Content-Type': 'application/json'
                 }
-            }, toast)
+            }, session?.user?.role, toast)
 
             if (result.ok) {
                 const data = await result.json()
@@ -67,7 +69,7 @@ export default function Users() {
                 })))
             }
         })()
-    }, [handleSetRole, toast])
+    }, [toast])
 
     const handleAddUser = async ({ username, password, role }: CreateUser) => {
         if (!role) {
@@ -85,7 +87,7 @@ export default function Users() {
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({ username, password, role })
-        }, toast)
+        }, session?.user?.role, toast)
 
         if (response.ok) {
             toast({

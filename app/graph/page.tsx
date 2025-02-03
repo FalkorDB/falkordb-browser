@@ -32,19 +32,19 @@ export default function Page() {
         const q1 = "MATCH (n) RETURN COUNT(n) as nodes"
         const q2 = "MATCH ()-[e]->() RETURN COUNT(e) as edges"
 
-        const nodes = await (await securedFetch(`api/graph/${prepareArg(graphName)}/?query=${q1}&role=${session?.user.role}`, {
+        const nodes = await (await securedFetch(`api/graph/${prepareArg(graphName)}/?query=${q1}`, {
             method: "GET"
-        }, toast)).json()
+        }, session?.user?.role, toast)).json()
 
-        const edges = await (await securedFetch(`api/graph/${prepareArg(graphName)}/?query=${q2}&role=${session?.user.role}`, {
+        const edges = await (await securedFetch(`api/graph/${prepareArg(graphName)}/?query=${q2}`, {
             method: "GET"
-        }, toast)).json()
+        }, session?.user?.role, toast)).json()
 
         if (!edges || !nodes) return
 
         setEdgesCount(edges.result?.data[0].edges)
         setNodesCount(nodes.result?.data[0].nodes)
-    }, [graphName])
+    }, [graphName, session?.user?.role, toast])
 
     useEffect(() => {
         fetchCount()
@@ -68,9 +68,9 @@ export default function Page() {
             return null
         }
 
-        const result = await securedFetch(`api/graph/${prepareArg(graphName)}/?query=${prepareArg(query)}&role=${session?.user.role}`, {
+        const result = await securedFetch(`api/graph/${prepareArg(graphName)}/?query=${prepareArg(query)}`, {
             method: "GET"
-        }, toast)
+        }, session?.user?.role, toast)
 
         if (!result.ok) return null
 

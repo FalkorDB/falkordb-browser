@@ -9,8 +9,8 @@ import { useEffect, useRef, useState } from "react"
 import * as monaco from "monaco-editor";
 import { prepareArg, securedFetch } from "@/lib/utils";
 import { Maximize2 } from "lucide-react";
-import { Session } from "next-auth";
 import { useToast } from "@/components/ui/use-toast";
+import { useSession } from "next-auth/react";
 import { Graph } from "../api/graph/model";
 import Button from "./ui/Button";
 
@@ -30,7 +30,6 @@ interface Props {
     runQuery: (query: string) => void
     graph: Graph
     isCollapsed: boolean
-    data: Session | null
 }
 
 const monacoOptions: monaco.editor.IStandaloneEditorConstructionOptions = {
@@ -203,7 +202,7 @@ const getEmptySuggestions = (): Suggestions => ({
 
 const PLACEHOLDER = "Type your query here to start"
 
-export default function EditorComponent({ currentQuery, historyQueries, setCurrentQuery, maximize, runQuery, graph, isCollapsed, data }: Props) {
+export default function EditorComponent({ currentQuery, historyQueries, setCurrentQuery, maximize, runQuery, graph, isCollapsed }: Props) {
 
     const [query, setQuery] = useState(currentQuery)
     const placeholderRef = useRef<HTMLDivElement>(null)
@@ -221,7 +220,8 @@ export default function EditorComponent({ currentQuery, historyQueries, setCurre
         historyCounter: historyQueries.length
     })
     const { toast } = useToast()
-
+    const { data: session } = useSession()
+    
     useEffect(() => {
         historyRef.current.historyQueries = historyQueries
     }, [historyQueries, currentQuery])
@@ -283,9 +283,9 @@ export default function EditorComponent({ currentQuery, historyQueries, setCurre
     const addLabelsSuggestions = async (sug: monaco.languages.CompletionItem[]) => {
         const labelsQuery = `CALL db.labels()`
 
-        await securedFetch(`api/graph/${prepareArg(graph.Id)}/?query=${prepareArg(labelsQuery)}&role=${data?.user.role}`, {
+        await securedFetch(`api/graph/${prepareArg(graph.Id)}/?query=${prepareArg(labelsQuery)}`, {
             method: "GET"
-        }, toast).then((res) => res.json()).then((json) => {
+        }, session?.user?.role, toast).then((res) => res.json()).then((json) => {
             json.result.data.forEach(({ label }: { label: string }) => {
                 sug.push({
                     label,
@@ -301,9 +301,9 @@ export default function EditorComponent({ currentQuery, historyQueries, setCurre
     const addRelationshipTypesSuggestions = async (sug: monaco.languages.CompletionItem[]) => {
         const relationshipTypeQuery = `CALL db.relationshipTypes()`
 
-        await securedFetch(`api/graph/${prepareArg(graph.Id)}/?query=${prepareArg(relationshipTypeQuery)}&role=${data?.user.role}`, {
+        await securedFetch(`api/graph/${prepareArg(graph.Id)}/?query=${prepareArg(relationshipTypeQuery)}`, {
             method: "GET"
-        }, toast).then((res) => res.json()).then((json) => {
+        }, session?.user?.role, toast).then((res) => res.json()).then((json) => {
             json.result.data.forEach(({ relationshipType }: { relationshipType: string }) => {
                 sug.push({
                     label: relationshipType,
@@ -319,9 +319,9 @@ export default function EditorComponent({ currentQuery, historyQueries, setCurre
     const addPropertyKeysSuggestions = async (sug: monaco.languages.CompletionItem[]) => {
         const propertyKeysQuery = `CALL db.propertyKeys()`
 
-        await securedFetch(`api/graph/${prepareArg(graph.Id)}/?query=${prepareArg(propertyKeysQuery)}&role=${data?.user.role}`, {
+        await securedFetch(`api/graph/${prepareArg(graph.Id)}/?query=${prepareArg(propertyKeysQuery)}`, {
             method: "GET"
-        }, toast).then((res) => res.json()).then((json) => {
+        }, session?.user?.role, toast).then((res) => res.json()).then((json) => {
             json.result.data.forEach(({ propertyKey }: { propertyKey: string }) => {
                 sug.push({
                     label: propertyKey,
@@ -336,9 +336,9 @@ export default function EditorComponent({ currentQuery, historyQueries, setCurre
 
     const addFunctionsSuggestions = async (functions: monaco.languages.CompletionItem[]) => {
         const proceduresQuery = `CALL dbms.procedures() YIELD name`
-        await securedFetch(`api/graph/${prepareArg(graph.Id)}/?query=${prepareArg(proceduresQuery)}&role=${data?.user.role}`, {
+        await securedFetch(`api/graph/${prepareArg(graph.Id)}/?query=${prepareArg(proceduresQuery)}`, {
             method: "GET"
-        }, toast).then((res) => res.json()).then((json) => {
+        }, session?.user?.role, toast).then((res) => res.json()).then((json) => {
             [...json.result.data.map(({ name }: { name: string }) => name), ...FUNCTIONS].forEach((name: string) => {
                 functions.push({
                     label: name,

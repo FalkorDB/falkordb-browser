@@ -1,6 +1,7 @@
 import { FormEvent, useState } from "react";
 import { prepareArg, securedFetch } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
+import { useSession } from "next-auth/react";
 import DialogComponent from "../components/DialogComponent";
 import Button from "../components/ui/Button";
 import Input from "../components/ui/Input";
@@ -15,14 +16,15 @@ export default function Duplicate({ open, onOpenChange, selectedValue, onDuplica
 
     const [duplicateName, setDuplicateName] = useState("");
     const { toast } = useToast()
-
+    const { data: session } = useSession()
+    
     const handleDuplicate = async (e: FormEvent) => {
 
         e.preventDefault()
 
         const result = await securedFetch(`api/graph/${prepareArg(duplicateName)}/?sourceName=${prepareArg(selectedValue)}`, {
             method: "POST"
-        }, toast)
+        }, session?.user?.role, toast)
 
         if (!result.ok) return
 

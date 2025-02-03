@@ -35,7 +35,7 @@ export default function Header({ onSetGraphName }: Props) {
                         href="https://www.falkordb.com"
                         target="_blank" rel="noreferrer"
                     >
-                        <Image priority width={103} height={29} src="/Logo.svg" alt="" />
+                        <Image style={{ width: 'auto', height: '40px' }} priority width={0} height={0} src="/Logo.svg" alt="" />
                     </a>
                     <p className="text-neutral-200" >|</p>
                     <div className="flex gap-2 bg-foreground rounded-lg p-2">
@@ -113,7 +113,7 @@ export default function Header({ onSetGraphName }: Props) {
                                 <SheetDescription />
                             </VisuallyHidden>
                             <div className="h-1 grow flex flex-col gap-8 items-center justify-center">
-                                <Image priority src="/ColorLogo.svg" alt="Loading..." width={120} height={1} />
+                                <Image style={{ width: 'auto', height: '50px' }} priority src="/ColorLogo.svg" alt="" width={0} height={0} />
                                 <h1 className="text-3xl font-bold">We Make AI Reliable</h1>
                                 <p className="text-xl text-center">
                                     Delivering a scalable,

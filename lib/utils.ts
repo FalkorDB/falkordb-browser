@@ -12,11 +12,12 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 export async function securedFetch(
-  input: string | URL | globalThis.Request,
+  url: string | URL | globalThis.Request,
   init: RequestInit,
+  role?: string,
   toast?: any,
 ): Promise<Response> {
-  const response = await fetch(input, init)
+  const response = await fetch(`${url}&role=${role}`, init)
   const { status } = response
 
   if (status >= 300) {

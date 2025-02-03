@@ -121,7 +121,7 @@ export default function LoginForm() {
     <div className="relative h-full w-full flex flex-col">
       <div className="grow flex items-center justify-center">
         <div className="flex flex-col gap-8 items-center">
-          <Image priority src="/BrowserLogo.svg" alt="Loading..." width={500} height={1} />
+          <Image style={{ width: 'auto', height: '80px' }} priority src="/BrowserLogo.svg" alt="" width={0} height={0} />
           <FormComponent
             fields={fields}
             handleSubmit={onSubmit}

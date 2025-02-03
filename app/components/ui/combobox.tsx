@@ -10,6 +10,7 @@ import { useEffect, useState } from "react"
 import { Select, SelectContent, SelectGroup, SelectItem, SelectSeparator, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useToast } from "@/components/ui/use-toast"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
+import { useSession } from "next-auth/react"
 import Button from "./Button"
 import TableComponent, { Row } from "../TableComponent"
 import CloseDialog from "../CloseDialog"
@@ -37,7 +38,7 @@ export default function Combobox({ isSelectGraph = false, disabled = false, inTa
   const [rows, setRows] = useState<Row[]>([])
   const [openDelete, setOpenDelete] = useState<boolean>(false)
   const { toast } = useToast()
-
+  const { data: session } = useSession()
 
   const handleSetOption = async (option: string, optionName: string) => {
     const result = await securedFetch(`api/graph/${prepareArg(option)}/?sourceName=${prepareArg(optionName)}`, {
@@ -46,7 +47,7 @@ export default function Combobox({ isSelectGraph = false, disabled = false, inTa
         "Content-Type": "application/json"
       },
       body: JSON.stringify({ name: optionName })
-    }, toast)
+    }, session?.user?.role, toast)
 
     if (result.ok) {
 
@@ -71,7 +72,7 @@ export default function Combobox({ isSelectGraph = false, disabled = false, inTa
     if (options.length !== 1 || !setSelectedValue) return
 
     setSelectedValue(options[0])
-  }, [options])
+  }, [options, setSelectedValue])
 
   const handleDelete = async (opts: string[]) => {
     const names = opts.map(opt => isSchema ? `${opt}_schema` : opt)
@@ -79,7 +80,7 @@ export default function Combobox({ isSelectGraph = false, disabled = false, inTa
     const newNames = await Promise.all(names.map(async (name) => {
       const result = await securedFetch(`api/graph/${prepareArg(name)}`, {
         method: "DELETE"
-      }, toast)
+      }, session?.user?.role, toast)
 
       if (!result.ok) return name
 

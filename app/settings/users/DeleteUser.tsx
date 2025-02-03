@@ -5,6 +5,7 @@ import { Dispatch, SetStateAction } from "react";
 import Button from "@/app/components/ui/Button";
 import { securedFetch } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
+import { useSession } from "next-auth/react";
 
 interface DeleteUserProps {
     users: User[]
@@ -12,7 +13,7 @@ interface DeleteUserProps {
 }
 
 export default function DeleteUser({ users, setUsers }: DeleteUserProps) {
-    
+    const { data: session } = useSession()
     const { toast } = useToast()
     
     const deleteSelected = async () => {
@@ -24,7 +25,7 @@ export default function DeleteUser({ users, setUsers }: DeleteUserProps) {
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({ users })
-        }, toast)
+        }, session?.user?.role, toast)
 
         if (response.ok) {
             toast({

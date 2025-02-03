@@ -60,7 +60,7 @@ export default function SchemaView({ schema, fetchCount, session }: Props) {
 
     useEffect(() => {
         setData({ ...schema.Elements })
-    }, [schema.Id])
+    }, [schema.Elements, schema.Id])
 
     useEffect(() => {
         dataPanel.current?.collapse()
@@ -146,7 +146,7 @@ export default function SchemaView({ schema, fetchCount, session }: Props) {
         const q = `${conditionsNodes.length > 0 ? `MATCH (n) WHERE ${conditionsNodes.join(" OR ")} DELETE n` : ""}${conditionsEdges.length > 0 && conditionsNodes.length > 0 ? " WITH * " : ""}${conditionsEdges.length > 0 ? `MATCH ()-[e]-() WHERE ${conditionsEdges.join(" OR ")} DELETE e` : ""}`
         const result = await securedFetch(`api/graph/${prepareArg(schema.Id)}_schema/?query=${prepareArg(q)} `, {
             method: "GET"
-        }, toast)
+        }, session?.user?.role, toast)
 
         if (!result.ok) return
 
@@ -183,7 +183,7 @@ export default function SchemaView({ schema, fetchCount, session }: Props) {
         const q = `MATCH ${type ? "(e)" : "()-[e]-()"} WHERE ID(e) = ${id} SET e.${key} = "${value.join(",")}"`
         const { ok } = await securedFetch(`api/graph/${prepareArg(schema.Id)}_schema/?query=${prepareArg(q)}`, {
             method: "GET"
-        }, toast)
+        }, session?.user?.role, toast)
 
         if (ok) {
             if (type) {
@@ -257,7 +257,7 @@ export default function SchemaView({ schema, fetchCount, session }: Props) {
         const q = `MATCH ${type ? "(e)" : "()-[e]-()"} WHERE ID(e) = ${id} SET e.${key} = NULL`
         const { ok } = await securedFetch(`api/graph/${prepareArg(schema.Id)}_schema/?query=${prepareArg(q)}`, {
             method: "GET"
-        }, toast)
+        }, session?.user?.role, toast)
 
         if (ok) {
             if (type) {
@@ -296,7 +296,7 @@ export default function SchemaView({ schema, fetchCount, session }: Props) {
 
         const result = await securedFetch(`api/graph/${prepareArg(schema.Id)}_schema/?query=${getCreateQuery(isAddEntity, selectedNodes as [Node, Node], attributes, label)}`, {
             method: "GET"
-        }, toast)
+        }, session?.user?.role, toast)
 
         if (result.ok) {
             const json = await result.json()

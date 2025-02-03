@@ -161,7 +161,7 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
 
         const result = await securedFetch(`api/graph/${prepareArg(graph.Id)}/?query=${prepareArg(q)} `, {
             method: "GET"
-        }, toast)
+        }, session?.user?.role, toast)
 
         if (!result.ok) return
 
@@ -226,7 +226,6 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
                     historyQueries={historyQueries}
                     runQuery={handleRunQuery}
                     setCurrentQuery={setQuery}
-                    data={session}
                 />
                 <Tabs value={tabsValue} className="h-1 grow flex gap-2 items-center">
                     <TabsList className="h-fit bg-foreground p-2 flex flex-col gap-2">
@@ -356,7 +355,6 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
                         onExpand={onExpand}
                         graph={graph}
                         onDeleteElement={handleDeleteElement}
-                        data={session}
                     />
                 }
             </ResizablePanel>

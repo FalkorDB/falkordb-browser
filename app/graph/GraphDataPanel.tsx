@@ -7,9 +7,9 @@
 import { prepareArg, securedFetch } from "@/lib/utils";
 import { Dispatch, SetStateAction, useEffect, useState } from "react";
 import { Check, ChevronRight, Pencil, Plus, Trash2, X } from "lucide-react";
-import { Session } from "next-auth";
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from "@/components/ui/use-toast";
+import { useSession } from "next-auth/react";
 import Button from "../components/ui/Button";
 import { Graph, Link, Node } from "../api/graph/model";
 import Input from "../components/ui/Input";
@@ -24,10 +24,9 @@ interface Props {
     onExpand: () => void;
     graph: Graph;
     onDeleteElement: () => Promise<void>;
-    data: Session | null;
 }
 
-export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement, graph, data }: Props) {
+export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement, graph }: Props) {
 
     const [attributes, setAttributes] = useState<string[]>([]);
     const [editable, setEditable] = useState<string>("");
@@ -39,7 +38,8 @@ export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement,
     const [label, setLabel] = useState([""]);
     const type = !("source" in obj)
     const { toast } = useToast()
-
+    const { data: session } = useSession()
+    
     const handleSetEditable = (key: string, val: string) => {
         if (key !== "") {
             setIsAddValue(false)
@@ -67,7 +67,7 @@ export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement,
         const q = `MATCH ${type ? "(e)" : "()-[e]-()"} WHERE id(e) = ${id} SET e.${key} = '${val}'`
         const success = (await securedFetch(`api/graph/${prepareArg(graph.Id)}/?query=${prepareArg(q)}`, {
             method: "GET"
-        }, toast)).ok
+        }, session?.user?.role, toast)).ok
 
         if (success) {
             graph.getElements().forEach(e => {
@@ -138,7 +138,7 @@ export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement,
         const q = `MATCH ${type ? "(e)" : "()-[e]-()"} WHERE id(e) = ${id} SET e.${key} = NULL`
         const success = (await securedFetch(`api/graph/${prepareArg(graph.Id)}/?query=${prepareArg(q)}`, {
             method: "GET"
-        }, toast)).ok
+        }, session?.user?.role, toast)).ok
 
         if (success) {
             const value = obj.data[key]
@@ -238,7 +238,7 @@ export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement,
                                 <TableCell>
                                     <div className="h-10 w-6 flex flex-col items-center gap-2 justify-center">
                                         {
-                                            editable === key && data?.user.role !== "Read-Only" ?
+                                            editable === key && session?.user?.role !== "Read-Only" ?
                                                 <>
                                                     <Button variant="button" onClick={(e) => {
                                                         e.stopPropagation()
@@ -289,7 +289,7 @@ export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement,
                                 <TableCell>{key}:</TableCell>
                                 <TableCell>
                                     {
-                                        editable === key && data?.user.role !== "Read-Only" ?
+                                        editable === key && session?.user?.role !== "Read-Only" ?
                                             <Input
                                                 className="w-full"
                                                 value={newVal}
@@ -307,7 +307,7 @@ export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement,
                         ))
                     }
                     {
-                        isAddValue && data?.user.role !== "Read-Only" &&
+                        isAddValue && session?.user?.role !== "Read-Only" &&
                         <TableRow>
                             <TableCell className="flex flex-col items-center gap-2">
                                 <Button
@@ -358,7 +358,7 @@ export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement,
                     onDeleteElement={onDeleteElement}
                     trigger={
                         <Button
-                            disabled={data?.user.role === "Read-Only"}
+                            disabled={session?.user?.role === "Read-Only"}
                             variant="Primary"
                             label={`Delete ${type ? "Node" : "Relation"}`}
                         >
