@@ -24,13 +24,14 @@ import TableView from "./TableView";
 const ForceGraph = dynamic(() => import("../components/ForceGraph"), { ssr: false });
 const EditorComponent = dynamic(() => import("../components/EditorComponent"), { ssr: false })
 
-function GraphView({ graph, selectedElement, setSelectedElement, runQuery, historyQuery, historyQueries, fetchCount, session }: {
+function GraphView({ graph, selectedElement, setSelectedElement, runQuery, historyQuery, historyQueries, setHistoryQueries, fetchCount, session }: {
     graph: Graph
     selectedElement: Node | Link | undefined
     setSelectedElement: Dispatch<SetStateAction<Node | Link | undefined>>
     runQuery: (query: string) => Promise<void>
     historyQuery: string
     historyQueries: string[]
+    setHistoryQueries: (queries: string[]) => void
     fetchCount: () => void
     session: Session | null
 }) {
@@ -224,6 +225,7 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
                     maximize={maximize}
                     currentQuery={query}
                     historyQueries={historyQueries}
+                    setHistoryQueries={setHistoryQueries}
                     runQuery={handleRunQuery}
                     setCurrentQuery={setQuery}
                     data={session}

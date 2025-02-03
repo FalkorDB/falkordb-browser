@@ -32,12 +32,12 @@
 
     @font-face {
         font-family: 'FiraCode';
-        src: url('/public/fonts/fira_code.ttf') format('truetype');
-        font-display: block;
+        src: url('/fonts/fira_code.ttf') format('truetype');
+        font-display: swap;
     }
 
     .tabs-trigger {
-        @apply !p-2 rounded-lg data-[state=active]:bg-foreground data-[state=active]:!text-white !text-white;
+        @apply !p-2 rounded-lg data-[state=active]:bg-foreground data-[state=active]:!text-white text-gray-500;
     }
 
     .hide-scrollbar {
@@ -67,23 +67,8 @@
     }
 }
 
-input[type="number"]::-webkit-outer-spin-button,
-input[type="number"]::-webkit-inner-spin-button {
-    -webkit-appearance: none;
-    margin: 0;
-}
-
-input[type="number"] {
-    -moz-appearance: textfield;
-
-}
-
-.monaco-editor .suggest-widget {
-    margin-top: 0.5rem;
-}
-
 * {
-    font-family: font-FiraCode, 'monospace';
+    font-family: 'FiraCode', 'Arial', monospace !important;
 }
 
 ::-webkit-scrollbar {
