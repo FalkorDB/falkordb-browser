@@ -33,7 +33,7 @@ export default function Tutorial({ onSetGraphName }: Props) {
             <DrawerContent className="flex flex-col">
                 <VisuallyHidden>
                     <DrawerHeader>
-                        <DrawerTitle />
+                        <DrawerTitle/>
                     </DrawerHeader>
                 </VisuallyHidden>
                 <div className="flex justify-center items-center p-8">
@@ -42,10 +42,8 @@ export default function Tutorial({ onSetGraphName }: Props) {
                             <CarouselItem className="border text-center p-40">
                                 <p>Our Browser allows you to visualize, manipulate and explore your data.</p>
                             </CarouselItem>
-                            <CarouselItem className="border text-center p-32">
-                                <p>Interact with your data with a force-directed layout,
-                                    with features including zoom, pan,
-                                    node-drag and interactive node/link hover and click events</p>
+                            <CarouselItem className="border text-center p-40">
+                                <p>Easily interact with your data in our adaptive force canvas</p>
                             </CarouselItem>
                             <CarouselItem className="border text-center p-40">
                                 <p>Configure or export your graph with ease from the control center</p>
