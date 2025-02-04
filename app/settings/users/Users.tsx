@@ -2,7 +2,7 @@
 
 "use client";
 
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { CreateUser, User } from "@/app/api/user/model";
 import { prepareArg, securedFetch } from "@/lib/utils";
 import TableComponent, { Row } from "@/app/components/TableComponent";
@@ -25,25 +25,23 @@ export default function Users() {
     const [rows, setRows] = useState<Row[]>([])
     const { toast } = useToast()
     const { data: session } = useSession()
-    
-    const handleSetRole = useCallback(async (username: string, role: string, isUndo: boolean) => {
-        const oldRole = users.find(user => user.username === username)!.role
 
+    const handleSetRole = async (username: string, role: string, oldRole?: string) => {
         const result = await securedFetch(`api/user/${prepareArg(username)}/?role=${role}`, {
             method: 'PATCH'
         }, session?.user?.role, toast)
 
         if (result.ok) {
-            setUsers(users.map(user => user.username === username ? { ...user, role } : user))
-            setRows(rows.map(row => row.cells[0].value === username ? { ...row, cells: [{ ...row.cells[0], value: role }] } : row))
+            setUsers(prev => prev.map(user => user.username === username ? { ...user, role } : user))
+            setRows(prev => prev.map(row => row.cells[0].value === username ? { ...row, cells: [row.cells[0], { ...row.cells[1], value: role }] } : row))
 
             toast({
                 title: "Success",
                 description: `${username} role updated successfully`,
-                action: isUndo ? <ToastAction altText="Undo" onClick={() => handleSetRole(username, oldRole, false)}>Undo</ToastAction> : undefined
+                action: oldRole ? <ToastAction altText="Undo" onClick={() => handleSetRole(username, oldRole)}>Undo</ToastAction> : undefined
             })
         }
-    }, [users, toast, rows])
+    }
 
     useEffect(() => {
         (async () => {
@@ -57,12 +55,12 @@ export default function Users() {
             if (result.ok) {
                 const data = await result.json()
                 setUsers(data.result.map((user: User) => ({ ...user, selected: false })))
-                setRows(data.result.map((user: User) => ({
+                setRows(data.result.map(({ username, role }: User) => ({
                     cells: [{
-                        value: user.username,
+                        value: username,
                     }, {
-                        value: user.role,
-                        onChange: user.username === "default" ? undefined : (value: string) => handleSetRole(user.username, value, true),
+                        value: role,
+                        onChange: username === "default" ? undefined : (value: string) => handleSetRole(username, value, role),
                         type: "combobox"
                     }],
                     checked: false,
@@ -72,15 +70,6 @@ export default function Users() {
     }, [toast])
 
     const handleAddUser = async ({ username, password, role }: CreateUser) => {
-        if (!role) {
-            toast({
-                title: "Error",
-                description: "Select role is required",
-                variant: "destructive"
-            })
-            return
-        }
-
         const response = await securedFetch('/api/user/', {
             method: 'POST',
             headers: {
@@ -95,6 +84,16 @@ export default function Users() {
                 description: "User added successfully",
             })
             setUsers(prev => [...prev, { username, role, selected: false }])
+            setRows(prev => [...prev, {
+                cells: [{
+                    value: username,
+                }, {
+                    value: role,
+                    onChange: (value: string) => handleSetRole(username, value, role),
+                    type: "combobox"
+                }],
+                checked: false,
+            }] as Row[])
         }
     }
 
@@ -108,7 +107,7 @@ export default function Users() {
             >
                 <div className="flex flex-row-reverse gap-4">
                     <AddUser onAddUser={handleAddUser} />
-                    <DeleteUser users={rows.filter(row => row.checked).map(row => users.find(user => user.username === row.cells[0].value)!)} setUsers={setUsers} />
+                    <DeleteUser users={rows.filter(row => row.checked).map(row => users.find(user => user.username === row.cells[0].value)!)} setUsers={setUsers} setRows={setRows} />
                 </div>
             </TableComponent>
         </div >
