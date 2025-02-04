@@ -74,9 +74,10 @@ export default function Selector({ onChange, graphName, setGraphName, queries, r
     }
 
     const handleOnChange = async (name: string) => {
+        const formattedName = name === '""' ? "" : name
         if (runQuery) {
             const q = 'MATCH (n)-[e]-(m) return n,e,m'
-            const result = await securedFetch(`api/graph/${prepareArg(name)}_schema/?query=${prepareArg(q)}&create=false&role=${session?.user.role}`, {
+            const result = await securedFetch(`api/graph/${prepareArg(formattedName)}_schema/?query=${prepareArg(q)}&create=false&role=${session?.user.role}`, {
                 method: "GET"
             }, toast)
 
@@ -87,7 +88,7 @@ export default function Selector({ onChange, graphName, setGraphName, queries, r
                 setSchema(Graph.create(name, json.result))
             }
         }
-        onChange(name)
+        onChange(formattedName)
         setSelectedValue(name)
     }
 
