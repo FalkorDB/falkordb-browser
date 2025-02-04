@@ -51,6 +51,7 @@ const Button = forwardRef<HTMLButtonElement, Props>(({ label, variant = "button"
                     ref={ref}
                     className={getClassName(variant, disabled, open, className)}
                     disabled={disabled}
+                    aria-label={title}
                     type={type}
                     {...props}
                 >
