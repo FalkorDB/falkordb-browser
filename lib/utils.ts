@@ -20,21 +20,18 @@ export async function securedFetch(
   
   const response = await fetch(`${url}${url.includes("?") ? "&" : "?"}role=${role}`, init)
   const { status } = response
-
   if (status >= 300) {
-    response.json().then((err) => {
-      if (toast) {
-        toast({
-          title: "Error",
-          description: err.message,
-          variant: "destructive"
-        })
-      }
-    }).then(() => {
-      if (status === 401 || status >= 500) {
-        signOut({ callbackUrl: '/login' })
-      }
-    })
+    const err = await response.text()
+    if (toast) {
+      toast({
+        title: "Error",
+        description: err,
+        variant: "destructive"
+      })
+    }
+    if (status === 401 || status >= 500) {
+      signOut({ callbackUrl: '/login' })
+    }
   }
   return response
 }
