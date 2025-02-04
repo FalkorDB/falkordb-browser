@@ -23,6 +23,10 @@ export default class SettingsUsersPage extends BasePage {
     private get userSelectRoleEditBtn(): (selectedUser: string) => Locator {
         return (selectedUser: string) => this.page.locator(`//tbody/tr[@data-id='${selectedUser}']/td[3]/div/div/button`)
     }
+
+    private get userRow(): (selectedUser: string) => Locator {
+        return (selectedUser: string) => this.page.locator(`//tbody/tr[@data-id='${selectedUser}']`)
+    }
     
     private get userSelectRoleBtn(): (selectedUser: string) => Locator {
         return (selectedUser: string) => this.page.locator(`//tbody/tr[@data-id='${selectedUser}']/td[3]/button`)
@@ -97,6 +101,7 @@ export default class SettingsUsersPage extends BasePage {
 
     async modifyUserRole(selectedUser: string, role: string): Promise<void> {
         await this.page.waitForLoadState('networkidle');
+        await this.userRow(selectedUser).hover();
         await this.userSelectRoleEditBtn(selectedUser).click();
         await this.userSelectRoleBtn(selectedUser).click();
         await this.selectUserRole(role).click();

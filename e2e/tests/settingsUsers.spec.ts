@@ -65,8 +65,6 @@ test.describe('Settings Tests', () => {
         const username2 = `user_${Date.now()}`
         await settingsUsersPage.addUser({ userName: username2, role: user.ReadWrite, password: user.password, confirmPassword: user.confirmPassword });
 
-        console.log(username1, username2);
-        
         // modify users roles
         const userRole = user.ReadOnly;
         await settingsUsersPage.modifyUserRole(username1, userRole)
