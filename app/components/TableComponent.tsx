@@ -22,6 +22,7 @@ type Cell = {
     value: DataCell,
     onChange?: (value: string) => Promise<boolean>,
     type?: string
+    comboboxType?: string
 }
 
 export interface Row {
@@ -164,6 +165,7 @@ export default function TableComponent({ headers, rows, children, setRows, optio
                                                                         cell.onChange!(value)
                                                                         handleSetEditable("", "")
                                                                     }}
+                                                                    type={cell.comboboxType}
                                                                 />
                                                                 : <div className="w-full flex gap-2 items-center">
                                                                     <Input

@@ -61,7 +61,8 @@ export default function Users() {
                     }, {
                         value: role,
                         onChange: username === "default" ? undefined : (value: string) => handleSetRole(username, value, role),
-                        type: "combobox"
+                        type: "combobox",
+                        comboboxType: "Role",
                     }],
                     checked: false,
                 })))
@@ -90,7 +91,8 @@ export default function Users() {
                 }, {
                     value: role,
                     onChange: (value: string) => handleSetRole(username, value, role),
-                    type: "combobox"
+                    type: "combobox",
+                    comboboxType: "Role"
                 }],
                 checked: false,
             }] as Row[])
