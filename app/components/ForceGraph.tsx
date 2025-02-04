@@ -85,7 +85,7 @@ export default function ForceGraph({
         if (result.ok) {
             const json = await result.json()
             const elements = graph.extend(json.result, true)
-            if (elements.length > 0) {
+            if (elements.length === 0) {
                 toast({
                     title: `No neighbors found`,
                     description: `No neighbors found`,

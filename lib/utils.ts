@@ -18,7 +18,7 @@ export async function securedFetch(
   toast?: any,
 ): Promise<Response> {
   
-  const response = await fetch(`${url}${url.includes("?") ? "&" : "?"}role=${role}`, init)
+  const response = await fetch(`${url}${role && (url.includes("?") ? "&" : "?")}role=${role}`, init)
   const { status } = response
   if (status >= 300) {
     const err = await response.text()
