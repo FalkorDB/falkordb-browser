@@ -56,7 +56,7 @@ test.describe('Settings Tests', () => {
 
     })
 
-    test("@admin Add two users -> change their roles via checkbox -> Validate that the users roles have been changed", async () => {
+    test("@admin Add two users -> change their roles -> Validate that the users roles have been changed", async () => {
         // Adding two user
         const settingsUsersPage = await browser.createNewPage(SettingsUsersPage, urls.settingsUrl)
         await settingsUsersPage.navigateToUserTab();
@@ -67,7 +67,8 @@ test.describe('Settings Tests', () => {
 
         // modify users roles
         const userRole = user.ReadOnly;
-        await settingsUsersPage.modifyTwoUsersRoles(username1, username2, userRole)
+        await settingsUsersPage.modifyUserRole(username1, userRole)
+        await settingsUsersPage.modifyUserRole(username2, userRole)
         await settingsUsersPage.refreshPage()
         await settingsUsersPage.navigateToUserTab()
         const userName1Role = await settingsUsersPage.getUserRole(username1)

@@ -31,24 +31,13 @@
 @layer components {
 
     @font-face {
-        font-family: 'Fira Code';
+        font-family: 'FiraCode';
         src: url('/fonts/fira_code.ttf') format('truetype');
-        font-display: swap;
-    }
-    
-    @font-face {
-        font-family: 'Oswald';
-        src: url('/fonts/oswald.ttf') format('truetype');
         font-display: swap;
     }
 
     .tabs-trigger {
-        @apply !p-2 rounded-lg data-[state=active]:bg-foreground data-[state=active]:!text-white !text-white;
-    }
-
-    .hide-scrollbar {
-        scrollbar-width: none;
-        -ms-overflow-style: none;
+        @apply !p-2 rounded-lg data-[state=active]:bg-foreground data-[state=active]:!text-white text-gray-500;
     }
 
     .hide-scrollbar {
@@ -76,39 +65,11 @@
         align-items: center;
         justify-content: center;
     }
-
-    .Secondary {
-        border-image: linear-gradient(90deg, #EC806C 0%, #B66EBD 43.41%, #7568F2 100%) 1;
-    }
-            
-    .monaco-placeholder {
-        @apply text-[#666] absolute select-none top-2 left-2;
-    }
-}
-
-input[type="number"]::-webkit-outer-spin-button,
-input[type="number"]::-webkit-inner-spin-button {
-    -webkit-appearance: none;
-    margin: 0;
-}
-
-input[type="number"] {
-    -moz-appearance: textfield;
-
-}
-
-.monaco-editor .suggest-widget {
-    margin-top: 0.5rem;
 }
 
 * {
-    font-family: font-FiraCode, 'monospace';
+    font-family: 'FiraCode', 'Arial', monospace !important;
 }
-
-.Title {
-    font-family: font-Oswald, 'monospace';
-}
-
 
 ::-webkit-scrollbar {
     width: 20px;

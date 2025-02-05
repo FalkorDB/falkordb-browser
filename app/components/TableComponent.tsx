@@ -1,3 +1,4 @@
+/* eslint-disable import/no-cycle */
 /* eslint-disable react/no-array-index-key */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable no-nested-ternary */
@@ -11,13 +12,17 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { cn } from "@/lib/utils";
 import { useState } from "react";
 import { CheckCircle, Pencil, XCircle } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import Button from "./ui/Button";
 import Input from "./ui/Input";
 import { DataCell } from "../api/graph/model";
+import Combobox from "./ui/combobox";
 
 type Cell = {
     value: DataCell,
-    onChange?: (value: string) => Promise<boolean>
+    onChange?: (value: string) => Promise<boolean>,
+    type?: string
+    comboboxType?: string
 }
 
 export interface Row {
@@ -29,10 +34,11 @@ interface Props {
     headers: string[],
     rows: Row[],
     children?: React.ReactNode,
-    setRows?: (rows: Row[]) => void
+    setRows?: (rows: Row[]) => void,
+    options?: string[]
 }
 
-export default function TableComponent({ headers, rows, children, setRows }: Props) {
+export default function TableComponent({ headers, rows, children, setRows, options }: Props) {
 
     const [search, setSearch] = useState<string>("")
     const [isSearchable, setIsSearchable] = useState<boolean>(false)
@@ -152,50 +158,66 @@ export default function TableComponent({ headers, rows, children, setRows }: Pro
                                                         />
                                                         : cell.value &&
                                                             editable === `${i}-${j}` ?
-                                                            <div className="w-full flex gap-2 items-center">
-                                                                <Input
-                                                                    ref={ref => ref?.focus()}
-                                                                    variant="primary"
-                                                                    className="grow"
-                                                                    value={newValue}
-                                                                    onChange={(e) => setNewValue(e.target.value)}
-                                                                    onKeyDown={async (e) => {
-                                                                        if (e.key === "Escape") {
-                                                                            e.preventDefault()
-                                                                            handleSetEditable("", "")
-                                                                        }
-
-                                                                        if (e.key !== "Enter") return
-
-                                                                        e.preventDefault()
-                                                                        const result = await cell.onChange!(newValue)
-                                                                        if (result) {
-                                                                            handleSetEditable("", "")
-                                                                        }
+                                                            cell.type === "combobox" ?
+                                                                <Combobox
+                                                                    options={options!}
+                                                                    setSelectedValue={(value) => {
+                                                                        cell.onChange!(value)
+                                                                        handleSetEditable("", "")
                                                                     }}
+                                                                    type={cell.comboboxType}
                                                                 />
-                                                                <div className="flex flex-col gap-1">
-                                                                    <Button
-                                                                        title="Save"
-                                                                        onClick={() => {
-                                                                            cell.onChange!(newValue)
-                                                                            handleSetEditable("", "")
+                                                                : <div className="w-full flex gap-2 items-center">
+                                                                    <Input
+                                                                        ref={ref => ref?.focus()}
+                                                                        variant="primary"
+                                                                        className="grow"
+                                                                        value={newValue}
+                                                                        onChange={(e) => setNewValue(e.target.value)}
+                                                                        onKeyDown={async (e) => {
+                                                                            if (e.key === "Escape") {
+                                                                                e.preventDefault()
+                                                                                handleSetEditable("", "")
+                                                                            }
+
+                                                                            if (e.key !== "Enter") return
+
+                                                                            e.preventDefault()
+                                                                            const result = await cell.onChange!(newValue)
+                                                                            if (result) {
+                                                                                handleSetEditable("", "")
+                                                                            }
                                                                         }}
-                                                                    >
-                                                                        <CheckCircle className="w-4 h-4" />
-                                                                    </Button>
-                                                                    <Button
-                                                                        title="Cancel"
-                                                                        onClick={() => {
-                                                                            handleSetEditable("", "")
-                                                                        }}
-                                                                    >
-                                                                        <XCircle className="w-4 h-4" />
-                                                                    </Button>
+                                                                    />
+                                                                    <div className="flex flex-col gap-1">
+                                                                        <Button
+                                                                            title="Save"
+                                                                            onClick={() => {
+                                                                                cell.onChange!(newValue)
+                                                                                handleSetEditable("", "")
+                                                                            }}
+                                                                        >
+                                                                            <CheckCircle className="w-4 h-4" />
+                                                                        </Button>
+                                                                        <Button
+                                                                            title="Cancel"
+                                                                            onClick={() => {
+                                                                                handleSetEditable("", "")
+                                                                            }}
+                                                                        >
+                                                                            <XCircle className="w-4 h-4" />
+                                                                        </Button>
+                                                                    </div>
                                                                 </div>
-                                                            </div>
                                                             : <div className="flex items-center gap-2">
-                                                                <p title={cell.value.toString()}>{cell.value}</p>
+                                                                <Tooltip>
+                                                                    <TooltipTrigger asChild>
+                                                                        <p>{cell.value}</p>
+                                                                    </TooltipTrigger>
+                                                                    <TooltipContent>
+                                                                        {cell.value}
+                                                                    </TooltipContent>
+                                                                </Tooltip>
                                                                 <div>
                                                                     {
                                                                         cell.onChange && hover === `${i}` &&

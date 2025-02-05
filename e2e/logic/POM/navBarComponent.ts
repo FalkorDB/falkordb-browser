@@ -11,7 +11,7 @@ export default class NavBarComponent extends BasePage {
     }
 
     private get graphsButton(): Locator {
-        return this.page.getByRole("button", { name: "Graphs" });
+        return this.page.locator("//button[contains(text(), 'Graphs')]");
     }
 
     private get schemaButton(): Locator {

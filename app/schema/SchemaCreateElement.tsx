@@ -194,7 +194,7 @@ export default function SchemaCreateElement({ onCreate, onExpand, selectedNodes,
               />
           }
         </div>
-        <p className="font-medium text-xl"><span className="text-primary">{attributes.length}</span> Attributes</p>
+        <p className="font-medium text-xl">{attributes.length}&ensp;Attributes</p>
       </div>
       <div className="w-full h-1 grow flex flex-col justify-between items-start font-medium">
         <Table>

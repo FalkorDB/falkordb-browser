@@ -8,9 +8,9 @@ import { Editor, Monaco } from "@monaco-editor/react"
 import { useEffect, useRef, useState } from "react"
 import * as monaco from "monaco-editor";
 import { Maximize2 } from "lucide-react";
-import { prepareArg, securedFetch } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
-import { Session } from "next-auth";
+import { useSession } from "next-auth/react";
+import { prepareArg, securedFetch } from "@/lib/utils";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import { Graph } from "../api/graph/model";
 import Button from "./ui/Button";
@@ -23,7 +23,6 @@ interface Props {
     maximize: boolean
     runQuery: (query: string) => void
     graph: Graph
-    data: Session | null
 }
 
 const monacoOptions: monaco.editor.IStandaloneEditorConstructionOptions = {
@@ -200,7 +199,7 @@ const LINE_HEIGHT = 38
 
 const PLACEHOLDER = "Type your query here to start"
 
-export default function EditorComponent({ currentQuery, historyQueries, setHistoryQueries, setCurrentQuery, maximize, runQuery, graph, data }: Props) {
+export default function EditorComponent({ currentQuery, historyQueries, setHistoryQueries, setCurrentQuery, maximize, runQuery, graph }: Props) {
 
     const [query, setQuery] = useState(currentQuery)
     const placeholderRef = useRef<HTMLDivElement>(null)
@@ -217,6 +216,8 @@ export default function EditorComponent({ currentQuery, historyQueries, setHisto
         currentQuery,
         historyCounter: 0
     })
+    const { data: session } = useSession()
+    
 
     useEffect(() => {
         graphIdRef.current = graph.Id
@@ -279,9 +280,9 @@ export default function EditorComponent({ currentQuery, historyQueries, setHisto
     }
 
     const fetchSuggestions = async (q: string, detail: string): Promise<monaco.languages.CompletionItem[]> => {
-        const result = await securedFetch(`api/graph/${graphIdRef.current}/?query=${prepareArg(q)}&role=${data?.user.role}`, {
+        const result = await securedFetch(`api/graph/${graphIdRef.current}/?query=${prepareArg(q)}`, {
             method: 'GET',
-        }, toast)
+        }, session?.user.role, toast)
 
         if (!result) return []
 

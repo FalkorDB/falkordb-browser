@@ -3,9 +3,11 @@
 "use client"
 
 import { useState } from "react"
-import { AlertCircle, PlusCircle } from "lucide-react"
+import { InfoIcon, PlusCircle } from "lucide-react"
 import { prepareArg, securedFetch } from "@/lib/utils"
 import { useToast } from "@/components/ui/use-toast"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
+import { useSession } from "next-auth/react"
 import DialogComponent from "./DialogComponent"
 import Button from "./ui/Button"
 import CloseDialog from "./CloseDialog"
@@ -23,7 +25,7 @@ export default function CreateGraph({
     trigger = (
         <Button
             variant="Primary"
-            label="Create New Graph"
+            label={`Create New ${type}`}
         >
             <PlusCircle />
         </Button>
@@ -33,7 +35,8 @@ export default function CreateGraph({
     const [graphName, setGraphName] = useState("")
     const [open, setOpen] = useState(false)
     const { toast } = useToast()
-
+    const { data: session } = useSession()
+    
     const handleCreateGraph = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault()
         const name = graphName.trim()
@@ -48,13 +51,17 @@ export default function CreateGraph({
         const q = 'RETURN 1'
         const result = await securedFetch(`api/graph/${prepareArg(name)}/?query=${prepareArg(q)}`, {
             method: "GET",
-        }, toast)
+        }, session?.user?.role, toast)
 
         if (!result.ok) return
 
         onSetGraphName(name)
         setGraphName("")
         setOpen(false)
+        toast({
+            title: "Graph created successfully",
+            description: "The graph has been created successfully",
+        })
     }
 
     return (
@@ -69,14 +76,15 @@ export default function CreateGraph({
                 handleCreateGraph(e)
             }}>
                 <div className="flex gap-2 items-center">
-                    <Button
-                        className="text-nowrap"
-                        type="button"
-                        title={`${type} names can be edited later`}
-                    >
-                        <AlertCircle size={20} />
-                    </Button>
-                    <p className="font-normal text-2xl">Name your graph:</p>
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <InfoIcon size={20} />
+                        </TooltipTrigger>
+                        <TooltipContent>
+                            {`${type} names can be edited later`}
+                        </TooltipContent>
+                    </Tooltip>
+                    <p className="font-normal text-2xl">Name your {type}:</p>
                     <Input
                         variant="primary"
                         ref={ref => ref?.focus()}

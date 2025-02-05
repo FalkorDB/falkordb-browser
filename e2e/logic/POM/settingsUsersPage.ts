@@ -20,8 +20,16 @@ export default class SettingsUsersPage extends BasePage {
         return this.page.locator("//div[@role='dialog']//button[span[text()='Select Role']]")
     }
 
-    private get selectRoleBtn(): Locator {
-        return this.page.locator("//button[span[text()='Select Role']]")
+    private get userSelectRoleEditBtn(): (selectedUser: string) => Locator {
+        return (selectedUser: string) => this.page.locator(`//tbody/tr[@data-id='${selectedUser}']/td[3]/div/div/button`)
+    }
+
+    private get userRow(): (selectedUser: string) => Locator {
+        return (selectedUser: string) => this.page.locator(`//tbody/tr[@data-id='${selectedUser}']`)
+    }
+    
+    private get userSelectRoleBtn(): (selectedUser: string) => Locator {
+        return (selectedUser: string) => this.page.locator(`//tbody/tr[@data-id='${selectedUser}']/td[3]/button`)
     }
 
     private get selectUserRole(): (role: string) => Locator {
@@ -93,18 +101,11 @@ export default class SettingsUsersPage extends BasePage {
 
     async modifyUserRole(selectedUser: string, role: string): Promise<void> {
         await this.page.waitForLoadState('networkidle');
-        await this.userCheckboxBtn(selectedUser).click();
-        await this.selectRoleBtn.click();
+        await this.userRow(selectedUser).hover();
+        await this.userSelectRoleEditBtn(selectedUser).click();
+        await this.userSelectRoleBtn(selectedUser).click();
         await this.selectUserRole(role).click();
         await waitForTimeOut(this.page, 1500)
-    }
-
-    async modifyTwoUsersRoles(selectedUser1: string, selectedUser2: string, role: string): Promise<void> {
-        await this.page.waitForLoadState('networkidle');
-        await this.userCheckboxBtn(selectedUser1).click();
-        await this.userCheckboxBtn(selectedUser2).click();
-        await this.selectRoleBtn.click();
-        await this.selectUserRole(role).click()
     }
 
     async deleteTwoUsers(selectedUser1: string, selectedUser2: string): Promise<void> {

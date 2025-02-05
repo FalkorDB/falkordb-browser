@@ -11,7 +11,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ us
     }
 
     const { user: username } = await params
-    const role = ROLE.get(req.nextUrl.searchParams.get("role") || "")
+    const role = ROLE.get(req.nextUrl.searchParams.get("userRole") || "")
     try {
         if (!role) throw new Error("Role is missing")
 

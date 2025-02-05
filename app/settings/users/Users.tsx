@@ -5,10 +5,10 @@
 import React, { useEffect, useState } from "react";
 import { CreateUser, User } from "@/app/api/user/model";
 import { prepareArg, securedFetch } from "@/lib/utils";
-import Combobox from "@/app/components/ui/combobox";
 import TableComponent, { Row } from "@/app/components/TableComponent";
 import { useToast } from "@/components/ui/use-toast";
 import { ToastAction } from "@/components/ui/toast";
+import { useSession } from "next-auth/react";
 import DeleteUser from "./DeleteUser";
 import AddUser from "./AddUser";
 
@@ -24,17 +24,24 @@ export default function Users() {
     const [users, setUsers] = useState<User[]>([])
     const [rows, setRows] = useState<Row[]>([])
     const { toast } = useToast()
+    const { data: session } = useSession()
 
-    useEffect(() => {
-        setRows(users.map((user) => ({
-            cells: [{
-                value: user.username,
-            }, {
-                value: user.role,
-            }],
-            checked: false,
-        })))
-    }, [users])
+    const handleSetRole = async (username: string, role: string, oldRole?: string) => {
+        const result = await securedFetch(`api/user/${prepareArg(username)}?userRole=${role}`, {
+            method: 'PATCH'
+        }, session?.user?.role, toast)
+
+        if (result.ok) {
+            setUsers(prev => prev.map(user => user.username === username ? { ...user, role } : user))
+            setRows(prev => prev.map(row => row.cells[0].value === username ? { ...row, cells: [row.cells[0], { ...row.cells[1], value: role }] } : row))
+
+            toast({
+                title: "Success",
+                description: `${username} role updated successfully`,
+                action: oldRole ? <ToastAction altText="Undo" onClick={() => handleSetRole(username, oldRole)}>Undo</ToastAction> : undefined
+            })
+        }
+    }
 
     useEffect(() => {
         (async () => {
@@ -43,79 +50,34 @@ export default function Users() {
                 headers: {
                     'Content-Type': 'application/json'
                 }
-            }, toast)
+            }, session?.user?.role, toast)
 
             if (result.ok) {
                 const data = await result.json()
                 setUsers(data.result.map((user: User) => ({ ...user, selected: false })))
-                setRows(data.result.map((user: User) => ({
+                setRows(data.result.map(({ username, role }: User) => ({
                     cells: [{
-                        value: user.username,
+                        value: username,
                     }, {
-                        value: user.role,
-                        onChange: (value: string) => handleSetRole([user.username], [value], true)
+                        value: role,
+                        onChange: username === "default" ? undefined : (value: string) => handleSetRole(username, value, role),
+                        type: "combobox",
+                        comboboxType: "Role",
                     }],
                     checked: false,
                 })))
             }
         })()
-
-    }, [])
-
-    const handleSetRole = async (usernames: string[], role: string[], isUndo: boolean) => {
-        const oldRoles = usernames.map(username => users.find(user => user.username === username)!.role)
-        const updatedUsers = await Promise.all(users.map(async (user, i) => {
-
-            if (!usernames.includes(user.username)) return user
-
-            const result = await securedFetch(`api/user/${prepareArg(user.username)}/?role=${role}`, {
-                method: 'PATCH'
-            }, toast)
-
-            if (result.ok) {
-                return {
-                    ...user,
-                    role: role.length === 1 ? role[0] : role[i]
-                }
-            }
-
-            return user
-        }))
-
-        setUsers(updatedUsers)
-        setRows(rows.map(row => {
-            if (!usernames.includes(row.cells[0].value as string)) return row
-            return {
-                ...row,
-                cells: [{ ...row.cells[0], value: role.length === 1 ? role[0] : role[usernames.indexOf(row.cells[0].value as string)] }],
-                checked: false
-            }
-        }))
-        toast({
-            title: "Success",
-            description: `${usernames.join(", ")} role updated successfully`,
-            action: isUndo ? <ToastAction altText="Undo" onClick={() => handleSetRole(usernames, oldRoles, false)}>Undo</ToastAction> : undefined
-        })
-        return true
-    }
+    }, [toast])
 
     const handleAddUser = async ({ username, password, role }: CreateUser) => {
-        if (!role) {
-            toast({
-                title: "Error",
-                description: "Select role is required",
-                variant: "destructive"
-            })
-            return
-        }
-
         const response = await securedFetch('/api/user/', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({ username, password, role })
-        }, toast)
+        }, session?.user?.role, toast)
 
         if (response.ok) {
             toast({
@@ -123,6 +85,17 @@ export default function Users() {
                 description: "User added successfully",
             })
             setUsers(prev => [...prev, { username, role, selected: false }])
+            setRows(prev => [...prev, {
+                cells: [{
+                    value: username,
+                }, {
+                    value: role,
+                    onChange: (value: string) => handleSetRole(username, value, role),
+                    type: "combobox",
+                    comboboxType: "Role"
+                }],
+                checked: false,
+            }] as Row[])
         }
     }
 
@@ -132,16 +105,11 @@ export default function Users() {
                 headers={["Name", "Role"]}
                 rows={rows}
                 setRows={setRows}
+                options={ROLES}
             >
                 <div className="flex flex-row-reverse gap-4">
                     <AddUser onAddUser={handleAddUser} />
-                    <DeleteUser users={rows.filter(row => row.checked).map(row => users.find(user => user.username === row.cells[0].value)!)} setUsers={setUsers} />
-                    <Combobox
-                        disabled={rows.filter(row => row.checked).length === 0}
-                        type="Role"
-                        options={ROLES}
-                        setSelectedValue={(role) => { handleSetRole(rows.filter(row => row.checked).map(row => row.cells[0].value as string), [role], true) }}
-                    />
+                    <DeleteUser users={rows.filter(row => row.checked).map(row => users.find(user => user.username === row.cells[0].value)!)} setUsers={setUsers} setRows={setRows} />
                 </div>
             </TableComponent>
         </div >

@@ -87,10 +87,10 @@ export type DataRow = {
 export type Data = DataRow[]
 
 export const DEFAULT_COLORS = [
-    "#7466FF",
-    "#FF66B3",
-    "#FF804D",
-    "#80E6E6"
+    "hsl(246, 100%, 70%)",
+    "hsl(330, 100%, 70%)",
+    "hsl(20, 100%, 65%)",
+    "hsl(180, 66%, 70%)"
 ]
 
 export interface Query {
@@ -127,13 +127,11 @@ export class Graph {
 
     private elements: GraphData;
 
+    private colorIndex: number = 0;
+
     private categoriesMap: Map<string, Category>;
 
-    private categoriesColorIndex: number = 0;
-
     private labelsMap: Map<string, Category>;
-
-    private labelsColorIndex: number = 0;
 
     private nodesMap: Map<number, Node>;
 
@@ -154,7 +152,7 @@ export class Graph {
         this.labelsMap = labelsMap;
         this.nodesMap = nodesMap;
         this.linksMap = edgesMap;
-        this.COLORS_ORDER_VALUE = colors || DEFAULT_COLORS
+        this.COLORS_ORDER_VALUE = [...(colors || DEFAULT_COLORS)]
     }
 
     get Id(): string {
@@ -274,23 +272,6 @@ export class Graph {
             Object.entries(cell.properties).forEach(([key, value]) => {
                 currentNode.data[key] = isSchema ? getSchemaValue(value) : value;
             });
-
-            // remove empty category if there are no more empty nodes category
-            if (Array.from(this.nodesMap.values()).every(n => n.category.some(c => c !== ""))) {
-                this.categories = this.categories.filter(l => l.name !== "").map(c => {
-                    // eslint-disable-next-line @typescript-eslint/no-non-null-asserted-optional-chain
-                    if (this.categoriesMap.get("")?.index! < c.index) {
-                        c.index -= 1
-                        this.categoriesMap.get(c.name)!.index = c.index
-                    }
-                    return c
-                })
-                this.categoriesMap.delete("")
-                this.categoriesColorIndex -= 1
-                this.elements.nodes.forEach(n => {
-                    n.color = this.getCategoryColorValue(this.categoriesMap.get(n.category[0])?.index)
-                })
-            }
         }
 
         return currentNode
@@ -458,6 +439,13 @@ export class Graph {
 
             link.curve = curve * 0.1
         })
+
+        // remove empty category if there are no more empty nodes category
+        if (Array.from(this.nodesMap.values()).every(n => n.category.some(c => c !== ""))) {
+            this.categories = this.categories.filter(c => c.name !== "")
+            this.categoriesMap.delete("")
+        }
+
         return newElements
     }
 
@@ -484,8 +472,8 @@ export class Graph {
             let c = this.categoriesMap.get(category)
 
             if (!c) {
-                c = { name: category, index: this.categoriesColorIndex, show: true }
-                this.categoriesColorIndex += 1
+                c = { name: category, index: this.colorIndex, show: true }
+                this.colorIndex += 1
                 this.categoriesMap.set(c.name, c)
                 this.categories.push(c)
             }
@@ -498,8 +486,8 @@ export class Graph {
         let l = this.labelsMap.get(category)
 
         if (!l) {
-            l = { name: category, index: this.labelsColorIndex, show: true }
-            this.labelsColorIndex += 1
+            l = { name: category, index: this.colorIndex, show: true }
+            this.colorIndex += 1
             this.labelsMap.set(l.name, l)
             this.labels.push(l)
         }
@@ -543,7 +531,14 @@ export class Graph {
         }
     }
 
-    public getCategoryColorValue(index = 0): string {
-        return this.COLORS_ORDER_VALUE[index % this.COLORS_ORDER_VALUE.length]
+    public getCategoryColorValue(index = 0) {
+        if (index < this.COLORS_ORDER_VALUE.length) {
+            return this.COLORS_ORDER_VALUE[index];
+        }
+
+        const newColor = `hsl(${(index - 4) * 20}, 100%, 70%)`
+        this.COLORS_ORDER_VALUE.push(newColor)
+        DEFAULT_COLORS.push(newColor)
+        return newColor
     }
 }
