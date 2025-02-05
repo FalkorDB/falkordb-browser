@@ -129,6 +129,7 @@ export default function Page() {
                     runQuery={runQuery}
                     historyQuery={historyQuery}
                     historyQueries={queries.map(({ text }) => text)}
+                    setHistoryQueries={(queriesArr) => setQueries(queries.map((query, i) => ({ text: queriesArr[i], metadata: query.metadata } as Query)))}
                     fetchCount={fetchCount}
                     session={session}
                 />
