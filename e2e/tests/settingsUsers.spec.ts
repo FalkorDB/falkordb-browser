@@ -147,7 +147,7 @@ test.describe('Settings Tests', () => {
         const User = users.result.find(u => u.username === username);
         expect(User?.username === username).toBe(true)
     })
-    // fail tests
+
     test(`@admin API Test: without passing a username, Attempt to add a user and validate the user was not added`, async () => {
         const apiCall = new ApiCalls()
         const username = ''

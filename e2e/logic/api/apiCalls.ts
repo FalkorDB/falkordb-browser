@@ -35,7 +35,6 @@ export default class ApiCalls {
     async getSettingsRoleValue(roleName: string, data?: any): Promise<GetSettingsRoleValue> {
         const result = await getRequest(urls.api.settingsConfig + roleName, data)
         const jsonData = await result.json();
-        console.log("api calls res:", jsonData, "  role: ", roleName);
         return jsonData
     }
 
