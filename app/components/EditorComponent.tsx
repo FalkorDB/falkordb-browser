@@ -11,7 +11,6 @@ import { Maximize2 } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { useSession } from "next-auth/react";
 import { prepareArg, securedFetch } from "@/lib/utils";
-import { Session } from "next-auth";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import { Graph } from "../api/graph/model";
 import Button from "./ui/Button";
