@@ -138,6 +138,17 @@ export default function Configurations() {
             return false;
         }
 
+        if (name === "MAX_INFO_QUERIES") {
+            if (Number(value) > 1000) {
+                toast({
+                    title: "Error",
+                    description: "Value must be less than 1000",
+                    variant: "destructive"
+                });
+                return false;
+            }
+        }
+
         const result = await securedFetch(
             `api/graph/?config=${prepareArg(name)}&value=${prepareArg(value)}`,
             { method: 'POST' },
@@ -145,7 +156,7 @@ export default function Configurations() {
         );
 
         if (!result.ok) return false;
-
+        
         const configToUpdate = configs.find(row => row.cells[0].value === name);
         const oldValue = configToUpdate?.cells[2].value;
 

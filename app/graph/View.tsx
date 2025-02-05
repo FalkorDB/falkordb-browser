@@ -19,8 +19,10 @@ export default function View({ graph, setGraph, selectedValue }: {
     const [editable, setEditable] = useState<string>("")
 
     const handlePreferencesChange = (colors?: string[]) => {
-        setGraph(Graph.create(graph.Id, { data: graph.Data, metadata: graph.Metadata }, colors || colorsArr))
-        if (colors) return
+        setGraph(Graph.create(graph.Id, { data: graph.Data, metadata: graph.Metadata }, false, true, colors || colorsArr))
+        if (colors) {
+            localStorage.removeItem(graph.Id)
+        }
         localStorage.setItem(graph.Id, JSON.stringify(colorsArr));
     }
 
@@ -40,9 +42,9 @@ export default function View({ graph, setGraph, selectedValue }: {
             className="w-[30%] h-[50%]"
             title="Preferences"
         >
-            <div className="h-full flex flex-col gap-8">
+            <div className="h-full flex flex-col gap-8 overflow-hidden">
                 <p className="text-xl">Legends</p>
-                <ul className="flex flex-col gap-4 overflow-auto">
+                <ul className="flex flex-col gap-4 p-2 overflow-auto">
                     {
                         colorsArr.map((c, i) => (
                             <li onMouseEnter={() => setHover(c)} onMouseLeave={(() => setHover(""))} key={c} className={cn(`flex gap-8 items-center`)}>
@@ -154,7 +156,7 @@ export default function View({ graph, setGraph, selectedValue }: {
                         <RotateCcw />
                     </Button>
                     <Button
-                        disabled={graph.Colors.filter((c, i) => c === colorsArr[i]).length === colorsArr.length && DEFAULT_COLORS.length === colorsArr.length}
+                        disabled={graph.Colors.every((c) => colorsArr.some(color => color === c)) && graph.Colors.length === colorsArr.length}
                         variant="Primary"
                         label="Apply"
                         onClick={() => handlePreferencesChange()}

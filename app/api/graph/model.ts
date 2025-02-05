@@ -1,8 +1,32 @@
+/* eslint-disable one-var */
 /* eslint-disable no-param-reassign */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 import { EdgeDataDefinition, NodeDataDefinition } from 'cytoscape';
 import { LinkObject, NodeObject } from 'react-force-graph-2d';
+
+const getSchemaValue = (value: string): string[] => {
+    let unique, required, type, description
+    if (value.includes("!")) {
+        value = value.replace("!", "")
+        unique = "true"
+    } else {
+        unique = "false"
+    }
+    if (value.includes("*")) {
+        value = value.replace("*", "")
+        required = "true"
+    } else {
+        required = "false"
+    }
+    if (value.includes("-")) {
+        [type, description] = value.split("-")
+    } else {
+        type = "string"
+        description = ""
+    }
+    return [type, description, unique, required]
+}
 
 export type Node = NodeObject<{
     id: number,
@@ -209,14 +233,14 @@ export class Graph {
         return new Graph(graphName || "", [], [], { nodes: [], links: [] }, new Map<string, Category>(), new Map<string, Category>(), new Map<number, Node>(), new Map<number, Link>(), colors)
     }
 
-    public static create(id: string, results: any, colors?: string[]): Graph {
+    public static create(id: string, results: { data: Data, metadata: any[] }, isCollapsed: boolean, isSchema: boolean, colors?: string[],): Graph {
         const graph = Graph.empty(undefined, colors)
-        graph.extend(results)
+        graph.extend(results, isCollapsed, isSchema)
         graph.id = id
         return graph
     }
 
-    public extendNode(cell: NodeCell, collapsed = false) {
+    public extendNode(cell: NodeCell, collapsed: boolean, isSchema: boolean) {
         // check if category already exists in categories
         const categories = this.createCategory(cell.labels.length === 0 ? [""] : cell.labels)
         // check if node already exists in nodes or fake node was created
@@ -233,7 +257,7 @@ export class Graph {
                 data: {}
             }
             Object.entries(cell.properties).forEach(([key, value]) => {
-                node.data[key] = value as string;
+                node.data[key] = isSchema ? getSchemaValue(value) : value;
             });
             this.nodesMap.set(cell.id, node)
             this.elements.nodes.push(node)
@@ -248,7 +272,7 @@ export class Graph {
             currentNode.expand = false
             currentNode.collapsed = collapsed
             Object.entries(cell.properties).forEach(([key, value]) => {
-                currentNode.data[key] = value as string;
+                currentNode.data[key] = isSchema ? getSchemaValue(value) : value;
             });
 
             // remove empty category if there are no more empty nodes category
@@ -272,9 +296,8 @@ export class Graph {
         return currentNode
     }
 
-    public extendEdge(cell: LinkCell, collapsed = false) {
+    public extendEdge(cell: LinkCell, collapsed: boolean, isSchema: boolean) {
         const label = this.createLabel(cell.relationshipType)
-
         const currentEdge = this.linksMap.get(cell.id)
 
         if (!currentEdge) {
@@ -369,7 +392,7 @@ export class Graph {
             }
 
             Object.entries(cell.properties).forEach(([key, value]) => {
-                link.data[key] = value as string;
+                link.data[key] = isSchema ? getSchemaValue(value) : value;
             });
 
             this.linksMap.set(cell.id, link)
@@ -381,7 +404,7 @@ export class Graph {
         return currentEdge
     }
 
-    public extend(results: { data: Data, metadata: any[] }, collapsed = false): (Node | Link)[] {
+    public extend(results: { data: Data, metadata: any[] }, collapsed = false, isSchema = false): (Node | Link)[] {
         const newElements: (Node | Link)[] = []
         const data = results?.data
 
@@ -399,15 +422,15 @@ export class Graph {
                 if (cell instanceof Object) {
                     if (cell.nodes) {
                         cell.nodes.forEach((node: any) => {
-                            newElements.push(this.extendNode(node, collapsed))
+                            newElements.push(this.extendNode(node, collapsed, isSchema))
                         })
                         cell.edges.forEach((edge: any) => {
-                            newElements.push(this.extendEdge(edge, collapsed))
+                            newElements.push(this.extendEdge(edge, collapsed, isSchema))
                         })
                     } else if (cell.relationshipType) {
-                        newElements.push(this.extendEdge(cell, collapsed))
+                        newElements.push(this.extendEdge(cell, collapsed, isSchema))
                     } else if (cell.labels) {
-                        newElements.push(this.extendNode(cell, collapsed))
+                        newElements.push(this.extendNode(cell, collapsed, isSchema))
                     }
                 }
             })

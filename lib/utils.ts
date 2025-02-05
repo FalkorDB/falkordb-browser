@@ -42,3 +42,18 @@ export function prepareArg(arg: string) {
 }
 
 export const defaultQuery = (q?: string) => q || "MATCH (n) OPTIONAL MATCH (n)-[e]-(m) return n,e,m LIMIT 100"
+
+export const lightenColor = (hex: string): string => {
+  // Remove the # if present
+  const color = hex.replace('#', '');
+  // Convert to RGB
+  const r = parseInt(color.slice(0, 2), 16);
+  const g = parseInt(color.slice(2, 4), 16);
+  const b = parseInt(color.slice(4, 6), 16);
+  // Mix with white (add 20% of the remaining distance to white)
+  const lightR = Math.min(255, r + Math.floor((255 - r) * 0.2));
+  const lightG = Math.min(255, g + Math.floor((255 - g) * 0.2));
+  const lightB = Math.min(255, b + Math.floor((255 - b) * 0.2));
+  // Convert back to hex
+  return `#${lightR.toString(16).padStart(2, '0')}${lightG.toString(16).padStart(2, '0')}${lightB.toString(16).padStart(2, '0')}`;
+}

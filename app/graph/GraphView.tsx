@@ -21,18 +21,16 @@ import Button from "../components/ui/Button";
 import TableView from "./TableView";
 
 const ForceGraph = dynamic(() => import("../components/ForceGraph"), { ssr: false });
+const EditorComponent = dynamic(() => import("../components/EditorComponent"), {ssr: false})
 
-const EditorComponent = dynamic(() => import("../components/EditorComponent"), {
-    ssr: false
-})
-
-function GraphView({ graph, selectedElement, setSelectedElement, runQuery, historyQuery, historyQueries, fetchCount, session }: {
+function GraphView({ graph, selectedElement, setSelectedElement, runQuery, historyQuery, historyQueries, setHistoryQueries, fetchCount, session }: {
     graph: Graph
     selectedElement: Node | Link | undefined
     setSelectedElement: Dispatch<SetStateAction<Node | Link | undefined>>
     runQuery: (query: string) => Promise<void>
     historyQuery: string
     historyQueries: string[]
+    setHistoryQueries: (queries: string[]) => void
     fetchCount: () => void
     session: Session | null
 }) {
@@ -222,10 +220,10 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
             >
                 <EditorComponent
                     graph={graph}
-                    isCollapsed={isCollapsed}
                     maximize={maximize}
                     currentQuery={query}
                     historyQueries={historyQueries}
+                    setHistoryQueries={setHistoryQueries}
                     runQuery={handleRunQuery}
                     setCurrentQuery={setQuery}
                     data={session}
@@ -278,7 +276,7 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
                                     title={!maximize ? "Maximize" : "Minimize"}
                                     onClick={() => setMaximize(prev => !prev)}
                                 >
-                                    {maximize ? <Maximize2 /> : <Minimize2 />}
+                                    {!maximize ? <Maximize2 /> : <Minimize2 />}
                                 </Button>
                                 <div className="z-10 absolute top-4 left-4 flex items-center gap-2 pointer-events-none">
                                     {cooldownTicks === undefined ? <Play size={20} /> : <Pause size={20} />}
@@ -292,7 +290,6 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
                                     />
                                 </div>
                                 <ForceGraph
-                                    isCollapsed={isCollapsed}
                                     graph={graph}
                                     chartRef={chartRef}
                                     data={data}

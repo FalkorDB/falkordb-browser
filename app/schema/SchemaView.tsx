@@ -28,10 +28,19 @@ interface Props {
 }
 
 const getCreateQuery = (type: boolean, selectedNodes: [Node, Node], attributes: [string, string[]][], label?: string) => {
+    const formateAttributes: [string, string][] = attributes.map((att) => {
+        const [key, [t, d, u, r]] = att
+        let val = `${t}`
+        if (u === "true") val += "!"
+        if (r === "true") val += "*"
+        if (d) val += `-${d}`
+        return [key, val]
+    })
+
     if (type) {
-        return `CREATE (n${label ? `:${label}` : ""}${attributes?.length > 0 ? ` {${attributes.map(([k, [t, d, u, r]]) => `${k}: ["${t}", "${d}", "${u}", "${r}"]`).join(",")}}` : ""}) RETURN n`
+        return `CREATE (n${label ? `:${label}` : ""}${formateAttributes?.length > 0 ? ` {${formateAttributes.map(([k, v]) => `${k}: "${v}"`).join(",")}}` : ""}) RETURN n`
     }
-    return `MATCH (a), (b) WHERE ID(a) = ${selectedNodes[0].id} AND ID(b) = ${selectedNodes[1].id} CREATE (a)-[e${label ? `:${label}` : ""}${attributes?.length > 0 ? ` {${attributes.map(([k, [t, d, u, un]]) => `${k}: ["${t}", "${d}", "${u}", "${un}"]`).join(",")}}` : ""}]->(b) RETURN e`
+    return `MATCH (a), (b) WHERE ID(a) = ${selectedNodes[0].id} AND ID(b) = ${selectedNodes[1].id} CREATE (a)-[e${label ? `:${label}` : ""}${formateAttributes?.length > 0 ? ` {${formateAttributes.map(([k, v]) => `${k}: "${v}"`).join(",")}}` : ""}]->(b) RETURN e`
 }
 
 export default function SchemaView({ schema, fetchCount, session }: Props) {
@@ -292,10 +301,10 @@ export default function SchemaView({ schema, fetchCount, session }: Props) {
             const json = await result.json()
 
             if (isAddEntity) {
-                schema.extendNode(json.result.data[0].n)
+                schema.extendNode(json.result.data[0].n, false, true)
                 setIsAddEntity(false)
             } else {
-                schema.extendEdge(json.result.data[0].e, true)
+                schema.extendEdge(json.result.data[0].e, false, true)
                 setIsAddRelation(false)
             }
 
@@ -337,7 +346,7 @@ export default function SchemaView({ schema, fetchCount, session }: Props) {
                         }}
                         onDeleteElement={handleDeleteElement}
                         chartRef={chartRef}
-                        addDisabled={session?.user.role === "Read-Only"}
+                        addDisabled={session?.user.role === "Read-Only" || !schema.Id}
                     />
                     {
                         isCollapsed &&
@@ -374,7 +383,6 @@ export default function SchemaView({ schema, fetchCount, session }: Props) {
                         />
                     </div>
                     <ForceGraph
-                        isCollapsed={isCollapsed}
                         chartRef={chartRef}
                         data={data}
                         graph={schema}

@@ -46,7 +46,7 @@ export default function Page() {
             if (!result.ok) return
             const json = await result.json()
             const colors = localStorage.getItem(schemaName)?.split(/[[\]",]/).filter(c => c)
-            setSchema(Graph.create(schemaName, json.result, colors))
+            setSchema(Graph.create(schemaName, json.result, false, true, colors))
 
             fetchCount()
 
