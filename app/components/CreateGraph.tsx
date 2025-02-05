@@ -39,7 +39,8 @@ export default function CreateGraph({
     
     const handleCreateGraph = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault()
-        if (!graphName) {
+        const name = graphName.trim()
+        if (!name) {
             toast({
                 title: "Error",
                 description: "Graph name cannot be empty",
@@ -48,13 +49,13 @@ export default function CreateGraph({
             return
         }
         const q = 'RETURN 1'
-        const result = await securedFetch(`api/graph/${prepareArg(graphName)}/?query=${prepareArg(q)}`, {
+        const result = await securedFetch(`api/graph/${prepareArg(name)}/?query=${prepareArg(q)}`, {
             method: "GET",
         }, session?.user?.role, toast)
 
         if (!result.ok) return
 
-        onSetGraphName(graphName)
+        onSetGraphName(name)
         setGraphName("")
         setOpen(false)
         toast({

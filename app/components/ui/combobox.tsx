@@ -123,10 +123,10 @@ export default function Combobox({ isSelectGraph = false, disabled = false, inTa
               {
                 options.map((option) => (
                   <SelectItem
-                    value={option}
-                    key={option}
+                    value={!option ? '""' : option}
+                    key={`key-${option}`}
                   >
-                    {option}
+                    {!option ? '""' : option}
                   </SelectItem>
                 ))
               }
