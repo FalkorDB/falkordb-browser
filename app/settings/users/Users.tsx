@@ -27,7 +27,7 @@ export default function Users() {
     const { data: session } = useSession()
 
     const handleSetRole = async (username: string, role: string, oldRole?: string) => {
-        const result = await securedFetch(`api/user/${prepareArg(username)}`, {
+        const result = await securedFetch(`api/user/${prepareArg(username)}?userRole=${role}`, {
             method: 'PATCH'
         }, session?.user?.role, toast)
 
