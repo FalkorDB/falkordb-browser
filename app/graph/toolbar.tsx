@@ -8,7 +8,6 @@ import Button from "../components/ui/Button";
 import DeleteElement from "./DeleteElement";
 
 interface Props {
-    addDisabled?: boolean,
     disabled?: boolean,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     chartRef: React.RefObject<any>,
@@ -16,18 +15,19 @@ interface Props {
     onAddEntity?: () => void,
     onAddRelation?: () => void,
     deleteDisabled?: boolean,
-    selectedElementsLength: number
+    selectedElementsLength: number,
+    displayAdd: boolean
 }
 
 export default function Toolbar({
     disabled,
-    addDisabled,
     chartRef,
     onDeleteElement,
     onAddEntity,
     onAddRelation,
     deleteDisabled,
-    selectedElementsLength
+    selectedElementsLength,
+    displayAdd
 }: Props) {
 
     const [deleteOpen, setDeleteOpen] = useState(false)
@@ -55,26 +55,31 @@ export default function Toolbar({
     return (
         <div className="flex items-center gap-6 p-1">
             <div className="flex gap-4">
-                <Button
-                    className="text-nowrap"
-                    disabled={addDisabled}
-                    variant="Primary"
-                    label="Add Node"
-                    onClick={onAddEntity}
-                >
-                    <PlusCircle size={20} />
-                </Button>
-                <Button
-                    className="text-nowrap"
-                    disabled={addDisabled}
-                    variant="Primary"
-                    label="Add Relation"
-                    onClick={onAddRelation}
-                    type="button"
-                >
-                    {/* eslint-disable-next-line jsx-a11y/anchor-is-valid */}
-                    <Link size={20} />
-                </Button>
+                {
+                    displayAdd &&
+                    <>
+                        <Button
+                            className="text-nowrap"
+                            disabled={disabled}
+                            variant="Primary"
+                            label="Add Node"
+                            onClick={onAddEntity}
+                        >
+                            <PlusCircle size={20} />
+                        </Button>
+                        <Button
+                            className="text-nowrap"
+                            disabled={disabled}
+                            variant="Primary"
+                            label="Add Relation"
+                            onClick={onAddRelation}
+                            type="button"
+                        >
+                            {/* eslint-disable-next-line jsx-a11y/anchor-is-valid */}
+                            <Link size={20} />
+                        </Button>
+                    </>
+                }
                 <DeleteElement
                     description={`Are you sure you want to delete this ${selectedElementsLength > 1 ? "elements" : "element"}?`}
                     open={deleteOpen}
@@ -85,7 +90,7 @@ export default function Toolbar({
                             className="text-nowrap"
                             variant="Primary"
                             label="Delete"
-                            disabled={deleteDisabled}
+                            disabled={deleteDisabled || disabled}
                         >
                             <Trash2 size={20} />
                         </Button>

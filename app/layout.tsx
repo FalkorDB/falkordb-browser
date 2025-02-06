@@ -4,6 +4,7 @@ import "./globals.css";
 import { Inter } from "next/font/google";
 import { Metadata } from "next";
 import { Toaster } from "@/components/ui/toaster";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import NextAuthProvider from "./providers";
 import GTM from "./GTM";
 
@@ -24,9 +25,13 @@ export default function RootLayout({
   // caused by mismatched client/server content caused by next-themes
   return (
     <html className="w-screen h-screen" lang="en" suppressHydrationWarning>
-      <body className={`h-full LandingPage ${inter.className}`}>
+      <body className={`h-full bg-foreground ${inter.className}`}>
         <GTM />
-        <NextAuthProvider>{children}</NextAuthProvider>
+        <NextAuthProvider>
+          <TooltipProvider>
+            {children}
+          </TooltipProvider>
+        </NextAuthProvider>
         <Toaster />
       </body>
     </html>

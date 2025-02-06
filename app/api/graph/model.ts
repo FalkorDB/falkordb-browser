@@ -1,8 +1,32 @@
+/* eslint-disable one-var */
 /* eslint-disable no-param-reassign */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 import { EdgeDataDefinition, NodeDataDefinition } from 'cytoscape';
 import { LinkObject, NodeObject } from 'react-force-graph-2d';
+
+const getSchemaValue = (value: string): string[] => {
+    let unique, required, type, description
+    if (value.includes("!")) {
+        value = value.replace("!", "")
+        unique = "true"
+    } else {
+        unique = "false"
+    }
+    if (value.includes("*")) {
+        value = value.replace("*", "")
+        required = "true"
+    } else {
+        required = "false"
+    }
+    if (value.includes("-")) {
+        [type, description] = value.split("-")
+    } else {
+        type = "string"
+        description = ""
+    }
+    return [type, description, unique, required]
+}
 
 export type Node = NodeObject<{
     id: number,
@@ -63,10 +87,10 @@ export type DataRow = {
 export type Data = DataRow[]
 
 export const DEFAULT_COLORS = [
-    "#7466FF",
-    "#FF66B3",
-    "#FF804D",
-    "#80E6E6"
+    "hsl(246, 100%, 70%)",
+    "hsl(330, 100%, 70%)",
+    "hsl(20, 100%, 65%)",
+    "hsl(180, 66%, 70%)"
 ]
 
 export interface Query {
@@ -103,13 +127,11 @@ export class Graph {
 
     private elements: GraphData;
 
+    private colorIndex: number = 0;
+
     private categoriesMap: Map<string, Category>;
 
-    private categoriesColorIndex: number = 0;
-
     private labelsMap: Map<string, Category>;
-
-    private labelsColorIndex: number = 0;
 
     private nodesMap: Map<number, Node>;
 
@@ -130,7 +152,7 @@ export class Graph {
         this.labelsMap = labelsMap;
         this.nodesMap = nodesMap;
         this.linksMap = edgesMap;
-        this.COLORS_ORDER_VALUE = colors || DEFAULT_COLORS
+        this.COLORS_ORDER_VALUE = [...(colors || DEFAULT_COLORS)]
     }
 
     get Id(): string {
@@ -209,14 +231,14 @@ export class Graph {
         return new Graph(graphName || "", [], [], { nodes: [], links: [] }, new Map<string, Category>(), new Map<string, Category>(), new Map<number, Node>(), new Map<number, Link>(), colors)
     }
 
-    public static create(id: string, results: any, colors?: string[]): Graph {
+    public static create(id: string, results: { data: Data, metadata: any[] }, isCollapsed: boolean, isSchema: boolean, colors?: string[],): Graph {
         const graph = Graph.empty(undefined, colors)
-        graph.extend(results)
+        graph.extend(results, isCollapsed, isSchema)
         graph.id = id
         return graph
     }
 
-    public extendNode(cell: NodeCell, collapsed = false) {
+    public extendNode(cell: NodeCell, collapsed: boolean, isSchema: boolean) {
         // check if category already exists in categories
         const categories = this.createCategory(cell.labels.length === 0 ? [""] : cell.labels)
         // check if node already exists in nodes or fake node was created
@@ -233,7 +255,7 @@ export class Graph {
                 data: {}
             }
             Object.entries(cell.properties).forEach(([key, value]) => {
-                node.data[key] = value as string;
+                node.data[key] = isSchema ? getSchemaValue(value) : value;
             });
             this.nodesMap.set(cell.id, node)
             this.elements.nodes.push(node)
@@ -248,33 +270,15 @@ export class Graph {
             currentNode.expand = false
             currentNode.collapsed = collapsed
             Object.entries(cell.properties).forEach(([key, value]) => {
-                currentNode.data[key] = value as string;
+                currentNode.data[key] = isSchema ? getSchemaValue(value) : value;
             });
-
-            // remove empty category if there are no more empty nodes category
-            if (Array.from(this.nodesMap.values()).every(n => n.category.some(c => c !== ""))) {
-                this.categories = this.categories.filter(l => l.name !== "").map(c => {
-                    // eslint-disable-next-line @typescript-eslint/no-non-null-asserted-optional-chain
-                    if (this.categoriesMap.get("")?.index! < c.index) {
-                        c.index -= 1
-                        this.categoriesMap.get(c.name)!.index = c.index
-                    }
-                    return c
-                })
-                this.categoriesMap.delete("")
-                this.categoriesColorIndex -= 1
-                this.elements.nodes.forEach(n => {
-                    n.color = this.getCategoryColorValue(this.categoriesMap.get(n.category[0])?.index)
-                })
-            }
         }
 
         return currentNode
     }
 
-    public extendEdge(cell: LinkCell, collapsed = false) {
+    public extendEdge(cell: LinkCell, collapsed: boolean, isSchema: boolean) {
         const label = this.createLabel(cell.relationshipType)
-
         const currentEdge = this.linksMap.get(cell.id)
 
         if (!currentEdge) {
@@ -369,7 +373,7 @@ export class Graph {
             }
 
             Object.entries(cell.properties).forEach(([key, value]) => {
-                link.data[key] = value as string;
+                link.data[key] = isSchema ? getSchemaValue(value) : value;
             });
 
             this.linksMap.set(cell.id, link)
@@ -381,7 +385,7 @@ export class Graph {
         return currentEdge
     }
 
-    public extend(results: { data: Data, metadata: any[] }, collapsed = false): (Node | Link)[] {
+    public extend(results: { data: Data, metadata: any[] }, collapsed = false, isSchema = false): (Node | Link)[] {
         const newElements: (Node | Link)[] = []
         const data = results?.data
 
@@ -399,15 +403,15 @@ export class Graph {
                 if (cell instanceof Object) {
                     if (cell.nodes) {
                         cell.nodes.forEach((node: any) => {
-                            newElements.push(this.extendNode(node, collapsed))
+                            newElements.push(this.extendNode(node, collapsed, isSchema))
                         })
                         cell.edges.forEach((edge: any) => {
-                            newElements.push(this.extendEdge(edge, collapsed))
+                            newElements.push(this.extendEdge(edge, collapsed, isSchema))
                         })
                     } else if (cell.relationshipType) {
-                        newElements.push(this.extendEdge(cell, collapsed))
+                        newElements.push(this.extendEdge(cell, collapsed, isSchema))
                     } else if (cell.labels) {
-                        newElements.push(this.extendNode(cell, collapsed))
+                        newElements.push(this.extendNode(cell, collapsed, isSchema))
                     }
                 }
             })
@@ -435,6 +439,13 @@ export class Graph {
 
             link.curve = curve * 0.1
         })
+
+        // remove empty category if there are no more empty nodes category
+        if (Array.from(this.nodesMap.values()).every(n => n.category.some(c => c !== ""))) {
+            this.categories = this.categories.filter(c => c.name !== "")
+            this.categoriesMap.delete("")
+        }
+
         return newElements
     }
 
@@ -461,8 +472,8 @@ export class Graph {
             let c = this.categoriesMap.get(category)
 
             if (!c) {
-                c = { name: category, index: this.categoriesColorIndex, show: true }
-                this.categoriesColorIndex += 1
+                c = { name: category, index: this.colorIndex, show: true }
+                this.colorIndex += 1
                 this.categoriesMap.set(c.name, c)
                 this.categories.push(c)
             }
@@ -475,8 +486,8 @@ export class Graph {
         let l = this.labelsMap.get(category)
 
         if (!l) {
-            l = { name: category, index: this.labelsColorIndex, show: true }
-            this.labelsColorIndex += 1
+            l = { name: category, index: this.colorIndex, show: true }
+            this.colorIndex += 1
             this.labelsMap.set(l.name, l)
             this.labels.push(l)
         }
@@ -520,7 +531,14 @@ export class Graph {
         }
     }
 
-    public getCategoryColorValue(index = 0): string {
-        return this.COLORS_ORDER_VALUE[index % this.COLORS_ORDER_VALUE.length]
+    public getCategoryColorValue(index = 0) {
+        if (index < this.COLORS_ORDER_VALUE.length) {
+            return this.COLORS_ORDER_VALUE[index];
+        }
+
+        const newColor = `hsl(${(index - 4) * 20}, 100%, 70%)`
+        this.COLORS_ORDER_VALUE.push(newColor)
+        DEFAULT_COLORS.push(newColor)
+        return newColor
     }
 }

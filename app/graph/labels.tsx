@@ -57,7 +57,7 @@ export default function Labels({ graph, categories, onClick, label, className = 
                                         setReload(prev => !prev)
                                     }}
                                 >
-                                    <div style={{ backgroundColor: `${graph.getCategoryColorValue(category.index)}` }} className={cn("min-w-6 min-h-6 rounded-full", label === "RelationshipTypes" && "opacity-50")} />
+                                    <div style={{ backgroundColor: graph.getCategoryColorValue(category.index) }} className={cn("min-w-6 min-h-6 rounded-full")} />
                                 </Button>
                             </li>
                         ))

@@ -11,6 +11,7 @@ import { Session } from "next-auth"
 import dynamic from "next/dynamic"
 import { useToast } from "@/components/ui/use-toast"
 import { Switch } from "@/components/ui/switch"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import Toolbar from "../graph/toolbar"
 import SchemaDataPanel from "./SchemaDataPanel"
 import Labels from "../graph/labels"
@@ -28,10 +29,19 @@ interface Props {
 }
 
 const getCreateQuery = (type: boolean, selectedNodes: [Node, Node], attributes: [string, string[]][], label?: string) => {
+    const formateAttributes: [string, string][] = attributes.map((att) => {
+        const [key, [t, d, u, r]] = att
+        let val = `${t}`
+        if (u === "true") val += "!"
+        if (r === "true") val += "*"
+        if (d) val += `-${d}`
+        return [key, val]
+    })
+
     if (type) {
-        return `CREATE (n${label ? `:${label}` : ""}${attributes?.length > 0 ? ` {${attributes.map(([k, [t, d, u, r]]) => `${k}: ["${t}", "${d}", "${u}", "${r}"]`).join(",")}}` : ""}) RETURN n`
+        return `CREATE (n${label ? `:${label}` : ""}${formateAttributes?.length > 0 ? ` {${formateAttributes.map(([k, v]) => `${k}: "${v}"`).join(",")}}` : ""}) RETURN n`
     }
-    return `MATCH (a), (b) WHERE ID(a) = ${selectedNodes[0].id} AND ID(b) = ${selectedNodes[1].id} CREATE (a)-[e${label ? `:${label}` : ""}${attributes?.length > 0 ? ` {${attributes.map(([k, [t, d, u, un]]) => `${k}: ["${t}", "${d}", "${u}", "${un}"]`).join(",")}}` : ""}]->(b) RETURN e`
+    return `MATCH (a), (b) WHERE ID(a) = ${selectedNodes[0].id} AND ID(b) = ${selectedNodes[1].id} CREATE (a)-[e${label ? `:${label}` : ""}${formateAttributes?.length > 0 ? ` {${formateAttributes.map(([k, v]) => `${k}: "${v}"`).join(",")}}` : ""}]->(b) RETURN e`
 }
 
 export default function SchemaView({ schema, fetchCount, session }: Props) {
@@ -50,7 +60,7 @@ export default function SchemaView({ schema, fetchCount, session }: Props) {
 
     useEffect(() => {
         setData({ ...schema.Elements })
-    }, [schema.Id])
+    }, [schema.Elements, schema.Id])
 
     useEffect(() => {
         dataPanel.current?.collapse()
@@ -136,7 +146,7 @@ export default function SchemaView({ schema, fetchCount, session }: Props) {
         const q = `${conditionsNodes.length > 0 ? `MATCH (n) WHERE ${conditionsNodes.join(" OR ")} DELETE n` : ""}${conditionsEdges.length > 0 && conditionsNodes.length > 0 ? " WITH * " : ""}${conditionsEdges.length > 0 ? `MATCH ()-[e]-() WHERE ${conditionsEdges.join(" OR ")} DELETE e` : ""}`
         const result = await securedFetch(`api/graph/${prepareArg(schema.Id)}_schema/?query=${prepareArg(q)} `, {
             method: "GET"
-        }, toast)
+        }, session?.user?.role, toast)
 
         if (!result.ok) return
 
@@ -173,7 +183,7 @@ export default function SchemaView({ schema, fetchCount, session }: Props) {
         const q = `MATCH ${type ? "(e)" : "()-[e]-()"} WHERE ID(e) = ${id} SET e.${key} = "${value.join(",")}"`
         const { ok } = await securedFetch(`api/graph/${prepareArg(schema.Id)}_schema/?query=${prepareArg(q)}`, {
             method: "GET"
-        }, toast)
+        }, session?.user?.role, toast)
 
         if (ok) {
             if (type) {
@@ -247,7 +257,7 @@ export default function SchemaView({ schema, fetchCount, session }: Props) {
         const q = `MATCH ${type ? "(e)" : "()-[e]-()"} WHERE ID(e) = ${id} SET e.${key} = NULL`
         const { ok } = await securedFetch(`api/graph/${prepareArg(schema.Id)}_schema/?query=${prepareArg(q)}`, {
             method: "GET"
-        }, toast)
+        }, session?.user?.role, toast)
 
         if (ok) {
             if (type) {
@@ -286,16 +296,16 @@ export default function SchemaView({ schema, fetchCount, session }: Props) {
 
         const result = await securedFetch(`api/graph/${prepareArg(schema.Id)}_schema/?query=${getCreateQuery(isAddEntity, selectedNodes as [Node, Node], attributes, label)}`, {
             method: "GET"
-        }, toast)
+        }, session?.user?.role, toast)
 
         if (result.ok) {
             const json = await result.json()
 
             if (isAddEntity) {
-                schema.extendNode(json.result.data[0].n)
+                schema.extendNode(json.result.data[0].n, false, true)
                 setIsAddEntity(false)
             } else {
-                schema.extendEdge(json.result.data[0].e, true)
+                schema.extendEdge(json.result.data[0].e, false, true)
                 setIsAddRelation(false)
             }
 
@@ -319,7 +329,7 @@ export default function SchemaView({ schema, fetchCount, session }: Props) {
                 <div className="flex items-center justify-between">
                     <Toolbar
                         selectedElementsLength={selectedElements.length}
-                        disabled={!schema.Id}
+                        disabled={session?.user.role === "Read-Only" || !schema.Id}
                         deleteDisabled={Object.values(selectedElements).length === 0 && !selectedElement}
                         onAddEntity={() => {
                             setIsAddEntity(true)
@@ -337,7 +347,7 @@ export default function SchemaView({ schema, fetchCount, session }: Props) {
                         }}
                         onDeleteElement={handleDeleteElement}
                         chartRef={chartRef}
-                        addDisabled={session?.user.role === "Read-Only"}
+                        displayAdd
                     />
                     {
                         isCollapsed &&
@@ -362,19 +372,26 @@ export default function SchemaView({ schema, fetchCount, session }: Props) {
                                 : <Maximize2 size={20} />
                         }
                     </Button>
-                    <div className="z-10 absolute top-4 left-4 flex items-center gap-2 pointer-events-none">
-                        {cooldownTicks === undefined ? <Play size={20} /> : <Pause size={20} />}
-                        <Switch
-                            title="Animation Control"
-                            className="pointer-events-auto"
-                            checked={cooldownTicks === undefined}
-                            onCheckedChange={() => {
-                                handleCooldown(cooldownTicks === undefined ? 0 : undefined)
-                            }}
-                        />
+                    <div className="z-10 absolute top-4 left-4 pointer-events-none">
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <div className="flex items-center gap-2">
+                                    {cooldownTicks === undefined ? <Play size={20} /> : <Pause size={20} />}
+                                    <Switch
+                                        className="pointer-events-auto"
+                                        checked={cooldownTicks === undefined}
+                                        onCheckedChange={() => {
+                                            handleCooldown(cooldownTicks === undefined ? 0 : undefined)
+                                        }}
+                                    />
+                                </div>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                                <p>Animation Control</p>
+                            </TooltipContent>
+                        </Tooltip>
                     </div>
                     <ForceGraph
-                        isCollapsed={isCollapsed}
                         chartRef={chartRef}
                         data={data}
                         graph={schema}
