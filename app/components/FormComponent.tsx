@@ -130,9 +130,8 @@ export default function FormComponent({ handleSubmit, fields, error = undefined,
                                 }
                                 <p className="text-sm text-gray-500">{field.description}</p>
                                 {
-                                    field.errors && errors[field.label] ?
+                                    field.errors && errors[field.label] &&
                                         <p className="text-sm text-red-500">{field.errors.find((err) => err.condition(field.value))?.message}</p>
-                                        : <p className="h-5" />
                                 }
                             </div>
                         </div>
@@ -141,7 +140,7 @@ export default function FormComponent({ handleSubmit, fields, error = undefined,
             }
             {children}
             {error?.show && <p className="text-sm text-red-500">{error.message}</p>}
-            <div className="flex justify-end gap-2 mt-10">
+            <div className="flex justify-end gap-2 mt-4">
                 <Button
                     className="grow bg-primary p-4 rounded-lg flex justify-center"
                     label={submitButtonLabel}
