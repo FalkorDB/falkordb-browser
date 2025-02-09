@@ -23,13 +23,13 @@ export default function Page() {
         const q1 = "MATCH (n) RETURN COUNT(n) as nodes"
         const q2 = "MATCH ()-[e]->() RETURN COUNT(e) as edges"
 
-        const nodes = await (await securedFetch(`api/graph/${prepareArg(name)}/?query=${q1}&role=${session?.user.role}`, {
+        const nodes = await (await securedFetch(`api/graph/${prepareArg(name)}/?query=${q1}`, {
             method: "GET"
-        }, toast)).json()
+        }, session?.user?.role, toast)).json()
 
-        const edges = await (await securedFetch(`api/graph/${prepareArg(name)}/?query=${q2}&role=${session?.user.role}`, {
+        const edges = await (await securedFetch(`api/graph/${prepareArg(name)}/?query=${q2}`, {
             method: "GET"
-        }, toast)).json()
+        }, session?.user?.role, toast)).json()
 
         if (!edges || !nodes) return
 
@@ -40,9 +40,9 @@ export default function Page() {
     useEffect(() => {
         if (!schemaName) return
         const run = async () => {
-            const result = await securedFetch(`/api/graph/${prepareArg(schemaName)}_schema/?query=${defaultQuery()}&role=${session?.user.role}`, {
+            const result = await securedFetch(`/api/graph/${prepareArg(schemaName)}_schema/?query=${defaultQuery()}`, {
                 method: "GET"
-            }, toast)
+            }, session?.user?.role, toast)
             if (!result.ok) return
             const json = await result.json()
             const colors = localStorage.getItem(schemaName)?.split(/[[\]",]/).filter(c => c)
@@ -56,7 +56,7 @@ export default function Page() {
 
     return (
         <div className="Page">
-            <Header />
+            <Header onSetGraphName={setSchemaName}/>
             <div className="h-1 grow p-8 px-10 flex flex-col gap-8">
                 <Selector
                     setGraphName={setSchemaName}

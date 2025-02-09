@@ -1,5 +1,6 @@
 /* eslint-disable react/button-has-type */
 /* eslint-disable react/jsx-props-no-spreading */
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { cn } from "@/lib/utils"
 import { forwardRef } from "react"
 
@@ -42,19 +43,38 @@ const getClassName = (variant: Variant, disable: boolean | undefined, open: bool
     return className
 }
 
-const Button = forwardRef<HTMLButtonElement, Props>(({ label, variant = "button", open, className, title, type = "button", disabled, children, ...props }, ref) => (
-    <button
-        ref={ref}
-        className={getClassName(variant, disabled, open, className)}
-        disabled={disabled}
-        title={title || label}
-        type={type}
-        {...props}
-    >
-        {children}
-        {label}
-    </button>
-))
+const Button = forwardRef<HTMLButtonElement, Props>(({ label, variant = "button", open, className, title, type = "button", disabled, children, ...props }, ref) =>
+    (title || label) ? (
+        <Tooltip>
+            <TooltipTrigger asChild>
+                <button
+                    ref={ref}
+                    className={getClassName(variant, disabled, open, className)}
+                    disabled={disabled}
+                    aria-label={title}
+                    type={type}
+                    {...props}
+                >
+                    {children}
+                    {label}
+                </button>
+            </TooltipTrigger>
+            <TooltipContent>
+                {title || label}
+            </TooltipContent>
+        </Tooltip>
+    ) : (
+        <button
+            ref={ref}
+            className={getClassName(variant, disabled, open, className)}
+            disabled={disabled}
+            type={type}
+            {...props}
+        >
+            {children}
+            {label}
+        </button>
+    ))
 
 Button.displayName = "Button"
 

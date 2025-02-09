@@ -8,7 +8,7 @@ export default class SettingsConfigPage extends BasePage {
     }
 
     async getRoleContentValue(role: string): Promise<string | null> {
-        const value = await this.roleContentValue(role).getAttribute('title')
+        const value = await this.roleContentValue(role).textContent();
         return value
     }
 

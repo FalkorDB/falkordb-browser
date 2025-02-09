@@ -143,7 +143,7 @@ export default function SchemaDataPanel({ obj, onExpand, onSetAttributes, onRemo
                     </Button>
                     <p>{label}</p>
                 </div>
-                <p className="font-medium text-xl"><span className="text-primary">{attributes.length}</span> Attributes</p>
+                <p className="font-medium text-xl">{attributes.length}&ensp;Attributes</p>
             </div>
             <Table parentClassName="grow">
                 <TableHeader>

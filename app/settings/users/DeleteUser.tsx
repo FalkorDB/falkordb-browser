@@ -5,14 +5,17 @@ import { Dispatch, SetStateAction } from "react";
 import Button from "@/app/components/ui/Button";
 import { securedFetch } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
+import { useSession } from "next-auth/react";
+import { Row } from "@/app/components/TableComponent";
 
 interface DeleteUserProps {
     users: User[]
     setUsers: Dispatch<SetStateAction<User[]>>
+    setRows: Dispatch<SetStateAction<Row[]>>
 }
 
-export default function DeleteUser({ users, setUsers }: DeleteUserProps) {
-    
+export default function DeleteUser({ users, setUsers, setRows }: DeleteUserProps) {
+    const { data: session } = useSession()
     const { toast } = useToast()
     
     const deleteSelected = async () => {
@@ -24,7 +27,7 @@ export default function DeleteUser({ users, setUsers }: DeleteUserProps) {
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({ users })
-        }, toast)
+        }, session?.user?.role, toast)
 
         if (response.ok) {
             toast({
@@ -32,6 +35,7 @@ export default function DeleteUser({ users, setUsers }: DeleteUserProps) {
                 description: "User deleted successfully",
             })
             setUsers(prev => prev.filter(user => !users.find(u => user.username === u.username)))
+            setRows(prev => prev.filter(row => !users.find(u => row.cells[0].value === u.username)))
         }
     }
 

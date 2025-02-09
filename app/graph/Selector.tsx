@@ -1,6 +1,6 @@
 'use client'
 
-import { SetStateAction, Dispatch, useEffect, useRef, useState } from "react";
+import { SetStateAction, Dispatch, useEffect, useRef, useState, useCallback } from "react";
 import { DialogTitle } from "@/components/ui/dialog";
 import { Editor } from "@monaco-editor/react";
 import { editor } from "monaco-editor";
@@ -46,7 +46,7 @@ export default function Selector({ onChange, graphName, setGraphName, queries, r
     const type = pathname.includes("/schema") ? "Schema" : "Graph"
     const [isRotating, setIsRotating] = useState(false);
     const { toast } = useToast()
-    
+
     useEffect(() => {
         if (!graphName) return
         setOptions(prev => {
@@ -56,29 +56,30 @@ export default function Selector({ onChange, graphName, setGraphName, queries, r
         })
     }, [graphName])
 
-    const getOptions = async () => {
+    const getOptions = useCallback(async () => {
         const result = await securedFetch("api/graph", {
             method: "GET"
-        }, toast)
+        }, session?.user?.role, toast)
         if (!result.ok) return
         const res = (await result.json()).result as string[]
         setOptions(!runQuery ? res.filter(name => name.includes("_schema")).map(name => name.split("_")[0]) : res.filter(name => !name.includes("_schema")))
-    }
+    }, [runQuery, session?.user?.role, toast])
 
     useEffect(() => {
         getOptions()
-    }, [])
+    }, [getOptions])
 
     const handleEditorDidMount = (e: editor.IStandaloneCodeEditor) => {
         editorRef.current = e
     }
 
     const handleOnChange = async (name: string) => {
+        const formattedName = name === '""' ? "" : name
         if (runQuery) {
             const q = 'MATCH (n)-[e]-(m) return n,e,m'
-            const result = await securedFetch(`api/graph/${prepareArg(name)}_schema/?query=${prepareArg(q)}&create=false&role=${session?.user.role}`, {
+            const result = await securedFetch(`api/graph/${prepareArg(name)}_schema/?query=${prepareArg(q)}&create=false`, {
                 method: "GET"
-            }, toast)
+            }, session?.user?.role, toast)
 
             if (!result.ok) return
 
@@ -87,7 +88,7 @@ export default function Selector({ onChange, graphName, setGraphName, queries, r
                 setSchema(Graph.create(name, json.result, false, true))
             }
         }
-        onChange(name)
+        onChange(formattedName)
         setSelectedValue(name)
     }
 
@@ -120,6 +121,7 @@ export default function Selector({ onChange, graphName, setGraphName, queries, r
                             isRotating && "animate-spin duration-1000"
                         )}
                         onClick={handleReloadClick}
+                        title="Reload Graphs List"
                     >
                         <RefreshCcw size={20} />
                     </Button>
@@ -135,6 +137,12 @@ export default function Selector({ onChange, graphName, setGraphName, queries, r
                 </div>
                 <div className="flex gap-16 text-[#e5e7eb]">
                     <ExportGraph
+                        trigger={
+                            <Button
+                                label="Export Data"
+                                disabled={!selectedValue}
+                            />
+                        }
                         type={type}
                         selectedValues={[selectedValue]}
                     />
@@ -145,6 +153,7 @@ export default function Selector({ onChange, graphName, setGraphName, queries, r
                         onDuplicate={(name) => {
                             setOptions(prev => [...prev, name])
                             setSelectedValue(name)
+                            setGraphName(name)
                         }}
                         selectedValue={selectedValue}
                     />
@@ -155,10 +164,9 @@ export default function Selector({ onChange, graphName, setGraphName, queries, r
                 {
                     selectedValue &&
                     <div className="flex gap-6">
-                        <p>Created on 2/2 24</p>
-                        <span><span className="text-primary">{nodesCount}</span>&ensp;Nodes</span>
+                        <span>{nodesCount}&ensp;Nodes</span>
                         <p className="text-secondary">|</p>
-                        <span><span className="text-primary">{edgesCount}</span>&ensp;Edges</span>
+                        <span>{edgesCount}&ensp;Edges</span>
                     </div>
                 }
                 {

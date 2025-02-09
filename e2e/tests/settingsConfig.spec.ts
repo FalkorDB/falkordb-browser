@@ -138,7 +138,6 @@ test.describe('Settings Tests', () => {
             await apiCall.modifySettingsRole(roles.maxInfoQueries, input)
             await settingsConfigPage.refreshPage()
             const value = await settingsConfigPage.getRoleContentValue(roles.maxInfoQueries)
-            console.log(value);
             expect(value === input).toBe(expected);
             if (index === Data.inputDataAcceptsZero.length - 1) {
                 await apiCall.modifySettingsRole(roles.maxInfoQueries, "1000");
@@ -146,98 +145,88 @@ test.describe('Settings Tests', () => {
         });
     })
 
-    test(`@admin Modify maxQueuedQueries via UI validation via API: Input value: 24`, async () => {
+    test(`@admin Modify maxQueuedQueries via UI validation via API: Input value: ${Data.roleModificationData[0].input}`, async () => {
         const settingsConfigPage = await browser.createNewPage(SettingsConfigPage, urls.settingsUrl)
-        await settingsConfigPage.modifyRoleValue(roles.maxQueuedQueries, "24")
+        await settingsConfigPage.modifyRoleValue(roles.maxQueuedQueries, Data.roleModificationData[0].input)
         const apiCall = new ApiCalls()
         let value = String((await apiCall.getSettingsRoleValue(roles.maxQueuedQueries)).config[1]);
-        expect(value === "24").toBe(true);
+        expect(value === Data.roleModificationData[0].input).toBe(true);
         await apiCall.modifySettingsRole(roles.maxQueuedQueries, "25")
     });
 
-    test(`@admin Modify TimeOut via UI validation via API: Input value: 1001`, async () => {
+    test(`@admin Modify TimeOut via UI validation via API: Input value: ${Data.roleModificationData[1].input}`, async () => {
         const settingsConfigPage = await browser.createNewPage(SettingsConfigPage, urls.settingsUrl)
-        await settingsConfigPage.modifyRoleValue(roles.TimeOut, "1001")
+        await settingsConfigPage.modifyRoleValue(roles.TimeOut, Data.roleModificationData[1].input)
         const apiCall = new ApiCalls()
         let value = String((await apiCall.getSettingsRoleValue(roles.TimeOut)).config[1]);
-        expect(value === "1001").toBe(true);
+        expect(value === Data.roleModificationData[1].input).toBe(true);
         await apiCall.modifySettingsRole(roles.TimeOut, "1000")
     });
 
-    test(`@admin Modify maxTimeOut via UI validation via API: Input value: 1`, async () => {
+    test(`@admin Modify maxTimeOut via UI validation via API: Input value: ${Data.roleModificationData[2].input}`, async () => {
         const settingsConfigPage = await browser.createNewPage(SettingsConfigPage, urls.settingsUrl)
-        await settingsConfigPage.modifyRoleValue(roles.maxTimeOut, "1")
+        await settingsConfigPage.modifyRoleValue(roles.maxTimeOut, Data.roleModificationData[2].input)
         const apiCall = new ApiCalls()
         let value = String((await apiCall.getSettingsRoleValue(roles.maxTimeOut)).config[1]);
-        expect(value === "1").toBe(true);
+        expect(value === Data.roleModificationData[2].input).toBe(true);
         await apiCall.modifySettingsRole(roles.maxTimeOut, "0")
     });
 
-    test(`@admin Modify defaultTimeOut via UI validation via API: Input value: 1`, async () => {
+    test(`@admin Modify defaultTimeOut via UI validation via API: Input value: ${Data.roleModificationData[3].input}`, async () => {
         const settingsConfigPage = await browser.createNewPage(SettingsConfigPage, urls.settingsUrl)
-        await settingsConfigPage.modifyRoleValue(roles.defaultTimeOut, "1")
+        await settingsConfigPage.modifyRoleValue(roles.defaultTimeOut, Data.roleModificationData[3].input)
         const apiCall = new ApiCalls()
         let value = String((await apiCall.getSettingsRoleValue(roles.defaultTimeOut)).config[1]);
-        expect(value === "1").toBe(true);
+        expect(value === Data.roleModificationData[3].input).toBe(true);
         await apiCall.modifySettingsRole(roles.defaultTimeOut, "0")
     });
 
-    test(`@admin Modify resultSetSize via UI validation via API: Input value: 10001`, async () => {
+    test(`@admin Modify resultSetSize via UI validation via API: Input value: ${Data.roleModificationData[4].input}`, async () => {
         const settingsConfigPage = await browser.createNewPage(SettingsConfigPage, urls.settingsUrl)
-        await settingsConfigPage.modifyRoleValue(roles.resultSetSize, "10001")
+        await settingsConfigPage.modifyRoleValue(roles.resultSetSize, Data.roleModificationData[4].input)
         const apiCall = new ApiCalls()
         let value = String((await apiCall.getSettingsRoleValue(roles.resultSetSize)).config[1]);
-        expect(value === "10001").toBe(true);
+        expect(value === Data.roleModificationData[4].input).toBe(true);
         await apiCall.modifySettingsRole(roles.resultSetSize, "10000")
     });
 
-    test(`@admin Modify queryMemCapacity via UI validation via API: Input value: 1`, async () => {
+    test(`@admin Modify queryMemCapacity via UI validation via API: Input value: ${Data.roleModificationData[5].input}`, async () => {
         const settingsConfigPage = await browser.createNewPage(SettingsConfigPage, urls.settingsUrl)
-        await settingsConfigPage.modifyRoleValue(roles.queryMemCapacity, "1")
+        await settingsConfigPage.modifyRoleValue(roles.queryMemCapacity, Data.roleModificationData[5].input)
         const apiCall = new ApiCalls()
         let value = String((await apiCall.getSettingsRoleValue(roles.queryMemCapacity)).config[1]);
-        expect(value === "1").toBe(true);
+        expect(value === Data.roleModificationData[5].input).toBe(true);
         await apiCall.modifySettingsRole(roles.queryMemCapacity, "0")
     });
 
-    test(`@admin Modify vKeyMaxEntityCount via UI validation via API: Input value: 100001`, async () => {
+    test(`@admin Modify vKeyMaxEntityCount via UI validation via API: Input value: ${Data.roleModificationData[6].input}`, async () => {
         const settingsConfigPage = await browser.createNewPage(SettingsConfigPage, urls.settingsUrl)
-        await settingsConfigPage.modifyRoleValue(roles.vKeyMaxEntityCount, "100001")
+        await settingsConfigPage.modifyRoleValue(roles.vKeyMaxEntityCount, Data.roleModificationData[6].input)
         const apiCall = new ApiCalls()
         let value = String((await apiCall.getSettingsRoleValue(roles.vKeyMaxEntityCount)).config[1]);
-        expect(value === "100001").toBe(true);
+        expect(value === Data.roleModificationData[6].input).toBe(true);
         await apiCall.modifySettingsRole(roles.vKeyMaxEntityCount, "100000")
     });
 
-    test(`@admin Modify cmdInfo via UI validation via API: Input value: no`, async () => {
+    test(`@admin Modify cmdInfo via UI validation via API: Input value: ${Data.roleModificationData[7].input}`, async () => {
         const settingsConfigPage = await browser.createNewPage(SettingsConfigPage, urls.settingsUrl)
-        await settingsConfigPage.modifyRoleValue(roles.cmdInfo, "no")
+        await settingsConfigPage.modifyRoleValue(roles.cmdInfo, Data.roleModificationData[7].input)
         const apiCall = new ApiCalls()
         let value = String((await apiCall.getSettingsRoleValue(roles.cmdInfo)).config[1]);
         value = value === '1' ? 'yes' : value === '0' ? 'no' : value;
-        expect(value === "no").toBe(true);
+        expect(value === Data.roleModificationData[7].input).toBe(true);
         await apiCall.modifySettingsRole(roles.cmdInfo, "yes")
     });
 
-    test(`@admin Modify maxInfoQueries via UI validation via API: Input value: 999`, async () => {
+    test(`@admin Modify maxInfoQueries via UI validation via API: Input value: ${Data.roleModificationData[8].input}`, async () => {
         const settingsConfigPage = await browser.createNewPage(SettingsConfigPage, urls.settingsUrl)
-        await settingsConfigPage.modifyRoleValue(roles.maxInfoQueries, "999")
+        await settingsConfigPage.modifyRoleValue(roles.maxInfoQueries, Data.roleModificationData[8].input)
         await settingsConfigPage.refreshPage();
         await settingsConfigPage.scrollToBottomInTable();
-        const res = await settingsConfigPage.getRoleContentValue(roles.maxInfoQueries);
-        console.log("ui value: ", res);
-        
-        await new Promise(resolve => { setTimeout(resolve, 3000) });
+        await settingsConfigPage.getRoleContentValue(roles.maxInfoQueries);
         const apiCall = new ApiCalls()
-        let value;
-        for (let i = 0; i < 5; i++) {
-            value = String((await apiCall.getSettingsRoleValue(roles.maxInfoQueries)).config[1]);
-            if (value === "999") break;
-            await new Promise(resolve => setTimeout(resolve, 1500));
-        }
-
-        console.log("api value:", value);
-        expect(value).toBe("999");
+        let value = String((await apiCall.getSettingsRoleValue(roles.maxInfoQueries)).config[1]);
+        expect(value).toBe(Data.roleModificationData[8].input);
         await apiCall.modifySettingsRole(roles.maxInfoQueries, "1000");
     });
 

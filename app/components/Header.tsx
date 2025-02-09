@@ -35,18 +35,18 @@ export default function Header({ onSetGraphName }: Props) {
                         href="https://www.falkordb.com"
                         target="_blank" rel="noreferrer"
                     >
-                        <Image priority width={103} height={29} src="/Logo.svg" alt="" />
+                        <Image style={{ width: 'auto', height: '40px' }} priority width={0} height={0} src="/Logo.svg" alt="" />
                     </a>
                     <p className="text-neutral-200" >|</p>
                     <div className="flex gap-2 bg-foreground rounded-lg p-2">
                         <Button
                             label="Graphs"
-                            className={cn("px-4 py-1 rounded-lg", pathname.includes("/graph") && "bg-background")}
+                            className={cn("px-4 py-1 rounded-lg", pathname.includes("/graph") ? "bg-background" : "text-gray-500")}
                             onClick={() => router.push("/graph")}
                         />
                         <Button
                             label="Schemas"
-                            className={cn("px-4 py-1 rounded-lg", pathname.includes("/schema") && "bg-background")}
+                            className={cn("px-4 py-1 rounded-lg", pathname.includes("/schema") ? "bg-background" : "text-gray-500")}
                             onClick={() => router.push("/schema")}
                         />
                     </div>
@@ -65,7 +65,7 @@ export default function Header({ onSetGraphName }: Props) {
                                     </Button>
                                 </NavigationMenuLink>
                                 <NavigationMenuItem>
-                                    <NavigationMenuTrigger className="gap-2 bg-foreground">
+                                    <NavigationMenuTrigger onClick={(e) => e.preventDefault()} className="gap-2 bg-foreground">
                                         <LifeBuoy size={25} />
                                         <p>Help</p>
                                     </NavigationMenuTrigger>
@@ -108,10 +108,12 @@ export default function Header({ onSetGraphName }: Props) {
                             </NavigationMenuList>
                         </NavigationMenu>
                         <SheetContent className="bg-popover-foreground flex flex-col gap-4 items-center text-foreground !max-w-[30rem]">
-                            <VisuallyHidden><SheetTitle /></VisuallyHidden>
-                            <VisuallyHidden><SheetDescription /></VisuallyHidden>
+                            <VisuallyHidden>
+                                <SheetTitle />
+                                <SheetDescription />
+                            </VisuallyHidden>
                             <div className="h-1 grow flex flex-col gap-8 items-center justify-center">
-                                <Image priority src="/ColorLogo.svg" alt="Loading..." width={120} height={1} />
+                                <Image style={{ width: 'auto', height: '50px' }} priority src="/ColorLogo.svg" alt="" width={0} height={0} />
                                 <h1 className="text-3xl font-bold">We Make AI Reliable</h1>
                                 <p className="text-xl text-center">
                                     Delivering a scalable,

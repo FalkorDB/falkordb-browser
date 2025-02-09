@@ -1,3 +1,4 @@
+/* eslint-disable import/no-cycle */
 /* eslint-disable @typescript-eslint/no-use-before-define */
 /* eslint-disable react/require-default-props */
 
@@ -8,6 +9,8 @@ import { cn, prepareArg, securedFetch } from "@/lib/utils"
 import { useEffect, useState } from "react"
 import { Select, SelectContent, SelectGroup, SelectItem, SelectSeparator, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useToast } from "@/components/ui/use-toast"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
+import { useSession } from "next-auth/react"
 import Button from "./Button"
 import TableComponent, { Row } from "../TableComponent"
 import CloseDialog from "../CloseDialog"
@@ -35,7 +38,7 @@ export default function Combobox({ isSelectGraph = false, disabled = false, inTa
   const [rows, setRows] = useState<Row[]>([])
   const [openDelete, setOpenDelete] = useState<boolean>(false)
   const { toast } = useToast()
-
+  const { data: session } = useSession()
 
   const handleSetOption = async (option: string, optionName: string) => {
     const result = await securedFetch(`api/graph/${prepareArg(option)}/?sourceName=${prepareArg(optionName)}`, {
@@ -44,7 +47,7 @@ export default function Combobox({ isSelectGraph = false, disabled = false, inTa
         "Content-Type": "application/json"
       },
       body: JSON.stringify({ name: optionName })
-    }, toast)
+    }, session?.user?.role, toast)
 
     if (result.ok) {
 
@@ -69,7 +72,7 @@ export default function Combobox({ isSelectGraph = false, disabled = false, inTa
     if (options.length !== 1 || !setSelectedValue) return
 
     setSelectedValue(options[0])
-  }, [options])
+  }, [options, setSelectedValue])
 
   const handleDelete = async (opts: string[]) => {
     const names = opts.map(opt => isSchema ? `${opt}_schema` : opt)
@@ -77,7 +80,7 @@ export default function Combobox({ isSelectGraph = false, disabled = false, inTa
     const newNames = await Promise.all(names.map(async (name) => {
       const result = await securedFetch(`api/graph/${prepareArg(name)}`, {
         method: "DELETE"
-      }, toast)
+      }, session?.user?.role, toast)
 
       if (!result.ok) return name
 
@@ -92,6 +95,10 @@ export default function Combobox({ isSelectGraph = false, disabled = false, inTa
     setOpenDelete(false)
     setOpenMenage(false)
     handleSetRows(options.filter(opt => !opts.includes(opt)))
+    toast({
+      title: "Graph(s) deleted successfully",
+      description: "The graph(s) have been deleted successfully",
+    })
   }
 
   return (
@@ -100,19 +107,26 @@ export default function Combobox({ isSelectGraph = false, disabled = false, inTa
         setOpen(o)
         if (onOpenChange) onOpenChange(o)
       }}>
-        <SelectTrigger data-type="select" disabled={disabled || options.length === 0} title={options.length === 0 ? "There is no graphs" : selectedValue || `Select ${type || "Graph"}`} className={cn("w-fit gap-2 border-none p-2", inTable ? "text-sm font-light" : "text-xl font-medium")}>
-          <SelectValue placeholder={`Select ${type || "Graph"}`} />
-        </SelectTrigger>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <SelectTrigger data-type="select" disabled={disabled || options.length === 0} className={cn("w-fit gap-2 border-none p-2", inTable ? "text-sm font-light" : "text-xl font-medium")}>
+              <SelectValue placeholder={`Select ${type || "Graph"}`} />
+            </SelectTrigger>
+          </TooltipTrigger>
+          <TooltipContent>
+            {options.length === 0 ? "There is no graphs" : selectedValue || `Select ${type || "Graph"}`}
+          </TooltipContent>
+        </Tooltip>
         <SelectContent className="min-w-52 max-h-[30lvh] bg-foreground">
           <SelectGroup>
             <ul className="shrink grow overflow-auto">
               {
                 options.map((option) => (
                   <SelectItem
-                    value={option}
-                    key={option}
+                    value={!option ? '""' : option}
+                    key={`key-${option}`}
                   >
-                    {option}
+                    {!option ? '""' : option}
                   </SelectItem>
                 ))
               }
@@ -148,10 +162,11 @@ export default function Combobox({ isSelectGraph = false, disabled = false, inTa
             onOpenChange={setOpenDelete}
             title="Delete Graph"
             trigger={<Button
+              variant="Primary"
               disabled={rows.filter(opt => opt.checked).length === 0}
               label="Delete"
             />}
-            description="Are you sure you want to delete the selected graph?"
+            description="Are you sure you want to delete the selected graph(s)?"
           >
             <div className="flex justify-end gap-2">
               <Button
@@ -162,7 +177,17 @@ export default function Combobox({ isSelectGraph = false, disabled = false, inTa
               <CloseDialog label="Cancel" />
             </div>
           </DialogComponent>
-          <ExportGraph selectedValues={rows.filter(opt => opt.checked).map(opt => opt.cells[0].value as string)} type={type!} />
+          <ExportGraph
+            trigger={
+              <Button
+                variant="Primary"
+                label="Export Data"
+                disabled={rows.filter(opt => opt.checked).length === 0}
+              />
+            }
+            selectedValues={rows.filter(opt => opt.checked).map(opt => opt.cells[0].value as string)}
+            type={type!}
+          />
         </TableComponent>
       </DialogContent>
     </Dialog >

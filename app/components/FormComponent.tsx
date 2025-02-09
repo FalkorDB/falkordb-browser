@@ -4,8 +4,9 @@
 "use client"
 
 import { useState } from "react"
-import { AlertCircle, EyeIcon, EyeOffIcon } from "lucide-react"
+import { EyeIcon, EyeOffIcon, InfoIcon } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import Button from "./ui/Button"
 import Combobox from "./ui/combobox"
 import Input from "./ui/Input"
@@ -74,9 +75,14 @@ export default function FormComponent({ handleSubmit, fields, error = undefined,
                                 <label className={cn(errors[field.label] && "text-red-500")} htmlFor={field.label}>{field.required && <span>*</span>} {field.label}</label>
                                 {
                                     field.info &&
-                                    <Button title={field.info}>
-                                        <AlertCircle size={20} />
-                                    </Button>
+                                    <Tooltip>
+                                        <TooltipTrigger asChild>
+                                            <InfoIcon size={20} />
+                                        </TooltipTrigger>
+                                        <TooltipContent>
+                                            {field.info}
+                                        </TooltipContent>
+                                    </Tooltip>
                                 }
                             </div>
                             <div className="relative flex flex-col gap-2">
