@@ -238,7 +238,7 @@ export class Graph {
         return graph
     }
 
-    public extendNode(cell: NodeCell, collapsed: boolean, isSchema: boolean) {
+    public extendNode(cell: NodeCell, collapsed: boolean, isSchema: boolean): Node | undefined {
         // check if category already exists in categories
         const categories = this.createCategory(cell.labels.length === 0 ? [""] : cell.labels)
         // check if node already exists in nodes or fake node was created
@@ -272,12 +272,13 @@ export class Graph {
             Object.entries(cell.properties).forEach(([key, value]) => {
                 currentNode.data[key] = isSchema ? getSchemaValue(value) : value;
             });
+            return currentNode
         }
 
-        return currentNode
+        return undefined
     }
 
-    public extendEdge(cell: LinkCell, collapsed: boolean, isSchema: boolean) {
+    public extendEdge(cell: LinkCell, collapsed: boolean, isSchema: boolean): Link | undefined {
         const label = this.createLabel(cell.relationshipType)
         const currentEdge = this.linksMap.get(cell.id)
 
@@ -382,11 +383,11 @@ export class Graph {
             return link
         }
 
-        return currentEdge
+        return undefined
     }
 
     public extend(results: { data: Data, metadata: any[] }, collapsed = false, isSchema = false): (Node | Link)[] {
-        const newElements: (Node | Link)[] = []
+        const newElements: (Node | Link | undefined)[] = []
         const data = results?.data
 
         if (data?.length) {
@@ -417,7 +418,9 @@ export class Graph {
             })
         })
 
-        newElements.filter((element): element is Link => "source" in element).forEach((link) => {
+        newElements.filter((element) => element ? "source" in element : false).forEach((link) => {
+            if (!link) return
+            
             const start = link.source
             const end = link.target
             const sameNodesLinks = this.elements.links.filter(l => (l.source.id === start.id && l.target.id === end.id) || (l.target.id === start.id && l.source.id === end.id))
@@ -446,7 +449,7 @@ export class Graph {
             this.categoriesMap.delete("")
         }
 
-        return newElements
+        return newElements.filter((element) => !!element)
     }
 
     public updateCategories(category: string, type: boolean) {

@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
 "use client"
 
 import React, { useCallback, useEffect, useState } from 'react';
@@ -19,21 +21,27 @@ import {
     useReactFlow,
 } from "@xyflow/react";
 import '@xyflow/react/dist/style.css';
-import Input from '../components/ui/Input';
+import { useSession } from 'next-auth/react';
+import { securedFetch } from '@/lib/utils';
+import { useToast } from '@/components/ui/use-toast';
 import Button from '../components/ui/Button';
+import Input from '../components/ui/Input';
 
-function InputNode({ id, data }: { id: string, data: { onChange: (id: string, value: string) => void, isProcessing?: boolean, success?: boolean } }) {
+function InputNode({ id, data }: { id: string, data: { onChange: (id: string, value: string) => void, value?: string, isProcessing?: boolean, success?: boolean } }) {
     return (
         <div className={`flex flex-col items-start gap-2 p-4 ${data.isProcessing ? 'animate-pulse' : ''}`}>
             <Input
                 className="w-full"
                 type='text'
                 placeholder='Input'
-                onChange={(e) => data.onChange(id, e.target.value)}
+                value={data.value || ''}
+                onChange={(e) => {
+                    data.onChange(id, e.target.value);
+                }}
             />
             {data.isProcessing && <p className="text-blue-500">Processing...</p>}
             {data.success && <p className="text-green-500">Success!</p>}
-            <Handle type="source" position={Position.Bottom} />
+            <Handle className='w-10 h-10' type="source" position={Position.Bottom} />
         </div>
     )
 }
@@ -72,13 +80,13 @@ function NodePanel() {
         event.dataTransfer.setData('application/reactflow', nodeType);
     };
 
-    const [nodes, setNodes] = useState<Node[]>([]);
+    const [nodes, setNodes] = useState<{ type: string }[]>([]);
 
     useEffect(() => {
         setNodes([
-            { id: '1', type: 'input', position: { x: 0, y: 0 }, data: { onChange: () => { } } },
-            { id: '2', type: 'output', position: { x: 0, y: 0 }, data: { output: '' } },
-            { id: '3', type: 'default', position: { x: 0, y: 0 }, data: { label: 'Default' } },
+            { type: 'input' },
+            { type: 'output' },
+            { type: 'default' },
         ]);
     }, []);
 
@@ -88,7 +96,7 @@ function NodePanel() {
             <div className="flex flex-col gap-4">
                 {nodes.map((node) => (
                     <div
-                        key={node.id}
+                        key={node.type}
                         className="rounded border border-gray-200 p-3 cursor-move hover:bg-gray-50"
                         draggable
                         onDragStart={(e) => onDragStart(e, node.type || 'default')}
@@ -105,12 +113,8 @@ function Flow() {
     const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
     const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
     const reactFlowInstance = useReactFlow();
-
-
-    const onConnect = useCallback((params: Connection) =>
-        setEdges((eds) => addEdge(params, eds)),
-        [setEdges]
-    );
+    const { data: session } = useSession();
+    const { toast } = useToast();
 
     const handleInputChange = useCallback((inputId: string, value: string) => {
         // Find connected output nodes
@@ -124,11 +128,11 @@ function Flow() {
                     data: { ...node.data, output: value }
                 };
             }
-            // Update input node with onChange handler
+            // Update input node with onChange handler and value
             if (node.id === inputId) {
                 return {
                     ...node,
-                    data: { ...node.data, onChange: handleInputChange }
+                    data: { ...node.data, onChange: handleInputChange, value }
                 };
             }
             return node;
@@ -146,6 +150,100 @@ function Flow() {
             return node;
         }));
     }, [handleInputChange]);
+
+
+    // Add function to load a flow
+    const loadFlow = useCallback(async () => {
+        try {
+            // Query to get all nodes
+            const nodesQuery = `
+                MATCH (n)
+                RETURN n
+            `;
+
+            const nodesResponse = await securedFetch(
+                `/api/graph/flows?query=${encodeURIComponent(nodesQuery)}`,
+                { method: 'GET' },
+                session?.user?.role,
+                toast
+            );
+
+            if (!nodesResponse.ok) throw new Error('Failed to load nodes');
+            const nodesData = (await nodesResponse.json()).result.data;
+
+            // Transform nodes data
+            const loadedNodes = nodesData.map((record: any) => ({
+                id: record.n.properties.id,
+                type: record.n.properties.type,
+                position: {
+                    x: record.n.properties.positionX,
+                    y: record.n.properties.positionY
+                },
+                data: JSON.parse(record.n.properties.data)
+            }));
+
+            // Query to get all relationships
+            const edgesQuery = `
+                MATCH (source)-[r:FLOWS_TO]->(target)
+                RETURN source.id as sourceId, target.id as targetId, ID(r) as edgeId
+            `;
+
+            const edgesResponse = await securedFetch(
+                `/api/graph/flows?query=${encodeURIComponent(edgesQuery)}`,
+                { method: 'GET' },
+                session?.user?.role,
+                toast
+            );
+
+            const edgesResult = await edgesResponse.json();
+
+            // Transform edges data
+            const loadedEdges = edgesResult.result.data.map((record: any) => ({
+                id: record.edgeId,
+                source: record.sourceId,
+                target: record.targetId,
+                type: 'default',
+                animated: false
+            }));
+
+            setNodes(loadedNodes);
+            setEdges(loadedEdges);
+        } catch (error) {
+            console.error('Error loading flow:', error);
+            toast({
+                title: 'Error',
+                description: 'Failed to load flow',
+            });
+        }
+    }, [setNodes, setEdges]);
+
+    useEffect(() => {
+        loadFlow();
+    }, [loadFlow]);
+
+    const onConnect = useCallback((params: Connection) => {
+        const source = nodes.find(node => node.id === params.source);
+        const target = nodes.find(node => node.id === params.target);
+
+        if (source?.type === "input" && target?.type === "output") {
+            // Get the input node's data value if it exists
+            const inputNode = nodes.find(node => node.id === source.id);
+            const inputValue = inputNode?.data?.value || '';
+
+            // Update the output node with the input value
+            setNodes(nds => nds.map(node => {
+                if (node.id === target.id) {
+                    return {
+                        ...node,
+                        data: { ...node.data, output: inputValue }
+                    };
+                }
+                return node;
+            }));
+        }
+
+        setEdges((eds) => addEdge(params, eds));
+    }, [nodes, setEdges]);
 
     const onDragOver = useCallback((event: React.DragEvent) => {
         event.preventDefault();
@@ -168,33 +266,30 @@ function Flow() {
         }
     };
 
-    const onDrop = useCallback(
-        (event: React.DragEvent) => {
-            event.preventDefault();
+    const onDrop = useCallback((event: React.DragEvent) => {
+        event.preventDefault();
 
-            const reactFlowBounds = (event.target as Element)
-                .closest('.react-flow')
-                ?.getBoundingClientRect();
-            const type = event.dataTransfer.getData('application/reactflow');
+        const reactFlowBounds = (event.target as Element)
+            .closest('.react-flow')
+            ?.getBoundingClientRect();
+        const type = event.dataTransfer.getData('application/reactflow');
 
-            if (!type || !reactFlowBounds) return;
+        if (!type || !reactFlowBounds) return;
 
-            const position = reactFlowInstance.screenToFlowPosition({
-                x: event.clientX - reactFlowBounds.left,
-                y: event.clientY - reactFlowBounds.top,
-            });
+        const position = reactFlowInstance.screenToFlowPosition({
+            x: event.clientX - reactFlowBounds.left,
+            y: event.clientY - reactFlowBounds.top,
+        });
 
-            const newNode = {
-                id: `${type}_${Date.now()}`,
-                type,
-                position,
-                data: getNodeData(type),
-            };
+        const newNode = {
+            id: `${type}_${Date.now()}`,
+            type,
+            position,
+            data: getNodeData(type),
+        };
 
-            setNodes((nds) => nds.concat(newNode));
-        },
-        [setNodes, reactFlowInstance]
-    );
+        setNodes((nds) => nds.concat(newNode));
+    }, [setNodes, reactFlowInstance]);
 
     const findConnectedNodes = (startNodeId: string, visited = new Set<string>()): string[] => {
         if (visited.has(startNodeId)) return [];
@@ -246,7 +341,83 @@ function Flow() {
         return sorted;
     };
 
+    // Add function to save the flow
+    const saveFlow = useCallback(async () => {
+        if (nodes.length === 0) return;
+
+        try {
+            // Delete all existing nodes and relationships
+            const deleteQuery = `
+                MATCH (n)
+                DETACH DELETE n
+            `;
+
+            await securedFetch(
+                `/api/graph/flows?query=${encodeURIComponent(deleteQuery)}`,
+                { method: 'GET' },
+                session?.user?.role,
+                toast
+            );
+
+            // Create nodes
+            const createNodesQuery = `
+                ${nodes.map(node => `
+                    CREATE (:${node.type} {
+                        id: '${node.id}',
+                        type: '${node.type}',
+                        positionX: ${node.position.x},
+                        positionY: ${node.position.y},
+                        data: '${JSON.stringify(node.data)}'
+                    })`).join('\n')}
+            `;
+
+            // Execute create nodes query
+            await securedFetch(
+                `/api/graph/flows?query=${encodeURIComponent(createNodesQuery)}`,
+                { method: 'GET' },
+                session?.user?.role,
+                toast
+            );
+
+            // Create relationships if there are any edges
+            if (edges.length > 0) {
+                const edgeQueries = edges.map(edge => `
+                    MATCH (source {id: '${edge.source}'})
+                    MATCH (target {id: '${edge.target}'})
+                    CREATE (source)-[:FLOWS_TO]->(target)
+                `);
+
+                // Execute all edge creation queries in parallel
+                await Promise.all(
+                    edgeQueries.map(async (edgeQuery) => {
+                        const response = await securedFetch(
+                            `/api/graph/flows?query=${encodeURIComponent(edgeQuery)}`,
+                            { method: 'GET' },
+                            session?.user?.role,
+                            toast
+                        );
+                        return response.json();
+                    })
+                );
+            }
+
+            toast({
+                title: 'Flow saved successfully!',
+                description: 'Graph has been updated',
+            });
+        } catch (error) {
+            console.error('Error saving flow:', error);
+            toast({
+                title: 'Error',
+                description: 'Failed to save flow',
+            });
+        }
+    }, [nodes, edges]);
+
+
     const processNodes = useCallback(async () => {
+
+        saveFlow();
 
         // Group nodes by their connections
         const nodeGroups: string[][] = [];
@@ -302,6 +473,19 @@ function Flow() {
                             (node.id === lastNodeInGroup.id && currentNode.id === lastNodeInGroup.id)
                     }
                 })));
+
+                // If this is the last node, set a timeout to clear the success state
+                if (currentNode.id === lastNodeInGroup.id) {
+                    setTimeout(() => {
+                        setNodes(nds => nds.map(node => ({
+                            ...node,
+                            data: {
+                                ...node.data,
+                                success: false
+                            }
+                        })));
+                    }, 3000); // Clear success after 3 seconds
+                }
             }, Promise.resolve());
 
             // Reset edge animations after group is done
@@ -312,18 +496,47 @@ function Flow() {
         }, Promise.resolve());
     }, [nodes, edges, setNodes, setEdges]);
 
+    const removeFlow = useCallback(async () => {
+        const deleteQuery = `
+            MATCH (n) OPTIONAL MATCH (n)-[r]-()
+            DETACH DELETE n, r
+        `;
+
+        await securedFetch(
+            `/api/graph/flows?query=${encodeURIComponent(deleteQuery)}`,
+            { method: 'GET' },
+            session?.user?.role,
+            toast
+        );
+
+        toast({
+            title: 'Flow removed successfully!',
+            description: 'Graph has been deleted',
+        });
+
+        setNodes([]);
+        setEdges([]);
+    }, []);
+
     return (
         <>
             <NodePanel />
-            <div className="flex gap-20 fixed left-64 bottom-0 z-10 p-4">
-                <Controls className='!relative bg-white' />
-                <Button
-                    className='text-white'
-                    variant='Primary'
-                    onClick={processNodes}
-                >
-                    Run Flow
-                </Button>
+            <div className="flex gap-4 fixed left-72 bottom-0 z-10 p-4 rounded-t-lg shadow-lg bg-white items-center">
+                <Controls className='!relative border border-black rounded-lg' />
+                <div className="flex flex-col gap-4">
+                    <Button
+                        variant='Primary'
+                        onClick={processNodes}
+                    >
+                        Run Flow
+                    </Button>
+                    <Button
+                        variant='Primary'
+                        onClick={removeFlow}
+                    >
+                        Remove Flow
+                    </Button>
+                </div>
             </div>
             <ReactFlow
                 nodes={nodes}
