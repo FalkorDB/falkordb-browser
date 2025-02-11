@@ -209,7 +209,14 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
 
     const handleRunQuery = async (q: string) => {
         await runQuery(q)
-        chartRef.current?.zoomToFit(1000, 40)
+        // Get canvas dimensions
+        const canvas = document.querySelector('.force-graph-container canvas') as HTMLCanvasElement;
+        if (!canvas) return;
+
+        // Calculate padding as 10% of the smallest canvas dimension, with minimum of 40px
+        const minDimension = Math.min(canvas.width, canvas.height);
+        const padding = minDimension * 0.1
+        chartRef.current?.zoomToFit(1000, padding)
         handleCooldown()
     }
 
