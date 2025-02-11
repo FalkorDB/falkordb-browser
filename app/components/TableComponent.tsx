@@ -112,23 +112,22 @@ export default function TableComponent({ headers, rows, children, setRows, optio
                 </TableHeader>
                 <TableBody className="overflow-auto">
                     {
-                        rows
-                            .filter((row) => !search || row.cells.some(cell => 
-                                cell.value && (
-                                    typeof cell.value === "object" 
-                                        ? Object.values(cell.value).some(value =>
-                                            typeof value === "object" 
+                        rows.filter((row) => !search || row.cells.some(cell =>
+                            cell.value && (
+                                typeof cell.value === "object"
+                                    ? Object.values(cell.value).some(value =>
+                                        typeof value === "object"
                                             ? Object.values(value).some(val => val.toString().toLowerCase().includes(search.toLocaleLowerCase()))
                                             : value?.toString().toLowerCase().includes(search.toLowerCase())
-                                          )
-                                        : cell.value.toString().toLowerCase().includes(search.toLowerCase())
-                                )
-                            ))
+                                    )
+                                    : cell.value.toString().toLowerCase().includes(search.toLowerCase())
+                            )
+                        ))
                             .map((row, i) => (
-                                <TableRow 
-                                    onMouseEnter={() => setHover(`${i}`)} 
-                                    onMouseLeave={() => setHover("")} 
-                                    data-id={typeof row.cells[0].value === "string" ? row.cells[0].value : undefined} 
+                                <TableRow
+                                    onMouseEnter={() => setHover(`${i}`)}
+                                    onMouseLeave={() => setHover("")}
+                                    data-id={typeof row.cells[0].value === "string" ? row.cells[0].value : undefined}
                                     key={i}
                                 >
                                     {
