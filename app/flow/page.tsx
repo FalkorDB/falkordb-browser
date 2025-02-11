@@ -16,29 +16,40 @@ import {
     Edge,
     Handle,
     Position,
-    SelectionMode,
     ReactFlowProvider,
     useReactFlow,
 } from "@xyflow/react";
 import '@xyflow/react/dist/style.css';
 import { useSession } from 'next-auth/react';
-import { securedFetch } from '@/lib/utils';
+import { cn, securedFetch } from '@/lib/utils';
 import { useToast } from '@/components/ui/use-toast';
 import Button from '../components/ui/Button';
+import Dropzone from '../components/ui/Dropzone';
 import Input from '../components/ui/Input';
 
-function InputNode({ id, data }: { id: string, data: { onChange: (id: string, value: string) => void, value?: string, isProcessing?: boolean, success?: boolean } }) {
+// Add these type definitions near the top of the file, after the imports
+interface BaseNodeData extends Record<string, unknown> {
+    isProcessing?: boolean;
+    success?: boolean;
+    value?: File[];
+}
+
+interface InputNodeData extends BaseNodeData {
+    onChange: (id: string, acceptedFiles: File[]) => void;
+}
+
+interface OutputNodeData extends BaseNodeData {
+    value: File[];
+    graphName: string;
+    setGraphName: (id: string, graphName: string) => void;
+}
+
+interface FilterNodeData extends BaseNodeData { }
+
+function InputNode({ id, data }: { id: string, data: { onChange: (id: string, acceptedFiles: File[]) => void, value?: File[], isProcessing?: boolean, success?: boolean } }) {
     return (
-        <div className={`flex flex-col items-start gap-2 p-4 ${data.isProcessing ? 'animate-pulse' : ''}`}>
-            <Input
-                className="w-full"
-                type='text'
-                placeholder='Input'
-                value={data.value || ''}
-                onChange={(e) => {
-                    data.onChange(id, e.target.value);
-                }}
-            />
+        <div className={cn('rounded-lg flex flex-col items-start gap-2 p-4', data.isProcessing && 'animate-pulse', data.value?.length === 0 || !data.value ? 'bg-red-500' : 'bg-white')}>
+            <Dropzone className='nodrag' label='Upload Files' onFileDrop={(acceptedFiles) => data.onChange(id, acceptedFiles)} />
             {data.isProcessing && <p className="text-blue-500">Processing...</p>}
             {data.success && <p className="text-green-500">Success!</p>}
             <Handle className='w-10 h-10' type="source" position={Position.Bottom} />
@@ -46,34 +57,58 @@ function InputNode({ id, data }: { id: string, data: { onChange: (id: string, va
     )
 }
 
-function OutputNode({ data }: { data: { output: string, isProcessing?: boolean, success?: boolean } }) {
+function OutputNode({ id, data }: { id: string, data: { value: File[], isProcessing?: boolean, success?: boolean, graphName: string, setGraphName: (id: string, graphName: string) => void } }) {
     return (
-        <div className={`flex flex-col items-start gap-2 p-4 ${data.isProcessing ? 'animate-pulse' : ''}`}>
+        <div className={`bg-white rounded-lg flex flex-col items-start gap-2 p-4 ${data.isProcessing ? 'animate-pulse' : ''}`}>
             <Handle type="target" position={Position.Top} />
             {data.isProcessing && <p className="text-blue-500">Processing...</p>}
             {data.success && <p className="text-green-500">Success!</p>}
-            <p>{data.output || 'Waiting for input...'}</p>
+            <p>{data.value.length > 0 ? data.value.map((file: File) => file.name).join(', ') : 'Waiting for input...'}</p>
+            <Input
+                className='w-full'
+                placeholder='Graph Name'
+                value={data.graphName}
+                onChange={(e) => data.setGraphName(id, e.target.value)}
+            />
         </div>
     )
 }
 
-function DefaultNode({ data }: { data: { label: string, isProcessing?: boolean, success?: boolean } }) {
+function FilterPngNode({ data }: { data: { isProcessing?: boolean, success?: boolean, value?: File[] } }) {
     return (
-        <div className={`flex flex-col items-start gap-2 p-4 ${data.isProcessing ? 'animate-pulse' : ''}`}>
+        <div className={`bg-white rounded-lg flex flex-col items-start gap-2 p-4 ${data.isProcessing ? 'animate-pulse' : ''}`}>
             <Handle type="target" position={Position.Top} />
             {data.isProcessing && <p className="text-blue-500">Processing...</p>}
             {data.success && <p className="text-green-500">Success!</p>}
-            <p>{data.label}</p>
+            <p>Filter png files</p>
+            <Handle type="source" position={Position.Bottom} />
+        </div>
+    )
+}
+
+function FilterMdNode({ data }: { data: { isProcessing?: boolean, success?: boolean, value?: File[] } }) {
+    return (
+        <div className={`bg-white rounded-lg flex flex-col items-start gap-2 p-4 ${data.isProcessing ? 'animate-pulse' : ''}`}>
+            <Handle type="target" position={Position.Top} />
+            {data.isProcessing && <p className="text-blue-500">Processing...</p>}
+            {data.success && <p className="text-green-500">Success!</p>}
+            <p>Filter md files</p>
             <Handle type="source" position={Position.Bottom} />
         </div>
     )
 }
 
 const nodeTypes = {
-    default: DefaultNode,
+    filterPng: FilterPngNode,
+    filterMd: FilterMdNode,
     input: InputNode,
     output: OutputNode,
 }
+
+type NodeTypes = keyof typeof nodeTypes;
+
+type FlowNode = Node<InputNodeData | OutputNodeData | FilterNodeData>;
+type FlowEdge = Edge;
 
 function NodePanel() {
     const onDragStart = (event: React.DragEvent, nodeType: string) => {
@@ -85,8 +120,9 @@ function NodePanel() {
     useEffect(() => {
         setNodes([
             { type: 'input' },
+            { type: 'filterPng' },
+            { type: 'filterMd' },
             { type: 'output' },
-            { type: 'default' },
         ]);
     }, []);
 
@@ -110,37 +146,76 @@ function NodePanel() {
 }
 
 function Flow() {
-    const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
-    const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
+    const [nodes, setNodes, onNodesChange] = useNodesState<FlowNode>([]);
+    const [edges, setEdges, onEdgesChange] = useEdgesState<FlowEdge>([]);
     const reactFlowInstance = useReactFlow();
     const { data: session } = useSession();
     const { toast } = useToast();
 
-    const handleInputChange = useCallback((inputId: string, value: string) => {
+    const handleFilter = useCallback((filterPngId: string, files: File[], type: string) => {
         // Find connected output nodes
-        const connectedEdges = edges.filter(edge => edge.source === inputId);
+        const connectedEdges = edges.filter(edge => edge.source === filterPngId);
 
         setNodes(nds => nds.map(node => {
-            // Update connected output nodes
-            if (connectedEdges.some(edge => edge.target === node.id)) {
+            if (connectedEdges.some(edge => edge.target === node.id) && node.type === 'output') {
                 return {
                     ...node,
-                    data: { ...node.data, output: value }
+                    data: {
+                        ...node.data,
+                        value: files.filter((file: File) => file.type.includes(type) || file.name.toLowerCase().endsWith(type))
+                    }
                 };
             }
-            // Update input node with onChange handler and value
-            if (node.id === inputId) {
+
+            if (node.id === filterPngId) {
                 return {
                     ...node,
-                    data: { ...node.data, onChange: handleInputChange, value }
+                    data: { ...node.data, value: files }
                 };
             }
             return node;
         }));
     }, [edges, setNodes]);
 
+    const handleInputChange = useCallback((inputId: string, acceptedFiles: File[]) => {
+        // Find connected output nodes
+        const connectedEdges = edges.filter(edge => edge.source === inputId);
+
+        setNodes(nds => nds.map(node => {
+            // Update connected output nodes
+            if (connectedEdges.some(edge => edge.target === node.id)) {
+                if (node.type === 'filterPng') {
+                    handleFilter(node.id, acceptedFiles, 'png');
+                    return node;
+                }
+                if (node.type === 'filterMd') {
+                    handleFilter(node.id, acceptedFiles, 'md');
+                    return node;
+                }
+                if (node.type === 'output') {
+                    return {
+                        ...node,
+                        data: { ...node.data, value: acceptedFiles }
+                    };
+                }
+            }
+            // Update input node with onChange handler and value
+            if (node.id === inputId) {
+                return {
+                    ...node,
+                    data: {
+                        ...node.data,
+                        onChange: handleInputChange,
+                        value: acceptedFiles
+                    }
+                };
+            }
+            return node;
+        }));
+    }, [edges, handleFilter, setNodes]);
+
     useEffect(() => {
-        setNodes(nodes.map(node => {
+        setNodes(prev => prev.map(node => {
             if (node.type === 'input') {
                 return {
                     ...node,
@@ -149,8 +224,7 @@ function Flow() {
             }
             return node;
         }));
-    }, [handleInputChange]);
-
+    }, [handleInputChange, setNodes]);
 
     // Add function to load a flow
     const loadFlow = useCallback(async () => {
@@ -171,16 +245,48 @@ function Flow() {
             if (!nodesResponse.ok) throw new Error('Failed to load nodes');
             const nodesData = (await nodesResponse.json()).result.data;
 
-            // Transform nodes data
-            const loadedNodes = nodesData.map((record: any) => ({
-                id: record.n.properties.id,
-                type: record.n.properties.type,
-                position: {
-                    x: record.n.properties.positionX,
-                    y: record.n.properties.positionY
-                },
-                data: JSON.parse(record.n.properties.data)
-            }));
+            // Transform nodes data with proper typing
+            const loadedNodes = nodesData.map((record: any) => {
+                const nodeType = record.n.properties.type as NodeTypes;
+                const baseData = JSON.parse(record.n.properties.data);
+
+                let typedData: InputNodeData | OutputNodeData | FilterNodeData = {
+                    isProcessing: false,
+                    success: false
+                }
+
+                switch (nodeType) {
+                    case 'input':
+                        typedData = {
+                            ...baseData,
+                            ...typedData,
+                            onChange: handleInputChange,
+                            value: baseData.value || [],
+                        };
+                        break;
+                    case 'output':
+                    case 'filterPng':
+                    case 'filterMd':
+                        typedData = {
+                            ...baseData,
+                            ...typedData,
+                            value: baseData.value || []
+                        };
+                        break;
+                    default:
+                        typedData = baseData;
+                }
+
+                return {
+                    id: record.n.properties.id,
+                    type: nodeType,
+                    position: {
+                        x: record.n.properties.positionX,
+                        y: record.n.properties.positionY
+                    },
+                    data: typedData
+                };
+            });
 
             // Query to get all relationships
             const edgesQuery = `
@@ -215,27 +321,35 @@ function Flow() {
                 description: 'Failed to load flow',
             });
         }
-    }, [setNodes, setEdges]);
+    }, [session?.user?.role, toast, setNodes, setEdges, handleInputChange]);
 
     useEffect(() => {
         loadFlow();
-    }, [loadFlow]);
+    }, []);
 
     const onConnect = useCallback((params: Connection) => {
         const source = nodes.find(node => node.id === params.source);
         const target = nodes.find(node => node.id === params.target);
 
-        if (source?.type === "input" && target?.type === "output") {
+        if (((source?.type === "input" || source?.type === "filterPng" || source?.type === "filterMd") && target?.type === "output") || (source?.type === "input" && (target?.type === "filterPng" || target?.type === "filterMd"))) {
             // Get the input node's data value if it exists
             const inputNode = nodes.find(node => node.id === source.id);
-            const inputValue = inputNode?.data?.value || '';
+            const inputValue = inputNode?.data?.value || [];
 
-            // Update the output node with the input value
+            // Filter value based on target type
+            let filteredValue = inputValue;
+            if (target?.type === 'filterPng') {
+                filteredValue = inputValue.filter((file: File) => file.type.includes('png') || file.name.toLowerCase().endsWith('png'));
+            } else if (target?.type === 'filterMd') {
+                filteredValue = inputValue.filter((file: File) => file.type.includes('md') || file.name.toLowerCase().endsWith('md'));
+            }
+
+            // Update the target node with the filtered value
             setNodes(nds => nds.map(node => {
                 if (node.id === target.id) {
                     return {
                         ...node,
-                        data: { ...node.data, output: inputValue }
+                        data: { ...node.data, value: filteredValue }
                     };
                 }
                 return node;
@@ -243,28 +357,41 @@ function Flow() {
         }
 
         setEdges((eds) => addEdge(params, eds));
-    }, [nodes, setEdges]);
+    }, [nodes, setEdges, setNodes]);
 
     const onDragOver = useCallback((event: React.DragEvent) => {
         event.preventDefault();
     }, []);
 
-    const getNodeData = (type: string) => {
+    const getNodeData = useCallback((type: NodeTypes): InputNodeData | OutputNodeData | FilterNodeData => {
         switch (type) {
             case 'input':
                 return {
-                    onChange: handleInputChange
+                    onChange: handleInputChange,
+                    value: []
                 };
             case 'output':
                 return {
-                    output: ''
+                    graphName: '',
+                    setGraphName: (id: string, graphName: string) => setNodes(nds => nds.map(node => {
+                        if (node.id === id) {
+                            return { ...node, data: { ...node.data, graphName } };
+                        }
+                        return node;
+                    })),
+                    value: [],
+                    isProcessing: false,
+                    success: false
+                };
+            case 'filterPng':
+            case 'filterMd':
+                return {
+                    value: []
                 };
             default:
-                return {
-                    label: type
-                };
+                return {};
         }
-    };
+    }, [handleInputChange, setNodes]);
 
     const onDrop = useCallback((event: React.DragEvent) => {
         event.preventDefault();
@@ -272,7 +399,7 @@ function Flow() {
         const reactFlowBounds = (event.target as Element)
             .closest('.react-flow')
             ?.getBoundingClientRect();
-        const type = event.dataTransfer.getData('application/reactflow');
+        const type = event.dataTransfer.getData('application/reactflow') as NodeTypes;
 
         if (!type || !reactFlowBounds) return;
 
@@ -281,17 +408,17 @@ function Flow() {
             y: event.clientY - reactFlowBounds.top,
         });
 
-        const newNode = {
+        const newNode: FlowNode = {
             id: `${type}_${Date.now()}`,
             type,
             position,
             data: getNodeData(type),
         };
 
-        setNodes((nds) => nds.concat(newNode));
-    }, [setNodes, reactFlowInstance]);
+        setNodes((nds) => [...nds, newNode]);
+    }, [reactFlowInstance, getNodeData, setNodes]);
 
-    const findConnectedNodes = (startNodeId: string, visited = new Set<string>()): string[] => {
+    const findConnectedNodes = useCallback((startNodeId: string, visited = new Set<string>()): string[] => {
         if (visited.has(startNodeId)) return [];
         visited.add(startNodeId);
 
@@ -300,46 +427,7 @@ function Flow() {
             .map(edge => edge.source === startNodeId ? edge.target : edge.source);
 
         return [startNodeId, ...connectedIds.flatMap(id => findConnectedNodes(id, visited))];
-    };
-
-    const sortNodesByConnections = (nodeIds: string[]): Node[] => {
-        const groupNodes = nodes.filter(node => nodeIds.includes(node.id));
-        const sorted: Node[] = [];
-        const visited = new Set<string>();
-
-        // Find root nodes (nodes with no incoming edges within the group)
-        const getRootNodes = () => groupNodes.filter(node => !edges.some(edge =>
-            edge.target === node.id && nodeIds.includes(edge.source)
-        ));
-
-        // Recursive function to add nodes in correct order
-        const addNodesInOrder = (currentNode: Node) => {
-            if (visited.has(currentNode.id)) return;
-            visited.add(currentNode.id);
-            sorted.push(currentNode);
-
-            // Find and sort children
-            const children = edges
-                .filter(edge => edge.source === currentNode.id && nodeIds.includes(edge.target))
-                .map(edge => groupNodes.find(node => node.id === edge.target)!)
-                .filter(Boolean);
-
-            children.forEach(child => addNodesInOrder(child));
-        };
-
-        // Start with root nodes
-        const rootNodes = getRootNodes();
-        rootNodes.forEach(node => addNodesInOrder(node));
-
-        // Add any remaining nodes (in case of cycles or disconnected nodes within group)
-        groupNodes.forEach(node => {
-            if (!visited.has(node.id)) {
-                addNodesInOrder(node);
-            }
-        });
-
-        return sorted;
-    };
+    }, [edges]);
 
     // Add function to save the flow
     const saveFlow = useCallback(async () => {
@@ -359,16 +447,32 @@ function Flow() {
                 toast
             );
 
-            // Create nodes
+            // Create nodes with sanitized data
             const createNodesQuery = `
-                ${nodes.map(node => `
-                    CREATE (:${node.type} {
-                        id: '${node.id}',
-                        type: '${node.type}',
-                        positionX: ${node.position.x},
-                        positionY: ${node.position.y},
-                        data: '${JSON.stringify(node.data)}'
-                    })`).join('\n')}
+                ${nodes.map(node => {
+                // Create a sanitized copy of the node data
+                const sanitizedData = {
+                    ...node.data,
+                    // Remove the onChange function as it can't be serialized
+                    onChange: undefined,
+                    // Ensure value is an array of file names instead of File objects
+                    value: node.data.value ? (node.data.value as File[]).map(file => ({
+                        name: file.name,
+                        type: file.type,
+                        size: file.size,
+                        lastModified: file.lastModified
+                    })) : []
+                };
+
+                return `
+                        CREATE (:${node.type} {
+                            id: '${node.id}',
+                            type: '${node.type}',
+                            positionX: ${node.position.x},
+                            positionY: ${node.position.y},
+                            data: '${JSON.stringify(sanitizedData).replace(/'/g, "\\'")}'
+                        })`;
+            }).join('\n')}
             `;
 
             // Execute create nodes query
@@ -412,89 +516,129 @@ function Flow() {
                 description: 'Failed to save flow',
             });
         }
-    }, [nodes, edges]);
+    }, [nodes, session?.user?.role, toast, edges]);
 
 
     const processNodes = useCallback(async () => {
-
         saveFlow();
 
-        // Group nodes by their connections
-        const nodeGroups: string[][] = [];
+        // Find all input nodes first
+        const inputNodes = nodes.filter(node => node.type === 'input');
         const processedNodes = new Set<string>();
-
-        nodes.forEach(node => {
-            if (!processedNodes.has(node.id)) {
-                const connectedNodes = findConnectedNodes(node.id);
-                nodeGroups.push(connectedNodes);
-                connectedNodes.forEach(id => processedNodes.add(id));
-            }
-        });
-        // Process each group one after another
-        nodeGroups.reduce(async (promise, group) => {
+        // Process input nodes sequentially
+        await inputNodes.reduce(async (promise, inputNode) => {
             await promise;
-            const groupNodes = sortNodesByConnections(group);
-            const lastNodeInGroup = groupNodes[groupNodes.length - 1];
 
-            // Process nodes in group sequentially
-            await groupNodes.reduce(async (nodePromise, currentNode) => {
-                await nodePromise;
-
-                // Update current node to processing state
-                setNodes(nds => nds.map(node => ({
-                    ...node,
-                    data: {
-                        ...node.data,
-                        isProcessing: node.id === currentNode.id,
-                        // Maintain existing success states for other groups
-                        success: node.data.success && node.id !== currentNode.id
-                    }
-                })));
-
-                // Animate edges connected to this node
-                setEdges(eds => eds.map(edge => ({
-                    ...edge,
-                    animated: edge.source === currentNode.id && group.includes(edge.target)
-                })));
-
-                // Wait for 5 seconds
-                await new Promise((resolve) => {
-                    setTimeout(resolve, 5000);
-                });
-
-                // Update processing state
-                setNodes(nds => nds.map(node => ({
-                    ...node,
-                    data: {
-                        ...node.data,
-                        isProcessing: false,
-                        // Maintain existing success states and set new one if it's the last node
-                        success: (node.data.success && node.id !== currentNode.id) ||
-                            (node.id === lastNodeInGroup.id && currentNode.id === lastNodeInGroup.id)
-                    }
-                })));
-
-                // If this is the last node, set a timeout to clear the success state
-                if (currentNode.id === lastNodeInGroup.id) {
-                    setTimeout(() => {
-                        setNodes(nds => nds.map(node => ({
-                            ...node,
-                            data: {
-                                ...node.data,
-                                success: false
-                            }
-                        })));
-                    }, 3000); // Clear success after 3 seconds
+            // Process input node
+            setNodes(nds => nds.map(node => ({
+                ...node,
+                data: {
+                    ...node.data,
+                    isProcessing: node.id === inputNode.id,
+                    success: false
                 }
+            })));
+
+            await new Promise(resolve => { setTimeout(resolve, 5000) });
+            processedNodes.add(inputNode.id);
+
+            // Find all paths from this input node
+            const paths: FlowNode[][] = [];
+            const findPaths = (currentNode: FlowNode, currentPath: FlowNode[] = []) => {
+                const newPath = [...currentPath, currentNode];
+
+                if (currentNode.type === 'output') {
+                    paths.push(newPath);
+                    return;
+                }
+
+                const connectedNodeIds = edges
+                    .filter(edge => edge.source === currentNode.id)
+                    .map(edge => edge.target);
+
+                connectedNodeIds.forEach(nodeId => {
+                    const nextNode = nodes.find(n => n.id === nodeId);
+                    if (nextNode && !currentPath.includes(nextNode)) {
+                        findPaths(nextNode, newPath);
+                    }
+                });
+            };
+
+            // Start finding paths from nodes connected to input
+            const initialNodes = edges
+                .filter(edge => edge.source === inputNode.id)
+                .map(edge => nodes.find(n => n.id === edge.target))
+                .filter((n): n is FlowNode => n !== undefined);
+
+            // Find paths starting from each node connected to input
+            initialNodes.forEach(node => {
+                findPaths(node, []);
+            });
+
+            // Process paths sequentially
+            await paths.reduce(async (pathPromise, path) => {
+                await pathPromise;
+
+                // Process nodes in path sequentially 
+                await path.reduce(async (nodePromise, currentNode) => {
+                    await nodePromise;
+
+                    if (processedNodes.has(currentNode.id)) {
+                        return;
+                    }
+
+                    setNodes(nds => nds.map(node => ({
+                        ...node,
+                        data: {
+                            ...node.data,
+                            isProcessing: node.id === currentNode.id,
+                            success: node.data.success && node.id !== currentNode.id
+                        }
+                    })));
+
+                    // Animate edges connected to this node
+                    setEdges(eds => eds.map(edge => ({
+                        ...edge,
+                        animated: edge.source === currentNode.id &&
+                            path.some(n => n.id === edge.target)
+                    })));
+
+                    await new Promise(resolve => { setTimeout(resolve, 5000) });
+                    processedNodes.add(currentNode.id);
+
+                    setNodes(nds => nds.map(node => ({
+                        ...node,
+                        data: {
+                            ...node.data,
+                            isProcessing: false,
+                            success: (node.data.success && node.id !== currentNode.id) ||
+                                (node.id === currentNode.id && currentNode.type === 'output')
+                        }
+                    })));
+
+                    if (currentNode.type === 'output') {
+                        console.log("Graph:", currentNode.data.graphName, currentNode.data.value);
+
+                        setTimeout(() => {
+                            setNodes(nds => nds.map(node => ({
+                                ...node,
+                                data: {
+                                    ...node.data,
+                                    success: node.id !== currentNode.id ? node.data.success : false
+                                }
+                            })));
+                        }, 3000);
+                    }
+                }, Promise.resolve());
             }, Promise.resolve());
 
-            // Reset edge animations after group is done
+            // Reset edge animations
             setEdges(eds => eds.map(edge => ({
                 ...edge,
                 animated: false
             })));
         }, Promise.resolve());
-    }, [nodes, edges, setNodes, setEdges]);
+    }, [saveFlow, nodes, edges, setNodes, setEdges]);
 
     const removeFlow = useCallback(async () => {
         const deleteQuery = `
@@ -516,7 +660,7 @@ function Flow() {
 
         setNodes([]);
         setEdges([]);
-    }, []);
+    }, [session?.user?.role, toast, setNodes, setEdges]);
 
     return (
         <>
@@ -525,12 +669,18 @@ function Flow() {
                 <Controls className='!relative border border-black rounded-lg' />
                 <div className="flex flex-col gap-4">
                     <Button
+                        disabled={
+                            nodes.some(node => node.type === 'input' && (node.data as { value?: File[] }).value?.length === 0)
+                            || !nodes.every(node => edges.some(edge => edge.source === node.id || edge.target === node.id))
+                            || nodes.length === 0
+                        }
                         variant='Primary'
                         onClick={processNodes}
                     >
                         Run Flow
                     </Button>
                     <Button
+                        disabled={nodes.length === 0}
                         variant='Primary'
                         onClick={removeFlow}
                     >
@@ -547,12 +697,17 @@ function Flow() {
                 onConnect={onConnect}
                 onDragOver={onDragOver}
                 onDrop={onDrop}
+                selectionKeyCode={null}
                 defaultEdgeOptions={{ animated: false }}
-                selectionMode={SelectionMode.Full}
                 selectNodesOnDrag
-                multiSelectionKeyCode={['Control']}
                 deleteKeyCode={['Delete']}
             >
+                {/* eslint-disable-next-line react/no-unknown-property */}
+                <style jsx global>
+                    {
+                        '.react-flow__node { padding: 0 !important; border-radius: 0.6rem !important; }'
+                    }
+                </style>
                 <MiniMap />
                 <Background />
             </ReactFlow>

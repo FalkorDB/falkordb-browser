@@ -137,7 +137,7 @@ export default function LoginForm() {
                 />
                 <p >TLS Secured Connection</p>
               </div>
-              <Dropzone onFileDrop={onFileDrop} disabled={!TLS} />
+              <Dropzone onFileDrop={onFileDrop} disabled={!TLS} label="Upload Certificate" />
             </div>
           </FormComponent>
         </div>

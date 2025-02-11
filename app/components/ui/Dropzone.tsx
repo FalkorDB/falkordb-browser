@@ -3,22 +3,17 @@
 import { ArrowDownToLine } from 'lucide-react'
 import React, { useCallback, useState } from 'react'
 import { useDropzone } from 'react-dropzone'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { cn } from '@/lib/utils'
-
-type TableFile = {
-    name: string
-    size: number
-    type: string
-}
+import TableComponent, { Row } from '../TableComponent'
 
 /* eslint-disable react/require-default-props */
 interface Props {
+    label: string
+    onFileDrop: (acceptedFiles: File[]) => void
     filesCount?: boolean
     className?: string
     withTable?: boolean
     disabled?: boolean
-    onFileDrop: (acceptedFiles: File[]) => void
 }
 
 const FileProps = [
@@ -27,19 +22,23 @@ const FileProps = [
     "Type",
 ]
 
-function Dropzone({ filesCount = false, className = "", withTable = false, disabled = false, onFileDrop }: Props) {
+function Dropzone({ filesCount = false, className = "", withTable = false, disabled = false, onFileDrop, label}: Props) {
 
-    const [files, setFiles] = useState<TableFile[]>([])
+    const [files, setFiles] = useState<File[]>([])
+    const [rows, setRows] = useState<Row[]>([])
 
     const onDrop = useCallback((acceptedFiles: File[]) => {
-        const newFiles = acceptedFiles.map((file: File) => ({
-            name: file.name,
-            size: file.size,
-            type: file.type,
-        }));
+        const newFiles = [...files, ...acceptedFiles]
         setFiles(newFiles)
-        onFileDrop(acceptedFiles)
-    }, [onFileDrop])
+        setRows(newFiles.map((file) => ({
+            cells: [
+                { value: file.name },
+                { value: file.size },
+                { value: file.type }
+            ]
+        })))
+        onFileDrop(newFiles)
+    }, [onFileDrop, files])
 
     const { getRootProps, getInputProps } = useDropzone({ onDrop, disabled })
 
@@ -56,7 +55,7 @@ function Dropzone({ filesCount = false, className = "", withTable = false, disab
                             <ArrowDownToLine color='#57577B' />
                             <span>Or <span className='text-[#7167F6]'>Browse</span></span>
                         </div>
-                        : <p className={cn('underline underline-offset-2 text-[#99E4E5]', disabled ? "opacity-30 cursor-text" : "cursor-pointer")}>Upload Certificate</p>
+                        : <p className={cn('underline underline-offset-2 text-[#99E4E5]', disabled ? "opacity-30 cursor-text" : "cursor-pointer")}>{label}</p>
                 }
             </div>
             {
@@ -65,39 +64,10 @@ function Dropzone({ filesCount = false, className = "", withTable = false, disab
                     <div className='text-lg'>
                         {`Uploaded Files ${filesCount ? `(${files.length})`: ''}`}
                     </div>
-                    <Table parentClassName='h-1 grow overflow-auto'>
-                        <TableHeader className='border-b border-[#7E7E9B]'>
-                            <TableRow className='border-none'>
-                                {
-                                    FileProps.map((cell) => (
-                                        <TableHead key={cell} className="text-center">
-                                            {cell}
-                                        </TableHead>
-                                    ))
-                                }
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {
-                                files.length > 0 ?
-                                    files.map((row, index) => (
-                                        // eslint-disable-next-line react/no-array-index-key
-                                        <TableRow className='border-[#57577B]' key={index}>
-                                            {
-                                                Object.values(row).map((cell) => (
-                                                    <TableCell className='text-center font-medium' key={cell}>
-                                                        {cell}
-                                                    </TableCell>
-                                                ))
-                                            }
-                                        </TableRow>
-                                    ))
-                                    : <TableRow>
-                                        <TableCell />
-                                    </TableRow>
-                            }
-                        </TableBody>
-                    </Table>
+                    <TableComponent
+                        rows={rows}
+                        headers={FileProps}
+                    />
                 </div>
             }
         </div>
