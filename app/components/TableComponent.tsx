@@ -117,7 +117,7 @@ export default function TableComponent({ headers, rows, children, setRows, optio
                                 typeof cell.value === "object"
                                     ? Object.values(cell.value).some(value =>
                                         typeof value === "object"
-                                            ? Object.values(value).some(val => val.toString().toLowerCase().includes(search.toLocaleLowerCase()))
+                                            ? Object.values(value).some(val => val.toString().toLowerCase().includes(search.toLowerCase()))
                                             : value?.toString().toLowerCase().includes(search.toLowerCase())
                                     )
                                     : cell.value.toString().toLowerCase().includes(search.toLowerCase())
@@ -148,7 +148,14 @@ export default function TableComponent({ headers, rows, children, setRows, optio
                                                 {
                                                     typeof cell.value === "object" ?
                                                         <JSONTree
-                                                            shouldExpandNodeInitially={() => false}
+                                                            key={search}
+                                                            shouldExpandNodeInitially={() =>
+                                                                search !== "" && Object.values(cell.value as object).some(value =>
+                                                                    typeof value === "object"
+                                                                        ? Object.values(value as object).some(val =>
+                                                                            val.toString().toLowerCase().includes(search.toLowerCase())
+                                                                        )
+                                                                        : value?.toString().toLowerCase().includes(search.toLowerCase()))}
                                                             keyPath={[headers[j]]}
                                                             theme={{
                                                                 base00: "var(--background)", // background
