@@ -6,6 +6,9 @@
 import { type ClassValue, clsx } from "clsx"
 import { signOut } from "next-auth/react"
 import { twMerge } from "tailwind-merge"
+import { MutableRefObject } from "react"
+import { ForceGraphMethods } from "react-force-graph-2d"
+import { Node, Link } from "@/app/api/graph/model"
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
@@ -89,8 +92,8 @@ export function rgbToHSL(hex: string): string {
   return `hsl(${hDeg}, ${sPct}%, ${lPct}%)`;
 }
 
-export function handleZoomToFit(chartRef?: any) {
-  const chart = chartRef.current
+export function handleZoomToFit(chartRef?: MutableRefObject<ForceGraphMethods<Node, Link>>) {
+  const chart = chartRef?.current
   if (chart) {
     // Get canvas dimensions
     const canvas = document.querySelector('.force-graph-container canvas') as HTMLCanvasElement;
