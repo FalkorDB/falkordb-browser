@@ -7,7 +7,7 @@ import { useRef, useState, useEffect, Dispatch, SetStateAction } from "react";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { ImperativePanelHandle } from "react-resizable-panels";
 import { ChevronLeft, GitGraph, Maximize2, Minimize2, Pause, Play, Table } from "lucide-react"
-import { cn, prepareArg, securedFetch } from "@/lib/utils";
+import { cn, handleZoomToFit, prepareArg, securedFetch } from "@/lib/utils";
 import dynamic from "next/dynamic";
 import { Session } from "next-auth";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -209,14 +209,7 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
 
     const handleRunQuery = async (q: string) => {
         await runQuery(q)
-        // Get canvas dimensions
-        const canvas = document.querySelector('.force-graph-container canvas') as HTMLCanvasElement;
-        if (!canvas) return;
-
-        // Calculate padding as 10% of the smallest canvas dimension, with minimum of 40px
-        const minDimension = Math.min(canvas.width, canvas.height);
-        const padding = minDimension * 0.1
-        chartRef.current?.zoomToFit(1000, padding)
+        handleZoomToFit(chartRef)
         handleCooldown()
     }
 

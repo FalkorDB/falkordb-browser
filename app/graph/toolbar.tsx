@@ -4,6 +4,7 @@
 
 import { Link, PlusCircle, Shrink, Trash2, ZoomIn, ZoomOut } from "lucide-react";
 import { useState } from "react";
+import { handleZoomToFit } from "@/lib/utils";
 import Button from "../components/ui/Button";
 import DeleteElement from "./DeleteElement";
 
@@ -40,17 +41,7 @@ export default function Toolbar({
     }
 
     const handleCenterClick = () => {
-        const chart = chartRef.current
-        if (chart) {
-            // Get canvas dimensions
-            const canvas = document.querySelector('.force-graph-container canvas') as HTMLCanvasElement;
-            if (!canvas) return;
-
-            // Calculate padding as 10% of the smallest canvas dimension, with minimum of 40px
-            const minDimension = Math.min(canvas.width, canvas.height);
-            const padding = minDimension * 0.1
-            chart.zoomToFit(1000, padding)
-        }
+        handleZoomToFit(chartRef)
     }
 
     const handleDeleteElement = async () => {
