@@ -88,3 +88,17 @@ export function rgbToHSL(hex: string): string {
 
   return `hsl(${hDeg}, ${sPct}%, ${lPct}%)`;
 }
+
+export function handleZoomToFit(chartRef?: any) {
+  const chart = chartRef.current
+  if (chart) {
+    // Get canvas dimensions
+    const canvas = document.querySelector('.force-graph-container canvas') as HTMLCanvasElement;
+    if (!canvas) return;
+
+    // Calculate padding as 10% of the smallest canvas dimension, with minimum of 40px
+    const minDimension = Math.min(canvas.width, canvas.height);
+    const padding = minDimension * 0.1
+    chart.zoomToFit(1000, padding)
+  }
+}
