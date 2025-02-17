@@ -92,7 +92,7 @@ export function rgbToHSL(hex: string): string {
   return `hsl(${hDeg}, ${sPct}%, ${lPct}%)`;
 }
 
-export function handleZoomToFit(chartRef?: MutableRefObject<ForceGraphMethods<Node, Link>>) {
+export function handleZoomToFit(chartRef?: MutableRefObject<ForceGraphMethods<Node, Link> | undefined>) {
   const chart = chartRef?.current
   if (chart) {
     // Get canvas dimensions

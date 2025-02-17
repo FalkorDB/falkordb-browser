@@ -14,8 +14,7 @@ import { Graph, GraphData, Link, Node } from "../api/graph/model"
 
 interface Props {
     graph: Graph
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    chartRef: MutableRefObject<ForceGraphMethods<Node, Link>>
+    chartRef: MutableRefObject<ForceGraphMethods<Node, Link> | undefined>
     data: GraphData
     selectedElement: Node | Link | undefined
     setSelectedElement: (element: Node | Link | undefined) => void

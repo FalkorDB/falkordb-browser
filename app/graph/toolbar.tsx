@@ -12,7 +12,7 @@ import DeleteElement from "./DeleteElement";
 
 interface Props {
     disabled?: boolean,
-    chartRef: MutableRefObject<ForceGraphMethods<Node, LinkType>>,
+    chartRef: MutableRefObject<ForceGraphMethods<Node, LinkType> | undefined>,
     onDeleteElement?: () => Promise<void>,
     onAddEntity?: () => void,
     onAddRelation?: () => void,
