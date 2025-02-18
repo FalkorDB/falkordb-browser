@@ -7,7 +7,7 @@ import { useRef, useState, useEffect, Dispatch, SetStateAction } from "react";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { ImperativePanelHandle } from "react-resizable-panels";
 import { ChevronLeft, GitGraph, Maximize2, Minimize2, Pause, Play, Table } from "lucide-react"
-import { cn, prepareArg, securedFetch } from "@/lib/utils";
+import { cn, handleZoomToFit, prepareArg, securedFetch } from "@/lib/utils";
 import dynamic from "next/dynamic";
 import { Session } from "next-auth";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -209,7 +209,7 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
 
     const handleRunQuery = async (q: string) => {
         await runQuery(q)
-        chartRef.current?.zoomToFit(1000, 40)
+        handleZoomToFit(chartRef)
         handleCooldown()
     }
 
