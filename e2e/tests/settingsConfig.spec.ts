@@ -222,7 +222,6 @@ test.describe('Settings Tests', () => {
         const settingsConfigPage = await browser.createNewPage(SettingsConfigPage, urls.settingsUrl)
         await settingsConfigPage.modifyRoleValue(roles.maxInfoQueries, Data.roleModificationData[8].input)
         await settingsConfigPage.refreshPage();
-        await settingsConfigPage.scrollToBottomInTable();
         await settingsConfigPage.getRoleContentValue(roles.maxInfoQueries);
         const apiCall = new ApiCalls()
         let value = String((await apiCall.getSettingsRoleValue(roles.maxInfoQueries)).config[1]);
