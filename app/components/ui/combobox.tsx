@@ -97,7 +97,7 @@ export default function Combobox({ isSelectGraph = false, disabled = false, inTa
     handleSetRows(options.filter(opt => !opts.includes(opt)))
     toast({
       title: "Graph(s) deleted successfully",
-      description: "The graph(s) have been deleted successfully",
+      description: `The graph(s) ${opts.join(", ")} have been deleted successfully`,
     })
   }
 
@@ -166,7 +166,7 @@ export default function Combobox({ isSelectGraph = false, disabled = false, inTa
               disabled={rows.filter(opt => opt.checked).length === 0}
               label="Delete"
             />}
-            description="Are you sure you want to delete the selected graph(s)?"
+            description={`Are you sure you want to delete the selected graph(s)? (${rows.filter(opt => opt.checked).map(opt => opt.cells[0].value as string).join(", ")})`}
           >
             <div className="flex justify-end gap-2">
               <Button
