@@ -14,6 +14,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/components/ui/use-toast";
 import { Switch } from "@/components/ui/switch";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { ForceGraphMethods } from "react-force-graph-2d";
 import { Category, Graph, GraphData, Link, Node } from "../api/graph/model";
 import DataPanel from "./GraphDataPanel";
 import Labels from "./labels";
@@ -40,8 +41,7 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
     const [query, setQuery] = useState<string>("")
     const [selectedElements, setSelectedElements] = useState<(Node | Link)[]>([]);
     const [isCollapsed, setIsCollapsed] = useState<boolean>(true);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const chartRef = useRef<any>(null)
+    const chartRef = useRef<ForceGraphMethods<Node, Link>>()
     const dataPanel = useRef<ImperativePanelHandle>(null)
     const [maximize, setMaximize] = useState<boolean>(false)
     const [tabsValue, setTabsValue] = useState<string>("")

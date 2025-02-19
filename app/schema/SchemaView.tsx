@@ -12,6 +12,7 @@ import dynamic from "next/dynamic"
 import { useToast } from "@/components/ui/use-toast"
 import { Switch } from "@/components/ui/switch"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
+import { ForceGraphMethods } from "react-force-graph-2d"
 import Toolbar from "../graph/toolbar"
 import SchemaDataPanel from "./SchemaDataPanel"
 import Labels from "../graph/labels"
@@ -49,7 +50,7 @@ export default function SchemaView({ schema, fetchCount, session }: Props) {
     const [selectedElements, setSelectedElements] = useState<(Node | Link)[]>([]);
     const [selectedNodes, setSelectedNodes] = useState<[Node | undefined, Node | undefined]>([undefined, undefined]);
     const [isCollapsed, setIsCollapsed] = useState<boolean>(false);
-    const chartRef = useRef<cytoscape.Core | null>(null);
+    const chartRef = useRef<ForceGraphMethods<Node, Link>>();
     const dataPanel = useRef<ImperativePanelHandle>(null);
     const [isAddRelation, setIsAddRelation] = useState(false)
     const [isAddEntity, setIsAddEntity] = useState(false)
