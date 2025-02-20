@@ -4,8 +4,8 @@
 
 "use client"
 
-import { Dispatch, RefObject, SetStateAction, useEffect, useRef, useState } from "react"
-import ForceGraph2D from "react-force-graph-2d"
+import { Dispatch, MutableRefObject, SetStateAction, useEffect, useRef, useState } from "react"
+import ForceGraph2D, { ForceGraphMethods } from "react-force-graph-2d"
 import { securedFetch } from "@/lib/utils"
 import { useToast } from "@/components/ui/use-toast"
 import * as d3 from "d3"
@@ -14,8 +14,7 @@ import { Graph, GraphData, Link, Node } from "../api/graph/model"
 
 interface Props {
     graph: Graph
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    chartRef: RefObject<any | null>
+    chartRef: MutableRefObject<ForceGraphMethods<Node, Link> | undefined>
     data: GraphData
     selectedElement: Node | Link | undefined
     setSelectedElement: (element: Node | Link | undefined) => void
