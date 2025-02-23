@@ -54,9 +54,9 @@ export default function ForceGraph({
     const { data: session } = useSession()
 
     useEffect(() => {
-        
+
     }, [])
-    
+
     useEffect(() => {
         const handleResize = () => {
             if (!parentRef.current) return
@@ -80,7 +80,7 @@ export default function ForceGraph({
 
     useEffect(() => {
         if (!chartRef.current) return;
-        
+
         // Adjust force parameters for better graph layout
         const linkForce = chartRef.current.d3Force('link');
         if (linkForce) {
@@ -275,53 +275,67 @@ export default function ForceGraph({
 
                     if (!start.x || !start.y || !end.x || !end.y) return
 
+                    let textX;
+                    let textY;
+                    let angle;
+
                     if (start.id === end.id) {
                         const radius = NODE_SIZE * link.curve * 6.2;
                         const angleOffset = -Math.PI / 4; // 45 degrees offset for text alignment
-                        const textX = start.x + radius * Math.cos(angleOffset);
-                        const textY = start.y + radius * Math.sin(angleOffset);
-
-                        ctx.save();
-                        ctx.translate(textX, textY);
-                        ctx.rotate(-angleOffset);
+                        textX = start.x + radius * Math.cos(angleOffset);
+                        textY = start.y + radius * Math.sin(angleOffset);
+                        angle = -angleOffset;
                     } else {
-                        const midX = (start.x + end.x) / 2 + (end.y - start.y) * (link.curve / 2);
-                        const midY = (start.y + end.y) / 2 + (start.x - end.x) * (link.curve / 2);
+                        const midX = (start.x + end.x) / 2;
+                        const midY = (start.y + end.y) / 2;
+                        const offset = link.curve / 2;
 
-                        let textAngle = Math.atan2(end.y - start.y, end.x - start.x);
+                        angle = Math.atan2(end.y - start.y, end.x - start.x);
 
                         // maintain label vertical orientation for legibility
-                        if (textAngle > Math.PI / 2) textAngle = -(Math.PI - textAngle);
-                        if (textAngle < -Math.PI / 2) textAngle = -(-Math.PI - textAngle);
+                        if (angle > Math.PI / 2) angle = -(Math.PI - angle);
+                        if (angle < -Math.PI / 2) angle = -(-Math.PI - angle);
 
-                        ctx.save();
-                        ctx.translate(midX, midY);
-                        ctx.rotate(textAngle);
+                        // Calculate perpendicular offset
+                        const perpX = -Math.sin(angle) * offset;
+                        const perpY = Math.cos(angle) * offset;
+
+                        // Adjust position to compensate for rotation around origin
+                        const cos = Math.cos(angle);
+                        const sin = Math.sin(angle);
+                        textX = midX + perpX;
+                        textY = midY + perpY;
+                        const rotatedX = textX * cos + textY * sin;
+                        const rotatedY = -textX * sin + textY * cos;
+                        textX = rotatedX;
+                        textY = rotatedY;
                     }
 
-                    // Set text properties first to measure
-                    ctx.font = "2px Arial";
-                    const textMetrics = ctx.measureText(link.label);
-                    const boxWidth = textMetrics.width;
-                    const boxHeight = 2; // Height of text
+                    // Setup text properties to measure background size
+                    ctx.font = '2px Arial';
+                    const padding = 1;
+                    const textWidth = ctx.measureText(link.label).width;
+                    const textHeight = 2; // Approximate height for 2px font
 
-                    // Draw background block
+                    // add label with background and rotation
+                    ctx.rotate(angle);
+
+                    // Draw background
                     ctx.fillStyle = '#191919';
-
-                    // Draw block aligned with text
                     ctx.fillRect(
-                        -textMetrics.width / 2,
-                        -1,
-                        boxWidth,
-                        boxHeight
+                        textX - textWidth / 2 - padding,
+                        textY - textHeight / 2 - padding,
+                        textWidth + padding * 2,
+                        textHeight + padding * 2
                     );
 
-                    // add label
+                    // Draw text
                     ctx.fillStyle = 'white';
                     ctx.textAlign = 'center';
                     ctx.textBaseline = 'middle';
-                    ctx.fillText(link.label, 0, 0);
-                    ctx.restore();
+                    ctx.fillText(link.label, textX, textY);
+
+                    ctx.rotate(-angle); // reset rotation
                 }}
                 onNodeClick={handleNodeClick}
                 onNodeHover={handleHover}
