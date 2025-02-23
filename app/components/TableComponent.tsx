@@ -36,9 +36,10 @@ interface Props {
     children?: React.ReactNode,
     setRows?: (rows: Row[]) => void,
     options?: string[]
+    className?: string
 }
 
-export default function TableComponent({ headers, rows, children, setRows, options }: Props) {
+export default function TableComponent({ headers, rows, children, setRows, options, className }: Props) {
 
     const [search, setSearch] = useState<string>("")
     const [isSearchable, setIsSearchable] = useState<boolean>(false)
@@ -52,7 +53,7 @@ export default function TableComponent({ headers, rows, children, setRows, optio
     }
 
     return (
-        <div className="h-full w-full flex flex-col gap-4">
+        <div className={cn("h-full w-full flex flex-col gap-4", className)}>
             <div className="flex gap-4">
                 {children}
                 {
