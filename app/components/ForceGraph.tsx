@@ -311,16 +311,27 @@ export default function ForceGraph({
                         textY = rotatedY;
                     }
 
+                    // Get text width
+                    const category = graph.LabelsMap.get(link.label)!
+                    let { textWidth } = category
+
+                    if (!textWidth) {
+                        textWidth = ctx.measureText(link.label).width;
+                        graph.LabelsMap.set(link.label, { ...category, textWidth })
+                    }
+
                     // Setup text properties to measure background size
                     ctx.font = '2px Arial';
                     const padding = 1;
-                    const textWidth = ctx.measureText(link.label).width;
                     const textHeight = 2; // Approximate height for 2px font
 
-                    // add label with background and rotation
+                    // Save the current context state
+                    ctx.save();
+
+                    // Rotate
                     ctx.rotate(angle);
 
-                    // Draw background
+                    // Draw background and text
                     ctx.fillStyle = '#191919';
                     ctx.fillRect(
                         textX - textWidth / 2 - padding,
@@ -329,13 +340,13 @@ export default function ForceGraph({
                         textHeight + padding * 2
                     );
 
-                    // Draw text
                     ctx.fillStyle = 'white';
                     ctx.textAlign = 'center';
                     ctx.textBaseline = 'middle';
                     ctx.fillText(link.label, textX, textY);
 
-                    ctx.rotate(-angle); // reset rotation
+                    // Restore the context to its original state
+                    ctx.restore();
                 }}
                 onNodeClick={handleNodeClick}
                 onNodeHover={handleHover}

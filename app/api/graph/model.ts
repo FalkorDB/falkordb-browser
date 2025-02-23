@@ -102,6 +102,7 @@ export interface Category {
     index: number,
     name: string,
     show: boolean,
+    textWidth?: number,
 }
 
 export interface ExtractedData {
