@@ -4,17 +4,17 @@
 
 "use client"
 
-import { Dispatch, RefObject, SetStateAction, useEffect, useRef, useState } from "react"
-import ForceGraph2D from "react-force-graph-2d"
+import { Dispatch, MutableRefObject, SetStateAction, useEffect, useRef, useState } from "react"
+import ForceGraph2D, { ForceGraphMethods } from "react-force-graph-2d"
 import { securedFetch } from "@/lib/utils"
 import { useToast } from "@/components/ui/use-toast"
+import * as d3 from "d3"
 import { useSession } from "next-auth/react"
 import { Graph, GraphData, Link, Node } from "../api/graph/model"
 
 interface Props {
     graph: Graph
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    chartRef: RefObject<any | null>
+    chartRef: MutableRefObject<ForceGraphMethods<Node, Link> | undefined>
     data: GraphData
     selectedElement: Node | Link | undefined
     setSelectedElement: (element: Node | Link | undefined) => void
@@ -52,6 +52,10 @@ export default function ForceGraph({
     const lastClick = useRef<{ date: Date, name: string }>({ date: new Date(), name: "" })
     const { toast } = useToast()
     const { data: session } = useSession()
+
+    useEffect(() => {
+        
+    }, [])
     
     useEffect(() => {
         const handleResize = () => {
@@ -73,6 +77,38 @@ export default function ForceGraph({
             observer.disconnect()
         }
     }, [parentRef])
+
+    useEffect(() => {
+        if (!chartRef.current) return;
+        
+        // Adjust force parameters for better graph layout
+        const linkForce = chartRef.current.d3Force('link');
+        if (linkForce) {
+            linkForce
+                .distance(() => 30)
+                .strength((link: any) => 1 / Math.min(
+                    graph.Elements.nodes.filter(n => n.id === link.source.id).length,
+                    graph.Elements.nodes.filter(n => n.id === link.target.id).length
+                ));
+        }
+
+        // Adjust charge force for node repulsion
+        const chargeForce = chartRef.current.d3Force('charge');
+        if (chargeForce) {
+            chargeForce
+                .strength(-30)
+                .distanceMax(150);
+        }
+
+        // Add collision force to prevent node overlap
+        chartRef.current.d3Force('collision', d3.forceCollide(NODE_SIZE * 1.5));
+
+        // Center force to keep graph centered
+        const centerForce = chartRef.current.d3Force('center');
+        if (centerForce) {
+            centerForce.strength(0.05);
+        }
+    }, [chartRef, graph.Elements.nodes])
 
     const onFetchNode = async (node: Node) => {
         const result = await securedFetch(`/api/graph/${graph.Id}/${node.id}`, {

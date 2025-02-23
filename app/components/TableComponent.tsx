@@ -113,10 +113,24 @@ export default function TableComponent({ headers, rows, children, setRows, optio
                 </TableHeader>
                 <TableBody className="overflow-auto">
                     {
-                        rows
-                            .filter((row) => typeof row.cells[0].value === "string" ? row.cells[0].value.toLowerCase().includes(search.toLowerCase()) : !search)
+                        rows.filter((row) => !search || row.cells.some(cell =>
+                            cell.value && (
+                                typeof cell.value === "object"
+                                    ? Object.values(cell.value).some(value =>
+                                        typeof value === "object"
+                                            ? Object.values(value).some(val => val.toString().toLowerCase().includes(search.toLowerCase()))
+                                            : value?.toString().toLowerCase().includes(search.toLowerCase())
+                                    )
+                                    : cell.value.toString().toLowerCase().includes(search.toLowerCase())
+                            )
+                        ))
                             .map((row, i) => (
-                                <TableRow onMouseEnter={() => setHover(`${i}`)} onMouseLeave={() => setHover("")} data-id={typeof row.cells[0].value === "string" && row.cells[0].value} key={i}>
+                                <TableRow
+                                    onMouseEnter={() => setHover(`${i}`)}
+                                    onMouseLeave={() => setHover("")}
+                                    data-id={typeof row.cells[0].value === "string" ? row.cells[0].value : undefined}
+                                    key={i}
+                                >
                                     {
                                         setRows ?
                                             <TableCell className="w-5 !pr-2">
@@ -135,7 +149,14 @@ export default function TableComponent({ headers, rows, children, setRows, optio
                                                 {
                                                     typeof cell.value === "object" ?
                                                         <JSONTree
-                                                            shouldExpandNodeInitially={() => false}
+                                                            key={search}
+                                                            shouldExpandNodeInitially={() =>
+                                                                search !== "" && Object.values(cell.value as object).some(value =>
+                                                                    typeof value === "object"
+                                                                        ? Object.values(value as object).some(val =>
+                                                                            val.toString().toLowerCase().includes(search.toLowerCase())
+                                                                        )
+                                                                        : value?.toString().toLowerCase().includes(search.toLowerCase()))}
                                                             keyPath={[headers[j]]}
                                                             theme={{
                                                                 base00: "var(--background)", // background
