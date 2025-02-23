@@ -38,7 +38,7 @@ export default function DialogComponent({
                 </DialogHeader>
                 {
                     description ?
-                        <DialogDescription className="p-4">
+                        <DialogDescription className="p-4 truncate">
                             {description}
                         </DialogDescription>
                         : <VisuallyHidden>
