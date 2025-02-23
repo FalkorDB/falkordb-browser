@@ -36,9 +36,10 @@ interface Props {
     children?: React.ReactNode,
     setRows?: (rows: Row[]) => void,
     options?: string[]
+    className?: string
 }
 
-export default function TableComponent({ headers, rows, children, setRows, options }: Props) {
+export default function TableComponent({ headers, rows, children, setRows, options, className }: Props) {
 
     const [search, setSearch] = useState<string>("")
     const [isSearchable, setIsSearchable] = useState<boolean>(false)
@@ -51,8 +52,27 @@ export default function TableComponent({ headers, rows, children, setRows, optio
         setNewValue(value)
     }
 
+    const handleSearchFilter = (cell: Cell): boolean => {
+        if (!cell.value) return false;
+
+        const searchLower = search.toLowerCase();
+
+        if (typeof cell.value === "object") {
+            return Object.values(cell.value).some(value => {
+                if (typeof value === "object") {
+                    return Object.values(value).some(val =>
+                        val?.toString().toLowerCase().includes(searchLower)
+                    );
+                }
+                return value?.toString().toLowerCase().includes(searchLower);
+            });
+        }
+
+        return cell.value.toString().toLowerCase().includes(searchLower);
+    }
+
     return (
-        <div className="h-full w-full flex flex-col gap-4">
+        <div className={cn("h-full w-full flex flex-col gap-4", className)}>
             <div className="flex gap-4">
                 {children}
                 {
@@ -112,10 +132,16 @@ export default function TableComponent({ headers, rows, children, setRows, optio
                 </TableHeader>
                 <TableBody className="overflow-auto">
                     {
-                        rows
-                            .filter((row) => typeof row.cells[0].value === "string" ? row.cells[0].value.toLowerCase().includes(search.toLowerCase()) : !search)
+                        rows.filter((row) => !search || row.cells.some(cell =>
+                            handleSearchFilter(cell)
+                        ))
                             .map((row, i) => (
-                                <TableRow onMouseEnter={() => setHover(`${i}`)} onMouseLeave={() => setHover("")} data-id={typeof row.cells[0].value === "string" && row.cells[0].value} key={i}>
+                                <TableRow
+                                    onMouseEnter={() => setHover(`${i}`)}
+                                    onMouseLeave={() => setHover("")}
+                                    data-id={typeof row.cells[0].value === "string" ? row.cells[0].value : undefined}
+                                    key={i}
+                                >
                                     {
                                         setRows ?
                                             <TableCell className="w-5 !pr-2">
@@ -134,7 +160,10 @@ export default function TableComponent({ headers, rows, children, setRows, optio
                                                 {
                                                     typeof cell.value === "object" ?
                                                         <JSONTree
-                                                            shouldExpandNodeInitially={() => false}
+                                                            key={search}
+                                                            shouldExpandNodeInitially={() =>
+                                                                !!search && handleSearchFilter(cell)
+                                                            }
                                                             keyPath={[headers[j]]}
                                                             theme={{
                                                                 base00: "var(--background)", // background

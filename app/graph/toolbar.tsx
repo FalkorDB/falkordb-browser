@@ -4,13 +4,13 @@
 
 import { Link, PlusCircle, Shrink, Trash2, ZoomIn, ZoomOut } from "lucide-react";
 import { useState } from "react";
+import { handleZoomToFit, GraphRef } from "@/lib/utils";
 import Button from "../components/ui/Button";
 import DeleteElement from "./DeleteElement";
 
 interface Props {
     disabled?: boolean,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    chartRef: React.RefObject<any>,
+    chartRef: GraphRef,
     onDeleteElement?: () => Promise<void>,
     onAddEntity?: () => void,
     onAddRelation?: () => void,
@@ -40,10 +40,7 @@ export default function Toolbar({
     }
 
     const handleCenterClick = () => {
-        const chart = chartRef.current
-        if (chart) {
-            chart.zoomToFit(1000, 40)
-        }
+        handleZoomToFit(chartRef)
     }
 
     const handleDeleteElement = async () => {

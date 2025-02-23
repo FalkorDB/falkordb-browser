@@ -97,7 +97,7 @@ export default function Combobox({ isSelectGraph = false, disabled = false, inTa
     handleSetRows(options.filter(opt => !opts.includes(opt)))
     toast({
       title: "Graph(s) deleted successfully",
-      description: "The graph(s) have been deleted successfully",
+      description: `The graph(s) ${opts.join(", ")} have been deleted successfully`,
     })
   }
 
@@ -147,17 +147,19 @@ export default function Combobox({ isSelectGraph = false, disabled = false, inTa
           }
         </SelectContent>
       </Select>
-      <DialogContent disableClose className="border-none rounded-lg max-w-none max-h-nones">
+      <DialogContent disableClose className="flex flex-col border-none rounded-lg max-w-none max-h-[90dvh]">
         <DialogHeader className="flex-row justify-between items-center border-b border-secondary pb-4">
           <DialogTitle className="text-2xl font-medium">Manage Graphs</DialogTitle>
           <CloseDialog />
         </DialogHeader>
         <TableComponent
+          className="grow overflow-hidden"
           headers={["Name"]}
           rows={rows}
           setRows={setRows}
         >
           <DialogComponent
+            className="max-w-[90dvw]"
             open={openDelete}
             onOpenChange={setOpenDelete}
             title="Delete Graph"
@@ -166,7 +168,7 @@ export default function Combobox({ isSelectGraph = false, disabled = false, inTa
               disabled={rows.filter(opt => opt.checked).length === 0}
               label="Delete"
             />}
-            description="Are you sure you want to delete the selected graph(s)?"
+            description={`Are you sure you want to delete the selected graph(s)? (${rows.filter(opt => opt.checked).map(opt => opt.cells[0].value as string).join(", ")})`}
           >
             <div className="flex justify-end gap-2">
               <Button
