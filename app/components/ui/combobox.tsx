@@ -147,17 +147,19 @@ export default function Combobox({ isSelectGraph = false, disabled = false, inTa
           }
         </SelectContent>
       </Select>
-      <DialogContent disableClose className="border-none rounded-lg max-w-none max-h-nones">
+      <DialogContent disableClose className="flex flex-col border-none rounded-lg max-w-none max-h-[90dvh]">
         <DialogHeader className="flex-row justify-between items-center border-b border-secondary pb-4">
           <DialogTitle className="text-2xl font-medium">Manage Graphs</DialogTitle>
           <CloseDialog />
         </DialogHeader>
         <TableComponent
+          className="grow overflow-hidden"
           headers={["Name"]}
           rows={rows}
           setRows={setRows}
         >
           <DialogComponent
+            className="max-w-[90dvw]"
             open={openDelete}
             onOpenChange={setOpenDelete}
             title="Delete Graph"
