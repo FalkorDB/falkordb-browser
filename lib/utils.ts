@@ -10,6 +10,8 @@ import { MutableRefObject } from "react"
 import { ForceGraphMethods } from "react-force-graph-2d"
 import { Node, Link } from "@/app/api/graph/model"
 
+export type GraphRef = MutableRefObject<ForceGraphMethods<Node, Link> | undefined>
+
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
@@ -92,7 +94,7 @@ export function rgbToHSL(hex: string): string {
   return `hsl(${hDeg}, ${sPct}%, ${lPct}%)`;
 }
 
-export function handleZoomToFit(chartRef?: MutableRefObject<ForceGraphMethods<Node, Link> | undefined>) {
+export function handleZoomToFit(chartRef?: GraphRef) {
   const chart = chartRef?.current
   if (chart) {
     // Get canvas dimensions

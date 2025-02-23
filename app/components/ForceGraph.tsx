@@ -4,9 +4,9 @@
 
 "use client"
 
-import { Dispatch, MutableRefObject, SetStateAction, useEffect, useRef, useState } from "react"
-import ForceGraph2D, { ForceGraphMethods } from "react-force-graph-2d"
-import { securedFetch } from "@/lib/utils"
+import { Dispatch, SetStateAction, useEffect, useRef, useState } from "react"
+import ForceGraph2D from "react-force-graph-2d"
+import { securedFetch, GraphRef } from "@/lib/utils"
 import { useToast } from "@/components/ui/use-toast"
 import * as d3 from "d3"
 import { useSession } from "next-auth/react"
@@ -14,7 +14,7 @@ import { Graph, GraphData, Link, Node } from "../api/graph/model"
 
 interface Props {
     graph: Graph
-    chartRef: MutableRefObject<ForceGraphMethods<Node, Link> | undefined>
+    chartRef: GraphRef
     data: GraphData
     selectedElement: Node | Link | undefined
     setSelectedElement: (element: Node | Link | undefined) => void

@@ -3,16 +3,14 @@
 /* eslint-disable react/require-default-props */
 
 import { Link, PlusCircle, Shrink, Trash2, ZoomIn, ZoomOut } from "lucide-react";
-import { MutableRefObject, useState } from "react";
-import { ForceGraphMethods } from "react-force-graph-2d";
-import { handleZoomToFit } from "@/lib/utils";
-import { Node, Link as LinkType } from "../api/graph/model";
+import { useState } from "react";
+import { handleZoomToFit, GraphRef } from "@/lib/utils";
 import Button from "../components/ui/Button";
 import DeleteElement from "./DeleteElement";
 
 interface Props {
     disabled?: boolean,
-    chartRef: MutableRefObject<ForceGraphMethods<Node, LinkType> | undefined>,
+    chartRef: GraphRef,
     onDeleteElement?: () => Promise<void>,
     onAddEntity?: () => void,
     onAddRelation?: () => void,

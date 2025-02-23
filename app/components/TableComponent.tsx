@@ -52,6 +52,25 @@ export default function TableComponent({ headers, rows, children, setRows, optio
         setNewValue(value)
     }
 
+    const handleSearchFilter = (cell: Cell): boolean => {
+        if (!cell.value) return false;
+
+        const searchLower = search.toLowerCase();
+
+        if (typeof cell.value === "object") {
+            return Object.values(cell.value).some(value => {
+                if (typeof value === "object") {
+                    return Object.values(value).some(val =>
+                        val?.toString().toLowerCase().includes(searchLower)
+                    );
+                }
+                return value?.toString().toLowerCase().includes(searchLower);
+            });
+        }
+
+        return cell.value.toString().toLowerCase().includes(searchLower);
+    }
+
     return (
         <div className={cn("h-full w-full flex flex-col gap-4", className)}>
             <div className="flex gap-4">
@@ -114,15 +133,7 @@ export default function TableComponent({ headers, rows, children, setRows, optio
                 <TableBody className="overflow-auto">
                     {
                         rows.filter((row) => !search || row.cells.some(cell =>
-                            cell.value && (
-                                typeof cell.value === "object"
-                                    ? Object.values(cell.value).some(value =>
-                                        typeof value === "object"
-                                            ? Object.values(value).some(val => val.toString().toLowerCase().includes(search.toLowerCase()))
-                                            : value?.toString().toLowerCase().includes(search.toLowerCase())
-                                    )
-                                    : cell.value.toString().toLowerCase().includes(search.toLowerCase())
-                            )
+                            handleSearchFilter(cell)
                         ))
                             .map((row, i) => (
                                 <TableRow
@@ -151,12 +162,8 @@ export default function TableComponent({ headers, rows, children, setRows, optio
                                                         <JSONTree
                                                             key={search}
                                                             shouldExpandNodeInitially={() =>
-                                                                search !== "" && Object.values(cell.value as object).some(value =>
-                                                                    typeof value === "object"
-                                                                        ? Object.values(value as object).some(val =>
-                                                                            val.toString().toLowerCase().includes(search.toLowerCase())
-                                                                        )
-                                                                        : value?.toString().toLowerCase().includes(search.toLowerCase()))}
+                                                                !!search && handleSearchFilter(cell)
+                                                            }
                                                             keyPath={[headers[j]]}
                                                             theme={{
                                                                 base00: "var(--background)", // background
