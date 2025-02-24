@@ -4,7 +4,7 @@
 "use client"
 
 import { useState } from "react"
-import { EyeIcon, EyeOffIcon, InfoIcon } from "lucide-react"
+import { EyeIcon, EyeOffIcon, InfoIcon, Loader2 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import Button from "./ui/Button"
@@ -45,7 +45,7 @@ interface Props {
 export default function FormComponent({ handleSubmit, fields, error = undefined, children = undefined, submitButtonLabel = "Submit" }: Props) {
     const [show, setShow] = useState<{ [key: string]: boolean }>({});
     const [errors, setErrors] = useState<{ [key: string]: boolean }>({});
-
+    const [isLoading, setIsLoading] = useState(false);
     const onHandleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault()
 
@@ -62,7 +62,12 @@ export default function FormComponent({ handleSubmit, fields, error = undefined,
             return
         }
 
-        await handleSubmit(e)
+        setIsLoading(true)
+        try {
+            await handleSubmit(e)
+        } finally {
+            setIsLoading(false)
+        }
     }
 
     return (
@@ -146,9 +151,9 @@ export default function FormComponent({ handleSubmit, fields, error = undefined,
                 <Button
                     className="grow bg-primary p-4 rounded-lg flex justify-center items-center gap-2"
                     type="submit"
-                    disabled={error?.show}
+                    disabled={error?.show || isLoading}
                 >
-                    {submitButtonLabel}
+                    {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : submitButtonLabel}
                 </Button>
             </div>
         </form>
