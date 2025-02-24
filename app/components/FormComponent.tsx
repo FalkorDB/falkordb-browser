@@ -145,10 +145,11 @@ export default function FormComponent({ handleSubmit, fields, error = undefined,
             <div className="flex justify-end gap-2 mt-10">
                 <Button
                     className="grow bg-primary p-4 rounded-lg flex justify-center items-center gap-2"
-                    label={submitButtonLabel}
                     type="submit"
                     disabled={error?.show}
-                />
+                >
+                    {submitButtonLabel}
+                </Button>
             </div>
         </form>
     )
