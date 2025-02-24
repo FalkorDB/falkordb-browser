@@ -4,6 +4,13 @@ on:
     branches: [ main, staging ]
   pull_request:
     branches: [ main, staging ]
+  workflow_run:
+    workflows:
+      - "FalkorDb/Falkordb: Release image to DockerHub"
+    types:
+      - completed
+    repositories:
+      - FalkorDb/Falkordb
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
