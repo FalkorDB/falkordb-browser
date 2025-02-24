@@ -32,7 +32,7 @@ export type Field = {
 }
 
 interface Props {
-    handleSubmit: (e: React.FormEvent<HTMLFormElement>) => void
+    handleSubmit: (e: React.FormEvent<HTMLFormElement>) => Promise<void>
     fields: Field[]
     error?: {
         message: string
@@ -46,11 +46,10 @@ export default function FormComponent({ handleSubmit, fields, error = undefined,
     const [show, setShow] = useState<{ [key: string]: boolean }>({});
     const [errors, setErrors] = useState<{ [key: string]: boolean }>({});
 
-    const onHandleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    const onHandleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault()
 
         const newErrors: { [key: string]: boolean } = {}
-
         fields.forEach(field => {
             if (field.errors) {
                 newErrors[field.label] = field.errors.some(err => err.condition(field.value))
@@ -59,9 +58,11 @@ export default function FormComponent({ handleSubmit, fields, error = undefined,
 
         setErrors(newErrors)
 
-        if (Object.values(newErrors).some(value => value)) return
+        if (Object.values(newErrors).some(value => value)) {
+            return
+        }
 
-        handleSubmit(e)
+        await handleSubmit(e)
     }
 
     return (
@@ -143,9 +144,10 @@ export default function FormComponent({ handleSubmit, fields, error = undefined,
             {error?.show && <p className="text-sm text-red-500">{error.message}</p>}
             <div className="flex justify-end gap-2 mt-10">
                 <Button
-                    className="grow bg-primary p-4 rounded-lg flex justify-center"
+                    className="grow bg-primary p-4 rounded-lg flex justify-center items-center gap-2"
                     label={submitButtonLabel}
                     type="submit"
+                    disabled={error?.show}
                 />
             </div>
         </form>
