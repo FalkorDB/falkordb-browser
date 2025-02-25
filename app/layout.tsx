@@ -30,9 +30,9 @@ export default function RootLayout({
         <NextAuthProvider>
           <TooltipProvider>
             {children}
+            <Toaster />
           </TooltipProvider>
         </NextAuthProvider>
-        <Toaster />
       </body>
     </html>
   );
