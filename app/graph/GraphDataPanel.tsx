@@ -39,7 +39,7 @@ export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement,
     const type = !("source" in obj)
     const { toast } = useToast()
     const { data: session } = useSession()
-    
+
     const handleSetEditable = (key: string, val: string) => {
         if (key !== "") {
             setIsAddValue(false)
@@ -72,6 +72,9 @@ export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement,
         if (success) {
             graph.getElements().forEach(e => {
                 if (e.id !== id) return
+                if (key === "name" && !e.source) {
+                    e.displayName = ""
+                }
                 e.data[key] = val
             })
             const value = obj.data[key]

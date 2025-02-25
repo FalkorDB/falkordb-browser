@@ -4,7 +4,7 @@
 
 "use client"
 
-import { Dispatch, SetStateAction, useEffect, useRef, useState } from "react"
+import { Dispatch, SetStateAction, useCallback, useEffect, useRef, useState } from "react"
 import ForceGraph2D from "react-force-graph-2d"
 import { securedFetch, GraphRef } from "@/lib/utils"
 import { useToast } from "@/components/ui/use-toast"
@@ -29,6 +29,10 @@ interface Props {
 
 const NODE_SIZE = 6
 const PADDING = 2;
+let ELLIPSIS_WIDTH = 0
+const FONT = '2px Arial';
+const TEXT_PADDING = 0.5;
+const TEXT_HEIGHT = 2;
 
 export default function ForceGraph({
     graph,
@@ -158,7 +162,6 @@ export default function ForceGraph({
     }
 
     const handleNodeClick = async (node: Node) => {
-
         const now = new Date()
         const { date, name } = lastClick.current
 
@@ -214,6 +217,145 @@ export default function ForceGraph({
         setSelectedElements([])
     }
 
+    const nodeCanvasObject = useCallback((node: Node, ctx: CanvasRenderingContext2D) => {
+        if (!node.x || !node.y) return
+
+        // Cache commonly used values
+        const isSelected = selectedElement?.id === node.id;
+        const isHovered = hoverElement?.id === node.id;
+        const isInSelection = selectedElements.some(el => el.id === node.id);
+
+        // Batch style settings
+        ctx.lineWidth = (isSelected || isHovered || isInSelection) ? 1 : 0.5;
+        ctx.strokeStyle = 'white';
+
+        // Single path for node circle
+        ctx.beginPath();
+        ctx.arc(node.x, node.y, NODE_SIZE, 0, 2 * Math.PI);
+        ctx.stroke();
+        ctx.fill();
+
+        // Calculate display name once and cache it
+        if (!node.displayName) {
+            const maxWidth = NODE_SIZE * 2 - PADDING;
+
+            // Cache ellipsis width
+            if (!ELLIPSIS_WIDTH) {
+                ctx.font = FONT;
+                ELLIPSIS_WIDTH = ctx.measureText('...').width;
+            }
+
+            const rawName = type === "graph"
+                ? (node.data.name || node.id.toString())
+                : node.category[0];
+
+            // Measure text only once
+            ctx.font = FONT;
+            const textWidth = ctx.measureText(rawName).width;
+
+            // Only process text if it needs truncation
+            if (textWidth > maxWidth) {
+                let name = rawName;
+                while (name.length > 0 && (ctx.measureText(name).width + ELLIPSIS_WIDTH) > maxWidth) {
+                    name = name.slice(0, -1);
+                }
+                node.displayName = `${name}...`;
+            } else {
+                node.displayName = rawName;
+            }
+        }
+
+        // Batch text rendering settings
+        ctx.font = FONT;
+        ctx.fillStyle = 'black';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(node.displayName, node.x, node.y);
+    }, [selectedElement, hoverElement, selectedElements, type]);
+
+    const linkCanvasObject = useCallback((link: Link, ctx: CanvasRenderingContext2D) => {
+        const start = link.source;
+        const end = link.target;
+
+        if (!start.x || !start.y || !end.x || !end.y) return;
+
+        // Cache text measurements in the LabelsMap
+        const category = graph.LabelsMap.get(link.label);
+        if (!category) return;
+
+        if (!category.textWidth) {
+            ctx.font = FONT;
+            category.textWidth = ctx.measureText(link.label).width;
+            graph.LabelsMap.set(link.label, category);
+        }
+
+        // Calculate position and angle
+        let textX: number;
+        let textY: number;
+        let angle: number;
+
+        // Optimize self-referential link rendering
+        if (start.id === end.id) {
+            const radius = NODE_SIZE * link.curve * 6.2;
+            const angleOffset = -Math.PI / 4;
+            textX = start.x + radius * Math.cos(angleOffset);
+            textY = start.y + radius * Math.sin(angleOffset);
+            angle = -angleOffset;
+        } else {
+            // Optimize straight link rendering
+            const midX = (start.x + end.x) / 2;
+            const midY = (start.y + end.y) / 2;
+            const offset = link.curve / 2;
+
+            // Calculate angle once
+            angle = Math.atan2(end.y - start.y, end.x - start.x);
+
+            // Optimize angle calculations
+            if (Math.abs(angle) > Math.PI / 2) {
+                angle = angle > 0 ? -(Math.PI - angle) : -(-Math.PI - angle);
+            }
+
+            // Calculate offset position
+            const perpX = -Math.sin(angle) * offset;
+            const perpY = Math.cos(angle) * offset;
+
+            // Optimize rotation calculations
+            const cos = Math.cos(angle);
+            const sin = Math.sin(angle);
+            textX = midX + perpX;
+            textY = midY + perpY;
+            const rotatedX = textX * cos + textY * sin;
+            const rotatedY = -textX * sin + textY * cos;
+            textX = rotatedX;
+            textY = rotatedY;
+        }
+
+        // Save context state once
+        ctx.save();
+        ctx.rotate(angle);
+
+        // Batch background drawing
+        const halfWidth = category.textWidth / 2;
+        const halfHeight = TEXT_HEIGHT / 2;
+
+        ctx.fillStyle = '#191919';
+        ctx.fillRect(
+            textX - halfWidth - TEXT_PADDING,
+            textY - halfHeight - TEXT_PADDING,
+            category.textWidth + TEXT_PADDING * 2,
+            TEXT_HEIGHT + TEXT_PADDING * 2
+        );
+
+        // Batch text rendering
+        ctx.font = FONT;
+        ctx.fillStyle = 'white';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(link.label, textX, textY);
+
+        ctx.restore();
+    }, [graph.LabelsMap]);
+
     return (
         <div ref={parentRef} className="w-full h-full relative">
             <ForceGraph2D
@@ -221,133 +363,15 @@ export default function ForceGraph({
                 backgroundColor="#191919"
                 width={parentWidth}
                 height={parentHeight}
-                nodeLabel={(node) => node.data.name || node.id.toString()}
+                nodeLabel={(node) => type === "graph" ? node.data.name || node.id.toString() : node.category[0]}
                 graphData={data}
                 nodeRelSize={NODE_SIZE}
                 nodeCanvasObjectMode={() => 'after'}
                 linkCanvasObjectMode={() => 'after'}
-                linkWidth={(link) => (selectedElement && ("source" in selectedElement) && selectedElement.id === link.id
-                    || hoverElement && ("source" in hoverElement) && hoverElement.id === link.id) ? 2 : 1}
-                nodeCanvasObject={(node, ctx) => {
-                    if (!node.x || !node.y) return
-
-                    ctx.lineWidth = ((selectedElement && !("source" in selectedElement) && selectedElement.id === node.id)
-                        || (hoverElement && !("source" in hoverElement) && hoverElement.id === node.id)
-                        || (selectedElements.length > 0 && selectedElements.some(el => el.id === node.id && !("source" in el)))) ? 1 : 0.5
-                    ctx.strokeStyle = 'white';
-
-                    ctx.beginPath();
-                    ctx.arc(node.x, node.y, NODE_SIZE, 0, 2 * Math.PI, false);
-                    ctx.stroke();
-                    ctx.fill();
-
-
-                    ctx.fillStyle = 'black';
-                    ctx.textAlign = 'center';
-                    ctx.textBaseline = 'middle';
-                    ctx.font = '3px Arial';
-                    const ellipsis = '...';
-                    const ellipsisWidth = ctx.measureText(ellipsis).width;
-                    const nodeSize = NODE_SIZE * 2 - PADDING;
-
-                    let name
-
-                    if (type === "graph") {
-                        name = node.data.name || node.id.toString()
-                    } else {
-                        [name] = node.category
-                    }
-
-                    // truncate text if it's too long
-                    if (ctx.measureText(name).width > nodeSize) {
-                        while (name.length > 0 && ctx.measureText(name).width + ellipsisWidth > nodeSize) {
-                            name = name.slice(0, -1);
-                        }
-                        name += ellipsis;
-                    }
-
-                    // add label
-                    ctx.fillText(name, node.x, node.y);
-                }}
-                linkCanvasObject={(link, ctx) => {
-                    const start = link.source;
-                    const end = link.target;
-
-                    if (!start.x || !start.y || !end.x || !end.y) return
-
-                    let textX;
-                    let textY;
-                    let angle;
-
-                    if (start.id === end.id) {
-                        const radius = NODE_SIZE * link.curve * 6.2;
-                        const angleOffset = -Math.PI / 4; // 45 degrees offset for text alignment
-                        textX = start.x + radius * Math.cos(angleOffset);
-                        textY = start.y + radius * Math.sin(angleOffset);
-                        angle = -angleOffset;
-                    } else {
-                        const midX = (start.x + end.x) / 2;
-                        const midY = (start.y + end.y) / 2;
-                        const offset = link.curve / 2;
-
-                        angle = Math.atan2(end.y - start.y, end.x - start.x);
-
-                        // maintain label vertical orientation for legibility
-                        if (angle > Math.PI / 2) angle = -(Math.PI - angle);
-                        if (angle < -Math.PI / 2) angle = -(-Math.PI - angle);
-
-                        // Calculate perpendicular offset
-                        const perpX = -Math.sin(angle) * offset;
-                        const perpY = Math.cos(angle) * offset;
-
-                        // Adjust position to compensate for rotation around origin
-                        const cos = Math.cos(angle);
-                        const sin = Math.sin(angle);
-                        textX = midX + perpX;
-                        textY = midY + perpY;
-                        const rotatedX = textX * cos + textY * sin;
-                        const rotatedY = -textX * sin + textY * cos;
-                        textX = rotatedX;
-                        textY = rotatedY;
-                    }
-
-                    // Get text width
-                    const category = graph.LabelsMap.get(link.label)!
-                    let { textWidth } = category
-
-                    if (!textWidth) {
-                        textWidth = ctx.measureText(link.label).width;
-                        graph.LabelsMap.set(link.label, { ...category, textWidth })
-                    }
-
-                    // Setup text properties to measure background size
-                    ctx.font = '2px Arial';
-                    const padding = 1;
-                    const textHeight = 2; // Approximate height for 2px font
-
-                    // Save the current context state
-                    ctx.save();
-
-                    // Rotate
-                    ctx.rotate(angle);
-
-                    // Draw background and text
-                    ctx.fillStyle = '#191919';
-                    ctx.fillRect(
-                        textX - textWidth / 2 - padding,
-                        textY - textHeight / 2 - padding,
-                        textWidth + padding * 2,
-                        textHeight + padding * 2
-                    );
-
-                    ctx.fillStyle = 'white';
-                    ctx.textAlign = 'center';
-                    ctx.textBaseline = 'middle';
-                    ctx.fillText(link.label, textX, textY);
-
-                    // Restore the context to its original state
-                    ctx.restore();
-                }}
+                linkWidth={useCallback((link: Link) => (selectedElement && (selectedElement.source) && selectedElement.id === link.id
+                    || hoverElement && (hoverElement.source) && hoverElement.id === link.id) ? 2 : 1, [selectedElement, hoverElement])}
+                nodeCanvasObject={nodeCanvasObject}
+                linkCanvasObject={linkCanvasObject}
                 onNodeClick={handleNodeClick}
                 onNodeHover={handleHover}
                 onLinkHover={handleHover}
