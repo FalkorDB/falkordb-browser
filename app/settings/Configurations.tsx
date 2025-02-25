@@ -5,12 +5,13 @@
 
 "use client";
 
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { prepareArg, securedFetch } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
 import { useSession } from "next-auth/react";
 import TableComponent, { Row } from "../components/TableComponent";
 import ToastButton from "../components/ToastButton";
+import { DataCell } from "../api/graph/model";
 
 type Config = {
     name: string,
@@ -104,8 +105,7 @@ export default function Configurations() {
     const { toast } = useToast();
     const { data: session } = useSession()
     
-    // Memoize the config update handler
-    const handleSetConfig = useCallback(async (name: string, value: string, isUndo: boolean) => {
+    const handleSetConfig = async (name: string, value: string, isUndo: boolean) => {
         if (!value) {
             toast({
                 title: "Error",
@@ -133,36 +133,36 @@ export default function Configurations() {
         );
 
         if (!result.ok) return false;
-        
-        const configToUpdate = configs.find(row => row.cells[0].value === name);
-        const oldValue = configToUpdate?.cells[2].value;
+
+        let oldValue: DataCell | undefined;
 
         setConfigs(currentConfigs => {
-            const updatedConfigs = currentConfigs.map((config: Row) => {
+            const configToUpdate = currentConfigs.find(row => row.cells[0].value === name);
+            oldValue = configToUpdate?.cells[2].value;
+
+            return currentConfigs.map((config: Row) => {
                 if (config.cells[0].value !== name) return config;
 
                 const newConfig = { ...config }
-
                 newConfig.cells[2].value = value;
-
                 return newConfig;
             });
-
-            return updatedConfigs;
         });
+
+        const valueToRestore = oldValue;
 
         toast({
             title: "Success",
             description: "Configuration value set successfully",
-            action: oldValue && isUndo
-                ? <ToastButton onClick={() => handleSetConfig(name, oldValue.toString(), false)} />
+            action: valueToRestore && isUndo
+                ? <ToastButton onClick={() => handleSetConfig(name, String(valueToRestore), false)} />
                 : undefined
         });
 
         return true;
-    }, [configs, toast]);
+    }
 
-    const fetchConfigs = useCallback(async () => {
+    const fetchConfigs = async () => {
         const newConfigs = await Promise.all(
             Configs.map(async (config) => {
                 const result = await securedFetch(
@@ -202,7 +202,7 @@ export default function Configurations() {
         );
 
         setConfigs(newConfigs);
-    }, [toast]);
+    }
 
     useEffect(() => {
         fetchConfigs();
