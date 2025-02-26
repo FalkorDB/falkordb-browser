@@ -6,7 +6,7 @@ on:
     branches: [ main, staging ]
   workflow_run:
     workflows:
-      - "FalkorDb/Falkordb: Release image to DockerHub"
+      - "FalkorDb/Falkordb: browser tests trigger on new tag release"
     types:
       - completed
     repositories:
