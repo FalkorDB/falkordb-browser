@@ -35,12 +35,12 @@ export default function Page() {
 
         setEdgesCount(edges.result?.data[0].edges)
         setNodesCount(nodes.result?.data[0].nodes)
-    }, [schemaName])
+    }, [schemaName, session?.user?.role, toast])
 
     useEffect(() => {
         if (!schemaName) return
         const run = async () => {
-            const result = await securedFetch(`/api/graph/${prepareArg(schemaName)}_schema/?query=${defaultQuery()}`, {
+            const result = await securedFetch(`/api/graph/${prepareArg(schemaName)}_schema/?query=${prepareArg(defaultQuery())}`, {
                 method: "GET"
             }, session?.user?.role, toast)
             if (!result.ok) return
@@ -52,7 +52,7 @@ export default function Page() {
 
         }
         run()
-    }, [fetchCount, schemaName])
+    }, [fetchCount, schemaName, session?.user?.role, toast])
 
     return (
         <div className="Page">

@@ -163,7 +163,11 @@ export default function SchemaView({ schema, fetchCount, session }: Props) {
             }
             if (fetchCount) fetchCount()
 
-            schema.updateCategories(type ? element.category : element.label, type)
+            const category = type ? schema.CategoriesMap.get(element.category[0]) : schema.LabelsMap.get(element.label)
+            if (category && category.elements.length === 0) {
+                schema.Categories.splice(schema.Categories.findIndex(c => c.name === category.name), 1)
+                schema.CategoriesMap.delete(category.name)
+            }
         })
 
         schema.removeLinks()
@@ -321,6 +325,50 @@ export default function SchemaView({ schema, fetchCount, session }: Props) {
         return result.ok
     }
 
+    const handleAddLabel = async (label: string) => {
+        const q = `MATCH (n) WHERE ID(n) = ${selectedElement?.id} SET n:${label}`
+        const result = await securedFetch(`api/graph/${prepareArg(schema.Id)}_schema/?query=${prepareArg(q)}`, {
+            method: "GET"
+        }, session?.user?.role, toast)
+
+        if (result.ok) {
+            selectedElement!.displayName = ""
+            schema.createCategory([label], selectedElement as Node)
+            schema.Elements.nodes.forEach((node) => {
+                if (node.id === selectedElement?.id) {
+                    node.category.push(label)
+                }
+            })
+            setData({ ...schema.Elements })
+        }
+
+        return result.ok
+    }
+
+    const handleRemoveLabel = async (label: string) => {
+        const q = `MATCH (n) WHERE ID(n) = ${selectedElement?.id} REMOVE n:${label}`
+        const result = await securedFetch(`api/graph/${prepareArg(schema.Id)}_schema/?query=${prepareArg(q)}`, {
+            method: "GET"
+        }, session?.user?.role, toast)
+
+        if (result.ok) {
+            selectedElement!.displayName = ""
+            schema.Elements.nodes.forEach((node) => {
+                if (node.id === selectedElement?.id) {
+                    node.category = node.category.filter(c => c !== label)
+                }
+            })
+            const category = schema.CategoriesMap.get(label)
+            if (category && category.elements.length === 0) {
+                schema.Categories.splice(schema.Categories.findIndex(c => c.name === category.name), 1)
+                schema.CategoriesMap.delete(category.name)
+            }
+            setData({ ...schema.Elements })
+        }
+
+        return result.ok
+    }
+
     return (
         <ResizablePanelGroup direction="horizontal" className={cn(maximize && "h-full p-10 bg-background fixed left-[50%] top-[50%] z-50 grid translate-x-[-50%] translate-y-[-50%]")}>
             <ResizablePanel
@@ -434,6 +482,8 @@ export default function SchemaView({ schema, fetchCount, session }: Props) {
                             onSetAttributes={handleSetAttributes}
                             onRemoveAttribute={handleRemoveProperty}
                             onDeleteElement={handleDeleteElement}
+                            onAddLabel={handleAddLabel}
+                            onRemoveLabel={handleRemoveLabel}
                         />
                         : (isAddEntity || isAddRelation) &&
                         <CreateElement

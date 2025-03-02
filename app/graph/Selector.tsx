@@ -4,7 +4,7 @@ import { SetStateAction, Dispatch, useEffect, useRef, useState, useCallback } fr
 import { DialogTitle } from "@/components/ui/dialog";
 import { Editor } from "@monaco-editor/react";
 import { editor } from "monaco-editor";
-import { cn, prepareArg, securedFetch } from "@/lib/utils";
+import { cn, defaultQuery, prepareArg, securedFetch } from "@/lib/utils";
 import { Session } from "next-auth";
 import { PlusCircle, RefreshCcw } from "lucide-react";
 import { usePathname } from "next/navigation";
@@ -76,8 +76,7 @@ export default function Selector({ onChange, graphName, setGraphName, queries, r
     const handleOnChange = async (name: string) => {
         const formattedName = name === '""' ? "" : name
         if (runQuery) {
-            const q = 'MATCH (n)-[e]-(m) return n,e,m'
-            const result = await securedFetch(`api/graph/${prepareArg(name)}_schema/?query=${prepareArg(q)}&create=false`, {
+            const result = await securedFetch(`api/graph/${prepareArg(name)}_schema/?query=${prepareArg(defaultQuery())}&create=false`, {
                 method: "GET"
             }, session?.user?.role, toast)
 
