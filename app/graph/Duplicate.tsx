@@ -42,22 +42,26 @@ export default function Duplicate({ open, onOpenChange, selectedValue, onDuplica
             onOpenChange={onOpenChange}
             trigger={<Button label="Duplicate" disabled={disabled} />}
             className="w-[25%]"
-            description="Enter a new graph name"
-            title="Duplicate Graph"
+            title="Duplicate this Graph"
         >
             <form onSubmit={handleDuplicate} className="flex flex-col gap-12">
                 <div className="flex flex-col gap-4">
-                    <p className="font-medium text-xl">Graph Name</p>
                     <Input
+                        placeholder="Enter a name for the duplicated graph"
                         onChange={(e) => setDuplicateName(e.target.value)}
                         required
                     />
                 </div>
-                <div className="flex justify-end">
+                <div className="flex gap-4">
                     <Button
                         variant="Primary"
                         label="Duplicate"
                         type="submit"
+                    />
+                    <Button
+                        variant="Secondary"
+                        label="Cancel"
+                        onClick={() => onOpenChange(false)}
                     />
                 </div>
             </form>
