@@ -1,6 +1,6 @@
 'use client'
 
-import { SetStateAction, Dispatch, useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { DialogTitle } from "@/components/ui/dialog";
 import { Editor } from "@monaco-editor/react";
 import { editor } from "monaco-editor";
@@ -20,10 +20,8 @@ import CreateGraph from "../components/CreateGraph";
 import ExportGraph from "../components/ExportGraph";
 
 interface Props {
-    /* eslint-disable react/require-default-props */
-    onChange: (selectedGraphName: string) => void
+    setGraphName: (selectedGraphName: string) => void
     graphName: string
-    setGraphName: Dispatch<SetStateAction<string>>
     runQuery?: (query: string, setQueriesOpen: (open: boolean) => void) => Promise<void>
     queries?: Query[]
     edgesCount: number
@@ -33,7 +31,7 @@ interface Props {
     data: Session | null
 }
 
-export default function Selector({ onChange, graphName, setGraphName, queries, runQuery, edgesCount, nodesCount, setGraph, graph, data: session }: Props) {
+export default function Selector({ setGraphName, graphName, queries, runQuery, edgesCount, nodesCount, setGraph, graph, data: session }: Props) {
 
     const [options, setOptions] = useState<string[]>([]);
     const [schema, setSchema] = useState<Graph>(Graph.empty());
@@ -48,12 +46,7 @@ export default function Selector({ onChange, graphName, setGraphName, queries, r
     const { toast } = useToast()
 
     useEffect(() => {
-        if (!graphName) return
-        setOptions(prev => {
-            if (prev.includes(graphName)) return prev
-            setSelectedValue(graphName)
-            return [...prev, graphName]
-        })
+        setSelectedValue(graphName)
     }, [graphName])
 
     const getOptions = useCallback(async () => {
@@ -62,7 +55,9 @@ export default function Selector({ onChange, graphName, setGraphName, queries, r
         }, session?.user?.role, toast)
         if (!result.ok) return
         const res = (await result.json()).result as string[]
-        setOptions(!runQuery ? res.filter(name => name.includes("_schema")).map(name => name.split("_")[0]) : res.filter(name => !name.includes("_schema")))
+        const opts = !runQuery ? res.filter(name => name.includes("_schema")).map(name => name.split("_")[0]) : res.filter(name => !name.includes("_schema"))
+        setOptions(opts)
+        if (opts.length === 1 && setSelectedValue) setSelectedValue(opts[0])
     }, [runQuery, session?.user?.role, toast])
 
     useEffect(() => {
@@ -87,7 +82,7 @@ export default function Selector({ onChange, graphName, setGraphName, queries, r
                 setSchema(Graph.create(name, json.result, false, true))
             }
         }
-        onChange(formattedName)
+        setGraphName(formattedName)
         setSelectedValue(name)
     }
 
@@ -103,7 +98,10 @@ export default function Selector({ onChange, graphName, setGraphName, queries, r
                 <div className="flex items-center gap-4">
                     <CreateGraph
                         type={type}
-                        onSetGraphName={setGraphName}
+                        onSetGraphName={(name) => {
+                            handleOnChange(name)
+                            setOptions(prev => [...prev, name])
+                        }}
                         trigger={
                             <Button
                                 variant="Primary"
@@ -152,7 +150,7 @@ export default function Selector({ onChange, graphName, setGraphName, queries, r
                         onDuplicate={(name) => {
                             setOptions(prev => [...prev, name])
                             setSelectedValue(name)
-                            setGraphName(name)
+                            handleOnChange(name)
                         }}
                         selectedValue={selectedValue}
                     />
@@ -272,4 +270,9 @@ export default function Selector({ onChange, graphName, setGraphName, queries, r
             </div>
         </div >
     )
+}
+
+Selector.defaultProps = {
+    runQuery: undefined,
+    queries: [],
 }
