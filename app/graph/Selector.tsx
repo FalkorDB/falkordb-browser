@@ -39,8 +39,9 @@ export default function Selector({ onChange, graphName, setGraphName, queries, r
     const [schema, setSchema] = useState<Graph>(Graph.empty());
     const [selectedValue, setSelectedValue] = useState<string>("");
     const [duplicateOpen, setDuplicateOpen] = useState<boolean>(false);
-    const [queriesOpen, setQueriesOpen] = useState<boolean>(false);
     const [query, setQuery] = useState<Query>();
+    const [queriesOpen, setQueriesOpen] = useState<boolean>(false);
+    const [isLoading, setIsLoading] = useState(false);
     const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null)
     const pathname = usePathname()
     const type = pathname.includes("/schema") ? "Schema" : "Graph"
@@ -253,9 +254,15 @@ export default function Selector({ onChange, graphName, setGraphName, queries, r
                                     />
                                     <Button
                                         className="text-white flex justify-center w-1/3"
-                                        onClick={() => runQuery(query?.text || "", setQueriesOpen)}
+                                        disabled={isLoading}
+                                        onClick={async () => {
+                                            setIsLoading(true);
+                                            await runQuery(query?.text || "", setQueriesOpen)
+                                            setIsLoading(false)
+                                        }}
                                         variant="Primary"
-                                        label="Run"
+                                        label={isLoading ? undefined : "Run"}
+                                        title={isLoading ? "Please wait..." : undefined}
                                     />
                                 </div>
                             </div>
