@@ -37,6 +37,7 @@ export default function ExportGraph({ selectedValues, type, trigger }: Props) {
                 link.click()
                 link.parentNode?.removeChild(link)
                 window.URL.revokeObjectURL(url)
+                setOpen(false)
             } catch (e) {
                 toast({
                     title: "Error",
