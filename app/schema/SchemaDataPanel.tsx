@@ -40,7 +40,7 @@ export default function SchemaDataPanel({ obj, onExpand, onSetAttributes, onRemo
 
     useEffect(() => {
         setAttributes(Object.entries(obj.data).filter(([key, val]) => !(key === "name" && Number(val) === obj.id)).map(([key, val]) => [key, Array.isArray(val) ? val : (val as string).split(',')]))
-        setLabel("source" in obj ? [obj.label] : obj.category)
+        setLabel("source" in obj ? [obj.label] : [...obj.category])
     }, [obj])
 
     const handleSetEditable = ([key, val]: [string, string[]] = getDefaultAttribute()) => {
@@ -174,7 +174,7 @@ export default function SchemaDataPanel({ obj, onExpand, onSetAttributes, onRemo
                         "source" in obj ?
                             <p className="px-2 py-1 bg-foreground rounded-full">{label[0]}</p>
                             :
-                            <ul className="flex flex-wrap gap-4" onMouseEnter={() => setLabelsHover(true)} onMouseLeave={() => setLabelsHover(false)}>
+                            <ul className="flex flex-wrap gap-4 min-w-[10%]" onMouseEnter={() => setLabelsHover(true)} onMouseLeave={() => setLabelsHover(false)}>
                                 {label.map((l) => (
                                     <li key={l} className="flex gap-2 px-2 py-1 bg-foreground rounded-full items-center">
                                         <p>{l}</p>

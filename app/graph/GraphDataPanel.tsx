@@ -256,7 +256,7 @@ export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement,
                     </Button>
                     {
                         type ?
-                            <ul className="flex flex-wrap gap-4 min-w-[10dvw]" onMouseEnter={() => setLabelsHover(true)} onMouseLeave={() => setLabelsHover(false)}>
+                            <ul className="flex flex-wrap gap-4 min-w-[10%]" onMouseEnter={() => setLabelsHover(true)} onMouseLeave={() => setLabelsHover(false)}>
                                 {label.map((l) => (
                                     <li key={l} className="flex gap-2 px-2 py-1 bg-foreground rounded-full items-center">
                                         <p>{l}</p>

@@ -164,9 +164,12 @@ export default function SchemaView({ schema, fetchCount, session }: Props) {
             if (fetchCount) fetchCount()
 
             const category = type ? schema.CategoriesMap.get(element.category[0]) : schema.LabelsMap.get(element.label)
-            if (category && category.elements.length === 0) {
-                schema.Categories.splice(schema.Categories.findIndex(c => c.name === category.name), 1)
-                schema.CategoriesMap.delete(category.name)
+            if (category) {
+                category.elements = category.elements.filter(n => n.id !== id)
+                if (category.elements.length === 0) {
+                    schema.Categories.splice(schema.Categories.findIndex(c => c.name === category.name), 1)
+                    schema.CategoriesMap.delete(category.name)
+                }
             }
         })
 
@@ -353,16 +356,21 @@ export default function SchemaView({ schema, fetchCount, session }: Props) {
 
         if (result.ok) {
             selectedElement!.displayName = ""
+            const category = schema.CategoriesMap.get(label)
+
+            if (category) {
+                category.elements = category.elements.filter((element) => element.id !== selectedElement?.id)
+                if (category.elements.length === 0) {
+                    schema.Categories.splice(schema.Categories.findIndex(c => c.name === category.name), 1)
+                    schema.CategoriesMap.delete(category.name)
+                }
+            }
             schema.Elements.nodes.forEach((node) => {
                 if (node.id === selectedElement?.id) {
                     node.category = node.category.filter(c => c !== label)
+                    node.color = schema.getCategoryColorValue(schema.CategoriesMap.get(node.category[0])?.index)
                 }
             })
-            const category = schema.CategoriesMap.get(label)
-            if (category && category.elements.length === 0) {
-                schema.Categories.splice(schema.Categories.findIndex(c => c.name === category.name), 1)
-                schema.CategoriesMap.delete(category.name)
-            }
             setData({ ...schema.Elements })
         }
 
