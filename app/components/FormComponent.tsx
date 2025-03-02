@@ -153,7 +153,7 @@ export default function FormComponent({ handleSubmit, fields, error = undefined,
                     type="submit"
                     disabled={error?.show || isLoading}
                 >
-                    {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : submitButtonLabel}
+                    {isLoading ? <Loader2 className="animate-spin" /> : submitButtonLabel}
                 </Button>
             </div>
         </form>
