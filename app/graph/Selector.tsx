@@ -256,9 +256,12 @@ export default function Selector({ onChange, graphName, setGraphName, queries, r
                                         className="text-white flex justify-center w-1/3"
                                         disabled={isLoading}
                                         onClick={async () => {
-                                            setIsLoading(true);
-                                            await runQuery(query?.text || "", setQueriesOpen)
-                                            setIsLoading(false)
+                                            try {
+                                                setIsLoading(true);
+                                                await runQuery(query?.text || "", setQueriesOpen)
+                                            } finally {
+                                                setIsLoading(false)
+                                            }
                                         }}
                                         variant="Primary"
                                         label={isLoading ? undefined : "Run"}

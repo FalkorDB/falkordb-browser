@@ -384,9 +384,12 @@ export default function EditorComponent({ currentQuery, historyQueries, setHisto
     }
 
     const handleSubmit = async () => {
-        setIsLoading(true)
-        await runQuery(query)
-        setIsLoading(false)
+        try {
+            setIsLoading(true)
+            await runQuery(query)
+        } finally {
+            setIsLoading(false)
+        }
     }
 
     const handleEditorWillMount = async (monacoI: Monaco) => {
