@@ -37,6 +37,10 @@
         {"role": "VKEY_MAX_ENTITY_COUNT", "description": "modify vKeyMaxEntityCount", "input": "100001", "expected": true},
         {"role": "CMD_INFO", "description": "modify cmdInfo", "input": "no", "expected": true},
         {"role": "MAX_INFO_QUERIES", "description": "modify maxInfoQueries", "input": "999", "expected": true}
-  ]
+    ],
+    "searchElements": [
+      {"input": "CACHE_SIZE", "expected": 2},
+      {"input": "RESULTSET_SIZE", "expected": 2}
+    ]
 }
   

@@ -175,4 +175,14 @@ test.describe('Settings Tests', () => {
         expect(User).toBeUndefined();
     });
 
+    test(`@admin Validate user search filters table results`, async () => {
+        const apiCall = new ApiCalls()
+        const username = `user_${Date.now()}`;
+        await apiCall.createUsers({ username, password: user.password, role: user.ReadOnly })
+        const settingsUsersPage = await browser.createNewPage(SettingsUsersPage, urls.settingsUrl)
+        await settingsUsersPage.navigateToUserTab();
+        await settingsUsersPage.searchForElement(username);
+        expect(await settingsUsersPage.getTableRolesCount()).toBe(2);
+    });
+
 })
