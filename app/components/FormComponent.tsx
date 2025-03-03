@@ -40,9 +40,10 @@ interface Props {
     }
     children?: React.ReactNode
     submitButtonLabel?: string
+    className?: string
 }
 
-export default function FormComponent({ handleSubmit, fields, error = undefined, children = undefined, submitButtonLabel = "Submit" }: Props) {
+export default function FormComponent({ handleSubmit, fields, error = undefined, children = undefined, submitButtonLabel = "Submit", className = "" }: Props) {
     const [show, setShow] = useState<{ [key: string]: boolean }>({});
     const [errors, setErrors] = useState<{ [key: string]: boolean }>({});
 
@@ -65,7 +66,7 @@ export default function FormComponent({ handleSubmit, fields, error = undefined,
     }
 
     return (
-        <form className="flex flex-col gap-4 w-full" onSubmit={onHandleSubmit}>
+        <form className={cn("flex flex-col gap-4 w-full", className)} onSubmit={onHandleSubmit}>
             {
                 fields.map((field) => {
                     const passwordType = show[field.label] ? "text" : "password"
@@ -155,5 +156,6 @@ export default function FormComponent({ handleSubmit, fields, error = undefined,
 FormComponent.defaultProps = {
     children: undefined,
     error: undefined,
-    submitButtonLabel: "Submit"
+    submitButtonLabel: "Submit",
+    className: ""
 }
