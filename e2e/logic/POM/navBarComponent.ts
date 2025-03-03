@@ -30,12 +30,24 @@ export default class NavBarComponent extends BasePage {
         return this.page.getByRole("link", { name: "Support" })
     }
 
+    private get aboutButton(): Locator {
+        return this.page.getByRole("button", { name: "About" })
+    }
+
     private get settingsButton(): Locator {
         return this.page.getByRole("button", { name: "Settings" })
     }
 
     private get LogoutButton(): Locator {
         return this.page.getByRole("button", { name: "Log Out" })
+    }
+
+    private get aboutPopUp(): Locator {
+        return this.page.locator('//div[@id="about"]');
+    }
+
+    private get closeBtnForAboutPopUp(): Locator {
+        return this.page.locator('//div[@id="about"]//button');
     }
 
     async clickOnFalkorLogo(): Promise<void> {
@@ -54,6 +66,10 @@ export default class NavBarComponent extends BasePage {
 
     async clickOnHelpBtn(): Promise<void> {
         await this.helpButton.click();
+    }
+
+    async clickOnAboutBtn(): Promise<void> {
+        await this.aboutButton.click();
     }
 
     async clickOnDocumentationBtn(): Promise<void> {
@@ -109,4 +125,16 @@ export default class NavBarComponent extends BasePage {
         return newPage
     }
 
+    async isAboutPopUp(): Promise<boolean>{
+        return await this.aboutPopUp.isVisible();
+    }
+
+    async clickOnClosepPopUpBtn(): Promise<void>{
+        await this.closeBtnForAboutPopUp.click();
+    }
+
+    async clickOnAbout(): Promise<void> {
+        await this.clickOnHelpBtn();
+        await this.clickOnAboutBtn();
+    }
 }

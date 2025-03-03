@@ -107,7 +107,7 @@ export default function Header({ onSetGraphName }: Props) {
                                 </Button>
                             </NavigationMenuList>
                         </NavigationMenu>
-                        <SheetContent className="bg-popover-foreground flex flex-col gap-4 items-center text-foreground !max-w-[30rem]">
+                        <SheetContent className="bg-popover-foreground flex flex-col gap-4 items-center text-foreground !max-w-[30rem]" id="about">
                             <VisuallyHidden>
                                 <SheetTitle />
                                 <SheetDescription />
