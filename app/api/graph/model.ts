@@ -105,6 +105,7 @@ export interface Category {
     show: boolean,
     textWidth?: number,
     elements: (Node | Link)[]
+    textHeight?: number,
 }
 
 export interface ExtractedData {

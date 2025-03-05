@@ -37,8 +37,9 @@ export default function Selector({ setGraphName, graphName, queries, runQuery, e
     const [schema, setSchema] = useState<Graph>(Graph.empty());
     const [selectedValue, setSelectedValue] = useState<string>("");
     const [duplicateOpen, setDuplicateOpen] = useState<boolean>(false);
-    const [queriesOpen, setQueriesOpen] = useState<boolean>(false);
     const [query, setQuery] = useState<Query>();
+    const [queriesOpen, setQueriesOpen] = useState<boolean>(false);
+    const [isLoading, setIsLoading] = useState(false);
     const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null)
     const pathname = usePathname()
     const type = pathname.includes("/schema") ? "Schema" : "Graph"
@@ -55,7 +56,14 @@ export default function Selector({ setGraphName, graphName, queries, runQuery, e
         }, session?.user?.role, toast)
         if (!result.ok) return
         const res = (await result.json()).result as string[]
-        const opts = !runQuery ? res.filter(name => name.includes("_schema")).map(name => name.split("_")[0]) : res.filter(name => !name.includes("_schema"))
+        const opts = !runQuery ? 
+            res.filter(name => name.endsWith("_schema")).map(name => {
+            let split = name.split("_schema")[0]
+            if (split.startsWith("{") && split.endsWith("}")) {
+                split = split.substring(1, split.length - 1)
+            }
+            return split
+        }) : res.filter(name => !name.endsWith("_schema"))
         setOptions(opts)
         if (opts.length === 1 && setSelectedValue) setSelectedValue(opts[0])
     }, [runQuery, session?.user?.role, toast])
@@ -185,7 +193,7 @@ export default function Selector({ setGraphName, graphName, queries, runQuery, e
                             <div className="grow flex flex-col p-8 gap-8">
                                 <DialogTitle>Queries</DialogTitle>
                                 <div className="h-1 grow flex">
-                                    <ul className="min-w-[50%] flex-col border overflow-auto">
+                                    <ul className="w-1 grow flex-col border overflow-auto">
                                         {
                                             queries && queries.map((q, index) => (
                                                 // eslint-disable-next-line react/no-array-index-key
@@ -250,9 +258,18 @@ export default function Selector({ setGraphName, graphName, queries, runQuery, e
                                     />
                                     <Button
                                         className="text-white flex justify-center w-1/3"
-                                        onClick={() => runQuery(query?.text || "", setQueriesOpen)}
+                                        disabled={isLoading}
+                                        onClick={async () => {
+                                            try {
+                                                setIsLoading(true);
+                                                await runQuery(query?.text || "", setQueriesOpen)
+                                            } finally {
+                                                setIsLoading(false)
+                                            }
+                                        }}
                                         variant="Primary"
-                                        label="Run"
+                                        label={isLoading ? undefined : "Run"}
+                                        title={isLoading ? "Please wait..." : undefined}
                                     />
                                 </div>
                             </div>

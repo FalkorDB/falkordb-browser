@@ -7,7 +7,7 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogTrigger } 
 import { Editor, Monaco } from "@monaco-editor/react"
 import { useEffect, useRef, useState } from "react"
 import * as monaco from "monaco-editor";
-import { Maximize2 } from "lucide-react";
+import { Loader2, Maximize2 } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { useSession } from "next-auth/react";
 import { prepareArg, securedFetch } from "@/lib/utils";
@@ -21,7 +21,7 @@ interface Props {
     setHistoryQueries: (queries: string[]) => void
     setCurrentQuery: (query: string) => void
     maximize: boolean
-    runQuery: (query: string) => void
+    runQuery: (query: string) => Promise<void>
     graph: Graph
 }
 
@@ -207,6 +207,7 @@ export default function EditorComponent({ currentQuery, historyQueries, setHisto
     const graphIdRef = useRef(graph.Id)
     const [blur, setBlur] = useState(false)
     const [sugDisposed, setSugDisposed] = useState<monaco.IDisposable>()
+    const [isLoading, setIsLoading] = useState(false)
     const { toast } = useToast()
     const submitQuery = useRef<HTMLButtonElement>(null)
     const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null)
@@ -217,7 +218,7 @@ export default function EditorComponent({ currentQuery, historyQueries, setHisto
         historyCounter: 0
     })
     const { data: session } = useSession()
-    
+
 
     useEffect(() => {
         graphIdRef.current = graph.Id
@@ -382,6 +383,15 @@ export default function EditorComponent({ currentQuery, historyQueries, setHisto
         return sug
     }
 
+    const handleSubmit = async () => {
+        try {
+            setIsLoading(true)
+            await runQuery(query)
+        } finally {
+            setIsLoading(false)
+        }
+    }
+
     const handleEditorWillMount = async (monacoI: Monaco) => {
 
         monacoI.languages.register({ id: "custom-language" })
@@ -539,12 +549,8 @@ export default function EditorComponent({ currentQuery, historyQueries, setHisto
                 <Dialog>
                     <div className="w-full flex items-center gap-8">
                         <p>Query</p>
-                        <form
+                        <div
                             className="w-1 grow flex rounded-lg overflow-hidden"
-                            onSubmit={(e) => {
-                                e.preventDefault()
-                                runQuery(query)
-                            }}
                         >
                             <div ref={containerRef} className="relative grow w-1">
                                 <Editor
@@ -575,13 +581,17 @@ export default function EditorComponent({ currentQuery, historyQueries, setHisto
                             </div>
                             <Button
                                 ref={submitQuery}
+                                disabled={isLoading}
                                 className="rounded-none py-2 px-8"
                                 variant="Primary"
-                                title="Run (Ctrl + Enter)"
-                                label="Run"
+                                title={isLoading ? "Please wait..." : "Run (Ctrl + Enter)"}
+                                label={isLoading ? undefined : "Run"}
                                 type="submit"
-                            />
-                        </form>
+                                onClick={handleSubmit}
+                            >
+                                {isLoading && <Loader2 size={20} className="animate-spin" />}
+                            </Button>
+                        </div>
                         <DialogContent closeSize={30} className="w-full h-full">
                             <VisuallyHidden>
                                 <DialogTitle />

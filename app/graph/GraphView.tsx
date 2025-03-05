@@ -105,6 +105,18 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
 
     useEffect(() => {
         dataPanel.current?.collapse()
+
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === "Escape") {
+                setMaximize(false)
+            }
+        }
+
+        window.addEventListener("keydown", handleKeyDown)
+
+        return () => {
+            window.removeEventListener("keydown", handleKeyDown)
+        }
     }, [])
 
     useEffect(() => {
