@@ -4,7 +4,7 @@
 "use client"
 
 import { useState } from "react"
-import { EyeIcon, EyeOffIcon, InfoIcon } from "lucide-react"
+import { EyeIcon, EyeOffIcon, InfoIcon, Loader2 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import Button from "./ui/Button"
@@ -32,7 +32,7 @@ export type Field = {
 }
 
 interface Props {
-    handleSubmit: (e: React.FormEvent<HTMLFormElement>) => void
+    handleSubmit: (e: React.FormEvent<HTMLFormElement>) => Promise<void>
     fields: Field[]
     error?: {
         message: string
@@ -45,12 +45,11 @@ interface Props {
 export default function FormComponent({ handleSubmit, fields, error = undefined, children = undefined, submitButtonLabel = "Submit" }: Props) {
     const [show, setShow] = useState<{ [key: string]: boolean }>({});
     const [errors, setErrors] = useState<{ [key: string]: boolean }>({});
-
-    const onHandleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    const [isLoading, setIsLoading] = useState(false);
+    const onHandleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault()
 
         const newErrors: { [key: string]: boolean } = {}
-
         fields.forEach(field => {
             if (field.errors) {
                 newErrors[field.label] = field.errors.some(err => err.condition(field.value))
@@ -59,9 +58,16 @@ export default function FormComponent({ handleSubmit, fields, error = undefined,
 
         setErrors(newErrors)
 
-        if (Object.values(newErrors).some(value => value)) return
+        if (Object.values(newErrors).some(value => value)) {
+            return
+        }
 
-        handleSubmit(e)
+        setIsLoading(true)
+        try {
+            await handleSubmit(e)
+        } finally {
+            setIsLoading(false)
+        }
     }
 
     return (
@@ -143,10 +149,12 @@ export default function FormComponent({ handleSubmit, fields, error = undefined,
             {error?.show && <p className="text-sm text-red-500">{error.message}</p>}
             <div className="flex justify-end gap-2 mt-10">
                 <Button
-                    className="grow bg-primary p-4 rounded-lg flex justify-center"
-                    label={submitButtonLabel}
+                    className="grow bg-primary p-4 rounded-lg flex justify-center items-center gap-2"
                     type="submit"
-                />
+                    disabled={error?.show || isLoading}
+                >
+                    {isLoading ? <Loader2 className="animate-spin" /> : submitButtonLabel}
+                </Button>
             </div>
         </form>
     )
