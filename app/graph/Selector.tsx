@@ -63,7 +63,14 @@ export default function Selector({ onChange, graphName, setGraphName, queries, r
         }, session?.user?.role, toast)
         if (!result.ok) return
         const res = (await result.json()).result as string[]
-        setOptions(!runQuery ? res.filter(name => name.includes("_schema")).map(name => name.split("_")[0]) : res.filter(name => !name.includes("_schema")))
+        setOptions(!runQuery ? 
+            res.filter(name => name.endsWith("_schema")).map(name => {
+            let split = name.split("_schema")[0]
+            if (split.startsWith("{") && split.endsWith("}")) {
+                split = split.substring(1, split.length - 1)
+            }
+            return split
+        }) : res.filter(name => !name.endsWith("_schema")))
     }, [runQuery, session?.user?.role, toast])
 
     useEffect(() => {
@@ -188,7 +195,7 @@ export default function Selector({ onChange, graphName, setGraphName, queries, r
                             <div className="grow flex flex-col p-8 gap-8">
                                 <DialogTitle>Queries</DialogTitle>
                                 <div className="h-1 grow flex">
-                                    <ul className="min-w-[50%] flex-col border overflow-auto">
+                                    <ul className="w-1 grow flex-col border overflow-auto">
                                         {
                                             queries && queries.map((q, index) => (
                                                 // eslint-disable-next-line react/no-array-index-key
