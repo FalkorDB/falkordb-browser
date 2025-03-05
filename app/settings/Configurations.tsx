@@ -206,7 +206,7 @@ export default function Configurations() {
 
     useEffect(() => {
         fetchConfigs();
-    }, [fetchConfigs]);
+    }, []);
 
     return (
         <TableComponent
