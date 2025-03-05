@@ -196,7 +196,7 @@ export default function Selector({ onChange, graphName, setGraphName, queries, r
                             <div className="grow flex flex-col p-8 gap-8">
                                 <DialogTitle>Queries</DialogTitle>
                                 <div className="h-1 grow flex">
-                                    <ul className="min-w-[50%] flex-col border overflow-auto">
+                                    <ul className="w-1 grow flex-col border overflow-auto">
                                         {
                                             queries && queries.map((q, index) => (
                                                 // eslint-disable-next-line react/no-array-index-key
