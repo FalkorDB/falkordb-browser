@@ -22,7 +22,6 @@ export default function Page() {
     const { data: session } = useSession()
     const { toast } = useToast()
 
-
     useEffect(() => {
         setQueries(JSON.parse(localStorage.getItem(`query history`) || "[]"))
     }, [])
@@ -110,9 +109,8 @@ export default function Page() {
             <Header onSetGraphName={setGraphName} />
             <div className="h-1 grow p-8 px-10 flex flex-col gap-4">
                 <Selector
-                    setGraphName={setGraphName}
                     queries={queries}
-                    onChange={setGraphName}
+                    setGraphName={setGraphName}
                     graphName={graphName}
                     runQuery={runHistoryQuery}
                     edgesCount={edgesCount}
