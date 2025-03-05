@@ -9,7 +9,8 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         return client
     }
 
-    const { graph: graphId, node: nodeId } = await params
+    const { graph: graphId, node } = await params
+    const nodeId = Number(node)
 
     const graph = client.selectGraph(graphId);
 
