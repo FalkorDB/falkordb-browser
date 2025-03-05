@@ -16,7 +16,6 @@ interface Props {
     graph: Graph
     chartRef: GraphRef
     data: GraphData
-    setData: Dispatch<SetStateAction<GraphData>>
     selectedElement: Node | Link | undefined
     setSelectedElement: (element: Node | Link | undefined) => void
     selectedElements: (Node | Link)[]
@@ -35,7 +34,6 @@ export default function ForceGraph({
     graph,
     chartRef,
     data,
-    setData,
     selectedElement,
     setSelectedElement,
     selectedElements,
@@ -129,7 +127,10 @@ export default function ForceGraph({
                     description: `No neighbors found`,
                 })
             }
+            return elements
         }
+
+        return []
     }
 
     const deleteNeighbors = (nodes: Node[]) => {
@@ -160,18 +161,18 @@ export default function ForceGraph({
 
         const now = new Date()
         const { date, name } = lastClick.current
-        lastClick.current = { date: now, name: node.data.name || node.id.toString() }
 
         if (now.getTime() - date.getTime() < 1000 && name === (node.data.name || node.id.toString())) {
-            if (!node.expand) {
-                await onFetchNode(node)
-            } else {
-                deleteNeighbors([node])
-            }
-                        
-            node.expand = !node.expand
-            setData({ ...graph.Elements })
+            return
         }
+
+        if (!node.expand) {
+            await onFetchNode(node)
+        } else {
+            deleteNeighbors([node])
+        }
+
+        lastClick.current = { date: new Date(), name: node.data.name || node.id.toString() }
     }
 
     const handleHover = (element: Node | Link | null) => {

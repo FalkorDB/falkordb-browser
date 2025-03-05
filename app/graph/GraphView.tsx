@@ -313,7 +313,6 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
                                     graph={graph}
                                     chartRef={chartRef}
                                     data={data}
-                                    setData={setData}
                                     selectedElement={selectedElement}
                                     setSelectedElement={setSelectedElement}
                                     selectedElements={selectedElements}
