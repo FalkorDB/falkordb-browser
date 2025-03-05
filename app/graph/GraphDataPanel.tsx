@@ -24,9 +24,11 @@ interface Props {
     onExpand: () => void;
     graph: Graph;
     onDeleteElement: () => Promise<void>;
+    onAddLabel: (label: string) => Promise<boolean>;
+    onRemoveLabel: (label: string) => Promise<boolean>;
 }
 
-export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement, graph }: Props) {
+export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement, graph, onAddLabel, onRemoveLabel }: Props) {
 
     const [attributes, setAttributes] = useState<string[]>([]);
     const [editable, setEditable] = useState<string>("");
@@ -35,11 +37,21 @@ export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement,
     const [deleteOpen, setDeleteOpen] = useState(false)
     const [newKey, setNewKey] = useState<string>("");
     const [newVal, setNewVal] = useState<string>("");
-    const [label, setLabel] = useState([""]);
+    const [label, setLabel] = useState<string[]>([]);
+    const [labelsHover, setLabelsHover] = useState(false)
+    const [labelsEditable, setLabelsEditable] = useState(false)
+    const [newLabel, setNewLabel] = useState("")
     const type = !("source" in obj)
     const { toast } = useToast()
     const { data: session } = useSession()
-    
+
+    useEffect(() => {
+        if (!obj) {
+            setLabelsEditable(false)
+            setLabelsHover(false)
+        }
+    }, [obj])
+
     const handleSetEditable = (key: string, val: string) => {
         if (key !== "") {
             setIsAddValue(false)
@@ -51,7 +63,7 @@ export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement,
 
     useEffect(() => {
         setAttributes(Object.keys(obj.data).filter((key) => (key !== "name" || obj.data.name !== obj.id)));
-        setLabel(type ? obj.category : [obj.label]);
+        setLabel(type ? [...obj.category] : [obj.label]);
     }, [obj, type]);
 
     const setProperty = async (key: string, val: string, isUndo: boolean, actionType: ("added" | "set") = "set") => {
@@ -199,6 +211,38 @@ export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement,
         setProperty(editable, newVal, true)
     }
 
+    const handleAddLabel = async () => {
+        if (newLabel === "") {
+            toast({
+                title: "Error",
+                description: "Please fill the label",
+                variant: "destructive"
+            })
+            return
+        }
+        if (label.includes(newLabel)) {
+            toast({
+                title: "Error",
+                description: "Label already exists",
+                variant: "destructive"
+            })
+            return
+        }
+        const ok = await onAddLabel(newLabel)
+        if (ok) {
+            setLabel(prev => [...prev, newLabel])
+            setNewLabel("")
+            setLabelsEditable(false)
+        }
+    }
+
+    const handleRemoveLabel = async (removeLabel: string) => {
+        const ok = await onRemoveLabel(removeLabel)
+        if (ok) {
+            setLabel(prev => prev.filter(l => l !== removeLabel))
+        }
+    }
+
     return (
         <div className="h-full flex flex-col gap-4 border-foreground border-[3px] rounded-lg">
             <div className="flex justify-between items-center p-4">
@@ -210,9 +254,82 @@ export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement,
                     >
                         <ChevronRight size={25} />
                     </Button>
-                    <p className="font-medium text-xl">{label}</p>
+                    {
+                        type ?
+                            <ul className="flex flex-wrap gap-4 min-w-[10%]" onMouseEnter={() => setLabelsHover(true)} onMouseLeave={() => setLabelsHover(false)}>
+                                {label.map((l) => (
+                                    <li key={l} className="flex gap-2 px-2 py-1 bg-foreground rounded-full items-center">
+                                        <p>{l}</p>
+                                        <Button
+                                            title="Remove"
+                                            onClick={() => handleRemoveLabel(l)}
+                                        >
+                                            <X size={15} />
+                                        </Button>
+                                    </li>
+                                ))}
+                                <li className="h-8 flex flex-wrap gap-2">
+                                    {
+                                        labelsHover && !labelsEditable &&
+                                        <Button
+                                            className="p-2 text-xs justify-center border border-foreground"
+                                            variant="Secondary"
+                                            label="Edit"
+                                            onClick={() => setLabelsEditable(true)}
+                                        >
+                                            <Pencil size={15} />
+                                        </Button>
+                                    }
+                                    {
+                                        labelsEditable &&
+                                        <>
+                                            <Input
+                                                ref={ref => ref?.focus()}
+                                                className="max-w-[50%] h-full bg-foreground border-none text-white"
+                                                value={newLabel}
+                                                onChange={(e) => setNewLabel(e.target.value)}
+                                                onKeyDown={(e) => {
+
+                                                    if (e.key === "Escape") {
+                                                        e.preventDefault()
+                                                        setLabelsEditable(false)
+                                                        setNewLabel("")
+                                                    }
+
+                                                    if (e.key !== "Enter") return
+
+                                                    e.preventDefault()
+                                                    handleAddLabel()
+                                                }}
+                                            />
+                                            <Button
+                                                className="p-2 text-xs justify-center border border-foreground"
+                                                variant="Secondary"
+                                                label="Save"
+                                                onClick={() => handleAddLabel()}
+                                            >
+                                                <Check size={15} />
+                                            </Button>
+                                            <Button
+                                                className="p-2 text-xs justify-center border border-foreground"
+                                                variant="Secondary"
+                                                label="Cancel"
+                                                onClick={() => {
+                                                    setLabelsEditable(false)
+                                                    setNewLabel("")
+                                                }}
+                                            >
+                                                <Check size={15} />
+                                            </Button>
+                                        </>
+                                    }
+                                </li>
+                            </ul>
+                            :
+                            <p className="bg-foreground rounded-full px-2 py-1">{label[0]}</p>
+                    }
                 </div>
-                <p className="font-medium text-xl">{attributes.length}&ensp;Attributes</p>
+                <p className="font-medium text-xl text-nowrap">{attributes.length}&ensp;Attributes</p>
             </div>
             <Table parentClassName="grow">
                 <TableHeader>

@@ -21,21 +21,26 @@ interface Props {
     onSetAttributes: (attribute: [string, string[]]) => Promise<boolean>;
     onRemoveAttribute: (key: string) => Promise<boolean>;
     onDeleteElement: () => Promise<void>;
+    onAddLabel: (label: string) => Promise<boolean>;
+    onRemoveLabel: (label: string) => Promise<boolean>;
 }
 
-export default function SchemaDataPanel({ obj, onExpand, onSetAttributes, onRemoveAttribute, onDeleteElement }: Props) {
+export default function SchemaDataPanel({ obj, onExpand, onSetAttributes, onRemoveAttribute, onDeleteElement, onAddLabel, onRemoveLabel }: Props) {
 
     const [attribute, setAttribute] = useState<[string, string[]]>(getDefaultAttribute())
     const [attributes, setAttributes] = useState<[string, string[]][]>([])
-    const [label, setLabel] = useState<string>("")
+    const [label, setLabel] = useState<string[]>([])
     const [editable, setEditable] = useState<string>("")
     const [hover, setHover] = useState<string>("")
+    const [labelsHover, setLabelsHover] = useState<boolean>(false)
+    const [labelsEditable, setLabelsEditable] = useState<boolean>(false)
+    const [newLabel, setNewLabel] = useState<string>("")
     const [isAddValue, setIsAddValue] = useState<boolean>(false)
     const { toast } = useToast()
 
     useEffect(() => {
         setAttributes(Object.entries(obj.data).filter(([key, val]) => !(key === "name" && Number(val) === obj.id)).map(([key, val]) => [key, Array.isArray(val) ? val : (val as string).split(',')]))
-        setLabel("source" in obj ? obj.label : obj.category)
+        setLabel("source" in obj ? [obj.label] : [...obj.category])
     }, [obj])
 
     const handleSetEditable = ([key, val]: [string, string[]] = getDefaultAttribute()) => {
@@ -132,6 +137,30 @@ export default function SchemaDataPanel({ obj, onExpand, onSetAttributes, onRemo
         handleAddAttribute()
     }
 
+    const handleAddLabel = async () => {
+        if (newLabel === "") {
+            toast({
+                title: "Error",
+                description: "Please fill the label",
+                variant: "destructive"
+            })
+            return
+        }
+        const ok = await onAddLabel(newLabel)
+        if (ok) {
+            setLabel([...label, newLabel])
+            setNewLabel("")
+            setLabelsEditable(false)
+        }
+    }
+
+    const handleRemoveLabel = async (removeLabel: string) => {
+        const ok = await onRemoveLabel(removeLabel)
+        if (ok) {
+            setLabel(prev => prev.filter(l => l !== removeLabel))
+        }
+    }
+
     return (
         <div className="DataPanel">
             <div className="w-full flex justify-between items-center p-4">
@@ -141,7 +170,80 @@ export default function SchemaDataPanel({ obj, onExpand, onSetAttributes, onRemo
                     >
                         <ChevronRight size={20} />
                     </Button>
-                    <p>{label}</p>
+                    {
+                        "source" in obj ?
+                            <p className="px-2 py-1 bg-foreground rounded-full">{label[0]}</p>
+                            :
+                            <ul className="flex flex-wrap gap-4 min-w-[10%]" onMouseEnter={() => setLabelsHover(true)} onMouseLeave={() => setLabelsHover(false)}>
+                                {label.map((l) => (
+                                    <li key={l} className="flex gap-2 px-2 py-1 bg-foreground rounded-full items-center">
+                                        <p>{l}</p>
+                                        <Button
+                                            title="Remove"
+                                            onClick={() => handleRemoveLabel(l)}
+                                        >
+                                            <X size={15} />
+                                        </Button>
+                                    </li>
+                                ))}
+                                <li className="h-8 flex flex-wrap gap-2">
+                                    {
+                                        labelsHover && !labelsEditable &&
+                                        <Button
+                                            className="p-2 text-xs justify-center border border-foreground"
+                                            variant="Secondary"
+                                            label="Edit"
+                                            onClick={() => setLabelsEditable(true)}
+                                        >
+                                            <Pencil size={15} />
+                                        </Button>
+                                    }
+                                    {
+                                        labelsEditable &&
+                                        <>
+                                            <Input
+                                                ref={ref => ref?.focus()}
+                                                className="max-w-[20dvw] h-full bg-foreground border-none text-white"
+                                                value={newLabel}
+                                                onChange={(e) => setNewLabel(e.target.value)}
+                                                onKeyDown={(e) => {
+
+                                                    if (e.key === "Escape") {
+                                                        e.preventDefault()
+                                                        setLabelsEditable(false)
+                                                        setNewLabel("")
+                                                    }
+
+                                                    if (e.key !== "Enter") return
+
+                                                    e.preventDefault()
+                                                    handleAddLabel()
+                                                }}
+                                            />
+                                            <Button
+                                                className="p-2 text-xs justify-center border border-foreground"
+                                                variant="Secondary"
+                                                label="Save"
+                                                onClick={() => handleAddLabel()}
+                                            >
+                                                <Check size={15} />
+                                            </Button>
+                                            <Button
+                                                className="p-2 text-xs justify-center border border-foreground"
+                                                variant="Secondary"
+                                                label="Cancel"
+                                                onClick={() => {
+                                                    setLabelsEditable(false)
+                                                    setNewLabel("")
+                                                }}
+                                            >
+                                                <Check size={15} />
+                                            </Button>
+                                        </>
+                                    }
+                                </li>
+                            </ul>
+                    }
                 </div>
                 <p className="font-medium text-xl">{attributes.length}&ensp;Attributes</p>
             </div>
