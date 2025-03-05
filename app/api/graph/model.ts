@@ -103,6 +103,7 @@ export interface Category {
     name: string,
     show: boolean,
     textWidth?: number,
+    textHeight?: number,
 }
 
 export interface ExtractedData {

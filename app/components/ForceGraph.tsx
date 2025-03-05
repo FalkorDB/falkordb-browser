@@ -310,36 +310,34 @@ export default function ForceGraph({
                         textX = rotatedX;
                         textY = rotatedY;
                     }
-
+                    
                     // Get text width
-                    const category = graph.LabelsMap.get(link.label)!
-                    let { textWidth } = category
-
-                    if (!textWidth) {
-                        textWidth = ctx.measureText(link.label).width;
-                        graph.LabelsMap.set(link.label, { ...category, textWidth })
-                    }
-
-                    // Setup text properties to measure background size
                     ctx.font = '2px Arial';
-                    const padding = 1;
-                    const textHeight = 2; // Approximate height for 2px font
+                    const category = graph.LabelsMap.get(link.label)!
+                    let { textWidth, textHeight } = category
+                    if (!textWidth || !textHeight) {
+                        const { width, actualBoundingBoxAscent, actualBoundingBoxDescent } = ctx.measureText(link.label)
+                        textWidth = width
+                        textHeight = actualBoundingBoxAscent + actualBoundingBoxDescent
+                        graph.LabelsMap.set(link.label, { ...category, textWidth, textHeight })
+                    }
 
                     // Save the current context state
                     ctx.save();
-
+                    
                     // Rotate
                     ctx.rotate(angle);
-
+                    
                     // Draw background and text
                     ctx.fillStyle = '#191919';
+                    const padding = 0.5;
                     ctx.fillRect(
                         textX - textWidth / 2 - padding,
                         textY - textHeight / 2 - padding,
                         textWidth + padding * 2,
                         textHeight + padding * 2
                     );
-
+                    
                     ctx.fillStyle = 'white';
                     ctx.textAlign = 'center';
                     ctx.textBaseline = 'middle';
