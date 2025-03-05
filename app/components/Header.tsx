@@ -9,9 +9,9 @@ import { cn } from "@/lib/utils";
 import { useRouter, usePathname } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
 import { NavigationMenu, NavigationMenuContent, NavigationMenuItem, NavigationMenuLink, NavigationMenuList, NavigationMenuTrigger } from "@/components/ui/navigation-menu";
-import { Sheet, SheetContent, SheetDescription, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import pkg from '@/package.json';
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
+import { Drawer, DrawerContent, DrawerDescription, DrawerTitle, DrawerTrigger } from "@/components/ui/drawer";
 import Button from "./ui/Button";
 import CreateGraph from "./CreateGraph";
 
@@ -52,7 +52,7 @@ export default function Header({ onSetGraphName }: Props) {
                     </div>
                 </div>
                 <div className="flex gap-6 items-center">
-                    <Sheet>
+                    <Drawer direction="right">
                         <NavigationMenu>
                             <NavigationMenuList className="gap-6 bg-foreground rounded-lg px-4 py-2">
                                 <NavigationMenuLink className="bg-foreground" asChild>
@@ -82,12 +82,12 @@ export default function Header({ onSetGraphName }: Props) {
                                                 </a>
                                             </li>
                                             <li>
-                                                <SheetTrigger asChild>
+                                                <DrawerTrigger asChild>
                                                     <Button
                                                         label="About"
                                                         className="bg-foreground"
                                                     />
-                                                </SheetTrigger>
+                                                </DrawerTrigger>
                                             </li>
                                         </ul>
                                     </NavigationMenuContent>
@@ -107,26 +107,28 @@ export default function Header({ onSetGraphName }: Props) {
                                 </Button>
                             </NavigationMenuList>
                         </NavigationMenu>
-                        <SheetContent className="bg-popover-foreground flex flex-col gap-4 items-center text-foreground !max-w-[30rem]" id="about">
+                        <DrawerContent side="right" className="bg-popover-foreground gap-4 items-center text-foreground" id="about">
                             <VisuallyHidden>
-                                <SheetTitle />
-                                <SheetDescription />
+                                <DrawerTitle />
+                                <DrawerDescription />
                             </VisuallyHidden>
-                            <div className="h-1 grow flex flex-col gap-8 items-center justify-center">
-                                <Image style={{ width: 'auto', height: '50px' }} priority src="/ColorLogo.svg" alt="" width={0} height={0} />
-                                <h1 className="text-3xl font-bold">We Make AI Reliable</h1>
-                                <p className="text-xl text-center">
-                                    Delivering a scalable,
-                                    low-latency graph database designed for development teams managing
-                                    structured and unstructured interconnected data in real-time or interactive environments.
-                                </p>
+                            <div className="h-full flex flex-col gap-8 max-w-[30rem] p-4">
+                                <div className="h-1 grow flex flex-col gap-8 items-center justify-center">
+                                    <Image style={{ width: 'auto', height: '50px' }} priority src="/ColorLogo.svg" alt="" width={0} height={0} />
+                                    <h1 className="text-3xl font-bold">We Make AI Reliable</h1>
+                                    <p className="text-xl text-center">
+                                        Delivering a scalable,
+                                        low-latency graph database designed for development teams managing
+                                        structured and unstructured interconnected data in real-time or interactive environments.
+                                    </p>
+                                </div>
+                                <div className="flex flex-col gap-8 items-center">
+                                    <p>Version: {`{${pkg.version}}`}</p>
+                                    <p className="text-sm text-nowrap">All Rights Reserved © 2024 - {new Date().getFullYear()} falkordb.com</p>
+                                </div>
                             </div>
-                            <div className="flex flex-col gap-8 items-center">
-                                <p>Version: {`{${pkg.version}}`}</p>
-                                <p className="text-sm text-nowrap">All Rights Reserved © 2024 - {new Date().getFullYear()} falkordb.com</p>
-                            </div>
-                        </SheetContent>
-                    </Sheet>
+                        </DrawerContent>
+                    </Drawer>
                 </div>
             </div>
             <div className="h-2 Gradient" />

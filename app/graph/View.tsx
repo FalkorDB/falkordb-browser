@@ -3,6 +3,7 @@
 import { Check, ChevronDown, ChevronUp, FileCheck2, Pencil, PlusCircle, RotateCcw, Trash2, X } from "lucide-react"
 import { useEffect, useState } from "react"
 import { cn, rgbToHSL } from "@/lib/utils"
+import { useToast } from "@/components/ui/use-toast"
 import { DEFAULT_COLORS, Graph } from "../api/graph/model"
 import Button from "../components/ui/Button"
 import DialogComponent from "../components/DialogComponent"
@@ -16,6 +17,8 @@ export default function View({ graph, setGraph, selectedValue }: {
     const [newColor, setNewColor] = useState<string>("")
     const [hover, setHover] = useState<string>("")
     const [editable, setEditable] = useState<string>("")
+    const [isAddColor, setIsAddColor] = useState<boolean>(false)
+    const { toast } = useToast()
 
     const handlePreferencesChange = (colors?: string[]) => {
         setGraph(Graph.create(graph.Id, { data: graph.Data, metadata: graph.Metadata }, false, true, colors || colorsArr))
@@ -29,6 +32,36 @@ export default function View({ graph, setGraph, selectedValue }: {
     useEffect(() => {
         setColorsArr(graph.Colors)
     }, [graph.Colors])
+
+    const handleAddColor = () => {
+        setColorsArr(prev => [...prev, newColor])
+        setNewColor("");
+        setIsAddColor(false)
+        toast({
+            title: "Color added",
+            description: "The color has been added to the list",
+        })
+    }
+
+    const handleEditColor = () => {
+        setColorsArr(prev => [...prev.map(color => color === editable ? newColor : color)])
+        setNewColor("");
+        setEditable("");
+        toast({
+            title: "Color set",
+            description: "The color has been set",
+        })
+    }
+
+    const handleCancelEditColor = () => {
+        setNewColor("");
+        setEditable("");
+    }
+
+    const handleCancelAddColor = () => {
+        setNewColor("");
+        setIsAddColor(false)
+    }
 
     return (
         <DialogComponent
@@ -83,30 +116,20 @@ export default function View({ graph, setGraph, selectedValue }: {
                                     }
                                 </div>
                                 {
-                                    c === newColor || c === editable ?
+                                    c === editable ?
                                         <>
-                                            <div style={{ backgroundColor: c }} className="h-6 w-6 rounded-full" />
+                                            <div style={{ backgroundColor: newColor }} className="h-6 w-6 rounded-full" />
                                             <input
                                                 className="p-0 bg-transparent"
                                                 ref={ref => ref?.focus()}
-                                                value={editable === c ? editable : newColor}
+                                                value={newColor}
                                                 onChange={(e) => {
                                                     const newHslColor = rgbToHSL(e.target.value);
-                                                    setColorsArr(prev => {
-                                                        const newArr = [...prev];
-                                                        newArr[i] = newHslColor;
-                                                        return newArr;
-                                                    });
-                                                    if (editable === c) {
-                                                        setEditable(newHslColor)
-                                                    } else {
-                                                        setNewColor(newHslColor);
-                                                    }
+                                                    setNewColor(newHslColor);
                                                 }}
                                                 onKeyDown={(e) => {
-                                                    if (e.key !== "Enter") return
-                                                    setNewColor("");
-                                                    setEditable("");
+                                                    if (e.key === "Escape") handleCancelEditColor()
+                                                    if (e.key === "Enter") handleEditColor()
                                                 }}
                                                 type="color"
                                             />
@@ -117,28 +140,22 @@ export default function View({ graph, setGraph, selectedValue }: {
                                         </>
                                 }
                                 {
-                                    (c === newColor || c === editable) ?
+                                    c === editable ?
                                         <div className="flex gap-2">
                                             <Button
-                                                onClick={() => {
-                                                    setNewColor("");
-                                                    setEditable("");
-                                                }}
+                                                onClick={handleEditColor}
                                                 title="Save"
                                             >
                                                 <Check />
                                             </Button>
                                             <Button
-                                                onClick={() => {
-                                                    setNewColor("");
-                                                    setEditable("");
-                                                }}
+                                                onClick={handleCancelEditColor}
                                                 title="Cancel"
                                             >
                                                 <X />
                                             </Button>
                                         </div>
-                                        : hover === c &&
+                                        : c === hover &&
                                         <div className="flex gap-2">
                                             <Button
                                                 onClick={() => {
@@ -150,6 +167,8 @@ export default function View({ graph, setGraph, selectedValue }: {
                                             </Button>
                                             <Button
                                                 onClick={() => setEditable(c)}
+                                                title={isAddColor ? "You can't edit color when adding a new one" : "Edit"}
+                                                disabled={isAddColor}
                                             >
                                                 <Pencil />
                                             </Button>
@@ -158,13 +177,49 @@ export default function View({ graph, setGraph, selectedValue }: {
                             </li>
                         ))
                     }
+                    {
+                        isAddColor &&
+                        <li className="flex gap-8 items-center">
+                            <div className="h-6 w-6" />
+                            <div style={{ backgroundColor: newColor }} className="h-6 w-6 rounded-full" />
+                            <input
+                                className="p-0 bg-transparent"
+                                ref={ref => ref?.focus()}
+                                value={newColor}
+                                onChange={(e) => {
+                                    const newHslColor = rgbToHSL(e.target.value);
+                                    setNewColor(newHslColor);
+                                }}
+                                onKeyDown={(e) => {
+                                    if (e.key === "Escape") handleCancelAddColor()
+                                    if (e.key === "Enter") handleAddColor()
+                                }}
+                                type="color"
+                            />
+                            <div className="flex gap-2">
+                                <Button
+                                    onClick={handleAddColor}
+                                    title="Save"
+                                >
+                                    <Check />
+                                </Button>
+                                <Button
+                                    onClick={handleCancelAddColor}
+                                    title="Cancel"
+                                >
+                                    <X />
+                                </Button>
+                            </div>
+                        </li>
+                    }
                 </ul>
                 <div className="flex justify-around">
                     <Button
                         disabled={colorsArr.some(color => color === editable)}
+                        variant="Primary"
                         label="Add Color"
                         onClick={() => {
-                            setColorsArr(prev => [...prev, ""])
+                            setIsAddColor(true)
                         }}
                     >
                         <PlusCircle />
