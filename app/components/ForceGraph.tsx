@@ -133,31 +133,36 @@ export default function ForceGraph({
     }
 
     const deleteNeighbors = (nodes: Node[]) => {
+
         if (nodes.length === 0) return;
 
+        const expandedNodes: Node[] = []
+
         graph.Elements = {
-            nodes: graph.Elements.nodes.map(node => {
-                const isTarget = graph.Elements.links.some(link => link.source.id === node.id && nodes.some(n => n.id === link.target.id));
+            nodes: graph.Elements.nodes.filter(node => {
+                if (!node.collapsed) return true
 
-                if (!isTarget || !node.collapsed) return node
+                const isTarget = graph.Elements.links.some(link => link.target.id === node.id && nodes.some(n => n.id === link.source.id));
 
-                if (node.expand) {
-                    node.expand = false
-                    deleteNeighbors([node])
+                if (!isTarget) return true
+
+                const deleted = graph.NodesMap.delete(Number(node.id))
+
+                if (deleted && node.expand) {
+                    expandedNodes.push(node)
                 }
 
-                graph.NodesMap.delete(Number(node.id))
-
-                return undefined
-            }).filter(node => node !== undefined),
+                return false
+            }),
             links: graph.Elements.links
         }
+
+        deleteNeighbors(expandedNodes)
 
         graph.removeLinks()
     }
 
     const handleNodeClick = async (node: Node) => {
-
         const now = new Date()
         const { date, name } = lastClick.current
         lastClick.current = { date: now, name: node.data.name || node.id.toString() }
@@ -168,9 +173,10 @@ export default function ForceGraph({
             } else {
                 deleteNeighbors([node])
             }
-                        
+
             node.expand = !node.expand
             setData({ ...graph.Elements })
+            handleCooldown()
         }
     }
 
