@@ -275,7 +275,7 @@ export class Graph {
             });
         }
 
-        return currentNode
+        return undefined
     }
 
     public extendEdge(cell: LinkCell, collapsed: boolean, isSchema: boolean) {
@@ -371,6 +371,7 @@ export class Graph {
                     curve: 0,
                     data: {}
                 }
+                return link
             }
 
             Object.entries(cell.properties).forEach(([key, value]) => {
@@ -379,11 +380,10 @@ export class Graph {
 
             this.linksMap.set(cell.id, link)
             this.elements.links.push(link)
-
             return link
         }
 
-        return currentEdge
+        return undefined
     }
 
     public extend(results: { data: Data, metadata: any[] }, collapsed = false, isSchema = false): (Node | Link)[] {
@@ -402,17 +402,21 @@ export class Graph {
         this.data.forEach((row: DataRow) => {
             Object.values(row).forEach((cell: any) => {
                 if (cell instanceof Object) {
+                    let element: Node | Link | undefined
                     if (cell.nodes) {
                         cell.nodes.forEach((node: any) => {
-                            newElements.push(this.extendNode(node, collapsed, isSchema))
+                            element = this.extendNode(node, collapsed, isSchema)
                         })
                         cell.edges.forEach((edge: any) => {
-                            newElements.push(this.extendEdge(edge, collapsed, isSchema))
+                            element = this.extendEdge(edge, collapsed, isSchema)
                         })
                     } else if (cell.relationshipType) {
-                        newElements.push(this.extendEdge(cell, collapsed, isSchema))
+                        element = this.extendEdge(cell, collapsed, isSchema)
                     } else if (cell.labels) {
-                        newElements.push(this.extendNode(cell, collapsed, isSchema))
+                        element = this.extendNode(cell, collapsed, isSchema)
+                    }
+                    if (element) {
+                        newElements.push(element)
                     }
                 }
             })
