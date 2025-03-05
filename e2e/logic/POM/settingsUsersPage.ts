@@ -68,6 +68,18 @@ export default class SettingsUsersPage extends BasePage {
         return this.page.getByRole("button", { name: "Delete Users" })
     }
 
+    private get searchBtn(): Locator {
+        return this.page.locator("//div[@id='search']/button");
+    }
+
+    private get searchInput(): Locator {
+        return this.page.locator("//div[@id='search']/input");
+    }
+
+    private get tableRoles(): Locator {
+        return this.page.locator("//table//tr");
+    }
+
     async navigateToUserTab(): Promise<void> {
         await this.page.waitForLoadState('networkidle');
         await this.usersTabBtn.click();
@@ -123,5 +135,15 @@ export default class SettingsUsersPage extends BasePage {
         await this.userCheckboxBtn(selectedUser).click();
         await this.deleteUsersBtn.click();
         await this.confirmUserDeleteMsg.click();
+    }
+
+    async searchForElement(element: string):  Promise<void>{
+        await this.searchBtn.click();
+        await this.searchInput.fill(element);
+        await this.page.keyboard.press('Enter');
+    }
+
+    async getTableRolesCount(): Promise<number>{
+        return await this.tableRoles.count();
     }
 }
