@@ -67,12 +67,9 @@ export default function Combobox({ isSelectGraph = false, disabled = false, inTa
   }
 
   useEffect(() => {
+    console.log(options)
     handleSetRows(options)
-
-    if (options.length !== 1 || !setSelectedValue) return
-
-    setSelectedValue(options[0])
-  }, [options, setSelectedValue])
+  }, [options])
 
   const handleDelete = async (opts: string[]) => {
     const names = opts.map(opt => isSchema ? `${opt}_schema` : opt)
@@ -82,15 +79,15 @@ export default function Combobox({ isSelectGraph = false, disabled = false, inTa
         method: "DELETE"
       }, session?.user?.role, toast)
 
-      if (!result.ok) return name
+      if (result.ok) return name
 
       return ""
 
-    })).then(graphNames => graphNames.filter(name => name !== ""))
+    })).then(graphNames => options.filter(opt => !graphNames.filter(name => name !== "").includes(opt)))
 
     setOptions!(newNames)
 
-    if (opts.includes(selectedValue) && setSelectedValue) setSelectedValue("")
+    if (opts.includes(selectedValue) && setSelectedValue) setSelectedValue(newNames[newNames.length - 1])
 
     setOpenDelete(false)
     setOpenMenage(false)

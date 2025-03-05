@@ -62,7 +62,6 @@ export default function Page() {
                     setGraphName={setSchemaName}
                     edgesCount={edgesCount}
                     nodesCount={nodesCount}
-                    onChange={setSchemaName}
                     graphName={schemaName}
                     graph={schema}
                     setGraph={setSchema}
