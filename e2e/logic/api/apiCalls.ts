@@ -51,7 +51,7 @@ export default class ApiCalls {
     }
 
     async deleteUsers(data?: any): Promise<DeleteUsersResponse> {
-        const result = await postRequest(urls.api.settingsUsers, data)
+        const result = await deleteRequest(urls.api.settingsUsers, data)
         const jsonData = await result.json();
         return jsonData
     }
