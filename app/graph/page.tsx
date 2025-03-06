@@ -93,7 +93,7 @@ export default function Page() {
         window.graph = g
     }
 
-    const runHistoryQuery = async (query: string, setQueriesOpen: (open: boolean) => void) => {
+    const runHistoryQuery = async (query: string) => {
         const result = await run(query)
         if (!result) return
         const queryArr = queries.some(q => q.text === query) ? queries : [...queries, { text: query, metadata: result.metadata }]
@@ -101,7 +101,6 @@ export default function Page() {
         localStorage.setItem("query history", JSON.stringify(queryArr))
         setGraph(Graph.create(graphName, result, false, false, graph.Colors))
         setHistoryQuery(query)
-        setQueriesOpen(false)
     }
 
     return (

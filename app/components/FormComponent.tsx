@@ -63,8 +63,8 @@ export default function FormComponent({ handleSubmit, fields, error = undefined,
             return
         }
 
-        setIsLoading(true)
         try {
+            setIsLoading(true)
             await handleSubmit(e)
         } finally {
             setIsLoading(false)
@@ -116,9 +116,9 @@ export default function FormComponent({ handleSubmit, fields, error = undefined,
                                         <Combobox
                                             inTable
                                             options={field.options!}
-                                            type={field.label}
+                                            label={field.label}
                                             selectedValue={field.value}
-                                            setSelectedValue={field.onSelectedValue}
+                                            setSelectedValue={field.onSelectedValue!}
                                         />
                                         : <Input
                                             id={field.label}

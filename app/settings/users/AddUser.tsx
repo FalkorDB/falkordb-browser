@@ -11,7 +11,7 @@ import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import { Drawer, DrawerDescription, DrawerContent, DrawerTitle, DrawerTrigger } from "@/components/ui/drawer";
 
 export default function AddUser({ onAddUser }: {
-    onAddUser: (user: CreateUser) => void
+    onAddUser: (user: CreateUser) => Promise<void>
 }) {
     const [open, setOpen] = useState(false)
     const [username, setUsername] = useState("")
@@ -115,7 +115,7 @@ export default function AddUser({ onAddUser }: {
     const handleAddUser = async (e: FormEvent) => {
         e.preventDefault();
 
-        onAddUser({ username, password, role })
+        await onAddUser({ username, password, role })
 
         setOpen(false)
 

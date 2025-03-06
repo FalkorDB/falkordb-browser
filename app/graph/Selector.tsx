@@ -22,7 +22,7 @@ import ExportGraph from "../components/ExportGraph";
 interface Props {
     setGraphName: (selectedGraphName: string) => void
     graphName: string
-    runQuery?: (query: string, setQueriesOpen: (open: boolean) => void) => Promise<void>
+    runQuery?: (query: string) => Promise<void>
     queries?: Query[]
     edgesCount: number
     nodesCount: number
@@ -50,33 +50,8 @@ export default function Selector({ setGraphName, graphName, queries, runQuery, e
         setSelectedValue(graphName)
     }, [graphName])
 
-    const getOptions = useCallback(async () => {
-        const result = await securedFetch("api/graph", {
-            method: "GET"
-        }, session?.user?.role, toast)
-        if (!result.ok) return
-        const res = (await result.json()).result as string[]
-        const opts = !runQuery ? 
-            res.filter(name => name.endsWith("_schema")).map(name => {
-            let split = name.split("_schema")[0]
-            if (split.startsWith("{") && split.endsWith("}")) {
-                split = split.substring(1, split.length - 1)
-            }
-            return split
-        }) : res.filter(name => !name.endsWith("_schema"))
-        setOptions(opts)
-        if (opts.length === 1 && setSelectedValue) setSelectedValue(opts[0])
-    }, [runQuery, session?.user?.role, toast])
 
-    useEffect(() => {
-        getOptions()
-    }, [getOptions])
-
-    const handleEditorDidMount = (e: editor.IStandaloneCodeEditor) => {
-        editorRef.current = e
-    }
-
-    const handleOnChange = async (name: string) => {
+    const handleOnChange = useCallback(async (name: string) => {
         const formattedName = name === '""' ? "" : name
         if (runQuery) {
             const result = await securedFetch(`api/graph/${prepareArg(name)}_schema/?query=${prepareArg(defaultQuery())}&create=false`, {
@@ -92,6 +67,32 @@ export default function Selector({ setGraphName, graphName, queries, runQuery, e
         }
         setGraphName(formattedName)
         setSelectedValue(name)
+    }, [runQuery, session?.user?.role, setGraphName, toast])
+
+    const getOptions = useCallback(async () => {
+        const result = await securedFetch("api/graph", {
+            method: "GET"
+        }, session?.user?.role, toast)
+        if (!result.ok) return
+        const res = (await result.json()).result as string[]
+        const opts = !runQuery ?
+            res.filter(name => name.endsWith("_schema")).map(name => {
+                let split = name.split("_schema")[0]
+                if (split.startsWith("{") && split.endsWith("}")) {
+                    split = split.substring(1, split.length - 1)
+                }
+                return split
+            }) : res.filter(name => !name.endsWith("_schema"))
+        setOptions(opts)
+        if (opts.length === 1) handleOnChange(opts[0])
+    }, [handleOnChange, runQuery, session?.user?.role, toast])
+
+    useEffect(() => {
+        getOptions()
+    }, [getOptions])
+
+    const handleEditorDidMount = (e: editor.IStandaloneCodeEditor) => {
+        editorRef.current = e
     }
 
     const handleReloadClick = () => {
@@ -133,11 +134,11 @@ export default function Selector({ setGraphName, graphName, queries, runQuery, e
                     <p className="text-secondary">|</p>
                     <Combobox
                         isSelectGraph
+                        type={type}
                         options={options}
                         setOptions={setOptions}
                         selectedValue={selectedValue}
                         setSelectedValue={handleOnChange}
-                        isSchema={!runQuery}
                     />
                 </div>
                 <div className="flex gap-16 text-[#e5e7eb]">
@@ -258,18 +259,18 @@ export default function Selector({ setGraphName, graphName, queries, runQuery, e
                                     />
                                     <Button
                                         className="text-white flex justify-center w-1/3"
-                                        disabled={isLoading}
                                         onClick={async () => {
                                             try {
                                                 setIsLoading(true);
-                                                await runQuery(query?.text || "", setQueriesOpen)
+                                                await runQuery(query?.text || "")
                                             } finally {
+                                                setQueriesOpen(false)
                                                 setIsLoading(false)
                                             }
                                         }}
                                         variant="Primary"
-                                        label={isLoading ? undefined : "Run"}
-                                        title={isLoading ? "Please wait..." : undefined}
+                                        label="Run"
+                                        isLoading={isLoading}
                                     />
                                 </div>
                             </div>

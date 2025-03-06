@@ -3,10 +3,9 @@ import { User } from "@/app/api/user/model";
 import { Trash2 } from "lucide-react";
 import { Dispatch, SetStateAction } from "react";
 import Button from "@/app/components/ui/Button";
-import { securedFetch } from "@/lib/utils";
+import { Row, securedFetch } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
 import { useSession } from "next-auth/react";
-import { Row } from "@/app/components/TableComponent";
 
 interface DeleteUserProps {
     users: User[]

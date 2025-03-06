@@ -295,7 +295,7 @@ export default function SchemaDataPanel({ obj, onExpand, onSetAttributes, onRemo
                                                         return p
                                                     })}
                                                     inTable
-                                                    type="Type"
+                                                    label="Type"
                                                     selectedValue={attribute[1][0]}
                                                 />
                                             </TableCell>
@@ -422,7 +422,7 @@ export default function SchemaDataPanel({ obj, onExpand, onSetAttributes, onRemo
                                         return p
                                     })}
                                     inTable
-                                    type="Type"
+                                    label="Type"
                                     selectedValue={attribute[1][0]}
                                 />
                             </TableCell>

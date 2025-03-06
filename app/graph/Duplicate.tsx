@@ -15,25 +15,30 @@ export default function Duplicate({ open, onOpenChange, selectedValue, onDuplica
 }) {
 
     const [duplicateName, setDuplicateName] = useState("");
+    const [isLoading, setIsLoading] = useState(false)
     const { toast } = useToast()
     const { data: session } = useSession()
-    
+
     const handleDuplicate = async (e: FormEvent) => {
-
         e.preventDefault()
+        try {
 
-        const result = await securedFetch(`api/graph/${prepareArg(duplicateName)}/?sourceName=${prepareArg(selectedValue)}`, {
-            method: "POST"
-        }, session?.user?.role, toast)
+            setIsLoading(true)
+            const result = await securedFetch(`api/graph/${prepareArg(duplicateName)}/?sourceName=${prepareArg(selectedValue)}`, {
+                method: "POST"
+            }, session?.user?.role, toast)
 
-        if (!result.ok) return
+            if (!result.ok) return
 
-        onDuplicate(duplicateName)
-        onOpenChange(false)
-        toast({
-            title: "Graph duplicated successfully",
-            description: "The graph has been duplicated successfully",
-        })
+            onDuplicate(duplicateName)
+            onOpenChange(false)
+            toast({
+                title: "Graph duplicated successfully",
+                description: "The graph has been duplicated successfully",
+            })
+        } finally {
+            setIsLoading(false)
+        }
     }
 
     return (
@@ -57,6 +62,7 @@ export default function Duplicate({ open, onOpenChange, selectedValue, onDuplica
                         variant="Primary"
                         label="Duplicate"
                         type="submit"
+                        isLoading={isLoading}
                     />
                     <Button
                         variant="Secondary"

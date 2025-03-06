@@ -240,7 +240,8 @@ export default function SchemaCreateElement({ onCreate, onExpand, selectedNodes,
                               return p
                             })}
                             inTable
-                            type="Type"
+
+                            label="Type"
                             selectedValue={attribute[1][0]}
                           />
                         </TableCell>
@@ -366,7 +367,7 @@ export default function SchemaCreateElement({ onCreate, onExpand, selectedNodes,
                     return p
                   })}
                   inTable
-                  type="Type"
+                  label="Type"
                   selectedValue={newAttribute[1][0]}
                 />
               </TableCell>
@@ -441,7 +442,9 @@ export default function SchemaCreateElement({ onCreate, onExpand, selectedNodes,
                   disabled
                   options={OPTIONS}
                   inTable
-                  type="Type"
+                  label="Type"
+                  selectedValue=""
+                  setSelectedValue={() => {}}
                 />
               </TableCell>
               <TableCell>
