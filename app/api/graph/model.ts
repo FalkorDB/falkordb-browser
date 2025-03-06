@@ -35,6 +35,7 @@ export type Node = NodeObject<{
     visible: boolean,
     expand: boolean,
     collapsed: boolean,
+    displayName: string,
     data: {
         [key: string]: any
     }
@@ -103,6 +104,8 @@ export interface Category {
     name: string,
     show: boolean,
     textWidth?: number,
+    elements: (Node | Link)[]
+    textHeight?: number,
 }
 
 export interface ExtractedData {
@@ -253,6 +256,7 @@ export class Graph {
                 visible: true,
                 expand: false,
                 collapsed,
+                displayName: "",
                 data: {}
             }
             Object.entries(cell.properties).forEach(([key, value]) => {
@@ -274,6 +278,10 @@ export class Graph {
                 currentNode.data[key] = isSchema ? getSchemaValue(value) : value;
             });
         }
+
+        currentNode.category.forEach(c => {
+            this.categoriesMap.get(c)!.elements.push(currentNode)
+        })
 
         return currentNode
     }
@@ -301,6 +309,7 @@ export class Graph {
                         expand: false,
                         collapsed,
                         visible: true,
+                        displayName: "",
                         data: {},
                     }
 
@@ -336,6 +345,7 @@ export class Graph {
                         expand: false,
                         collapsed,
                         visible: true,
+                        displayName: "",
                         data: {},
                     }
 
@@ -352,6 +362,7 @@ export class Graph {
                         expand: false,
                         collapsed,
                         visible: true,
+                        displayName: "",
                         data: {},
                     }
                 }
@@ -382,6 +393,8 @@ export class Graph {
 
             return link
         }
+
+        this.labelsMap.get(currentEdge.label)?.elements.push(currentEdge)
 
         return currentEdge
     }
@@ -450,33 +463,19 @@ export class Graph {
         return newElements
     }
 
-    public updateCategories(category: string, type: boolean) {
-        if (type && this.elements.nodes.every(n => n.category.some(c => c !== category))) {
-            const i = this.categories.findIndex(({ name }) => name === category)
-            this.categories.splice(i, 1)
-            this.categoriesMap.delete(category)
-            return true
-        }
-
-        if (!type && !this.elements.links.every(l => l.data.label !== category)) {
-            const i = this.labels.findIndex(({ name }) => name === category)
-            this.labels.splice(i, 1)
-            this.labelsMap.delete(category)
-            return true
-        }
-
-        return false
-    }
-
-    public createCategory(categories: string[]): Category[] {
+    public createCategory(categories: string[], node?: Node): Category[] {
         return categories.map(category => {
             let c = this.categoriesMap.get(category)
 
             if (!c) {
-                c = { name: category, index: this.colorIndex, show: true }
+                c = { name: category, index: this.colorIndex, show: true, elements: [] }
                 this.colorIndex += 1
                 this.categoriesMap.set(c.name, c)
                 this.categories.push(c)
+            }
+
+            if (node) {
+                c.elements.push(node)
             }
 
             return c
@@ -487,7 +486,7 @@ export class Graph {
         let l = this.labelsMap.get(category)
 
         if (!l) {
-            l = { name: category, index: this.colorIndex, show: true }
+            l = { name: category, index: this.colorIndex, show: true, elements: [] }
             this.colorIndex += 1
             this.labelsMap.set(l.name, l)
             this.labels.push(l)

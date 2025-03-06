@@ -43,7 +43,7 @@ export default function CreateGraph({
         if (!name) {
             toast({
                 title: "Error",
-                description: "Graph name cannot be empty",
+                description: `${type} name cannot be empty`,
                 variant: "destructive"
             })
             return
@@ -59,8 +59,8 @@ export default function CreateGraph({
         setGraphName("")
         setOpen(false)
         toast({
-            title: "Graph created successfully",
-            description: "The graph has been created successfully",
+            title: `${type} created successfully`,
+            description: `The ${type.toLowerCase()} has been created successfully`,
         })
     }
 
