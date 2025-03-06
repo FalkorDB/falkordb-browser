@@ -219,6 +219,13 @@ export default function EditorComponent({ currentQuery, historyQueries, setHisto
     })
     const { data: session } = useSession()
 
+    useEffect(() => {
+        if (currentQuery && placeholderRef.current) {
+            placeholderRef.current.style.display = "none"
+        } else if (!currentQuery && placeholderRef.current) {
+            placeholderRef.current.style.display = "block"
+        }
+    }, [currentQuery])
 
     useEffect(() => {
         graphIdRef.current = graph.Id
