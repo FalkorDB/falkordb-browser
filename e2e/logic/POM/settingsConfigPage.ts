@@ -41,7 +41,7 @@ export default class SettingsConfigPage extends BasePage {
     }
 
     private get tableRoles(): Locator {
-        return this.page.locator("//table//tr");
+        return this.page.locator("//table//tbody//tr");
     }
 
     async modifyRoleValue(role: string, input: string): Promise<string | null> {
@@ -68,6 +68,7 @@ export default class SettingsConfigPage extends BasePage {
     }
 
     async getTableRolesCount(): Promise<number>{
+        await this.page.waitForTimeout(1500);
         return await this.tableRoles.count();
     }
 

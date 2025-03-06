@@ -39,8 +39,8 @@
         {"role": "MAX_INFO_QUERIES", "description": "modify maxInfoQueries", "input": "999", "expected": true}
     ],
     "searchElements": [
-      {"input": "CACHE_SIZE", "expected": 2},
-      {"input": "RESULTSET_SIZE", "expected": 2}
+      {"input": "CACHE_SIZE", "expected": 1},
+      {"input": "RESULTSET_SIZE", "expected": 1}
     ]
 }
   
