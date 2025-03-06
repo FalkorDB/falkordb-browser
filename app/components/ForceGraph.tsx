@@ -6,14 +6,11 @@
 
 import { Dispatch, SetStateAction, useEffect, useRef, useState } from "react"
 import ForceGraph2D from "react-force-graph-2d"
-import { securedFetch, GraphRef, handleZoomToFit } from "@/lib/utils"
+import { securedFetch, GraphRef } from "@/lib/utils"
 import { useToast } from "@/components/ui/use-toast"
 import * as d3 from "d3"
 import { useSession } from "next-auth/react"
-import { Search } from "lucide-react"
 import { Graph, GraphData, Link, Node } from "../api/graph/model"
-import Input from "./ui/Input"
-import Button from "./ui/Button"
 
 interface Props {
     graph: Graph
@@ -50,7 +47,6 @@ export default function ForceGraph({
 
     const [parentWidth, setParentWidth] = useState<number>(0)
     const [parentHeight, setParentHeight] = useState<number>(0)
-    const [searchElement, setSearchElement] = useState<string>("")
     const [hoverElement, setHoverElement] = useState<Node | Link | undefined>()
     const parentRef = useRef<HTMLDivElement>(null)
     const lastClick = useRef<{ date: Date, name: string }>({ date: new Date(), name: "" })
@@ -89,28 +85,25 @@ export default function ForceGraph({
         const linkForce = chartRef.current.d3Force('link');
         if (linkForce) {
             linkForce
-                .distance(() => 30)
-                .strength((link: any) => 1 / Math.min(
-                    graph.Elements.nodes.filter(n => n.id === link.source.id).length,
-                    graph.Elements.nodes.filter(n => n.id === link.target.id).length
-                ));
+                .distance(() => 100)
+                .strength(0.1);
         }
 
         // Adjust charge force for node repulsion
         const chargeForce = chartRef.current.d3Force('charge');
         if (chargeForce) {
             chargeForce
-                .strength(-30)
-                .distanceMax(150);
+                .strength(-0.1)
+                .distanceMax(0.1);
         }
 
         // Add collision force to prevent node overlap
-        chartRef.current.d3Force('collision', d3.forceCollide(NODE_SIZE * 1.5));
+        chartRef.current.d3Force('collision', d3.forceCollide(NODE_SIZE * 2));
 
         // Center force to keep graph centered
         const centerForce = chartRef.current.d3Force('center');
         if (centerForce) {
-            centerForce.strength(0.05);
+            centerForce.strength(0.1);
         }
     }, [chartRef, graph.Elements.nodes])
 
@@ -218,40 +211,8 @@ export default function ForceGraph({
         setSelectedElements([])
     }
 
-    const handleSearchElement = () => {
-        if (searchElement) {
-            const element = graph.Elements.nodes.find(node => node.data.name ? node.data.name.toLowerCase().includes(searchElement.toLowerCase()) : node.id.toString().toLowerCase().includes(searchElement.toLowerCase()))
-            if (element) {
-                handleZoomToFit(chartRef, (node: Node) => node.id === element.id)
-                setSelectedElement(element)
-            }
-        }
-    }
-
     return (
         <div ref={parentRef} className="w-full h-full relative">
-            <div className="w-[20dvw] absolute top-4 left-4 z-10">
-                <div className="relative w-full">
-                    <Input
-                        className="w-full"
-                        placeholder="Search for element in the graph"
-                        value={searchElement}
-                        onChange={(e) => setSearchElement(e.target.value)}
-                        onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                                handleSearchElement()
-                                setSearchElement("")
-                            }
-                        }}
-                    />
-                    <Button
-                        className="absolute right-2 top-2"
-                        onClick={handleSearchElement}
-                    >
-                        <Search color="black" />
-                    </Button>
-                </div>
-            </div>
             <ForceGraph2D
                 ref={chartRef}
                 backgroundColor="#191919"
