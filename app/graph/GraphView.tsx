@@ -389,7 +389,7 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
                                         </Tooltip>
                                         <div className="relative pointer-events-auto">
                                             <Input
-                                                className="w-full"
+                                                className="w-[20dvw]"
                                                 placeholder="Search for element in the graph"
                                                 value={searchElement}
                                                 onChange={(e) => setSearchElement(e.target.value)}

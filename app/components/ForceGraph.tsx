@@ -85,7 +85,7 @@ export default function ForceGraph({
         const linkForce = chartRef.current.d3Force('link');
         if (linkForce) {
             linkForce
-                .distance(() => 100)
+                .distance(() => 10)
                 .strength(0.1);
         }
 
@@ -93,17 +93,17 @@ export default function ForceGraph({
         const chargeForce = chartRef.current.d3Force('charge');
         if (chargeForce) {
             chargeForce
-                .strength(-0.1)
-                .distanceMax(0.1);
+                .strength(-5)
+                .distanceMax(10);
         }
 
         // Add collision force to prevent node overlap
-        chartRef.current.d3Force('collision', d3.forceCollide(NODE_SIZE * 2));
+        chartRef.current.d3Force('collision', d3.forceCollide(NODE_SIZE * 2).strength(10));
 
         // Center force to keep graph centered
         const centerForce = chartRef.current.d3Force('center');
         if (centerForce) {
-            centerForce.strength(0.1);
+            centerForce.strength(0.05);
         }
     }, [chartRef, graph.Elements.nodes])
 
@@ -357,7 +357,7 @@ export default function ForceGraph({
                 nodeVisibility="visible"
                 linkVisibility="visible"
                 cooldownTicks={cooldownTicks}
-                cooldownTime={2000}
+                cooldownTime={4000}
                 linkDirectionalArrowRelPos={1}
                 linkDirectionalArrowLength={(link) => link.source.id === link.target.id ? 0 : 2}
                 linkDirectionalArrowColor={(link) => link.color}
