@@ -105,6 +105,18 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
 
     useEffect(() => {
         dataPanel.current?.collapse()
+
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === "Escape") {
+                setMaximize(false)
+            }
+        }
+
+        window.addEventListener("keydown", handleKeyDown)
+
+        return () => {
+            window.removeEventListener("keydown", handleKeyDown)
+        }
     }, [])
 
     useEffect(() => {
@@ -113,12 +125,13 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
 
     const onCategoryClick = (category: Category) => {
         category.show = !category.show
-        graph.Elements.nodes.forEach((node) => {
-            if (node.category[0] !== category.name) return
+        
+        category.elements.forEach((element) => {
+            if (element.category[0] !== category.name) return
             if (category.show) {
-                node.visible = true
+                element.visible = true
             } else {
-                node.visible = false
+                element.visible = false
             }
         })
 
@@ -129,15 +142,13 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
 
     const onLabelClick = (label: Category) => {
         label.show = !label.show
-        graph.Elements.links.forEach((link) => {
-            if (link.label !== label.name) return
+        label.elements.forEach((element) => {
             if (label.show) {
-                link.visible = true
+                element.visible = true
             } else {
-                link.visible = false
+                element.visible = false
             }
         })
-
         setData({ ...graph.Elements })
     }
     const handleDeleteElement = async () => {
@@ -176,7 +187,16 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
                 graph.Elements.links.splice(graph.Elements.links.findIndex(l => l.id === id), 1)
             }
 
-            graph.updateCategories(type ? element.category[0] : element.label, type)
+            const category = type ? graph.CategoriesMap.get(element.category[0]) : graph.LabelsMap.get(element.label)
+            
+            if (category) {
+                category.elements = category.elements.filter((e) => e.id !== id)
+                if (category.elements.length === 0) {
+                    graph.Categories.splice(graph.Categories.findIndex(c => c.name === category.name), 1)
+                    graph.CategoriesMap.delete(category.name)
+                }
+            }
+
             fetchCount()
         })
 
@@ -211,6 +231,54 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
         await runQuery(q)
         handleZoomToFit(chartRef)
         handleCooldown()
+    }
+
+    
+    const handleAddLabel = async (label: string) => {
+        const q = `MATCH (n) WHERE ID(n) = ${selectedElement?.id} SET n:${label}`
+        const result = await securedFetch(`api/graph/${prepareArg(graph.Id)}/?query=${prepareArg(q)}`, {
+            method: "GET"
+        }, session?.user?.role, toast)
+
+        if (result.ok) {
+            graph.createCategory([label], selectedElement as Node)
+            graph.Elements.nodes.forEach((node) => {
+                if (node.id === selectedElement?.id) {
+                    node.category.push(label)
+                }
+            })
+            setData({ ...graph.Elements })
+        }
+
+        return result.ok
+    }
+
+    const handleRemoveLabel = async (label: string) => {
+        const q = `MATCH (n) WHERE ID(n) = ${selectedElement?.id} REMOVE n:${label}`
+        const result = await securedFetch(`api/graph/${prepareArg(graph.Id)}/?query=${prepareArg(q)}`, {
+            method: "GET"
+        }, session?.user?.role, toast)
+
+        if (result.ok) {
+            const category = graph.CategoriesMap.get(label)
+
+            if (category) {
+                category.elements = category.elements.filter((element) => element.id !== selectedElement?.id)
+                if (category.elements.length === 0) {
+                    graph.Categories.splice(graph.Categories.findIndex(c => c.name === category.name), 1)
+                    graph.CategoriesMap.delete(category.name)
+                }
+            }
+            graph.Elements.nodes.forEach((node) => {
+                if (node.id === selectedElement?.id) {
+                    node.category = node.category.filter(c => c !== label)
+                    node.color = graph.getCategoryColorValue(graph.CategoriesMap.get(node.category[0])?.index)
+                }
+            })
+            setData({ ...graph.Elements })
+        }
+
+        return result.ok
     }
 
     return (
@@ -357,6 +425,8 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
                         onExpand={onExpand}
                         graph={graph}
                         onDeleteElement={handleDeleteElement}
+                        onAddLabel={handleAddLabel}
+                        onRemoveLabel={handleRemoveLabel}
                     />
                 }
             </ResizablePanel>

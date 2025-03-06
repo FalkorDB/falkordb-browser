@@ -32,7 +32,13 @@ export default function LoginForm() {
   const fields = [
     {
       value: host,
-      onChange: (e: React.ChangeEvent<HTMLInputElement>) => setHost(e.target.value),
+      onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
+        setHost(e.target.value)
+        setError(prev => ({
+          ...prev,
+          show: false
+        }))
+      },
       label: "Host",
       type: "text",
       placeholder: DEFAULT_HOST,
@@ -40,7 +46,13 @@ export default function LoginForm() {
     },
     {
       value: port,
-      onChange: (e: React.ChangeEvent<HTMLInputElement>) => setPort(e.target.value),
+      onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
+        setPort(e.target.value)
+        setError(prev => ({
+          ...prev,
+          show: false
+        }))
+      },
       label: "Port",
       type: "text",
       placeholder: DEFAULT_PORT,
@@ -48,7 +60,13 @@ export default function LoginForm() {
     },
     {
       value: username,
-      onChange: (e: React.ChangeEvent<HTMLInputElement>) => setUsername(e.target.value),
+      onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
+        setUsername(e.target.value)
+        setError(prev => ({
+          ...prev,
+          show: false
+        }))
+      },
       label: "Username",
       placeholder: "Default",
       info: "You can skip entering your username when deploying a FalkorDB instance \n from localhost with default credentials.",
@@ -57,7 +75,13 @@ export default function LoginForm() {
     },
     {
       value: password,
-      onChange: (e: React.ChangeEvent<HTMLInputElement>) => setPassword(e.target.value),
+      onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
+        setPassword(e.target.value)
+        setError(prev => ({
+          ...prev,
+          show: false
+        }))
+      },
       label: "Password",
       placeholder: "Default",
       info: "You can skip entering your password when deploying a FalkorDB instance \n from localhost with default credentials.",
