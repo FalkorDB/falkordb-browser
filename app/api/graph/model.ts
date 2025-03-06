@@ -264,8 +264,8 @@ export class Graph {
             });
             this.nodesMap.set(cell.id, node)
             this.elements.nodes.push(node)
-            currentNode.category.forEach(c => {
-              this.categoriesMap.get(c)!.elements.push(currentNode)
+            node.category.forEach(c => {
+              this.categoriesMap.get(c)!.elements.push(node)
             })
             return node
         }
@@ -392,7 +392,7 @@ export class Graph {
 
             this.linksMap.set(cell.id, link)
             this.elements.links.push(link)
-            this.labelsMap.get(currentEdge.label)?.elements.push(currentEdge)
+            this.labelsMap.get(link.label)?.elements.push(link)
             return link
         }
 
