@@ -71,7 +71,7 @@ test.describe(`Navbar tests`, () => {
             const navBar = await browser.createNewPage(NavBarComponent, urls.graphUrl);
             await navBar.clickOnAbout();
             expect(await navBar.isAboutPopUp()).toBe(true);
-            await navBar.clickOnClosepPopUpBtn();
+            await navBar.closePopUp();
             expect(await navBar.isAboutPopUp()).toBe(false);
         })
     })

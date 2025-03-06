@@ -183,6 +183,7 @@ test.describe('Settings Tests', () => {
         await settingsUsersPage.navigateToUserTab();
         await settingsUsersPage.searchForElement(username);
         expect(await settingsUsersPage.getTableRolesCount()).toBe(2);
+        await apiCall.deleteUsers({ users: [{ username }] })
     });
 
 })

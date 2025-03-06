@@ -46,10 +46,6 @@ export default class NavBarComponent extends BasePage {
         return this.page.locator('//div[@id="about"]');
     }
 
-    private get closeBtnForAboutPopUp(): Locator {
-        return this.page.locator('//div[@id="about"]//button');
-    }
-
     async clickOnFalkorLogo(): Promise<void> {
         await this.falkorDBLogo.click();
     }
@@ -129,8 +125,9 @@ export default class NavBarComponent extends BasePage {
         return await this.aboutPopUp.isVisible();
     }
 
-    async clickOnClosepPopUpBtn(): Promise<void>{
-        await this.closeBtnForAboutPopUp.click();
+    async closePopUp(): Promise<void>{
+        await this.page.mouse.click(10, 10);
+        await this.page.waitForTimeout(1000);
     }
 
     async clickOnAbout(): Promise<void> {
