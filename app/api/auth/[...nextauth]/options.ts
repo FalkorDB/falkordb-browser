@@ -1,13 +1,14 @@
 import { FalkorDB } from "falkordb";
 import CredentialsProvider from "next-auth/providers/credentials"
-import { AuthOptions, Role, getServerSession } from "next-auth"
+import { AuthOptions, Role, User, getServerSession } from "next-auth"
 import { NextResponse } from "next/server";
 import { FalkorDBOptions } from "falkordb/dist/src/falkordb";
 import { ErrorReply } from "redis";
+import { v4 as uuidv4 } from 'uuid'
 
-const connections = new Map<number, FalkorDB>();
+const connections = new Map<string, FalkorDB>();
 
-async function newClient(credentials: { host: string, port: string, password: string, username: string, tls: string, ca: string }, id: number): Promise<{ role: Role, client: FalkorDB }> {
+async function newClient(credentials: { host: string, port: string, password: string, username: string, tls: string, ca: string }, id: string): Promise<{ role: Role, client: FalkorDB }> {
     const connectionOptions: FalkorDBOptions = credentials.ca === "undefined" ?
         {
             socket: {
@@ -73,7 +74,11 @@ async function newClient(credentials: { host: string, port: string, password: st
     return { role: "Admin", client }
 }
 
-let userId = 1;
+function generateTimeUUID() {
+    const timestamp = Date.now(); // Get current time in milliseconds
+    const uuid = uuidv4(); // Generate a random UUID
+    return `${timestamp}-${uuid}`; // Combine both
+}
 
 const authOptions: AuthOptions = {
     providers: [
@@ -94,12 +99,11 @@ const authOptions: AuthOptions = {
                 }
 
                 try {
-                    const id = userId;
-                    userId += 1;
+                    const id = generateTimeUUID();
 
                     const { role } = await newClient(credentials, id)
 
-                    const res = {
+                    const res: User = {
                         id,
                         host: credentials.host,
                         port: credentials.port ? parseInt(credentials.port, 10) : 6379,
@@ -141,7 +145,7 @@ const authOptions: AuthOptions = {
                     ...session,
                     user: {
                         ...session.user,
-                        id: token.id as number,
+                        id: token.id as string,
                         host: token.host as string,
                         port: parseInt(token.port as string, 10),
                         username: token.username as string,
