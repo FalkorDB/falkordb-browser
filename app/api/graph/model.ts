@@ -156,7 +156,7 @@ export class Graph {
         this.labelsMap = labelsMap;
         this.nodesMap = nodesMap;
         this.linksMap = edgesMap;
-        this.COLORS_ORDER_VALUE = [...(colors || DEFAULT_COLORS)]
+        this.COLORS_ORDER_VALUE = [...(colors && colors.length > 0 ? colors : DEFAULT_COLORS)]
     }
 
     get Id(): string {
@@ -540,9 +540,13 @@ export class Graph {
             return this.COLORS_ORDER_VALUE[index];
         }
 
-        const newColor = `hsl(${(index - 4) * 20}, 100%, 70%)`
+        let newColor
+        let i = index
+        do {
+            newColor = `hsl(${(i - Math.min(DEFAULT_COLORS.length, this.COLORS_ORDER_VALUE.length)) * 20}, 100%, 70%)`
+            i += 1
+        } while (this.COLORS_ORDER_VALUE.includes(newColor))
         this.COLORS_ORDER_VALUE.push(newColor)
-        DEFAULT_COLORS.push(newColor)
         return newColor
     }
 }
