@@ -20,8 +20,7 @@ test.describe(`Navbar tests`, () => {
         test(`@${role.name} Verify clicking on FalkorDB logo redirects to specified URL`, async () => {
             const navBar = await browser.createNewPage(NavBarComponent, urls.graphUrl)
             const page = await navBar.clickOnFalkor()
-            expect(page.url()).toBe("https://www.falkordb.com/")
-
+            expect(page.url()).toBe(urls.falkorDBWeb)
         })
     })
 
@@ -31,7 +30,6 @@ test.describe(`Navbar tests`, () => {
             await navBar.clickOnGraphsButton()
             const newUrl = navBar.getCurrentURL();
             expect(newUrl).toBe(urls.graphUrl)
-
         })
     })
 
@@ -41,7 +39,6 @@ test.describe(`Navbar tests`, () => {
             await navBar.clickOnSchemasButton()
             const newUrl = navBar.getCurrentURL();
             expect(newUrl).toBe(urls.schemaUrl)
-
         })
     })
 
@@ -49,8 +46,7 @@ test.describe(`Navbar tests`, () => {
         test(`@${role.name} Verify clicking on help -> Documentation redirects to specified URL`, async () => {
             const navBar = await browser.createNewPage(NavBarComponent, urls.graphUrl)
             const page = await navBar.clickOnDocumentation()
-            expect(page.url()).toBe("https://docs.falkordb.com/")
-
+            expect(page.url()).toBe(urls.documentationUrl)
         })
     })
 
@@ -58,8 +54,7 @@ test.describe(`Navbar tests`, () => {
         test(`@${role.name} Verify clicking on help -> Support redirects to specified URL`, async () => {
             const navBar = await browser.createNewPage(NavBarComponent, urls.graphUrl)
             const page = await navBar.clickOnSupport()
-            expect(page.url()).toBe("https://www.falkordb.com/contact-us/")
-
+            expect(page.url()).toBe(urls.supportUrl)
         })
     })
 
@@ -68,6 +63,16 @@ test.describe(`Navbar tests`, () => {
             const navBar = await browser.createNewPage(NavBarComponent, urls.graphUrl)
             const result = await navBar.isSettingsButtonEnabled()
             expect(result).toBe(role.name === 'admin')
+        })
+    })
+
+    roles.forEach((role) => {
+        test(`@${role.name} Verify Help -> About Popup opens and closes correctly`, async () => {
+            const navBar = await browser.createNewPage(NavBarComponent, urls.graphUrl);
+            await navBar.clickOnAbout();
+            expect(await navBar.isAboutPopUp()).toBe(true);
+            await navBar.closePopUp();
+            expect(await navBar.isAboutPopUp()).toBe(false);
         })
     })
 })

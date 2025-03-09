@@ -107,7 +107,7 @@ export default function Header({ onSetGraphName }: Props) {
                                 </Button>
                             </NavigationMenuList>
                         </NavigationMenu>
-                        <DrawerContent side="right" className="bg-popover-foreground gap-4 items-center text-foreground">
+                        <DrawerContent side="right" className="bg-popover-foreground gap-4 items-center text-foreground" id="about">
                             <VisuallyHidden>
                                 <DrawerTitle />
                                 <DrawerDescription />
