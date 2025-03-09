@@ -88,10 +88,9 @@ export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement,
             }, session?.user?.role, toast)).ok
 
             if (success) {
-                graph.getElements().forEach(e => {
-                    if (e.id !== id) return
-                    e.data[key] = val
-                })
+
+                graph.setProperty(key, val, id)
+
                 const value = obj.data[key]
                 setObj((prev) => {
                     if (!prev) return prev
@@ -113,15 +112,6 @@ export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement,
                     } as Node
                 })
 
-                graph.Data = graph.Data.map(row => {
-                    const newRow = Object.entries(row).map(([k, cell]) => {
-                        if (cell && typeof cell === "object" && cell.id === id) {
-                            return [k, { ...cell, properties: { ...cell.properties, [key]: val } }]
-                        }
-                        return [k, cell]
-                    })
-                    return Object.fromEntries(newRow)
-                })
                 handleSetEditable("", "")
                 toast({
                     title: "Success",
@@ -170,26 +160,12 @@ export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement,
             if (success) {
                 const value = obj.data[key]
 
-                graph.getElements().forEach((e) => {
-                    if (e.id !== id) return
-                    delete e.data[key]
-                })
+                graph.removeProperty(key, id)
 
                 const newObj = { ...obj }
 
                 delete newObj.data[key]
                 setObj(newObj)
-
-                graph.Data = graph.Data.map(row => {
-                    const newRow = Object.entries(row).map(([k, cell]) => {
-                        if (cell && typeof cell === "object" && cell.id === id) {
-                            delete cell.properties[key]
-                            return [k, cell]
-                        }
-                        return [k, cell]
-                    })
-                    return Object.fromEntries(newRow)
-                })
 
                 toast({
                     title: "Success",

@@ -50,7 +50,6 @@ export default function Selector({ setGraphName, graphName, queries, runQuery, e
         setSelectedValue(graphName)
     }, [graphName])
 
-
     const handleOnChange = useCallback(async (name: string) => {
         const formattedName = name === '""' ? "" : name
         if (runQuery) {

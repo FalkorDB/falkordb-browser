@@ -11,20 +11,14 @@ interface Props {
 export default function TableView({ data }: Props) {
 
     return (
-        data.length > 0 ? (
-            <TableComponent
-                headers={Object.keys(data[0])}
-                rows={data.map(row => ({
-                    cells: Object.values(row).map((value) => ({
-                        value,
+        <TableComponent
+            headers={Object.keys(data[0])}
+            rows={data.map(row => ({
+                cells: Object.values(row).map((value) => ({
+                    value,
 
-                    }))
-                }))}
-            />
-        ) : (
-            <div className="flex justify-center items-center h-full">
-                <p className="text-sm text-gray-500">No data</p>
-            </div>
-        )
+                }))
+            }))}
+        />
     )
 }
