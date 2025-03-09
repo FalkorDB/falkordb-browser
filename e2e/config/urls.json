@@ -2,7 +2,7 @@
     "api": {
         "graphUrl": "http://localhost:3000/api/graph/",
         "LoginApiUrl": "http://localhost:3000/api/auth/providers",
-        "LogoutApiUlr": "http://localhost:3000/api/auth/signout",
+        "LogoutApiUrl": "http://localhost:3000/api/auth/signout",
         "settingsConfig": "http://localhost:3000/api/graph?config=",
         "settingsUsers": "http://localhost:3000/api/user"
     },

@@ -20,98 +20,147 @@ import { AddSchemaResponse } from "./responses/addSchemaResponse";
 export default class ApiCalls {
 
     async login(): Promise<AuthCredentialsResponse> {
-        const result = await getRequest(`${urls.api.LoginApiUrl}`)
-        const jsonData = await result.json();
-        return jsonData
+        try {
+            const result = await getRequest(`${urls.api.LoginApiUrl}`);
+            return await result.json();
+        } catch (error) {
+            throw new Error("Failed to login. Please try again.");
+        }
     }
-
+    
     async logout(): Promise<LogoutResponse> {
-        const result = await postRequest(`${urls.api.LogoutApiUlr}`)
-        const jsonData = await result.json();
-        return jsonData
+        try {
+            const result = await postRequest(`${urls.api.LogoutApiUrl}`);
+            return await result.json();
+        } catch (error) {
+            throw new Error("Failed to logout. Please try again.");
+        }
     }
-
+    
     async addGraph(graphName: string): Promise<AddGraphResponse> {
-        const result = await getRequest(`${urls.api.graphUrl + graphName}?query=RETURN%201`)
-        const jsonData = await result.json();
-        return jsonData
+        try {
+            const result = await getRequest(`${urls.api.graphUrl + graphName}?query=RETURN%201`);
+            return await result.json();
+        } catch (error) {
+            throw new Error("Failed to add graph.");
+        }
     }
-
+    
     async getGraphs(): Promise<GetGraphsResponse> {
-        const result = await getRequest(`${urls.api.graphUrl}`)
-        const jsonData = await result.json();
-        return jsonData
+        try {
+            const result = await getRequest(`${urls.api.graphUrl}`);
+            return await result.json();
+        } catch (error) {
+            throw new Error("Failed to retrieve graphs.");
+        }
     }
-
+    
     async removeGraph(graphName: string): Promise<RemoveGraphResponse> {
-        const result = await deleteRequest(urls.api.graphUrl + graphName)
-        const jsonData = await result.json();
-        return jsonData
+        try {
+            const result = await deleteRequest(urls.api.graphUrl + graphName);
+            return await result.json();
+        } catch (error) {
+            throw new Error("Failed to remove graph.");
+        }
     }
-
+    
     async changeGraphName(sourceGraph: string, destinationGraph: string): Promise<ChangeGraphNameResponse> {
-        const result = await patchRequest(urls.api.graphUrl + destinationGraph + "?sourceName=" +  sourceGraph)
-        const jsonData = await result.json();
-        return jsonData
+        try {
+            const result = await patchRequest(urls.api.graphUrl + destinationGraph + "?sourceName=" + sourceGraph);
+            return await result.json();
+        } catch (error) {
+            throw new Error("Failed to change graph name.");
+        }
     }
-
+    
     async exportGraph(graphName: string): Promise<void> {
-        const result = await getRequest(urls.api.graphUrl + graphName + "/export")
-        const jsonData = await result.json();
-        return jsonData
+        try {
+            const result = await getRequest(urls.api.graphUrl + graphName + "/export");
+            await result.json();
+        } catch (error) {
+            throw new Error("Failed to export graph.");
+        }
     }
-
+    
     async duplicateGraph(sourceGraph: string, destinationGraph: string, data?: any): Promise<DuplicateGraphresponse> {
-        const result = await postRequest(urls.api.graphUrl + destinationGraph + "?sourceName=" + sourceGraph, data)
-        const jsonData = await result.json();
-        return jsonData
+        try {
+            const result = await postRequest(urls.api.graphUrl + destinationGraph + "?sourceName=" + sourceGraph, data);
+            return await result.json();
+        } catch (error) {
+            throw new Error("Failed to duplicate graph.");
+        }
     }
-
+    
     async runQuery(query: string): Promise<RunQueryResponse> {
-        const result = await getRequest(urls.api.graphUrl + query)
-        const jsonData = await result.json();
-        return jsonData
+        try {
+            const result = await getRequest(urls.api.graphUrl + query);
+            return await result.json();
+        } catch (error) {
+            throw new Error("Failed to run query.");
+        }
     }
-
+    
     async modifySettingsRole(roleName: string, roleValue: string): Promise<ModifySettingsRoleResponse> {
-        const result = await postRequest(`${urls.api.settingsConfig + roleName}&value=${roleValue}`)
-        const jsonData = await result.json();
-        return jsonData
+        try {
+            const result = await postRequest(`${urls.api.settingsConfig + roleName}&value=${roleValue}`);
+            return await result.json();
+        } catch (error) {
+            throw new Error("Failed to modify settings role.");
+        }
     }
-
+    
     async getSettingsRoleValue(roleName: string): Promise<GetSettingsRoleValue> {
-        const result = await getRequest(urls.api.settingsConfig + roleName)
-        const jsonData = await result.json();
-        return jsonData
+        try {
+            const result = await getRequest(urls.api.settingsConfig + roleName);
+            return await result.json();
+        } catch (error) {
+            throw new Error("Failed to get settings role value.");
+        }
     }
-
+    
     async getUsers(): Promise<GetUsersResponse> {
-        const result = await getRequest(urls.api.settingsUsers)
-        const jsonData = await result.json();
-        return jsonData
+        try {
+            const result = await getRequest(urls.api.settingsUsers);
+            return await result.json();
+        } catch (error) {
+            throw new Error("Failed to retrieve users.");
+        }
     }
-
+    
     async createUsers(): Promise<CreateUsersResponse> {
-        const result = await postRequest(urls.api.settingsUsers)
-        const jsonData = await result.json();
-        return jsonData
+        try {
+            const result = await postRequest(urls.api.settingsUsers);
+            return await result.json();
+        } catch (error) {
+            throw new Error("Failed to create users.");
+        }
     }
-
+    
     async deleteUsers(): Promise<DeleteUsersResponse> {
-        const result = await deleteRequest(urls.api.settingsUsers)
-        const jsonData = await result.json();
-        return jsonData
+        try {
+            const result = await deleteRequest(urls.api.settingsUsers);
+            return await result.json();
+        } catch (error) {
+            throw new Error("Failed to delete users.");
+        }
     }
-
+    
     async addSchema(schemaName: string): Promise<AddSchemaResponse> {
-        const result = await getRequest(`${urls.api.graphUrl + schemaName}?query=RETURN%201`)
-        const jsonData = await result.json();
-        return jsonData
+        try {
+            const result = await getRequest(`${urls.api.graphUrl + schemaName}?query=RETURN%201`);
+            return await result.json();
+        } catch (error) {
+            throw new Error("Failed to add schema.");
+        }
     }
-
+    
     async removeSchema(schemaName: string): Promise<RemoveGraphResponse> {
-        const result = await deleteRequest(urls.api.graphUrl + schemaName)
-        const jsonData = await result.json();
-        return jsonData
+        try {
+            const result = await deleteRequest(urls.api.graphUrl + schemaName);
+            return await result.json();
+        } catch (error) {
+            throw new Error("Failed to remove schema.");
+        }
     }
+    
 }
