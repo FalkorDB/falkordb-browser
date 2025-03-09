@@ -83,7 +83,7 @@ export default function Combobox({ isSelectGraph = false, disabled = false, inTa
 
       return ""
 
-    })).then(graphNames => options.filter(opt => !graphNames.filter(name => name !== "").includes(opt)))
+    })).then(graphNames => graphNames.filter(name => name !== "")).then(graphNames => options.filter(opt => !graphNames.includes(opt)))
 
     setOptions!(newNames)
 
@@ -91,10 +91,14 @@ export default function Combobox({ isSelectGraph = false, disabled = false, inTa
 
     setOpenDelete(false)
     setOpenMenage(false)
-    handleSetRows(options.filter(opt => !opts.includes(opt)))
+    handleSetRows(newNames)
+
+    const deletedNames = opts.filter(opt => !newNames.includes(opt))
+    const notDeletedNames = opts.filter(opt => newNames.includes(opt))
+
     toast({
       title: "Graph(s) deleted successfully",
-      description: `The graph(s) ${opts.join(", ")} have been deleted successfully`,
+      description: `${deletedNames.length > 0 ? `The graph(s) have been deleted successfully: ${deletedNames.join(", ")}` : ""}${deletedNames.length > 0 && notDeletedNames.length > 0 ? ". " : ""}${notDeletedNames.length > 0 ? `The graph(s) could not be deleted: ${notDeletedNames.join(", ")}.` : ""}`,
     })
   }
 
