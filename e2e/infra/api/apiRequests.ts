@@ -3,7 +3,7 @@
 import { APIRequestContext, request } from "@playwright/test"
 
 
-const getRequest = async (url: string, body: any, availableRequest?: APIRequestContext, headers?: Record<string, string>) => {
+const getRequest = async (url: string, body?: any, availableRequest?: APIRequestContext, headers?: Record<string, string>) => {
   const requestOptions = {
     data: body,
     headers: headers || undefined,
@@ -14,7 +14,7 @@ const getRequest = async (url: string, body: any, availableRequest?: APIRequestC
   return response;
 };
 
-const postRequest = async (url: string, body: any, availableRequest?: APIRequestContext, headers?: Record<string, string>) => {
+const postRequest = async (url: string, body?: any, availableRequest?: APIRequestContext, headers?: Record<string, string>) => {
   const requestOptions = {
     data: body,
     headers: headers || undefined,
@@ -36,6 +36,15 @@ const deleteRequest = async (url: string, body?: any, headers?: Record<string, s
   return response;
 };
 
+const patchRequest = async (url: string, body?: any, availableRequest?: APIRequestContext, headers?: Record<string, string>) => {
+  const requestOptions = {
+    data: body,
+    headers: headers || undefined,
+  };
 
+  const requestContext = availableRequest || (await request.newContext());
+  const response = await requestContext.patch(url, requestOptions);
+  return response;
+};
 
-export { getRequest, deleteRequest, postRequest }
+export { getRequest, deleteRequest, postRequest, patchRequest }
