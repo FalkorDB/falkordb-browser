@@ -264,6 +264,9 @@ export class Graph {
             });
             this.nodesMap.set(cell.id, node)
             this.elements.nodes.push(node)
+            node.category.forEach(c => {
+              this.categoriesMap.get(c)!.elements.push(node)
+            })
             return node
         }
 
@@ -277,13 +280,12 @@ export class Graph {
             Object.entries(cell.properties).forEach(([key, value]) => {
                 currentNode.data[key] = isSchema ? getSchemaValue(value) : value;
             });
+            currentNode.category.forEach(c => {
+              this.categoriesMap.get(c)!.elements.push(currentNode)
+            })
         }
 
-        currentNode.category.forEach(c => {
-            this.categoriesMap.get(c)!.elements.push(currentNode)
-        })
-
-        return currentNode
+        return undefined
     }
 
     public extendEdge(cell: LinkCell, collapsed: boolean, isSchema: boolean) {
@@ -390,13 +392,11 @@ export class Graph {
 
             this.linksMap.set(cell.id, link)
             this.elements.links.push(link)
-
+            this.labelsMap.get(link.label)?.elements.push(link)
             return link
         }
 
-        this.labelsMap.get(currentEdge.label)?.elements.push(currentEdge)
-
-        return currentEdge
+        return undefined
     }
 
     public extend(results: { data: Data, metadata: any[] }, collapsed = false, isSchema = false): (Node | Link)[] {
@@ -415,17 +415,21 @@ export class Graph {
         this.data.forEach((row: DataRow) => {
             Object.values(row).forEach((cell: any) => {
                 if (cell instanceof Object) {
+                    let element: Node | Link | undefined
                     if (cell.nodes) {
                         cell.nodes.forEach((node: any) => {
-                            newElements.push(this.extendNode(node, collapsed, isSchema))
+                            element = this.extendNode(node, collapsed, isSchema)
                         })
                         cell.edges.forEach((edge: any) => {
-                            newElements.push(this.extendEdge(edge, collapsed, isSchema))
+                            element = this.extendEdge(edge, collapsed, isSchema)
                         })
                     } else if (cell.relationshipType) {
-                        newElements.push(this.extendEdge(cell, collapsed, isSchema))
+                        element = this.extendEdge(cell, collapsed, isSchema)
                     } else if (cell.labels) {
-                        newElements.push(this.extendNode(cell, collapsed, isSchema))
+                        element = this.extendNode(cell, collapsed, isSchema)
+                    }
+                    if (element) {
+                        newElements.push(element)
                     }
                 }
             })
