@@ -163,12 +163,25 @@ export default function SchemaView({ schema, fetchCount, session }: Props) {
             }
             if (fetchCount) fetchCount()
 
-            const category = type ? schema.CategoriesMap.get(element.category[0]) : schema.LabelsMap.get(element.label)
-            if (category) {
-                category.elements = category.elements.filter(n => n.id !== id)
-                if (category.elements.length === 0) {
-                    schema.Categories.splice(schema.Categories.findIndex(c => c.name === category.name), 1)
-                    schema.CategoriesMap.delete(category.name)
+            if (type) {
+                element.category.forEach((category) => {
+                    const cat = schema.CategoriesMap.get(category)
+                    if (cat) {
+                        cat.elements = cat.elements.filter(n => n.id !== id)
+                        if (cat.elements.length === 0) {
+                            schema.Categories.splice(schema.Categories.findIndex(c => c.name === cat.name), 1)
+                            schema.CategoriesMap.delete(cat.name)
+                        }
+                    }
+                })
+            } else {
+                const cat = schema.CategoriesMap.get(element.label)
+                if (cat) {
+                    cat.elements = cat.elements.filter(n => n.id !== id)
+                    if (cat.elements.length === 0) {
+                        schema.Categories.splice(schema.Categories.findIndex(c => c.name === cat.name), 1)
+                        schema.CategoriesMap.delete(cat.name)
+                    }
                 }
             }
         })
@@ -452,6 +465,7 @@ export default function SchemaView({ schema, fetchCount, session }: Props) {
                         chartRef={chartRef}
                         data={data}
                         graph={schema}
+                        onExpand={onExpand}
                         selectedElement={selectedElement}
                         setSelectedElement={handleSetSelectedElement}
                         selectedElements={selectedElements}

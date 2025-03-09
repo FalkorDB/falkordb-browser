@@ -19,6 +19,7 @@ interface Props {
     graph: Graph
     chartRef: GraphRef
     data: GraphData
+    onExpand: (expand?: boolean) => void
     selectedElement: Node | Link | undefined
     setSelectedElement: (element: Node | Link | undefined) => void
     selectedElements: (Node | Link)[]
@@ -37,6 +38,7 @@ export default function ForceGraph({
     graph,
     chartRef,
     data,
+    onExpand,
     selectedElement,
     setSelectedElement,
     selectedElements,
@@ -199,17 +201,15 @@ export default function ForceGraph({
             }
         }
 
-        setSelectedElement(element)
-
         if (evt.ctrlKey) {
             if (selectedElements.includes(element)) {
                 setSelectedElements(selectedElements.filter((el) => el !== element))
-                return
+            } else {
+                setSelectedElements([...selectedElements, element])
             }
-            setSelectedElements([...selectedElements, element])
         }
-
         setSelectedElement(element)
+        onExpand(!!selectedElement)
     }
 
     const handleUnselected = (evt?: MouseEvent) => {
@@ -346,7 +346,7 @@ export default function ForceGraph({
                         textX = rotatedX;
                         textY = rotatedY;
                     }
-                    
+
                     // Get text width
                     ctx.font = '2px Arial';
                     const category = graph.LabelsMap.get(link.label)!
@@ -360,10 +360,10 @@ export default function ForceGraph({
 
                     // Save the current context state
                     ctx.save();
-                    
+
                     // Rotate
                     ctx.rotate(angle);
-                    
+
                     // Draw background and text
                     ctx.fillStyle = '#191919';
                     const padding = 0.5;
@@ -373,7 +373,7 @@ export default function ForceGraph({
                         textWidth + padding * 2,
                         textHeight + padding * 2
                     );
-                    
+
                     ctx.fillStyle = 'white';
                     ctx.textAlign = 'center';
                     ctx.textBaseline = 'middle';

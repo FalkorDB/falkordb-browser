@@ -37,6 +37,7 @@ export default function SchemaCreateElement({ onCreate, onExpand, selectedNodes,
   const [labelEditable, setLabelEditable] = useState<boolean>(false)
   const [editable, setEditable] = useState<string>("")
   const [hover, setHover] = useState<string>("")
+  const [isLoading, setIsLoading] = useState<boolean>(false)
   const { toast } = useToast()
 
   const handleSetEditable = (att: [string, string[]] = getDefaultAttribute()) => {
@@ -121,12 +122,17 @@ export default function SchemaCreateElement({ onCreate, onExpand, selectedNodes,
       })
       return
     }
-    const ok = await onCreate(attributes, label)
-    if (!ok) return
-    setAttributes([])
-    setAttribute(getDefaultAttribute())
-    setLabel("")
-    setLabelEditable(false)
+    try {
+      setIsLoading(true)
+      const ok = await onCreate(attributes, label)
+      if (!ok) return
+      setAttributes([])
+      setAttribute(getDefaultAttribute())
+      setLabel("")
+      setLabelEditable(false)
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   const handleLabelCancel = () => {
@@ -444,7 +450,7 @@ export default function SchemaCreateElement({ onCreate, onExpand, selectedNodes,
                   inTable
                   label="Type"
                   selectedValue=""
-                  setSelectedValue={() => {}}
+                  setSelectedValue={() => { }}
                 />
               </TableCell>
               <TableCell>
@@ -530,6 +536,7 @@ export default function SchemaCreateElement({ onCreate, onExpand, selectedNodes,
                 e.preventDefault();
                 handleOnCreate();
               }}
+              isLoading={isLoading}
             />
           </form>
         </div>

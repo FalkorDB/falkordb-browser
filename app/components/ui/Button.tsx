@@ -58,8 +58,14 @@ const Button = forwardRef<HTMLButtonElement, Props>(({ label, variant = "button"
                     type={type}
                     {...props}
                 >
-                    {children}
-                    {isLoading ? <Loader2 className="animate-spin" /> : label}
+                    {
+                        isLoading ?
+                            <Loader2 className="animate-spin" />
+                            : <>
+                                {children}
+                                {label}
+                            </>
+                    }
                 </button>
             </TooltipTrigger>
             <TooltipContent>

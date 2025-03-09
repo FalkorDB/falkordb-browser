@@ -119,10 +119,6 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
         }
     }, [])
 
-    useEffect(() => {
-        onExpand(!!selectedElement)
-    }, [selectedElement])
-
     const onCategoryClick = (category: Category) => {
         category.show = !category.show
         
@@ -241,9 +237,22 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
         }, session?.user?.role, toast)
 
         if (result.ok) {
+            
             graph.createCategory([label], selectedElement as Node)
             graph.Elements.nodes.forEach((node) => {
                 if (node.id === selectedElement?.id) {
+                    const emptyCategory = graph.CategoriesMap.get(selectedElement?.category.find((c: string) => c === "") as string)
+                    if (emptyCategory) {
+                        emptyCategory.elements = emptyCategory.elements.filter((element) => element.id !== selectedElement?.id)
+                        if (emptyCategory.elements.length === 0) {
+                            graph.Categories.splice(graph.Categories.findIndex(c => c.name === emptyCategory.name), 1)
+                            graph.CategoriesMap.delete(emptyCategory.name)
+                            node.category = node.category.filter((c) => c !== "")
+                        }
+                    }
+                    if (node.category.length === 0) {
+                        node.color = graph.getCategoryColorValue(graph.CategoriesMap.get(label)?.index)
+                    }
                     node.category.push(label)
                 }
             })
@@ -272,6 +281,9 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
             graph.Elements.nodes.forEach((node) => {
                 if (node.id === selectedElement?.id) {
                     node.category = node.category.filter(c => c !== label)
+                    if (node.category.length === 0) {
+                        node.category.push(graph.createCategory([""], node as Node)[0].name)
+                    }
                     node.color = graph.getCategoryColorValue(graph.CategoriesMap.get(node.category[0])?.index)
                 }
             })
@@ -381,6 +393,7 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
                                     graph={graph}
                                     chartRef={chartRef}
                                     data={data}
+                                    onExpand={onExpand}
                                     selectedElement={selectedElement}
                                     setSelectedElement={setSelectedElement}
                                     selectedElements={selectedElements}
