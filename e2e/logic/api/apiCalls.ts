@@ -127,18 +127,18 @@ export default class ApiCalls {
         }
     }
     
-    async createUsers(): Promise<CreateUsersResponse> {
+    async createUsers(data?: any): Promise<CreateUsersResponse> {
         try {
-            const result = await postRequest(urls.api.settingsUsers);
+            const result = await postRequest(urls.api.settingsUsers, data);
             return await result.json();
         } catch (error) {
             throw new Error("Failed to create users.");
         }
     }
     
-    async deleteUsers(): Promise<DeleteUsersResponse> {
+    async deleteUsers(data?: any): Promise<DeleteUsersResponse> {
         try {
-            const result = await deleteRequest(urls.api.settingsUsers);
+            const result = await deleteRequest(urls.api.settingsUsers, data);
             return await result.json();
         } catch (error) {
             throw new Error("Failed to delete users.");
