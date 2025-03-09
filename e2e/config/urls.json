@@ -1,11 +1,10 @@
 {
     "api": {
-        "addGraphUrl": "http://localhost:3000/api/graph/",
+        "graphUrl": "http://localhost:3000/api/graph/",
         "LoginApiUrl": "http://localhost:3000/api/auth/providers",
-        "deleteGraphUrl": "http://localhost:3000/api/graph/",
+        "LogoutApiUlr": "http://localhost:3000/api/auth/signout",
         "settingsConfig": "http://localhost:3000/api/graph?config=",
-        "settingsUsers": "http://localhost:3000/api/user",
-        "runQueryUrl": "http://localhost:3000/api/graph/"
+        "settingsUsers": "http://localhost:3000/api/user"
     },
   
     "falkorDBWeb": "https://www.falkordb.com/",
