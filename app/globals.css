@@ -54,16 +54,11 @@
     }
 
     .DataPanel {
-        @apply h-full w-full flex flex-col shadow-lg;
-        background-color: #232323;
+        @apply h-full w-full flex flex-col shadow-lg bg-background;
     }
 
     .Dropzone {
-        display: flex;
-        flex: 1 1 0%;
-        background-color: #232323;
-        align-items: center;
-        justify-content: center;
+        @apply flex grow shrink bg-background items-center justify-center;
     }
 }
 

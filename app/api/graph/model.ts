@@ -35,6 +35,7 @@ export type Node = NodeObject<{
     visible: boolean,
     expand: boolean,
     collapsed: boolean,
+    displayName: string,
     data: {
         [key: string]: any
     }
@@ -103,6 +104,8 @@ export interface Category {
     name: string,
     show: boolean,
     textWidth?: number,
+    elements: (Node | Link)[]
+    textHeight?: number,
 }
 
 export interface ExtractedData {
@@ -253,6 +256,7 @@ export class Graph {
                 visible: true,
                 expand: false,
                 collapsed,
+                displayName: "",
                 data: {}
             }
             Object.entries(cell.properties).forEach(([key, value]) => {
@@ -260,6 +264,9 @@ export class Graph {
             });
             this.nodesMap.set(cell.id, node)
             this.elements.nodes.push(node)
+            node.category.forEach(c => {
+              this.categoriesMap.get(c)!.elements.push(node)
+            })
             return node
         }
 
@@ -273,9 +280,12 @@ export class Graph {
             Object.entries(cell.properties).forEach(([key, value]) => {
                 currentNode.data[key] = isSchema ? getSchemaValue(value) : value;
             });
+            currentNode.category.forEach(c => {
+              this.categoriesMap.get(c)!.elements.push(currentNode)
+            })
         }
 
-        return currentNode
+        return undefined
     }
 
     public extendEdge(cell: LinkCell, collapsed: boolean, isSchema: boolean) {
@@ -301,6 +311,7 @@ export class Graph {
                         expand: false,
                         collapsed,
                         visible: true,
+                        displayName: "",
                         data: {},
                     }
 
@@ -336,6 +347,7 @@ export class Graph {
                         expand: false,
                         collapsed,
                         visible: true,
+                        displayName: "",
                         data: {},
                     }
 
@@ -352,6 +364,7 @@ export class Graph {
                         expand: false,
                         collapsed,
                         visible: true,
+                        displayName: "",
                         data: {},
                     }
                 }
@@ -379,11 +392,11 @@ export class Graph {
 
             this.linksMap.set(cell.id, link)
             this.elements.links.push(link)
-
+            this.labelsMap.get(link.label)?.elements.push(link)
             return link
         }
 
-        return currentEdge
+        return undefined
     }
 
     public extend(results: { data: Data, metadata: any[] }, collapsed = false, isSchema = false): (Node | Link)[] {
@@ -402,17 +415,21 @@ export class Graph {
         this.data.forEach((row: DataRow) => {
             Object.values(row).forEach((cell: any) => {
                 if (cell instanceof Object) {
+                    let element: Node | Link | undefined
                     if (cell.nodes) {
                         cell.nodes.forEach((node: any) => {
-                            newElements.push(this.extendNode(node, collapsed, isSchema))
+                            element = this.extendNode(node, collapsed, isSchema)
                         })
                         cell.edges.forEach((edge: any) => {
-                            newElements.push(this.extendEdge(edge, collapsed, isSchema))
+                            element = this.extendEdge(edge, collapsed, isSchema)
                         })
                     } else if (cell.relationshipType) {
-                        newElements.push(this.extendEdge(cell, collapsed, isSchema))
+                        element = this.extendEdge(cell, collapsed, isSchema)
                     } else if (cell.labels) {
-                        newElements.push(this.extendNode(cell, collapsed, isSchema))
+                        element = this.extendNode(cell, collapsed, isSchema)
+                    }
+                    if (element) {
+                        newElements.push(element)
                     }
                 }
             })
@@ -450,33 +467,19 @@ export class Graph {
         return newElements
     }
 
-    public updateCategories(category: string, type: boolean) {
-        if (type && this.elements.nodes.every(n => n.category.some(c => c !== category))) {
-            const i = this.categories.findIndex(({ name }) => name === category)
-            this.categories.splice(i, 1)
-            this.categoriesMap.delete(category)
-            return true
-        }
-
-        if (!type && !this.elements.links.every(l => l.data.label !== category)) {
-            const i = this.labels.findIndex(({ name }) => name === category)
-            this.labels.splice(i, 1)
-            this.labelsMap.delete(category)
-            return true
-        }
-
-        return false
-    }
-
-    public createCategory(categories: string[]): Category[] {
+    public createCategory(categories: string[], node?: Node): Category[] {
         return categories.map(category => {
             let c = this.categoriesMap.get(category)
 
             if (!c) {
-                c = { name: category, index: this.colorIndex, show: true }
+                c = { name: category, index: this.colorIndex, show: true, elements: [] }
                 this.colorIndex += 1
                 this.categoriesMap.set(c.name, c)
                 this.categories.push(c)
+            }
+
+            if (node) {
+                c.elements.push(node)
             }
 
             return c
@@ -487,7 +490,7 @@ export class Graph {
         let l = this.labelsMap.get(category)
 
         if (!l) {
-            l = { name: category, index: this.colorIndex, show: true }
+            l = { name: category, index: this.colorIndex, show: true, elements: [] }
             this.colorIndex += 1
             this.labelsMap.set(l.name, l)
             this.labels.push(l)

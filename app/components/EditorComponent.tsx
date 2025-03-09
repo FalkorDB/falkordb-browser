@@ -7,13 +7,14 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogTrigger } 
 import { Editor, Monaco } from "@monaco-editor/react"
 import { useEffect, useRef, useState } from "react"
 import * as monaco from "monaco-editor";
-import { Loader2, Maximize2 } from "lucide-react";
+import { Loader2, Maximize2, Minimize2 } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { useSession } from "next-auth/react";
 import { prepareArg, securedFetch } from "@/lib/utils";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import { Graph } from "../api/graph/model";
 import Button from "./ui/Button";
+import CloseDialog from "./CloseDialog";
 
 interface Props {
     currentQuery: string
@@ -219,6 +220,13 @@ export default function EditorComponent({ currentQuery, historyQueries, setHisto
     })
     const { data: session } = useSession()
 
+    useEffect(() => {
+        if (currentQuery && placeholderRef.current) {
+            placeholderRef.current.style.display = "none"
+        } else if (!currentQuery && placeholderRef.current) {
+            placeholderRef.current.style.display = "block"
+        }
+    }, [currentQuery])
 
     useEffect(() => {
         graphIdRef.current = graph.Id
@@ -592,23 +600,36 @@ export default function EditorComponent({ currentQuery, historyQueries, setHisto
                                 {isLoading && <Loader2 size={20} className="animate-spin" />}
                             </Button>
                         </div>
-                        <DialogContent closeSize={30} className="w-full h-full">
-                            <VisuallyHidden>
-                                <DialogTitle />
-                                <DialogDescription />
-                            </VisuallyHidden>
-                            <Editor
-                                className="w-full h-full"
-                                onMount={handleEditorDidMount}
-                                theme="custom-theme"
-                                options={{
-                                    lineHeight: 30,
-                                    fontSize: 25
-                                }}
-                                value={query}
-                                onChange={(val) => setQuery(val || "")}
-                                language="custom-language"
-                            />
+                        <DialogContent disableClose className="w-full h-full">
+                            <div className="relative w-full h-full">
+                                <VisuallyHidden>
+                                    <DialogTitle />
+                                    <DialogDescription />
+                                </VisuallyHidden>
+                                <CloseDialog
+                                    className="z-10 absolute top-1 right-6"
+                                >
+                                    <Minimize2 size={20} />
+                                </CloseDialog>
+                                <Editor
+                                    className="w-full h-full"
+                                    onMount={handleEditorDidMount}
+                                    theme="custom-theme"
+                                    options={{
+                                        padding: {
+                                            bottom: 10,
+                                            top: 10,
+                                        },
+                                        lineNumbersMinChars: 3,
+                                        minimap: { enabled: false },
+                                        lineHeight: 30,
+                                        fontSize: 25
+                                    }}
+                                    value={query}
+                                    onChange={(val) => setQuery(val || "")}
+                                    language="custom-language"
+                                />
+                            </div>
                         </DialogContent>
                     </div>
                 </Dialog>

@@ -7,8 +7,8 @@ import { PlusCircle } from "lucide-react";
 import { CreateUser } from "@/app/api/user/model";
 import Button from "@/app/components/ui/Button";
 import FormComponent, { Field } from "@/app/components/FormComponent";
-import { Sheet, SheetContent, SheetDescription, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
+import { Drawer, DrawerDescription, DrawerContent, DrawerTitle, DrawerTrigger } from "@/components/ui/drawer";
 
 export default function AddUser({ onAddUser }: {
     onAddUser: (user: CreateUser) => void
@@ -123,25 +123,26 @@ export default function AddUser({ onAddUser }: {
     };
 
     return (
-        <Sheet open={open} onOpenChange={setOpen}>
-            <SheetTrigger asChild>
+        <Drawer direction="right" open={open} onOpenChange={setOpen}>
+            <DrawerTrigger asChild>
                 <Button
                     variant="Primary"
                     label="Add User"
                 >
                     <PlusCircle size={20} />
                 </Button>
-            </SheetTrigger>
-            <SheetContent className="flex flex-col gap-6">
+              </DrawerTrigger>
+              <DrawerContent side="right" className="gap-6 after:hidden">
                 <VisuallyHidden>
-                        <SheetTitle />
-                        <SheetDescription />
+                  <DrawerTitle />
+                  <DrawerDescription />
                 </VisuallyHidden>
                 <FormComponent
+                    className="p-4"
                     handleSubmit={handleAddUser}
                     fields={fields}
                 />
-            </SheetContent>
-        </Sheet>
+            </DrawerContent>
+        </Drawer>
     )
 }
