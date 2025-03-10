@@ -129,10 +129,12 @@ export default function FormComponent({ handleSubmit, fields, error = undefined,
                                                 field.onChange!(e)
                                                 if (field.type === "password") {
                                                     const confirmPasswordField = fields.find(f => f.label === "Confirm Password")
+                                                    if (confirmPasswordField && confirmPasswordField.errors) {
                                                         setErrors(prev => ({
                                                             ...prev,
-                                                            "Confirm Password": confirmPasswordField!.errors!.some(err => err.condition(confirmPasswordField!.value, e.target.value))
+                                                            "Confirm Password": confirmPasswordField.errors!.some(err => err.condition(confirmPasswordField.value, e.target.value))
                                                         }))
+                                                    }
                                                 }
                                                 if (field.errors) {
                                                     setErrors(prev => ({

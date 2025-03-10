@@ -92,7 +92,7 @@ export default function AddUser({ onAddUser }: {
                 },
                 {
                     message: "Password don't match",
-                    condition: (value: string, pass?: string) => value !== (pass || password)
+                    condition: (value: string, pass?: string) => value !== (pass ?? password)
                 },
             ]
         },
