@@ -229,4 +229,12 @@ test.describe('Settings Tests', () => {
         await apiCall.modifySettingsRole(roles.maxInfoQueries, "1000");
     });
 
+    Data.searchElements.forEach(({input, expected}) => {
+        test(`@admin Validate role filtering via search input: (${input})`, async () => {
+            const settingsConfigPage = await browser.createNewPage(SettingsConfigPage, urls.settingsUrl)
+            await settingsConfigPage.searchForElement(input);
+            expect(await settingsConfigPage.getTableRolesCount()).toBe(expected);
+        });
+    })
+
 })
