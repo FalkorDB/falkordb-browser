@@ -30,7 +30,19 @@ export default class SettingsConfigPage extends BasePage {
 
     private get tableContent(): Locator {
         return this.page.locator("//div[@id='tableContent']");
-      }
+    }
+
+    private get searchBtn(): Locator {
+        return this.page.locator("//div[@id='search']/button");
+    }
+
+    private get searchInput(): Locator {
+        return this.page.locator("//div[@id='search']/input");
+    }
+
+    private get tableRoles(): Locator {
+        return this.page.locator("//table//tbody//tr");
+    }
 
     async modifyRoleValue(role: string, input: string): Promise<string | null> {
         await this.roleContentValue(role).hover();
@@ -48,4 +60,16 @@ export default class SettingsConfigPage extends BasePage {
     async scrollToBottomInTable(): Promise<void> {
         await this.tableContent.evaluate((el) => el.scrollTo(0, el.scrollHeight));
     }
+
+    async searchForElement(element: string):  Promise<void>{
+        await this.searchBtn.click();
+        await this.searchInput.fill(element);
+        await this.page.keyboard.press('Enter');
+    }
+
+    async getTableRolesCount(): Promise<number>{
+        await this.page.waitForTimeout(1500);
+        return await this.tableRoles.count();
+    }
+
 }
