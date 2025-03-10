@@ -180,10 +180,16 @@ export default function SchemaCreateElement({ onCreate, onExpand, selectedNodes,
 
                 />
                 <div className="flex flex-col gap-1">
-                  <Button onClick={handleSetLabel}>
+                  <Button
+                    title="Save"
+                    onClick={handleSetLabel}
+                  >
                     <CheckCircle size={20} />
                   </Button>
-                  <Button onClick={handleLabelCancel}>
+                  <Button
+                    title="Cancel"
+                    onClick={handleLabelCancel}
+                  >
                     <XCircle size={20} />
                   </Button>
                 </div>

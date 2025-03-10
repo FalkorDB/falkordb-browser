@@ -319,7 +319,7 @@ export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement,
                                                     setNewLabel("")
                                                 }}
                                             >
-                                                <Check size={15} />
+                                                <X size={15} />
                                             </Button>
                                         </>
                                     }
@@ -357,29 +357,40 @@ export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement,
                                         {
                                             editable === key && session?.user?.role !== "Read-Only" ?
                                                 <>
-                                                    <Button variant="button" onClick={(e) => {
-                                                        e.stopPropagation()
-                                                        setProperty(key, newVal, true)
-                                                    }}>
+                                                    <Button
+                                                        variant="button"
+                                                        title="Save"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation()
+                                                            setProperty(key, newVal, true)
+                                                        }}
+                                                    >
                                                         <Check size={20} />
                                                     </Button>
-                                                    <Button variant="button" onClick={(e) => {
-                                                        e.stopPropagation()
-                                                        handleSetEditable("", "")
-                                                    }}>
+                                                    <Button
+                                                        variant="button"
+                                                        title="Cancel"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation()
+                                                            handleSetEditable("", "")
+                                                        }}>
                                                         <X size={20} />
                                                     </Button>
                                                 </>
                                                 : hover === key &&
                                                 <>
-                                                    <Button variant="button" onClick={() => handleSetEditable(key, obj.data[key])}>
+                                                    <Button
+                                                        variant="button"
+                                                        title="Edit"
+                                                        onClick={() => handleSetEditable(key, obj.data[key])}
+                                                    >
                                                         <Pencil size={20} />
                                                     </Button>
                                                     <DialogComponent
                                                         trigger={
                                                             <Button
                                                                 variant="button"
-                                                                title="Delete Attribute"
+                                                                title="Delete"
                                                             >
                                                                 <Trash2 size={20} />
                                                             </Button>
@@ -429,11 +440,16 @@ export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement,
                             <TableCell className="flex flex-col items-center gap-2">
                                 <Button
                                     variant="button"
+                                    title="Save"
                                     onClick={() => handleAddValue(newKey, newVal)}
                                 >
                                     <Check size={20} />
                                 </Button>
-                                <Button variant="button" onClick={() => setIsAddValue(false)}>
+                                <Button
+                                    variant="button"
+                                    title="Cancel"
+                                    onClick={() => setIsAddValue(false)}
+                                >
                                     <X size={20} />
                                 </Button>
                             </TableCell>
