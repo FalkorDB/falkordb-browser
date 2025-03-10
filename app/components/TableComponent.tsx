@@ -86,7 +86,7 @@ export default function TableComponent({ headers, rows, children, setRows, optio
 
     return (
         <div className={cn("h-full w-full flex flex-col gap-4", className)}>
-            <div className="flex gap-4">
+            <div className="flex gap-4" id="search">
                 {children}
                 {
                     isSearchable ?
