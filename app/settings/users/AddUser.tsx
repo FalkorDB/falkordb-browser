@@ -75,7 +75,7 @@ export default function AddUser({ onAddUser }: {
                 {
                     message: "Password must contain at least one special character",
                     condition: (value: string) => !/[!@#$%^&*]/.test(value)
-                },
+                }
             ]
         },
         {
@@ -92,7 +92,7 @@ export default function AddUser({ onAddUser }: {
                 },
                 {
                     message: "Password don't match",
-                    condition: (value: string) => value !== password
+                    condition: (value: string, pass?: string) => value !== (pass ?? password)
                 },
             ]
         },
@@ -131,11 +131,11 @@ export default function AddUser({ onAddUser }: {
                 >
                     <PlusCircle size={20} />
                 </Button>
-              </DrawerTrigger>
-              <DrawerContent side="right" className="gap-6 after:hidden">
+            </DrawerTrigger>
+            <DrawerContent side="right" className="gap-6 after:hidden">
                 <VisuallyHidden>
-                  <DrawerTitle />
-                  <DrawerDescription />
+                    <DrawerTitle />
+                    <DrawerDescription />
                 </VisuallyHidden>
                 <FormComponent
                     className="p-4"
