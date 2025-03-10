@@ -46,12 +46,8 @@ export default function Page() {
     }, [graphName, session?.user?.role, toast])
 
     useEffect(() => {
-        fetchCount()
-    }, [graphName, fetchCount])
-
-    useEffect(() => {
         if (graphName !== graph.Id) {
-            const colors = localStorage.getItem(graphName)?.split(/[[\]",]/).filter(c => c)
+            const colors = JSON.parse(localStorage.getItem(graphName) || "[]")
             setGraph(Graph.empty(graphName, colors))
         }
         fetchCount()
