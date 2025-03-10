@@ -29,7 +29,7 @@ interface Props {
     session: Session | null
 }
 
-const getCreateQuery = (type: boolean, selectedNodes: [Node, Node], attributes: [string, string[]][], label?: string) => {
+const getCreateQuery = (type: boolean, selectedNodes: [Node, Node], attributes: [string, string[]][], label?: string[]) => {
     const formateAttributes: [string, string][] = attributes.map((att) => {
         const [key, [t, d, u, r]] = att
         let val = `${t}`
@@ -40,7 +40,7 @@ const getCreateQuery = (type: boolean, selectedNodes: [Node, Node], attributes: 
     })
 
     if (type) {
-        return `CREATE (n${label ? `:${label}` : ""}${formateAttributes?.length > 0 ? ` {${formateAttributes.map(([k, v]) => `${k}: "${v}"`).join(",")}}` : ""}) RETURN n`
+        return `CREATE (n${label ? `:${label.join(":")}` : ""}${formateAttributes?.length > 0 ? ` {${formateAttributes.map(([k, v]) => `${k}: "${v}"`).join(",")}}` : ""}) RETURN n`
     }
     return `MATCH (a), (b) WHERE ID(a) = ${selectedNodes[0].id} AND ID(b) = ${selectedNodes[1].id} CREATE (a)-[e${label ? `:${label}` : ""}${formateAttributes?.length > 0 ? ` {${formateAttributes.map(([k, v]) => `${k}: "${v}"`).join(",")}}` : ""}]->(b) RETURN e`
 }
@@ -292,7 +292,7 @@ export default function SchemaView({ schema, fetchCount, session }: Props) {
         return ok
     }
 
-    const onCreateElement = async (attributes: [string, string[]][], label?: string) => {
+    const onCreateElement = async (attributes: [string, string[]][], label?: string[]) => {
         if (!isAddEntity && selectedNodes[0] === undefined && selectedNodes[1] === undefined) {
             toast({
                 title: "Error",
