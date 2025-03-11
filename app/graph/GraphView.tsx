@@ -9,7 +9,6 @@ import { ImperativePanelHandle } from "react-resizable-panels";
 import { ChevronLeft, GitGraph, Maximize2, Minimize2, Pause, Play, Table } from "lucide-react"
 import { cn, handleZoomToFit, prepareArg, securedFetch } from "@/lib/utils";
 import dynamic from "next/dynamic";
-import { Session } from "next-auth";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/components/ui/use-toast";
 import { Switch } from "@/components/ui/switch";
@@ -25,7 +24,7 @@ import TableView from "./TableView";
 const ForceGraph = dynamic(() => import("../components/ForceGraph"), { ssr: false });
 const EditorComponent = dynamic(() => import("../components/EditorComponent"), { ssr: false })
 
-function GraphView({ graph, selectedElement, setSelectedElement, runQuery, historyQuery, historyQueries, setHistoryQueries, fetchCount, session }: {
+function GraphView({ graph, selectedElement, setSelectedElement, runQuery, historyQuery, historyQueries, setHistoryQueries, fetchCount }: {
     graph: Graph
     selectedElement: Node | Link | undefined
     setSelectedElement: Dispatch<SetStateAction<Node | Link | undefined>>
@@ -34,7 +33,6 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
     historyQueries: string[]
     setHistoryQueries: (queries: string[]) => void
     fetchCount: () => void
-    session: Session | null
 }) {
 
     const [data, setData] = useState<GraphData>(graph.Elements)
@@ -125,7 +123,7 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
 
     const onCategoryClick = (category: Category) => {
         category.show = !category.show
-        
+
         category.elements.forEach((element) => {
             if (element.category[0] !== category.name) return
             if (category.show) {
@@ -173,7 +171,7 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
 
         const result = await securedFetch(`api/graph/${prepareArg(graph.Id)}/?query=${prepareArg(q)} `, {
             method: "GET"
-        }, session?.user?.role, toast)
+        }, toast)
 
         if (!result.ok) return
 
@@ -188,7 +186,7 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
             }
 
             const category = type ? graph.CategoriesMap.get(element.category[0]) : graph.LabelsMap.get(element.label)
-            
+
             if (category) {
                 category.elements = category.elements.filter((e) => e.id !== id)
                 if (category.elements.length === 0) {
@@ -233,12 +231,12 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
         handleCooldown()
     }
 
-    
+
     const handleAddLabel = async (label: string) => {
         const q = `MATCH (n) WHERE ID(n) = ${selectedElement?.id} SET n:${label}`
         const result = await securedFetch(`api/graph/${prepareArg(graph.Id)}/?query=${prepareArg(q)}`, {
             method: "GET"
-        }, session?.user?.role, toast)
+        }, toast)
 
         if (result.ok) {
             graph.createCategory([label], selectedElement as Node)
@@ -257,7 +255,7 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
         const q = `MATCH (n) WHERE ID(n) = ${selectedElement?.id} REMOVE n:${label}`
         const result = await securedFetch(`api/graph/${prepareArg(graph.Id)}/?query=${prepareArg(q)}`, {
             method: "GET"
-        }, session?.user?.role, toast)
+        }, toast)
 
         if (result.ok) {
             const category = graph.CategoriesMap.get(label)
@@ -331,7 +329,7 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
                                 <Toolbar
                                     selectedElementsLength={selectedElements.length + (selectedElement ? 1 : 0)}
                                     disabled={!graph.Id}
-                                    deleteDisabled={(Object.values(selectedElements).length === 0 && !selectedElement) || session?.user.role === "Read-Only"}
+                                    deleteDisabled={(Object.values(selectedElements).length === 0 && !selectedElement)}
                                     onDeleteElement={handleDeleteElement}
                                     chartRef={chartRef}
                                     displayAdd={false}

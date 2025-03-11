@@ -53,20 +53,20 @@ export default function Selector({ setGraphName, graphName, queries, runQuery, e
     const getOptions = useCallback(async () => {
         const result = await securedFetch("api/graph", {
             method: "GET"
-        }, session?.user?.role, toast)
+        }, toast)
         if (!result.ok) return
         const res = (await result.json()).result as string[]
-        const opts = !runQuery ? 
+        const opts = !runQuery ?
             res.filter(name => name.endsWith("_schema")).map(name => {
-            let split = name.split("_schema")[0]
-            if (split.startsWith("{") && split.endsWith("}")) {
-                split = split.substring(1, split.length - 1)
-            }
-            return split
-        }) : res.filter(name => !name.endsWith("_schema"))
+                let split = name.split("_schema")[0]
+                if (split.startsWith("{") && split.endsWith("}")) {
+                    split = split.substring(1, split.length - 1)
+                }
+                return split
+            }) : res.filter(name => !name.endsWith("_schema"))
         setOptions(opts)
         if (opts.length === 1 && setSelectedValue) setSelectedValue(opts[0])
-    }, [runQuery, session?.user?.role, toast])
+    }, [runQuery, toast])
 
     useEffect(() => {
         getOptions()
@@ -81,7 +81,7 @@ export default function Selector({ setGraphName, graphName, queries, runQuery, e
         if (runQuery) {
             const result = await securedFetch(`api/graph/${prepareArg(name)}_schema/?query=${prepareArg(defaultQuery())}&create=false`, {
                 method: "GET"
-            }, session?.user?.role, toast)
+            }, toast)
 
             if (!result.ok) return
 
@@ -104,22 +104,27 @@ export default function Selector({ setGraphName, graphName, queries, runQuery, e
         <div className="flex flex-col gap-4">
             <div className="flex justify-between items-center">
                 <div className="flex items-center gap-4">
-                    <CreateGraph
-                        type={type}
-                        onSetGraphName={(name) => {
-                            handleOnChange(name)
-                            setOptions(prev => [...prev, name])
-                        }}
-                        trigger={
-                            <Button
-                                variant="Primary"
-                                title={`Create New ${type}`}
-                            >
-                                <PlusCircle size={20} />
-                            </Button>
-                        }
-                    />
-                    <p className="text-secondary">|</p>
+                    {
+                        session?.user?.role !== "Read-Only" &&
+                        <>
+                            <CreateGraph
+                                type={type}
+                                onSetGraphName={(name) => {
+                                    handleOnChange(name)
+                                    setOptions(prev => [...prev, name])
+                                }}
+                                trigger={
+                                    <Button
+                                        variant="Primary"
+                                        title={`Create New ${type}`}
+                                    >
+                                        <PlusCircle size={20} />
+                                    </Button>
+                                }
+                            />
+                            <p className="text-secondary">|</p>
+                        </>
+                    }
                     <Button
                         className={cn(
                             "transition-transform",
@@ -151,17 +156,20 @@ export default function Selector({ setGraphName, graphName, queries, runQuery, e
                         type={type}
                         selectedValues={[selectedValue]}
                     />
-                    <Duplicate
-                        disabled={!selectedValue}
-                        open={duplicateOpen}
-                        onOpenChange={setDuplicateOpen}
-                        onDuplicate={(name) => {
-                            setOptions(prev => [...prev, name])
-                            setSelectedValue(name)
-                            handleOnChange(name)
-                        }}
-                        selectedValue={selectedValue}
-                    />
+                    {
+                        session?.user?.role !== "Read-Only" &&
+                        <Duplicate
+                            disabled={!selectedValue}
+                            open={duplicateOpen}
+                            onOpenChange={setDuplicateOpen}
+                            onDuplicate={(name) => {
+                                setOptions(prev => [...prev, name])
+                                setSelectedValue(name)
+                                handleOnChange(name)
+                            }}
+                            selectedValue={selectedValue}
+                        />
+                    }
                     <View setGraph={setGraph} graph={graph} selectedValue={selectedValue} />
                 </div >
             </div >
@@ -280,7 +288,7 @@ export default function Selector({ setGraphName, graphName, queries, runQuery, e
                                 label="View Schema"
                             />
                         }>
-                            <SchemaView schema={schema} session={session} />
+                            <SchemaView schema={schema} />
                         </DialogComponent>
                     </div>
                 }

@@ -19,14 +19,9 @@ export function cn(...inputs: ClassValue[]) {
 export async function securedFetch(
   input: string,
   init: RequestInit,
-  role?: string,
   toast?: any,
 ): Promise<Response> {
-  let url = input
-  if (role) {
-    url += input.includes("?") ? `&role=${role}` : `?role=${role}`
-  }
-  const response = await fetch(url, init)
+  const response = await fetch(input, init)
   const { status } = response
   if (status >= 300) {
     const err = await response.text()
