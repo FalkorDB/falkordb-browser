@@ -500,15 +500,26 @@ export default function EditorComponent({ currentQuery, historyQueries, setHisto
             }
         });
 
+        // eslint-disable-next-line no-bitwise
+        e.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, () => {
+            submitQuery.current?.click();
+        });
+
+        // eslint-disable-next-line no-bitwise
+        e.addCommand(monaco.KeyMod.Shift | monaco.KeyCode.Enter, () => {
+            e.trigger('keyboard', 'type', { text: '\n' });
+        });
+
         e.addAction({
             id: 'submit',
             label: 'Submit Query',
             // eslint-disable-next-line no-bitwise
-            keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter],
+            keybindings: [monaco.KeyCode.Enter],
             contextMenuOrder: 1.5,
             run: async () => {
                 submitQuery.current?.click()
-            }
+            },
+            precondition: '!suggestWidgetVisible',
         });
 
         e.addAction({
