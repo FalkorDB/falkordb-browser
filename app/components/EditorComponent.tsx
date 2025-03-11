@@ -219,12 +219,12 @@ export default function EditorComponent({ currentQuery, historyQueries, setHisto
     })
 
     useEffect(() => {
-        if (currentQuery && placeholderRef.current) {
+        if (query && placeholderRef.current) {
             placeholderRef.current.style.display = "none"
-        } else if (!currentQuery && placeholderRef.current) {
+        } else if (!query && placeholderRef.current && blur) {
             placeholderRef.current.style.display = "block"
         }
-    }, [currentQuery])
+    }, [query])
 
     useEffect(() => {
         graphIdRef.current = graph.Id
@@ -393,6 +393,8 @@ export default function EditorComponent({ currentQuery, historyQueries, setHisto
         try {
             setIsLoading(true)
             await runQuery(query)
+            setCurrentQuery(query)
+            historyRef.current.historyCounter = 0
         } finally {
             setIsLoading(false)
         }
@@ -623,8 +625,8 @@ export default function EditorComponent({ currentQuery, historyQueries, setHisto
                                         lineHeight: 30,
                                         fontSize: 25
                                     }}
-                                    value={query}
-                                    onChange={(val) => setQuery(val || "")}
+                                    value={(blur ? query.replace(/\s+/g, ' ').trim() : query)}
+                                    onChange={(val) => historyRef.current.historyCounter ? handleSetHistoryQuery(val || "") : setCurrentQuery(val || "")}
                                     language="custom-language"
                                 />
                             </div>

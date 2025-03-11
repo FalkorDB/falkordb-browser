@@ -6,8 +6,8 @@
 import { useRef, useState, useEffect, Dispatch, SetStateAction } from "react";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { ImperativePanelHandle } from "react-resizable-panels";
-import { ChevronLeft, GitGraph, Maximize2, Minimize2, Pause, Play, Table } from "lucide-react"
-import { cn, handleZoomToFit, prepareArg, securedFetch } from "@/lib/utils";
+import { ChevronLeft, GitGraph, Info, Maximize2, Minimize2, Pause, Play, Table } from "lucide-react"
+import { cn, handleZoomToFit, prepareArg, Query, securedFetch } from "@/lib/utils";
 import dynamic from "next/dynamic";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/components/ui/use-toast";
@@ -20,6 +20,7 @@ import Labels from "./labels";
 import Toolbar from "./toolbar";
 import Button from "../components/ui/Button";
 import TableView from "./TableView";
+import MetadataView from "./MetadataView";
 
 const ForceGraph = dynamic(() => import("../components/ForceGraph"), { ssr: false });
 const EditorComponent = dynamic(() => import("../components/EditorComponent"), { ssr: false })
@@ -28,7 +29,7 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
     graph: Graph
     selectedElement: Node | Link | undefined
     setSelectedElement: Dispatch<SetStateAction<Node | Link | undefined>>
-    runQuery: (query: string) => Promise<void>
+    runQuery: (query: string) => Promise<Query>
     historyQuery: string
     historyQueries: string[]
     setHistoryQueries: (queries: string[]) => void
@@ -44,6 +45,7 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
     const [maximize, setMaximize] = useState<boolean>(false)
     const [tabsValue, setTabsValue] = useState<string>("")
     const [cooldownTicks, setCooldownTicks] = useState<number | undefined>(0)
+    const [currentQuery, setCurrentQuery] = useState<Query | undefined>(undefined)
     const { toast } = useToast()
 
     useEffect(() => {
@@ -63,12 +65,18 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
     useEffect(() => {
         setData({ ...graph.Elements })
     }, [graph.getElements().length, graph.Elements])
-
     useEffect(() => {
-        const defaultChecked = graph.Data.length !== 0 ? "Table" : "Graph"
-        setTabsValue(graph.getElements().length !== 0 ? "Graph" : defaultChecked)
-    }, [graph.getElements().length, graph.Data.length])
+        let defaultChecked = "Graph"
+        if (graph.getElements().length !== 0) {
+            defaultChecked = "Graph"
+        } else if (graph.Data.length !== 0) {
+            defaultChecked = "Table";
+        } else if (currentQuery && (currentQuery.metadata.length > 0 || currentQuery.explain.length > 0)) {
+            defaultChecked = "Metadata";
+        }
 
+        setTabsValue(defaultChecked);
+    }, [graph.getElements().length, graph.Data.length])
 
     const handleCooldown = (ticks?: number) => {
         setCooldownTicks(ticks)
@@ -226,7 +234,8 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
     }
 
     const handleRunQuery = async (q: string) => {
-        await runQuery(q)
+        const newQuery = await runQuery(q)
+        setCurrentQuery(newQuery)
         handleZoomToFit(chartRef)
         handleCooldown()
     }
@@ -322,6 +331,19 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
                                 <Table />
                             </Button>
                         </TabsTrigger>
+                        <TabsTrigger
+                            asChild
+                            value="Metadata"
+                        >
+                            <Button
+                                disabled={currentQuery && (currentQuery.metadata.length === 0 || currentQuery.explain.length === 0)}
+                                className="tabs-trigger"
+                                onClick={() => setTabsValue("Metadata")}
+                                title="Metadata"
+                            >
+                                <Info />
+                            </Button>
+                        </TabsTrigger>
                     </TabsList>
                     <TabsContent value="Graph" className="w-1 grow h-full mt-0">
                         <div className="h-full flex flex-col gap-4">
@@ -400,6 +422,12 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
                     <TabsContent value="Table" className="mt-0 w-1 grow h-full">
                         <TableView
                             data={graph.Data}
+                        />
+                    </TabsContent>
+                    <TabsContent value="Metadata" className="mt-0 w-1 grow h-full">
+                        <MetadataView
+                            query={currentQuery!}
+                            graphName={graph.Id}
                         />
                     </TabsContent>
                 </Tabs>

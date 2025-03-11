@@ -12,6 +12,12 @@ import { Node, Link } from "@/app/api/graph/model"
 
 export type GraphRef = MutableRefObject<ForceGraphMethods<Node, Link> | undefined>
 
+export interface Query {
+  text: string
+  metadata: string[]
+  explain: string[]
+}
+
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
@@ -101,4 +107,11 @@ export function handleZoomToFit(chartRef?: GraphRef, filter?: (node: Node) => bo
     const padding = minDimension * 0.1
     chart.zoomToFit(1000, padding, filter)
   }
+}
+
+export function createNestedObject(arr: string[]): object {
+  if (arr.length === 0) return {};
+
+  const [first, ...rest] = arr;
+  return { [first]: createNestedObject(rest) };
 }

@@ -123,17 +123,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
     const { graph: graphId } = await params
 
-    const ID = request.nextUrl.searchParams.get("ID")
-
     try {
-        if (ID) {
-            // const result = await securedFetch(`https://localhost:5000/progress/?ID=${ID}`, {
-            //     method: "GET"
-            // })
-            // if (!result.ok) throw new Error("something went wrong")
-            // const json = await result.json()
-            return NextResponse.json({ progress: 10 }, { status: 200 })
-        }
 
         const query = request.nextUrl.searchParams.get("query")
         const create = request.nextUrl.searchParams.get("create")

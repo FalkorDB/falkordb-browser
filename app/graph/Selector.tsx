@@ -4,13 +4,14 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { DialogTitle } from "@/components/ui/dialog";
 import { Editor } from "@monaco-editor/react";
 import { editor } from "monaco-editor";
-import { cn, defaultQuery, prepareArg, securedFetch } from "@/lib/utils";
+import { cn, createNestedObject, defaultQuery, prepareArg, Query, securedFetch } from "@/lib/utils";
 import { Session } from "next-auth";
 import { PlusCircle, RefreshCcw } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { useToast } from "@/components/ui/use-toast";
+import { JSONTree } from "react-json-tree";
 import Combobox from "../components/ui/combobox";
-import { Graph, Query } from "../api/graph/model";
+import { Graph } from "../api/graph/model";
 import DialogComponent from "../components/DialogComponent";
 import Button from "../components/ui/Button";
 import Duplicate from "./Duplicate";
@@ -216,7 +217,7 @@ export default function Selector({ setGraphName, graphName, queries, runQuery, e
                                         }
                                     </ul>
                                     <div className="w-1 grow flex flex-col gap-2 p-4 border">
-                                        <div className="h-1 grow flex">
+                                        <div className="h-1 grow flex border">
                                             <Editor
                                                 width="100%"
                                                 height="100%"
@@ -234,36 +235,52 @@ export default function Selector({ setGraphName, graphName, queries, runQuery, e
                                                     renderWhitespace: "none"
                                                 }}
                                                 value={query?.text}
-                                                onChange={(q) => setQuery(({ text: q || "", metadata: query?.metadata || [] }))}
+                                                onChange={(q) => setQuery(({ text: q || "", metadata: query?.metadata || [], explain: query?.explain || [] }))}
                                                 onMount={handleEditorDidMount}
                                             />
                                         </div>
-                                        <ul className="flex flex-col gap-2">
+                                        <ul className="flex flex-col gap-2 max-h-[30%] overflow-auto">
                                             {
-                                                query?.metadata &&
-                                                query.metadata.map((line, index) => (
-                                                    // eslint-disable-next-line react/no-array-index-key
-                                                    <li key={index}>
-                                                        <p>{line}</p>
-                                                    </li>
-                                                ))
+                                                query && (query.metadata.length > 0 || query.explain.length > 0) &&
+                                                <>
+                                                    {
+
+                                                        query.metadata.map((line, index) => (
+                                                            // eslint-disable-next-line react/no-array-index-key
+                                                            <li key={index}>
+                                                                <p>{line}</p>
+                                                            </li>
+                                                        ))
+                                                    }
+                                                    < JSONTree
+                                                        data={createNestedObject(query.explain)}
+                                                        shouldExpandNodeInitially={() => true}
+                                                        hideRoot
+                                                        theme={{
+                                                            base00: "var(--background)", // background
+                                                            base01: '#000000',
+                                                            base02: '#CE9178',
+                                                            base03: '#CE9178', // open values
+                                                            base04: '#CE9178',
+                                                            base05: '#CE9178',
+                                                            base06: '#CE9178',
+                                                            base07: '#CE9178',
+                                                            base08: '#CE9178',
+                                                            base09: '#b5cea8', // numbers
+                                                            base0A: '#CE9178',
+                                                            base0B: '#CE9178', // close values
+                                                            base0C: '#CE9178',
+                                                            base0D: '#99E4E5', // * keys
+                                                            base0E: '#ae81ff',
+                                                            base0F: '#cc6633'
+                                                        }}
+                                                    />
+                                                </>
                                             }
                                         </ul>
                                     </div>
                                 </div>
-                                <div className="flex justify-end items-center gap-12 text-[#7167F6]">
-                                    <Button
-                                        label="Profile"
-                                        disabled
-                                    />
-                                    <Button
-                                        label="Explain"
-                                        disabled
-                                    />
-                                    <Button
-                                        label="Translate to cypher"
-                                        disabled
-                                    />
+                                <div className="flex justify-end">
                                     <Button
                                         className="text-white flex justify-center w-1/3"
                                         disabled={isLoading}
