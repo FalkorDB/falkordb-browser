@@ -25,7 +25,7 @@ export default function Users() {
     const { toast } = useToast()
 
     const handleSetRole = async (username: string, role: string, oldRole?: string) => {
-        const result = await securedFetch(`api/user/${prepareArg(username)}?userRole=${role}`, {
+        const result = await securedFetch(`api/user/${prepareArg(username)}?role=${role}`, {
             method: 'PATCH'
         }, toast)
 
