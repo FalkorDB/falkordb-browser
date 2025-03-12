@@ -67,7 +67,6 @@ export default function Combobox({ isSelectGraph = false, disabled = false, inTa
   }
 
   useEffect(() => {
-    console.log(options)
     handleSetRows(options)
   }, [options])
 
