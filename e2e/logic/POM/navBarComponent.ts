@@ -122,7 +122,8 @@ export default class NavBarComponent extends BasePage {
     }
 
     async isAboutPopUp(): Promise<boolean>{
-        return await this.aboutPopUp.isVisible();
+        const isVisible = await this.aboutPopUp.isVisible();
+        return isVisible;
     }
 
     async closePopUp(): Promise<void>{

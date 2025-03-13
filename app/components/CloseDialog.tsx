@@ -14,6 +14,7 @@ export default function CloseDialog({ className, label, children, ...props }: Pr
     return (
         <DialogClose asChild >
             <Button
+                aria-label="Close"
                 variant={label === "Cancel" ? "Cancel" : undefined}
                 className={className}
                 label={label}

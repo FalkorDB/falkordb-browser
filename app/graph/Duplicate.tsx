@@ -5,11 +5,12 @@ import DialogComponent from "../components/DialogComponent";
 import Button from "../components/ui/Button";
 import Input from "../components/ui/Input";
 
-export default function Duplicate({ open, onOpenChange, selectedValue, onDuplicate, disabled }: {
+export default function Duplicate({ open, onOpenChange, selectedValue, onDuplicate, type, disabled }: {
     selectedValue: string,
     open: boolean,
     onOpenChange: (open: boolean) => void
     onDuplicate: (duplicateName: string) => void
+    type: "Graph" | "Schema",
     disabled: boolean
 }) {
 
@@ -20,7 +21,10 @@ export default function Duplicate({ open, onOpenChange, selectedValue, onDuplica
 
         e.preventDefault()
 
-        const result = await securedFetch(`api/graph/${prepareArg(duplicateName)}/?sourceName=${prepareArg(selectedValue)}`, {
+        const graphName = type === "Schema" ? `${duplicateName}_schema` : duplicateName
+        const sourceName = type === "Schema" ? `${selectedValue}_schema` : selectedValue
+
+        const result = await securedFetch(`api/graph/${prepareArg(graphName)}/?sourceName=${prepareArg(sourceName)}`, {
             method: "POST"
         }, toast)
 
