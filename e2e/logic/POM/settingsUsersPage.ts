@@ -145,6 +145,7 @@ export default class SettingsUsersPage extends BasePage {
 
     async getTableRolesCount(): Promise<number>{
         await this.page.waitForTimeout(1000);
-        return await this.tableRoles.count();
+        const count = await this.tableRoles.count();
+        return count;
     }
 }
