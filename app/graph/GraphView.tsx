@@ -385,7 +385,7 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
                                                 <p>Animation Control</p>
                                             </TooltipContent>
                                         </Tooltip>
-                                        <div className="relative pointer-events-auto">
+                                        <div className="relative pointer-events-auto" id="elementCanvasSearch">
                                             <Input
                                                 className="w-[20dvw]"
                                                 placeholder="Search for element in the graph"
