@@ -4,10 +4,12 @@ import { getClient } from "@/app/api/auth/[...nextauth]/options";
 // eslint-disable-next-line import/prefer-default-export
 export async function GET(request: NextRequest, { params }: { params: Promise<{ graph: string, node: string }> }) {
 
-    const client = await getClient()
-    if (client instanceof NextResponse) {
-        return client
+    const session = await getClient()
+    if (session instanceof NextResponse) {
+        return session
     }
+
+    const { client } = session
 
     const { graph: graphId, node } = await params
     const nodeId = Number(node)

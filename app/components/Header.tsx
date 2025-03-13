@@ -55,15 +55,17 @@ export default function Header({ onSetGraphName }: Props) {
                     <Drawer direction="right">
                         <NavigationMenu>
                             <NavigationMenuList className="gap-6 bg-foreground rounded-lg px-4 py-2">
-                                <NavigationMenuLink className="bg-foreground" asChild>
-                                    <Button
-                                        label="Settings"
-                                        onClick={() => router.push("/settings")}
-                                        disabled={session?.user?.role !== "Admin"}
-                                    >
-                                        <Settings size={25} />
-                                    </Button>
-                                </NavigationMenuLink>
+                                {
+                                    session?.user?.role === "Admin" &&
+                                    <NavigationMenuLink className="bg-foreground" asChild>
+                                        <Button
+                                            label="Settings"
+                                            onClick={() => router.push("/settings")}
+                                        >
+                                            <Settings size={25} />
+                                        </Button>
+                                    </NavigationMenuLink>
+                                }
                                 <NavigationMenuItem>
                                     <NavigationMenuTrigger onClick={(e) => e.preventDefault()} className="gap-2 bg-foreground">
                                         <LifeBuoy size={25} />
@@ -93,7 +95,7 @@ export default function Header({ onSetGraphName }: Props) {
                                     </NavigationMenuContent>
                                 </NavigationMenuItem>
                                 {
-                                    !inCreate &&
+                                    !inCreate && session?.user?.role !== "Read-Only" &&
                                     <CreateGraph
                                         onSetGraphName={onSetGraphName!}
                                         type={type}

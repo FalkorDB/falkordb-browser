@@ -4,21 +4,19 @@ import useSWR from 'swr'
 import React, { useState } from 'react'
 import { securedFetch } from '@/lib/utils'
 import { useToast } from '@/components/ui/use-toast'
-import { useSession } from 'next-auth/react'
 import MonitorView from './MonitorView'
 
 export default function Page() {
 
     const [time, setTime] = useState<Date | null>(null)
     const { toast } = useToast()
-    const { data: session } = useSession()
     
     const fetcher = (url: string) => securedFetch(url, {
         method: 'GET',
         headers: {
             'Content-Type': 'application/json'
         }
-    }, session?.user?.role, toast).then((result) => {
+    }, toast).then((result) => {
         if (result.ok) {
             setTime(new Date())
             return result.json()

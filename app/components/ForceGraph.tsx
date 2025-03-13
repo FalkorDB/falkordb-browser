@@ -9,7 +9,6 @@ import ForceGraph2D from "react-force-graph-2d"
 import { securedFetch, GraphRef } from "@/lib/utils"
 import { useToast } from "@/components/ui/use-toast"
 import * as d3 from "d3"
-import { useSession } from "next-auth/react"
 import { Graph, GraphData, Link, Node } from "../api/graph/model"
 
 interface Props {
@@ -53,7 +52,6 @@ export default function ForceGraph({
     const parentRef = useRef<HTMLDivElement>(null)
     const lastClick = useRef<{ date: Date, name: string }>({ date: new Date(), name: "" })
     const { toast } = useToast()
-    const { data: session } = useSession()
 
     useEffect(() => {
         const handleResize = () => {
@@ -103,7 +101,7 @@ export default function ForceGraph({
             headers: {
                 'Content-Type': 'application/json'
             }
-        }, session?.user?.role, toast);
+        }, toast);
 
         if (result.ok) {
             const json = await result.json()
