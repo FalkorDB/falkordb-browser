@@ -7,7 +7,6 @@ import { InfoIcon, PlusCircle } from "lucide-react"
 import { prepareArg, securedFetch } from "@/lib/utils"
 import { useToast } from "@/components/ui/use-toast"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
-import { useSession } from "next-auth/react"
 import DialogComponent from "./DialogComponent"
 import Button from "./ui/Button"
 import CloseDialog from "./CloseDialog"
@@ -36,7 +35,6 @@ export default function CreateGraph({
     const [open, setOpen] = useState(false)
     const [isLoading, setIsLoading] = useState(false)
     const { toast } = useToast()
-    const { data: session } = useSession()
     
     const handleCreateGraph = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault()
@@ -54,7 +52,7 @@ export default function CreateGraph({
             const q = 'RETURN 1'
             const result = await securedFetch(`api/graph/${prepareArg(name)}/?query=${prepareArg(q)}`, {
                 method: "GET",
-            }, session?.user?.role, toast)
+            }, toast)
             
             if (!result.ok) return
             

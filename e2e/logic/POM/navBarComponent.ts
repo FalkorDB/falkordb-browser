@@ -82,7 +82,7 @@ export default class NavBarComponent extends BasePage {
     }
 
     async isSettingsButtonEnabled(): Promise<boolean> {
-        const isEnabled = await this.settingsButton.isEnabled();
+        const isEnabled = await this.settingsButton.isVisible();
         return isEnabled;
     }
 

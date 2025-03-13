@@ -4,11 +4,13 @@ import { getClient } from "@/app/api/auth/[...nextauth]/options";
 // eslint-disable-next-line import/prefer-default-export, @typescript-eslint/no-unused-vars
 export async function GET(request: NextRequest) {
 
-    const client = await getClient()
+    const session = await getClient()
 
-    if (client instanceof NextResponse) {
-        return client
+    if (session instanceof NextResponse) {
+        return session
     }
+
+    const { client } = session
 
     const configName = request.nextUrl.searchParams.get("config")
 
@@ -19,7 +21,7 @@ export async function GET(request: NextRequest) {
 
     try {
         const result = await client.list()
-    
+
         return NextResponse.json({ result }, { status: 200 })
     } catch (err: unknown) {
         console.error(err)
@@ -30,16 +32,18 @@ export async function GET(request: NextRequest) {
 // eslint-disable-next-line import/prefer-default-export, @typescript-eslint/no-unused-vars
 export async function POST(request: NextRequest) {
 
-    const client = await getClient()
+    const session = await getClient()
 
-    if (client instanceof NextResponse) {
-        return client
+    if (session instanceof NextResponse) {
+        return session
     }
+
+    const { client } = session
 
     const configName = request.nextUrl.searchParams.get("config")
     const value = request.nextUrl.searchParams.get("value")
 
-    
+
     try {
         if (configName && value) {
             const config = await client.configSet(configName, configName === "CMD_INFO" ? value : parseInt(value, 10))

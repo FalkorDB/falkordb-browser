@@ -1,6 +1,5 @@
 import { useToast } from "@/components/ui/use-toast";
 import { prepareArg, securedFetch, Row } from "@/lib/utils";
-import { useSession } from "next-auth/react";
 import { ReactNode, useState } from "react";
 import DialogComponent from "../DialogComponent";
 import Button from "../ui/Button";
@@ -20,7 +19,6 @@ export default function DeleteGraph({ type, trigger, options, rows, handleSetRow
 
     const [open, setOpen] = useState(false)
     const { toast } = useToast()
-    const { data: session } = useSession()
     const [isLoading, setIsLoading] = useState(false)
 
     const handleDelete = async (opts: string[]) => {
@@ -31,7 +29,7 @@ export default function DeleteGraph({ type, trigger, options, rows, handleSetRow
           const newNames = await Promise.all(names.map(async (name) => {
             const result = await securedFetch(`api/graph/${prepareArg(name)}`, {
               method: "DELETE"
-            }, session?.user?.role, toast)
+            }, toast)
     
             if (result.ok) return name
     

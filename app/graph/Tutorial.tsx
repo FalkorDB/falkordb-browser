@@ -3,6 +3,7 @@ import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from "@/components/u
 import { Dispatch, SetStateAction, useEffect, useState } from "react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
+import { useSession } from "next-auth/react";
 import CreateGraph from "../components/CreateGraph";
 
 interface Props {
@@ -13,6 +14,7 @@ export default function Tutorial({ onSetGraphName }: Props) {
 
     const [open, setOpen] = useState<boolean>(false)
     const [showAgain, setShowAgain] = useState<boolean>(false)
+    const { data: session } = useSession()
 
     useEffect(() => {
         setOpen(localStorage.getItem("tutorial") !== "false")
@@ -51,10 +53,13 @@ export default function Tutorial({ onSetGraphName }: Props) {
                                 <p>Configure or export your graph with ease from the control center</p>
                             </CarouselItem>
                             <CarouselItem className="border flex justify-center items-center">
-                                <CreateGraph
-                                    onSetGraphName={handleSetGraphName}
-                                    type="Graph"
-                                />
+                                {
+                                    session?.user?.role !== "Read-Only" &&
+                                    <CreateGraph
+                                        onSetGraphName={handleSetGraphName}
+                                        type="Graph"
+                                    />
+                                }
                             </CarouselItem>
                         </CarouselContent>
                         <CarouselPrevious />

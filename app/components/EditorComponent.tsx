@@ -9,7 +9,6 @@ import { useEffect, useRef, useState } from "react"
 import * as monaco from "monaco-editor";
 import { Maximize2, Minimize2 } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
-import { useSession } from "next-auth/react";
 import { prepareArg, securedFetch } from "@/lib/utils";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import { Graph } from "../api/graph/model";
@@ -218,7 +217,6 @@ export default function EditorComponent({ currentQuery, historyQueries, setHisto
         currentQuery,
         historyCounter: 0
     })
-    const { data: session } = useSession()
 
     useEffect(() => {
         if (currentQuery && placeholderRef.current) {
@@ -291,7 +289,7 @@ export default function EditorComponent({ currentQuery, historyQueries, setHisto
     const fetchSuggestions = async (q: string, detail: string): Promise<monaco.languages.CompletionItem[]> => {
         const result = await securedFetch(`api/graph/${graphIdRef.current}/?query=${prepareArg(q)}`, {
             method: 'GET',
-        }, session?.user.role, toast)
+        }, toast)
 
         if (!result) return []
 

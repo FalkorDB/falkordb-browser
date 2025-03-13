@@ -46,7 +46,7 @@ export default function Combobox({ isSelectGraph = false, disabled = false, inTa
         "Content-Type": "application/json"
       },
       body: JSON.stringify({ name: optionName })
-    }, session?.user?.role, toast)
+    }, toast)
 
     if (result.ok) {
 
@@ -126,21 +126,24 @@ export default function Combobox({ isSelectGraph = false, disabled = false, inTa
           rows={rows}
           setRows={setRows}
         >
-          <DeleteGraph
-            type={type!}
-            options={options}
-            rows={rows}
-            handleSetRows={handleSetRows}
-            setOpenMenage={setOpenMenage}
-            setOptions={setOptions!}
-            selectedValue={selectedValue}
-            setSelectedValue={setSelectedValue}
-            trigger={<Button
-              variant="Primary"
-              disabled={rows.filter(opt => opt.checked).length === 0}
-              label="Delete"
-            />}
-          />
+          {
+            session?.user?.role !== "Read-Only" &&
+            <DeleteGraph
+              type={type!}
+              options={options}
+              rows={rows}
+              handleSetRows={handleSetRows}
+              setOpenMenage={setOpenMenage}
+              setOptions={setOptions!}
+              selectedValue={selectedValue}
+              setSelectedValue={setSelectedValue}
+              trigger={<Button
+                variant="Primary"
+                disabled={rows.filter(opt => opt.checked).length === 0}
+                label="Delete"
+              />}
+            />
+          }
           <ExportGraph
             trigger={
               <Button
