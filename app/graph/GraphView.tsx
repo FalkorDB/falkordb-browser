@@ -175,10 +175,33 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
 
         if (!result.ok) return
 
+        selectedElements.forEach((element) => {
+            if ("source" in element) {
+                const category = graph.LabelsMap.get(element.label)
+                if (category) {
+                    category.elements = category.elements.filter((e) => e.id !== element.id)
+                    if (category.elements.length === 0) {
+                        graph.Labels.splice(graph.Labels.findIndex(l => l.name === category.name), 1)
+                        graph.LabelsMap.delete(category.name)
+                    }
+                }
+            } else {
+                element.category.forEach((category) => {
+                    const cat = graph.CategoriesMap.get(category)
+                    if (cat) {
+                        cat.elements = cat.elements.filter((e) => e.id !== element.id)
+                        if (cat.elements.length === 0) {
+                            graph.Categories.splice(graph.Categories.findIndex(c => c.name === cat.name), 1)
+                            graph.CategoriesMap.delete(cat.name)
+                        }
+                    }
+                })
+            }
+        })
+
         graph.removeElements(selectedElements)
 
         fetchCount()
-
         setSelectedElements([])
         setSelectedElement(undefined)
 

@@ -265,7 +265,7 @@ export class Graph {
             this.nodesMap.set(cell.id, node)
             this.elements.nodes.push(node)
             node.category.forEach(c => {
-              this.categoriesMap.get(c)!.elements.push(node)
+                this.categoriesMap.get(c)!.elements.push(node)
             })
             return node
         }
@@ -283,6 +283,10 @@ export class Graph {
             currentNode.category.forEach(c => {
                 this.categoriesMap.get(c)!.elements.push(currentNode)
             })
+            const category = this.categoriesMap.get("")
+            if (category && !currentNode.category.includes("")) {
+                category.elements = category.elements.filter(e => e.id !== currentNode.id)
+            }
         }
 
         return undefined
@@ -315,6 +319,7 @@ export class Graph {
                         data: {},
                     }
 
+                    category?.elements.push(source)
                     this.nodesMap.set(cell.sourceId, source)
                     this.elements.nodes.push(source)
                 }
@@ -351,6 +356,7 @@ export class Graph {
                         data: {},
                     }
 
+                    category?.elements.push(source)
                     this.nodesMap.set(cell.sourceId, source)
                     this.elements.nodes.push(source)
                 }
@@ -367,10 +373,11 @@ export class Graph {
                         displayName: "",
                         data: {},
                     }
-                }
 
-                this.nodesMap.set(cell.destinationId, target)
-                this.elements.nodes.push(target)
+                    category?.elements.push(target)
+                    this.nodesMap.set(cell.destinationId, target)
+                    this.elements.nodes.push(target)
+                }
 
                 link = {
                     id: cell.id,
@@ -459,7 +466,8 @@ export class Graph {
         })
 
         // remove empty category if there are no more empty nodes category
-        if (Array.from(this.nodesMap.values()).every(n => n.category.some(c => c !== ""))) {
+        const emptyCategory = this.categoriesMap.get("")
+        if (emptyCategory && emptyCategory.elements.length === 0) {
             this.categories = this.categories.filter(c => c.name !== "")
             this.categoriesMap.delete("")
         }

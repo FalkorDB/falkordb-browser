@@ -58,10 +58,6 @@ export default function ForceGraph({
     const { data: session } = useSession()
 
     useEffect(() => {
-
-    }, [])
-
-    useEffect(() => {
         const handleResize = () => {
             if (!parentRef.current) return
             setParentWidth(parentRef.current.clientWidth)
@@ -89,23 +85,12 @@ export default function ForceGraph({
         const linkForce = chartRef.current.d3Force('link');
         if (linkForce) {
             linkForce
-                .distance(() => 30)
-                .strength((link: any) => 1 / Math.min(
-                    graph.Elements.nodes.filter(n => n.id === link.source.id).length,
-                    graph.Elements.nodes.filter(n => n.id === link.target.id).length
-                ));
-        }
-
-        // Adjust charge force for node repulsion
-        const chargeForce = chartRef.current.d3Force('charge');
-        if (chargeForce) {
-            chargeForce
-                .strength(-30)
-                .distanceMax(150);
+                .distance(() => 50)
+                .strength(0.1);
         }
 
         // Add collision force to prevent node overlap
-        chartRef.current.d3Force('collision', d3.forceCollide(NODE_SIZE * 1.5));
+        chartRef.current.d3Force('collision', d3.forceCollide(NODE_SIZE).strength(-1));
 
         // Center force to keep graph centered
         const centerForce = chartRef.current.d3Force('center');
@@ -125,7 +110,6 @@ export default function ForceGraph({
         if (result.ok) {
             const json = await result.json()
             const elements = graph.extend(json.result, true)
-            console.log(elements);
             if (elements.length === 0) {
                 toast({
                     title: `No neighbors found`,
@@ -366,7 +350,7 @@ export default function ForceGraph({
                 nodeVisibility="visible"
                 linkVisibility="visible"
                 cooldownTicks={cooldownTicks}
-                cooldownTime={2000}
+                cooldownTime={6000}
                 linkDirectionalArrowRelPos={1}
                 linkDirectionalArrowLength={(link) => link.source.id === link.target.id ? 0 : 2}
                 linkDirectionalArrowColor={(link) => link.color}
