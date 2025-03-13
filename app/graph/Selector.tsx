@@ -160,6 +160,7 @@ export default function Selector({ setGraphName, graphName, queries, runQuery, e
                             setSelectedValue(name)
                             handleOnChange(name)
                         }}
+                        type={type}
                         selectedValue={selectedValue}
                     />
                     <View setGraph={setGraph} graph={graph} selectedValue={selectedValue} />
