@@ -72,6 +72,7 @@ export default function Page() {
         const json = await result.json()
         fetchCount()
         setSelectedElement(undefined)
+        
         return json.result
     }
 
