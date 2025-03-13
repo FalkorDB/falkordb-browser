@@ -318,6 +318,7 @@ export default function SchemaCreateElement({ onCreate, onExpand, selectedNodes,
                             <Button
                               className="p-2 justify-center border border-foreground rounded-lg"
                               label="Save"
+                              title="Save the attribute changes"
                               onClick={(e) => {
                                 e.stopPropagation()
                                 handleSetAttribute(true)
@@ -328,6 +329,7 @@ export default function SchemaCreateElement({ onCreate, onExpand, selectedNodes,
                             <Button
                               className="p-2 justify-center border border-foreground rounded-lg"
                               label="Cancel"
+                              title="Discard the attribute changes"
                               onClick={(e) => {
                                 e.stopPropagation()
                                 handleSetEditable()
@@ -341,6 +343,7 @@ export default function SchemaCreateElement({ onCreate, onExpand, selectedNodes,
                             <Button
                               className="p-2 justify-center border border-foreground rounded-lg"
                               label="Remove"
+                              title="Delete this attribute"
                               onClick={(e) => {
                                 e.stopPropagation()
                                 const oldAttribute = attributes.find(([k]) => k === key)
@@ -357,6 +360,7 @@ export default function SchemaCreateElement({ onCreate, onExpand, selectedNodes,
                             <Button
                               className="p-2 justify-center border border-foreground rounded-lg"
                               label="Edit"
+                              title="Modify this attribute"
                               onClick={(e) => {
                                 e.stopPropagation()
                                 handleSetEditable([key, [...val]])
@@ -436,6 +440,7 @@ export default function SchemaCreateElement({ onCreate, onExpand, selectedNodes,
                   <Button
                     className="p-2 justify-center border border-foreground rounded-lg"
                     label="Add"
+                    title="Add a new attribute"
                     onClick={(e) => {
                       e.stopPropagation()
                       handleAddAttribute()
@@ -446,6 +451,7 @@ export default function SchemaCreateElement({ onCreate, onExpand, selectedNodes,
                   <Button
                     className="p-2 justify-center border border-foreground rounded-lg"
                     label="Cancel"
+                    title="Discard the new attribute"
                     onClick={(e) => {
                       e.stopPropagation()
                       setNewAttribute(getDefaultAttribute())
@@ -496,6 +502,7 @@ export default function SchemaCreateElement({ onCreate, onExpand, selectedNodes,
                     disabled
                     variant="Secondary"
                     label="Add"
+                    title="Add a new attribute"
                   >
                     <Plus size={20} />
                   </Button>
@@ -504,6 +511,7 @@ export default function SchemaCreateElement({ onCreate, onExpand, selectedNodes,
                     disabled
                     variant="Secondary"
                     label="Cancel"
+                    title="Discard the new attribute"
                   >
                     <X size={20} />
                   </Button>
@@ -528,6 +536,7 @@ export default function SchemaCreateElement({ onCreate, onExpand, selectedNodes,
               <Button
                 className="flex-col-reverse border border-[#232341]"
                 label="Clear"
+                title="Clear selected nodes for relation"
                 onClick={() => setSelectedNodes([undefined, undefined])}
               >
                 <Trash2 size={40} />
@@ -535,6 +544,7 @@ export default function SchemaCreateElement({ onCreate, onExpand, selectedNodes,
               <Button
                 className="flex-col-reverse border border-[#232341]"
                 label="Swap"
+                title="Swap the order of selected nodes"
                 onClick={() => setSelectedNodes(prev => [prev[1], prev[0]])}
               >
                 <ArrowRightLeft size={40} />
@@ -549,6 +559,7 @@ export default function SchemaCreateElement({ onCreate, onExpand, selectedNodes,
           }}>
             <Button
               label={`Create new ${type ? "node" : "edge"}`}
+              title={`Add a new ${type ? "node" : "edge"} to the schema`}
               variant="Primary"
               onClick={(e) => {
                 e.preventDefault();

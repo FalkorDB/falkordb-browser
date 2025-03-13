@@ -12,7 +12,6 @@ import { useToast } from "@/components/ui/use-toast"
 import { Switch } from "@/components/ui/switch"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { ForceGraphMethods } from "react-force-graph-2d"
-import { useSession } from "next-auth/react"
 import Toolbar from "../graph/toolbar"
 import SchemaDataPanel from "./SchemaDataPanel"
 import Labels from "../graph/labels"
@@ -57,7 +56,6 @@ export default function SchemaView({ schema, fetchCount }: Props) {
     const [cooldownTicks, setCooldownTicks] = useState<number | undefined>(0)
     const [data, setData] = useState<GraphData>(schema.Elements)
     const { toast } = useToast()
-    const { data: session } = useSession()
     
     useEffect(() => {
         setData({ ...schema.Elements })
