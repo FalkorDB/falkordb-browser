@@ -8,10 +8,12 @@ const fileds = [
 // eslint-disable-next-line import/prefer-default-export
 export async function GET() {
 
-    const client = await getClient()
-    if (client instanceof NextResponse) {
-        return client
+    const session = await getClient()
+    if (session instanceof NextResponse) {
+        return session
     }
+
+    const { client } = session
 
     const infoMemory = await (await client.connection).info("memory")
     const infoGraph = await client.info()

@@ -33,25 +33,21 @@ export default function Page() {
 
         const nodes = await (await securedFetch(`api/graph/${prepareArg(graphName)}/?query=${q1}`, {
             method: "GET"
-        }, session?.user?.role, toast)).json()
+        }, toast)).json()
 
         const edges = await (await securedFetch(`api/graph/${prepareArg(graphName)}/?query=${q2}`, {
             method: "GET"
-        }, session?.user?.role, toast)).json()
+        }, toast)).json()
 
         if (!edges || !nodes) return
 
         setEdgesCount(edges.result?.data[0].edges)
         setNodesCount(nodes.result?.data[0].nodes)
-    }, [graphName, session?.user?.role, toast])
-
-    useEffect(() => {
-        fetchCount()
-    }, [graphName, fetchCount])
+    }, [graphName, toast])
 
     useEffect(() => {
         if (graphName !== graph.Id) {
-            const colors = localStorage.getItem(graphName)?.split(/[[\]",]/).filter(c => c)
+            const colors = JSON.parse(localStorage.getItem(graphName) || "[]")
             setGraph(Graph.empty(graphName, colors))
         }
         fetchCount()
@@ -69,13 +65,14 @@ export default function Page() {
 
         const result = await securedFetch(`api/graph/${prepareArg(graphName)}/?query=${prepareArg(query)}`, {
             method: "GET"
-        }, session?.user?.role, toast)
+        }, toast)
 
         if (!result.ok) return null
 
         const json = await result.json()
         fetchCount()
         setSelectedElement(undefined)
+        
         return json.result
     }
 
@@ -129,7 +126,6 @@ export default function Page() {
                     historyQueries={queries.map(({ text }) => text)}
                     setHistoryQueries={(queriesArr) => setQueries(queries.map((query, i) => ({ text: queriesArr[i], metadata: query.metadata } as Query)))}
                     fetchCount={fetchCount}
-                    session={session}
                 />
                 <Tutorial onSetGraphName={setGraphName} />
             </div>

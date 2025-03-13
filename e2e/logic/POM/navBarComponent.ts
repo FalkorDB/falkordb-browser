@@ -82,7 +82,7 @@ export default class NavBarComponent extends BasePage {
     }
 
     async isSettingsButtonEnabled(): Promise<boolean> {
-        const isEnabled = await this.settingsButton.isEnabled();
+        const isEnabled = await this.settingsButton.isVisible();
         return isEnabled;
     }
 
@@ -122,7 +122,8 @@ export default class NavBarComponent extends BasePage {
     }
 
     async isAboutPopUp(): Promise<boolean>{
-        return await this.aboutPopUp.isVisible();
+        const isVisible = await this.aboutPopUp.isVisible();
+        return isVisible;
     }
 
     async closePopUp(): Promise<void>{

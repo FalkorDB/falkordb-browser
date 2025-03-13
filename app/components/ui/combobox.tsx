@@ -47,7 +47,7 @@ export default function Combobox({ isSelectGraph = false, disabled = false, inTa
         "Content-Type": "application/json"
       },
       body: JSON.stringify({ name: optionName })
-    }, session?.user?.role, toast)
+    }, toast)
 
     if (result.ok) {
 
@@ -67,7 +67,6 @@ export default function Combobox({ isSelectGraph = false, disabled = false, inTa
   }
 
   useEffect(() => {
-    console.log(options)
     handleSetRows(options)
   }, [options])
 
@@ -77,13 +76,13 @@ export default function Combobox({ isSelectGraph = false, disabled = false, inTa
     const newNames = await Promise.all(names.map(async (name) => {
       const result = await securedFetch(`api/graph/${prepareArg(name)}`, {
         method: "DELETE"
-      }, session?.user?.role, toast)
+      }, toast)
 
       if (result.ok) return name
 
       return ""
 
-    })).then(graphNames => options.filter(opt => !graphNames.filter(name => name !== "").includes(opt)))
+    })).then(graphNames => graphNames.filter(name => name !== "")).then(graphNames => options.filter(opt => !graphNames.includes(opt)))
 
     setOptions!(newNames)
 
@@ -91,10 +90,14 @@ export default function Combobox({ isSelectGraph = false, disabled = false, inTa
 
     setOpenDelete(false)
     setOpenMenage(false)
-    handleSetRows(options.filter(opt => !opts.includes(opt)))
+    handleSetRows(newNames)
+
+    const deletedNames = opts.filter(opt => !newNames.includes(opt))
+    const notDeletedNames = opts.filter(opt => newNames.includes(opt))
+
     toast({
       title: "Graph(s) deleted successfully",
-      description: `The graph(s) ${opts.join(", ")} have been deleted successfully`,
+      description: `${deletedNames.length > 0 ? `The graph(s) ${deletedNames.join(", ")} have been deleted successfully` : ''}${deletedNames.length > 0 && notDeletedNames.length > 0 ? '. ' : ''}${notDeletedNames.length > 0 ? `The graph(s) ${notDeletedNames.join(", ")} could not be deleted` : ''}`,
     })
   }
 
@@ -155,27 +158,30 @@ export default function Combobox({ isSelectGraph = false, disabled = false, inTa
           rows={rows}
           setRows={setRows}
         >
-          <DialogComponent
-            className="max-w-[90dvw]"
-            open={openDelete}
-            onOpenChange={setOpenDelete}
-            title="Delete Graph"
-            trigger={<Button
-              variant="Primary"
-              disabled={rows.filter(opt => opt.checked).length === 0}
-              label="Delete"
-            />}
-            description={`Are you sure you want to delete the selected graph(s)? (${rows.filter(opt => opt.checked).map(opt => opt.cells[0].value as string).join(", ")})`}
-          >
-            <div className="flex justify-end gap-2">
-              <Button
+          {
+            session?.user?.role !== "Read-Only" &&
+            <DialogComponent
+              className="max-w-[90dvw]"
+              open={openDelete}
+              onOpenChange={setOpenDelete}
+              title="Delete Graph"
+              trigger={<Button
                 variant="Primary"
-                label="Delete Graph"
-                onClick={() => handleDelete(rows.filter(opt => opt.checked).map(opt => opt.cells[0].value as string))}
-              />
-              <CloseDialog label="Cancel" />
-            </div>
-          </DialogComponent>
+                disabled={rows.filter(opt => opt.checked).length === 0}
+                label="Delete"
+              />}
+              description={`Are you sure you want to delete the selected graph(s)? (${rows.filter(opt => opt.checked).map(opt => opt.cells[0].value as string).join(", ")})`}
+            >
+              <div className="flex justify-end gap-2">
+                <Button
+                  variant="Primary"
+                  label="Delete Graph"
+                  onClick={() => handleDelete(rows.filter(opt => opt.checked).map(opt => opt.cells[0].value as string))}
+                />
+                <CloseDialog label="Cancel" />
+              </div>
+            </DialogComponent>
+          }
           <ExportGraph
             trigger={
               <Button

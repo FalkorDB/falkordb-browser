@@ -1,7 +1,6 @@
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useToast } from "@/components/ui/use-toast";
 import { prepareArg, securedFetch } from "@/lib/utils";
-import { useSession } from "next-auth/react";
 
 export default function DeleteGraph({ graphName, isOpen, onOpen, onDeleteGraph, isSchema }: {
     graphName: string
@@ -13,13 +12,12 @@ export default function DeleteGraph({ graphName, isOpen, onOpen, onDeleteGraph, 
 
     const type = isSchema ? "Schema" : "Graph"
     const { toast } = useToast()
-    const { data: session } = useSession()
     
     const deleteGraph = async () => {
         const name = `${graphName}${isSchema ? "_schema" : ""}`
         const result = await securedFetch(`/api/graph/${prepareArg(name)}`, {
             method: "DELETE",
-        }, session?.user?.role, toast);
+        }, toast);
 
         if (result.ok) {
             toast({
