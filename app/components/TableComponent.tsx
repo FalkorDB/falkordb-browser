@@ -114,6 +114,7 @@ export default function TableComponent({ headers, rows, children, setRows, optio
                         : <Button
                             variant="Secondary"
                             label="Search"
+                            title="Search within the table"
                             onClick={() => setIsSearchable(true)}
                         />
                 }

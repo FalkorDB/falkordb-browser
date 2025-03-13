@@ -146,6 +146,7 @@ export default function Selector({ setGraphName, graphName, queries, runQuery, e
                             <Button
                                 label="Export Data"
                                 disabled={!selectedValue}
+                                title="Export your data to a file"
                             />
                         }
                         type={type}
@@ -160,6 +161,7 @@ export default function Selector({ setGraphName, graphName, queries, runQuery, e
                             setSelectedValue(name)
                             handleOnChange(name)
                         }}
+                        type={type}
                         selectedValue={selectedValue}
                     />
                     <View setGraph={setGraph} graph={graph} selectedValue={selectedValue} />
@@ -184,7 +186,7 @@ export default function Selector({ setGraphName, graphName, queries, runQuery, e
                             trigger={
                                 <Button
                                     disabled={!queries || queries.length === 0}
-                                    title={!queries || queries.length === 0 ? "No queries" : undefined}
+                                    title={!queries || queries.length === 0 ? "No queries" : "View past queries"}
                                     label="Query History"
                                 />
                             }
@@ -269,7 +271,7 @@ export default function Selector({ setGraphName, graphName, queries, runQuery, e
                                         }}
                                         variant="Primary"
                                         label={isLoading ? undefined : "Run"}
-                                        title={isLoading ? "Please wait..." : undefined}
+                                        title={isLoading ? "Please wait..." : "Execute this query again"}
                                     />
                                 </div>
                             </div>
@@ -278,6 +280,7 @@ export default function Selector({ setGraphName, graphName, queries, runQuery, e
                             <Button
                                 disabled={!schema.Id}
                                 label="View Schema"
+                                title="Display the schema structure"
                             />
                         }>
                             <SchemaView schema={schema} session={session} />

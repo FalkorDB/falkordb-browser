@@ -69,6 +69,7 @@ export default function View({ graph, setGraph, selectedValue }: {
             trigger={
                 <Button
                     label="Preferences"
+                    title="Open application preferences"
                     disabled={!selectedValue}
                 />
             }
@@ -218,6 +219,7 @@ export default function View({ graph, setGraph, selectedValue }: {
                         disabled={colorsArr.some(color => color === editable)}
                         variant="Primary"
                         label="Add Color"
+                        title="Add a new color option"
                         onClick={() => {
                             setIsAddColor(true)
                         }}
@@ -228,6 +230,7 @@ export default function View({ graph, setGraph, selectedValue }: {
                         disabled={DEFAULT_COLORS.every((c, i) => c === graph.Colors[i]) && DEFAULT_COLORS.length === graph.Colors.length}
                         variant="Secondary"
                         label="Reset"
+                        title="Restore default colors settings"
                         onClick={() => {
                             handlePreferencesChange(DEFAULT_COLORS)
                         }}
@@ -238,6 +241,7 @@ export default function View({ graph, setGraph, selectedValue }: {
                         disabled={graph.Colors.every((c) => colorsArr.some(color => color === c)) && graph.Colors.length === colorsArr.length}
                         variant="Primary"
                         label="Apply"
+                        title="Save and apply changes"
                         onClick={() => handlePreferencesChange()}
                     >
                         <FileCheck2 />

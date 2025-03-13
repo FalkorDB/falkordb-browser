@@ -35,6 +35,7 @@ export default function DeleteElement({
                     className="text-nowrap"
                     variant="Primary"
                     label="Delete"
+                    title="Remove the selected element(s)"
                     onClick={onDeleteElement}
                 />
                 <CloseDialog

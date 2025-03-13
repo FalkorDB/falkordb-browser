@@ -138,6 +138,7 @@ export default function Combobox({ isSelectGraph = false, disabled = false, inTa
                   onClick={() => setOpen(false)}
                   className="w-full p-2"
                   label="Manage Graphs"
+                  title="Organize and edit your graphs"
                 />
               </DialogTrigger>
             </>
@@ -164,6 +165,7 @@ export default function Combobox({ isSelectGraph = false, disabled = false, inTa
               variant="Primary"
               disabled={rows.filter(opt => opt.checked).length === 0}
               label="Delete"
+              title="Delete and existing graph(s)"
             />}
             description={`Are you sure you want to delete the selected graph(s)? (${rows.filter(opt => opt.checked).map(opt => opt.cells[0].value as string).join(", ")})`}
           >
@@ -171,6 +173,7 @@ export default function Combobox({ isSelectGraph = false, disabled = false, inTa
               <Button
                 variant="Primary"
                 label="Delete Graph"
+                title="Confirm the deletion of the graph(s)"
                 onClick={() => handleDelete(rows.filter(opt => opt.checked).map(opt => opt.cells[0].value as string))}
               />
               <CloseDialog label="Cancel" />
@@ -181,6 +184,7 @@ export default function Combobox({ isSelectGraph = false, disabled = false, inTa
               <Button
                 variant="Primary"
                 label="Export Data"
+                title="Export graph data to a .dump file"
                 disabled={rows.filter(opt => opt.checked).length === 0}
               />
             }

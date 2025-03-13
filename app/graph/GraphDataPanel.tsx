@@ -274,7 +274,8 @@ export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement,
                                         <Button
                                             className="p-2 text-xs justify-center border border-foreground"
                                             variant="Secondary"
-                                            label="Edit"
+                                            label="Add"
+                                            title="Add a new label"
                                             onClick={() => setLabelsEditable(true)}
                                         >
                                             <Pencil size={15} />
@@ -306,6 +307,7 @@ export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement,
                                                 className="p-2 text-xs justify-center border border-foreground"
                                                 variant="Secondary"
                                                 label="Save"
+                                                title="Save the new label"
                                                 onClick={() => handleAddLabel()}
                                             >
                                                 <Check size={15} />
@@ -314,6 +316,7 @@ export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement,
                                                 className="p-2 text-xs justify-center border border-foreground"
                                                 variant="Secondary"
                                                 label="Cancel"
+                                                title="Discard new label"
                                                 onClick={() => {
                                                     setLabelsEditable(false)
                                                     setNewLabel("")
@@ -402,10 +405,12 @@ export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement,
                                                             <Button
                                                                 variant="Primary"
                                                                 label="Delete"
+                                                                title="Confirm deletion of the attribute"
                                                                 onClick={() => removeProperty(key)}
                                                             />
                                                             <CloseDialog
                                                                 label="Cancel"
+                                                                title="Cancel the deletion of the attribute"
                                                                 variant="Cancel"
                                                             />
                                                         </div>
@@ -426,6 +431,7 @@ export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement,
                                             />
                                             : <Button
                                                 label={obj.data[key]}
+                                                title="Click to edit the attribute value"
                                                 variant="button"
                                                 onClick={() => handleSetEditable(key, obj.data[key])}
                                             />
@@ -477,6 +483,7 @@ export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement,
                     <Button
                         variant="Primary"
                         label="Add Attribute"
+                        title="Add a new attribute"
                         onClick={() => setIsAddValue(true)}
                     >
                         <Plus size={20} />
@@ -494,6 +501,7 @@ export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement,
                             disabled={session?.user?.role === "Read-Only"}
                             variant="Primary"
                             label={`Delete ${type ? "Node" : "Relation"}`}
+                            title={`Delete the selected ${type ? "Node" : "Relation"}`}
                         >
                             <Trash2 size={20} />
                         </Button>

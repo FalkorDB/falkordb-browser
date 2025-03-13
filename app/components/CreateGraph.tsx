@@ -26,6 +26,7 @@ export default function CreateGraph({
         <Button
             variant="Primary"
             label={`Create New ${type}`}
+            title={`Create a new ${type}`}
         >
             <PlusCircle />
         </Button>
@@ -96,6 +97,7 @@ export default function CreateGraph({
                     <Button
                         variant="Primary"
                         label={`Create your ${type}`}
+                        title={`Build and customize your ${type}`}
                         type="submit"
                     />
                     <CloseDialog

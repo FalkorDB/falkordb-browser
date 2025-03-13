@@ -41,11 +41,13 @@ export default function Header({ onSetGraphName }: Props) {
                     <div className="flex gap-2 bg-foreground rounded-lg p-2">
                         <Button
                             label="Graphs"
+                            title="View and manage your graphs"
                             className={cn("px-4 py-1 rounded-lg", pathname.includes("/graph") ? "bg-background" : "text-gray-500")}
                             onClick={() => router.push("/graph")}
                         />
                         <Button
                             label="Schemas"
+                            title="View and manage your schemas"
                             className={cn("px-4 py-1 rounded-lg", pathname.includes("/schema") ? "bg-background" : "text-gray-500")}
                             onClick={() => router.push("/schema")}
                         />
@@ -58,6 +60,7 @@ export default function Header({ onSetGraphName }: Props) {
                                 <NavigationMenuLink className="bg-foreground" asChild>
                                     <Button
                                         label="Settings"
+                                        title="Adjust application settings"
                                         onClick={() => router.push("/settings")}
                                         disabled={session?.user?.role !== "Admin"}
                                     >
@@ -85,6 +88,7 @@ export default function Header({ onSetGraphName }: Props) {
                                                 <DrawerTrigger asChild>
                                                     <Button
                                                         label="About"
+                                                        title="Learn more about the application"
                                                         className="bg-foreground"
                                                     />
                                                 </DrawerTrigger>
