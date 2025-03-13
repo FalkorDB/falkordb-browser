@@ -235,7 +235,7 @@ export default function View({ graph, setGraph, selectedValue }: {
                         <RotateCcw />
                     </Button>
                     <Button
-                        disabled={graph.Colors.every((c, i) => colorsArr[i] === c) && graph.Colors.length === colorsArr.length}
+                        disabled={JSON.stringify(graph.Colors) === JSON.stringify(colorsArr) && graph.Colors.length === colorsArr.length}
                         variant="Primary"
                         label="Apply"
                         onClick={() => handlePreferencesChange()}

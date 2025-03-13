@@ -67,7 +67,6 @@ export default function Combobox({ isSelectGraph = false, disabled = false, inTa
   }
 
   useEffect(() => {
-    console.log(options)
     handleSetRows(options)
   }, [options])
 
@@ -98,7 +97,7 @@ export default function Combobox({ isSelectGraph = false, disabled = false, inTa
 
     toast({
       title: "Graph(s) deleted successfully",
-      description: `${deletedNames.length > 0 ? `The graph(s) have been deleted successfully: ${deletedNames.join(", ")}` : ""}${deletedNames.length > 0 && notDeletedNames.length > 0 ? ". " : ""}${notDeletedNames.length > 0 ? `The graph(s) could not be deleted: ${notDeletedNames.join(", ")}.` : ""}`,
+      description: `${deletedNames.length > 0 ? `The graph(s) ${deletedNames.join(", ")} have been deleted successfully` : ''}${deletedNames.length > 0 && notDeletedNames.length > 0 ? '. ' : ''}${notDeletedNames.length > 0 ? `The graph(s) ${notDeletedNames.join(", ")} could not be deleted` : ''}`,
     })
   }
 
