@@ -237,7 +237,7 @@ export default function ForceGraph({
     return (
         <div ref={parentRef} className="w-full h-full relative">
             <div className="w-[20dvw] absolute top-4 left-4 z-10">
-                <div className="relative w-full">
+                <div className="relative w-full" id="elementCanvasSearch">
                     <Input
                         className="w-full"
                         placeholder="Search for element in the graph"

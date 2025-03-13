@@ -103,7 +103,7 @@ export default function Selector({ setGraphName, graphName, queries, runQuery, e
     return (
         <div className="flex flex-col gap-4">
             <div className="flex justify-between items-center">
-                <div className="flex items-center gap-4">
+                <div className="flex items-center gap-4" id="graphManager">
                     <CreateGraph
                         type={type}
                         onSetGraphName={(name) => {
@@ -190,7 +190,7 @@ export default function Selector({ setGraphName, graphName, queries, runQuery, e
                             }
                             title="Query History"
                         >
-                            <div className="grow flex flex-col p-8 gap-8">
+                            <div className="grow flex flex-col p-8 gap-8" id="Query History">
                                 <DialogTitle>Queries</DialogTitle>
                                 <div className="h-1 grow flex">
                                     <ul className="w-1 grow flex-col border overflow-auto">

@@ -560,7 +560,7 @@ export default function EditorComponent({ currentQuery, historyQueries, setHisto
                         <div
                             className="w-1 grow flex rounded-lg overflow-hidden"
                         >
-                            <div ref={containerRef} className="relative grow w-1">
+                            <div ref={containerRef} className="relative grow w-1" id="editor-container">
                                 <Editor
                                     // eslint-disable-next-line no-nested-ternary
                                     height={blur ? LINE_HEIGHT : lineNumber * LINE_HEIGHT > document.body.clientHeight / 100 * MAX_HEIGHT ? document.body.clientHeight / 100 * MAX_HEIGHT : lineNumber * LINE_HEIGHT}

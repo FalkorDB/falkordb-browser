@@ -36,3 +36,8 @@ export async function waitForURL(page: Page, expectedURL: string, timeout: numbe
 
     throw new Error(`Timed out waiting for URL to be ${expectedURL}. Current URL is ${page.url()}`);
 }
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function findNodeByName(nodes: { name: string }[], nodeName: string): any {
+    return nodes.find((node) => node.name === nodeName);
+}

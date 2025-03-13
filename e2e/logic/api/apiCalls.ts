@@ -16,6 +16,7 @@ import { ChangeGraphNameResponse } from "./responses/changeGraphNameResponse";
 import { AuthCredentialsResponse } from "./responses/LoginResponse";
 import { LogoutResponse } from "./responses/logoutResponse";
 import { AddSchemaResponse } from "./responses/addSchemaResponse";
+import { GetGraphsResponse } from "./responses/getGraphsResponse";
 
 export default class ApiCalls {
 
