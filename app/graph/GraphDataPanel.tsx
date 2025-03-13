@@ -79,7 +79,7 @@ export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement,
         const q = `MATCH ${type ? "(e)" : "()-[e]-()"} WHERE id(e) = ${id} SET e.${key} = '${val}'`
         const success = (await securedFetch(`api/graph/${prepareArg(graph.Id)}/?query=${prepareArg(q)}`, {
             method: "GET"
-        }, session?.user?.role, toast)).ok
+        }, toast)).ok
 
         if (success) {
             graph.getElements().forEach(e => {
@@ -150,7 +150,7 @@ export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement,
         const q = `MATCH ${type ? "(e)" : "()-[e]-()"} WHERE id(e) = ${id} SET e.${key} = NULL`
         const success = (await securedFetch(`api/graph/${prepareArg(graph.Id)}/?query=${prepareArg(q)}`, {
             method: "GET"
-        }, session?.user?.role, toast)).ok
+        }, toast)).ok
 
         if (success) {
             const value = obj.data[key]
@@ -260,17 +260,20 @@ export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement,
                                 {label.map((l) => (
                                     <li key={l} className="flex gap-2 px-2 py-1 bg-foreground rounded-full items-center">
                                         <p>{l}</p>
-                                        <Button
-                                            title="Remove"
-                                            onClick={() => handleRemoveLabel(l)}
-                                        >
-                                            <X size={15} />
-                                        </Button>
+                                        {
+                                            session?.user?.role !== "Read-Only" &&
+                                            <Button
+                                                title="Remove"
+                                                onClick={() => handleRemoveLabel(l)}
+                                            >
+                                                <X size={15} />
+                                            </Button>
+                                        }
                                     </li>
                                 ))}
                                 <li className="h-8 flex flex-wrap gap-2">
                                     {
-                                        labelsHover && !labelsEditable &&
+                                        labelsHover && !labelsEditable && session?.user?.role !== "Read-Only" &&
                                         <Button
                                             className="p-2 text-xs justify-center border border-foreground"
                                             variant="Secondary"
@@ -358,71 +361,60 @@ export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement,
                                 <TableCell>
                                     <div className="h-10 w-6 flex flex-col items-center gap-2 justify-center">
                                         {
-                                            editable === key && session?.user?.role !== "Read-Only" ?
-                                                <>
-                                                    <Button
-                                                        variant="button"
-                                                        title="Save"
-                                                        onClick={(e) => {
+                                            session?.user?.role !== "Read-Only" && (
+                                                editable === key ?
+                                                    <>
+                                                        <Button variant="button" onClick={(e) => {
                                                             e.stopPropagation()
                                                             setProperty(key, newVal, true)
-                                                        }}
-                                                    >
-                                                        <Check size={20} />
-                                                    </Button>
-                                                    <Button
-                                                        variant="button"
-                                                        title="Cancel"
-                                                        onClick={(e) => {
+                                                        }}>
+                                                            <Check size={20} />
+                                                        </Button>
+                                                        <Button variant="button" onClick={(e) => {
                                                             e.stopPropagation()
                                                             handleSetEditable("", "")
                                                         }}>
-                                                        <X size={20} />
-                                                    </Button>
-                                                </>
-                                                : hover === key &&
-                                                <>
-                                                    <Button
-                                                        variant="button"
-                                                        title="Edit"
-                                                        onClick={() => handleSetEditable(key, obj.data[key])}
-                                                    >
-                                                        <Pencil size={20} />
-                                                    </Button>
-                                                    <DialogComponent
-                                                        trigger={
-                                                            <Button
-                                                                variant="button"
-                                                                title="Delete"
-                                                            >
-                                                                <Trash2 size={20} />
-                                                            </Button>
-                                                        }
-                                                        title="Delete Attribute"
-                                                        description="Are you sure you want to delete this attribute?"
-                                                    >
-                                                        <div className="flex justify-end gap-4">
-                                                            <Button
-                                                                variant="Primary"
-                                                                label="Delete"
-                                                                title="Confirm deletion of the attribute"
-                                                                onClick={() => removeProperty(key)}
-                                                            />
-                                                            <CloseDialog
-                                                                label="Cancel"
-                                                                title="Cancel the deletion of the attribute"
-                                                                variant="Cancel"
-                                                            />
-                                                        </div>
-                                                    </DialogComponent>
-                                                </>
+                                                            <X size={20} />
+                                                        </Button>
+                                                    </>
+                                                    : hover === key &&
+                                                    <>
+                                                        <Button variant="button" onClick={() => handleSetEditable(key, obj.data[key])}>
+                                                            <Pencil size={20} />
+                                                        </Button>
+                                                        <DialogComponent
+                                                            trigger={
+                                                                <Button
+                                                                    variant="button"
+                                                                    title="Delete Attribute"
+                                                                >
+                                                                    <Trash2 size={20} />
+                                                                </Button>
+                                                            }
+                                                            title="Delete Attribute"
+                                                            description="Are you sure you want to delete this attribute?"
+                                                        >
+                                                            <div className="flex justify-end gap-4">
+                                                                <Button
+                                                                    variant="Primary"
+                                                                    label="Delete"
+                                                                    onClick={() => removeProperty(key)}
+                                                                />
+                                                                <CloseDialog
+                                                                    label="Cancel"
+                                                                    variant="Cancel"
+                                                                />
+                                                            </div>
+                                                        </DialogComponent>
+                                                    </>
+                                            )
                                         }
                                     </div>
                                 </TableCell>
                                 <TableCell>{key}:</TableCell>
                                 <TableCell>
                                     {
-                                        editable === key && session?.user?.role !== "Read-Only" ?
+                                        editable === key ?
                                             <Input
                                                 className="w-full"
                                                 value={newVal}
@@ -441,7 +433,7 @@ export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement,
                         ))
                     }
                     {
-                        isAddValue && session?.user?.role !== "Read-Only" &&
+                        isAddValue &&
                         <TableRow>
                             <TableCell className="flex flex-col items-center gap-2">
                                 <Button
@@ -480,33 +472,38 @@ export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement,
                     }
                 </TableBody>
                 <TableCaption>
-                    <Button
-                        variant="Primary"
-                        label="Add Attribute"
-                        title="Add a new attribute"
-                        onClick={() => setIsAddValue(true)}
-                    >
-                        <Plus size={20} />
-                    </Button>
+                    {
+                        session?.user?.role !== "Read-Only" &&
+                        <Button
+                            variant="Primary"
+                            label="Add Attribute"
+                            title="Add a new attribute"
+                            onClick={() => setIsAddValue(true)}
+                        >
+                            <Plus size={20} />
+                        </Button>
+                    }
                 </TableCaption>
             </Table>
             <div className="flex justify-end p-4">
-                <DeleteElement
-                    description={`Are you sure you want to delete this ${type ? "Node" : "Relation"}?`}
-                    open={deleteOpen}
-                    setOpen={setDeleteOpen}
-                    onDeleteElement={onDeleteElement}
-                    trigger={
-                        <Button
-                            disabled={session?.user?.role === "Read-Only"}
-                            variant="Primary"
-                            label={`Delete ${type ? "Node" : "Relation"}`}
-                            title={`Delete the selected ${type ? "Node" : "Relation"}`}
-                        >
-                            <Trash2 size={20} />
-                        </Button>
-                    }
-                />
+                {
+                    session?.user?.role !== "Read-Only" &&
+                    <DeleteElement
+                        description={`Are you sure you want to delete this ${type ? "Node" : "Relation"}?`}
+                        open={deleteOpen}
+                        setOpen={setDeleteOpen}
+                        onDeleteElement={onDeleteElement}
+                        trigger={
+                            <Button
+                                variant="Primary"
+                                label={`Delete ${type ? "Node" : "Relation"}`}
+                                title={`Delete the selected ${type ? "Node" : "Relation"}`}
+                            >
+                                <Trash2 size={20} />
+                            </Button>
+                        }
+                    />
+                }
             </div>
         </div>
     )

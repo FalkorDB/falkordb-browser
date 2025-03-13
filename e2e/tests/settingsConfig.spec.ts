@@ -149,7 +149,7 @@ test.describe('Settings Tests', () => {
         const settingsConfigPage = await browser.createNewPage(SettingsConfigPage, urls.settingsUrl)
         await settingsConfigPage.modifyRoleValue(roles.maxQueuedQueries, Data.roleModificationData[0].input)
         const apiCall = new ApiCalls()
-        let value = String((await apiCall.getSettingsRoleValue(roles.maxQueuedQueries)).config[1]);
+        const value = String((await apiCall.getSettingsRoleValue(roles.maxQueuedQueries)).config[1]);
         expect(value === Data.roleModificationData[0].input).toBe(true);
         await apiCall.modifySettingsRole(roles.maxQueuedQueries, "25")
     });
@@ -158,7 +158,7 @@ test.describe('Settings Tests', () => {
         const settingsConfigPage = await browser.createNewPage(SettingsConfigPage, urls.settingsUrl)
         await settingsConfigPage.modifyRoleValue(roles.TimeOut, Data.roleModificationData[1].input)
         const apiCall = new ApiCalls()
-        let value = String((await apiCall.getSettingsRoleValue(roles.TimeOut)).config[1]);
+        const value = String((await apiCall.getSettingsRoleValue(roles.TimeOut)).config[1]);
         expect(value === Data.roleModificationData[1].input).toBe(true);
         await apiCall.modifySettingsRole(roles.TimeOut, "1000")
     });
@@ -167,7 +167,7 @@ test.describe('Settings Tests', () => {
         const settingsConfigPage = await browser.createNewPage(SettingsConfigPage, urls.settingsUrl)
         await settingsConfigPage.modifyRoleValue(roles.maxTimeOut, Data.roleModificationData[2].input)
         const apiCall = new ApiCalls()
-        let value = String((await apiCall.getSettingsRoleValue(roles.maxTimeOut)).config[1]);
+        const value = String((await apiCall.getSettingsRoleValue(roles.maxTimeOut)).config[1]);
         expect(value === Data.roleModificationData[2].input).toBe(true);
         await apiCall.modifySettingsRole(roles.maxTimeOut, "0")
     });
@@ -176,7 +176,7 @@ test.describe('Settings Tests', () => {
         const settingsConfigPage = await browser.createNewPage(SettingsConfigPage, urls.settingsUrl)
         await settingsConfigPage.modifyRoleValue(roles.defaultTimeOut, Data.roleModificationData[3].input)
         const apiCall = new ApiCalls()
-        let value = String((await apiCall.getSettingsRoleValue(roles.defaultTimeOut)).config[1]);
+        const value = String((await apiCall.getSettingsRoleValue(roles.defaultTimeOut)).config[1]);
         expect(value === Data.roleModificationData[3].input).toBe(true);
         await apiCall.modifySettingsRole(roles.defaultTimeOut, "0")
     });
@@ -185,7 +185,7 @@ test.describe('Settings Tests', () => {
         const settingsConfigPage = await browser.createNewPage(SettingsConfigPage, urls.settingsUrl)
         await settingsConfigPage.modifyRoleValue(roles.resultSetSize, Data.roleModificationData[4].input)
         const apiCall = new ApiCalls()
-        let value = String((await apiCall.getSettingsRoleValue(roles.resultSetSize)).config[1]);
+        const value = String((await apiCall.getSettingsRoleValue(roles.resultSetSize)).config[1]);
         expect(value === Data.roleModificationData[4].input).toBe(true);
         await apiCall.modifySettingsRole(roles.resultSetSize, "10000")
     });
@@ -194,7 +194,7 @@ test.describe('Settings Tests', () => {
         const settingsConfigPage = await browser.createNewPage(SettingsConfigPage, urls.settingsUrl)
         await settingsConfigPage.modifyRoleValue(roles.queryMemCapacity, Data.roleModificationData[5].input)
         const apiCall = new ApiCalls()
-        let value = String((await apiCall.getSettingsRoleValue(roles.queryMemCapacity)).config[1]);
+        const value = String((await apiCall.getSettingsRoleValue(roles.queryMemCapacity)).config[1]);
         expect(value === Data.roleModificationData[5].input).toBe(true);
         await apiCall.modifySettingsRole(roles.queryMemCapacity, "0")
     });
@@ -203,7 +203,7 @@ test.describe('Settings Tests', () => {
         const settingsConfigPage = await browser.createNewPage(SettingsConfigPage, urls.settingsUrl)
         await settingsConfigPage.modifyRoleValue(roles.vKeyMaxEntityCount, Data.roleModificationData[6].input)
         const apiCall = new ApiCalls()
-        let value = String((await apiCall.getSettingsRoleValue(roles.vKeyMaxEntityCount)).config[1]);
+        const value = String((await apiCall.getSettingsRoleValue(roles.vKeyMaxEntityCount)).config[1]);
         expect(value === Data.roleModificationData[6].input).toBe(true);
         await apiCall.modifySettingsRole(roles.vKeyMaxEntityCount, "100000")
     });
@@ -212,9 +212,16 @@ test.describe('Settings Tests', () => {
         const settingsConfigPage = await browser.createNewPage(SettingsConfigPage, urls.settingsUrl)
         await settingsConfigPage.modifyRoleValue(roles.cmdInfo, Data.roleModificationData[7].input)
         const apiCall = new ApiCalls()
-        let value = String((await apiCall.getSettingsRoleValue(roles.cmdInfo)).config[1]);
-        value = value === '1' ? 'yes' : value === '0' ? 'no' : value;
-        expect(value === Data.roleModificationData[7].input).toBe(true);
+        const value = String((await apiCall.getSettingsRoleValue(roles.cmdInfo)).config[1]);
+        let modifiedValue
+        if (value === '1') {
+            modifiedValue = 'yes'
+        } else if (value === '0') {
+            modifiedValue = 'no'
+        } else {
+            modifiedValue = value
+        }
+        expect(modifiedValue === Data.roleModificationData[7].input).toBe(true);
         await apiCall.modifySettingsRole(roles.cmdInfo, "yes")
     });
 
@@ -224,7 +231,7 @@ test.describe('Settings Tests', () => {
         await settingsConfigPage.refreshPage();
         await settingsConfigPage.getRoleContentValue(roles.maxInfoQueries);
         const apiCall = new ApiCalls()
-        let value = String((await apiCall.getSettingsRoleValue(roles.maxInfoQueries)).config[1]);
+        const value = String((await apiCall.getSettingsRoleValue(roles.maxInfoQueries)).config[1]);
         expect(value).toBe(Data.roleModificationData[8].input);
         await apiCall.modifySettingsRole(roles.maxInfoQueries, "1000");
     });

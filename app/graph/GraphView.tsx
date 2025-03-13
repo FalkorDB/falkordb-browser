@@ -6,10 +6,9 @@
 import { useRef, useState, useEffect, Dispatch, SetStateAction } from "react";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { ImperativePanelHandle } from "react-resizable-panels";
-import { ChevronLeft, GitGraph, Maximize2, Minimize2, Pause, Play, Table } from "lucide-react"
+import { ChevronLeft, GitGraph, Maximize2, Minimize2, Pause, Play, Search, Table } from "lucide-react"
 import { cn, handleZoomToFit, prepareArg, securedFetch } from "@/lib/utils";
 import dynamic from "next/dynamic";
-import { Session } from "next-auth";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/components/ui/use-toast";
 import { Switch } from "@/components/ui/switch";
@@ -21,11 +20,12 @@ import Labels from "./labels";
 import Toolbar from "./toolbar";
 import Button from "../components/ui/Button";
 import TableView from "./TableView";
+import Input from "../components/ui/Input";
 
 const ForceGraph = dynamic(() => import("../components/ForceGraph"), { ssr: false });
 const EditorComponent = dynamic(() => import("../components/EditorComponent"), { ssr: false })
 
-function GraphView({ graph, selectedElement, setSelectedElement, runQuery, historyQuery, historyQueries, setHistoryQueries, fetchCount, session }: {
+function GraphView({ graph, selectedElement, setSelectedElement, runQuery, historyQuery, historyQueries, setHistoryQueries, fetchCount }: {
     graph: Graph
     selectedElement: Node | Link | undefined
     setSelectedElement: Dispatch<SetStateAction<Node | Link | undefined>>
@@ -34,7 +34,6 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
     historyQueries: string[]
     setHistoryQueries: (queries: string[]) => void
     fetchCount: () => void
-    session: Session | null
 }) {
 
     const [data, setData] = useState<GraphData>(graph.Elements)
@@ -46,6 +45,7 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
     const [maximize, setMaximize] = useState<boolean>(false)
     const [tabsValue, setTabsValue] = useState<string>("")
     const [cooldownTicks, setCooldownTicks] = useState<number | undefined>(0)
+    const [searchElement, setSearchElement] = useState<string>("")
     const { toast } = useToast()
 
     useEffect(() => {
@@ -125,7 +125,7 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
 
     const onCategoryClick = (category: Category) => {
         category.show = !category.show
-        
+
         category.elements.forEach((element) => {
             if (element.category[0] !== category.name) return
             if (category.show) {
@@ -173,7 +173,7 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
 
         const result = await securedFetch(`api/graph/${prepareArg(graph.Id)}/?query=${prepareArg(q)} `, {
             method: "GET"
-        }, session?.user?.role, toast)
+        }, toast)
 
         if (!result.ok) return
 
@@ -188,7 +188,7 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
             }
 
             const category = type ? graph.CategoriesMap.get(element.category[0]) : graph.LabelsMap.get(element.label)
-            
+
             if (category) {
                 category.elements = category.elements.filter((e) => e.id !== id)
                 if (category.elements.length === 0) {
@@ -233,12 +233,12 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
         handleCooldown()
     }
 
-    
+
     const handleAddLabel = async (label: string) => {
         const q = `MATCH (n) WHERE ID(n) = ${selectedElement?.id} SET n:${label}`
         const result = await securedFetch(`api/graph/${prepareArg(graph.Id)}/?query=${prepareArg(q)}`, {
             method: "GET"
-        }, session?.user?.role, toast)
+        }, toast)
 
         if (result.ok) {
             graph.createCategory([label], selectedElement as Node)
@@ -257,7 +257,7 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
         const q = `MATCH (n) WHERE ID(n) = ${selectedElement?.id} REMOVE n:${label}`
         const result = await securedFetch(`api/graph/${prepareArg(graph.Id)}/?query=${prepareArg(q)}`, {
             method: "GET"
-        }, session?.user?.role, toast)
+        }, toast)
 
         if (result.ok) {
             const category = graph.CategoriesMap.get(label)
@@ -279,6 +279,16 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
         }
 
         return result.ok
+    }
+
+    const handleSearchElement = () => {
+        if (searchElement) {
+            const element = graph.Elements.nodes.find(node => node.data.name ? node.data.name.toLowerCase().startsWith(searchElement.toLowerCase()) : node.id.toString().toLowerCase().includes(searchElement.toLowerCase()))
+            if (element) {
+                handleZoomToFit(chartRef, (node: Node) => node.id === element.id)
+                setSelectedElement(element)
+            }
+        }
     }
 
     return (
@@ -330,7 +340,7 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
                             <div className="flex items-center justify-between">
                                 <Toolbar
                                     disabled={!graph.Id}
-                                    deleteDisabled={(Object.values(selectedElements).length === 0 && !selectedElement) || session?.user.role === "Read-Only"}
+                                    deleteDisabled={(Object.values(selectedElements).length === 0 && !selectedElement)}
                                     onDeleteElement={handleDeleteElement}
                                     chartRef={chartRef}
                                     displayAdd={false}
@@ -357,7 +367,7 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
                                 </Button>
                                 {
                                     graph.getElements().length > 0 &&
-                                    <div className="z-10 absolute top-4 left-4 pointer-events-none">
+                                    <div className="z-10 absolute top-4 left-4 pointer-events-none flex gap-4">
                                         <Tooltip>
                                             <TooltipTrigger asChild>
                                                 <div className="flex items-center gap-2">
@@ -375,6 +385,26 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
                                                 <p>Animation Control</p>
                                             </TooltipContent>
                                         </Tooltip>
+                                        <div className="relative pointer-events-auto">
+                                            <Input
+                                                className="w-[20dvw]"
+                                                placeholder="Search for element in the graph"
+                                                value={searchElement}
+                                                onChange={(e) => setSearchElement(e.target.value)}
+                                                onKeyDown={(e) => {
+                                                    if (e.key === 'Enter') {
+                                                        handleSearchElement()
+                                                        setSearchElement("")
+                                                    }
+                                                }}
+                                            />
+                                            <Button
+                                                className="absolute right-2 top-2"
+                                                onClick={handleSearchElement}
+                                            >
+                                                <Search color="black" />
+                                            </Button>
+                                        </div>
                                     </div>
                                 }
                                 <ForceGraph

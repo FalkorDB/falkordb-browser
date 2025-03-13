@@ -156,7 +156,7 @@ export class Graph {
         this.labelsMap = labelsMap;
         this.nodesMap = nodesMap;
         this.linksMap = edgesMap;
-        this.COLORS_ORDER_VALUE = [...(colors || DEFAULT_COLORS)]
+        this.COLORS_ORDER_VALUE = [...(colors && colors.length > 0 ? colors : DEFAULT_COLORS)]
     }
 
     get Id(): string {
@@ -265,7 +265,7 @@ export class Graph {
             this.nodesMap.set(cell.id, node)
             this.elements.nodes.push(node)
             node.category.forEach(c => {
-              this.categoriesMap.get(c)!.elements.push(node)
+                this.categoriesMap.get(c)!.elements.push(node)
             })
             return node
         }
@@ -281,8 +281,12 @@ export class Graph {
                 currentNode.data[key] = isSchema ? getSchemaValue(value) : value;
             });
             currentNode.category.forEach(c => {
-              this.categoriesMap.get(c)!.elements.push(currentNode)
+                this.categoriesMap.get(c)!.elements.push(currentNode)
             })
+            const category = this.categoriesMap.get("")
+            if (category) {
+                category.elements = category.elements.filter(e => e.id !== currentNode.id)
+            }
         }
 
         return undefined
@@ -315,6 +319,7 @@ export class Graph {
                         data: {},
                     }
 
+                    category?.elements.push(source)
                     this.nodesMap.set(cell.sourceId, source)
                     this.elements.nodes.push(source)
                 }
@@ -351,6 +356,7 @@ export class Graph {
                         data: {},
                     }
 
+                    category?.elements.push(source)
                     this.nodesMap.set(cell.sourceId, source)
                     this.elements.nodes.push(source)
                 }
@@ -367,10 +373,11 @@ export class Graph {
                         displayName: "",
                         data: {},
                     }
-                }
 
-                this.nodesMap.set(cell.destinationId, target)
-                this.elements.nodes.push(target)
+                    category?.elements.push(target)
+                    this.nodesMap.set(cell.destinationId, target)
+                    this.elements.nodes.push(target)
+                }
 
                 link = {
                     id: cell.id,
@@ -459,7 +466,8 @@ export class Graph {
         })
 
         // remove empty category if there are no more empty nodes category
-        if (Array.from(this.nodesMap.values()).every(n => n.category.some(c => c !== ""))) {
+        const emptyCategory = this.categoriesMap.get("")
+        if (emptyCategory && emptyCategory.elements.length === 0) {
             this.categories = this.categories.filter(c => c.name !== "")
             this.categoriesMap.delete("")
         }
@@ -540,9 +548,13 @@ export class Graph {
             return this.COLORS_ORDER_VALUE[index];
         }
 
-        const newColor = `hsl(${(index - 4) * 20}, 100%, 70%)`
+        let newColor
+        let i = index
+        do {
+            newColor = `hsl(${(i - Math.min(DEFAULT_COLORS.length, this.COLORS_ORDER_VALUE.length)) * 20}, 100%, 70%)`
+            i += 1
+        } while (this.COLORS_ORDER_VALUE.includes(newColor))
         this.COLORS_ORDER_VALUE.push(newColor)
-        DEFAULT_COLORS.push(newColor)
         return newColor
     }
 }

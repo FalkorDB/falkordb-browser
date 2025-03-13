@@ -31,7 +31,7 @@ export default class GraphPage extends BasePage {
     private get exportDataBtn(): Locator {
         return this.page.getByRole("button", { name: "Export Data" });
     }
-    
+
     private get exportDataConfirmBtn(): Locator {
         return this.page.getByRole("button", { name: "Download" });
     }
@@ -58,7 +58,7 @@ export default class GraphPage extends BasePage {
 
     async countGraphsInMenu(): Promise<number> {
         await waitForTimeOut(this.page, 1000);
-        
+
         if (await this.graphsMenu.isEnabled()) {
             await this.graphsMenu.click();
             await this.manageGraphBtn.click();
@@ -66,7 +66,7 @@ export default class GraphPage extends BasePage {
             await this.refreshPage();
             return count;
         }
-        
+
         return 0;
     }
 
@@ -100,11 +100,11 @@ export default class GraphPage extends BasePage {
 
     async verifyGraphExists(graph: string): Promise<boolean> {
         if (await this.graphsMenu.isDisabled()) return false;
-        
+
         await this.graphsMenu.click();
         await this.manageGraphBtn.click();
         const isVisible = await this.findGraphInMenu(graph).isVisible();
-        
+
         return isVisible;
     }
 
@@ -115,5 +115,4 @@ export default class GraphPage extends BasePage {
         await this.deleteGraphBtn.click();
         await this.deleteGraphConfirmBtn.click();
     }
-
 }

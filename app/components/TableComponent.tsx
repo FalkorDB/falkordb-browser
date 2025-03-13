@@ -258,7 +258,7 @@ export default function TableComponent({ headers, rows, children, setRows, optio
                                                                     {cell.value}
                                                                 </TooltipContent>
                                                             </Tooltip>
-                                                            <div>
+                                                            <div className="w-4">
                                                                 {
                                                                     cell.onChange && hover === `${i}` &&
                                                                     <Button
