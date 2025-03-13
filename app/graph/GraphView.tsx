@@ -370,6 +370,7 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
                                     chartRef={chartRef}
                                     data={data}
                                     onExpand={onExpand}
+                                    setData={setData}
                                     selectedElement={selectedElement}
                                     setSelectedElement={setSelectedElement}
                                     selectedElements={selectedElements}

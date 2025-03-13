@@ -6,22 +6,23 @@ import Button, { Variant } from "./ui/Button";
 
 /* eslint-disable react/require-default-props */
 interface Props extends React.DetailedHTMLProps<React.ButtonHTMLAttributes<HTMLButtonElement>, HTMLButtonElement> {
-    icon?: JSX.Element
     label?: string
     variant?: Variant
 }
 
-export default function CloseDialog({ className, label, icon, ...props }: Props) {
+export default function CloseDialog({ className, label, children, ...props }: Props) {
     return (
         <DialogClose asChild >
             <Button
+                aria-label="Close"
                 variant={label === "Cancel" ? "Cancel" : undefined}
                 className={className}
                 label={label}
                 // eslint-disable-next-line react/jsx-props-no-spreading
                 {...props}
             >
-                {!label && <X />}
+                {(!label && !children) && <X />}
+                {children}
             </Button>
         </DialogClose>
     )

@@ -464,6 +464,7 @@ export default function SchemaView({ schema, fetchCount, session }: Props) {
                     <ForceGraph
                         chartRef={chartRef}
                         data={data}
+                        setData={setData}
                         graph={schema}
                         onExpand={onExpand}
                         selectedElement={selectedElement}

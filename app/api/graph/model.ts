@@ -156,7 +156,7 @@ export class Graph {
         this.labelsMap = labelsMap;
         this.nodesMap = nodesMap;
         this.linksMap = edgesMap;
-        this.COLORS_ORDER_VALUE = [...(colors || DEFAULT_COLORS)]
+        this.COLORS_ORDER_VALUE = [...(colors && colors.length > 0 ? colors : DEFAULT_COLORS)]
     }
 
     get Id(): string {
@@ -265,7 +265,7 @@ export class Graph {
             this.nodesMap.set(cell.id, node)
             this.elements.nodes.push(node)
             node.category.forEach(c => {
-                this.categoriesMap.get(c)!.elements.push(node)
+              this.categoriesMap.get(c)!.elements.push(node)
             })
             return node
         }
@@ -285,7 +285,7 @@ export class Graph {
             })
         }
 
-        return currentNode
+        return undefined
     }
 
     public extendEdge(cell: LinkCell, collapsed: boolean, isSchema: boolean) {
@@ -392,13 +392,11 @@ export class Graph {
 
             this.linksMap.set(cell.id, link)
             this.elements.links.push(link)
-
+            this.labelsMap.get(link.label)?.elements.push(link)
             return link
         }
 
-        this.labelsMap.get(currentEdge.label)?.elements.push(currentEdge)
-
-        return currentEdge
+        return undefined
     }
 
     public extend(results: { data: Data, metadata: any[] }, collapsed = false, isSchema = false): (Node | Link)[] {
@@ -417,17 +415,21 @@ export class Graph {
         this.data.forEach((row: DataRow) => {
             Object.values(row).forEach((cell: any) => {
                 if (cell instanceof Object) {
+                    let element: Node | Link | undefined
                     if (cell.nodes) {
                         cell.nodes.forEach((node: any) => {
-                            newElements.push(this.extendNode(node, collapsed, isSchema))
+                            element = this.extendNode(node, collapsed, isSchema)
                         })
                         cell.edges.forEach((edge: any) => {
-                            newElements.push(this.extendEdge(edge, collapsed, isSchema))
+                            element = this.extendEdge(edge, collapsed, isSchema)
                         })
                     } else if (cell.relationshipType) {
-                        newElements.push(this.extendEdge(cell, collapsed, isSchema))
+                        element = this.extendEdge(cell, collapsed, isSchema)
                     } else if (cell.labels) {
-                        newElements.push(this.extendNode(cell, collapsed, isSchema))
+                        element = this.extendNode(cell, collapsed, isSchema)
+                    }
+                    if (element) {
+                        newElements.push(element)
                     }
                 }
             })
@@ -538,9 +540,13 @@ export class Graph {
             return this.COLORS_ORDER_VALUE[index];
         }
 
-        const newColor = `hsl(${(index - 4) * 20}, 100%, 70%)`
+        let newColor
+        let i = index
+        do {
+            newColor = `hsl(${(i - Math.min(DEFAULT_COLORS.length, this.COLORS_ORDER_VALUE.length)) * 20}, 100%, 70%)`
+            i += 1
+        } while (this.COLORS_ORDER_VALUE.includes(newColor))
         this.COLORS_ORDER_VALUE.push(newColor)
-        DEFAULT_COLORS.push(newColor)
         return newColor
     }
 

@@ -73,7 +73,7 @@ export default function TableComponent({ headers, rows, children, setRows, optio
 
     return (
         <div className={cn("h-full w-full flex flex-col gap-4", className)}>
-            <div className="flex gap-4">
+            <div className="flex gap-4" id="search">
                 {children}
                 {
                     isSearchable ?
@@ -245,7 +245,7 @@ export default function TableComponent({ headers, rows, children, setRows, optio
                                                                     {cell.value}
                                                                 </TooltipContent>
                                                             </Tooltip>
-                                                            <div>
+                                                            <div className="w-4">
                                                                 {
                                                                     cell.onChange && hover === `${i}` &&
                                                                     <Button
