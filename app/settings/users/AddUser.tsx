@@ -128,6 +128,7 @@ export default function AddUser({ onAddUser }: {
                 <Button
                     variant="Primary"
                     label="Add User"
+                    title="Add a new user to the system"
                 >
                     <PlusCircle size={20} />
                 </Button>

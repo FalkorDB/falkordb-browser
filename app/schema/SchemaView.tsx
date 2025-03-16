@@ -56,7 +56,7 @@ export default function SchemaView({ schema, fetchCount }: Props) {
     const [cooldownTicks, setCooldownTicks] = useState<number | undefined>(0)
     const [data, setData] = useState<GraphData>(schema.Elements)
     const { toast } = useToast()
-
+    
     useEffect(() => {
         setData({ ...schema.Elements })
     }, [schema.Elements, schema.Id])
@@ -396,7 +396,6 @@ export default function SchemaView({ schema, fetchCount }: Props) {
             >
                 <div className="flex items-center justify-between">
                     <Toolbar
-                        selectedElementsLength={selectedElements.length}
                         disabled={!schema.Id}
                         deleteDisabled={Object.values(selectedElements).length === 0 && !selectedElement}
                         onAddEntity={() => {
@@ -416,6 +415,7 @@ export default function SchemaView({ schema, fetchCount }: Props) {
                         onDeleteElement={handleDeleteElement}
                         chartRef={chartRef}
                         displayAdd
+                        type="Schema"
                     />
                     {
                         isCollapsed &&

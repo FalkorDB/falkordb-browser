@@ -9,7 +9,7 @@ export default class SettingsUsersPage extends BasePage {
     }
 
     private get addUserButton(): Locator {
-        return this.page.getByRole("button", { name: "Add User" });
+        return this.page.locator("//button[contains(text(), 'Add User')]");
     }
 
     private get submitUserAddition(): Locator {
@@ -65,15 +65,15 @@ export default class SettingsUsersPage extends BasePage {
     }
 
     private get deleteUsersBtn(): Locator {
-        return this.page.getByRole("button", { name: "Delete Users" })
+        return this.page.locator("//button[contains(text(), 'Delete Users')]")
     }
 
     private get searchBtn(): Locator {
-        return this.page.locator("//div[@id='search']/button");
+        return this.page.locator("//div[@id='tableComponent']/button");
     }
 
     private get searchInput(): Locator {
-        return this.page.locator("//div[@id='search']/input");
+        return this.page.locator("//div[@id='tableComponent']/input");
     }
 
     private get tableRoles(): Locator {

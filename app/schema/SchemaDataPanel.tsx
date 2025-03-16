@@ -230,7 +230,8 @@ export default function SchemaDataPanel({ obj, onExpand, onSetAttributes, onRemo
                                         <Button
                                             className="p-2 text-xs justify-center border border-foreground"
                                             variant="Secondary"
-                                            label="Edit"
+                                            label="Add"
+                                            title="Add a new label"
                                             onClick={() => setLabelsEditable(true)}
                                         >
                                             <Pencil size={15} />
@@ -262,6 +263,7 @@ export default function SchemaDataPanel({ obj, onExpand, onSetAttributes, onRemo
                                                 className="p-2 text-xs justify-center border border-foreground"
                                                 variant="Secondary"
                                                 label="Save"
+                                                title="Save the new label"
                                                 onClick={() => handleAddLabel()}
                                                 isLoading={isLabelLoading}
                                             >
@@ -273,6 +275,7 @@ export default function SchemaDataPanel({ obj, onExpand, onSetAttributes, onRemo
                                                     className="p-2 text-xs justify-center border border-foreground"
                                                     variant="Secondary"
                                                     label="Cancel"
+                                                    title="Discard the new label"
                                                     onClick={() => {
                                                         setLabelsEditable(false)
                                                         setNewLabel("")
@@ -390,6 +393,7 @@ export default function SchemaDataPanel({ obj, onExpand, onSetAttributes, onRemo
                                                             className="p-2 justify-center border border-foreground"
                                                             variant="Secondary"
                                                             label="Save"
+                                                            title="Save the attribute changes"
                                                             onClick={(e) => {
                                                                 e.stopPropagation()
                                                                 handleSetAttribute(true)
@@ -404,6 +408,7 @@ export default function SchemaDataPanel({ obj, onExpand, onSetAttributes, onRemo
                                                                 className="p-2 justify-center border border-foreground"
                                                                 variant="Secondary"
                                                                 label="Cancel"
+                                                                title="Discard the attribute changes"
                                                                 onClick={(e) => {
                                                                     e.stopPropagation()
                                                                     handleSetEditable()
@@ -432,6 +437,7 @@ export default function SchemaDataPanel({ obj, onExpand, onSetAttributes, onRemo
                                                                 <Button
                                                                     variant="Primary"
                                                                     label="Delete"
+                                                                    title="Confirm the deletion of the attribute"
                                                                     onClick={() => handleRemoveAttribute(key)}
                                                                     isLoading={isRemoveLoading}
                                                                 />
@@ -448,6 +454,7 @@ export default function SchemaDataPanel({ obj, onExpand, onSetAttributes, onRemo
                                                             className="p-2 justify-center border border-foreground"
                                                             variant="Secondary"
                                                             label="Edit"
+                                                            title="Modify this attribute"
                                                             onClick={(e) => {
                                                                 e.stopPropagation()
                                                                 handleSetEditable([key, [...val]])
@@ -531,6 +538,7 @@ export default function SchemaDataPanel({ obj, onExpand, onSetAttributes, onRemo
                                         className="p-2 justify-center border border-foreground"
                                         variant="Secondary"
                                         label="Save"
+                                        title="Save the new attribute"
                                         onClick={(e) => {
                                             e.stopPropagation()
                                             handleAddAttribute()
@@ -539,21 +547,19 @@ export default function SchemaDataPanel({ obj, onExpand, onSetAttributes, onRemo
                                     >
                                         <Check size={20} />
                                     </Button>
-                                    {
-                                        !isAddLoading &&
-                                        <Button
-                                            className="p-2 justify-center border border-foreground"
-                                            variant="Secondary"
-                                            label="Cancel"
-                                            onClick={(e) => {
-                                                e.stopPropagation()
-                                                handleSetEditable()
-                                                setIsAddValue(false)
-                                            }}
-                                        >
-                                            <X size={20} />
-                                        </Button>
-                                    }
+                                    <Button
+                                        className="p-2 justify-center border border-foreground"
+                                        variant="Secondary"
+                                        label="Cancel"
+                                        title="Discard the new attribute"
+                                        onClick={(e) => {
+                                            e.stopPropagation()
+                                            handleSetEditable()
+                                            setIsAddValue(false)
+                                        }}
+                                    >
+                                        <X size={20} />
+                                    </Button>
                                 </div>
                             </TableCell>
                         </TableRow>
@@ -565,6 +571,7 @@ export default function SchemaDataPanel({ obj, onExpand, onSetAttributes, onRemo
                         <Button
                             variant="Primary"
                             label="Add Value"
+                            title="Add a new attribute"
                             onClick={() => setIsAddValue(true)}
                         >
                             <PlusCircle size={20} />
@@ -580,15 +587,7 @@ export default function SchemaDataPanel({ obj, onExpand, onSetAttributes, onRemo
                         open={deleteOpen}
                         setOpen={setDeleteOpen}
                         onDeleteElement={onDeleteElement}
-                        trigger={
-                            <Button
-                                disabled={session?.user?.role === "Read-Only"}
-                                variant="Primary"
-                                label={`Delete ${type ? "Node" : "Relation"}`}
-                            >
-                                <Trash2 size={20} />
-                            </Button>
-                        }
+                        trigger={<Button label="Delete" variant="Secondary" title="Remove the selected element" />}
                     />
                 }
             </div>

@@ -318,12 +318,12 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
                         <div className="h-full flex flex-col gap-4">
                             <div className="flex items-center justify-between">
                                 <Toolbar
-                                    selectedElementsLength={selectedElements.length + (selectedElement ? 1 : 0)}
                                     disabled={!graph.Id}
                                     deleteDisabled={(Object.values(selectedElements).length === 0 && !selectedElement)}
                                     onDeleteElement={handleDeleteElement}
                                     chartRef={chartRef}
                                     displayAdd={false}
+                                    type="Graph"
                                 />
                                 {
                                     isCollapsed && graph.Id &&

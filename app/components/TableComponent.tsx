@@ -73,7 +73,7 @@ export default function TableComponent({ headers, rows, children, setRows, optio
 
     return (
         <div className={cn("h-full w-full flex flex-col gap-4", className)}>
-            <div className="flex gap-4" id="search">
+            <div className="flex gap-4" id="tableComponent">
                 {children}
                 {
                     isSearchable ?
@@ -101,6 +101,7 @@ export default function TableComponent({ headers, rows, children, setRows, optio
                         : <Button
                             variant="Secondary"
                             label="Search"
+                            title="Search within the table"
                             onClick={() => setIsSearchable(true)}
                         />
                 }

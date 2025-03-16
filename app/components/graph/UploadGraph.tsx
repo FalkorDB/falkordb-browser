@@ -24,6 +24,7 @@ export default function UploadGraph({ disabled, open, onOpenChange }: {
                 <DialogTrigger asChild>
                     <Button
                         label="Upload Data"
+                        title="Upload data to the graph"
                         disabled={disabled}
                     />
                 </DialogTrigger>
@@ -38,6 +39,7 @@ export default function UploadGraph({ disabled, open, onOpenChange }: {
                     <Button
                         type="submit"
                         label="Upload"
+                        title="Submit the uploaded data"
                         variant="Primary"
                     />
                 </form>

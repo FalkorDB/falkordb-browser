@@ -276,7 +276,8 @@ export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement,
                                         <Button
                                             className="p-2 text-xs justify-center border border-foreground"
                                             variant="Secondary"
-                                            label="Edit"
+                                            label="Add"
+                                            title="Add a new label"
                                             onClick={() => setLabelsEditable(true)}
                                         >
                                             <Pencil size={15} />
@@ -308,6 +309,7 @@ export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement,
                                                 className="p-2 text-xs justify-center border border-foreground"
                                                 variant="Secondary"
                                                 label="Save"
+                                                title="Save the new label"
                                                 onClick={() => handleAddLabel()}
                                                 isLoading={isLabelLoading}
                                             >
@@ -319,6 +321,7 @@ export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement,
                                                     className="p-2 text-xs justify-center border border-foreground"
                                                     variant="Secondary"
                                                     label="Cancel"
+                                                    title="Discard new label"
                                                     onClick={() => {
                                                         setLabelsEditable(false)
                                                         setNewLabel("")
@@ -431,6 +434,7 @@ export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement,
                                             />
                                             : <Button
                                                 label={obj.data[key]}
+                                                title="Click to edit the attribute value"
                                                 variant="button"
                                                 onClick={() => handleSetEditable(key, obj.data[key])}
                                             />
@@ -445,6 +449,7 @@ export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement,
                             <TableCell className="flex flex-col items-center gap-2">
                                 <Button
                                     variant="button"
+                                    title="Save"
                                     onClick={() => handleAddValue(newKey, newVal)}
                                     isLoading={isAddLoading}
                                 >
@@ -452,11 +457,15 @@ export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement,
                                 </Button>
                                 {
                                     !isAddLoading &&
-                                    <Button variant="button" onClick={() => setIsAddValue(false)}>
+                                    <Button
+                                        variant="button"
+                                        onClick={() => setIsAddValue(false)}
+                                        title="Cancel"
+                                    >
                                         <X size={20} />
                                     </Button>
                                 }
-                            </TableCell>
+                            </TableCell >
                             <TableCell>
                                 <Input
                                     ref={ref => !newKey ? ref?.focus() : undefined}
@@ -474,22 +483,23 @@ export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement,
                                     onKeyDown={handleAddKeyDown}
                                 />
                             </TableCell>
-                        </TableRow>
+                        </TableRow >
                     }
-                </TableBody>
+                </TableBody >
                 <TableCaption>
                     {
                         session?.user?.role !== "Read-Only" &&
                         <Button
                             variant="Primary"
                             label="Add Attribute"
+                            title="Add a new attribute"
                             onClick={() => setIsAddValue(true)}
                         >
                             <Plus size={20} />
                         </Button>
                     }
                 </TableCaption>
-            </Table>
+            </Table >
             <div className="flex justify-end p-4">
                 {
                     session?.user?.role !== "Read-Only" &&
@@ -502,6 +512,7 @@ export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement,
                             <Button
                                 variant="Primary"
                                 label={`Delete ${type ? "Node" : "Relation"}`}
+                                title={`Delete the selected ${type ? "Node" : "Relation"}`}
                             >
                                 <Trash2 size={20} />
                             </Button>
@@ -509,6 +520,6 @@ export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement,
                     />
                 }
             </div>
-        </div>
+        </div >
     )
 }
