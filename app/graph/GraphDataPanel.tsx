@@ -42,6 +42,10 @@ export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement,
     const [labelsEditable, setLabelsEditable] = useState(false)
     const [newLabel, setNewLabel] = useState("")
     const type = !("source" in obj)
+    const [isLabelLoading, setIsLabelLoading] = useState(false)
+    const [isAddLoading, setIsAddLoading] = useState(false)
+    const [isSetLoading, setIsSetLoading] = useState(false)
+    const [isRemoveLoading, setIsRemoveLoading] = useState(false)
     const { toast } = useToast()
     const { data: session } = useSession()
 
@@ -63,7 +67,7 @@ export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement,
 
     useEffect(() => {
         setAttributes(Object.keys(obj.data).filter((key) => (key !== "name" || obj.data.name !== obj.id)));
-        setLabel(type ? [...obj.category] : [obj.label]);
+        setLabel(type ? [...obj.category.filter((c) => c !== "")] : [obj.label]);
     }, [obj, type]);
 
     const setProperty = async (key: string, val: string, isUndo: boolean, actionType: ("added" | "set") = "set") => {
@@ -76,56 +80,51 @@ export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement,
             })
             return false
         }
-        const q = `MATCH ${type ? "(e)" : "()-[e]-()"} WHERE id(e) = ${id} SET e.${key} = '${val}'`
-        const success = (await securedFetch(`api/graph/${prepareArg(graph.Id)}/?query=${prepareArg(q)}`, {
-            method: "GET"
-        }, toast)).ok
+        try {
+            if (actionType === "set") setIsSetLoading(true)
+            const q = `MATCH ${type ? "(e)" : "()-[e]-()"} WHERE id(e) = ${id} SET e.${key} = '${val}'`
+            const success = (await securedFetch(`api/graph/${prepareArg(graph.Id)}/?query=${prepareArg(q)}`, {
+                method: "GET"
+            }, toast)).ok
 
-        if (success) {
-            graph.getElements().forEach(e => {
-                if (e.id !== id) return
-                e.data[key] = val
-            })
-            const value = obj.data[key]
-            setObj((prev) => {
-                if (!prev) return prev
-                if ("source" in prev) {
+            if (success) {
+
+                graph.setProperty(key, val, id)
+
+                const value = obj.data[key]
+                setObj((prev) => {
+                    if (!prev) return prev
+                    if ("source" in prev) {
+                        return {
+                            ...prev,
+                            data: {
+                                ...prev.data,
+                                [key]: val
+                            }
+                        } as Link
+                    }
                     return {
                         ...prev,
                         data: {
                             ...prev.data,
                             [key]: val
                         }
-                    } as Link
-                }
-                return {
-                    ...prev,
-                    data: {
-                        ...prev.data,
-                        [key]: val
-                    }
-                } as Node
-            })
-
-            graph.Data = graph.Data.map(row => {
-                const newRow = Object.entries(row).map(([k, cell]) => {
-                    if (cell && typeof cell === "object" && cell.id === id) {
-                        return [k, { ...cell, properties: { ...cell.properties, [key]: val } }]
-                    }
-                    return [k, cell]
+                    } as Node
                 })
-                return Object.fromEntries(newRow)
-            })
-            handleSetEditable("", "")
-            toast({
-                title: "Success",
-                description: `Attribute ${actionType}`,
-                variant: "default",
-                action: isUndo ? <ToastButton onClick={() => setProperty(key, value, false)} /> : undefined
-            })
-        }
 
-        return success
+                handleSetEditable("", "")
+                toast({
+                    title: "Success",
+                    description: `Attribute ${actionType}`,
+                    variant: "default",
+                    action: isUndo ? <ToastButton onClick={() => setProperty(key, value, false)} /> : undefined
+                })
+            }
+
+            return success
+        } finally {
+            if (actionType === "set") setIsSetLoading(false)
+        }
     }
 
     const handleAddValue = async (key: string, value: string) => {
@@ -137,54 +136,49 @@ export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement,
             })
             return
         }
-
-        const success = await setProperty(key, value, false, "added")
-        if (!success) return
-        setIsAddValue(false)
-        setNewKey("")
-        setNewVal("")
+        try {
+            setIsAddLoading(true)
+            const success = await setProperty(key, value, false, "added")
+            if (!success) return
+            setIsAddValue(false)
+            setNewKey("")
+            setNewVal("")
+        } finally {
+            setIsAddLoading(false)
+        }
     }
 
     const removeProperty = async (key: string) => {
-        const { id } = obj
-        const q = `MATCH ${type ? "(e)" : "()-[e]-()"} WHERE id(e) = ${id} SET e.${key} = NULL`
-        const success = (await securedFetch(`api/graph/${prepareArg(graph.Id)}/?query=${prepareArg(q)}`, {
-            method: "GET"
-        }, toast)).ok
+        try {
+            setIsRemoveLoading(true)
+            const { id } = obj
+            const q = `MATCH ${type ? "(e)" : "()-[e]-()"} WHERE id(e) = ${id} SET e.${key} = NULL`
+            const success = (await securedFetch(`api/graph/${prepareArg(graph.Id)}/?query=${prepareArg(q)}`, {
+                method: "GET"
+            }, toast)).ok
 
-        if (success) {
-            const value = obj.data[key]
+            if (success) {
+                const value = obj.data[key]
 
-            graph.getElements().forEach((e) => {
-                if (e.id !== id) return
-                delete e.data[key]
-            })
+                graph.removeProperty(key, id)
 
-            const newObj = { ...obj }
+                const newObj = { ...obj }
 
-            delete newObj.data[key]
-            setObj(newObj)
+                delete newObj.data[key]
+                setObj(newObj)
 
-            graph.Data = graph.Data.map(row => {
-                const newRow = Object.entries(row).map(([k, cell]) => {
-                    if (cell && typeof cell === "object" && cell.id === id) {
-                        delete cell.properties[key]
-                        return [k, cell]
-                    }
-                    return [k, cell]
+                toast({
+                    title: "Success",
+                    description: "Attribute removed",
+                    action: <ToastButton onClick={() => handleAddValue(key, value)} />,
+                    variant: "default"
                 })
-                return Object.fromEntries(newRow)
-            })
+            }
 
-            toast({
-                title: "Success",
-                description: "Attribute removed",
-                action: <ToastButton onClick={() => handleAddValue(key, value)} />,
-                variant: "default"
-            })
+            return success
+        } finally {
+            setIsRemoveLoading(false)
         }
-
-        return success
     }
 
     const handleAddKeyDown = async (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -195,7 +189,7 @@ export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement,
             return
         }
 
-        if (e.key !== "Enter") return
+        if (e.key !== "Enter" || isAddLoading) return
 
         handleAddValue(newKey, newVal)
     }
@@ -206,7 +200,7 @@ export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement,
             setNewKey("")
         }
 
-        if (e.key !== "Enter") return
+        if (e.key !== "Enter" || isSetLoading) return
 
         setProperty(editable, newVal, true)
     }
@@ -228,11 +222,16 @@ export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement,
             })
             return
         }
-        const ok = await onAddLabel(newLabel)
-        if (ok) {
-            setLabel(prev => [...prev, newLabel])
-            setNewLabel("")
-            setLabelsEditable(false)
+        try {
+            setIsLabelLoading(true)
+            const ok = await onAddLabel(newLabel)
+            if (ok) {
+                setLabel(prev => [...prev, newLabel])
+                setNewLabel("")
+                setLabelsEditable(false)
+            }
+        } finally {
+            setIsLabelLoading(false)
         }
     }
 
@@ -299,7 +298,7 @@ export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement,
                                                         setNewLabel("")
                                                     }
 
-                                                    if (e.key !== "Enter") return
+                                                    if (e.key !== "Enter" || isLabelLoading) return
 
                                                     e.preventDefault()
                                                     handleAddLabel()
@@ -310,20 +309,24 @@ export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement,
                                                 variant="Secondary"
                                                 label="Save"
                                                 onClick={() => handleAddLabel()}
+                                                isLoading={isLabelLoading}
                                             >
                                                 <Check size={15} />
                                             </Button>
-                                            <Button
-                                                className="p-2 text-xs justify-center border border-foreground"
-                                                variant="Secondary"
-                                                label="Cancel"
-                                                onClick={() => {
-                                                    setLabelsEditable(false)
-                                                    setNewLabel("")
-                                                }}
-                                            >
-                                                <Check size={15} />
-                                            </Button>
+                                            {
+                                                !isLabelLoading &&
+                                                <Button
+                                                    className="p-2 text-xs justify-center border border-foreground"
+                                                    variant="Secondary"
+                                                    label="Cancel"
+                                                    onClick={() => {
+                                                        setLabelsEditable(false)
+                                                        setNewLabel("")
+                                                    }}
+                                                >
+                                                    <X size={15} />
+                                                </Button>
+                                            }
                                         </>
                                     }
                                 </li>
@@ -361,18 +364,25 @@ export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement,
                                             session?.user?.role !== "Read-Only" && (
                                                 editable === key ?
                                                     <>
-                                                        <Button variant="button" onClick={(e) => {
-                                                            e.stopPropagation()
-                                                            setProperty(key, newVal, true)
-                                                        }}>
+                                                        <Button
+                                                            variant="button"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation()
+                                                                setProperty(key, newVal, true)
+                                                            }}
+                                                            isLoading={isSetLoading}
+                                                        >
                                                             <Check size={20} />
                                                         </Button>
-                                                        <Button variant="button" onClick={(e) => {
-                                                            e.stopPropagation()
-                                                            handleSetEditable("", "")
-                                                        }}>
-                                                            <X size={20} />
-                                                        </Button>
+                                                        {
+                                                            !isSetLoading &&
+                                                            <Button variant="button" onClick={(e) => {
+                                                                e.stopPropagation()
+                                                                handleSetEditable("", "")
+                                                            }}>
+                                                                <X size={20} />
+                                                            </Button>
+                                                        }
                                                     </>
                                                     : hover === key &&
                                                     <>
@@ -396,6 +406,7 @@ export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement,
                                                                     variant="Primary"
                                                                     label="Delete"
                                                                     onClick={() => removeProperty(key)}
+                                                                    isLoading={isRemoveLoading}
                                                                 />
                                                                 <CloseDialog
                                                                     label="Cancel"
@@ -435,12 +446,16 @@ export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement,
                                 <Button
                                     variant="button"
                                     onClick={() => handleAddValue(newKey, newVal)}
+                                    isLoading={isAddLoading}
                                 >
                                     <Check size={20} />
                                 </Button>
-                                <Button variant="button" onClick={() => setIsAddValue(false)}>
-                                    <X size={20} />
-                                </Button>
+                                {
+                                    !isAddLoading &&
+                                    <Button variant="button" onClick={() => setIsAddValue(false)}>
+                                        <X size={20} />
+                                    </Button>
+                                }
                             </TableCell>
                             <TableCell>
                                 <Input

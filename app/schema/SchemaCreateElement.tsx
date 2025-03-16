@@ -36,6 +36,7 @@ export default function SchemaCreateElement({ onCreate, onExpand, selectedNodes,
   const [newLabel, setNewLabel] = useState<string>("")
   const [editable, setEditable] = useState<string>("")
   const [hover, setHover] = useState<string>("")
+  const [isLoading, setIsLoading] = useState<boolean>(false)
   const [labelsHover, setLabelsHover] = useState<boolean>(false)
   const [labelsEditable, setLabelsEditable] = useState<boolean>(false)
   const { toast } = useToast()
@@ -122,11 +123,17 @@ export default function SchemaCreateElement({ onCreate, onExpand, selectedNodes,
       })
       return
     }
-    const ok = await onCreate(attributes, label)
-    if (!ok) return
-    setAttributes([])
-    setAttribute(getDefaultAttribute())
-    setLabel([])
+    try {
+      setIsLoading(true)
+      const ok = await onCreate(attributes, label)
+      if (!ok) return
+      setAttributes([])
+      setAttribute(getDefaultAttribute())
+      setLabel([])
+      setLabelsEditable(false)
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   const handleRemoveLabel = (removeLabel: string) => {
@@ -264,7 +271,8 @@ export default function SchemaCreateElement({ onCreate, onExpand, selectedNodes,
                               return p
                             })}
                             inTable
-                            type="Type"
+
+                            label="Type"
                             selectedValue={attribute[1][0]}
                           />
                         </TableCell>
@@ -390,7 +398,7 @@ export default function SchemaCreateElement({ onCreate, onExpand, selectedNodes,
                     return p
                   })}
                   inTable
-                  type="Type"
+                  label="Type"
                   selectedValue={newAttribute[1][0]}
                 />
               </TableCell>
@@ -465,7 +473,9 @@ export default function SchemaCreateElement({ onCreate, onExpand, selectedNodes,
                   disabled
                   options={OPTIONS}
                   inTable
-                  type="Type"
+                  label="Type"
+                  selectedValue=""
+                  setSelectedValue={() => { }}
                 />
               </TableCell>
               <TableCell>
@@ -551,6 +561,7 @@ export default function SchemaCreateElement({ onCreate, onExpand, selectedNodes,
                 e.preventDefault();
                 handleOnCreate();
               }}
+              isLoading={isLoading}
             />
           </form>
         </div>

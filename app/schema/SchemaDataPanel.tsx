@@ -40,9 +40,16 @@ export default function SchemaDataPanel({ obj, onExpand, onSetAttributes, onRemo
     const [labelsEditable, setLabelsEditable] = useState<boolean>(false)
     const [newLabel, setNewLabel] = useState<string>("")
     const [isAddValue, setIsAddValue] = useState<boolean>(false)
+    const [isAddLoading, setIsAddLoading] = useState<boolean>(false)
+    const [isRemoveLoading, setIsRemoveLoading] = useState<boolean>(false)
+    const [isSetLoading, setIsSetLoading] = useState<boolean>(false)
+    const [isLabelLoading, setIsLabelLoading] = useState<boolean>(false)
+    const [isRemoveLabelLoading, setIsRemoveLabelLoading] = useState<boolean>(false)
     const [deleteOpen, setDeleteOpen] = useState<boolean>(false)
+    const type = !!obj.category
     const { toast } = useToast()
     const { data: session } = useSession()
+
     useEffect(() => {
         setAttributes(Object.entries(obj.data).filter(([key, val]) => !(key === "name" && Number(val) === obj.id)).map(([key, val]) => [key, Array.isArray(val) ? val : (val as string).split(',')]))
         setLabel("source" in obj ? [obj.label] : [...obj.category])
@@ -67,34 +74,42 @@ export default function SchemaDataPanel({ obj, onExpand, onSetAttributes, onRemo
             })
             return
         }
+        try {
+            setIsSetLoading(true)
+            const ok = await onSetAttributes(newAttribute)
+            const oldAttribute = attributes.find(([key]) => key === newAttribute[0])
 
-        const ok = await onSetAttributes(newAttribute)
-        const oldAttribute = attributes.find(([key]) => key === newAttribute[0])
-
-        if (ok) {
-            setAttributes(prev => prev.map((attr) => attr[0] === newAttribute[0] ? newAttribute : attr))
-            handleSetEditable()
-            toast({
-                title: "Success",
-                description: `Property set`,
-                action: isUndo && oldAttribute ? <ToastButton onClick={() => handleSetAttribute(false, oldAttribute)} /> : undefined,
-            })
+            if (ok) {
+                setAttributes(prev => prev.map((attr) => attr[0] === newAttribute[0] ? newAttribute : attr))
+                handleSetEditable()
+                toast({
+                    title: "Success",
+                    description: `Property set`,
+                    action: isUndo && oldAttribute ? <ToastButton onClick={() => handleSetAttribute(false, oldAttribute)} /> : undefined,
+                })
+            }
+        } finally {
+            setIsSetLoading(false)
         }
     }
 
     const handleRemoveAttribute = async (key: string) => {
+        try {
+            setIsRemoveLoading(true)
+            const ok = await onRemoveAttribute(key)
 
-        const ok = await onRemoveAttribute(key)
-
-        if (ok) {
-            const att = attributes.find(([k]) => k === key)
-            setAttributes(prev => prev.filter(([k]) => k !== key))
-            toast({
-                title: "Success",
-                description: "Attribute removed",
-                action: att && <ToastButton onClick={() => handleAddAttribute(att)} />,
-            })
-            setAttribute(getDefaultAttribute())
+            if (ok) {
+                const att = attributes.find(([k]) => k === key)
+                setAttributes(prev => prev.filter(([k]) => k !== key))
+                toast({
+                    title: "Success",
+                    description: "Attribute removed",
+                    action: att && <ToastButton onClick={() => handleAddAttribute(att)} />,
+                })
+                setAttribute(getDefaultAttribute())
+            }
+        } finally {
+            setIsRemoveLoading(false)
         }
     }
 
@@ -108,13 +123,17 @@ export default function SchemaDataPanel({ obj, onExpand, onSetAttributes, onRemo
             })
             return
         }
+        try {
+            setIsAddLoading(true)
+            const ok = await onSetAttributes(newAttribute)
 
-        const ok = await onSetAttributes(newAttribute)
-
-        if (ok) {
-            setAttributes(prev => [...prev, newAttribute])
-            setAttribute(getDefaultAttribute())
-            setIsAddValue(false)
+            if (ok) {
+                setAttributes(prev => [...prev, newAttribute])
+                setAttribute(getDefaultAttribute())
+                setIsAddValue(false)
+            }
+        } finally {
+            setIsAddLoading(false)
         }
     }
 
@@ -124,7 +143,7 @@ export default function SchemaDataPanel({ obj, onExpand, onSetAttributes, onRemo
             handleSetEditable()
         }
 
-        if (evt.code !== "Enter") return
+        if (evt.code !== "Enter" || isSetLoading) return
 
         evt.preventDefault()
         handleSetAttribute(true)
@@ -136,7 +155,7 @@ export default function SchemaDataPanel({ obj, onExpand, onSetAttributes, onRemo
             handleSetEditable()
         }
 
-        if (evt.code !== "Enter") return
+        if (evt.code !== "Enter" || isAddLoading) return
 
         evt.preventDefault()
         handleAddAttribute()
@@ -151,18 +170,28 @@ export default function SchemaDataPanel({ obj, onExpand, onSetAttributes, onRemo
             })
             return
         }
-        const ok = await onAddLabel(newLabel)
-        if (ok) {
-            setLabel([...label, newLabel])
-            setNewLabel("")
-            setLabelsEditable(false)
+        try {
+            setIsLabelLoading(true)
+            const ok = await onAddLabel(newLabel)
+            if (ok) {
+                setLabel([...label, newLabel])
+                setNewLabel("")
+                setLabelsEditable(false)
+            }
+        } finally {
+            setIsLabelLoading(false)
         }
     }
 
     const handleRemoveLabel = async (removeLabel: string) => {
-        const ok = await onRemoveLabel(removeLabel)
-        if (ok) {
-            setLabel(prev => prev.filter(l => l !== removeLabel))
+        try {
+            setIsRemoveLabelLoading(true)
+            const ok = await onRemoveLabel(removeLabel)
+            if (ok) {
+                setLabel(prev => prev.filter(l => l !== removeLabel))
+            }
+        } finally {
+            setIsRemoveLabelLoading(false)
         }
     }
 
@@ -188,6 +217,7 @@ export default function SchemaDataPanel({ obj, onExpand, onSetAttributes, onRemo
                                             <Button
                                                 title="Remove"
                                                 onClick={() => handleRemoveLabel(l)}
+                                                isLoading={isRemoveLabelLoading}
                                             >
                                                 <X size={15} />
                                             </Button>
@@ -222,7 +252,7 @@ export default function SchemaDataPanel({ obj, onExpand, onSetAttributes, onRemo
                                                         setNewLabel("")
                                                     }
 
-                                                    if (e.key !== "Enter") return
+                                                    if (e.key !== "Enter" || isLabelLoading) return
 
                                                     e.preventDefault()
                                                     handleAddLabel()
@@ -233,20 +263,24 @@ export default function SchemaDataPanel({ obj, onExpand, onSetAttributes, onRemo
                                                 variant="Secondary"
                                                 label="Save"
                                                 onClick={() => handleAddLabel()}
+                                                isLoading={isLabelLoading}
                                             >
                                                 <Check size={15} />
                                             </Button>
-                                            <Button
-                                                className="p-2 text-xs justify-center border border-foreground"
-                                                variant="Secondary"
-                                                label="Cancel"
-                                                onClick={() => {
-                                                    setLabelsEditable(false)
-                                                    setNewLabel("")
-                                                }}
-                                            >
-                                                <Check size={15} />
-                                            </Button>
+                                            {
+                                                !isLabelLoading &&
+                                                <Button
+                                                    className="p-2 text-xs justify-center border border-foreground"
+                                                    variant="Secondary"
+                                                    label="Cancel"
+                                                    onClick={() => {
+                                                        setLabelsEditable(false)
+                                                        setNewLabel("")
+                                                    }}
+                                                >
+                                                    <X size={15} />
+                                                </Button>
+                                            }
                                         </>
                                     }
                                 </li>
@@ -303,7 +337,7 @@ export default function SchemaDataPanel({ obj, onExpand, onSetAttributes, onRemo
                                                         return p
                                                     })}
                                                     inTable
-                                                    type="Type"
+                                                    label="Type"
                                                     selectedValue={attribute[1][0]}
                                                 />
                                             </TableCell>
@@ -360,21 +394,25 @@ export default function SchemaDataPanel({ obj, onExpand, onSetAttributes, onRemo
                                                                 e.stopPropagation()
                                                                 handleSetAttribute(true)
                                                             }}
+                                                            isLoading={isSetLoading}
                                                         >
                                                             <Check size={20} />
                                                         </Button>
-                                                        <Button
-                                                            className="p-2 justify-center border border-foreground"
-                                                            variant="Secondary"
-                                                            label="Cancel"
-                                                            onClick={(e) => {
-                                                                e.stopPropagation()
-                                                                handleSetEditable()
+                                                        {
+                                                            !isSetLoading &&
+                                                            <Button
+                                                                className="p-2 justify-center border border-foreground"
+                                                                variant="Secondary"
+                                                                label="Cancel"
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation()
+                                                                    handleSetEditable()
 
-                                                            }}
-                                                        >
-                                                            <X size={20} />
-                                                        </Button>
+                                                                }}
+                                                            >
+                                                                <X size={20} />
+                                                            </Button>
+                                                        }
                                                     </>
                                                     : hover === key &&
                                                     <>
@@ -395,11 +433,15 @@ export default function SchemaDataPanel({ obj, onExpand, onSetAttributes, onRemo
                                                                     variant="Primary"
                                                                     label="Delete"
                                                                     onClick={() => handleRemoveAttribute(key)}
+                                                                    isLoading={isRemoveLoading}
                                                                 />
-                                                                <CloseDialog
-                                                                    label="Cancel"
-                                                                    variant="Cancel"
-                                                                />
+                                                                {
+                                                                    !isRemoveLoading &&
+                                                                    <CloseDialog
+                                                                        label="Cancel"
+                                                                        variant="Cancel"
+                                                                    />
+                                                                }
                                                             </div>
                                                         </DialogComponent>
                                                         <Button
@@ -445,7 +487,7 @@ export default function SchemaDataPanel({ obj, onExpand, onSetAttributes, onRemo
                                         return p
                                     })}
                                     inTable
-                                    type="Type"
+                                    label="Type"
                                     selectedValue={attribute[1][0]}
                                 />
                             </TableCell>
@@ -493,21 +535,25 @@ export default function SchemaDataPanel({ obj, onExpand, onSetAttributes, onRemo
                                             e.stopPropagation()
                                             handleAddAttribute()
                                         }}
+                                        isLoading={isAddLoading}
                                     >
                                         <Check size={20} />
                                     </Button>
-                                    <Button
-                                        className="p-2 justify-center border border-foreground"
-                                        variant="Secondary"
-                                        label="Cancel"
-                                        onClick={(e) => {
-                                            e.stopPropagation()
-                                            handleSetEditable()
-                                            setIsAddValue(false)
-                                        }}
-                                    >
-                                        <X size={20} />
-                                    </Button>
+                                    {
+                                        !isAddLoading &&
+                                        <Button
+                                            className="p-2 justify-center border border-foreground"
+                                            variant="Secondary"
+                                            label="Cancel"
+                                            onClick={(e) => {
+                                                e.stopPropagation()
+                                                handleSetEditable()
+                                                setIsAddValue(false)
+                                            }}
+                                        >
+                                            <X size={20} />
+                                        </Button>
+                                    }
                                 </div>
                             </TableCell>
                         </TableRow>
@@ -528,13 +574,21 @@ export default function SchemaDataPanel({ obj, onExpand, onSetAttributes, onRemo
             </Table>
             <div className="p-8 flex justify-end">
                 {
-                    session?.user?.role !== "Read-Only" &&
+                    session?.user.role &&
                     <DeleteElement
-                        description={`Are you sure you want to delete this ${"source" in obj ? "Node" : "Relation"}?`}
+                        description={`Are you sure you want to delete this ${type ? "Node" : "Relation"}?`}
                         open={deleteOpen}
                         setOpen={setDeleteOpen}
                         onDeleteElement={onDeleteElement}
-                        trigger={<Button label="Delete" variant="Secondary" />}
+                        trigger={
+                            <Button
+                                disabled={session?.user?.role === "Read-Only"}
+                                variant="Primary"
+                                label={`Delete ${type ? "Node" : "Relation"}`}
+                            >
+                                <Trash2 size={20} />
+                            </Button>
+                        }
                     />
                 }
             </div>
