@@ -12,15 +12,15 @@ export default class PreferencesPage extends BasePage {
     }
 
     private get addColorBtn(): Locator {
-        return this.page.getByRole('button', { name: 'Add Color' })
+        return this.page.locator("//button[contains(text(), 'Add Color')]");
     }
 
     private get resetColorsBtn(): Locator {
-        return this.page.getByRole('button', { name: 'Reset' })
+        return this.page.locator("//button[contains(text(), 'Reset')]");
     }
 
     private get saveColorBtn(): Locator {
-        return this.page.getByRole('button', { name: 'Save' })
+        return this.page.locator("//button[@aria-label='Save']");
     }
 
     private get applyColorBtn(): Locator {

@@ -7,7 +7,7 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogTrigger } 
 import { Editor, Monaco } from "@monaco-editor/react"
 import { useEffect, useRef, useState } from "react"
 import * as monaco from "monaco-editor";
-import { Loader2, Maximize2, Minimize2 } from "lucide-react";
+import { Maximize2, Minimize2 } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { prepareArg, securedFetch } from "@/lib/utils";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
@@ -587,16 +587,14 @@ export default function EditorComponent({ currentQuery, historyQueries, setHisto
                             </div>
                             <Button
                                 ref={submitQuery}
-                                disabled={isLoading}
                                 className="rounded-none py-2 px-8"
                                 variant="Primary"
-                                title={isLoading ? "Please wait..." : "Run (Ctrl + Enter)"}
-                                label={isLoading ? undefined : "Run"}
+                                title="Run (Ctrl + Enter)"
+                                label="Run"
                                 type="submit"
                                 onClick={handleSubmit}
-                            >
-                                {isLoading && <Loader2 size={20} className="animate-spin" />}
-                            </Button>
+                                isLoading={isLoading}
+                            />
                         </div>
                         <DialogContent disableClose className="w-full h-full">
                             <div className="relative w-full h-full">

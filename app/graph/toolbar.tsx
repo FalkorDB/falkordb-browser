@@ -16,8 +16,8 @@ interface Props {
     onAddEntity?: () => void,
     onAddRelation?: () => void,
     deleteDisabled?: boolean,
-    selectedElementsLength: number,
-    displayAdd: boolean
+    displayAdd: boolean,
+    type: "Graph" | "Schema"
 }
 
 export default function Toolbar({
@@ -27,8 +27,8 @@ export default function Toolbar({
     onAddEntity,
     onAddRelation,
     deleteDisabled,
-    selectedElementsLength,
-    displayAdd
+    displayAdd,
+    type
 }: Props) {
 
     const [deleteOpen, setDeleteOpen] = useState(false)
@@ -64,6 +64,7 @@ export default function Toolbar({
                                 disabled={disabled}
                                 variant="Primary"
                                 label="Add Node"
+                                title={`Add a new node to the ${type}`}
                                 onClick={onAddEntity}
                             >
                                 <PlusCircle size={20} />
@@ -73,6 +74,7 @@ export default function Toolbar({
                                 disabled={disabled}
                                 variant="Primary"
                                 label="Add Relation"
+                                title={`Add a new relation to the ${type}`}
                                 onClick={onAddRelation}
                                 type="button"
                             >
@@ -82,7 +84,7 @@ export default function Toolbar({
                         </>
                     }
                     <DeleteElement
-                        description={`Are you sure you want to delete this ${selectedElementsLength > 1 ? "elements" : "element"}?`}
+                        description="Are you sure you want to delete this element(s)?"
                         open={deleteOpen}
                         setOpen={setDeleteOpen}
                         onDeleteElement={handleDeleteElement}
@@ -108,8 +110,9 @@ export default function Toolbar({
                     disabled={disabled}
                     variant="Secondary"
                     label="Zoom In"
+                    title="Zoom in for a closer view"
                     onClick={() => handleZoomClick(1.1)}
-                >
+                >   
                     <ZoomIn size={20} />
                 </Button>
                 <Button
@@ -117,6 +120,7 @@ export default function Toolbar({
                     disabled={disabled}
                     variant="Secondary"
                     label="Zoom Out"
+                    title="Zoom out for a broader view"
                     onClick={() => handleZoomClick(0.9)}
                 >
                     <ZoomOut size={20} />
@@ -126,6 +130,7 @@ export default function Toolbar({
                     disabled={disabled}
                     variant="Secondary"
                     label="Fit To Size"
+                    title="Center and fit the graph to the screen"
                     onClick={() => handleCenterClick()}
                 >
                     <Shrink size={20} />
