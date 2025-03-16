@@ -16,6 +16,7 @@ import TableComponent from "../TableComponent"
 import CloseDialog from "../CloseDialog"
 import ExportGraph from "../ExportGraph"
 import DeleteGraph from "../graph/DeleteGraph"
+import Input from "./Input"
 
 interface ComboboxProps {
   options: string[],
@@ -31,13 +32,23 @@ interface ComboboxProps {
   onOpenChange?: (open: boolean) => void
 }
 
-export default function Combobox({ isSelectGraph = false, disabled = false, inTable, type, label, options, setOptions, selectedValue, setSelectedValue, defaultOpen = false, onOpenChange }: ComboboxProps) {
+export default function Combobox({ isSelectGraph = false, disabled = false, inTable, type = "Graph", label, options, setOptions, selectedValue, setSelectedValue, defaultOpen = false, onOpenChange }: ComboboxProps) {
 
   const [openMenage, setOpenMenage] = useState<boolean>(false)
   const [open, setOpen] = useState<boolean>(defaultOpen)
   const [rows, setRows] = useState<Row[]>([])
+  const [search, setSearch] = useState<string>("")
+  const [filteredOptions, setFilteredOptions] = useState<string[]>([])
   const { toast } = useToast()
   const { data: session } = useSession()
+
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      setFilteredOptions(!search ? options : options.filter((option) => option.toLowerCase().includes(search.toLowerCase())))
+    }, 500)
+
+    return () => clearTimeout(timeout)
+  }, [options, search])
 
   const handleSetOption = async (option: string, optionName: string) => {
     const result = await securedFetch(`api/graph/${prepareArg(option)}/?sourceName=${prepareArg(optionName)}`, {
@@ -69,6 +80,8 @@ export default function Combobox({ isSelectGraph = false, disabled = false, inTa
     handleSetRows(options)
   }, [options])
 
+  console.log(selectedValue)
+
   return (
     <Dialog open={openMenage} onOpenChange={setOpenMenage}>
       <Select value={selectedValue} onValueChange={setSelectedValue} open={open} onOpenChange={(o) => {
@@ -86,10 +99,16 @@ export default function Combobox({ isSelectGraph = false, disabled = false, inTa
           </TooltipContent>
         </Tooltip>
         <SelectContent className="min-w-52 max-h-[30lvh] bg-foreground">
+          <Input ref={ref => ref?.focus()} className="w-full" placeholder={`Search a graph ${type}`} onChange={(e) => setSearch(e.target.value)} value={search} />
           <SelectGroup>
             <ul className="shrink grow overflow-auto">
+              {selectedValue && (
+                <SelectItem value={selectedValue}>
+                  {selectedValue}
+                </SelectItem>
+              )}
               {
-                options.map((option) => (
+                filteredOptions.map((option) => selectedValue !== option && (
                   <SelectItem
                     value={!option ? '""' : option}
                     key={`key-${option}`}
@@ -107,7 +126,7 @@ export default function Combobox({ isSelectGraph = false, disabled = false, inTa
               <DialogTrigger asChild>
                 <Button
                   onClick={() => setOpen(false)}
-                  className="w-full p-2"
+                  className="w-full p-2 justify-center"
                   label="Manage Graphs"
                   title="Organize and edit your graphs"
                 />
