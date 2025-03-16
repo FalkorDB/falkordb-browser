@@ -32,6 +32,8 @@ interface ComboboxProps {
   onOpenChange?: (open: boolean) => void
 }
 
+const STEP = 4
+
 export default function Combobox({ isSelectGraph = false, disabled = false, inTable, type = "Graph", label, options, setOptions, selectedValue, setSelectedValue, defaultOpen = false, onOpenChange }: ComboboxProps) {
 
   const [openMenage, setOpenMenage] = useState<boolean>(false)
@@ -39,6 +41,7 @@ export default function Combobox({ isSelectGraph = false, disabled = false, inTa
   const [rows, setRows] = useState<Row[]>([])
   const [search, setSearch] = useState<string>("")
   const [filteredOptions, setFilteredOptions] = useState<string[]>([])
+  const [maxOptions, setMaxOptions] = useState<number>(STEP)
   const { toast } = useToast()
   const { data: session } = useSession()
 
@@ -80,8 +83,6 @@ export default function Combobox({ isSelectGraph = false, disabled = false, inTa
     handleSetRows(options)
   }, [options])
 
-  console.log(selectedValue)
-
   return (
     <Dialog open={openMenage} onOpenChange={setOpenMenage}>
       <Select value={selectedValue} onValueChange={setSelectedValue} open={open} onOpenChange={(o) => {
@@ -98,8 +99,13 @@ export default function Combobox({ isSelectGraph = false, disabled = false, inTa
             {options.length === 0 ? "There is no graphs" : selectedValue || `Select ${label || type || "Graph"}`}
           </TooltipContent>
         </Tooltip>
-        <SelectContent className="min-w-52 max-h-[30lvh] bg-foreground">
-          <Input ref={ref => ref?.focus()} className="w-full" placeholder={`Search a graph ${type}`} onChange={(e) => setSearch(e.target.value)} value={search} />
+        <SelectContent className="min-w-52 max-h-[40lvh] bg-foreground">
+          <div className="p-4">
+          <Input ref={ref => ref?.focus()} className="w-full" placeholder={`Search a graph ${type}`} onChange={(e) => {
+            setSearch(e.target.value)
+            setMaxOptions(5)
+          }} value={search} />
+          </div>
           <SelectGroup>
             <ul className="shrink grow overflow-auto">
               {selectedValue && (
@@ -108,7 +114,7 @@ export default function Combobox({ isSelectGraph = false, disabled = false, inTa
                 </SelectItem>
               )}
               {
-                filteredOptions.map((option) => selectedValue !== option && (
+                filteredOptions.slice(0, maxOptions).filter((option) => selectedValue !== option).map((option) => (
                   <SelectItem
                     value={!option ? '""' : option}
                     key={`key-${option}`}
@@ -117,6 +123,23 @@ export default function Combobox({ isSelectGraph = false, disabled = false, inTa
                   </SelectItem>
                 ))
               }
+              <div className={cn("flex justify-center gap-2 pl-8 py-2", maxOptions <= 5 && "justify-start")}>
+              {
+                filteredOptions.length > maxOptions && (
+                  <Button onClick={() => setMaxOptions(maxOptions + STEP)}>
+                    Show more...
+                  </Button>
+                )
+              }
+              {
+                maxOptions > STEP && (
+                  <Button onClick={() => setMaxOptions(maxOptions - STEP)}>
+                    Show fewer...
+                  </Button>
+                )
+              }
+              </div>
+              <p className="text-center text-sm">({maxOptions > filteredOptions.length ? filteredOptions.length : maxOptions}/{filteredOptions.length} results)</p>
             </ul>
           </SelectGroup>
           {
