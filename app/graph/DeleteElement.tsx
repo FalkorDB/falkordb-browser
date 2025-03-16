@@ -2,6 +2,7 @@
 
 "use client"
 
+import { useState } from "react";
 import CloseDialog from "../components/CloseDialog";
 import DialogComponent from "../components/DialogComponent";
 import Button from "../components/ui/Button";
@@ -22,6 +23,17 @@ export default function DeleteElement({
     description,
 }: Props) {
 
+    const [isLoading, setIsLoading] = useState(false)
+
+    const handleDelete = async () => {
+        try {
+            setIsLoading(true)
+            await onDeleteElement()
+        } finally {
+            setIsLoading(false)
+        }
+    }
+
     return (
         <DialogComponent
             onOpenChange={setOpen}
@@ -36,7 +48,8 @@ export default function DeleteElement({
                     variant="Primary"
                     label="Delete"
                     title="Remove the selected element(s)"
-                    onClick={onDeleteElement}
+                    onClick={handleDelete}
+                    isLoading={isLoading}
                 />
                 <CloseDialog
                     className="text-nowrap"

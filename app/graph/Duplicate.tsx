@@ -15,27 +15,32 @@ export default function Duplicate({ open, onOpenChange, selectedValue, onDuplica
 }) {
 
     const [duplicateName, setDuplicateName] = useState("");
+    const [isLoading, setIsLoading] = useState(false)
     const { toast } = useToast()
 
     const handleDuplicate = async (e: FormEvent) => {
-
         e.preventDefault()
+        try {
 
-        const graphName = type === "Schema" ? `${duplicateName}_schema` : duplicateName
-        const sourceName = type === "Schema" ? `${selectedValue}_schema` : selectedValue
+            setIsLoading(true)
+            const graphName = type === "Schema" ? `${duplicateName}_schema` : duplicateName
+            const sourceName = type === "Schema" ? `${selectedValue}_schema` : selectedValue
 
         const result = await securedFetch(`api/graph/${prepareArg(graphName)}/?sourceName=${prepareArg(sourceName)}`, {
             method: "POST"
         }, toast)
 
-        if (!result.ok) return
+            if (!result.ok) return
 
-        onDuplicate(duplicateName)
-        onOpenChange(false)
-        toast({
-            title: `${type} duplicated successfully`,
-            description: `The ${type} has been duplicated successfully`,
-        })
+            onDuplicate(duplicateName)
+            onOpenChange(false)
+            toast({
+                title: `${type} duplicated successfully`,
+                description: `The ${type} has been duplicated successfully`,
+            })
+        } finally {
+            setIsLoading(false)
+        }
     }
 
     return (
@@ -64,6 +69,7 @@ export default function Duplicate({ open, onOpenChange, selectedValue, onDuplica
                         label="Duplicate"
                         title={`Confirm duplication of the ${type}`}
                         type="submit"
+                        isLoading={isLoading}
                     />
                     <Button
                         variant="Secondary"
