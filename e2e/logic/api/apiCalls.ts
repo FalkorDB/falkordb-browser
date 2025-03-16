@@ -17,6 +17,7 @@ import { AuthCredentialsResponse } from "./responses/LoginResponse";
 import { LogoutResponse } from "./responses/logoutResponse";
 import { AddSchemaResponse } from "./responses/addSchemaResponse";
 import { GetGraphsResponse } from "./responses/getGraphsResponse";
+import { getAdminToken } from "@/e2e/infra/utils";
 
 export default class ApiCalls {
 
@@ -38,10 +39,13 @@ export default class ApiCalls {
         }
     }
     
-    async addGraph(graphName: string): Promise<AddGraphResponse> {
+    async addGraph(graphName: string, role?: string): Promise<AddGraphResponse> {
         try {
-            const result = await getRequest(`${urls.api.graphUrl + graphName}?query=RETURN%201`);
-            return await result.json();
+            const headers = role === "admin" ? await getAdminToken() : undefined;
+            const requestUrl = `${urls.api.graphUrl + graphName}?query=RETURN%201`;
+            const result = await getRequest(requestUrl, headers);
+            const jsonResponse = await result.json();
+            return jsonResponse;
         } catch (error) {
             throw new Error("Failed to add graph.");
         }
@@ -92,9 +96,12 @@ export default class ApiCalls {
         }
     }
     
-    async runQuery(query: string): Promise<RunQueryResponse> {
+    async runQuery(graphName: string, query: string, role?: string): Promise<RunQueryResponse> {
         try {
-            const result = await getRequest(urls.api.graphUrl + query);
+            console.log(query);
+            
+            const headers = role === "admin" ? await getAdminToken() : undefined;
+            const result = await getRequest(urls.api.graphUrl + graphName + "?query=" + query, headers);
             return await result.json();
         } catch (error) {
             throw new Error("Failed to run query.");

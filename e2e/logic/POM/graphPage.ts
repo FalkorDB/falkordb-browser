@@ -78,8 +78,8 @@ export default class GraphPage extends BasePage {
         return this.page.locator("//div[contains(@class, 'force-graph-container')]//canvas");
     }
 
-    private get selectGraphBtn(): Locator {
-        return this.page.locator("//div[@id='graphManager']//button[3]");
+    private get selectGraphBtn(): (buttonNumber: string) => Locator {
+        return (buttonNumber: string) => this.page.locator(`//div[@id='graphManager']//button[${buttonNumber}]`);
     }
 
     private get selectGraphList(): (graphNumber: string) => Locator {
@@ -214,17 +214,17 @@ export default class GraphPage extends BasePage {
         await this.canvasElement.click({ position: { x, y }, button: 'right' });
     }
 
-    async selectGraph(): Promise<void>{
-        await this.selectGraphBtn.click();
+    async selectGraph(buttonNumber: string): Promise<void>{
+        await this.selectGraphBtn(buttonNumber).click();
     }
 
     async selectGraphFromList(graphNumber: string): Promise<void> {
-        await this.page.mouse.click(0, 0);
+        // await this.page.mouse.click(0, 0);
         this.selectGraphList(graphNumber).click();
     }
 
-    async selectExistingGraph(graphNumber: string): Promise<void>{
-        await this.selectGraph();
+    async selectExistingGraph(graphNumber: string, buttonNumber: string): Promise<void>{
+        await this.selectGraph(buttonNumber);
         await this.selectGraphFromList(graphNumber);
     }
 
@@ -335,6 +335,14 @@ export default class GraphPage extends BasePage {
         const centerX = boundingBox.x + boundingBox.width / 2;
         const centerY = boundingBox.y + boundingBox.height / 2;
         await this.page.mouse.click(centerX, centerY, { button: 'right' });
+    }
+
+    async hoverAtCanvasCenter(): Promise<void> {
+        const boundingBox = await this.canvasElement.boundingBox();
+        if (!boundingBox) throw new Error('Canvas bounding box not found');
+        const centerX = boundingBox.x + boundingBox.width / 2;
+        const centerY = boundingBox.y + boundingBox.height / 2;
+        await this.page.mouse.move(centerX, centerY);
     }
     
     async waitForCanvasAnimationToEnd(timeout = 15000, checkInterval = 500): Promise<void> {

@@ -1,6 +1,8 @@
 /* eslint-disable no-param-reassign */
 /* eslint-disable no-await-in-loop */
 import { Locator, Page } from "playwright";
+import { readFileSync } from "fs";
+const adminAuthFile = 'playwright/.auth/admin.json'
 
 export function delay(ms: number) {
     return new Promise(resolve => { setTimeout(resolve, ms) });
@@ -41,3 +43,34 @@ export async function waitForURL(page: Page, expectedURL: string, timeout: numbe
 export function findNodeByName(nodes: { name: string }[], nodeName: string): any {
     return nodes.find((node) => node.name === nodeName);
 }
+
+
+export async function getAdminToken(): Promise<Record<string, string> | undefined> {
+    try {
+        const authState = JSON.parse(readFileSync(adminAuthFile, "utf-8"));
+
+        if (!authState?.cookies || !Array.isArray(authState.cookies)) {
+            console.error("Invalid auth state: No cookies found.");
+            return undefined;
+        }
+
+        const requiredCookies = ["next-auth.callback-url", "next-auth.csrf-token", "next-auth.session-token"];
+        const cookieString = authState.cookies
+            .filter((cookie: { name: string }) => requiredCookies.includes(cookie.name))
+            .map((cookie: { name: string; value: string }) => `${cookie.name}=${cookie.value}`)
+            .join("; ");
+
+        if (!cookieString) {
+            console.error("Required auth cookies not found.");
+            return undefined;
+        }
+
+        return {
+            Cookie: cookieString
+        };
+    } catch (error) {
+        console.error("Failed to retrieve admin cookies:", error);
+        return undefined;
+    }
+}
+
