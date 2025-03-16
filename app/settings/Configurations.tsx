@@ -102,6 +102,11 @@ const Configs: Map<string, Config> = new Map([
         name: "IMPORT_FOLDER",
         description: "The import folder configuration specifies an absolute path to a folder from which FalkorDB is allowed to load CSV files.",
         value: ""
+    }],
+    ["EFFECTS_THRESHOLD", {
+        name: "EFFECTS_THRESHOLD",
+        description: "Replicate modification via effect when average modification time > EFFECTS_THRESHOLD",
+        value: ""
     }]
 ])
 
