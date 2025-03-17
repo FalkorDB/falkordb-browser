@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback, Dispatch, SetStateAction } from "react";
 import { DialogTitle } from "@/components/ui/dialog";
 import { Editor } from "@monaco-editor/react";
 import { editor } from "monaco-editor";
@@ -29,11 +29,12 @@ interface Props {
     setGraph: (graph: Graph) => void
     graph: Graph
     data: Session | null
+    options: string[]
+    setOptions: Dispatch<SetStateAction<string[]>>
 }
 
-export default function Selector({ setGraphName, graphName, queries, runQuery, edgesCount, nodesCount, setGraph, graph, data: session }: Props) {
+export default function Selector({ setGraphName, graphName, queries, runQuery, edgesCount, nodesCount, setGraph, graph, data: session, options, setOptions }: Props) {
 
-    const [options, setOptions] = useState<string[]>([]);
     const [schema, setSchema] = useState<Graph>(Graph.empty());
     const [selectedValue, setSelectedValue] = useState<string>("");
     const [duplicateOpen, setDuplicateOpen] = useState<boolean>(false);
@@ -109,6 +110,7 @@ export default function Selector({ setGraphName, graphName, queries, runQuery, e
                         <>
                             <CreateGraph
                                 type={type}
+                                graphNames={options}
                                 onSetGraphName={(name) => {
                                     handleOnChange(name)
                                     setOptions(prev => [...prev, name])
