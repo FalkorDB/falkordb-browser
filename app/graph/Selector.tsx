@@ -252,15 +252,17 @@ export default function Selector({ setGraphName, graphName, queries, runQuery, e
                                                             </li>
                                                         ))
                                                     }
-                                                    < JSONTree
+                                                    <JSONTree
                                                         data={createNestedObject(query.explain)}
                                                         shouldExpandNodeInitially={() => true}
                                                         hideRoot
+                                                        // eslint-disable-next-line react/no-unstable-nested-components
+                                                        labelRenderer={(label) => <span>{label}</span>}
                                                         theme={{
                                                             base00: "var(--background)", // background
                                                             base01: '#000000',
                                                             base02: '#CE9178',
-                                                            base03: '#CE9178', // open values
+                                                            base03: '#242424', // open values
                                                             base04: '#CE9178',
                                                             base05: '#CE9178',
                                                             base06: '#CE9178',
@@ -268,9 +270,9 @@ export default function Selector({ setGraphName, graphName, queries, runQuery, e
                                                             base08: '#CE9178',
                                                             base09: '#b5cea8', // numbers
                                                             base0A: '#CE9178',
-                                                            base0B: '#CE9178', // close values
+                                                            base0B: '#242424',
                                                             base0C: '#CE9178',
-                                                            base0D: '#99E4E5', // * keys
+                                                            base0D: '#FFFFFF', // * keys
                                                             base0E: '#ae81ff',
                                                             base0F: '#cc6633'
                                                         }}
