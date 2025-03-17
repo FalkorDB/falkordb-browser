@@ -33,17 +33,17 @@ export default function Page() {
 
         const nodes = await (await securedFetch(`api/graph/${prepareArg(graphName)}/?query=${q1}`, {
             method: "GET"
-        }, session?.user?.role, toast)).json()
+        }, toast)).json()
 
         const edges = await (await securedFetch(`api/graph/${prepareArg(graphName)}/?query=${q2}`, {
             method: "GET"
-        }, session?.user?.role, toast)).json()
+        }, toast)).json()
 
         if (!edges || !nodes) return
 
         setEdgesCount(edges.result?.data[0].edges)
         setNodesCount(nodes.result?.data[0].nodes)
-    }, [graphName, session?.user?.role, toast])
+    }, [graphName, toast])
 
     useEffect(() => {
         if (graphName !== graph.Id) {
@@ -65,13 +65,14 @@ export default function Page() {
 
         const result = await securedFetch(`api/graph/${prepareArg(graphName)}/?query=${prepareArg(query)}`, {
             method: "GET"
-        }, session?.user?.role, toast)
+        }, toast)
 
         if (!result.ok) return null
 
         const json = await result.json()
         fetchCount()
         setSelectedElement(undefined)
+        
         return json.result
     }
 
@@ -89,7 +90,7 @@ export default function Page() {
         window.graph = g
     }
 
-    const runHistoryQuery = async (query: string, setQueriesOpen: (open: boolean) => void) => {
+    const runHistoryQuery = async (query: string) => {
         const result = await run(query)
         if (!result) return
         const queryArr = queries.some(q => q.text === query) ? queries : [...queries, { text: query, metadata: result.metadata }]
@@ -97,7 +98,6 @@ export default function Page() {
         localStorage.setItem("query history", JSON.stringify(queryArr))
         setGraph(Graph.create(graphName, result, false, false, graph.Colors))
         setHistoryQuery(query)
-        setQueriesOpen(false)
     }
 
     return (
@@ -125,7 +125,6 @@ export default function Page() {
                     historyQueries={queries.map(({ text }) => text)}
                     setHistoryQueries={(queriesArr) => setQueries(queries.map((query, i) => ({ text: queriesArr[i], metadata: query.metadata } as Query)))}
                     fetchCount={fetchCount}
-                    session={session}
                 />
                 <Tutorial onSetGraphName={setGraphName} />
             </div>

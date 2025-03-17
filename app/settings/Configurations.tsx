@@ -6,10 +6,9 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { prepareArg, securedFetch } from "@/lib/utils";
+import { prepareArg, securedFetch, Row } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
-import { useSession } from "next-auth/react";
-import TableComponent, { Row } from "../components/TableComponent";
+import TableComponent from "../components/TableComponent";
 import ToastButton from "../components/ToastButton";
 import { DataCell } from "../api/graph/model";
 
@@ -103,8 +102,7 @@ const Configs: Config[] = [
 export default function Configurations() {
     const [configs, setConfigs] = useState<Row[]>([]);
     const { toast } = useToast();
-    const { data: session } = useSession()
-    
+
     const handleSetConfig = async (name: string, value: string, isUndo: boolean) => {
         if (!value) {
             toast({
@@ -129,7 +127,7 @@ export default function Configurations() {
         const result = await securedFetch(
             `api/graph/?config=${prepareArg(name)}&value=${prepareArg(value)}`,
             { method: 'POST' },
-            session?.user?.role, toast
+            toast
         );
 
         if (!result.ok) return false;
@@ -168,7 +166,7 @@ export default function Configurations() {
                 const result = await securedFetch(
                     `api/graph/?config=${prepareArg(config.name)}`,
                     { method: 'GET' },
-                    session?.user?.role, toast
+                    toast
                 );
 
                 if (!result.ok) {

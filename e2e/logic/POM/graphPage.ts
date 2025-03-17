@@ -9,11 +9,11 @@ export default class GraphPage extends BasePage {
     }
 
     private get manageGraphBtn(): Locator {
-        return this.page.getByRole("button", { name: "Manage Graphs" })
+        return this.page.locator("//button[contains(text(), 'Manage Graphs')]")
     }
 
     private get deleteGraphBtn(): Locator {
-        return this.page.getByRole('button', { name: 'Delete' })
+        return this.page.locator("//div[contains(@id, 'tableComponent')]//button[contains(text(), 'Delete')]")
     }
 
     private get addGraphBtnInNavBar(): Locator {
@@ -25,13 +25,13 @@ export default class GraphPage extends BasePage {
     }
 
     private get createGraphBtn(): Locator {
-        return this.page.getByRole("button", { name: "Create your Graph" });
+        return this.page.locator("//div[@id='dialog']//button[contains(text(), 'Create your Graph')]");
     }
 
     private get exportDataBtn(): Locator {
-        return this.page.getByRole("button", { name: "Export Data" });
+        return this.page.locator("//button[contains(text(), 'Export Data')]");
     }
-    
+
     private get exportDataConfirmBtn(): Locator {
         return this.page.getByRole("button", { name: "Download" });
     }
@@ -53,12 +53,12 @@ export default class GraphPage extends BasePage {
     }
 
     private get deleteGraphConfirmBtn(): Locator {
-        return this.page.getByRole('button', { name: 'Delete Graph' })
+        return this.page.locator("//button[contains(text(), 'Delete Graph')]")
     }
 
     async countGraphsInMenu(): Promise<number> {
         await waitForTimeOut(this.page, 1000);
-        
+
         if (await this.graphsMenu.isEnabled()) {
             await this.graphsMenu.click();
             await this.manageGraphBtn.click();
@@ -66,7 +66,7 @@ export default class GraphPage extends BasePage {
             await this.refreshPage();
             return count;
         }
-        
+
         return 0;
     }
 
@@ -100,11 +100,11 @@ export default class GraphPage extends BasePage {
 
     async verifyGraphExists(graph: string): Promise<boolean> {
         if (await this.graphsMenu.isDisabled()) return false;
-        
+
         await this.graphsMenu.click();
         await this.manageGraphBtn.click();
         const isVisible = await this.findGraphInMenu(graph).isVisible();
-        
+
         return isVisible;
     }
 
@@ -115,5 +115,4 @@ export default class GraphPage extends BasePage {
         await this.deleteGraphBtn.click();
         await this.deleteGraphConfirmBtn.click();
     }
-
 }

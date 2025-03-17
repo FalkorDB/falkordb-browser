@@ -37,11 +37,13 @@ export default function Settings() {
                     <Button
                         className={cn("p-2 rounded-lg", current === "DB" ? "bg-background" : "text-gray-500")}
                         label="DB Configuration"
+                        title="Configure database settings"
                         onClick={() => setCurrent("DB")}
                         />
                     <Button
                         className={cn("p-2 rounded-lg", current === "Users" ? "bg-background" : "text-gray-500")}
                         label="Users"
+                        title="Manage users accounts"
                         onClick={() => setCurrent("Users")}
                     />
                 </div>

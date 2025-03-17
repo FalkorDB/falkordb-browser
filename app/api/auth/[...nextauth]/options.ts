@@ -188,7 +188,7 @@ export async function getClient() {
         return NextResponse.json({ message: "Not authenticated" }, { status: 401 })
     }
 
-    return client
+    return { client, user }
 }
 
 export default authOptions

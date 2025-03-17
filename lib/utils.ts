@@ -8,9 +8,20 @@ import { signOut } from "next-auth/react"
 import { twMerge } from "tailwind-merge"
 import { MutableRefObject } from "react"
 import { ForceGraphMethods } from "react-force-graph-2d"
-import { Node, Link } from "@/app/api/graph/model"
+import { Node, Link, DataCell } from "@/app/api/graph/model"
 
 export type GraphRef = MutableRefObject<ForceGraphMethods<Node, Link> | undefined>
+
+export type Cell = {
+  value: DataCell,
+  onChange?: (value: string) => Promise<boolean>,
+  type?: string
+  comboboxType?: string
+}
+export interface Row {
+  cells: Cell[]
+  checked?: boolean
+}
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
@@ -19,14 +30,9 @@ export function cn(...inputs: ClassValue[]) {
 export async function securedFetch(
   input: string,
   init: RequestInit,
-  role?: string,
   toast?: any,
 ): Promise<Response> {
-  let url = input
-  if (role) {
-    url += input.includes("?") ? `&role=${role}` : `?role=${role}`
-  }
-  const response = await fetch(url, init)
+  const response = await fetch(input, init)
   const { status } = response
   if (status >= 300) {
     const err = await response.text()

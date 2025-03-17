@@ -4,7 +4,7 @@
 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dispatch, SetStateAction, useState } from "react";
-import { ArrowRight, ArrowRightLeft, Check, CheckCircle, ChevronRight, Pencil, Plus, Trash2, X, XCircle } from "lucide-react";
+import { ArrowRight, ArrowRightLeft, Check, ChevronRight, Pencil, Plus, Trash2, X } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/components/ui/use-toast";
 import Button from "../components/ui/Button";
@@ -14,7 +14,7 @@ import Input from "../components/ui/Input";
 import ToastButton from "../components/ToastButton";
 
 interface Props {
-  onCreate: (element: [string, string[]][], label?: string) => Promise<boolean>
+  onCreate: (element: [string, string[]][], label?: string[]) => Promise<boolean>
   onExpand: () => void
   selectedNodes: [Node | undefined, Node | undefined]
   setSelectedNodes: Dispatch<SetStateAction<[Node | undefined, Node | undefined]>>
@@ -32,11 +32,13 @@ export default function SchemaCreateElement({ onCreate, onExpand, selectedNodes,
   const [attributes, setAttributes] = useState<[string, string[]][]>([])
   const [newAttribute, setNewAttribute] = useState<[string, string[]]>(getDefaultAttribute())
   const [attribute, setAttribute] = useState<[string, string[]]>(getDefaultAttribute())
-  const [label, setLabel] = useState<string>("")
+  const [label, setLabel] = useState<string[]>([])
   const [newLabel, setNewLabel] = useState<string>("")
-  const [labelEditable, setLabelEditable] = useState<boolean>(false)
   const [editable, setEditable] = useState<string>("")
   const [hover, setHover] = useState<string>("")
+  const [isLoading, setIsLoading] = useState<boolean>(false)
+  const [labelsHover, setLabelsHover] = useState<boolean>(false)
+  const [labelsEditable, setLabelsEditable] = useState<boolean>(false)
   const { toast } = useToast()
 
   const handleSetEditable = (att: [string, string[]] = getDefaultAttribute()) => {
@@ -121,42 +123,27 @@ export default function SchemaCreateElement({ onCreate, onExpand, selectedNodes,
       })
       return
     }
-    const ok = await onCreate(attributes, label)
-    if (!ok) return
-    setAttributes([])
-    setAttribute(getDefaultAttribute())
-    setLabel("")
-    setLabelEditable(false)
-  }
-
-  const handleLabelCancel = () => {
-    setLabel("")
-    setLabelEditable(false)
-  }
-
-  const handleSetLabel = () => {
-    if (!newLabel) {
-      toast({
-        title: "Error",
-        description: "You must type a label",
-        variant: "destructive"
-      })
-      return
+    try {
+      setIsLoading(true)
+      const ok = await onCreate(attributes, label)
+      if (!ok) return
+      setAttributes([])
+      setAttribute(getDefaultAttribute())
+      setLabel([])
+      setLabelsEditable(false)
+    } finally {
+      setIsLoading(false)
     }
-
-    setLabel(newLabel)
-    setLabelEditable(false)
   }
 
-  const handleSetLabelKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Escape") {
-      handleLabelCancel()
-    }
+  const handleRemoveLabel = (removeLabel: string) => {
+    setLabel(prev => prev.filter(l => l !== removeLabel))
+  }
 
-    if (e.key !== "Enter") return
-
-    handleSetLabel()
-
+  const handleAddLabel = () => {
+    setLabel(prev => [...prev, newLabel])
+    setNewLabel("")
+    setLabelsEditable(false)
   }
 
   return (
@@ -168,31 +155,78 @@ export default function SchemaCreateElement({ onCreate, onExpand, selectedNodes,
           >
             <ChevronRight size={20} />
           </Button>
-          {
-            labelEditable ?
-              <div className="flex gap-4 items-center">
-                <Input
-                  ref={ref => ref?.focus()}
-                  className="w-full"
-                  onChange={(e) => setNewLabel(e.target.value)}
-                  value={newLabel}
-                  onKeyDown={handleSetLabelKeyDown}
+          <ul className="flex flex-wrap gap-4 min-w-[10%]" onMouseEnter={() => setLabelsHover(true)} onMouseLeave={() => setLabelsHover(false)}>
+            {label.map((l) => (
+              <li key={l} className="flex gap-2 px-2 py-1 bg-foreground rounded-full items-center">
+                <p>{l}</p>
+                <Button
+                  title="Remove"
+                  onClick={() => handleRemoveLabel(l)}
+                >
+                  <X size={15} />
+                </Button>
+              </li>
+            ))}
+            <li className="h-8 flex flex-wrap gap-2">
+              {
+                (type ? (labelsHover || label.length === 0) && !labelsEditable : label.length < 1 && !labelsEditable) &&
+                <Button
+                  className="p-2 text-xs justify-center border border-foreground"
+                  variant="Secondary"
+                  label="Add"
+                  title="Add a new label"
+                  onClick={() => setLabelsEditable(true)}
+                >
+                  <Pencil size={15} />
+                </Button>
+              }
+              {
+                labelsEditable &&
+                <>
+                  <Input
+                    ref={ref => ref?.focus()}
+                    className="max-w-[20dvw] h-full bg-foreground border-none text-white"
+                    value={newLabel}
+                    onChange={(e) => setNewLabel(e.target.value)}
+                    onKeyDown={(e) => {
 
-                />
-                <div className="flex flex-col gap-1">
-                  <Button onClick={handleSetLabel}>
-                    <CheckCircle size={20} />
+                      if (e.key === "Escape") {
+                        e.preventDefault()
+                        setLabelsEditable(false)
+                        setNewLabel("")
+                      }
+
+                      if (e.key !== "Enter") return
+
+                      e.preventDefault()
+                      handleAddLabel()
+                    }}
+                  />
+                  <Button
+                    className="p-2 text-xs justify-center border border-foreground"
+                    variant="Secondary"
+                    label="Save"
+                    title="Save the new label"
+                    onClick={() => handleAddLabel()}
+                  >
+                    <Check size={15} />
                   </Button>
-                  <Button onClick={handleLabelCancel}>
-                    <XCircle size={20} />
+                  <Button
+                    className="p-2 text-xs justify-center border border-foreground"
+                    variant="Secondary"
+                    label="Cancel"
+                    title="Discard new label"
+                    onClick={() => {
+                      setLabelsEditable(false)
+                      setNewLabel("")
+                    }}
+                  >
+                    <X size={15} />
                   </Button>
-                </div>
-              </div> : <Button
-                className="underline underline-offset-2"
-                label={label || "Edit Label"}
-                onClick={() => setLabelEditable(true)}
-              />
-          }
+                </>
+              }
+            </li>
+          </ul>
         </div>
         <p className="font-medium text-xl">{attributes.length}&ensp;Attributes</p>
       </div>
@@ -240,7 +274,8 @@ export default function SchemaCreateElement({ onCreate, onExpand, selectedNodes,
                               return p
                             })}
                             inTable
-                            type="Type"
+
+                            label="Type"
                             selectedValue={attribute[1][0]}
                           />
                         </TableCell>
@@ -291,6 +326,7 @@ export default function SchemaCreateElement({ onCreate, onExpand, selectedNodes,
                             <Button
                               className="p-2 justify-center border border-foreground rounded-lg"
                               label="Save"
+                              title="Save the attribute changes"
                               onClick={(e) => {
                                 e.stopPropagation()
                                 handleSetAttribute(true)
@@ -301,6 +337,7 @@ export default function SchemaCreateElement({ onCreate, onExpand, selectedNodes,
                             <Button
                               className="p-2 justify-center border border-foreground rounded-lg"
                               label="Cancel"
+                              title="Discard the attribute changes"
                               onClick={(e) => {
                                 e.stopPropagation()
                                 handleSetEditable()
@@ -314,6 +351,7 @@ export default function SchemaCreateElement({ onCreate, onExpand, selectedNodes,
                             <Button
                               className="p-2 justify-center border border-foreground rounded-lg"
                               label="Remove"
+                              title="Delete this attribute"
                               onClick={(e) => {
                                 e.stopPropagation()
                                 const oldAttribute = attributes.find(([k]) => k === key)
@@ -330,6 +368,7 @@ export default function SchemaCreateElement({ onCreate, onExpand, selectedNodes,
                             <Button
                               className="p-2 justify-center border border-foreground rounded-lg"
                               label="Edit"
+                              title="Modify this attribute"
                               onClick={(e) => {
                                 e.stopPropagation()
                                 handleSetEditable([key, [...val]])
@@ -366,7 +405,7 @@ export default function SchemaCreateElement({ onCreate, onExpand, selectedNodes,
                     return p
                   })}
                   inTable
-                  type="Type"
+                  label="Type"
                   selectedValue={newAttribute[1][0]}
                 />
               </TableCell>
@@ -409,6 +448,7 @@ export default function SchemaCreateElement({ onCreate, onExpand, selectedNodes,
                   <Button
                     className="p-2 justify-center border border-foreground rounded-lg"
                     label="Add"
+                    title="Add a new attribute"
                     onClick={(e) => {
                       e.stopPropagation()
                       handleAddAttribute()
@@ -419,6 +459,7 @@ export default function SchemaCreateElement({ onCreate, onExpand, selectedNodes,
                   <Button
                     className="p-2 justify-center border border-foreground rounded-lg"
                     label="Cancel"
+                    title="Discard the new attribute"
                     onClick={(e) => {
                       e.stopPropagation()
                       setNewAttribute(getDefaultAttribute())
@@ -441,7 +482,9 @@ export default function SchemaCreateElement({ onCreate, onExpand, selectedNodes,
                   disabled
                   options={OPTIONS}
                   inTable
-                  type="Type"
+                  label="Type"
+                  selectedValue=""
+                  setSelectedValue={() => { }}
                 />
               </TableCell>
               <TableCell>
@@ -469,6 +512,7 @@ export default function SchemaCreateElement({ onCreate, onExpand, selectedNodes,
                     disabled
                     variant="Secondary"
                     label="Add"
+                    title="Add a new attribute"
                   >
                     <Plus size={20} />
                   </Button>
@@ -477,6 +521,7 @@ export default function SchemaCreateElement({ onCreate, onExpand, selectedNodes,
                     disabled
                     variant="Secondary"
                     label="Cancel"
+                    title="Discard the new attribute"
                   >
                     <X size={20} />
                   </Button>
@@ -501,6 +546,7 @@ export default function SchemaCreateElement({ onCreate, onExpand, selectedNodes,
               <Button
                 className="flex-col-reverse border border-[#232341]"
                 label="Clear"
+                title="Clear selected nodes for relation"
                 onClick={() => setSelectedNodes([undefined, undefined])}
               >
                 <Trash2 size={40} />
@@ -508,6 +554,7 @@ export default function SchemaCreateElement({ onCreate, onExpand, selectedNodes,
               <Button
                 className="flex-col-reverse border border-[#232341]"
                 label="Swap"
+                title="Swap the order of selected nodes"
                 onClick={() => setSelectedNodes(prev => [prev[1], prev[0]])}
               >
                 <ArrowRightLeft size={40} />
@@ -522,11 +569,13 @@ export default function SchemaCreateElement({ onCreate, onExpand, selectedNodes,
           }}>
             <Button
               label={`Create new ${type ? "node" : "edge"}`}
+              title={`Add a new ${type ? "node" : "edge"} to the schema`}
               variant="Primary"
               onClick={(e) => {
                 e.preventDefault();
                 handleOnCreate();
               }}
+              isLoading={isLoading}
             />
           </form>
         </div>

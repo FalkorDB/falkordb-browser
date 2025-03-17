@@ -265,7 +265,7 @@ export class Graph {
             this.nodesMap.set(cell.id, node)
             this.elements.nodes.push(node)
             node.category.forEach(c => {
-              this.categoriesMap.get(c)!.elements.push(node)
+                this.categoriesMap.get(c)!.elements.push(node)
             })
             return node
         }
@@ -281,8 +281,12 @@ export class Graph {
                 currentNode.data[key] = isSchema ? getSchemaValue(value) : value;
             });
             currentNode.category.forEach(c => {
-              this.categoriesMap.get(c)!.elements.push(currentNode)
+                this.categoriesMap.get(c)!.elements.push(currentNode)
             })
+            const category = this.categoriesMap.get("")
+            if (category && !currentNode.category.includes("")) {
+                category.elements = category.elements.filter(e => e.id !== currentNode.id)
+            }
         }
 
         return undefined
@@ -315,6 +319,7 @@ export class Graph {
                         data: {},
                     }
 
+                    category?.elements.push(source)
                     this.nodesMap.set(cell.sourceId, source)
                     this.elements.nodes.push(source)
                 }
@@ -351,6 +356,7 @@ export class Graph {
                         data: {},
                     }
 
+                    category?.elements.push(source)
                     this.nodesMap.set(cell.sourceId, source)
                     this.elements.nodes.push(source)
                 }
@@ -367,10 +373,11 @@ export class Graph {
                         displayName: "",
                         data: {},
                     }
-                }
 
-                this.nodesMap.set(cell.destinationId, target)
-                this.elements.nodes.push(target)
+                    category?.elements.push(target)
+                    this.nodesMap.set(cell.destinationId, target)
+                    this.elements.nodes.push(target)
+                }
 
                 link = {
                     id: cell.id,
@@ -459,7 +466,8 @@ export class Graph {
         })
 
         // remove empty category if there are no more empty nodes category
-        if (Array.from(this.nodesMap.values()).every(n => n.category.some(c => c !== ""))) {
+        const emptyCategory = this.categoriesMap.get("")
+        if (emptyCategory?.elements.length === 0) {
             this.categories = this.categories.filter(c => c.name !== "")
             this.categoriesMap.delete("")
         }
@@ -548,5 +556,125 @@ export class Graph {
         } while (this.COLORS_ORDER_VALUE.includes(newColor))
         this.COLORS_ORDER_VALUE.push(newColor)
         return newColor
+    }
+
+    public removeElements(elements: (Node | Link)[]) {
+        elements.forEach((element) => {
+            const { id } = element
+            const type = !("source" in element)
+
+            if (type) {
+                this.elements.nodes.splice(this.elements.nodes.findIndex(n => n.id === id), 1)
+            } else {
+                this.elements.links.splice(this.elements.links.findIndex(l => l.id === id), 1)
+            }
+
+            const category = type ? this.categoriesMap.get(element.category[0]) : this.labelsMap.get(element.label)
+
+            if (category) {
+                category.elements = category.elements.filter((e) => e.id !== id)
+                if (category.elements.length === 0) {
+                    this.categories.splice(this.categories.findIndex(c => c.name === category.name), 1)
+                    this.categoriesMap.delete(category.name)
+                }
+            }
+        })
+
+        this.data = this.data.map(row => {
+            const newRow = Object.entries(row).map(([key, cell]) => {
+                if (cell && typeof cell === "object" && elements.some(element => element.id === cell.id)) {
+                    return [key, undefined]
+                }
+                return [key, cell]
+            })
+
+            if (newRow.every(([, cell]) => cell === undefined)) {
+                return undefined
+            }
+
+            return Object.fromEntries(newRow)
+        }).filter((row) => row !== undefined)
+    }
+
+    public removeLabel(label: string, selectedElement: Node) {
+        this.Elements.nodes.forEach((node) => {
+            if (node.id === selectedElement?.id) {
+                node.category = node.category.filter(c => c !== label)
+                if (node.category.length === 0) {
+                    node.category.push(this.createCategory([""], node as Node)[0].name)
+                }
+                node.color = this.getCategoryColorValue(this.CategoriesMap.get(node.category[0])?.index)
+            }
+        })
+
+        this.Data = this.Data.map(row => Object.fromEntries(Object.entries(row).map(([key, cell]) => {
+            if (cell && typeof cell === "object" && cell.id === selectedElement?.id && "labels" in cell) {
+                const newCell = { ...cell }
+                newCell.labels = newCell.labels.filter((l) => l !== label)
+                return [key, newCell]
+            }
+            return [key, cell]
+        })))
+    }
+
+    public addLabel(label: string, selectedElement: Node) {
+        this.Elements.nodes.forEach((node) => {
+            if (node.id === selectedElement?.id) {
+                const emptyCategory = this.CategoriesMap.get(selectedElement?.category.find((c: string) => c === "") as string)
+                if (emptyCategory) {
+                    emptyCategory.elements = emptyCategory.elements.filter((element) => element.id !== selectedElement?.id)
+                    if (emptyCategory.elements.length === 0) {
+                        this.Categories.splice(this.Categories.findIndex(c => c.name === emptyCategory.name), 1)
+                        this.CategoriesMap.delete(emptyCategory.name)
+                        node.category = node.category.filter((c) => c !== "")
+                    }
+                }
+                if (node.category.length === 0) {
+                    node.color = this.getCategoryColorValue(this.CategoriesMap.get(label)?.index)
+                }
+                node.category.push(label)
+            }
+        })
+
+        this.Data = this.Data.map(row => Object.fromEntries(Object.entries(row).map(([key, cell]) => {
+            if (cell && typeof cell === "object" && cell.id === selectedElement?.id && "labels" in cell) {
+                const newCell = { ...cell }
+                newCell.labels.push(label)
+                return [key, newCell]
+            }
+            return [key, cell]
+        })))
+    }
+
+    public removeProperty(key: string, id: number) {
+        this.getElements().forEach((e) => {
+            if (e.id !== id) return
+            delete e.data[key]
+        })
+
+        this.Data = this.Data.map(row => {
+            const newRow = Object.entries(row).map(([k, cell]) => {
+                if (cell && typeof cell === "object" && cell.id === id) {
+                    delete cell.properties[key]
+                    return [k, cell]
+                }
+                return [k, cell]
+            })
+            return Object.fromEntries(newRow)
+        })
+    }
+
+    public setProperty(key: string, val: string, id: number) {
+        this.getElements().forEach(e => {
+            if (e.id !== id) return
+            e.data[key] = val
+        })
+        
+        this.Data = this.Data.map(row => Object.fromEntries(Object.entries(row).map(([k, cell]) => {
+            if (cell && typeof cell === "object" && cell.id === id) {
+                return [k, { ...cell, properties: { ...cell.properties, [key]: val } }]
+            }
+            return [k, cell]
+        })))
     }
 }
