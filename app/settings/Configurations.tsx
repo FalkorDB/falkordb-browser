@@ -201,7 +201,7 @@ export default function Configurations() {
                 ? (value === 0 ? "no" : "yes")
                 : value;
 
-            const description = Configs.get(name)?.description;
+            const description = Configs.get(name)?.description ?? "";
 
             return {
                 cells: [

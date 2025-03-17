@@ -66,7 +66,7 @@ export default class ApiCalls {
     
     async changeGraphName(sourceGraph: string, destinationGraph: string): Promise<ChangeGraphNameResponse> {
         try {
-            const result = await patchRequest(urls.api.graphUrl + destinationGraph + "?sourceName=" + sourceGraph);
+            const result = await patchRequest(`${urls.api.graphUrl + destinationGraph}?sourceName=${sourceGraph}`);
             return await result.json();
         } catch (error) {
             throw new Error("Failed to change graph name.");
@@ -75,7 +75,7 @@ export default class ApiCalls {
     
     async exportGraph(graphName: string): Promise<void> {
         try {
-            const result = await getRequest(urls.api.graphUrl + graphName + "/export");
+            const result = await getRequest(`${urls.api.graphUrl + graphName}/export`);
             await result.json();
         } catch (error) {
             throw new Error("Failed to export graph.");
@@ -84,7 +84,7 @@ export default class ApiCalls {
     
     async duplicateGraph(sourceGraph: string, destinationGraph: string, data?: any): Promise<DuplicateGraphresponse> {
         try {
-            const result = await postRequest(urls.api.graphUrl + destinationGraph + "?sourceName=" + sourceGraph, data);
+            const result = await postRequest(`${urls.api.graphUrl + destinationGraph}?sourceName=${sourceGraph}`, data);
             return await result.json();
         } catch (error) {
             throw new Error("Failed to duplicate graph.");
@@ -102,7 +102,7 @@ export default class ApiCalls {
     
     async modifySettingsRole(roleName: string, roleValue: string): Promise<ModifySettingsRoleResponse> {
         try {
-            const result = await postRequest(`${urls.api.settingsConfig + roleName}&value=${roleValue}`);
+            const result = await postRequest(`${urls.api.settingsConfig + roleName}?value=${roleValue}`);
             return await result.json();
         } catch (error) {
             throw new Error("Failed to modify settings role.");
