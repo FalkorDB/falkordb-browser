@@ -82,8 +82,8 @@ export default class GraphPage extends BasePage {
         return (buttonNumber: string) => this.page.locator(`//div[@id='graphManager']//button[${buttonNumber}]`);
     }
 
-    private get selectGraphList(): (graphNumber: string) => Locator {
-        return (graphNumber: string) => this.page.locator(`//ul[@id='graphsList']/div[${graphNumber}]//span[2]`);
+    private get selectGraphList(): (graph: string) => Locator {
+        return (graph: string) => this.page.locator(`//ul[@id='graphsList']/div[descendant::text()[contains(., '${graph}')]]`);
     }
 
     private get canvasElementSearchInput(): Locator {
@@ -218,14 +218,14 @@ export default class GraphPage extends BasePage {
         await this.selectGraphBtn(buttonNumber).click();
     }
 
-    async selectGraphFromList(graphNumber: string): Promise<void> {
-        // await this.page.mouse.click(0, 0);
-        this.selectGraphList(graphNumber).click();
+    async selectGraphFromList(graph: string): Promise<void> {
+        // await this.page.mouse.click(0, 0); 
+        await this.selectGraphList(graph).click();
     }
 
-    async selectExistingGraph(graphNumber: string, buttonNumber: string): Promise<void>{
+    async selectExistingGraph(graph: string, buttonNumber: string): Promise<void>{
         await this.selectGraph(buttonNumber);
-        await this.selectGraphFromList(graphNumber);
+        await this.selectGraphFromList(graph);
     }
 
     async insertElementInCanvasSearch(node: string): Promise<void>{

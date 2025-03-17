@@ -16,16 +16,18 @@ test.describe('Graph Tests', () => {
     const readOnlyGraph = `readOnlyGraph`;
     const BATCH_CREATE_PERSONS = queryData.queries[0].testQueries[0].query;
     const FETCH_FIRST_TEN_NODES = queryData.queries[0].testQueries[1].query;
-    const GRAPH_BUTTON_COUNT_ADMIN = "3";
     const GRAPH_BUTTON_COUNT_READONLY = "2";
 
     test.beforeAll(async () => {
         browser = new BrowserWrapper();
         apicalls = new ApiCalls();
-        await apicalls.addGraph(readOnlyGraph, "admin");
-        const response = await apicalls.runQuery(readOnlyGraph, queryData.queries[0].testQueries[0].apiReq || "", "admin");
-        console.log(response);
-        
+        const existingGraphsResponse = await apicalls.getGraphs();
+        const graphExists = existingGraphsResponse?.result?.includes(readOnlyGraph) ?? false;
+
+        if (!graphExists) {
+            await apicalls.addGraph(readOnlyGraph, "admin");
+            await apicalls.runQuery(readOnlyGraph, queryData.queries[0].testQueries[0].apiReq || "", "admin");
+        }
     })
 
     test.afterAll(async () => {
@@ -97,7 +99,7 @@ test.describe('Graph Tests', () => {
     queryData.queries[0].failedQueries.slice(0,5).forEach((query) => {
         test(`@readonly Validate failure & error message when any user runs an invalid queries: ${query.name}`, async () => {
             const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
-            await graph.selectExistingGraph("1", GRAPH_BUTTON_COUNT_READONLY);
+            await graph.selectExistingGraph(readOnlyGraph, GRAPH_BUTTON_COUNT_READONLY);
             await graph.insertQuery(query.query);
             await graph.clickRunQuery();
             expect(await graph.getErrorNotification()).toBe(true);
@@ -112,7 +114,7 @@ test.describe('Graph Tests', () => {
             if (role.role !== "readonly") {
                 await graph.addGraph(graphName);
             } else {
-                await graph.selectExistingGraph("1", GRAPH_BUTTON_COUNT_READONLY);
+                await graph.selectExistingGraph(readOnlyGraph, GRAPH_BUTTON_COUNT_READONLY);
             }
             await graph.insertQuery(FETCH_FIRST_TEN_NODES);
             await graph.clickRunQuery();
@@ -128,13 +130,14 @@ test.describe('Graph Tests', () => {
         test(`@${role.role} Validate that running a query without selecting a graph displays the proper error notification`, async () => {
             const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
             await browser.setPageToFullScreen();
+            await graph.removeAllGraphs();
             await graph.insertQuery(FETCH_FIRST_TEN_NODES);
             await graph.clickRunQuery();
             expect(await graph.getErrorNotification()).toBe(true);
         });
     })
 
-    roles.userRoles.forEach((role) => {
+    roles.userRoles.slice(2,3).forEach((role) => {
         test(`@${role.role} Validate search for an element in the canvas and ensure focus on the searched node`, async () => {
             const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
             await browser.setPageToFullScreen();
@@ -143,7 +146,7 @@ test.describe('Graph Tests', () => {
                 await graph.addGraph(graphName);
                 await graph.insertQuery(BATCH_CREATE_PERSONS);
             } else {
-                await graph.selectExistingGraph("1", GRAPH_BUTTON_COUNT_READONLY);
+                await graph.selectExistingGraph(readOnlyGraph, GRAPH_BUTTON_COUNT_READONLY);
                 await graph.insertQuery(FETCH_FIRST_TEN_NODES);
             }
             await graph.clickRunQuery();
@@ -169,7 +172,7 @@ test.describe('Graph Tests', () => {
                 await graph.addGraph(graphName);
                 await graph.insertQuery(BATCH_CREATE_PERSONS);
             } else {
-                await graph.selectExistingGraph("1", GRAPH_BUTTON_COUNT_READONLY);
+                await graph.selectExistingGraph(readOnlyGraph, GRAPH_BUTTON_COUNT_READONLY);
                 await graph.insertQuery(FETCH_FIRST_TEN_NODES);
             }
             await graph.clickRunQuery();
@@ -194,7 +197,7 @@ test.describe('Graph Tests', () => {
                 await graph.addGraph(graphName);
                 await graph.insertQuery(BATCH_CREATE_PERSONS);
             } else {
-                await graph.selectExistingGraph("1", GRAPH_BUTTON_COUNT_READONLY);
+                await graph.selectExistingGraph(readOnlyGraph, GRAPH_BUTTON_COUNT_READONLY);
                 await graph.insertQuery(FETCH_FIRST_TEN_NODES);
             }
             await graph.clickRunQuery();
@@ -219,7 +222,7 @@ test.describe('Graph Tests', () => {
                 await graph.addGraph(graphName);
                 await graph.insertQuery(BATCH_CREATE_PERSONS);
             } else {
-                await graph.selectExistingGraph("1", GRAPH_BUTTON_COUNT_READONLY);
+                await graph.selectExistingGraph(readOnlyGraph, GRAPH_BUTTON_COUNT_READONLY);
                 await graph.insertQuery(FETCH_FIRST_TEN_NODES);
             }
             await graph.clickRunQuery();

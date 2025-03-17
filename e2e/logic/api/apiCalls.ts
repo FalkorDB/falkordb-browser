@@ -98,8 +98,6 @@ export default class ApiCalls {
     
     async runQuery(graphName: string, query: string, role?: string): Promise<RunQueryResponse> {
         try {
-            console.log(query);
-            
             const headers = role === "admin" ? await getAdminToken() : undefined;
             const result = await getRequest(urls.api.graphUrl + graphName + "?query=" + query, headers);
             return await result.json();
