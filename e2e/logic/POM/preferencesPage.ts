@@ -3,7 +3,7 @@ import { Locator } from "@playwright/test";
 
 export default class PreferencesPage extends BasePage {
 
-    private get preferencesView(): Locator {
+    private get openPreferencesViewBtn(): Locator {
         return this.page.getByRole('button', { name: 'Preferences' })
     }
 
@@ -44,7 +44,7 @@ export default class PreferencesPage extends BasePage {
     }
 
     async addColor(): Promise<void> {
-        await this.preferencesView.click();
+        await this.openPreferencesViewBtn.click();
         await this.addColorBtn.click();
         await this.saveColorBtn.click();
         await this.applyColorBtn.click();
@@ -52,14 +52,14 @@ export default class PreferencesPage extends BasePage {
     }
 
     async getColorsCount(): Promise<number> {
-        await this.preferencesView.click();
+        await this.openPreferencesViewBtn.click();
         const count = await this.getColors.count();
         await this.closePreferencesBtn.click();
         return count;
     }
 
     async removeColor(): Promise<void> {
-        await this.preferencesView.click();
+        await this.openPreferencesViewBtn.click();
         const color = this.getColors.last();
         await color.hover();
         await this.deleteColorBtn.click();
@@ -68,7 +68,7 @@ export default class PreferencesPage extends BasePage {
     }
 
     async getColor(): Promise<string | null> {
-        await this.preferencesView.click();
+        await this.openPreferencesViewBtn.click();
         const color = this.getColors.last();
         const colorText = await color.textContent();
         await this.closePreferencesBtn.click();
@@ -76,7 +76,7 @@ export default class PreferencesPage extends BasePage {
     }
 
     async modifyColor(): Promise<void> {
-        await this.preferencesView.click();
+        await this.openPreferencesViewBtn.click();
         const color = this.getColors.last();
         await color.hover();
         await this.editColorBtn.click();
@@ -86,13 +86,13 @@ export default class PreferencesPage extends BasePage {
     }
 
     async resetColors(): Promise<void> {
-        await this.preferencesView.click();
+        await this.openPreferencesViewBtn.click();
         await this.resetColorsBtn.click();
         await this.closePreferencesBtn.click();
     }
 
     async openPreferencesView(): Promise<void> {
-        await this.preferencesView.click();
+        await this.openPreferencesViewBtn.click();
     }
 
     async isPreferencesViewOpen(): Promise<boolean> {
