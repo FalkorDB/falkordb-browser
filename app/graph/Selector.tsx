@@ -9,6 +9,7 @@ import { Session } from "next-auth";
 import { PlusCircle, RefreshCcw } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { useToast } from "@/components/ui/use-toast";
+import * as monaco from "monaco-editor";
 import Combobox from "../components/ui/combobox";
 import { Graph, Query } from "../api/graph/model";
 import DialogComponent from "../components/DialogComponent";
@@ -45,7 +46,8 @@ export default function Selector({ setGraphName, graphName, queries, runQuery, e
     const type = pathname.includes("/schema") ? "Schema" : "Graph"
     const [isRotating, setIsRotating] = useState(false);
     const { toast } = useToast()
-
+    const submitQuery = useRef<HTMLButtonElement>(null)
+    
     useEffect(() => {
         setSelectedValue(graphName)
     }, [graphName])
@@ -74,6 +76,28 @@ export default function Selector({ setGraphName, graphName, queries, runQuery, e
 
     const handleEditorDidMount = (e: editor.IStandaloneCodeEditor) => {
         editorRef.current = e
+
+        // eslint-disable-next-line no-bitwise
+        e.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, () => {
+            submitQuery.current?.click();
+        });
+
+        // eslint-disable-next-line no-bitwise
+        e.addCommand(monaco.KeyMod.Shift | monaco.KeyCode.Enter, () => {
+            e.trigger('keyboard', 'type', { text: '\n' });
+        });
+
+        e.addAction({
+            id: 'submit',
+            label: 'Submit Query',
+            // eslint-disable-next-line no-bitwise
+            keybindings: [monaco.KeyCode.Enter],
+            contextMenuOrder: 1.5,
+            run: async () => {
+                submitQuery.current?.click()
+            },
+            precondition: '!suggestWidgetVisible',
+        });
     }
 
     const handleOnChange = async (name: string) => {
@@ -257,6 +281,7 @@ export default function Selector({ setGraphName, graphName, queries, runQuery, e
                                         disabled
                                     />
                                     <Button
+                                        ref={submitQuery}
                                         className="text-white flex justify-center w-1/3"
                                         disabled={isLoading}
                                         onClick={async () => {
