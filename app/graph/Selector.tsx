@@ -4,12 +4,11 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { DialogTitle } from "@/components/ui/dialog";
 import { Editor } from "@monaco-editor/react";
 import { editor } from "monaco-editor";
-import { cn, createNestedObject, defaultQuery, prepareArg, Query, securedFetch } from "@/lib/utils";
+import { cn, defaultQuery, prepareArg, Query, securedFetch } from "@/lib/utils";
 import { Session } from "next-auth";
 import { PlusCircle, RefreshCcw } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { useToast } from "@/components/ui/use-toast";
-import { JSONTree } from "react-json-tree";
 import Combobox from "../components/ui/combobox";
 import { Graph } from "../api/graph/model";
 import DialogComponent from "../components/DialogComponent";
@@ -19,6 +18,7 @@ import SchemaView from "../schema/SchemaView";
 import View from "./View";
 import CreateGraph from "../components/CreateGraph";
 import ExportGraph from "../components/ExportGraph";
+import MetadataView from "./MetadataView";
 
 interface Props {
     setGraphName: (selectedGraphName: string) => void
@@ -187,7 +187,7 @@ export default function Selector({ setGraphName, graphName, queries, runQuery, e
                     runQuery &&
                     <div className="flex gap-4 items-center">
                         <DialogComponent
-                            className="h-[80dvh] w-[90dvw]"
+                            className="h-[90dvh] w-[90dvw]"
                             open={queriesOpen}
                             onOpenChange={setQueriesOpen}
                             trigger={
@@ -239,47 +239,7 @@ export default function Selector({ setGraphName, graphName, queries, runQuery, e
                                                 onMount={handleEditorDidMount}
                                             />
                                         </div>
-                                        <ul className="flex flex-col gap-2 max-h-[30%] overflow-auto">
-                                            {
-                                                query && (query.metadata.length > 0 || query.explain.length > 0) &&
-                                                <>
-                                                    {
-
-                                                        query.metadata.map((line, index) => (
-                                                            // eslint-disable-next-line react/no-array-index-key
-                                                            <li key={index}>
-                                                                <p>{line}</p>
-                                                            </li>
-                                                        ))
-                                                    }
-                                                    <JSONTree
-                                                        data={createNestedObject(query.explain)}
-                                                        shouldExpandNodeInitially={() => true}
-                                                        hideRoot
-                                                        // eslint-disable-next-line react/no-unstable-nested-components
-                                                        labelRenderer={(label) => <span>{label}</span>}
-                                                        theme={{
-                                                            base00: "var(--background)", // background
-                                                            base01: '#000000',
-                                                            base02: '#CE9178',
-                                                            base03: '#242424', // open values
-                                                            base04: '#CE9178',
-                                                            base05: '#CE9178',
-                                                            base06: '#CE9178',
-                                                            base07: '#CE9178',
-                                                            base08: '#CE9178',
-                                                            base09: '#b5cea8', // numbers
-                                                            base0A: '#CE9178',
-                                                            base0B: '#242424',
-                                                            base0C: '#CE9178',
-                                                            base0D: '#FFFFFF', // * keys
-                                                            base0E: '#ae81ff',
-                                                            base0F: '#cc6633'
-                                                        }}
-                                                    />
-                                                </>
-                                            }
-                                        </ul>
+                                        {query && <MetadataView query={query} graphName={selectedValue} className="max-h-[30%] overflow-auto" />}
                                     </div>
                                 </div>
                                 <div className="flex justify-end">

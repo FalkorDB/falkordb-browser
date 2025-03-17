@@ -1,12 +1,13 @@
-import { createNestedObject, Query } from "@/lib/utils";
+import { cn, createNestedObject, Query } from "@/lib/utils";
 import { JSONTree } from "react-json-tree";
 import { useState } from "react";
 import { Info } from "lucide-react";
 import Button from "../components/ui/Button";
 
-export default function MetadataView({ query, graphName }: {
+export default function MetadataView({ query, graphName, className = "" }: {
     query: Query,
-    graphName: string
+    graphName: string,
+    className?: string
 }) {
     const [profile, setProfile] = useState<string[]>([])
 
@@ -19,7 +20,7 @@ export default function MetadataView({ query, graphName }: {
     }
 
     return (
-        <div className="h-full flex">
+        <div className={cn("h-full flex", className)}>
             <div className="grow flex flex-col gap-4 border p-8">
                 <h1 className="text-2xl font-bold p-2">Profile</h1>
                 <div className="flex gap-4">
@@ -65,7 +66,7 @@ export default function MetadataView({ query, graphName }: {
                 }
 
             </div>
-            <div className="flex flex-col">
+            <div className="grow flex flex-col">
                 <div className="grow border p-8">
                     <h1 className="text-2xl font-bold p-2">Metadata</h1>
                     {query.metadata.map((m, i) => (
@@ -104,4 +105,8 @@ export default function MetadataView({ query, graphName }: {
             </div>
         </div>
     )
+}
+
+MetadataView.defaultProps = {
+    className: ""
 }
