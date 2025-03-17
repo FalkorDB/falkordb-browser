@@ -8,17 +8,20 @@ export function delay(ms: number) {
     return new Promise(resolve => { setTimeout(resolve, ms) });
 }
 
-export const waitForElementToBeVisible = async (locator: Locator, time = 400, retry = 5): Promise<boolean> => {
-
-    while (retry > 0) {
-        if (await locator.isVisible()) {
-            return true
+export const waitForElementToBeVisible = async (locator: Locator, time = 500, retry = 10): Promise<boolean> => {
+    for (let i = 0; i < retry; i++) {
+        try {
+            if (await locator.count() > 0 && await locator.isVisible()) {
+                return true;
+            }
+        } catch (error) {
+            console.error(`Error checking element visibility: ${error}`);
         }
-        retry -= 1
-        await delay(time)
+        await new Promise(resolve => setTimeout(resolve, time));
     }
-    return false
-}
+    return false;
+};
+
 
 export const waitForTimeOut = async (page: Page, time = 500) => {
     await page.waitForTimeout(time);

@@ -13,7 +13,6 @@ import roles from '../config/user.json'
 test.describe('Graph Tests', () => {
     let browser: BrowserWrapper;
     let apicalls: ApiCalls;
-    const readOnlyGraph = `readOnlyGraph`;
     const BATCH_CREATE_PERSONS = queryData.queries[0].testQueries[0].query;
     const FETCH_FIRST_TEN_NODES = queryData.queries[0].testQueries[1].query;
     const GRAPH_BUTTON_COUNT_READONLY = "2";
@@ -21,13 +20,6 @@ test.describe('Graph Tests', () => {
     test.beforeAll(async () => {
         browser = new BrowserWrapper();
         apicalls = new ApiCalls();
-        const existingGraphsResponse = await apicalls.getGraphs();
-        const graphExists = existingGraphsResponse?.result?.includes(readOnlyGraph) ?? false;
-
-        if (!graphExists) {
-            await apicalls.addGraph(readOnlyGraph, "admin");
-            await apicalls.runQuery(readOnlyGraph, queryData.queries[0].testQueries[0].apiReq || "", "admin");
-        }
     })
 
     test.afterAll(async () => {
@@ -78,7 +70,7 @@ test.describe('Graph Tests', () => {
             const graphName = `graph_${Date.now()}`;
             await graph.addGraph(graphName);
             await graph.insertQuery(query.query);
-            await graph.clickRunQuery();
+            await graph.clickRunQuery(false);
             expect(await graph.getErrorNotification()).toBe(true);
             apicalls.removeGraph(graphName);
         });
@@ -90,7 +82,7 @@ test.describe('Graph Tests', () => {
             const graphName = `graph_${Date.now()}`;
             await graph.addGraph(graphName);
             await graph.insertQuery(query.query);
-            await graph.clickRunQuery();
+            await graph.clickRunQuery(false);
             expect(await graph.getErrorNotification()).toBe(true);
             apicalls.removeGraph(graphName);
         });
@@ -98,11 +90,16 @@ test.describe('Graph Tests', () => {
 
     queryData.queries[0].failedQueries.slice(0,5).forEach((query) => {
         test(`@readonly Validate failure & error message when any user runs an invalid queries: ${query.name}`, async () => {
+            const graphName = `graph_${Date.now()}`;
+            await apicalls.addGraph(graphName, "admin");
+            await apicalls.runQuery(graphName, queryData.queries[0].testQueries[0].apiReq || "", "admin");
+            await new Promise(resolve => { setTimeout(resolve, 1000) });
             const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
-            await graph.selectExistingGraph(readOnlyGraph, GRAPH_BUTTON_COUNT_READONLY);
+            await graph.selectExistingGraph(graphName, GRAPH_BUTTON_COUNT_READONLY);
             await graph.insertQuery(query.query);
-            await graph.clickRunQuery();
+            await graph.clickRunQuery(false);
             expect(await graph.getErrorNotification()).toBe(true);
+            await apicalls.removeGraph(graphName, "admin")
         });
     })
     
@@ -114,15 +111,19 @@ test.describe('Graph Tests', () => {
             if (role.role !== "readonly") {
                 await graph.addGraph(graphName);
             } else {
-                await graph.selectExistingGraph(readOnlyGraph, GRAPH_BUTTON_COUNT_READONLY);
+                await apicalls.addGraph(graphName, "admin");
+                await graph.refreshPage();
+                await graph.selectExistingGraph(graphName, GRAPH_BUTTON_COUNT_READONLY);
             }
             await graph.insertQuery(FETCH_FIRST_TEN_NODES);
-            await graph.clickRunQuery();
+            await graph.clickRunQuery(false);
             await graph.clickOnQueryHistory();
             expect(await graph.getQueryHistory("1")).toBe(true);
             if (role.role !== "readonly") {
                 await apicalls.removeGraph(graphName);
-            }            
+            } else {
+                await apicalls.removeGraph(graphName, "admin");
+            }           
         });
     })
 
@@ -130,14 +131,13 @@ test.describe('Graph Tests', () => {
         test(`@${role.role} Validate that running a query without selecting a graph displays the proper error notification`, async () => {
             const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
             await browser.setPageToFullScreen();
-            await graph.removeAllGraphs();
             await graph.insertQuery(FETCH_FIRST_TEN_NODES);
-            await graph.clickRunQuery();
+            await graph.clickRunQuery(false);
             expect(await graph.getErrorNotification()).toBe(true);
         });
     })
 
-    roles.userRoles.slice(2,3).forEach((role) => {
+    roles.userRoles.forEach((role) => {
         test(`@${role.role} Validate search for an element in the canvas and ensure focus on the searched node`, async () => {
             const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
             await browser.setPageToFullScreen();
@@ -146,7 +146,11 @@ test.describe('Graph Tests', () => {
                 await graph.addGraph(graphName);
                 await graph.insertQuery(BATCH_CREATE_PERSONS);
             } else {
-                await graph.selectExistingGraph(readOnlyGraph, GRAPH_BUTTON_COUNT_READONLY);
+                await apicalls.addGraph(graphName, "admin");
+                await apicalls.runQuery(graphName, queryData.queries[0].testQueries[0].apiReq || "", "admin");
+                await new Promise(resolve => { setTimeout(resolve, 1000) });
+                await graph.refreshPage();
+                await graph.selectExistingGraph(graphName, GRAPH_BUTTON_COUNT_READONLY);
                 await graph.insertQuery(FETCH_FIRST_TEN_NODES);
             }
             await graph.clickRunQuery();
@@ -159,6 +163,8 @@ test.describe('Graph Tests', () => {
             }
             if (role.role !== "readonly") {
                 await apicalls.removeGraph(graphName);
+            } else {
+                await apicalls.removeGraph(graphName, "admin");
             }
         });
     })
@@ -172,7 +178,11 @@ test.describe('Graph Tests', () => {
                 await graph.addGraph(graphName);
                 await graph.insertQuery(BATCH_CREATE_PERSONS);
             } else {
-                await graph.selectExistingGraph(readOnlyGraph, GRAPH_BUTTON_COUNT_READONLY);
+                await apicalls.addGraph(graphName, "admin");
+                await apicalls.runQuery(graphName, queryData.queries[0].testQueries[0].apiReq || "", "admin");
+                await new Promise(resolve => { setTimeout(resolve, 1000) });
+                await graph.refreshPage();
+                await graph.selectExistingGraph(graphName, GRAPH_BUTTON_COUNT_READONLY);
                 await graph.insertQuery(FETCH_FIRST_TEN_NODES);
             }
             await graph.clickRunQuery();
@@ -184,6 +194,8 @@ test.describe('Graph Tests', () => {
             expect(updatedGraph.scaleY).toBeGreaterThan(initialGraph.scaleY);
             if (role.role !== "readonly") {
                 await apicalls.removeGraph(graphName);
+            } else {
+                await apicalls.removeGraph(graphName, "admin");
             }
         });
     })
@@ -197,7 +209,11 @@ test.describe('Graph Tests', () => {
                 await graph.addGraph(graphName);
                 await graph.insertQuery(BATCH_CREATE_PERSONS);
             } else {
-                await graph.selectExistingGraph(readOnlyGraph, GRAPH_BUTTON_COUNT_READONLY);
+                await apicalls.addGraph(graphName, "admin");
+                await apicalls.runQuery(graphName, queryData.queries[0].testQueries[0].apiReq || "", "admin");
+                await new Promise(resolve => { setTimeout(resolve, 1000) });
+                await graph.refreshPage();
+                await graph.selectExistingGraph(graphName, GRAPH_BUTTON_COUNT_READONLY);
                 await graph.insertQuery(FETCH_FIRST_TEN_NODES);
             }
             await graph.clickRunQuery();
@@ -209,6 +225,8 @@ test.describe('Graph Tests', () => {
             expect(updatedGraph.scaleY).toBeLessThan(initialGraph.scaleY);
             if (role.role !== "readonly") {
                 await apicalls.removeGraph(graphName);
+            } else {
+                await apicalls.removeGraph(graphName, "admin");
             }
         });
     })
@@ -222,7 +240,10 @@ test.describe('Graph Tests', () => {
                 await graph.addGraph(graphName);
                 await graph.insertQuery(BATCH_CREATE_PERSONS);
             } else {
-                await graph.selectExistingGraph(readOnlyGraph, GRAPH_BUTTON_COUNT_READONLY);
+                await apicalls.addGraph(graphName, "admin");
+                await apicalls.runQuery(graphName, queryData.queries[0].testQueries[0].apiReq || "", "admin");
+                await graph.refreshPage();
+                await graph.selectExistingGraph(graphName, GRAPH_BUTTON_COUNT_READONLY);
                 await graph.insertQuery(FETCH_FIRST_TEN_NODES);
             }
             await graph.clickRunQuery();
@@ -236,8 +257,61 @@ test.describe('Graph Tests', () => {
             expect(Math.abs(initialGraph.scaleY - updatedGraph.scaleY)).toBeLessThanOrEqual(0.1);
             if (role.role !== "readonly") {
                 await apicalls.removeGraph(graphName);
+            } else {
+                await apicalls.removeGraph(graphName, "admin");
             }
         });
     })
+
+    // // //new
+
+    roles.userRoles.slice(0,2).forEach((role) => {
+        test(`@${role.role} Validate that the reload graph list function works by adding a graph via API and testing the reload button`, async () => {
+            const graphName = `graph_${Date.now()}`;
+            await apicalls.addGraph(graphName);
+            const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+            await browser.setPageToFullScreen();
+            await graph.clickOnSelectBtnFromGraphManager("2")
+            expect(await graph.verifyGraphExists(graphName)).toBe(true);
+            await apicalls.removeGraph(graphName);
+        });
+    })
+
+    test(`@admin Validate that modifying the graph name updates it correctly`, async () => {
+        const graphName = `graph_${Date.now()}`;
+        await apicalls.addGraph(graphName);
+        const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+        await browser.setPageToFullScreen();
+        const newGraphName = `graph_${Date.now()}`;
+        await graph.modifyGraphName(graphName, newGraphName);
+        await graph.refreshPage();
+        expect(await graph.verifyGraphExists(newGraphName)).toBe(true);
+        await apicalls.removeGraph(newGraphName);
+    });
+
+    roles.userRoles.slice(1,3).forEach((role) => {
+        test(`@${role.role} Validate that modifying a graph name fails and does not apply the change`, async () => {
+            const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+            await browser.setPageToFullScreen();
+            const graphName = `graph_${Date.now()}`;
+            if (role.role !== "readonly") {
+                await graph.addGraph(graphName);
+            } else {
+                await apicalls.addGraph(graphName, "admin");
+            }
+            await graph.refreshPage();
+            const newGraphName = `graph_${Date.now()}`;
+            await graph.modifyGraphName(graphName, newGraphName);
+            await graph.refreshPage();
+            expect(await graph.verifyGraphExists(newGraphName)).toBe(false);
+            if (role.role !== "readonly") {
+                await apicalls.removeGraph(graphName);
+            } else {
+                await apicalls.removeGraph(graphName, "admin");
+            }
+        });
+    })
+
+    
     
 })

@@ -60,9 +60,10 @@ export default class ApiCalls {
         }
     }
     
-    async removeGraph(graphName: string): Promise<RemoveGraphResponse> {
+    async removeGraph(graphName: string, role?: string): Promise<RemoveGraphResponse> {
         try {
-            const result = await deleteRequest(urls.api.graphUrl + graphName);
+            const headers = role === "admin" ? await getAdminToken() : undefined;
+            const result = await deleteRequest(urls.api.graphUrl + graphName, headers);
             return await result.json();
         } catch (error) {
             throw new Error("Failed to remove graph.");

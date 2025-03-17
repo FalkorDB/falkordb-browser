@@ -6,7 +6,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { Locator, Download } from "@playwright/test";
 import BasePage from "@/e2e/infra/ui/basePage";
-import { waitForTimeOut } from "@/e2e/infra/utils";
+import { waitForElementToBeVisible, waitForTimeOut } from "@/e2e/infra/utils";
 
 export default class GraphPage extends BasePage {
 
@@ -78,7 +78,7 @@ export default class GraphPage extends BasePage {
         return this.page.locator("//div[contains(@class, 'force-graph-container')]//canvas");
     }
 
-    private get selectGraphBtn(): (buttonNumber: string) => Locator {
+    private get selectBtnFromGraphManager(): (buttonNumber: string) => Locator {
         return (buttonNumber: string) => this.page.locator(`//div[@id='graphManager']//button[${buttonNumber}]`);
     }
 
@@ -112,6 +112,18 @@ export default class GraphPage extends BasePage {
 
     private get fitToSizeBtn(): Locator {
         return this.page.locator("//button[contains(., 'Fit To Size')]");
+    }
+
+    private get editBtnInGraphListMenu(): (graph: string) => Locator {
+        return (graph: string) => this.page.locator(`//table//tbody/tr[@data-id='${graph}']//td[2]//button`);
+    }
+
+    private get editInputInGraphListMenu(): (graph: string) => Locator {
+        return (graph: string) => this.page.locator(`//table//tbody/tr[@data-id='${graph}']//td[2]//input`);
+    }
+
+    private get editSaveBtnInGraphListMenu(): (graph: string) => Locator {
+        return (graph: string) => this.page.locator(`//table//tbody/tr[@data-id='${graph}']//td[2]//button[1]`);
     }
 
     /* QUERY History */
@@ -184,6 +196,17 @@ export default class GraphPage extends BasePage {
         return isVisible;
     }
 
+    async modifyGraphName(graph: string, newGraphName: string): Promise<void> {
+        await this.graphsMenu.click();
+        await this.manageGraphBtn.click();
+        const isFindGraphInMenuVisible = await waitForElementToBeVisible(this.findGraphInMenu(graph));
+        if (!isFindGraphInMenuVisible) throw new Error("find graph in menu button is not visible!");
+        await this.findGraphInMenu(graph).hover();
+        await this.editBtnInGraphListMenu(graph).click();
+        await this.editInputInGraphListMenu(graph).fill(newGraphName);
+        await this.editSaveBtnInGraphListMenu(graph).click();
+    }
+
     async deleteGraph(graph: string): Promise<void> {
         await this.graphsMenu.click();
         await this.manageGraphBtn.click();
@@ -203,10 +226,14 @@ export default class GraphPage extends BasePage {
         await this.page.keyboard.type(query);
     }
 
-    async clickRunQuery(): Promise<void>{
+    async clickRunQuery(waitForAnimation: boolean = true): Promise<void> {
+        const isVisible = await waitForElementToBeVisible(this.queryRunBtn);
+        if (!isVisible) throw new Error("run query button is not visible!");
         await this.queryRunBtn.click();
-        await this.waitForCanvasAnimationToEnd();
-    }
+        if (waitForAnimation) {
+            await this.waitForCanvasAnimationToEnd();
+        }
+    }    
 
     async nodeClick(x: number, y: number): Promise<void> {  
         await this.canvasElement.hover({ position: { x, y } });
@@ -214,25 +241,33 @@ export default class GraphPage extends BasePage {
         await this.canvasElement.click({ position: { x, y }, button: 'right' });
     }
 
-    async selectGraph(buttonNumber: string): Promise<void>{
-        await this.selectGraphBtn(buttonNumber).click();
+    async clickOnSelectBtnFromGraphManager(buttonNumber: string): Promise<void>{
+        const isSelectBtnFromGraphManager = await waitForElementToBeVisible(this.selectBtnFromGraphManager(buttonNumber));
+        if (!isSelectBtnFromGraphManager) throw new Error("select from graph manager button is not visible!");
+        await this.selectBtnFromGraphManager(buttonNumber).click();
     }
 
     async selectGraphFromList(graph: string): Promise<void> {
-        // await this.page.mouse.click(0, 0); 
-        await this.selectGraphList(graph).click();
+        const graphLocator = this.selectGraphList(graph);
+        const isVisible = await waitForElementToBeVisible(graphLocator);
+        if (!isVisible) throw new Error("select Graph From List button is not visible!");
+        await graphLocator.click();
     }
 
     async selectExistingGraph(graph: string, buttonNumber: string): Promise<void>{
-        await this.selectGraph(buttonNumber);
+        await this.clickOnSelectBtnFromGraphManager(buttonNumber);
         await this.selectGraphFromList(graph);
     }
 
     async insertElementInCanvasSearch(node: string): Promise<void>{
+        const isCanvasElementSearchInput = await waitForElementToBeVisible(this.canvasElementSearchInput);
+        if (!isCanvasElementSearchInput) throw new Error("canvas element search input is not visible!");
         await this.canvasElementSearchInput.fill(node);
     }
 
     async clickOnElementSearchInCanvas(): Promise<void>{
+        const isCanvasElementSearchBtn = await waitForElementToBeVisible(this.canvasElementSearchBtn);
+        if (!isCanvasElementSearchBtn) throw new Error("canvas element search button is not visible!");
         await this.canvasElementSearchBtn.click();
     }
 
@@ -259,14 +294,20 @@ export default class GraphPage extends BasePage {
     }
 
     async clickOnZoomIn(): Promise<void>{
+        const isVisible = await waitForElementToBeVisible(this.zoomInBtn);
+        if (!isVisible) throw new Error("zoom in button is not visible!");
         await this.zoomInBtn.click();
     }
 
     async clickOnZoomOut(): Promise<void>{
+        const isVisible = await waitForElementToBeVisible(this.zoomOutBtn);
+        if (!isVisible) throw new Error("zoom out button is not visible!");
         await this.zoomOutBtn.click();
     }
 
     async clickOnFitToSize(): Promise<void>{
+        const isVisible = await waitForElementToBeVisible(this.fitToSizeBtn);
+        if (!isVisible) throw new Error("fit to size button is not visible!");
         await this.fitToSizeBtn.click();
         await this.waitForCanvasAnimationToEnd();
     }
@@ -309,6 +350,8 @@ export default class GraphPage extends BasePage {
     /* QUERY History */
 
     async clickOnQueryHistory(): Promise<void> {
+        const isVisible = await waitForElementToBeVisible(this.queryHistory);
+        if (!isVisible) throw new Error("query history button is not visible!");
         await this.queryHistory.click();
     }
 
