@@ -151,7 +151,7 @@ export default function Configurations() {
         }
 
         const result = await securedFetch(
-            `api/graph/?config=${prepareArg(name)}&value=${prepareArg(value)}`,
+            `api/graph/config/${prepareArg(name)}?value=${prepareArg(value)}`,
             { method: 'POST' },
             toast
         );
