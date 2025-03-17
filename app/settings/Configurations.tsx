@@ -107,6 +107,21 @@ const Configs: Map<string, Config> = new Map([
         name: "EFFECTS_THRESHOLD",
         description: "Replicate modification via effect when average modification time > EFFECTS_THRESHOLD",
         value: ""
+    }],
+    ["DELAY_INDEXING", {
+        name: "DELAY_INDEXING",
+        description: "Delay indexing configuration if set to `yes` will delay index construction during database load, speeding up the overall loading time, indexes will be constructed asynchronously once the DB is fully loaded, during construction time the database is fully functional.",
+        value: ""
+    }],
+    ["DELTA_MAX_PENDING_CHANGES", {
+        name: "DELTA_MAX_PENDING_CHANGES",
+        description: "Delta max pending changes determines the number of creations & deletions held by delta matrices before a matrix flush is required, setting this value too low will result in frequent matrix flush which will hurt performance, setting this value too high will also affect performance as intermediate delta matrices will incur a large number of changes.",
+        value: ""
+    }],
+    ["ASYNC_DELETE", {
+        name: "ASYNC_DELETE",
+        description: "Controls how graphs are discarded, when set to `yes` graphs are freed on a dedicated thread leaving the server's main thread free, otherwise graphs are freed on the server's main thread.",
+        value: ""
     }]
 ])
 
