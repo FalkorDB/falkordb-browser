@@ -50,6 +50,7 @@ export default function Users() {
                 description: `${username} role updated successfully`,
                 action: oldRole ? <ToastAction altText="Undo" onClick={() => handleSetRole({ username, role: oldRole })}>Undo</ToastAction> : undefined
             })
+            setOpen(false)
         }
     }
 
@@ -129,9 +130,10 @@ export default function Users() {
                 </div>
             </TableComponent>
             <Dialog open={open} onOpenChange={setOpen}>
-                <DialogContent className="bg-foreground p-8 flex flex-col gap-8 rounded-lg border-none">
-                    <DialogHeader>
-                        <DialogTitle>Set User</DialogTitle>
+                <DialogContent className="bg-foreground p-8 flex flex-col gap-8 rounded-lg border-none" disableClose>
+                    <DialogHeader className="flex-row justify-between items-center border-b border-secondary pb-4">
+                        <DialogTitle className="text-2xl font-medium">Set User Role</DialogTitle>
+                        <CloseDialog />
                     </DialogHeader>
                     <DialogDescription>Are you sure you want to set the user role to {setUser?.role}?</DialogDescription>
                     <div className="flex justify-end gap-4">
