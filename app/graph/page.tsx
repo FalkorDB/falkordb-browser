@@ -129,7 +129,7 @@ export default function Page() {
                     setHistoryQueries={(queriesArr) => setQueries(queries.map((query, i) => ({ text: queriesArr[i], metadata: query.metadata } as Query)))}
                     fetchCount={fetchCount}
                 />
-                <Tutorial onSetGraphName={setGraphName} />
+                <Tutorial onSetGraphName={setGraphName} graphNames={graphNames} />
             </div>
         </div >
     )
