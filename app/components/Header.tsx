@@ -82,7 +82,7 @@ export default function Header({ onSetGraphName }: Props) {
                                                 </a>
                                             </li>
                                             <li>
-                                                <a href="https://discord.gg/jyUgBweNQz" target="_blank" rel="noreferrer">
+                                                <a href="https://discord.com/invite/jyUgBweNQz" target="_blank" rel="noreferrer">
                                                     Support
                                                 </a>
                                             </li>
