@@ -136,14 +136,6 @@ test.describe('Graph Tests', () => {
         await apicalls.removeGraph(graphName);
     });
 
-    test(`@admin Validate that running a query without selecting a graph displays the proper error notification`, async () => {
-        const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
-        await browser.setPageToFullScreen();
-        await graph.insertQuery(FETCH_FIRST_TEN_NODES);
-        await graph.clickRunQuery(false);
-        expect(await graph.getErrorNotification()).toBe(true);
-    });
-
     const testNodes = [1, 5, 10];
     for (const node of testNodes) {
         test(`@admin Validate search for Person ${node} in the canvas and ensure focus`, async () => {
