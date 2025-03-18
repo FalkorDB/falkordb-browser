@@ -53,7 +53,7 @@ export default class ApiCalls {
     
     async getGraphs(): Promise<GetGraphsResponse> {
         try {
-            const result = await getRequest(`${urls.api.graphUrl}`);
+            const result = await getRequest(`${urls.api.settingsUsers}`);
             return await result.json();
         } catch (error) {
             throw new Error("Failed to retrieve graphs.");
@@ -136,7 +136,7 @@ export default class ApiCalls {
     
     async createUsers(data?: any): Promise<CreateUsersResponse> {
         try {
-            const result = await postRequest(urls.api.settingsUsers, data);
+            const result = await postRequest(urls.api.settingsUsers ,data);
             return await result.json();
         } catch (error) {
             throw new Error("Failed to create users.");
@@ -145,7 +145,7 @@ export default class ApiCalls {
     
     async deleteUsers(data?: any): Promise<DeleteUsersResponse> {
         try {
-            const result = await deleteRequest(urls.api.settingsUsers, data);
+            const result = await deleteRequest(urls.api.settingsUsers, undefined, data);
             return await result.json();
         } catch (error) {
             throw new Error("Failed to delete users.");

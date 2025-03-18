@@ -6,7 +6,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { Locator, Download } from "@playwright/test";
 import BasePage from "@/e2e/infra/ui/basePage";
-import { waitForElementToBeVisible, waitForTimeOut } from "@/e2e/infra/utils";
+import { waitForElementCount, waitForElementToBeVisible, waitForTimeOut } from "@/e2e/infra/utils";
 
 export default class GraphPage extends BasePage {
 
@@ -98,8 +98,8 @@ export default class GraphPage extends BasePage {
         return this.page.locator("//div[contains(@class, 'float-tooltip-kap')]");
     }
 
-    private get reloadGraphListBtn(): Locator {
-        return this.page.locator("//div[@id='graphManager']//button[2]");
+    private get reloadGraphListBtn(): (index: string) => Locator {
+        return (index: string) => this.page.locator(`//div[@id='graphManager']//button[${index}]`);
     }
 
     private get zoomInBtn(): Locator {
@@ -241,10 +241,11 @@ export default class GraphPage extends BasePage {
         await this.canvasElement.click({ position: { x, y }, button: 'right' });
     }
 
-    async clickOnSelectBtnFromGraphManager(buttonNumber: string): Promise<void>{
-        const isSelectBtnFromGraphManager = await waitForElementToBeVisible(this.selectBtnFromGraphManager(buttonNumber));
+    async clickOnSelectBtnFromGraphManager(role: string = "admin"): Promise<void>{
+        const index = role === 'readonly' ? "2" : "3";
+        const isSelectBtnFromGraphManager = await waitForElementToBeVisible(this.selectBtnFromGraphManager(index));
         if (!isSelectBtnFromGraphManager) throw new Error("select from graph manager button is not visible!");
-        await this.selectBtnFromGraphManager(buttonNumber).click();
+        await this.selectBtnFromGraphManager(index).click();
     }
 
     async selectGraphFromList(graph: string): Promise<void> {
@@ -254,8 +255,8 @@ export default class GraphPage extends BasePage {
         await graphLocator.click();
     }
 
-    async selectExistingGraph(graph: string, buttonNumber: string): Promise<void>{
-        await this.clickOnSelectBtnFromGraphManager(buttonNumber);
+    async selectExistingGraph(graph: string, role?: string): Promise<void>{
+        await this.clickOnSelectBtnFromGraphManager(role);
         await this.selectGraphFromList(graph);
     }
 
@@ -289,8 +290,11 @@ export default class GraphPage extends BasePage {
         return toolTipText;
     }
 
-    async reloadGraphList(): Promise<void>{
-        await this.reloadGraphListBtn.click();
+    async reloadGraphList(role: string = "admin"): Promise<void>{
+        const index = role === 'readonly' ? "1" : "2";
+        const isVisible = await waitForElementToBeVisible(this.reloadGraphListBtn(index));
+        if (!isVisible) throw new Error("reload graph button is not visible!");
+        await this.reloadGraphListBtn(index).click();
     }
 
     async clickOnZoomIn(): Promise<void>{
@@ -370,6 +374,22 @@ export default class GraphPage extends BasePage {
 
     async isQueryHistoryDialog(): Promise<void> {
         await this.queryHistoryDialog.isVisible();
+    }
+
+    /* End of QUERY History*/
+
+    async changeNodePosition(x: number, y: number): Promise<void> {
+        const box = (await this.canvasElement.boundingBox())!;
+        const targetX = x + 100;
+        const targetY = y + 50;
+        const absStartX = box.x + x;
+        const absStartY = box.y + y;
+        const absEndX = box.x + targetX;
+        const absEndY = box.y + targetY;
+        await this.page.mouse.move(absStartX, absStartY);
+        await this.page.mouse.down();
+        await this.page.mouse.move(absEndX, absEndY);
+        await this.page.mouse.up();
     }
 
     async rightClickAtCanvasCenter(): Promise<void> {

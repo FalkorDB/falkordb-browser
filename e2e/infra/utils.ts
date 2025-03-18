@@ -22,6 +22,22 @@ export const waitForElementToBeVisible = async (locator: Locator, time = 500, re
     return false;
 };
 
+export const waitForElementCount = async (locator: Locator, time = 500, retry = 10): Promise<number> => {
+    for (let i = 0; i < retry; i++) {
+        try {
+            const count = await locator.count();
+            if (count > 0) {
+                return count;
+            }
+        } catch (error) {
+            console.error(`Error checking element count: ${error}`);
+        }
+        await new Promise(resolve => setTimeout(resolve, time));
+    }
+    return 0;
+};
+
+
 
 export const waitForTimeOut = async (page: Page, time = 500) => {
     await page.waitForTimeout(time);
