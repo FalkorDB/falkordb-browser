@@ -7,7 +7,7 @@ import { useRef, useState, useEffect, Dispatch, SetStateAction } from "react";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { ImperativePanelHandle } from "react-resizable-panels";
 import { ChevronLeft, GitGraph, Info, Maximize2, Minimize2, Pause, Play, Table } from "lucide-react"
-import { cn, handleZoomToFit, prepareArg, Query, securedFetch } from "@/lib/utils";
+import { cn, handleZoomToFit, HistoryQuery, prepareArg, Query, securedFetch } from "@/lib/utils";
 import dynamic from "next/dynamic";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/components/ui/use-toast";
@@ -25,19 +25,19 @@ import MetadataView from "./MetadataView";
 const ForceGraph = dynamic(() => import("../components/ForceGraph"), { ssr: false });
 const EditorComponent = dynamic(() => import("../components/EditorComponent"), { ssr: false })
 
-function GraphView({ graph, selectedElement, setSelectedElement, runQuery, historyQuery, historyQueries, setHistoryQueries, fetchCount }: {
+function GraphView({ graph, selectedElement, setSelectedElement, runQuery, historyQuery, fetchCount, query, setQuery, setHistoryQuery }: {
     graph: Graph
     selectedElement: Node | Link | undefined
     setSelectedElement: Dispatch<SetStateAction<Node | Link | undefined>>
-    runQuery: (query: string) => Promise<Query>
-    historyQuery: string
-    historyQueries: string[]
-    setHistoryQueries: (queries: string[]) => void
+    runQuery: (query: string) => Promise<Query | undefined>
+    historyQuery: HistoryQuery
+    setHistoryQuery: Dispatch<SetStateAction<HistoryQuery>>
     fetchCount: () => void
+    query: string
+    setQuery: (value: string) => void
 }) {
 
     const [data, setData] = useState<GraphData>(graph.Elements)
-    const [query, setQuery] = useState<string>("")
     const [selectedElements, setSelectedElements] = useState<(Node | Link)[]>([]);
     const [isCollapsed, setIsCollapsed] = useState<boolean>(true);
     const chartRef = useRef<ForceGraphMethods<Node, Link>>()
@@ -86,10 +86,6 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
         setSelectedElement(undefined)
         setSelectedElements([])
     }, [graph.Id])
-
-    useEffect(() => {
-        setQuery(historyQuery)
-    }, [historyQuery])
 
     const onExpand = (expand?: boolean) => {
         if (!dataPanel.current) return
@@ -235,9 +231,12 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
 
     const handleRunQuery = async (q: string) => {
         const newQuery = await runQuery(q)
-        setCurrentQuery(newQuery)
-        handleZoomToFit(chartRef)
-        handleCooldown()
+        if (newQuery) {
+            setCurrentQuery(newQuery)
+            handleZoomToFit(chartRef)
+            handleCooldown()
+        }
+        return !!newQuery
     }
 
 
@@ -295,13 +294,13 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
                 defaultSize={selectedElement ? 75 : 100}
             >
                 <EditorComponent
+                    query={query}
+                    setQuery={setQuery}
                     graph={graph}
                     maximize={maximize}
-                    currentQuery={query}
-                    historyQueries={historyQueries}
-                    setHistoryQueries={setHistoryQueries}
                     runQuery={handleRunQuery}
-                    setCurrentQuery={setQuery}
+                    historyQuery={historyQuery}
+                    setHistoryQuery={setHistoryQuery}
                 />
                 <Tabs value={tabsValue} className="h-1 grow flex gap-2 items-center">
                     <TabsList className="h-fit bg-foreground p-2 flex flex-col gap-2">

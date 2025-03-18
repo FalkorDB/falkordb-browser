@@ -1,10 +1,10 @@
 'use client'
 
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback, Dispatch, SetStateAction } from "react";
 import { DialogTitle } from "@/components/ui/dialog";
 import { Editor } from "@monaco-editor/react";
 import { editor } from "monaco-editor";
-import { cn, defaultQuery, prepareArg, Query, securedFetch } from "@/lib/utils";
+import { cn, defaultQuery, HistoryQuery, prepareArg, Query, securedFetch } from "@/lib/utils";
 import { Session } from "next-auth";
 import { PlusCircle, RefreshCcw } from "lucide-react";
 import { usePathname } from "next/navigation";
@@ -23,24 +23,25 @@ import MetadataView from "./MetadataView";
 interface Props {
     setGraphName: (selectedGraphName: string) => void
     graphName: string
-    runQuery?: (query: string, setQueriesOpen: (open: boolean) => void) => Promise<void>
+    runQuery?: (query: string) => Promise<Query | undefined>
     queries?: Query[]
     edgesCount: number
     nodesCount: number
     setGraph: (graph: Graph) => void
     graph: Graph
     data: Session | null
+    setHistoryQuery: Dispatch<SetStateAction<HistoryQuery>>
 }
 
-export default function Selector({ setGraphName, graphName, queries, runQuery, edgesCount, nodesCount, setGraph, graph, data: session }: Props) {
+export default function Selector({ setGraphName, graphName, queries, runQuery, edgesCount, nodesCount, setGraph, graph, data: session, setHistoryQuery }: Props) {
 
     const [options, setOptions] = useState<string[]>([]);
     const [schema, setSchema] = useState<Graph>(Graph.empty());
     const [selectedValue, setSelectedValue] = useState<string>("");
     const [duplicateOpen, setDuplicateOpen] = useState<boolean>(false);
-    const [query, setQuery] = useState<Query>();
     const [queriesOpen, setQueriesOpen] = useState<boolean>(false);
     const [isLoading, setIsLoading] = useState(false);
+    const [currentQueryIndex, setCurrentQueryIndex] = useState<number>();
     const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null)
     const pathname = usePathname()
     const type = pathname.includes("/schema") ? "Schema" : "Graph"
@@ -201,55 +202,68 @@ export default function Selector({ setGraphName, graphName, queries, runQuery, e
                         >
                             <div className="grow flex flex-col p-8 gap-8">
                                 <DialogTitle>Queries</DialogTitle>
-                                <div className="h-1 grow flex">
-                                    <ul className="w-1 grow flex-col border overflow-auto">
-                                        {
-                                            queries && queries.map((q, index) => (
-                                                // eslint-disable-next-line react/no-array-index-key
-                                                <li key={index} className="w-full text-sm border-b py-3 px-12">
-                                                    <Button
-                                                        className="w-full truncate"
-                                                        label={q.text}
-                                                        onClick={() => setQuery(q)}
-                                                    />
-                                                </li>
-                                            ))
-                                        }
-                                    </ul>
-                                    <div className="w-1 grow flex flex-col gap-2 p-4 border">
-                                        <div className="h-1 grow flex border">
-                                            <Editor
-                                                width="100%"
-                                                height="100%"
-                                                language="cypher"
-                                                theme="custom-theme"
-                                                options={{
-                                                    lineHeight: 30,
-                                                    fontSize: 25,
-                                                    lineNumbersMinChars: 3,
-                                                    scrollbar: {
-                                                        horizontal: "hidden"
-                                                    },
-                                                    wordWrap: "on",
-                                                    scrollBeyondLastLine: false,
-                                                    renderWhitespace: "none"
-                                                }}
-                                                value={query?.text}
-                                                onChange={(q) => setQuery(({ text: q || "", metadata: query?.metadata || [], explain: query?.explain || [] }))}
-                                                onMount={handleEditorDidMount}
-                                            />
-                                        </div>
-                                        {query && <MetadataView query={query} graphName={selectedValue} className="max-h-[30%] overflow-auto" />}
+                                <div className="h-1 grow flex border">
+                                    <div className="w-1 grow border-r overflow-auto">
+                                        <ul className="flex flex-col-reverse">
+                                            {
+                                                queries && queries.map((query, index) => (
+                                                    // eslint-disable-next-line react/no-array-index-key
+                                                    <li key={index} className="flex flex-col gap-2 w-full border-b py-3 px-12">
+                                                        <Button
+                                                            className="w-full truncate text-sm"
+                                                            label={query.text}
+                                                            onClick={() => {
+                                                                setCurrentQueryIndex(index)
+                                                            }}
+                                                        />
+                                                        {
+                                                            currentQueryIndex === index &&
+                                                            <div className="h-[20dvh] border">
+                                                                <Editor
+                                                                    width="100%"
+                                                                    height="100%"
+                                                                    language="cypher"
+                                                                    theme="custom-theme"
+                                                                    options={{
+                                                                        lineHeight: 30,
+                                                                        fontSize: 25,
+                                                                        lineNumbersMinChars: 3,
+                                                                        scrollbar: {
+                                                                            horizontal: "hidden"
+                                                                        },
+                                                                        wordWrap: "on",
+                                                                        scrollBeyondLastLine: false,
+                                                                        renderWhitespace: "none"
+                                                                    }}
+                                                                    value={queries[currentQueryIndex]?.text}
+                                                                    onChange={(value) => setHistoryQuery(prev => ({
+                                                                        ...prev,
+                                                                        queries: !value ? prev.queries.filter((_, i) => i !== currentQueryIndex) : prev.queries.map((q, i) => i === currentQueryIndex ? { ...q, text: value || "" } : q)
+                                                                    }))}
+                                                                    onMount={handleEditorDidMount}
+                                                                />
+                                                            </div>
+                                                        }
+                                                    </li>
+                                                ))
+                                            }
+                                        </ul>
+                                    </div>
+                                    <div className="w-1 grow">
+                                        {currentQueryIndex && queries?.[currentQueryIndex] && <MetadataView query={queries[currentQueryIndex]} graphName={selectedValue} />}
                                     </div>
                                 </div>
                                 <div className="flex justify-end">
                                     <Button
                                         className="text-white flex justify-center w-1/3"
-                                        disabled={isLoading}
+                                        disabled={isLoading || !currentQueryIndex}
                                         onClick={async () => {
                                             try {
                                                 setIsLoading(true);
-                                                await runQuery(query?.text || "", setQueriesOpen)
+                                                const q = await runQuery(queries?.[currentQueryIndex!]?.text || "")
+                                                if (q) {
+                                                    setQueriesOpen(false)
+                                                }
                                             } finally {
                                                 setIsLoading(false)
                                             }

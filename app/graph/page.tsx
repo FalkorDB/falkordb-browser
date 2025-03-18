@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState } from "react";
-import { prepareArg, Query, securedFetch } from "@/lib/utils";
+import { HistoryQuery, prepareArg, Query, securedFetch } from "@/lib/utils";
 import { useSession } from "next-auth/react";
 import { useToast } from "@/components/ui/use-toast";
 import Selector from "./Selector";
@@ -16,14 +16,22 @@ export default function Page() {
     const [nodesCount, setNodesCount] = useState<number>(0)
     const [graphName, setGraphName] = useState<string>("")
     const [graph, setGraph] = useState<Graph>(Graph.empty())
-    const [queries, setQueries] = useState<Query[]>([])
-    const [historyQuery, setHistoryQuery] = useState<string>("")
     const [selectedElement, setSelectedElement] = useState<Node | Link>();
+    const [historyQuery, setHistoryQuery] = useState<HistoryQuery>({
+        queries: [],
+        currentQuery: "",
+        counter: 0
+    })
+    const [query, setQuery] = useState<Query | undefined>()
     const { data: session } = useSession()
     const { toast } = useToast()
 
     useEffect(() => {
-        setQueries(JSON.parse(localStorage.getItem(`query history`) || "[]"))
+        setHistoryQuery({
+            queries: JSON.parse(localStorage.getItem(`query history`) || "[]"),
+            currentQuery: "",
+            counter: 0
+        })
     }, [])
 
     const fetchCount = useCallback(async () => {
@@ -57,7 +65,7 @@ export default function Page() {
         fetchCount()
     }, [fetchCount, graph.Id, graphName])
 
-    const run = async (query: string) => {
+    const run = async (q: string) => {
         if (!graphName) {
             toast({
                 title: "Error",
@@ -67,7 +75,7 @@ export default function Page() {
             return null
         }
 
-        const result = await securedFetch(`api/graph/${prepareArg(graphName)}/?query=${prepareArg(query)}`, {
+        const result = await securedFetch(`api/graph/${prepareArg(graphName)}/?query=${prepareArg(q)}`, {
             method: "GET"
         }, toast)
 
@@ -79,17 +87,22 @@ export default function Page() {
         return json.result
     }
 
-    const runQuery = async (query: string) => {
-        const result = await run(query)
-        if (!result) return { text: query, metadata: [], explain: [] }
-        const explain = await securedFetch(`api/graph/${prepareArg(graphName)}/explain/?query=${prepareArg(query)}`, {
+    const runQuery = async (q: string) => {
+        const result = await run(q)
+        if (!result) return undefined
+        const explain = await securedFetch(`api/graph/${prepareArg(graphName)}/explain/?query=${prepareArg(q)}`, {
             method: "GET"
         }, toast)
-        if (!explain.ok) return { text: query, metadata: result.metadata, explain: [] }
+        if (!explain.ok) return undefined
         const explainJson = await explain.json()
-        const newQuery = { text: query, metadata: result.metadata, explain: explainJson.result }
-        const queryArr = queries.some(q => q.text === query) ? queries : [...queries, newQuery]
-        setQueries(queryArr)
+        const newQuery = { text: q, metadata: result.metadata, explain: explainJson.result }
+        const queryArr = historyQuery.queries.some(qu => qu.text === q) ? historyQuery.queries : [...historyQuery.queries, newQuery]
+        setHistoryQuery(prev => ({
+            ...prev,
+            queries: queryArr,
+            currentQuery: "",
+            counter: queryArr.findIndex(qu => qu.text === q) + 1
+        }))
         localStorage.setItem("query history", JSON.stringify(queryArr))
         const g = Graph.create(graphName, result, false, false, graph.Colors)
         setGraph(g)
@@ -99,49 +112,32 @@ export default function Page() {
         return newQuery
     }
 
-    const runHistoryQuery = async (query: string, setQueriesOpen: (open: boolean) => void) => {
-        const result = await run(query)
-        if (!result) return
-        if (!queries.some(q => q.text === query)) {
-            const explain = await securedFetch(`api/graph/${prepareArg(graphName)}/explain/?query=${prepareArg(query)}`, {
-                method: "GET"
-            }, toast)
-            if (!explain.ok) return
-            const explainJson = await explain.json()
-            const queryArr = queries.map(q => q.text === query ? { ...q, explain: explainJson.result.explain } : q)
-            setQueries(queryArr)
-            localStorage.setItem("query history", JSON.stringify(queryArr))
-        }
-        setGraph(Graph.create(graphName, result, false, false, graph.Colors))
-        setHistoryQuery(query)
-        setQueriesOpen(false)
-    }
-
     return (
         <div className="Page">
             <Header onSetGraphName={setGraphName} />
             <div className="h-1 grow p-8 px-10 flex flex-col gap-4">
                 <Selector
-                    queries={queries}
+                    queries={historyQuery.queries}
                     setGraphName={setGraphName}
                     graphName={graphName}
-                    runQuery={runHistoryQuery}
+                    runQuery={runQuery}
                     edgesCount={edgesCount}
                     nodesCount={nodesCount}
                     setGraph={setGraph}
                     graph={graph}
                     data={session}
-
+                    setHistoryQuery={setHistoryQuery}
                 />
                 <GraphView
                     graph={graph}
                     selectedElement={selectedElement}
                     setSelectedElement={setSelectedElement}
                     runQuery={runQuery}
-                    historyQuery={historyQuery}
-                    historyQueries={queries.map(({ text }) => text)}
-                    setHistoryQueries={(queriesArr) => setQueries(queries.map((query, i) => ({ text: queriesArr[i], metadata: query.metadata } as Query)))}
                     fetchCount={fetchCount}
+                    historyQuery={historyQuery}
+                    setHistoryQuery={setHistoryQuery}
+                    query={query?.text || ""}
+                    setQuery={(value) => setQuery({ text: value, metadata: query?.metadata || [], explain: query?.explain || [] })}
                 />
                 <Tutorial onSetGraphName={setGraphName} />
             </div>

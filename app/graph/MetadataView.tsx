@@ -20,8 +20,8 @@ export default function MetadataView({ query, graphName, className = "" }: {
     }
 
     return (
-        <div className={cn("h-full flex", className)}>
-            <div className="grow flex flex-col gap-4 border p-8">
+        <div className={cn("h-full flex overflow-hidden border", className)}>
+            <div className="w-1 grow flex flex-col gap-4 border-r p-8 overflow-auto">
                 <h1 className="text-2xl font-bold p-2">Profile</h1>
                 <div className="flex gap-4">
                     <Button
@@ -66,15 +66,17 @@ export default function MetadataView({ query, graphName, className = "" }: {
                 }
 
             </div>
-            <div className="grow flex flex-col">
-                <div className="grow border p-8">
+            <div className="w-1 grow flex flex-col">
+                <div className="h-1 grow p-8 overflow-auto overflow-x-hidden border-b">
                     <h1 className="text-2xl font-bold p-2">Metadata</h1>
-                    {query.metadata.map((m, i) => (
-                        // eslint-disable-next-line react/no-array-index-key
-                        <pre key={i}>{m}</pre>
-                    ))}
+                    <ul>
+                        {query.metadata.map((m, i) => (
+                            // eslint-disable-next-line react/no-array-index-key
+                            <li key={i}>{m}</li>
+                        ))}
+                    </ul>
                 </div>
-                <div className="grow border p-8">
+                <div className="h-1 grow p-8 overflow-auto overflow-x-hidden">
                     <h1 className="text-2xl font-bold p-2">Explain</h1>
                     <JSONTree
                         data={createNestedObject(query.explain)}

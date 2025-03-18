@@ -12,6 +12,12 @@ import { Node, Link } from "@/app/api/graph/model"
 
 export type GraphRef = MutableRefObject<ForceGraphMethods<Node, Link> | undefined>
 
+export interface HistoryQuery {
+  queries: Query[]
+  currentQuery: string
+  counter: number
+}
+
 export interface Query {
   text: string
   metadata: string[]
