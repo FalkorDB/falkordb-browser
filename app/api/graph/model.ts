@@ -467,7 +467,7 @@ export class Graph {
 
         // remove empty category if there are no more empty nodes category
         const emptyCategory = this.categoriesMap.get("")
-        if (emptyCategory && emptyCategory.elements.length === 0) {
+        if (emptyCategory?.elements.length === 0) {
             this.categories = this.categories.filter(c => c.name !== "")
             this.categoriesMap.delete("")
         }
