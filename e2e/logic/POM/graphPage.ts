@@ -129,7 +129,7 @@ export default class GraphPage extends BasePage {
     /* QUERY History */
 
     private get queryHistoryDialog(): Locator {
-        return this.page.locator("//div[contains(@id, 'Query History')]");
+        return this.page.locator("//div[contains(@id, 'queryHistory')]");
     }
 
     private get queryHistory(): Locator {
@@ -137,11 +137,23 @@ export default class GraphPage extends BasePage {
     }
 
     private get queryInHistory(): (query: string) => Locator {
-        return (query: string) => this.page.locator(`//div[contains(@id, 'Query History')]//ul//li[${query}]`);
+        return (query: string) => this.page.locator(`//div[contains(@id, 'queryHistory')]//ul//li[${query}]`);
+    }
+
+    private get selectQueryInHistoryBtn(): (query: string) => Locator {
+        return (query: string) => this.page.locator(`//div[contains(@id, 'queryHistory')]//ul//li[${query}]/button`);
     }
 
     private get runBtnInQueryHistory(): Locator {
-        return this.page.locator("//div[contains(@id, 'Query History')]//button[contains(text(), 'Run')]");
+        return this.page.locator("//div[contains(@id, 'queryHistory')]//button[contains(text(), 'Run')]");
+    }
+
+    private get queryHistoryTextarea(): Locator {
+        return this.page.locator("#queryHistoryEditor textarea");
+    }
+
+    private get queryHistoryPanel(): Locator {
+        return this.page.locator("//div[@id='queryHistoryPanel']//ul");
     }
 
     async countGraphsInMenu(): Promise<number> {
@@ -375,6 +387,44 @@ export default class GraphPage extends BasePage {
     async isQueryHistoryDialog(): Promise<void> {
         await this.queryHistoryDialog.isVisible();
     }
+
+    async ClickOnSelectQueryInHistoryBtn(queryNumber: string): Promise<void> {
+        await this.selectQueryInHistoryBtn(queryNumber).click();
+    }
+
+    async getSelectQueryInHistoryText(queryNumber: string): Promise<string | null> {
+        const text = await this.selectQueryInHistoryBtn(queryNumber).textContent();
+        return text;
+    }
+
+    async runAQueryFromHistory(queryNumber: string): Promise<void> {
+        await this.clickOnQueryHistory();
+        await this.ClickOnSelectQueryInHistoryBtn(queryNumber);
+        await this.clickOnRunBtnInQueryHistory();
+    }
+
+    async getQueryHistoryEditor(): Promise<string | null> {
+        return await this.queryHistoryTextarea.inputValue();
+    }
+
+    async getQueryHistoryPanel(): Promise<string[]> {
+        const rawText = await this.queryHistoryPanel.allTextContents();
+    
+        if (!rawText || rawText.length === 0) {
+            return [];
+        }
+    
+        // Ensure we are working with the first entry (UI returns as a single string)
+        const formattedText = rawText[0]
+            .replace(/Query internal execution time:.*/, '') // Remove execution time
+            .replace(/([a-z]+: \d+)/gi, '$1\n') // Add a newline after each key-value pair
+            .split('\n') // Split into an array
+            .map(line => line.trim()) // Remove extra spaces
+            .filter(line => line.length > 0); // Remove empty lines
+    
+        return formattedText;
+    }
+    
 
     /* End of QUERY History*/
 
