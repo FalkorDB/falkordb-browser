@@ -51,6 +51,7 @@ export default function Selector({ setGraphName, graphName, queries, runQuery, e
     const type = pathname.includes("/schema") ? "Schema" : "Graph"
     const [isRotating, setIsRotating] = useState(false);
     const { toast } = useToast()
+    const submitQuery = useRef<HTMLButtonElement>(null)
     const [filteredQueries, setFilteredQueries] = useState<Query[]>(queries || [])
 
     useEffect(() => {
@@ -65,6 +66,7 @@ export default function Selector({ setGraphName, graphName, queries, runQuery, e
         }
     }, [queries, search, historyQuery?.counter, historyQuery])
 
+    
     useEffect(() => {
         setSelectedValue(graphName)
     }, [graphName])
@@ -91,6 +93,36 @@ export default function Selector({ setGraphName, graphName, queries, runQuery, e
         getOptions()
     }, [getOptions])
 
+    const handleEditorDidMount = (e: editor.IStandaloneCodeEditor) => {
+        editorRef.current = e
+
+        // eslint-disable-next-line no-bitwise
+        e.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, () => {
+            submitQuery.current?.click();
+        });
+
+        // eslint-disable-next-line no-bitwise
+        e.addCommand(monaco.KeyMod.Shift | monaco.KeyCode.Enter, () => {
+            e.trigger('keyboard', 'type', { text: '\n' });
+        });
+
+        e.addAction({
+            id: 'submit',
+            label: 'Submit Query',
+            // eslint-disable-next-line no-bitwise
+            keybindings: [monaco.KeyCode.Enter],
+            contextMenuOrder: 1.5,
+            run: async () => {
+                submitQuery.current?.click()
+            },
+            precondition: '!suggestWidgetVisible',
+        });
+
+        // Disable Ctrl + F keybinding
+        // eslint-disable-next-line no-bitwise
+        e.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyF, () => { });
+    }
+
     const handleOnChange = async (name: string) => {
         const formattedName = name === '""' ? "" : name
         if (runQuery) {
@@ -112,13 +144,6 @@ export default function Selector({ setGraphName, graphName, queries, runQuery, e
     useEffect(() => {
         getOptions()
     }, [getOptions])
-
-    const handleEditorDidMount = (e: editor.IStandaloneCodeEditor) => {
-        editorRef.current = e
-        // Disable Ctrl + F keybinding
-        // eslint-disable-next-line no-bitwise
-        e.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyF, () => { });
-    }
 
     const handleReloadClick = () => {
         setIsRotating(true);
@@ -296,6 +321,7 @@ export default function Selector({ setGraphName, graphName, queries, runQuery, e
                                 </div>
                                 <div className="flex justify-end">
                                     <Button
+                                        ref={submitQuery}
                                         className="text-white flex justify-center w-1/3"
                                         disabled={isLoading || !historyQuery!.counter}
                                         onClick={async () => {
