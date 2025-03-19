@@ -500,11 +500,19 @@ export default function EditorComponent({ historyQuery, maximize, runQuery, grap
             contextMenuOrder: 1.5,
             run: async () => {
                 setHistoryQuery(prev => {
-                    if (prev.queries.length === 0) return prev
-                    const counter = prev.counter ? prev.counter - 1 : prev.queries.length
+                    if (prev.queries.length === 0) return prev;
+
+                    let counter;
+                    if (prev.counter !== 1) {
+                        counter = prev.counter ? prev.counter - 1 : prev.queries.length;
+                    } else {
+                        counter = 1;
+                    }
+                    const query = counter ? prev.queries[counter - 1].text : prev.currentQuery;
+
                     return {
                         ...prev,
-                        query: counter ? prev.queries[counter - 1].text : prev.currentQuery,
+                        query,
                         counter
                     }
                 })
@@ -520,7 +528,12 @@ export default function EditorComponent({ historyQuery, maximize, runQuery, grap
             run: async () => {
                 setHistoryQuery(prev => {
                     if (prev.queries.length === 0) return prev
-                    const counter = prev.counter + 1 > prev.queries.length ? 1 : prev.counter + 1
+                    let counter
+                    if (prev.counter) {
+                        counter = prev.counter + 1 > prev.queries.length ? 0 : prev.counter + 1
+                    } else {
+                        counter = 0
+                    }
                     return {
                         ...prev,
                         query: counter ? prev.queries[counter - 1].text : prev.currentQuery,
@@ -533,7 +546,7 @@ export default function EditorComponent({ historyQuery, maximize, runQuery, grap
 
         // Override the default Ctrl + F keybinding
         // eslint-disable-next-line no-bitwise
-        e.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyF, () => {});
+        e.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyF, () => { });
     }
 
     useEffect(() => {
