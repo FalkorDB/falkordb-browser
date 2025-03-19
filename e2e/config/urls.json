@@ -3,7 +3,7 @@
         "graphUrl": "http://localhost:3000/api/graph/",
         "LoginApiUrl": "http://localhost:3000/api/auth/providers",
         "LogoutApiUrl": "http://localhost:3000/api/auth/signout",
-        "settingsConfig": "http://localhost:3000/api/graph?config=",
+        "settingsConfig": "http://localhost:3000/api/graph/config/",
         "settingsUsers": "http://localhost:3000/api/user"
     },
   
