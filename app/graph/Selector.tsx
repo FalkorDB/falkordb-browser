@@ -104,7 +104,7 @@ export default function Selector({ setGraphName, graphName, queries, runQuery, e
     return (
         <div className="flex flex-col gap-4">
             <div className="flex justify-between items-center">
-                <div className="flex items-center gap-4">
+                <div className="flex items-center gap-4" id="graphManager">
                     {
                         session?.user?.role !== "Read-Only" &&
                         <>
@@ -202,7 +202,7 @@ export default function Selector({ setGraphName, graphName, queries, runQuery, e
                             }
                             title="Query History"
                         >
-                            <div className="grow flex flex-col p-8 gap-8">
+                            <div className="grow flex flex-col p-8 gap-8" id="queryHistory">
                                 <DialogTitle>Queries</DialogTitle>
                                 <div className="h-1 grow flex">
                                     <ul className="w-1 grow flex-col border overflow-auto">
@@ -219,8 +219,8 @@ export default function Selector({ setGraphName, graphName, queries, runQuery, e
                                             ))
                                         }
                                     </ul>
-                                    <div className="w-1 grow flex flex-col gap-2 p-4 border">
-                                        <div className="h-1 grow flex">
+                                    <div className="w-1 grow flex flex-col gap-2 p-4 border" id="queryHistoryPanel">
+                                        <div className="h-1 grow flex" id="queryHistoryEditor">
                                             <Editor
                                                 width="100%"
                                                 height="100%"
