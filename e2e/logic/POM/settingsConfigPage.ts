@@ -33,11 +33,11 @@ export default class SettingsConfigPage extends BasePage {
     }
 
     private get searchBtn(): Locator {
-        return this.page.locator("//div[@id='search']/button");
+        return this.page.locator("//div[@id='tableComponent']/button");
     }
 
     private get searchInput(): Locator {
-        return this.page.locator("//div[@id='search']/input");
+        return this.page.locator("//div[@id='tableComponent']/input");
     }
 
     private get tableRoles(): Locator {

@@ -2,6 +2,7 @@
 /* eslint-disable react/jsx-props-no-spreading */
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { cn } from "@/lib/utils"
+import { Loader2 } from "lucide-react"
 import { forwardRef } from "react"
 
 export type Variant = "Large" | "Primary" | "Secondary" | "Cancel" | "button"
@@ -13,14 +14,16 @@ interface Props extends React.DetailedHTMLProps<React.ButtonHTMLAttributes<HTMLB
     open?: boolean
     side?: "down" | "left" | "right"
     children?: React.ReactNode
+    isLoading?: boolean
 }
 
-const getClassName = (variant: Variant, disable: boolean | undefined, open: boolean | undefined, classN: string | undefined) => {
+const getClassName = (variant: Variant, disable: boolean | undefined, open: boolean | undefined, isLoading: boolean, classN: string | undefined) => {
 
     let className = cn(
         "disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2",
         variant !== "button" && "rounded-lg hover:opacity-90",
         open !== undefined && "gap-4",
+        isLoading && "flex items-center justify-center",
         classN,
     )
 
@@ -43,36 +46,42 @@ const getClassName = (variant: Variant, disable: boolean | undefined, open: bool
     return className
 }
 
-const Button = forwardRef<HTMLButtonElement, Props>(({ label, variant = "button", open, className, title, type = "button", disabled, children, ...props }, ref) =>
+const Button = forwardRef<HTMLButtonElement, Props>(({ label, variant = "button", open, className, title, type = "button", disabled, children, isLoading = false, ...props }, ref) =>
     (title || label) ? (
         <Tooltip>
             <TooltipTrigger asChild>
                 <button
                     ref={ref}
-                    className={getClassName(variant, disabled, open, className)}
-                    disabled={disabled}
+                    className={getClassName(variant, disabled, open, isLoading, className)}
+                    disabled={disabled || isLoading}
                     aria-label={title}
                     type={type}
                     {...props}
                 >
-                    {children}
-                    {label}
+                    {
+                        isLoading ?
+                            <Loader2 className="animate-spin" />
+                            : <>
+                                {children}
+                                {label}
+                            </>
+                    }
                 </button>
             </TooltipTrigger>
             <TooltipContent>
-                {title || label}
+                {isLoading ? "Loading..." : title || label}
             </TooltipContent>
         </Tooltip>
     ) : (
         <button
             ref={ref}
-            className={getClassName(variant, disabled, open, className)}
-            disabled={disabled}
+            className={getClassName(variant, disabled, open, isLoading, className)}
+            disabled={disabled || isLoading}
             type={type}
             {...props}
         >
             {children}
-            {label}
+            {isLoading ? <Loader2 className="animate-spin" /> : label}
         </button>
     ))
 

@@ -4,8 +4,8 @@
 
 import React, { useEffect, useState } from "react";
 import { CreateUser, User } from "@/app/api/user/model";
-import { prepareArg, securedFetch } from "@/lib/utils";
-import TableComponent, { Row } from "@/app/components/TableComponent";
+import { prepareArg, securedFetch, Row } from "@/lib/utils";
+import TableComponent from "@/app/components/TableComponent";
 import { useToast } from "@/components/ui/use-toast";
 import { ToastAction } from "@/components/ui/toast";
     import DeleteUser from "./DeleteUser";

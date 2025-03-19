@@ -6,9 +6,9 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { prepareArg, securedFetch } from "@/lib/utils";
+import { prepareArg, securedFetch, Row } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
-import TableComponent, { Row } from "../components/TableComponent";
+import TableComponent from "../components/TableComponent";
 import ToastButton from "../components/ToastButton";
 import { DataCell } from "../api/graph/model";
 

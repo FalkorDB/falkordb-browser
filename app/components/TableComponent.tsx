@@ -9,26 +9,13 @@
 import { Checkbox } from "@/components/ui/checkbox";
 import { JSONTree } from "react-json-tree"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { cn } from "@/lib/utils";
+import { Cell, cn, Row } from "@/lib/utils";
 import { useCallback, useEffect, useState } from "react";
 import { CheckCircle, Pencil, XCircle } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import Button from "./ui/Button";
 import Input from "./ui/Input";
-import { DataCell } from "../api/graph/model";
 import Combobox from "./ui/combobox";
-
-type Cell = {
-    value: DataCell,
-    onChange?: (value: string) => Promise<boolean>,
-    type?: string
-    comboboxType?: string
-}
-
-export interface Row {
-    cells: Cell[]
-    checked?: boolean
-}
 
 interface Props {
     headers: string[],
@@ -86,7 +73,7 @@ export default function TableComponent({ headers, rows, children, setRows, optio
 
     return (
         <div className={cn("h-full w-full flex flex-col gap-4", className)}>
-            <div className="flex gap-4" id="search">
+            <div className="flex gap-4" id="tableComponent">
                 {children}
                 {
                     isSearchable ?
@@ -114,6 +101,7 @@ export default function TableComponent({ headers, rows, children, setRows, optio
                         : <Button
                             variant="Secondary"
                             label="Search"
+                            title="Search within the table"
                             onClick={() => setIsSearchable(true)}
                         />
                 }
@@ -204,7 +192,8 @@ export default function TableComponent({ headers, rows, children, setRows, optio
                                                                     cell.onChange!(value)
                                                                     handleSetEditable("", "")
                                                                 }}
-                                                                type={cell.comboboxType}
+                                                                label={cell.comboboxType}
+                                                                selectedValue={cell.value.toString()}
                                                             />
                                                             : <div className="w-full flex gap-2 items-center">
                                                                 <Input
