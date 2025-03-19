@@ -27,13 +27,13 @@ interface Props {
     graphName: string
     runQuery?: (query: string) => Promise<Query | undefined>
     queries?: Query[]
+    historyQuery?: HistoryQuery
+    setHistoryQuery?: Dispatch<SetStateAction<HistoryQuery>>
     edgesCount: number
     nodesCount: number
     setGraph: (graph: Graph) => void
     graph: Graph
     data: Session | null
-    historyQuery: HistoryQuery
-    setHistoryQuery: Dispatch<SetStateAction<HistoryQuery>>
 }
 
 export default function Selector({ setGraphName, graphName, queries, runQuery, edgesCount, nodesCount, setGraph, graph, data: session, historyQuery, setHistoryQuery }: Props) {
@@ -53,14 +53,16 @@ export default function Selector({ setGraphName, graphName, queries, runQuery, e
     const [filteredQueries, setFilteredQueries] = useState<Query[]>(queries || [])
 
     useEffect(() => {
+
         const timeout = setTimeout(() => {
+            if (!historyQuery) return
             setFilteredQueries(queries?.filter((query, i) => !search || query.text.toLowerCase().includes(search.toLowerCase()) || i === historyQuery.counter - 1) || [])
         }, 500)
 
         return () => {
             clearTimeout(timeout)
         }
-    }, [queries, search, historyQuery.counter])
+    }, [queries, search, historyQuery?.counter, historyQuery])
 
     useEffect(() => {
         setSelectedValue(graphName)
@@ -237,7 +239,7 @@ export default function Selector({ setGraphName, graphName, queries, runQuery, e
                                         </div>
                                         <ul className="flex flex-col-reverse">
                                             {
-                                                queries && filteredQueries && filteredQueries.map((query, index) => {
+                                                setHistoryQuery && historyQuery && queries && filteredQueries && filteredQueries.map((query, index) => {
                                                     const currentIndex = queries.findIndex(q => q.text === query.text)
                                                     return (
                                                         // eslint-disable-next-line react/no-array-index-key
@@ -288,17 +290,17 @@ export default function Selector({ setGraphName, graphName, queries, runQuery, e
                                         </ul>
                                     </div>
                                     <div className="w-1 grow">
-                                        {queries?.[historyQuery.counter - 1] && <MetadataView query={queries[historyQuery.counter - 1]} graphName={selectedValue} />}
+                                        {historyQuery && queries?.[historyQuery.counter - 1] && <MetadataView query={queries[historyQuery.counter - 1]} graphName={selectedValue} />}
                                     </div>
                                 </div>
                                 <div className="flex justify-end">
                                     <Button
                                         className="text-white flex justify-center w-1/3"
-                                        disabled={isLoading || !historyQuery.counter}
+                                        disabled={isLoading || !historyQuery!.counter}
                                         onClick={async () => {
                                             try {
                                                 setIsLoading(true);
-                                                const q = await runQuery(queries?.[historyQuery.counter!]?.text || "")
+                                                const q = await runQuery(queries?.[historyQuery!.counter!]?.text || "")
                                                 if (q) {
                                                     setQueriesOpen(false)
                                                 }
@@ -315,15 +317,15 @@ export default function Selector({ setGraphName, graphName, queries, runQuery, e
                                 </div>
                             </div >
                         </DialogComponent >
-        <DialogComponent className="h-[90%] w-[90%]" title={`${selectedValue} Schema`} trigger={
-            <Button
-                disabled={!schema.Id}
-                label="View Schema"
-                title="Display the schema structure"
-            />
-        }>
-            <SchemaView schema={schema} />
-        </DialogComponent>
+                        <DialogComponent className="h-[90%] w-[90%]" title={`${selectedValue} Schema`} trigger={
+                            <Button
+                                disabled={!schema.Id}
+                                label="View Schema"
+                                title="Display the schema structure"
+                            />
+                        }>
+                            <SchemaView schema={schema} />
+                        </DialogComponent>
                     </div >
                 }
             </div >
@@ -334,4 +336,11 @@ export default function Selector({ setGraphName, graphName, queries, runQuery, e
 Selector.defaultProps = {
     runQuery: undefined,
     queries: [],
+    historyQuery: {
+        queries: [],
+        counter: 0,
+        query: "",
+        currentQuery: ""
+    },
+    setHistoryQuery: () => { }
 }

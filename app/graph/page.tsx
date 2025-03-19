@@ -4,11 +4,13 @@ import { useCallback, useEffect, useState } from "react";
 import { HistoryQuery, prepareArg, securedFetch } from "@/lib/utils";
 import { useSession } from "next-auth/react";
 import { useToast } from "@/components/ui/use-toast";
-import Selector from "./Selector";
+import dynamic from "next/dynamic";
 import Header from "../components/Header";
 import { Graph, Link, Node } from "../api/graph/model";
 import GraphView from "./GraphView";
 import Tutorial from "./Tutorial";
+
+const Selector = dynamic(() => import("./Selector"), { ssr: false })
 
 export default function Page() {
 
