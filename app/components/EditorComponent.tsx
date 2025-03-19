@@ -204,10 +204,9 @@ export default function EditorComponent({ historyQuery, maximize, runQuery, grap
     const containerRef = useRef<HTMLDivElement>(null)
 
     useEffect(() => {
-        if (historyQuery.counter === 0) return
         setHistoryQuery(prev => ({
             ...prev,
-            query: historyQuery.queries[historyQuery.counter - 1].text
+            query: historyQuery.counter ? historyQuery.queries[historyQuery.counter - 1].text : historyQuery.currentQuery
         }))
     }, [historyQuery.counter])
 
@@ -508,11 +507,9 @@ export default function EditorComponent({ historyQuery, maximize, runQuery, grap
                     } else {
                         counter = 1;
                     }
-                    const query = counter ? prev.queries[counter - 1].text : prev.currentQuery;
 
                     return {
                         ...prev,
-                        query,
                         counter
                     }
                 })
@@ -536,7 +533,6 @@ export default function EditorComponent({ historyQuery, maximize, runQuery, grap
                     }
                     return {
                         ...prev,
-                        query: counter ? prev.queries[counter - 1].text : prev.currentQuery,
                         counter
                     }
                 })

@@ -250,7 +250,6 @@ export default function Selector({ setGraphName, graphName, queries, runQuery, e
                                                                 onClick={() => {
                                                                     setHistoryQuery(prev => ({
                                                                         ...prev,
-                                                                        query: query.text,
                                                                         counter: currentIndex + 1
                                                                     }))
                                                                 }}

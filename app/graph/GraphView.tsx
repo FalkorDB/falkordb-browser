@@ -63,9 +63,6 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
     }, [tabsValue])
 
     useEffect(() => {
-        setData({ ...graph.Elements })
-    }, [graph.getElements().length, graph.Elements])
-    useEffect(() => {
         let defaultChecked = "Graph"
         if (graph.getElements().length !== 0) {
             defaultChecked = "Graph"
@@ -74,8 +71,9 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
         } else if (currentQuery && (currentQuery.metadata.length > 0 || currentQuery.explain.length > 0)) {
             defaultChecked = "Metadata";
         }
-
+        
         setTabsValue(defaultChecked);
+        setData({ ...graph.Elements })
     }, [graph.getElements().length, graph.Data.length])
 
     const handleCooldown = (ticks?: number) => {
