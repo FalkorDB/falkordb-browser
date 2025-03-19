@@ -8,7 +8,7 @@ import { signOut } from "next-auth/react"
 import { twMerge } from "tailwind-merge"
 import { MutableRefObject } from "react"
 import { ForceGraphMethods } from "react-force-graph-2d"
-import { Node, Link } from "@/app/api/graph/model"
+import { Node, Link, DataCell } from "@/app/api/graph/model"
 
 export type GraphRef = MutableRefObject<ForceGraphMethods<Node, Link> | undefined>
 
@@ -23,6 +23,17 @@ export interface Query {
   text: string
   metadata: string[]
   explain: string[]
+}
+
+export type Cell = {
+  value: DataCell,
+  onChange?: (value: string) => Promise<boolean>,
+  type?: string
+  comboboxType?: string
+}
+export interface Row {
+  cells: Cell[]
+  checked?: boolean
 }
 
 export function cn(...inputs: ClassValue[]) {

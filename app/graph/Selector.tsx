@@ -88,13 +88,6 @@ export default function Selector({ setGraphName, graphName, queries, runQuery, e
         getOptions()
     }, [getOptions])
 
-    const handleEditorDidMount = (e: editor.IStandaloneCodeEditor) => {
-        editorRef.current = e
-        // Disable Ctrl + F keybinding
-        // eslint-disable-next-line no-bitwise
-        e.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyF, () => {});
-    }
-
     const handleOnChange = async (name: string) => {
         const formattedName = name === '""' ? "" : name
         if (runQuery) {
@@ -113,6 +106,17 @@ export default function Selector({ setGraphName, graphName, queries, runQuery, e
         setSelectedValue(name)
     }
 
+    useEffect(() => {
+        getOptions()
+    }, [getOptions])
+
+    const handleEditorDidMount = (e: editor.IStandaloneCodeEditor) => {
+        editorRef.current = e
+        // Disable Ctrl + F keybinding
+        // eslint-disable-next-line no-bitwise
+        e.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyF, () => { });
+    }
+
     const handleReloadClick = () => {
         setIsRotating(true);
         getOptions();
@@ -122,7 +126,7 @@ export default function Selector({ setGraphName, graphName, queries, runQuery, e
     return (
         <div className="flex flex-col gap-4">
             <div className="flex justify-between items-center">
-                <div className="flex items-center gap-4">
+                <div className="flex items-center gap-4" id="graphManager">
                     {
                         session?.user?.role !== "Read-Only" &&
                         <>
@@ -157,11 +161,11 @@ export default function Selector({ setGraphName, graphName, queries, runQuery, e
                     <p className="text-secondary">|</p>
                     <Combobox
                         isSelectGraph
+                        type={type}
                         options={options}
                         setOptions={setOptions}
                         selectedValue={selectedValue}
                         setSelectedValue={handleOnChange}
-                        isSchema={!runQuery}
                     />
                 </div>
                 <div className="flex gap-16 text-[#e5e7eb]">
@@ -170,6 +174,7 @@ export default function Selector({ setGraphName, graphName, queries, runQuery, e
                             <Button
                                 label="Export Data"
                                 disabled={!selectedValue}
+                                title="Export your data to a file"
                             />
                         }
                         type={type}
@@ -186,6 +191,7 @@ export default function Selector({ setGraphName, graphName, queries, runQuery, e
                                 setSelectedValue(name)
                                 handleOnChange(name)
                             }}
+                            type={type}
                             selectedValue={selectedValue}
                         />
                     }
@@ -211,13 +217,13 @@ export default function Selector({ setGraphName, graphName, queries, runQuery, e
                             trigger={
                                 <Button
                                     disabled={!queries || queries.length === 0}
-                                    title={!queries || queries.length === 0 ? "No queries" : undefined}
+                                    title={!queries || queries.length === 0 ? "No queries" : "View past queries"}
                                     label="Query History"
                                 />
                             }
                             title="Query History"
                         >
-                            <div className="grow flex flex-col p-8 gap-8">
+                            <div className="grow flex flex-col p-8 gap-8" id="queryHistory">
                                 <DialogTitle>Queries</DialogTitle>
                                 <div className="h-1 grow flex border">
                                     <div className="w-1 grow border-r overflow-auto">
@@ -297,27 +303,30 @@ export default function Selector({ setGraphName, graphName, queries, runQuery, e
                                                     setQueriesOpen(false)
                                                 }
                                             } finally {
+                                                setQueriesOpen(false)
                                                 setIsLoading(false)
                                             }
                                         }}
                                         variant="Primary"
                                         label={isLoading ? undefined : "Run"}
-                                        title={isLoading ? "Please wait..." : undefined}
+                                        title={isLoading ? "Please wait..." : "Execute this query again"}
+                                        isLoading={isLoading}
                                     />
                                 </div>
-                            </div>
-                        </DialogComponent>
-                        <DialogComponent className="h-[90%] w-[90%]" title={`${selectedValue} Schema`} trigger={
-                            <Button
-                                disabled={!schema.Id}
-                                label="View Schema"
-                            />
-                        }>
-                            <SchemaView schema={schema} />
-                        </DialogComponent>
-                    </div>
+                            </div >
+                        </DialogComponent >
+        <DialogComponent className="h-[90%] w-[90%]" title={`${selectedValue} Schema`} trigger={
+            <Button
+                disabled={!schema.Id}
+                label="View Schema"
+                title="Display the schema structure"
+            />
+        }>
+            <SchemaView schema={schema} />
+        </DialogComponent>
+                    </div >
                 }
-            </div>
+            </div >
         </div >
     )
 }

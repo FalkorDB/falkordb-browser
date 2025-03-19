@@ -6,7 +6,7 @@
 import { useRef, useState, useEffect, Dispatch, SetStateAction } from "react";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { ImperativePanelHandle } from "react-resizable-panels";
-import { ChevronLeft, GitGraph, Info, Maximize2, Minimize2, Pause, Play, Table } from "lucide-react"
+import { ChevronLeft, GitGraph, Info, Maximize2, Minimize2, Pause, Play, Search, Table } from "lucide-react"
 import { cn, handleZoomToFit, HistoryQuery, prepareArg, Query, securedFetch } from "@/lib/utils";
 import dynamic from "next/dynamic";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -21,6 +21,7 @@ import Toolbar from "./toolbar";
 import Button from "../components/ui/Button";
 import TableView from "./TableView";
 import MetadataView from "./MetadataView";
+import Input from "../components/ui/Input";
 
 const ForceGraph = dynamic(() => import("../components/ForceGraph"), { ssr: false });
 const EditorComponent = dynamic(() => import("../components/EditorComponent"), { ssr: false })
@@ -44,6 +45,7 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
     const [tabsValue, setTabsValue] = useState<string>("")
     const [cooldownTicks, setCooldownTicks] = useState<number | undefined>(0)
     const [currentQuery, setCurrentQuery] = useState<Query | undefined>(undefined)
+    const [searchElement, setSearchElement] = useState<string>("")
     const { toast } = useToast()
 
     useEffect(() => {
@@ -119,10 +121,6 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
         }
     }, [])
 
-    useEffect(() => {
-        onExpand(!!selectedElement)
-    }, [selectedElement])
-
     const onCategoryClick = (category: Category) => {
         category.show = !category.show
 
@@ -178,42 +176,32 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
         if (!result.ok) return
 
         selectedElements.forEach((element) => {
-            const { id } = element
-            const type = !("source" in element)
-
-            if (type) {
-                graph.Elements.nodes.splice(graph.Elements.nodes.findIndex(n => n.id === id), 1)
+            if ("source" in element) {
+                const category = graph.LabelsMap.get(element.label)
+                if (category) {
+                    category.elements = category.elements.filter((e) => e.id !== element.id)
+                    if (category.elements.length === 0) {
+                        graph.Labels.splice(graph.Labels.findIndex(l => l.name === category.name), 1)
+                        graph.LabelsMap.delete(category.name)
+                    }
+                }
             } else {
-                graph.Elements.links.splice(graph.Elements.links.findIndex(l => l.id === id), 1)
+                element.category.forEach((category) => {
+                    const cat = graph.CategoriesMap.get(category)
+                    if (cat) {
+                        cat.elements = cat.elements.filter((e) => e.id !== element.id)
+                        if (cat.elements.length === 0) {
+                            graph.Categories.splice(graph.Categories.findIndex(c => c.name === cat.name), 1)
+                            graph.CategoriesMap.delete(cat.name)
+                        }
+                    }
+                })
             }
-
-            const category = type ? graph.CategoriesMap.get(element.category[0]) : graph.LabelsMap.get(element.label)
-
-            if (category) {
-                category.elements = category.elements.filter((e) => e.id !== id)
-                if (category.elements.length === 0) {
-                    graph.Categories.splice(graph.Categories.findIndex(c => c.name === category.name), 1)
-                    graph.CategoriesMap.delete(category.name)
-                }
-            }
-
-            fetchCount()
         })
 
+        graph.removeElements(selectedElements)
 
-        graph.Data = graph.Data.map(row => {
-            const newRow = Object.entries(row).map(([key, cell]) => {
-                if (typeof cell === "object" && cell && selectedElements.some(element => element.id === cell.id)) {
-                    return [key, undefined]
-                }
-                return [key, cell]
-            })
-            if (newRow.every(([, cell]) => cell === undefined)) {
-                return undefined
-            }
-            return Object.fromEntries(newRow)
-        })
-
+        fetchCount()
         setSelectedElements([])
         setSelectedElement(undefined)
 
@@ -245,12 +233,9 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
         }, toast)
 
         if (result.ok) {
+
             graph.createCategory([label], selectedElement as Node)
-            graph.Elements.nodes.forEach((node) => {
-                if (node.id === selectedElement?.id) {
-                    node.category.push(label)
-                }
-            })
+            graph.addLabel(label, selectedElement as Node)
             setData({ ...graph.Elements })
         }
 
@@ -273,16 +258,22 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
                     graph.CategoriesMap.delete(category.name)
                 }
             }
-            graph.Elements.nodes.forEach((node) => {
-                if (node.id === selectedElement?.id) {
-                    node.category = node.category.filter(c => c !== label)
-                    node.color = graph.getCategoryColorValue(graph.CategoriesMap.get(node.category[0])?.index)
-                }
-            })
+            
+            graph.removeLabel(label, selectedElement as Node)
             setData({ ...graph.Elements })
         }
 
         return result.ok
+    }
+
+    const handleSearchElement = () => {
+        if (searchElement) {
+            const element = graph.Elements.nodes.find(node => node.data.name ? node.data.name.toLowerCase().startsWith(searchElement.toLowerCase()) : node.id.toString().toLowerCase().includes(searchElement.toLowerCase()))
+            if (element) {
+                handleZoomToFit(chartRef, (node: Node) => node.id === element.id)
+                setSelectedElement(element)
+            }
+        }
     }
 
     return (
@@ -344,12 +335,12 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
                         <div className="h-full flex flex-col gap-4">
                             <div className="flex items-center justify-between">
                                 <Toolbar
-                                    selectedElementsLength={selectedElements.length + (selectedElement ? 1 : 0)}
                                     disabled={!graph.Id}
                                     deleteDisabled={(Object.values(selectedElements).length === 0 && !selectedElement)}
                                     onDeleteElement={handleDeleteElement}
                                     chartRef={chartRef}
                                     displayAdd={false}
+                                    type="Graph"
                                 />
                                 {
                                     isCollapsed && graph.Id &&
@@ -372,7 +363,7 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
                                 </Button>
                                 {
                                     graph.getElements().length > 0 &&
-                                    <div className="z-10 absolute top-4 left-4 pointer-events-none">
+                                    <div className="z-10 absolute top-4 left-4 pointer-events-none flex gap-4">
                                         <Tooltip>
                                             <TooltipTrigger asChild>
                                                 <div className="flex items-center gap-2">
@@ -390,12 +381,33 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
                                                 <p>Animation Control</p>
                                             </TooltipContent>
                                         </Tooltip>
+                                        <div className="relative pointer-events-auto" id="elementCanvasSearch">
+                                            <Input
+                                                className="w-[20dvw]"
+                                                placeholder="Search for element in the graph"
+                                                value={searchElement}
+                                                onChange={(e) => setSearchElement(e.target.value)}
+                                                onKeyDown={(e) => {
+                                                    if (e.key === 'Enter') {
+                                                        handleSearchElement()
+                                                        setSearchElement("")
+                                                    }
+                                                }}
+                                            />
+                                            <Button
+                                                className="absolute right-2 top-2"
+                                                onClick={handleSearchElement}
+                                            >
+                                                <Search color="black" />
+                                            </Button>
+                                        </div>
                                     </div>
                                 }
                                 <ForceGraph
                                     graph={graph}
                                     chartRef={chartRef}
                                     data={data}
+                                    onExpand={onExpand}
                                     setData={setData}
                                     selectedElement={selectedElement}
                                     setSelectedElement={setSelectedElement}

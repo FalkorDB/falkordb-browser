@@ -8,6 +8,49 @@ import { DEFAULT_COLORS, Graph } from "../api/graph/model"
 import Button from "../components/ui/Button"
 import DialogComponent from "../components/DialogComponent"
 
+
+function hslToHex(hsl: string): string {
+    const hslValues = hsl.match(/\d+/g);
+
+    if (!hslValues || hslValues.length < 3) {
+        throw new Error("Invalid HSL string");
+    }
+
+    const [h, s, l] = hslValues.map(Number);
+
+    const sDecimal = s / 100;
+    const lDecimal = l / 100;
+
+    const c = (1 - Math.abs(2 * lDecimal - 1)) * sDecimal;
+    const x = c * (1 - Math.abs((h / 60) % 2 - 1));
+    const m = lDecimal - c / 2;
+
+    let r = 0;
+    let g = 0;
+    let b = 0;
+
+    if (h >= 0 && h < 60) {
+        r = c; g = x; b = 0;
+    } else if (h >= 60 && h < 120) {
+        r = x; g = c; b = 0;
+    } else if (h >= 120 && h < 180) {
+        r = 0; g = c; b = x;
+    } else if (h >= 180 && h < 240) {
+        r = 0; g = x; b = c;
+    } else if (h >= 240 && h < 300) {
+        r = x; g = 0; b = c;
+    } else if (h >= 300 && h < 360) {
+        r = c; g = 0; b = x;
+    }
+
+    const toHex = (value: number) => {
+        const hex = Math.round((value + m) * 255).toString(16);
+        return hex.length === 1 ? `0${hex}` : hex;
+    };
+
+    return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+}
+
 export default function View({ graph, setGraph, selectedValue }: {
     graph: Graph,
     setGraph: (graph: Graph) => void,
@@ -63,12 +106,18 @@ export default function View({ graph, setGraph, selectedValue }: {
         setIsAddColor(false)
     }
 
+    const getNewColor = () => {
+        const newHslColor = `hsl(${(colorsArr.length - Math.min(DEFAULT_COLORS.length, colorsArr.length)) * 20}, 100%, 70%)`
+        setNewColor(newHslColor)
+    }
+
     return (
         <DialogComponent
             onOpenChange={(o) => !o && setColorsArr(graph.Colors)}
             trigger={
                 <Button
                     label="Preferences"
+                    title="Open application preferences"
                     disabled={!selectedValue}
                 />
             }
@@ -76,12 +125,12 @@ export default function View({ graph, setGraph, selectedValue }: {
             title="Labels Legend"
             description="Pick a color for each label"
         >
-            <div className="h-full flex flex-col gap-8 overflow-hidden">
-                <ul className="flex flex-col gap-4 p-2 overflow-auto">
+            <div className="h-full flex flex-col gap-8">
+                <ul className="h-1 grow flex flex-col gap-4 p-2 overflow-auto">
                     {
                         colorsArr.map((c, i) => (
                             <li onMouseEnter={() => setHover(c)} onMouseLeave={(() => setHover(""))} key={c} className={cn(`flex gap-8 items-center`)}>
-                                <div className="flex flex-col">
+                                <div className="flex flex-col justify-center h-12 w-6">
                                     {
                                         i !== 0 &&
                                         <Button
@@ -118,11 +167,10 @@ export default function View({ graph, setGraph, selectedValue }: {
                                 {
                                     c === editable ?
                                         <>
-                                            <div style={{ backgroundColor: newColor }} className="h-6 w-6 rounded-full" />
                                             <input
-                                                className="p-0 bg-transparent"
+                                                className="h-6 w-6 rounded-full"
                                                 ref={ref => ref?.focus()}
-                                                value={newColor}
+                                                value={hslToHex(newColor)}
                                                 onChange={(e) => {
                                                     const newHslColor = rgbToHSL(e.target.value);
                                                     setNewColor(newHslColor);
@@ -133,6 +181,7 @@ export default function View({ graph, setGraph, selectedValue }: {
                                                 }}
                                                 type="color"
                                             />
+                                            <p>{newColor}</p>
                                         </>
                                         : <>
                                             <div style={{ backgroundColor: c }} className="h-6 w-6 rounded-full" />
@@ -166,7 +215,10 @@ export default function View({ graph, setGraph, selectedValue }: {
                                                 <Trash2 />
                                             </Button>
                                             <Button
-                                                onClick={() => setEditable(c)}
+                                                onClick={() => {
+                                                    setEditable(c)
+                                                    getNewColor()
+                                                }}
                                                 title={isAddColor ? "You can't edit color when adding a new one" : "Edit"}
                                                 disabled={isAddColor}
                                             >
@@ -180,12 +232,11 @@ export default function View({ graph, setGraph, selectedValue }: {
                     {
                         isAddColor &&
                         <li className="flex gap-8 items-center">
-                            <div className="h-6 w-6" />
-                            <div style={{ backgroundColor: newColor }} className="h-6 w-6 rounded-full" />
+                            <div className="h-12 w-6" />
                             <input
-                                className="p-0 bg-transparent"
+                                className="h-6 w-6 rounded-full"
                                 ref={ref => ref?.focus()}
-                                value={newColor}
+                                value={hslToHex(newColor)}
                                 onChange={(e) => {
                                     const newHslColor = rgbToHSL(e.target.value);
                                     setNewColor(newHslColor);
@@ -196,6 +247,7 @@ export default function View({ graph, setGraph, selectedValue }: {
                                 }}
                                 type="color"
                             />
+                            <p>{newColor}</p>
                             <div className="flex gap-2">
                                 <Button
                                     onClick={handleAddColor}
@@ -218,8 +270,10 @@ export default function View({ graph, setGraph, selectedValue }: {
                         disabled={colorsArr.some(color => color === editable)}
                         variant="Primary"
                         label="Add Color"
+                        title="Add a new color option"
                         onClick={() => {
                             setIsAddColor(true)
+                            getNewColor()
                         }}
                     >
                         <PlusCircle />
@@ -228,6 +282,7 @@ export default function View({ graph, setGraph, selectedValue }: {
                         disabled={DEFAULT_COLORS.every((c, i) => c === graph.Colors[i]) && DEFAULT_COLORS.length === graph.Colors.length}
                         variant="Secondary"
                         label="Reset"
+                        title="Restore default colors settings"
                         onClick={() => {
                             handlePreferencesChange(DEFAULT_COLORS)
                         }}
@@ -235,9 +290,10 @@ export default function View({ graph, setGraph, selectedValue }: {
                         <RotateCcw />
                     </Button>
                     <Button
-                        disabled={graph.Colors.every((c) => colorsArr.some(color => color === c)) && graph.Colors.length === colorsArr.length}
+                        disabled={JSON.stringify(graph.Colors) === JSON.stringify(colorsArr) && graph.Colors.length === colorsArr.length}
                         variant="Primary"
                         label="Apply"
+                        title="Save and apply changes"
                         onClick={() => handlePreferencesChange()}
                     >
                         <FileCheck2 />

@@ -1,3 +1,5 @@
+/* eslint-disable no-restricted-syntax */
+/* eslint-disable no-await-in-loop */
 import { test as setup } from "@playwright/test"
 import urls from '../config/urls.json'
 import BrowserWrapper from "../infra/ui/browserWrapper";

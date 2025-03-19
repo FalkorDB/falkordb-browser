@@ -55,12 +55,8 @@ export default function Page() {
     }, [graphName, toast])
 
     useEffect(() => {
-        fetchCount()
-    }, [graphName, fetchCount])
-
-    useEffect(() => {
         if (graphName !== graph.Id) {
-            const colors = localStorage.getItem(graphName)?.split(/[[\]",]/).filter(c => c)
+            const colors = JSON.parse(localStorage.getItem(graphName) || "[]")
             setGraph(Graph.empty(graphName, colors))
         }
         fetchCount()
@@ -85,6 +81,7 @@ export default function Page() {
         const json = await result.json()
         fetchCount()
         setSelectedElement(undefined)
+        
         return json.result
     }
 

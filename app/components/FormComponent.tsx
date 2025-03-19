@@ -13,7 +13,7 @@ import Input from "./ui/Input"
 
 export type Error = {
     message: string
-    condition: (value: string) => boolean
+    condition: (value: string, password?: string) => boolean
 }
 
 export type Field = {
@@ -63,8 +63,8 @@ export default function FormComponent({ handleSubmit, fields, error = undefined,
             return
         }
 
-        setIsLoading(true)
         try {
+            setIsLoading(true)
             await handleSubmit(e)
         } finally {
             setIsLoading(false)
@@ -116,9 +116,9 @@ export default function FormComponent({ handleSubmit, fields, error = undefined,
                                         <Combobox
                                             inTable
                                             options={field.options!}
-                                            type={field.label}
+                                            label={field.label}
                                             selectedValue={field.value}
-                                            setSelectedValue={field.onSelectedValue}
+                                            setSelectedValue={field.onSelectedValue!}
                                         />
                                         : <Input
                                             id={field.label}
@@ -127,6 +127,15 @@ export default function FormComponent({ handleSubmit, fields, error = undefined,
                                             value={field.value}
                                             onChange={(e) => {
                                                 field.onChange!(e)
+                                                if (field.type === "password") {
+                                                    const confirmPasswordField = fields.find(f => f.label === "Confirm Password")
+                                                    if (confirmPasswordField && confirmPasswordField.errors) {
+                                                        setErrors(prev => ({
+                                                            ...prev,
+                                                            "Confirm Password": confirmPasswordField.errors!.some(err => err.condition(confirmPasswordField.value, e.target.value))
+                                                        }))
+                                                    }
+                                                }
                                                 if (field.errors) {
                                                     setErrors(prev => ({
                                                         ...prev,
