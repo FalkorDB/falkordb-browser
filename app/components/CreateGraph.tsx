@@ -15,12 +15,14 @@ import Input from "./ui/Input"
 interface Props {
     onSetGraphName: (name: string) => void
     type: string
+    graphNames: string[]
     trigger?: React.ReactNode
 }
 
 export default function CreateGraph({
     onSetGraphName,
     type,
+    graphNames,
     trigger = (
         <Button
             variant="Primary"
@@ -36,7 +38,7 @@ export default function CreateGraph({
     const [open, setOpen] = useState(false)
     const [isLoading, setIsLoading] = useState(false)
     const { toast } = useToast()
-    
+
     const handleCreateGraph = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault()
         try {
@@ -50,13 +52,21 @@ export default function CreateGraph({
                 })
                 return
             }
+            if (graphNames.includes(name)) {
+                toast({
+                    title: "Error",
+                    description: `${type} name already exists`,
+                    variant: "destructive"
+                })
+                return
+            }
             const q = 'RETURN 1'
             const result = await securedFetch(`api/graph/${prepareArg(name)}/?query=${prepareArg(q)}`, {
                 method: "GET",
             }, toast)
-            
+
             if (!result.ok) return
-            
+
             onSetGraphName(name)
             setGraphName("")
             setOpen(false)

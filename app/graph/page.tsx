@@ -25,6 +25,7 @@ export default function Page() {
         currentQuery: "",
         counter: 0
     })
+    const [graphNames, setGraphNames] = useState<string[]>([])
     const { data: session } = useSession()
     const { toast } = useToast()
 
@@ -83,7 +84,7 @@ export default function Page() {
         const json = await result.json()
         fetchCount()
         setSelectedElement(undefined)
-        
+
         return json.result
     }
 
@@ -114,13 +115,15 @@ export default function Page() {
 
     return (
         <div className="Page">
-            <Header onSetGraphName={setGraphName} />
+            <Header onSetGraphName={setGraphName} graphNames={graphNames} />
             <div className="h-1 grow p-8 px-10 flex flex-col gap-4">
                 <Selector
                     queries={historyQuery.queries}
                     setGraphName={setGraphName}
                     graphName={graphName}
                     runQuery={runQuery}
+                    options={graphNames}
+                    setOptions={setGraphNames}
                     edgesCount={edgesCount}
                     nodesCount={nodesCount}
                     setGraph={setGraph}
@@ -138,7 +141,7 @@ export default function Page() {
                     historyQuery={historyQuery}
                     setHistoryQuery={setHistoryQuery}
                 />
-                <Tutorial onSetGraphName={setGraphName} />
+                <Tutorial onSetGraphName={setGraphName} graphNames={graphNames} />
             </div>
         </div >
     )

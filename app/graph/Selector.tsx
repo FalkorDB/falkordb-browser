@@ -34,11 +34,12 @@ interface Props {
     setGraph: (graph: Graph) => void
     graph: Graph
     data: Session | null
+    options: string[]
+    setOptions: Dispatch<SetStateAction<string[]>>
 }
 
-export default function Selector({ setGraphName, graphName, queries, runQuery, edgesCount, nodesCount, setGraph, graph, data: session, historyQuery, setHistoryQuery }: Props) {
+export default function Selector({ setGraphName, graphName, queries, runQuery, edgesCount, nodesCount, setGraph, graph, data: session, options, setOptions, historyQuery, setHistoryQuery }: Props) {
 
-    const [options, setOptions] = useState<string[]>([]);
     const [schema, setSchema] = useState<Graph>(Graph.empty());
     const [search, setSearch] = useState<string>("")
     const [selectedValue, setSelectedValue] = useState<string>("");
@@ -134,6 +135,7 @@ export default function Selector({ setGraphName, graphName, queries, runQuery, e
                         <>
                             <CreateGraph
                                 type={type}
+                                graphNames={options}
                                 onSetGraphName={(name) => {
                                     handleOnChange(name)
                                     setOptions(prev => [...prev, name])

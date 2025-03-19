@@ -17,9 +17,10 @@ import CreateGraph from "./CreateGraph";
 
 interface Props {
     onSetGraphName?: Dispatch<SetStateAction<string>>
+    graphNames?: string[]
 }
 
-export default function Header({ onSetGraphName }: Props) {
+export default function Header({ onSetGraphName, graphNames }: Props) {
     const router = useRouter()
     const pathname = usePathname()
     const type = pathname.includes("/schema") ? "Schema" : "Graph"
@@ -103,6 +104,7 @@ export default function Header({ onSetGraphName }: Props) {
                                     <CreateGraph
                                         onSetGraphName={onSetGraphName!}
                                         type={type}
+                                        graphNames={graphNames!}
                                     />
                                 }
                                 <Button
