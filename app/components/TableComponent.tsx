@@ -172,7 +172,7 @@ export default function TableComponent({ headers, rows, children, setRows, optio
                                                             base05: '#CE9178',
                                                             base06: '#CE9178',
                                                             base07: '#CE9178',
-                                                            base08: '#CE9178',cell.value
+                                                            base08: '#CE9178',
                                                             base09: '#b5cea8', // numbers
                                                             base0A: '#CE9178',
                                                             base0B: '#CE9178', // close values
