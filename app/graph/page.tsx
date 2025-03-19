@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState } from "react";
-import { HistoryQuery, prepareArg, Query, securedFetch } from "@/lib/utils";
+import { HistoryQuery, prepareArg, securedFetch } from "@/lib/utils";
 import { useSession } from "next-auth/react";
 import { useToast } from "@/components/ui/use-toast";
 import Selector from "./Selector";
@@ -19,16 +19,17 @@ export default function Page() {
     const [selectedElement, setSelectedElement] = useState<Node | Link>();
     const [historyQuery, setHistoryQuery] = useState<HistoryQuery>({
         queries: [],
+        query: "",
         currentQuery: "",
         counter: 0
     })
-    const [query, setQuery] = useState<Query | undefined>()
     const { data: session } = useSession()
     const { toast } = useToast()
 
     useEffect(() => {
         setHistoryQuery({
             queries: JSON.parse(localStorage.getItem(`query history`) || "[]"),
+            query: "",
             currentQuery: "",
             counter: 0
         })
@@ -100,8 +101,8 @@ export default function Page() {
         setHistoryQuery(prev => ({
             ...prev,
             queries: queryArr,
-            currentQuery: "",
-            counter: queryArr.findIndex(qu => qu.text === q) + 1
+            currentQuery: q,
+            counter: 0
         }))
         localStorage.setItem("query history", JSON.stringify(queryArr))
         const g = Graph.create(graphName, result, false, false, graph.Colors)
@@ -126,6 +127,7 @@ export default function Page() {
                     setGraph={setGraph}
                     graph={graph}
                     data={session}
+                    historyQuery={historyQuery}
                     setHistoryQuery={setHistoryQuery}
                 />
                 <GraphView
@@ -136,8 +138,6 @@ export default function Page() {
                     fetchCount={fetchCount}
                     historyQuery={historyQuery}
                     setHistoryQuery={setHistoryQuery}
-                    query={query?.text || ""}
-                    setQuery={(value) => setQuery({ text: value, metadata: query?.metadata || [], explain: query?.explain || [] })}
                 />
                 <Tutorial onSetGraphName={setGraphName} />
             </div>

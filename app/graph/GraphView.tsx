@@ -25,7 +25,7 @@ import MetadataView from "./MetadataView";
 const ForceGraph = dynamic(() => import("../components/ForceGraph"), { ssr: false });
 const EditorComponent = dynamic(() => import("../components/EditorComponent"), { ssr: false })
 
-function GraphView({ graph, selectedElement, setSelectedElement, runQuery, historyQuery, fetchCount, query, setQuery, setHistoryQuery }: {
+function GraphView({ graph, selectedElement, setSelectedElement, runQuery, historyQuery, fetchCount, setHistoryQuery }: {
     graph: Graph
     selectedElement: Node | Link | undefined
     setSelectedElement: Dispatch<SetStateAction<Node | Link | undefined>>
@@ -33,8 +33,6 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
     historyQuery: HistoryQuery
     setHistoryQuery: Dispatch<SetStateAction<HistoryQuery>>
     fetchCount: () => void
-    query: string
-    setQuery: (value: string) => void
 }) {
 
     const [data, setData] = useState<GraphData>(graph.Elements)
@@ -294,8 +292,6 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
                 defaultSize={selectedElement ? 75 : 100}
             >
                 <EditorComponent
-                    query={query}
-                    setQuery={setQuery}
                     graph={graph}
                     maximize={maximize}
                     runQuery={handleRunQuery}

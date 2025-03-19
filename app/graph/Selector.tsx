@@ -9,6 +9,7 @@ import { Session } from "next-auth";
 import { PlusCircle, RefreshCcw } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { useToast } from "@/components/ui/use-toast";
+import * as monaco from "monaco-editor";
 import Combobox from "../components/ui/combobox";
 import { Graph } from "../api/graph/model";
 import DialogComponent from "../components/DialogComponent";
@@ -19,6 +20,7 @@ import View from "./View";
 import CreateGraph from "../components/CreateGraph";
 import ExportGraph from "../components/ExportGraph";
 import MetadataView from "./MetadataView";
+import Input from "../components/ui/Input";
 
 interface Props {
     setGraphName: (selectedGraphName: string) => void
@@ -30,23 +32,35 @@ interface Props {
     setGraph: (graph: Graph) => void
     graph: Graph
     data: Session | null
+    historyQuery: HistoryQuery
     setHistoryQuery: Dispatch<SetStateAction<HistoryQuery>>
 }
 
-export default function Selector({ setGraphName, graphName, queries, runQuery, edgesCount, nodesCount, setGraph, graph, data: session, setHistoryQuery }: Props) {
+export default function Selector({ setGraphName, graphName, queries, runQuery, edgesCount, nodesCount, setGraph, graph, data: session, historyQuery, setHistoryQuery }: Props) {
 
     const [options, setOptions] = useState<string[]>([]);
     const [schema, setSchema] = useState<Graph>(Graph.empty());
+    const [search, setSearch] = useState<string>("")
     const [selectedValue, setSelectedValue] = useState<string>("");
     const [duplicateOpen, setDuplicateOpen] = useState<boolean>(false);
     const [queriesOpen, setQueriesOpen] = useState<boolean>(false);
     const [isLoading, setIsLoading] = useState(false);
-    const [currentQueryIndex, setCurrentQueryIndex] = useState<number>();
     const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null)
     const pathname = usePathname()
     const type = pathname.includes("/schema") ? "Schema" : "Graph"
     const [isRotating, setIsRotating] = useState(false);
     const { toast } = useToast()
+    const [filteredQueries, setFilteredQueries] = useState<Query[]>(queries || [])
+
+    useEffect(() => {
+        const timeout = setTimeout(() => {
+            setFilteredQueries(queries?.filter((query, i) => !search || query.text.toLowerCase().includes(search.toLowerCase()) || i === historyQuery.counter - 1) || [])
+        }, 500)
+
+        return () => {
+            clearTimeout(timeout)
+        }
+    }, [queries, search, historyQuery.counter])
 
     useEffect(() => {
         setSelectedValue(graphName)
@@ -76,6 +90,9 @@ export default function Selector({ setGraphName, graphName, queries, runQuery, e
 
     const handleEditorDidMount = (e: editor.IStandaloneCodeEditor) => {
         editorRef.current = e
+        // Disable Ctrl + F keybinding
+        // eslint-disable-next-line no-bitwise
+        e.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyF, () => {});
     }
 
     const handleOnChange = async (name: string) => {
@@ -204,63 +221,78 @@ export default function Selector({ setGraphName, graphName, queries, runQuery, e
                                 <DialogTitle>Queries</DialogTitle>
                                 <div className="h-1 grow flex border">
                                     <div className="w-1 grow border-r overflow-auto">
+                                        <div className="p-8 border-b">
+                                            <Input
+                                                className="w-full"
+                                                value={search}
+                                                placeholder="Search for a query"
+                                                onChange={(e) => setSearch(e.target.value)}
+                                            />
+                                        </div>
                                         <ul className="flex flex-col-reverse">
                                             {
-                                                queries && queries.map((query, index) => (
-                                                    // eslint-disable-next-line react/no-array-index-key
-                                                    <li key={index} className="flex flex-col gap-2 w-full border-b py-3 px-12">
-                                                        <Button
-                                                            className="w-full truncate text-sm"
-                                                            label={query.text}
-                                                            onClick={() => {
-                                                                setCurrentQueryIndex(index)
-                                                            }}
-                                                        />
-                                                        {
-                                                            currentQueryIndex === index &&
-                                                            <div className="h-[20dvh] border">
-                                                                <Editor
-                                                                    width="100%"
-                                                                    height="100%"
-                                                                    language="cypher"
-                                                                    theme="custom-theme"
-                                                                    options={{
-                                                                        lineHeight: 30,
-                                                                        fontSize: 25,
-                                                                        lineNumbersMinChars: 3,
-                                                                        scrollbar: {
-                                                                            horizontal: "hidden"
-                                                                        },
-                                                                        wordWrap: "on",
-                                                                        scrollBeyondLastLine: false,
-                                                                        renderWhitespace: "none"
-                                                                    }}
-                                                                    value={queries[currentQueryIndex]?.text}
-                                                                    onChange={(value) => setHistoryQuery(prev => ({
+                                                queries && filteredQueries && filteredQueries.map((query, index) => {
+                                                    const currentIndex = queries.findIndex(q => q.text === query.text)
+                                                    return (
+                                                        // eslint-disable-next-line react/no-array-index-key
+                                                        <li key={index} className="flex flex-col gap-2 w-full border-b py-3 px-12">
+                                                            <Button
+                                                                className="w-full truncate text-sm"
+                                                                label={query.text}
+                                                                onClick={() => {
+                                                                    setHistoryQuery(prev => ({
                                                                         ...prev,
-                                                                        queries: !value ? prev.queries.filter((_, i) => i !== currentQueryIndex) : prev.queries.map((q, i) => i === currentQueryIndex ? { ...q, text: value || "" } : q)
-                                                                    }))}
-                                                                    onMount={handleEditorDidMount}
-                                                                />
-                                                            </div>
-                                                        }
-                                                    </li>
-                                                ))
+                                                                        query: query.text,
+                                                                        counter: currentIndex + 1
+                                                                    }))
+                                                                }}
+                                                            />
+                                                            {
+                                                                historyQuery.counter - 1 === currentIndex &&
+                                                                <div className="h-[20dvh] border">
+                                                                    <Editor
+                                                                        width="100%"
+                                                                        height="100%"
+                                                                        language="cypher"
+                                                                        theme="custom-theme"
+                                                                        options={{
+                                                                            lineHeight: 30,
+                                                                            fontSize: 25,
+                                                                            lineNumbersMinChars: 3,
+                                                                            scrollbar: {
+                                                                                horizontal: "hidden"
+                                                                            },
+                                                                            wordWrap: "on",
+                                                                            scrollBeyondLastLine: false,
+                                                                            renderWhitespace: "none"
+                                                                        }}
+                                                                        value={historyQuery.query}
+                                                                        onChange={(value) => setHistoryQuery(prev => ({
+                                                                            ...prev,
+                                                                            query: value || ""
+                                                                        }))}
+                                                                        onMount={handleEditorDidMount}
+                                                                    />
+                                                                </div>
+                                                            }
+                                                        </li>
+                                                    )
+                                                })
                                             }
                                         </ul>
                                     </div>
                                     <div className="w-1 grow">
-                                        {currentQueryIndex && queries?.[currentQueryIndex] && <MetadataView query={queries[currentQueryIndex]} graphName={selectedValue} />}
+                                        {queries?.[historyQuery.counter - 1] && <MetadataView query={queries[historyQuery.counter - 1]} graphName={selectedValue} />}
                                     </div>
                                 </div>
                                 <div className="flex justify-end">
                                     <Button
                                         className="text-white flex justify-center w-1/3"
-                                        disabled={isLoading || !currentQueryIndex}
+                                        disabled={isLoading || !historyQuery.counter}
                                         onClick={async () => {
                                             try {
                                                 setIsLoading(true);
-                                                const q = await runQuery(queries?.[currentQueryIndex!]?.text || "")
+                                                const q = await runQuery(queries?.[historyQuery.counter!]?.text || "")
                                                 if (q) {
                                                     setQueriesOpen(false)
                                                 }

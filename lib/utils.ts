@@ -14,6 +14,7 @@ export type GraphRef = MutableRefObject<ForceGraphMethods<Node, Link> | undefine
 
 export interface HistoryQuery {
   queries: Query[]
+  query: string
   currentQuery: string
   counter: number
 }
