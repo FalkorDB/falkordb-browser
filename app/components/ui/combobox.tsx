@@ -87,7 +87,7 @@ export default function Combobox({ isSelectGraph = false, disabled = false, inTa
         </Tooltip>
         <SelectContent className="min-w-52 max-h-[30lvh] bg-foreground">
           <SelectGroup>
-            <ul className="shrink grow overflow-auto">
+            <ul className="shrink grow overflow-auto" id="graphsList">
               {
                 options.map((option) => (
                   <SelectItem

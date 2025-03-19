@@ -3,7 +3,7 @@
 import { APIRequestContext, request } from "@playwright/test"
 
 
-const getRequest = async (url: string, body?: any, availableRequest?: APIRequestContext, headers?: Record<string, string>) => {
+const getRequest = async (url: string, headers?: Record<string, string>, body?: any, availableRequest?: APIRequestContext) => {
   const requestOptions = {
     data: body,
     headers: headers || undefined,
@@ -25,7 +25,7 @@ const postRequest = async (url: string, body?: any, availableRequest?: APIReques
   return response;
 };
 
-const deleteRequest = async (url: string, body?: any, headers?: Record<string, string>) => {
+const deleteRequest = async (url: string, headers?: Record<string, string>, body?: any) => {
   const requestOptions = {
     data: body,
     headers: headers || undefined,

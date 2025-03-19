@@ -1,3 +1,3 @@
-interface GetGraphsResponse {
+export interface GetGraphsResponse {
     result: string[];
 }
