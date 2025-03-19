@@ -1,8 +1,118 @@
 {
-    "queries": [
-      {
-        "name": "querySuccess1",
-        "query": "graphName?query=unwind%20range(1%2C20)%20as%20x%20create%20(n%3Arider)-%5Be%3Arides%5D-%3E(m%3Ateam)%20return%20*"
-      }
-    ]
-  }
+  "queries": [
+    {
+      "failedQueries": [
+        {
+          "name": "typoCreate",
+          "query": "MATCH (n) CRETE (m)",
+          "reason": "Syntax error: 'CREATE' is spelled incorrectly, causing the query to fail."
+        },    
+        {
+          "name": "unknownClause",
+          "query": "MATCH (n) FROG (m)",
+          "reason": "Syntax error: 'FROG' is not a valid clause, causing the query to fail."
+        },
+        {
+          "name": "undefinedVariable",
+          "query": "MATCH (p:Person) RETURN x",
+          "reason": "Reference error: variable 'x' is never introduced, causing the query to fail."
+        },
+        {
+          "name": "typoReturn",
+          "query": "MATCH (n) RETUN n",
+          "reason": "Syntax error: 'RETURN' is spelled incorrectly, causing the query to fail."
+        },
+        {
+          "name": "reservedKeywordUsage",
+          "query": "MATCH (n) RETURN CREATE",
+          "reason": "Syntax error: 'CREATE' is a reserved keyword and cannot be used as a return variable."
+        },
+        {
+          "name": "mismatchedBrackets",
+          "query": "CREATE (n:Person { name: \"Alice\" )",
+          "reason": "Missing closing curly brace for the property map, causing a syntax error."
+        },
+        {
+          "name": "nonexistentProcedure",
+          "query": "CALL my.nonexistentProcedure()",
+          "reason": "Runtime error: procedure does not exist, failing immediately."
+        }
+      ],
+      "successQueries": [
+        {
+          "name": "createVisualNode",
+          "query": "CREATE (n:Person { name: 'Alice' }) RETURN n",
+          "reason": "Ensures that a node visually appears in the UI canvas when created."
+        },
+        {
+          "name": "updateNodePropertyVisual",
+          "query": "MATCH (n:Person { name: 'Alice' }) SET n.age = 30 RETURN n",
+          "reason": "Checks if updating a node property is reflected in the UI canvas."
+        },
+        {
+          "name": "createVisualRelationship",
+          "query": "MATCH (a:Person { name: 'Alice' }), (b:Person { name: 'Bob' }) CREATE (a)-[:FRIENDS_WITH]->(b) RETURN a, b",
+          "reason": "Validates that a relationship visually appears between nodes in the UI canvas."
+        },
+        {
+          "name": "deleteVisualNode",
+          "query": "MATCH (n:Person { name: 'Alice' }) DELETE n",
+          "reason": "Confirms that a node disappears from the UI canvas when deleted."
+        },
+        {
+          "name": "deleteVisualRelationship",
+          "query": "MATCH (a:Person)-[r:FRIENDS_WITH]-(b:Person) DELETE r RETURN a, b",
+          "reason": "Ensures that deleting a relationship is reflected visually in the UI canvas."
+        },
+        {
+          "name": "mergeVisualNode",
+          "query": "MERGE (n:Person { name: 'Eve' }) RETURN n",
+          "reason": "Tests if the UI correctly handles MERGE by displaying the node only if it doesn't already exist."
+        },
+        {
+          "name": "expandGraphView",
+          "query": "MATCH (n)-[r]->(m) RETURN n, r, m",
+          "reason": "Ensures that the UI can display multiple nodes and relationships in the canvas."
+        },
+        {
+          "name": "collapseGraphView",
+          "query": "MATCH (n) RETURN n LIMIT 1",
+          "reason": "Checks if the UI supports zooming or focusing on a single node in the canvas."
+        },
+        {
+          "name": "displayMultipleNodes",
+          "query": "CREATE (a:Person { name: 'Alice' }), (b:Person { name: 'Bob' }), (c:Person { name: 'Charlie' }) RETURN a, b, c",
+          "reason": "Verifies that multiple nodes appear in the canvas without issue."
+        },
+        {
+          "name": "displayMultipleRelationships",
+          "query": "MATCH (a:Person { name: 'Alice' }), (b:Person { name: 'Bob' }), (c:Person { name: 'Charlie' }) CREATE (a)-[:FRIENDS_WITH]->(b), (b)-[:FRIENDS_WITH]->(c) RETURN a, b, c",
+          "reason": "Ensures that multiple relationships between nodes are rendered correctly in the UI canvas."
+        },
+        {
+          "name": "checkNodeTooltip",
+          "query": "MATCH (n:Person) RETURN n",
+          "reason": "Tests whether the UI correctly displays tooltips or properties when clicking on a node in the canvas."
+        },
+        {
+          "name": "checkRelationshipTooltip",
+          "query": "MATCH (a)-[r]->(b) RETURN r",
+          "reason": "Tests whether the UI correctly displays tooltips or properties when clicking on a relationship in the canvas."
+        }
+      ],
+      "testQueries": [
+        {
+          "name": "batchCreatePersons",
+          "query": "UNWIND range(1, 10) AS i CREATE (p:Person {id: i, name: 'Person ' + toString(i)}) RETURN p;",
+          "reason": "Creates 10 Person nodes with sequential IDs and names using UNWIND.",
+          "apiReq": "UNWIND%20range(1%2C%2010)%20AS%20i%20CREATE%20(p%3APerson%20%7Bid%3A%20i%2C%20name%3A%20%27Person%20%27%20%2B%20toString(i)%7D)%20RETURN%20p"
+        },
+        {
+          "name": "fetchFirstTenNodes",
+          "query": "MATCH (n) RETURN n LIMIT 10",
+          "reason": "Retrieves up to 10 nodes from the database without any filtering."
+        }
+      ]
+    }
+  ]
+}
