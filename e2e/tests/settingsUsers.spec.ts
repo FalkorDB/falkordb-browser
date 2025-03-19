@@ -49,7 +49,6 @@ test.describe('Settings Tests', () => {
         const newUserRole = await settingsUsersPage.getUserRole(username);
         await settingsUsersPage.removeUser(username);
         expect(newUserRole).toBe("Read-Only");
-
     })
 
     const searchData = [
