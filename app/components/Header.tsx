@@ -83,7 +83,7 @@ export default function Header({ onSetGraphName, graphNames }: Props) {
                                                 </a>
                                             </li>
                                             <li>
-                                                <a href="https://www.falkordb.com/contact-us/" target="_blank" rel="noreferrer">
+                                                <a href="https://discord.com/invite/jyUgBweNQz" target="_blank" rel="noreferrer">
                                                     Support
                                                 </a>
                                             </li>
