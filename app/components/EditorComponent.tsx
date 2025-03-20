@@ -573,7 +573,8 @@ export default function EditorComponent({ historyQuery, maximize, runQuery, grap
                                         if (!historyQuery.counter) {
                                             setHistoryQuery(prev => ({
                                                 ...prev,
-                                                currentQuery: val || ""
+                                                currentQuery: val || "",
+                                                query: val || "",
                                             }))
                                         } else {
                                             setHistoryQuery(prev => ({
