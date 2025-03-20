@@ -86,6 +86,10 @@ export default class GraphPage extends BasePage {
         return (graph: string) => this.page.locator(`//ul[@id='graphsList']/div[descendant::text()[contains(., '${graph}')]]`);
     }
 
+    private get graphSelectSearchInput(): Locator {
+        return this.page.locator(`//div[@id='graphSearch']//input`);
+    }
+
     private get canvasElementSearchInput(): Locator {
         return this.page.locator("//div[@id='elementCanvasSearch']//input");
     }
@@ -261,6 +265,7 @@ export default class GraphPage extends BasePage {
     }
 
     async selectGraphFromList(graph: string): Promise<void> {
+        await this.graphSelectSearchInput.fill(graph);
         const graphLocator = this.selectGraphList(graph);
         const isVisible = await waitForElementToBeVisible(graphLocator);
         if (!isVisible) throw new Error("select Graph From List button is not visible!");
