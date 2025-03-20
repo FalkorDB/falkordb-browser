@@ -4,18 +4,20 @@
 
 "use client"
 
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { cn, prepareArg, Row, securedFetch } from "@/lib/utils"
 import { useEffect, useState } from "react"
 import { Select, SelectContent, SelectGroup, SelectItem, SelectSeparator, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useToast } from "@/components/ui/use-toast"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { useSession } from "next-auth/react"
+import { VisuallyHidden } from "@radix-ui/react-visually-hidden"
 import Button from "./Button"
 import TableComponent from "../TableComponent"
 import CloseDialog from "../CloseDialog"
 import ExportGraph from "../ExportGraph"
 import DeleteGraph from "../graph/DeleteGraph"
+import Input from "./Input"
 
 interface ComboboxProps {
   options: string[],
@@ -31,13 +33,26 @@ interface ComboboxProps {
   onOpenChange?: (open: boolean) => void
 }
 
-export default function Combobox({ isSelectGraph = false, disabled = false, inTable, type, label, options, setOptions, selectedValue, setSelectedValue, defaultOpen = false, onOpenChange }: ComboboxProps) {
+const STEP = 4
+
+export default function Combobox({ isSelectGraph = false, disabled = false, inTable, type = "Graph", label, options, setOptions, selectedValue, setSelectedValue, defaultOpen = false, onOpenChange }: ComboboxProps) {
 
   const [openMenage, setOpenMenage] = useState<boolean>(false)
   const [open, setOpen] = useState<boolean>(defaultOpen)
   const [rows, setRows] = useState<Row[]>([])
+  const [search, setSearch] = useState<string>("")
+  const [filteredOptions, setFilteredOptions] = useState<string[]>([])
+  const [maxOptions, setMaxOptions] = useState<number>(STEP)
   const { toast } = useToast()
   const { data: session } = useSession()
+
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      setFilteredOptions(!search ? options : options.filter((option) => option.toLowerCase().includes(search.toLowerCase())))
+    }, 500)
+
+    return () => clearTimeout(timeout)
+  }, [options, search])
 
   const handleSetOption = async (option: string, optionName: string) => {
     const result = await securedFetch(`api/graph/${prepareArg(option)}/?sourceName=${prepareArg(optionName)}`, {
@@ -85,11 +100,22 @@ export default function Combobox({ isSelectGraph = false, disabled = false, inTa
             {options.length === 0 ? "There is no graphs" : selectedValue || `Select ${label || type || "Graph"}`}
           </TooltipContent>
         </Tooltip>
-        <SelectContent className="min-w-52 max-h-[30lvh] bg-foreground">
+        <SelectContent className="min-w-52 max-h-[40lvh] bg-foreground">
+          <div className="p-4" id="graphSearch">
+            <Input ref={ref => ref?.focus()} className="w-full" placeholder={`Search a graph ${type}`} onChange={(e) => {
+              setSearch(e.target.value)
+              setMaxOptions(5)
+            }} value={search} />
+          </div>
           <SelectGroup>
-            <ul className="shrink grow overflow-auto">
+            <ul className="shrink grow overflow-auto" id="graphsList">
+              {selectedValue && (
+                <SelectItem value={selectedValue}>
+                  {selectedValue}
+                </SelectItem>
+              )}
               {
-                options.map((option) => (
+                filteredOptions.slice(0, maxOptions).filter((option) => selectedValue !== option).map((option) => (
                   <SelectItem
                     value={!option ? '""' : option}
                     key={`key-${option}`}
@@ -98,6 +124,23 @@ export default function Combobox({ isSelectGraph = false, disabled = false, inTa
                   </SelectItem>
                 ))
               }
+              <div className={cn("flex justify-center gap-2 pl-8 py-2", maxOptions <= 5 && "justify-start")}>
+                {
+                  filteredOptions.length > maxOptions && (
+                    <Button onClick={() => setMaxOptions(maxOptions + STEP)}>
+                      Show more...
+                    </Button>
+                  )
+                }
+                {
+                  maxOptions > STEP && (
+                    <Button onClick={() => setMaxOptions(maxOptions - STEP)}>
+                      Show fewer...
+                    </Button>
+                  )
+                }
+              </div>
+              <p className="text-center text-sm">({maxOptions > filteredOptions.length ? filteredOptions.length : maxOptions}/{filteredOptions.length} results)</p>
             </ul>
           </SelectGroup>
           {
@@ -107,7 +150,7 @@ export default function Combobox({ isSelectGraph = false, disabled = false, inTa
               <DialogTrigger asChild>
                 <Button
                   onClick={() => setOpen(false)}
-                  className="w-full p-2"
+                  className="w-full p-2 justify-center"
                   label="Manage Graphs"
                   title="Organize and edit your graphs"
                 />
@@ -121,6 +164,9 @@ export default function Combobox({ isSelectGraph = false, disabled = false, inTa
           <DialogTitle className="text-2xl font-medium">Manage Graphs</DialogTitle>
           <CloseDialog />
         </DialogHeader>
+        <VisuallyHidden>
+          <DialogDescription />
+        </VisuallyHidden>
         <TableComponent
           className="grow overflow-hidden"
           headers={["Name"]}

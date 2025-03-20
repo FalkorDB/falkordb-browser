@@ -29,11 +29,14 @@ export default class SettingsUsersPage extends BasePage {
     }
     
     private get userSelectRoleBtn(): (selectedUser: string) => Locator {
-        return (selectedUser: string) => this.page.locator(`//tbody/tr[@data-id='${selectedUser}']/td[3]/button`)
+        return (selectedUser: string) => this.page.locator(`//tbody/tr[@data-id='${selectedUser}']/td[3]//button`).first();
     }
 
     private get selectUserRole(): (role: string) => Locator {
         return (role: string) => this.page.locator(`//ul//div[@role='option'][span[contains(text(), '${role}')]]`)
+    }
+    private get confirmModifyingUserRole(): Locator {
+        return this.page.locator("//button[text()='Set User']");
     }
 
     private get userNameField(): Locator {
@@ -118,6 +121,7 @@ export default class SettingsUsersPage extends BasePage {
         await this.userSelectRoleEditBtn(selectedUser).click();
         await this.userSelectRoleBtn(selectedUser).click();
         await this.selectUserRole(role).click();
+        await this.clickOnConfirmModifyingUserRole();
         await waitForTimeOut(this.page, 1500)
     }
 
@@ -147,5 +151,9 @@ export default class SettingsUsersPage extends BasePage {
         await this.page.waitForTimeout(1000);
         const count = await this.tableRoles.count();
         return count;
+    }
+
+    async clickOnConfirmModifyingUserRole():  Promise<void>{
+        await this.confirmModifyingUserRole.click();
     }
 }

@@ -17,9 +17,10 @@ import CreateGraph from "./CreateGraph";
 
 interface Props {
     onSetGraphName?: Dispatch<SetStateAction<string>>
+    graphNames?: string[]
 }
 
-export default function Header({ onSetGraphName }: Props) {
+export default function Header({ onSetGraphName, graphNames }: Props) {
     const router = useRouter()
     const pathname = usePathname()
     const type = pathname.includes("/schema") ? "Schema" : "Graph"
@@ -82,7 +83,7 @@ export default function Header({ onSetGraphName }: Props) {
                                                 </a>
                                             </li>
                                             <li>
-                                                <a href="https://www.falkordb.com/contact-us/" target="_blank" rel="noreferrer">
+                                                <a href="https://discord.com/invite/jyUgBweNQz" target="_blank" rel="noreferrer">
                                                     Support
                                                 </a>
                                             </li>
@@ -103,6 +104,7 @@ export default function Header({ onSetGraphName }: Props) {
                                     <CreateGraph
                                         onSetGraphName={onSetGraphName!}
                                         type={type}
+                                        graphNames={graphNames!}
                                     />
                                 }
                                 <Button
