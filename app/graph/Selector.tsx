@@ -26,7 +26,6 @@ interface Props {
     setGraphName: (selectedGraphName: string) => void
     graphName: string
     runQuery?: (query: string) => Promise<Query | undefined>
-    queries?: Query[]
     historyQuery?: HistoryQuery
     setHistoryQuery?: Dispatch<SetStateAction<HistoryQuery>>
     edgesCount: number
@@ -36,7 +35,7 @@ interface Props {
     data: Session | null
 }
 
-export default function Selector({ setGraphName, graphName, queries, runQuery, edgesCount, nodesCount, setGraph, graph, data: session, historyQuery, setHistoryQuery }: Props) {
+export default function Selector({ setGraphName, graphName, runQuery, edgesCount, nodesCount, setGraph, graph, data: session, historyQuery, setHistoryQuery }: Props) {
 
     const [options, setOptions] = useState<string[]>([]);
     const [schema, setSchema] = useState<Graph>(Graph.empty());
@@ -50,19 +49,37 @@ export default function Selector({ setGraphName, graphName, queries, runQuery, e
     const type = pathname.includes("/schema") ? "Schema" : "Graph"
     const [isRotating, setIsRotating] = useState(false);
     const { toast } = useToast()
-    const [filteredQueries, setFilteredQueries] = useState<Query[]>(queries || [])
+    const [filteredQueries, setFilteredQueries] = useState<Query[]>(historyQuery?.queries || [])
+
+
+    const focusEditorAtEnd = () => {
+        if (editorRef.current) {
+            editorRef.current.focus();
+
+            const model = editorRef.current.getModel();
+            if (model) {
+                const lastLine = model.getLineCount();
+                const lastColumn = model.getLineMaxColumn(lastLine);
+
+                editorRef.current.setPosition({ lineNumber: lastLine, column: lastColumn });
+
+                editorRef.current.revealPositionInCenter({ lineNumber: lastLine, column: lastColumn });
+            }
+        }
+    };
 
     useEffect(() => {
-
         const timeout = setTimeout(() => {
             if (!historyQuery) return
-            setFilteredQueries(queries?.filter((query, i) => !search || query.text.toLowerCase().includes(search.toLowerCase()) || i === historyQuery.counter - 1) || [])
+            setFilteredQueries(historyQuery.queries?.filter((query, i) => !search || query.text.toLowerCase().includes(search.toLowerCase()) || i === historyQuery.counter - 1) || [])
+            focusEditorAtEnd()
         }, 500)
+        
 
         return () => {
             clearTimeout(timeout)
         }
-    }, [queries, search, historyQuery?.counter, historyQuery])
+    }, [historyQuery?.queries, search, historyQuery?.counter, historyQuery])
     const submitQuery = useRef<HTMLButtonElement>(null)
 
     useEffect(() => {
@@ -235,11 +252,18 @@ export default function Selector({ setGraphName, graphName, queries, runQuery, e
                         <DialogComponent
                             className="h-[90dvh] w-[90dvw]"
                             open={queriesOpen}
-                            onOpenChange={setQueriesOpen}
+                            onOpenChange={(open) => {
+                                setQueriesOpen(open)
+                                if (open) {
+                                    setTimeout(() => {
+                                        focusEditorAtEnd()
+                                    }, 100)
+                                }
+                            }}
                             trigger={
                                 <Button
-                                    disabled={!queries || queries.length === 0}
-                                    title={!queries || queries.length === 0 ? "No queries" : "View past queries"}
+                                    disabled={!historyQuery || historyQuery.queries.length === 0}
+                                    title={!historyQuery || historyQuery.queries.length === 0 ? "No queries" : "View past queries"}
                                     label="Query History"
                                 />
                             }
@@ -259,8 +283,8 @@ export default function Selector({ setGraphName, graphName, queries, runQuery, e
                                         </div>
                                         <ul className="flex flex-col-reverse">
                                             {
-                                                setHistoryQuery && historyQuery && queries && filteredQueries && filteredQueries.map((query, index) => {
-                                                    const currentIndex = queries.findIndex(q => q.text === query.text)
+                                                setHistoryQuery && historyQuery && filteredQueries.length > 0 && filteredQueries.map((query, index) => {
+                                                    const currentIndex = historyQuery.queries.findIndex(q => q.text === query.text)
                                                     return (
                                                         // eslint-disable-next-line react/no-array-index-key
                                                         <li key={index} className="flex flex-col gap-2 w-full border-b py-3 px-12">
@@ -309,18 +333,18 @@ export default function Selector({ setGraphName, graphName, queries, runQuery, e
                                         </ul>
                                     </div>
                                     <div className="w-1 grow">
-                                        {historyQuery && queries?.[historyQuery.counter - 1] && <MetadataView query={queries[historyQuery.counter - 1]} graphName={selectedValue} />}
+                                        {historyQuery && historyQuery.queries.length > 0 && historyQuery.counter && <MetadataView query={historyQuery.queries[historyQuery.counter - 1]} graphName={selectedValue} />}
                                     </div>
                                 </div>
                                 <div className="flex justify-end">
                                     <Button
                                         ref={submitQuery}
                                         className="text-white flex justify-center w-1/3"
-                                        disabled={isLoading || !historyQuery!.counter}
+                                        disabled={isLoading || !historyQuery?.counter}
                                         onClick={async () => {
                                             try {
                                                 setIsLoading(true);
-                                                const q = await runQuery(queries?.[historyQuery!.counter!]?.text || "")
+                                                const q = await runQuery(historyQuery?.query || "")
                                                 if (q) {
                                                     setQueriesOpen(false)
                                                 }
@@ -355,7 +379,6 @@ export default function Selector({ setGraphName, graphName, queries, runQuery, e
 
 Selector.defaultProps = {
     runQuery: undefined,
-    queries: [],
     historyQuery: {
         queries: [],
         counter: 0,

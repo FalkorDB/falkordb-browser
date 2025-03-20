@@ -4,13 +4,14 @@
 
 "use client"
 
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { cn, prepareArg, Row, securedFetch } from "@/lib/utils"
 import { useEffect, useState } from "react"
 import { Select, SelectContent, SelectGroup, SelectItem, SelectSeparator, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useToast } from "@/components/ui/use-toast"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { useSession } from "next-auth/react"
+import { VisuallyHidden } from "@radix-ui/react-visually-hidden"
 import Button from "./Button"
 import TableComponent from "../TableComponent"
 import CloseDialog from "../CloseDialog"
@@ -101,10 +102,10 @@ export default function Combobox({ isSelectGraph = false, disabled = false, inTa
         </Tooltip>
         <SelectContent className="min-w-52 max-h-[40lvh] bg-foreground">
           <div className="p-4" id="graphSearch">
-          <Input ref={ref => ref?.focus()} className="w-full" placeholder={`Search a graph ${type}`} onChange={(e) => {
-            setSearch(e.target.value)
-            setMaxOptions(5)
-          }} value={search} />
+            <Input ref={ref => ref?.focus()} className="w-full" placeholder={`Search a graph ${type}`} onChange={(e) => {
+              setSearch(e.target.value)
+              setMaxOptions(5)
+            }} value={search} />
           </div>
           <SelectGroup>
             <ul className="shrink grow overflow-auto" id="graphsList">
@@ -124,20 +125,20 @@ export default function Combobox({ isSelectGraph = false, disabled = false, inTa
                 ))
               }
               <div className={cn("flex justify-center gap-2 pl-8 py-2", maxOptions <= 5 && "justify-start")}>
-              {
-                filteredOptions.length > maxOptions && (
-                  <Button onClick={() => setMaxOptions(maxOptions + STEP)}>
-                    Show more...
-                  </Button>
-                )
-              }
-              {
-                maxOptions > STEP && (
-                  <Button onClick={() => setMaxOptions(maxOptions - STEP)}>
-                    Show fewer...
-                  </Button>
-                )
-              }
+                {
+                  filteredOptions.length > maxOptions && (
+                    <Button onClick={() => setMaxOptions(maxOptions + STEP)}>
+                      Show more...
+                    </Button>
+                  )
+                }
+                {
+                  maxOptions > STEP && (
+                    <Button onClick={() => setMaxOptions(maxOptions - STEP)}>
+                      Show fewer...
+                    </Button>
+                  )
+                }
               </div>
               <p className="text-center text-sm">({maxOptions > filteredOptions.length ? filteredOptions.length : maxOptions}/{filteredOptions.length} results)</p>
             </ul>
@@ -163,6 +164,9 @@ export default function Combobox({ isSelectGraph = false, disabled = false, inTa
           <DialogTitle className="text-2xl font-medium">Manage Graphs</DialogTitle>
           <CloseDialog />
         </DialogHeader>
+        <VisuallyHidden>
+          <DialogDescription />
+        </VisuallyHidden>
         <TableComponent
           className="grow overflow-hidden"
           headers={["Name"]}

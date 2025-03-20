@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState } from "react";
-import { HistoryQuery, prepareArg, securedFetch } from "@/lib/utils";
+import { HistoryQuery, prepareArg, Query, securedFetch } from "@/lib/utils";
 import { useSession } from "next-auth/react";
 import { useToast } from "@/components/ui/use-toast";
 import dynamic from "next/dynamic";
@@ -25,6 +25,7 @@ export default function Page() {
         currentQuery: "",
         counter: 0
     })
+    const [currentQuery, setCurrentQuery] = useState<Query | undefined>(undefined)
     const { data: session } = useSession()
     const { toast } = useToast()
 
@@ -60,6 +61,7 @@ export default function Page() {
         if (graphName !== graph.Id) {
             const colors = JSON.parse(localStorage.getItem(graphName) || "[]")
             setGraph(Graph.empty(graphName, colors))
+            setCurrentQuery(undefined)
         }
         fetchCount()
     }, [fetchCount, graph.Id, graphName])
@@ -83,7 +85,7 @@ export default function Page() {
         const json = await result.json()
         fetchCount()
         setSelectedElement(undefined)
-        
+
         return json.result
     }
 
@@ -117,7 +119,6 @@ export default function Page() {
             <Header onSetGraphName={setGraphName} />
             <div className="h-1 grow p-8 px-10 flex flex-col gap-4">
                 <Selector
-                    queries={historyQuery.queries}
                     setGraphName={setGraphName}
                     graphName={graphName}
                     runQuery={runQuery}
@@ -131,6 +132,8 @@ export default function Page() {
                 />
                 <GraphView
                     graph={graph}
+                    currentQuery={currentQuery}
+                    setCurrentQuery={setCurrentQuery}
                     selectedElement={selectedElement}
                     setSelectedElement={setSelectedElement}
                     runQuery={runQuery}
