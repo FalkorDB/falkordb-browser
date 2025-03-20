@@ -94,11 +94,6 @@ export const DEFAULT_COLORS = [
     "hsl(180, 66%, 70%)"
 ]
 
-export interface Query {
-    text: string
-    metadata: string[]
-}
-
 export interface Category {
     index: number,
     name: string,

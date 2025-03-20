@@ -86,6 +86,10 @@ export default class GraphPage extends BasePage {
         return (graph: string) => this.page.locator(`//ul[@id='graphsList']/div[descendant::text()[contains(., '${graph}')]]`);
     }
 
+    private get graphSelectSearchInput(): Locator {
+        return this.page.locator(`//div[@id='graphSearch']//input`);
+    }
+
     private get canvasElementSearchInput(): Locator {
         return this.page.locator("//div[@id='elementCanvasSearch']//input");
     }
@@ -261,6 +265,7 @@ export default class GraphPage extends BasePage {
     }
 
     async selectGraphFromList(graph: string): Promise<void> {
+        await this.graphSelectSearchInput.fill(graph);
         const graphLocator = this.selectGraphList(graph);
         const isVisible = await waitForElementToBeVisible(graphLocator);
         if (!isVisible) throw new Error("select Graph From List button is not visible!");
@@ -376,6 +381,7 @@ export default class GraphPage extends BasePage {
     }
 
     async getQueryHistory(query: string): Promise<boolean> {
+        await this.page.waitForTimeout(500);
         const isVisible = await this.queryInHistory(query).isVisible();
         return isVisible;
     }
@@ -401,9 +407,11 @@ export default class GraphPage extends BasePage {
         await this.clickOnQueryHistory();
         await this.ClickOnSelectQueryInHistoryBtn(queryNumber);
         await this.clickOnRunBtnInQueryHistory();
+        await this.waitForCanvasAnimationToEnd();
     }
 
     async getQueryHistoryEditor(): Promise<string | null> {
+        await this.page.waitForTimeout(500);
         return await this.queryHistoryTextarea.inputValue();
     }
 
@@ -413,19 +421,16 @@ export default class GraphPage extends BasePage {
         if (!rawText || rawText.length === 0) {
             return [];
         }
-    
-        // Ensure we are working with the first entry (UI returns as a single string)
         const formattedText = rawText[0]
-            .replace(/Query internal execution time:.*/, '') // Remove execution time
-            .replace(/([a-z]+: \d+)/gi, '$1\n') // Add a newline after each key-value pair
-            .split('\n') // Split into an array
-            .map(line => line.trim()) // Remove extra spaces
-            .filter(line => line.length > 0); // Remove empty lines
+            .replace(/Query internal execution time:.*/, '')
+            .replace(/([a-z]+: \d+)/gi, '$1\n')
+            .split('\n')
+            .map(line => line.trim())
+            .filter(line => line.length > 0);
     
         return formattedText;
     }
     
-
     /* End of QUERY History*/
 
     async changeNodePosition(x: number, y: number): Promise<void> {

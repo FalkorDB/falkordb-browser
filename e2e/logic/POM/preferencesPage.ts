@@ -52,6 +52,10 @@ export default class PreferencesPage extends BasePage {
         return (graph: string) => this.page.locator(`//ul[@id='graphsList']/div[descendant::text()[contains(., '${graph}')]]`);
     }
 
+    private get graphSelectSearchInput(): Locator {
+        return this.page.locator(`//div[@id='graphSearch']//input`);
+    }
+
     async clickOnPreferencesBtn(): Promise<void>{
         const isVisible = await waitForElementToBeVisible(this.openPreferencesViewBtn);
         if (!isVisible) throw new Error("preferences button is not visible!");
@@ -161,6 +165,7 @@ export default class PreferencesPage extends BasePage {
     }
 
     async selectGraphFromList(graph: string): Promise<void> {
+        await this.graphSelectSearchInput.fill(graph);
         const graphLocator = this.selectGraphList(graph);
         const isVisible = await waitForElementToBeVisible(graphLocator);
         if (!isVisible) throw new Error("select Graph From List button is not visible!");

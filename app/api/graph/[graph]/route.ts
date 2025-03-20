@@ -119,11 +119,12 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     const { client, user } = session
 
     const { graph: graphId } = await params
-    const query = request.nextUrl.searchParams.get("query")
-    const create = request.nextUrl.searchParams.get("create")
-    const { role } = user
 
     try {
+
+        const query = request.nextUrl.searchParams.get("query")
+        const create = request.nextUrl.searchParams.get("create")
+        const { role } = user
 
         if (!query) throw new Error("Missing parameter query")
 
