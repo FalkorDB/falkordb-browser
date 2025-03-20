@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState, useCallback, Dispatch, SetStateAction } from "react";
+import { useEffect, useRef, useState, Dispatch, SetStateAction } from "react";
 import { DialogTitle } from "@/components/ui/dialog";
 import { Editor } from "@monaco-editor/react";
 import { editor } from "monaco-editor";
@@ -33,11 +33,12 @@ interface Props {
     setGraph: (graph: Graph) => void
     graph: Graph
     data: Session | null
+    options: string[]
+    setOptions: Dispatch<SetStateAction<string[]>>
 }
 
-export default function Selector({ setGraphName, graphName, runQuery, edgesCount, nodesCount, setGraph, graph, data: session, historyQuery, setHistoryQuery }: Props) {
+export default function Selector({ setGraphName, graphName, runQuery, edgesCount, nodesCount, setGraph, graph, data: session, historyQuery, setHistoryQuery, options, setOptions }: Props) {
 
-    const [options, setOptions] = useState<string[]>([]);
     const [schema, setSchema] = useState<Graph>(Graph.empty());
     const [search, setSearch] = useState<string>("")
     const [selectedValue, setSelectedValue] = useState<string>("");
@@ -74,7 +75,7 @@ export default function Selector({ setGraphName, graphName, runQuery, edgesCount
             setFilteredQueries(historyQuery.queries?.filter((query, i) => !search || query.text.toLowerCase().includes(search.toLowerCase()) || i === historyQuery.counter - 1) || [])
             focusEditorAtEnd()
         }, 500)
-        
+
 
         return () => {
             clearTimeout(timeout)
@@ -86,7 +87,25 @@ export default function Selector({ setGraphName, graphName, runQuery, edgesCount
         setSelectedValue(graphName)
     }, [graphName])
 
-    const getOptions = useCallback(async () => {
+    const handleOnChange = async (name: string) => {
+        const formattedName = name === '""' ? "" : name
+        if (runQuery) {
+            const result = await securedFetch(`api/graph/${prepareArg(name)}_schema/?query=${prepareArg(defaultQuery())}&create=false`, {
+                method: "GET"
+            }, toast)
+
+            if (!result.ok) return
+
+            const json = await result.json()
+            if (json.result) {
+                setSchema(Graph.create(name, json.result, false, true))
+            }
+        }
+        setGraphName(formattedName)
+        setSelectedValue(name)
+    }
+
+    const getOptions = async () => {
         const result = await securedFetch("api/graph", {
             method: "GET"
         }, toast)
@@ -101,16 +120,12 @@ export default function Selector({ setGraphName, graphName, runQuery, edgesCount
                 return split
             }) : res.filter(name => !name.endsWith("_schema"))
         setOptions(opts)
-        if (opts.length === 1 && setSelectedValue) setSelectedValue(opts[0])
-    }, [runQuery, toast])
+        if (opts.length === 1) handleOnChange(opts[0])
+    }
 
     useEffect(() => {
         getOptions()
-    }, [getOptions])
-
-    useEffect(() => {
-        getOptions()
-    }, [getOptions])
+    }, [])
 
     const handleEditorDidMount = (e: editor.IStandaloneCodeEditor) => {
         editorRef.current = e
@@ -138,24 +153,6 @@ export default function Selector({ setGraphName, graphName, runQuery, edgesCount
         });
     }
 
-    const handleOnChange = async (name: string) => {
-        const formattedName = name === '""' ? "" : name
-        if (runQuery) {
-            const result = await securedFetch(`api/graph/${prepareArg(name)}_schema/?query=${prepareArg(defaultQuery())}&create=false`, {
-                method: "GET"
-            }, toast)
-
-            if (!result.ok) return
-
-            const json = await result.json()
-            if (json.result) {
-                setSchema(Graph.create(name, json.result, false, true))
-            }
-        }
-        setGraphName(formattedName)
-        setSelectedValue(name)
-    }
-
     const handleReloadClick = () => {
         setIsRotating(true);
         getOptions();
@@ -171,6 +168,7 @@ export default function Selector({ setGraphName, graphName, runQuery, edgesCount
                         <>
                             <CreateGraph
                                 type={type}
+                                graphNames={options}
                                 onSetGraphName={(name) => {
                                     handleOnChange(name)
                                     setOptions(prev => [...prev, name])

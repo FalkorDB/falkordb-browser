@@ -19,6 +19,7 @@ export default function Page() {
     const [graphName, setGraphName] = useState<string>("")
     const [graph, setGraph] = useState<Graph>(Graph.empty())
     const [selectedElement, setSelectedElement] = useState<Node | Link>();
+    const [graphNames, setGraphNames] = useState<string[]>([])
     const [historyQuery, setHistoryQuery] = useState<HistoryQuery>({
         queries: [],
         query: "",
@@ -116,11 +117,13 @@ export default function Page() {
 
     return (
         <div className="Page">
-            <Header onSetGraphName={setGraphName} />
+            <Header onSetGraphName={setGraphName} graphNames={graphNames} />
             <div className="h-1 grow p-8 px-10 flex flex-col gap-4">
                 <Selector
                     setGraphName={setGraphName}
                     graphName={graphName}
+                    options={graphNames}
+                    setOptions={setGraphNames}
                     runQuery={runQuery}
                     edgesCount={edgesCount}
                     nodesCount={nodesCount}
@@ -141,7 +144,7 @@ export default function Page() {
                     historyQuery={historyQuery}
                     setHistoryQuery={setHistoryQuery}
                 />
-                <Tutorial onSetGraphName={setGraphName} />
+                <Tutorial onSetGraphName={setGraphName} graphNames={graphNames} />
             </div>
         </div >
     )
