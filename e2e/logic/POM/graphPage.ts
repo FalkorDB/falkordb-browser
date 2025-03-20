@@ -411,6 +411,7 @@ export default class GraphPage extends BasePage {
     }
 
     async getQueryHistoryEditor(): Promise<string | null> {
+        await this.page.waitForTimeout(500);
         return await this.queryHistoryTextarea.inputValue();
     }
 
@@ -420,19 +421,16 @@ export default class GraphPage extends BasePage {
         if (!rawText || rawText.length === 0) {
             return [];
         }
-    
-        // Ensure we are working with the first entry (UI returns as a single string)
         const formattedText = rawText[0]
-            .replace(/Query internal execution time:.*/, '') // Remove execution time
-            .replace(/([a-z]+: \d+)/gi, '$1\n') // Add a newline after each key-value pair
-            .split('\n') // Split into an array
-            .map(line => line.trim()) // Remove extra spaces
-            .filter(line => line.length > 0); // Remove empty lines
+            .replace(/Query internal execution time:.*/, '')
+            .replace(/([a-z]+: \d+)/gi, '$1\n')
+            .split('\n')
+            .map(line => line.trim())
+            .filter(line => line.length > 0);
     
         return formattedText;
     }
     
-
     /* End of QUERY History*/
 
     async changeNodePosition(x: number, y: number): Promise<void> {
