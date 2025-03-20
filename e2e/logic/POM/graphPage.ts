@@ -381,6 +381,7 @@ export default class GraphPage extends BasePage {
     }
 
     async getQueryHistory(query: string): Promise<boolean> {
+        await this.page.waitForTimeout(500);
         const isVisible = await this.queryInHistory(query).isVisible();
         return isVisible;
     }
