@@ -77,7 +77,7 @@ test.describe('Graph Tests', () => {
         await browser.setPageToFullScreen();
         const graphName = `graph_${Date.now()}`;
         await graph.addGraph(graphName);
-        await graph.insertQuery(FETCH_FIRST_TEN_NODES);
+        await graph.insertQuery(BATCH_CREATE_PERSONS);
         await graph.clickRunQuery(false);
         await graph.clickOnQueryHistory();
         expect(await graph.getQueryHistory("1")).toBe(true);
@@ -91,9 +91,7 @@ test.describe('Graph Tests', () => {
         await graph.addGraph(graphName);
         await graph.insertQuery(BATCH_CREATE_PERSONS);
         await graph.clickRunQuery(false);
-        await graph.refreshPage();
-        await graph.selectExistingGraph(graphName)
-        await graph.runAQueryFromHistory("1")
+        await graph.runAQueryFromHistory("1");
         const searchQuery = `Person 1`;
         await graph.searchForElementInCanvas(searchQuery);
         await graph.hoverAtCanvasCenter();
