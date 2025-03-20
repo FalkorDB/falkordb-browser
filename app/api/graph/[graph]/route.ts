@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { getClient } from "@/app/api/auth/[...nextauth]/options";
 import { prepareArg, securedFetch } from "@/lib/utils";
 
-// eslint-disable-next-line import/prefer-default-export
 export async function DELETE(request: NextRequest, { params }: { params: Promise<{ graph: string }> }) {
 
     const session = await getClient()
@@ -29,7 +28,6 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
     }
 }
 
-// eslint-disable-next-line import/prefer-default-export
 export async function POST(request: NextRequest, { params }: { params: Promise<{ graph: string }> }) {
 
     const session = await getClient()
@@ -85,7 +83,6 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     }
 }
 
-// eslint-disable-next-line import/prefer-default-export
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ graph: string }> }) {
 
     const session = await getClient()

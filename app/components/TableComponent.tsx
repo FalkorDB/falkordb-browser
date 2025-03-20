@@ -183,8 +183,7 @@ export default function TableComponent({ headers, rows, children, setRows, optio
                                                         }}
                                                         data={cell.value}
                                                     />
-                                                    : cell.value &&
-                                                        editable === `${i}-${j}` ?
+                                                      : editable === `${i}-${j}` ?
                                                         <div className="w-full flex gap-2 items-center">
                                                             {
                                                                 cell.type === "combobox" ?
