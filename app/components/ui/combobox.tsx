@@ -5,40 +5,53 @@
 "use client"
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { cn, prepareArg, securedFetch } from "@/lib/utils"
+import { cn, prepareArg, Row, securedFetch } from "@/lib/utils"
 import { useEffect, useState } from "react"
 import { Select, SelectContent, SelectGroup, SelectItem, SelectSeparator, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useToast } from "@/components/ui/use-toast"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { useSession } from "next-auth/react"
 import Button from "./Button"
-import TableComponent, { Row } from "../TableComponent"
+import TableComponent from "../TableComponent"
 import CloseDialog from "../CloseDialog"
 import ExportGraph from "../ExportGraph"
-import DialogComponent from "../DialogComponent"
+import DeleteGraph from "../graph/DeleteGraph"
+import Input from "./Input"
 
 interface ComboboxProps {
+  options: string[],
+  selectedValue: string,
+  setSelectedValue: (value: string) => void,
+  type?: "Graph" | "Schema",
   isSelectGraph?: boolean,
   disabled?: boolean,
   inTable?: boolean,
-  type?: string | undefined,
-  options: string[],
+  label?: string,
   setOptions?: (value: string[]) => void,
-  selectedValue?: string,
-  setSelectedValue?: (value: string) => void,
-  isSchema?: boolean
-  defaultOpen?: boolean
+  defaultOpen?: boolean,
   onOpenChange?: (open: boolean) => void
 }
 
-export default function Combobox({ isSelectGraph = false, disabled = false, inTable, type, options, setOptions, selectedValue = "", setSelectedValue, isSchema = false, defaultOpen = false, onOpenChange }: ComboboxProps) {
+const STEP = 4
+
+export default function Combobox({ isSelectGraph = false, disabled = false, inTable, type = "Graph", label, options, setOptions, selectedValue, setSelectedValue, defaultOpen = false, onOpenChange }: ComboboxProps) {
 
   const [openMenage, setOpenMenage] = useState<boolean>(false)
   const [open, setOpen] = useState<boolean>(defaultOpen)
   const [rows, setRows] = useState<Row[]>([])
-  const [openDelete, setOpenDelete] = useState<boolean>(false)
+  const [search, setSearch] = useState<string>("")
+  const [filteredOptions, setFilteredOptions] = useState<string[]>([])
+  const [maxOptions, setMaxOptions] = useState<number>(STEP)
   const { toast } = useToast()
   const { data: session } = useSession()
+
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      setFilteredOptions(!search ? options : options.filter((option) => option.toLowerCase().includes(search.toLowerCase())))
+    }, 500)
+
+    return () => clearTimeout(timeout)
+  }, [options, search])
 
   const handleSetOption = async (option: string, optionName: string) => {
     const result = await securedFetch(`api/graph/${prepareArg(option)}/?sourceName=${prepareArg(optionName)}`, {
@@ -47,7 +60,7 @@ export default function Combobox({ isSelectGraph = false, disabled = false, inTa
         "Content-Type": "application/json"
       },
       body: JSON.stringify({ name: optionName })
-    }, session?.user?.role, toast)
+    }, toast)
 
     if (result.ok) {
 
@@ -67,36 +80,8 @@ export default function Combobox({ isSelectGraph = false, disabled = false, inTa
   }
 
   useEffect(() => {
-    console.log(options)
     handleSetRows(options)
   }, [options])
-
-  const handleDelete = async (opts: string[]) => {
-    const names = opts.map(opt => isSchema ? `${opt}_schema` : opt)
-
-    const newNames = await Promise.all(names.map(async (name) => {
-      const result = await securedFetch(`api/graph/${prepareArg(name)}`, {
-        method: "DELETE"
-      }, session?.user?.role, toast)
-
-      if (result.ok) return name
-
-      return ""
-
-    })).then(graphNames => options.filter(opt => !graphNames.filter(name => name !== "").includes(opt)))
-
-    setOptions!(newNames)
-
-    if (opts.includes(selectedValue) && setSelectedValue) setSelectedValue(newNames[newNames.length - 1])
-
-    setOpenDelete(false)
-    setOpenMenage(false)
-    handleSetRows(options.filter(opt => !opts.includes(opt)))
-    toast({
-      title: "Graph(s) deleted successfully",
-      description: `The graph(s) ${opts.join(", ")} have been deleted successfully`,
-    })
-  }
 
   return (
     <Dialog open={openMenage} onOpenChange={setOpenMenage}>
@@ -107,18 +92,29 @@ export default function Combobox({ isSelectGraph = false, disabled = false, inTa
         <Tooltip>
           <TooltipTrigger asChild>
             <SelectTrigger data-type="select" disabled={disabled || options.length === 0} className={cn("w-fit gap-2 border-none p-2", inTable ? "text-sm font-light" : "text-xl font-medium")}>
-              <SelectValue placeholder={`Select ${type || "Graph"}`} />
+              <SelectValue placeholder={`Select ${label || type || "Graph"}`} />
             </SelectTrigger>
           </TooltipTrigger>
           <TooltipContent>
-            {options.length === 0 ? "There is no graphs" : selectedValue || `Select ${type || "Graph"}`}
+            {options.length === 0 ? "There is no graphs" : selectedValue || `Select ${label || type || "Graph"}`}
           </TooltipContent>
         </Tooltip>
-        <SelectContent className="min-w-52 max-h-[30lvh] bg-foreground">
+        <SelectContent className="min-w-52 max-h-[40lvh] bg-foreground">
+          <div className="p-4">
+          <Input ref={ref => ref?.focus()} className="w-full" placeholder={`Search a graph ${type}`} onChange={(e) => {
+            setSearch(e.target.value)
+            setMaxOptions(5)
+          }} value={search} />
+          </div>
           <SelectGroup>
-            <ul className="shrink grow overflow-auto">
+            <ul className="shrink grow overflow-auto" id="graphsList">
+              {selectedValue && (
+                <SelectItem value={selectedValue}>
+                  {selectedValue}
+                </SelectItem>
+              )}
               {
-                options.map((option) => (
+                filteredOptions.slice(0, maxOptions).filter((option) => selectedValue !== option).map((option) => (
                   <SelectItem
                     value={!option ? '""' : option}
                     key={`key-${option}`}
@@ -127,6 +123,23 @@ export default function Combobox({ isSelectGraph = false, disabled = false, inTa
                   </SelectItem>
                 ))
               }
+              <div className={cn("flex justify-center gap-2 pl-8 py-2", maxOptions <= 5 && "justify-start")}>
+              {
+                filteredOptions.length > maxOptions && (
+                  <Button onClick={() => setMaxOptions(maxOptions + STEP)}>
+                    Show more...
+                  </Button>
+                )
+              }
+              {
+                maxOptions > STEP && (
+                  <Button onClick={() => setMaxOptions(maxOptions - STEP)}>
+                    Show fewer...
+                  </Button>
+                )
+              }
+              </div>
+              <p className="text-center text-sm">({maxOptions > filteredOptions.length ? filteredOptions.length : maxOptions}/{filteredOptions.length} results)</p>
             </ul>
           </SelectGroup>
           {
@@ -136,8 +149,9 @@ export default function Combobox({ isSelectGraph = false, disabled = false, inTa
               <DialogTrigger asChild>
                 <Button
                   onClick={() => setOpen(false)}
-                  className="w-full p-2"
+                  className="w-full p-2 justify-center"
                   label="Manage Graphs"
+                  title="Organize and edit your graphs"
                 />
               </DialogTrigger>
             </>
@@ -155,32 +169,31 @@ export default function Combobox({ isSelectGraph = false, disabled = false, inTa
           rows={rows}
           setRows={setRows}
         >
-          <DialogComponent
-            className="max-w-[90dvw]"
-            open={openDelete}
-            onOpenChange={setOpenDelete}
-            title="Delete Graph"
-            trigger={<Button
-              variant="Primary"
-              disabled={rows.filter(opt => opt.checked).length === 0}
-              label="Delete"
-            />}
-            description={`Are you sure you want to delete the selected graph(s)? (${rows.filter(opt => opt.checked).map(opt => opt.cells[0].value as string).join(", ")})`}
-          >
-            <div className="flex justify-end gap-2">
-              <Button
+          {
+            session?.user?.role !== "Read-Only" &&
+            <DeleteGraph
+              type={type!}
+              options={options}
+              rows={rows}
+              handleSetRows={handleSetRows}
+              setOpenMenage={setOpenMenage}
+              setOptions={setOptions!}
+              selectedValue={selectedValue}
+              setSelectedValue={setSelectedValue}
+              trigger={<Button
                 variant="Primary"
-                label="Delete Graph"
-                onClick={() => handleDelete(rows.filter(opt => opt.checked).map(opt => opt.cells[0].value as string))}
-              />
-              <CloseDialog label="Cancel" />
-            </div>
-          </DialogComponent>
+                disabled={rows.filter(opt => opt.checked).length === 0}
+                label="Delete"
+                title="Confirm the deletion of the selected graph(s)"
+              />}
+            />
+          }
           <ExportGraph
             trigger={
               <Button
                 variant="Primary"
                 label="Export Data"
+                title="Export graph data to a .dump file"
                 disabled={rows.filter(opt => opt.checked).length === 0}
               />
             }

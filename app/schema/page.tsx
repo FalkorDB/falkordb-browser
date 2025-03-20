@@ -27,24 +27,24 @@ export default function Page() {
 
         const nodes = await (await securedFetch(`api/graph/${prepareArg(name)}/?query=${q1}`, {
             method: "GET"
-        }, session?.user?.role, toast)).json()
+        }, toast)).json()
 
         const edges = await (await securedFetch(`api/graph/${prepareArg(name)}/?query=${q2}`, {
             method: "GET"
-        }, session?.user?.role, toast)).json()
+        }, toast)).json()
 
         if (!edges || !nodes) return
 
         setEdgesCount(edges.result?.data[0].edges)
         setNodesCount(nodes.result?.data[0].nodes)
-    }, [schemaName, session?.user?.role, toast])
+    }, [schemaName, toast])
 
     useEffect(() => {
         if (!schemaName) return
         const run = async () => {
             const result = await securedFetch(`/api/graph/${prepareArg(schemaName)}_schema/?query=${prepareArg(defaultQuery())}`, {
                 method: "GET"
-            }, session?.user?.role, toast)
+            }, toast)
             if (!result.ok) return
             const json = await result.json()
             const colors = localStorage.getItem(schemaName)?.split(/[[\]",]/).filter(c => c)
@@ -54,11 +54,11 @@ export default function Page() {
 
         }
         run()
-    }, [fetchCount, schemaName, session?.user?.role, toast])
+    }, [fetchCount, schemaName, toast])
 
     return (
         <div className="Page">
-            <Header onSetGraphName={setSchemaName}/>
+            <Header onSetGraphName={setSchemaName} />
             <div className="h-1 grow p-8 px-10 flex flex-col gap-8">
                 <Selector
                     setGraphName={setSchemaName}
@@ -69,7 +69,7 @@ export default function Page() {
                     setGraph={setSchema}
                     data={session}
                 />
-                <SchemaView schema={schema} fetchCount={fetchCount} session={session} />
+                <SchemaView schema={schema} fetchCount={fetchCount} />
             </div>
         </div>
     )

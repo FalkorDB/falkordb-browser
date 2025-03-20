@@ -7,9 +7,8 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogTrigger } 
 import { Editor, Monaco } from "@monaco-editor/react"
 import { useEffect, useRef, useState } from "react"
 import * as monaco from "monaco-editor";
-import { Loader2, Maximize2, Minimize2 } from "lucide-react";
+import { Maximize2, Minimize2 } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
-import { useSession } from "next-auth/react";
 import { prepareArg, securedFetch } from "@/lib/utils";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import { Graph } from "../api/graph/model";
@@ -218,7 +217,6 @@ export default function EditorComponent({ currentQuery, historyQueries, setHisto
         currentQuery,
         historyCounter: 0
     })
-    const { data: session } = useSession()
 
     useEffect(() => {
         if (currentQuery && placeholderRef.current) {
@@ -291,7 +289,7 @@ export default function EditorComponent({ currentQuery, historyQueries, setHisto
     const fetchSuggestions = async (q: string, detail: string): Promise<monaco.languages.CompletionItem[]> => {
         const result = await securedFetch(`api/graph/${graphIdRef.current}/?query=${prepareArg(q)}`, {
             method: 'GET',
-        }, session?.user.role, toast)
+        }, toast)
 
         if (!result) return []
 
@@ -571,7 +569,7 @@ export default function EditorComponent({ currentQuery, historyQueries, setHisto
                         <div
                             className="w-1 grow flex rounded-lg overflow-hidden"
                         >
-                            <div ref={containerRef} className="relative grow w-1">
+                            <div ref={containerRef} className="relative grow w-1" id="editor-container">
                                 <Editor
                                     // eslint-disable-next-line no-nested-ternary
                                     height={blur ? LINE_HEIGHT : lineNumber * LINE_HEIGHT > document.body.clientHeight / 100 * MAX_HEIGHT ? document.body.clientHeight / 100 * MAX_HEIGHT : lineNumber * LINE_HEIGHT}
@@ -600,16 +598,14 @@ export default function EditorComponent({ currentQuery, historyQueries, setHisto
                             </div>
                             <Button
                                 ref={submitQuery}
-                                disabled={isLoading}
                                 className="rounded-none py-2 px-8"
                                 variant="Primary"
-                                title={isLoading ? "Please wait..." : "Run (Ctrl + Enter)"}
-                                label={isLoading ? undefined : "Run"}
+                                title="Run (Ctrl + Enter)"
+                                label="Run"
                                 type="submit"
                                 onClick={handleSubmit}
-                            >
-                                {isLoading && <Loader2 size={20} className="animate-spin" />}
-                            </Button>
+                                isLoading={isLoading}
+                            />
                         </div>
                         <DialogContent disableClose className="w-full h-full">
                             <div className="relative w-full h-full">

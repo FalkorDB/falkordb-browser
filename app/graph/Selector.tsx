@@ -23,7 +23,7 @@ import ExportGraph from "../components/ExportGraph";
 interface Props {
     setGraphName: (selectedGraphName: string) => void
     graphName: string
-    runQuery?: (query: string, setQueriesOpen: (open: boolean) => void) => Promise<void>
+    runQuery?: (query: string) => Promise<void>
     queries?: Query[]
     edgesCount: number
     nodesCount: number
@@ -47,7 +47,7 @@ export default function Selector({ setGraphName, graphName, queries, runQuery, e
     const [isRotating, setIsRotating] = useState(false);
     const { toast } = useToast()
     const submitQuery = useRef<HTMLButtonElement>(null)
-    
+
     useEffect(() => {
         setSelectedValue(graphName)
     }, [graphName])
@@ -55,20 +55,20 @@ export default function Selector({ setGraphName, graphName, queries, runQuery, e
     const getOptions = useCallback(async () => {
         const result = await securedFetch("api/graph", {
             method: "GET"
-        }, session?.user?.role, toast)
+        }, toast)
         if (!result.ok) return
         const res = (await result.json()).result as string[]
-        const opts = !runQuery ? 
+        const opts = !runQuery ?
             res.filter(name => name.endsWith("_schema")).map(name => {
-            let split = name.split("_schema")[0]
-            if (split.startsWith("{") && split.endsWith("}")) {
-                split = split.substring(1, split.length - 1)
-            }
-            return split
-        }) : res.filter(name => !name.endsWith("_schema"))
+                let split = name.split("_schema")[0]
+                if (split.startsWith("{") && split.endsWith("}")) {
+                    split = split.substring(1, split.length - 1)
+                }
+                return split
+            }) : res.filter(name => !name.endsWith("_schema"))
         setOptions(opts)
         if (opts.length === 1 && setSelectedValue) setSelectedValue(opts[0])
-    }, [runQuery, session?.user?.role, toast])
+    }, [runQuery, toast])
 
     useEffect(() => {
         getOptions()
@@ -105,7 +105,7 @@ export default function Selector({ setGraphName, graphName, queries, runQuery, e
         if (runQuery) {
             const result = await securedFetch(`api/graph/${prepareArg(name)}_schema/?query=${prepareArg(defaultQuery())}&create=false`, {
                 method: "GET"
-            }, session?.user?.role, toast)
+            }, toast)
 
             if (!result.ok) return
 
@@ -127,23 +127,28 @@ export default function Selector({ setGraphName, graphName, queries, runQuery, e
     return (
         <div className="flex flex-col gap-4">
             <div className="flex justify-between items-center">
-                <div className="flex items-center gap-4">
-                    <CreateGraph
-                        type={type}
-                        onSetGraphName={(name) => {
-                            handleOnChange(name)
-                            setOptions(prev => [...prev, name])
-                        }}
-                        trigger={
-                            <Button
-                                variant="Primary"
-                                title={`Create New ${type}`}
-                            >
-                                <PlusCircle size={20} />
-                            </Button>
-                        }
-                    />
-                    <p className="text-secondary">|</p>
+                <div className="flex items-center gap-4" id="graphManager">
+                    {
+                        session?.user?.role !== "Read-Only" &&
+                        <>
+                            <CreateGraph
+                                type={type}
+                                onSetGraphName={(name) => {
+                                    handleOnChange(name)
+                                    setOptions(prev => [...prev, name])
+                                }}
+                                trigger={
+                                    <Button
+                                        variant="Primary"
+                                        title={`Create New ${type}`}
+                                    >
+                                        <PlusCircle size={20} />
+                                    </Button>
+                                }
+                            />
+                            <p className="text-secondary">|</p>
+                        </>
+                    }
                     <Button
                         className={cn(
                             "transition-transform",
@@ -157,11 +162,11 @@ export default function Selector({ setGraphName, graphName, queries, runQuery, e
                     <p className="text-secondary">|</p>
                     <Combobox
                         isSelectGraph
+                        type={type}
                         options={options}
                         setOptions={setOptions}
                         selectedValue={selectedValue}
                         setSelectedValue={handleOnChange}
-                        isSchema={!runQuery}
                     />
                 </div>
                 <div className="flex gap-16 text-[#e5e7eb]">
@@ -170,22 +175,27 @@ export default function Selector({ setGraphName, graphName, queries, runQuery, e
                             <Button
                                 label="Export Data"
                                 disabled={!selectedValue}
+                                title="Export your data to a file"
                             />
                         }
                         type={type}
                         selectedValues={[selectedValue]}
                     />
-                    <Duplicate
-                        disabled={!selectedValue}
-                        open={duplicateOpen}
-                        onOpenChange={setDuplicateOpen}
-                        onDuplicate={(name) => {
-                            setOptions(prev => [...prev, name])
-                            setSelectedValue(name)
-                            handleOnChange(name)
-                        }}
-                        selectedValue={selectedValue}
-                    />
+                    {
+                        session?.user?.role !== "Read-Only" &&
+                        <Duplicate
+                            disabled={!selectedValue}
+                            open={duplicateOpen}
+                            onOpenChange={setDuplicateOpen}
+                            onDuplicate={(name) => {
+                                setOptions(prev => [...prev, name])
+                                setSelectedValue(name)
+                                handleOnChange(name)
+                            }}
+                            type={type}
+                            selectedValue={selectedValue}
+                        />
+                    }
                     <View setGraph={setGraph} graph={graph} selectedValue={selectedValue} />
                 </div >
             </div >
@@ -208,13 +218,13 @@ export default function Selector({ setGraphName, graphName, queries, runQuery, e
                             trigger={
                                 <Button
                                     disabled={!queries || queries.length === 0}
-                                    title={!queries || queries.length === 0 ? "No queries" : undefined}
+                                    title={!queries || queries.length === 0 ? "No queries" : "View past queries"}
                                     label="Query History"
                                 />
                             }
                             title="Query History"
                         >
-                            <div className="grow flex flex-col p-8 gap-8">
+                            <div className="grow flex flex-col p-8 gap-8" id="queryHistory">
                                 <DialogTitle>Queries</DialogTitle>
                                 <div className="h-1 grow flex">
                                     <ul className="w-1 grow flex-col border overflow-auto">
@@ -231,8 +241,8 @@ export default function Selector({ setGraphName, graphName, queries, runQuery, e
                                             ))
                                         }
                                     </ul>
-                                    <div className="w-1 grow flex flex-col gap-2 p-4 border">
-                                        <div className="h-1 grow flex">
+                                    <div className="w-1 grow flex flex-col gap-2 p-4 border" id="queryHistoryPanel">
+                                        <div className="h-1 grow flex" id="queryHistoryEditor">
                                             <Editor
                                                 width="100%"
                                                 height="100%"
@@ -283,18 +293,19 @@ export default function Selector({ setGraphName, graphName, queries, runQuery, e
                                     <Button
                                         ref={submitQuery}
                                         className="text-white flex justify-center w-1/3"
-                                        disabled={isLoading}
                                         onClick={async () => {
                                             try {
                                                 setIsLoading(true);
-                                                await runQuery(query?.text || "", setQueriesOpen)
+                                                await runQuery(query?.text || "")
                                             } finally {
+                                                setQueriesOpen(false)
                                                 setIsLoading(false)
                                             }
                                         }}
                                         variant="Primary"
                                         label={isLoading ? undefined : "Run"}
-                                        title={isLoading ? "Please wait..." : undefined}
+                                        title={isLoading ? "Please wait..." : "Execute this query again"}
+                                        isLoading={isLoading}
                                     />
                                 </div>
                             </div>
@@ -303,9 +314,10 @@ export default function Selector({ setGraphName, graphName, queries, runQuery, e
                             <Button
                                 disabled={!schema.Id}
                                 label="View Schema"
+                                title="Display the schema structure"
                             />
                         }>
-                            <SchemaView schema={schema} session={session} />
+                            <SchemaView schema={schema} />
                         </DialogComponent>
                     </div>
                 }

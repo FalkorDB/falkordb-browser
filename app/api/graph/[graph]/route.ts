@@ -2,13 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { getClient } from "@/app/api/auth/[...nextauth]/options";
 import { prepareArg, securedFetch } from "@/lib/utils";
 
-// eslint-disable-next-line import/prefer-default-export
 export async function DELETE(request: NextRequest, { params }: { params: Promise<{ graph: string }> }) {
 
-    const client = await getClient()
-    if (client instanceof NextResponse) {
-        return client
+    const session = await getClient()
+    if (session instanceof NextResponse) {
+        return session
     }
+
+    const { client } = session
 
     const { graph: graphId } = await params;
 
@@ -27,13 +28,14 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
     }
 }
 
-// eslint-disable-next-line import/prefer-default-export
 export async function POST(request: NextRequest, { params }: { params: Promise<{ graph: string }> }) {
 
-    const client = await getClient()
-    if (client instanceof NextResponse) {
-        return client
+    const session = await getClient()
+    if (session instanceof NextResponse) {
+        return session
     }
+
+    const { client } = session
 
     const { graph: name } = await params;
     const sourceName = request.nextUrl.searchParams.get("sourceName")
@@ -81,13 +83,14 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     }
 }
 
-// eslint-disable-next-line import/prefer-default-export
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ graph: string }> }) {
 
-    const client = await getClient()
-    if (client instanceof NextResponse) {
-        return client
+    const session = await getClient()
+    if (session instanceof NextResponse) {
+        return session
     }
+
+    const { client } = session
 
     const { graph: graphId } = await params;
     const sourceName = request.nextUrl.searchParams.get("sourceName")
@@ -108,28 +111,19 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ graph: string }> }) {
 
-    const client = await getClient()
-    if (client instanceof NextResponse) {
-        return client
+    const session = await getClient()
+    if (session instanceof NextResponse) {
+        return session
     }
 
-    const { graph: graphId } = await params
+    const { client, user } = session
 
-    const ID = request.nextUrl.searchParams.get("ID")
+    const { graph: graphId } = await params
+    const query = request.nextUrl.searchParams.get("query")
+    const create = request.nextUrl.searchParams.get("create")
+    const { role } = user
 
     try {
-        if (ID) {
-            // const result = await securedFetch(`https://localhost:5000/progress/?ID=${ID}`, {
-            //     method: "GET"
-            // })
-            // if (!result.ok) throw new Error("something went wrong")
-            // const json = await result.json()
-            return NextResponse.json({ progress: 10 }, { status: 200 })
-        }
-
-        const query = request.nextUrl.searchParams.get("query")
-        const create = request.nextUrl.searchParams.get("create")
-        const role = request.nextUrl.searchParams.get("role")
 
         if (!query) throw new Error("Missing parameter query")
 

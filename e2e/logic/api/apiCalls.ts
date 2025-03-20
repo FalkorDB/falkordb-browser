@@ -16,6 +16,8 @@ import { ChangeGraphNameResponse } from "./responses/changeGraphNameResponse";
 import { AuthCredentialsResponse } from "./responses/LoginResponse";
 import { LogoutResponse } from "./responses/logoutResponse";
 import { AddSchemaResponse } from "./responses/addSchemaResponse";
+import { GetGraphsResponse } from "./responses/getGraphsResponse";
+import { getAdminToken } from "@/e2e/infra/utils";
 
 export default class ApiCalls {
 
@@ -37,10 +39,13 @@ export default class ApiCalls {
         }
     }
     
-    async addGraph(graphName: string): Promise<AddGraphResponse> {
+    async addGraph(graphName: string, role?: string): Promise<AddGraphResponse> {
         try {
-            const result = await getRequest(`${urls.api.graphUrl + graphName}?query=RETURN%201`);
-            return await result.json();
+            const headers = role === "admin" ? await getAdminToken() : undefined;
+            const requestUrl = `${urls.api.graphUrl + graphName}?query=RETURN%201`;
+            const result = await getRequest(requestUrl, headers);
+            const jsonResponse = await result.json();
+            return jsonResponse;
         } catch (error) {
             throw new Error("Failed to add graph.");
         }
@@ -48,16 +53,17 @@ export default class ApiCalls {
     
     async getGraphs(): Promise<GetGraphsResponse> {
         try {
-            const result = await getRequest(`${urls.api.graphUrl}`);
+            const result = await getRequest(`${urls.api.settingsUsers}`);
             return await result.json();
         } catch (error) {
             throw new Error("Failed to retrieve graphs.");
         }
     }
     
-    async removeGraph(graphName: string): Promise<RemoveGraphResponse> {
+    async removeGraph(graphName: string, role?: string): Promise<RemoveGraphResponse> {
         try {
-            const result = await deleteRequest(urls.api.graphUrl + graphName);
+            const headers = role === "admin" ? await getAdminToken() : undefined;
+            const result = await deleteRequest(urls.api.graphUrl + graphName, headers);
             return await result.json();
         } catch (error) {
             throw new Error("Failed to remove graph.");
@@ -66,7 +72,7 @@ export default class ApiCalls {
     
     async changeGraphName(sourceGraph: string, destinationGraph: string): Promise<ChangeGraphNameResponse> {
         try {
-            const result = await patchRequest(urls.api.graphUrl + destinationGraph + "?sourceName=" + sourceGraph);
+            const result = await patchRequest(`${urls.api.graphUrl + destinationGraph}?sourceName=${sourceGraph}`);
             return await result.json();
         } catch (error) {
             throw new Error("Failed to change graph name.");
@@ -75,7 +81,7 @@ export default class ApiCalls {
     
     async exportGraph(graphName: string): Promise<void> {
         try {
-            const result = await getRequest(urls.api.graphUrl + graphName + "/export");
+            const result = await getRequest(`${urls.api.graphUrl + graphName}/export`);
             await result.json();
         } catch (error) {
             throw new Error("Failed to export graph.");
@@ -84,16 +90,17 @@ export default class ApiCalls {
     
     async duplicateGraph(sourceGraph: string, destinationGraph: string, data?: any): Promise<DuplicateGraphresponse> {
         try {
-            const result = await postRequest(urls.api.graphUrl + destinationGraph + "?sourceName=" + sourceGraph, data);
+            const result = await postRequest(`${urls.api.graphUrl + destinationGraph}?sourceName=${sourceGraph}`, data);
             return await result.json();
         } catch (error) {
             throw new Error("Failed to duplicate graph.");
         }
     }
     
-    async runQuery(query: string): Promise<RunQueryResponse> {
+    async runQuery(graphName: string, query: string, role?: string): Promise<RunQueryResponse> {
         try {
-            const result = await getRequest(urls.api.graphUrl + query);
+            const headers = role === "admin" ? await getAdminToken() : undefined;
+            const result = await getRequest(urls.api.graphUrl + graphName + "?query=" + query, headers);
             return await result.json();
         } catch (error) {
             throw new Error("Failed to run query.");
@@ -102,7 +109,7 @@ export default class ApiCalls {
     
     async modifySettingsRole(roleName: string, roleValue: string): Promise<ModifySettingsRoleResponse> {
         try {
-            const result = await postRequest(`${urls.api.settingsConfig + roleName}&value=${roleValue}`);
+            const result = await postRequest(`${urls.api.settingsConfig + roleName}?value=${roleValue}`);
             return await result.json();
         } catch (error) {
             throw new Error("Failed to modify settings role.");
@@ -129,7 +136,7 @@ export default class ApiCalls {
     
     async createUsers(data?: any): Promise<CreateUsersResponse> {
         try {
-            const result = await postRequest(urls.api.settingsUsers, data);
+            const result = await postRequest(urls.api.settingsUsers ,data);
             return await result.json();
         } catch (error) {
             throw new Error("Failed to create users.");
@@ -138,7 +145,7 @@ export default class ApiCalls {
     
     async deleteUsers(data?: any): Promise<DeleteUsersResponse> {
         try {
-            const result = await deleteRequest(urls.api.settingsUsers, data);
+            const result = await deleteRequest(urls.api.settingsUsers, undefined, data);
             return await result.json();
         } catch (error) {
             throw new Error("Failed to delete users.");

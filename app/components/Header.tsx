@@ -41,11 +41,13 @@ export default function Header({ onSetGraphName }: Props) {
                     <div className="flex gap-2 bg-foreground rounded-lg p-2">
                         <Button
                             label="Graphs"
+                            title="View and manage your graphs"
                             className={cn("px-4 py-1 rounded-lg", pathname.includes("/graph") ? "bg-background" : "text-gray-500")}
                             onClick={() => router.push("/graph")}
                         />
                         <Button
                             label="Schemas"
+                            title="View and manage your schemas"
                             className={cn("px-4 py-1 rounded-lg", pathname.includes("/schema") ? "bg-background" : "text-gray-500")}
                             onClick={() => router.push("/schema")}
                         />
@@ -55,15 +57,18 @@ export default function Header({ onSetGraphName }: Props) {
                     <Drawer direction="right">
                         <NavigationMenu>
                             <NavigationMenuList className="gap-6 bg-foreground rounded-lg px-4 py-2">
-                                <NavigationMenuLink className="bg-foreground" asChild>
-                                    <Button
-                                        label="Settings"
-                                        onClick={() => router.push("/settings")}
-                                        disabled={session?.user?.role !== "Admin"}
-                                    >
-                                        <Settings size={25} />
-                                    </Button>
-                                </NavigationMenuLink>
+                                {
+                                    session?.user?.role === "Admin" &&
+                                    <NavigationMenuLink className="bg-foreground" asChild>
+                                        <Button
+                                            label="Settings"
+                                            title="Adjust application settings"
+                                            onClick={() => router.push("/settings")}
+                                        >
+                                            <Settings size={25} />
+                                        </Button>
+                                    </NavigationMenuLink>
+                                }
                                 <NavigationMenuItem>
                                     <NavigationMenuTrigger onClick={(e) => e.preventDefault()} className="gap-2 bg-foreground">
                                         <LifeBuoy size={25} />
@@ -77,7 +82,7 @@ export default function Header({ onSetGraphName }: Props) {
                                                 </a>
                                             </li>
                                             <li>
-                                                <a href="https://www.falkordb.com/contact-us/" target="_blank" rel="noreferrer">
+                                                <a href="https://discord.com/invite/jyUgBweNQz" target="_blank" rel="noreferrer">
                                                     Support
                                                 </a>
                                             </li>
@@ -85,6 +90,7 @@ export default function Header({ onSetGraphName }: Props) {
                                                 <DrawerTrigger asChild>
                                                     <Button
                                                         label="About"
+                                                        title="Learn more about the application"
                                                         className="bg-foreground"
                                                     />
                                                 </DrawerTrigger>
@@ -93,7 +99,7 @@ export default function Header({ onSetGraphName }: Props) {
                                     </NavigationMenuContent>
                                 </NavigationMenuItem>
                                 {
-                                    !inCreate &&
+                                    !inCreate && session?.user?.role !== "Read-Only" &&
                                     <CreateGraph
                                         onSetGraphName={onSetGraphName!}
                                         type={type}

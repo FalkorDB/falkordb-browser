@@ -33,11 +33,11 @@ export default class SettingsConfigPage extends BasePage {
     }
 
     private get searchBtn(): Locator {
-        return this.page.locator("//div[@id='search']/button");
+        return this.page.locator("//div[@id='tableComponent']/button");
     }
 
     private get searchInput(): Locator {
-        return this.page.locator("//div[@id='search']/input");
+        return this.page.locator("//div[@id='tableComponent']/input");
     }
 
     private get tableRoles(): Locator {
@@ -69,7 +69,8 @@ export default class SettingsConfigPage extends BasePage {
 
     async getTableRolesCount(): Promise<number>{
         await this.page.waitForTimeout(1500);
-        return await this.tableRoles.count();
+        const count = await this.tableRoles.count();
+        return count;
     }
 
 }

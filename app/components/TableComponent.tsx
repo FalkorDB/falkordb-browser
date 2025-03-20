@@ -9,26 +9,13 @@
 import { Checkbox } from "@/components/ui/checkbox";
 import { JSONTree } from "react-json-tree"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { cn } from "@/lib/utils";
+import { Cell, cn, Row } from "@/lib/utils";
 import { useCallback, useEffect, useState } from "react";
 import { CheckCircle, Pencil, XCircle } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import Button from "./ui/Button";
 import Input from "./ui/Input";
-import { DataCell } from "../api/graph/model";
 import Combobox from "./ui/combobox";
-
-type Cell = {
-    value: DataCell,
-    onChange?: (value: string) => Promise<boolean>,
-    type?: string
-    comboboxType?: string
-}
-
-export interface Row {
-    cells: Cell[]
-    checked?: boolean
-}
 
 interface Props {
     headers: string[],
@@ -86,7 +73,7 @@ export default function TableComponent({ headers, rows, children, setRows, optio
 
     return (
         <div className={cn("h-full w-full flex flex-col gap-4", className)}>
-            <div className="flex gap-4" id="search">
+            <div className="flex gap-4" id="tableComponent">
                 {children}
                 {
                     isSearchable ?
@@ -114,6 +101,7 @@ export default function TableComponent({ headers, rows, children, setRows, optio
                         : <Button
                             variant="Secondary"
                             label="Search"
+                            title="Search within the table"
                             onClick={() => setIsSearchable(true)}
                         />
                 }
@@ -195,40 +183,44 @@ export default function TableComponent({ headers, rows, children, setRows, optio
                                                         }}
                                                         data={cell.value}
                                                     />
-                                                    : cell.value &&
-                                                        editable === `${i}-${j}` ?
-                                                        cell.type === "combobox" ?
-                                                            <Combobox
-                                                                options={options!}
-                                                                setSelectedValue={(value) => {
-                                                                    cell.onChange!(value)
-                                                                    handleSetEditable("", "")
-                                                                }}
-                                                                type={cell.comboboxType}
-                                                            />
-                                                            : <div className="w-full flex gap-2 items-center">
-                                                                <Input
-                                                                    ref={ref => ref?.focus()}
-                                                                    variant="primary"
-                                                                    className="grow"
-                                                                    value={newValue}
-                                                                    onChange={(e) => setNewValue(e.target.value)}
-                                                                    onKeyDown={async (e) => {
-                                                                        if (e.key === "Escape") {
+                                                      : editable === `${i}-${j}` ?
+                                                        <div className="w-full flex gap-2 items-center">
+                                                            {
+                                                                cell.type === "combobox" ?
+                                                                    <Combobox
+                                                                        options={options!}
+                                                                        setSelectedValue={(value) => {
+                                                                            cell.onChange!(value)
+                                                                            handleSetEditable("", "")
+                                                                        }}
+                                                                        label={cell.comboboxType}
+                                                                        selectedValue={cell.value.toString()}
+                                                                    />
+                                                                    : <Input
+                                                                        ref={ref => ref?.focus()}
+                                                                        variant="primary"
+                                                                        className="grow"
+                                                                        value={newValue}
+                                                                        onChange={(e) => setNewValue(e.target.value)}
+                                                                        onKeyDown={async (e) => {
+                                                                            if (e.key === "Escape") {
+                                                                                e.preventDefault()
+                                                                                handleSetEditable("", "")
+                                                                            }
+
+                                                                            if (e.key !== "Enter") return
+
                                                                             e.preventDefault()
-                                                                            handleSetEditable("", "")
-                                                                        }
-
-                                                                        if (e.key !== "Enter") return
-
-                                                                        e.preventDefault()
-                                                                        const result = await cell.onChange!(newValue)
-                                                                        if (result) {
-                                                                            handleSetEditable("", "")
-                                                                        }
-                                                                    }}
-                                                                />
-                                                                <div className="flex flex-col gap-1">
+                                                                            const result = await cell.onChange!(newValue)
+                                                                            if (result) {
+                                                                                handleSetEditable("", "")
+                                                                            }
+                                                                        }}
+                                                                    />
+                                                            }
+                                                            <div className="flex flex-col gap-1">
+                                                                {
+                                                                    cell.type !== "combobox" &&
                                                                     <Button
                                                                         title="Save"
                                                                         onClick={() => {
@@ -238,16 +230,17 @@ export default function TableComponent({ headers, rows, children, setRows, optio
                                                                     >
                                                                         <CheckCircle className="w-4 h-4" />
                                                                     </Button>
-                                                                    <Button
-                                                                        title="Cancel"
-                                                                        onClick={() => {
-                                                                            handleSetEditable("", "")
-                                                                        }}
-                                                                    >
-                                                                        <XCircle className="w-4 h-4" />
-                                                                    </Button>
-                                                                </div>
+                                                                }
+                                                                <Button
+                                                                    title="Cancel"
+                                                                    onClick={() => {
+                                                                        handleSetEditable("", "")
+                                                                    }}
+                                                                >
+                                                                    <XCircle className="w-4 h-4" />
+                                                                </Button>
                                                             </div>
+                                                        </div>
                                                         : <div className="flex items-center gap-2">
                                                             <Tooltip>
                                                                 <TooltipTrigger asChild>
@@ -257,7 +250,7 @@ export default function TableComponent({ headers, rows, children, setRows, optio
                                                                     {cell.value}
                                                                 </TooltipContent>
                                                             </Tooltip>
-                                                            <div>
+                                                            <div className="w-4">
                                                                 {
                                                                     cell.onChange && hover === `${i}` &&
                                                                     <Button
