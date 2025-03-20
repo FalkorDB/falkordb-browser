@@ -63,6 +63,7 @@ export default function Selector({ setGraphName, graphName, queries, runQuery, e
             clearTimeout(timeout)
         }
     }, [queries, search, historyQuery?.counter, historyQuery])
+    const submitQuery = useRef<HTMLButtonElement>(null)
 
     useEffect(() => {
         setSelectedValue(graphName)
@@ -90,6 +91,36 @@ export default function Selector({ setGraphName, graphName, queries, runQuery, e
         getOptions()
     }, [getOptions])
 
+    useEffect(() => {
+        getOptions()
+    }, [getOptions])
+
+    const handleEditorDidMount = (e: editor.IStandaloneCodeEditor) => {
+        editorRef.current = e
+
+        // eslint-disable-next-line no-bitwise
+        e.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, () => {
+            submitQuery.current?.click();
+        });
+
+        // eslint-disable-next-line no-bitwise
+        e.addCommand(monaco.KeyMod.Shift | monaco.KeyCode.Enter, () => {
+            e.trigger('keyboard', 'type', { text: '\n' });
+        });
+
+        e.addAction({
+            id: 'submit',
+            label: 'Submit Query',
+            // eslint-disable-next-line no-bitwise
+            keybindings: [monaco.KeyCode.Enter],
+            contextMenuOrder: 1.5,
+            run: async () => {
+                submitQuery.current?.click()
+            },
+            precondition: '!suggestWidgetVisible',
+        });
+    }
+
     const handleOnChange = async (name: string) => {
         const formattedName = name === '""' ? "" : name
         if (runQuery) {
@@ -106,17 +137,6 @@ export default function Selector({ setGraphName, graphName, queries, runQuery, e
         }
         setGraphName(formattedName)
         setSelectedValue(name)
-    }
-
-    useEffect(() => {
-        getOptions()
-    }, [getOptions])
-
-    const handleEditorDidMount = (e: editor.IStandaloneCodeEditor) => {
-        editorRef.current = e
-        // Disable Ctrl + F keybinding
-        // eslint-disable-next-line no-bitwise
-        e.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyF, () => { });
     }
 
     const handleReloadClick = () => {
@@ -294,6 +314,7 @@ export default function Selector({ setGraphName, graphName, queries, runQuery, e
                                 </div>
                                 <div className="flex justify-end">
                                     <Button
+                                        ref={submitQuery}
                                         className="text-white flex justify-center w-1/3"
                                         disabled={isLoading || !historyQuery!.counter}
                                         onClick={async () => {
