@@ -300,7 +300,7 @@ export default function Selector({ setGraphName, graphName, runQuery, edgesCount
                                                             />
                                                             {
                                                                 historyQuery.counter - 1 === currentIndex &&
-                                                                <div className="h-[20dvh] border">
+                                                                <div className="h-[20dvh] border" id="queryHistoryEditor">
                                                                     <Editor
                                                                         width="100%"
                                                                         height="100%"
