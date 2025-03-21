@@ -6,7 +6,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { Locator, Download } from "@playwright/test";
 import BasePage from "@/e2e/infra/ui/basePage";
-import { waitForElementCount, waitForElementToBeVisible, waitForTimeOut } from "@/e2e/infra/utils";
+import { waitForElementToBeVisible, waitForTimeOut } from "@/e2e/infra/utils";
 
 export default class GraphPage extends BasePage {
 
@@ -126,34 +126,8 @@ export default class GraphPage extends BasePage {
         return (graph: string) => this.page.locator(`//table//tbody/tr[@data-id='${graph}']//td[2]//button[1]`);
     }
 
-    /* QUERY History */
-
-    private get queryHistoryDialog(): Locator {
-        return this.page.locator("//div[contains(@id, 'queryHistory')]");
-    }
-
-    private get queryHistory(): Locator {
-        return this.page.locator("//button[contains(text(), 'Query History')]");
-    }
-
-    private get queryInHistory(): (query: string) => Locator {
-        return (query: string) => this.page.locator(`//div[contains(@id, 'queryHistory')]//ul//li[${query}]`);
-    }
-
-    private get selectQueryInHistoryBtn(): (query: string) => Locator {
-        return (query: string) => this.page.locator(`//div[contains(@id, 'queryHistory')]//ul//li[${query}]/button`);
-    }
-
-    private get runBtnInQueryHistory(): Locator {
-        return this.page.locator("//div[contains(@id, 'queryHistory')]//button[contains(text(), 'Run')]");
-    }
-
-    private get queryHistoryTextarea(): Locator {
-        return this.page.locator("#queryHistoryEditor textarea");
-    }
-
-    private get queryHistoryPanel(): Locator {
-        return this.page.locator("//div[@id='queryHistoryPanel']//ul");
+    private get graphsearchInCombobox(): Locator {
+        return this.page.locator("//div[@id='graphSearch']//input");
     }
 
     async countGraphsInMenu(): Promise<number> {
@@ -269,6 +243,7 @@ export default class GraphPage extends BasePage {
 
     async selectExistingGraph(graph: string, role?: string): Promise<void>{
         await this.clickOnSelectBtnFromGraphManager(role);
+        await this.graphsearchInCombobox.fill(graph);
         await this.selectGraphFromList(graph);
     }
 
@@ -362,71 +337,6 @@ export default class GraphPage extends BasePage {
             screenY: transformData.top + node.y * d + f - 380,
         }));
     }
-    
-    /* QUERY History */
-
-    async clickOnQueryHistory(): Promise<void> {
-        const isVisible = await waitForElementToBeVisible(this.queryHistory);
-        if (!isVisible) throw new Error("query history button is not visible!");
-        await this.queryHistory.click();
-    }
-
-    async selectQueryInHistory(query: string): Promise<void> {
-        await this.queryInHistory(query).click();
-    }
-
-    async getQueryHistory(query: string): Promise<boolean> {
-        const isVisible = await this.queryInHistory(query).isVisible();
-        return isVisible;
-    }
-
-    async clickOnRunBtnInQueryHistory(): Promise<void> {
-        await this.runBtnInQueryHistory.click();
-    }
-
-    async isQueryHistoryDialog(): Promise<void> {
-        await this.queryHistoryDialog.isVisible();
-    }
-
-    async ClickOnSelectQueryInHistoryBtn(queryNumber: string): Promise<void> {
-        await this.selectQueryInHistoryBtn(queryNumber).click();
-    }
-
-    async getSelectQueryInHistoryText(queryNumber: string): Promise<string | null> {
-        const text = await this.selectQueryInHistoryBtn(queryNumber).textContent();
-        return text;
-    }
-
-    async runAQueryFromHistory(queryNumber: string): Promise<void> {
-        await this.clickOnQueryHistory();
-        await this.ClickOnSelectQueryInHistoryBtn(queryNumber);
-        await this.clickOnRunBtnInQueryHistory();
-    }
-
-    async getQueryHistoryEditor(): Promise<string | null> {
-        return await this.queryHistoryTextarea.inputValue();
-    }
-
-    async getQueryHistoryPanel(): Promise<string[]> {
-        const rawText = await this.queryHistoryPanel.allTextContents();
-    
-        if (!rawText || rawText.length === 0) {
-            return [];
-        }
-    
-        // Ensure we are working with the first entry (UI returns as a single string)
-        const formattedText = rawText[0]
-            .replace(/Query internal execution time:.*/, '') // Remove execution time
-            .replace(/([a-z]+: \d+)/gi, '$1\n') // Add a newline after each key-value pair
-            .split('\n') // Split into an array
-            .map(line => line.trim()) // Remove extra spaces
-            .filter(line => line.length > 0); // Remove empty lines
-    
-        return formattedText;
-    }
-    
-
-    /* End of QUERY History*/
 
     async changeNodePosition(x: number, y: number): Promise<void> {
         const box = (await this.canvasElement.boundingBox())!;
