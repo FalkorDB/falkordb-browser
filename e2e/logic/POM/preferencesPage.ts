@@ -144,5 +144,4 @@ export default class PreferencesPage extends GraphPage {
         const isVisible = await this.preferencesViewDialog.isVisible();
         return isVisible;
     }
-
 }

@@ -5,24 +5,22 @@
 
 import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Editor, Monaco } from "@monaco-editor/react"
-import { useEffect, useRef, useState } from "react"
+import { SetStateAction, Dispatch, useEffect, useRef, useState } from "react"
 import * as monaco from "monaco-editor";
 import { Maximize2, Minimize2 } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
-import { prepareArg, securedFetch } from "@/lib/utils";
+import { HistoryQuery, prepareArg, securedFetch } from "@/lib/utils";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import { Graph } from "../api/graph/model";
 import Button from "./ui/Button";
 import CloseDialog from "./CloseDialog";
 
 interface Props {
-    currentQuery: string
-    historyQueries: string[]
-    setHistoryQueries: (queries: string[]) => void
-    setCurrentQuery: (query: string) => void
+    historyQuery: HistoryQuery
     maximize: boolean
-    runQuery: (query: string) => Promise<void>
+    runQuery: (query: string) => Promise<boolean>
     graph: Graph
+    setHistoryQuery: Dispatch<SetStateAction<HistoryQuery>>
 }
 
 const monacoOptions: monaco.editor.IStandaloneEditorConstructionOptions = {
@@ -40,13 +38,6 @@ const monacoOptions: monaco.editor.IStandaloneEditorConstructionOptions = {
     cursorStyle: "line-thin",
     links: false,
     minimap: { enabled: false },
-    // disable `Find`
-    find: {
-        addExtraSpaceOnTop: false,
-        autoFindInSelection: "never",
-        seedSearchStringFromSelection: "never",
-        loop: false,
-    },
     automaticLayout: true,
     fontSize: 26,
     fontWeight: "200",
@@ -199,9 +190,8 @@ const LINE_HEIGHT = 38
 
 const PLACEHOLDER = "Type your query here to start"
 
-export default function EditorComponent({ currentQuery, historyQueries, setHistoryQueries, setCurrentQuery, maximize, runQuery, graph }: Props) {
+export default function EditorComponent({ historyQuery, maximize, runQuery, graph, setHistoryQuery }: Props) {
 
-    const [query, setQuery] = useState(currentQuery)
     const placeholderRef = useRef<HTMLDivElement>(null)
     const [lineNumber, setLineNumber] = useState(1)
     const graphIdRef = useRef(graph.Id)
@@ -212,19 +202,21 @@ export default function EditorComponent({ currentQuery, historyQueries, setHisto
     const submitQuery = useRef<HTMLButtonElement>(null)
     const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null)
     const containerRef = useRef<HTMLDivElement>(null)
-    const historyRef = useRef({
-        historyQueries,
-        currentQuery,
-        historyCounter: 0
-    })
 
     useEffect(() => {
-        if (currentQuery && placeholderRef.current) {
+        setHistoryQuery(prev => ({
+            ...prev,
+            query: historyQuery.counter ? historyQuery.queries[historyQuery.counter - 1].text : historyQuery.currentQuery
+        }))
+    }, [historyQuery.counter])
+
+    useEffect(() => {
+        if (historyQuery.query && placeholderRef.current) {
             placeholderRef.current.style.display = "none"
-        } else if (!currentQuery && placeholderRef.current) {
+        } else if (!historyQuery.query && placeholderRef.current && blur) {
             placeholderRef.current.style.display = "block"
         }
-    }, [currentQuery])
+    }, [historyQuery.query])
 
     useEffect(() => {
         graphIdRef.current = graph.Id
@@ -233,10 +225,6 @@ export default function EditorComponent({ currentQuery, historyQueries, setHisto
     useEffect(() => () => {
         sugDisposed?.dispose()
     }, [sugDisposed])
-
-    useEffect(() => {
-        historyRef.current.historyQueries = historyQueries
-    }, [historyQueries, currentQuery])
 
     useEffect(() => {
         if (!containerRef.current) return
@@ -256,11 +244,6 @@ export default function EditorComponent({ currentQuery, historyQueries, setHisto
             observer.disconnect()
         }
     }, [containerRef.current])
-
-    useEffect(() => {
-        setQuery(currentQuery)
-        historyRef.current.currentQuery = currentQuery
-    }, [currentQuery])
 
     const setTheme = (monacoI: Monaco) => {
         monacoI.editor.defineTheme('custom-theme', {
@@ -392,7 +375,7 @@ export default function EditorComponent({ currentQuery, historyQueries, setHisto
     const handleSubmit = async () => {
         try {
             setIsLoading(true)
-            await runQuery(query)
+            await runQuery(historyQuery.query)
         } finally {
             setIsLoading(false)
         }
@@ -526,10 +509,21 @@ export default function EditorComponent({ currentQuery, historyQueries, setHisto
             keybindings: [monaco.KeyCode.UpArrow],
             contextMenuOrder: 1.5,
             run: async () => {
-                if (historyRef.current.historyQueries.length === 0) return
-                const counter = (historyRef.current.historyCounter + 1) % (historyRef.current.historyQueries.length + 1)
-                historyRef.current.historyCounter = counter
-                setQuery(counter ? historyRef.current.historyQueries[counter - 1] : historyRef.current.currentQuery)
+                setHistoryQuery(prev => {
+                    if (prev.queries.length === 0) return prev;
+
+                    let counter;
+                    if (prev.counter !== 1) {
+                        counter = prev.counter ? prev.counter - 1 : prev.queries.length;
+                    } else {
+                        counter = 1;
+                    }
+
+                    return {
+                        ...prev,
+                        counter
+                    }
+                })
             },
             precondition: 'isFirstLine && !suggestWidgetVisible',
         });
@@ -540,24 +534,31 @@ export default function EditorComponent({ currentQuery, historyQueries, setHisto
             keybindings: [monaco.KeyCode.DownArrow],
             contextMenuOrder: 1.5,
             run: async () => {
-                if (historyRef.current.historyQueries.length === 0) return
-                const counter = historyRef.current.historyCounter ? historyRef.current.historyCounter - 1 : historyRef.current.historyQueries.length;
-                historyRef.current.historyCounter = counter;
-                setQuery(counter ? historyRef.current.historyQueries[counter - 1] : historyRef.current.currentQuery);
+                setHistoryQuery(prev => {
+                    if (prev.queries.length === 0) return prev
+                    let counter
+                    if (prev.counter) {
+                        counter = prev.counter + 1 > prev.queries.length ? 0 : prev.counter + 1
+                    } else {
+                        counter = 0
+                    }
+                    return {
+                        ...prev,
+                        counter
+                    }
+                })
             },
             precondition: 'isFirstLine && !suggestWidgetVisible',
         });
-    }
 
-    const handleSetHistoryQuery = (val: string) => {
-        setQuery(val)
-        historyRef.current.historyQueries[historyRef.current.historyCounter - 1] = val
-        setHistoryQueries(historyRef.current.historyQueries)
+        // Override the default Ctrl + F keybinding
+        // eslint-disable-next-line no-bitwise
+        e.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyF, () => { });
     }
 
     useEffect(() => {
-        setLineNumber(query.split("\n").length)
-    }, [query])
+        setLineNumber(historyQuery.query.split("\n").length)
+    }, [historyQuery.query])
 
     return (
         <div>
@@ -578,8 +579,21 @@ export default function EditorComponent({ currentQuery, historyQueries, setHisto
                                         ...monacoOptions,
                                         lineNumbers: lineNumber > 1 ? "on" : "off",
                                     }}
-                                    value={(blur ? query.replace(/\s+/g, ' ').trim() : query)}
-                                    onChange={(val) => historyRef.current.historyCounter ? handleSetHistoryQuery(val || "") : setCurrentQuery(val || "")}
+                                    value={(blur ? historyQuery.query.replace(/\s+/g, ' ').trim() : historyQuery.query)}
+                                    onChange={(val) => {
+                                        if (!historyQuery.counter) {
+                                            setHistoryQuery(prev => ({
+                                                ...prev,
+                                                currentQuery: val || "",
+                                                query: val || "",
+                                            }))
+                                        } else {
+                                            setHistoryQuery(prev => ({
+                                                ...prev,
+                                                query: val || "",
+                                            }))
+                                        }
+                                    }}
                                     theme="custom-theme"
                                     beforeMount={handleEditorWillMount}
                                     onMount={handleEditorDidMount}
@@ -632,8 +646,20 @@ export default function EditorComponent({ currentQuery, historyQueries, setHisto
                                         lineHeight: 30,
                                         fontSize: 25
                                     }}
-                                    value={query}
-                                    onChange={(val) => setQuery(val || "")}
+                                    value={(blur ? historyQuery.query.replace(/\s+/g, ' ').trim() : historyQuery.query)}
+                                    onChange={(val) => {
+                                        if (historyQuery.counter) {
+                                            setHistoryQuery(prev => ({
+                                                ...prev,
+                                                query: val || ""
+                                            }))
+                                        } else {
+                                            setHistoryQuery(prev => ({
+                                                ...prev,
+                                                currentQuery: val || ""
+                                            }))
+                                        }
+                                    }}
                                     language="custom-language"
                                 />
                             </div>

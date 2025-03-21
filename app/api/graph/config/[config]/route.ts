@@ -37,7 +37,11 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     try {
         if (!value) throw new Error("Value is required")
 
-        const config = await client.configSet(configName, configName === "CMD_INFO" ? value : parseInt(value, 10))
+        const parsedValue = configName === "CMD_INFO" ? value : parseInt(value, 10)
+
+        if (configName !== "CMD_INFO" && Number.isNaN(parsedValue)) throw new Error("Invalid value")
+
+        const config = await client.configSet(configName, parsedValue)
         return NextResponse.json({ config }, { status: 200 })
     } catch (err: unknown) {
         console.error(err)

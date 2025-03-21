@@ -8,9 +8,10 @@ import CreateGraph from "../components/CreateGraph";
 
 interface Props {
     onSetGraphName: Dispatch<SetStateAction<string>>
+    graphNames: string[]
 }
 
-export default function Tutorial({ onSetGraphName }: Props) {
+export default function Tutorial({ onSetGraphName, graphNames }: Props) {
 
     const [open, setOpen] = useState<boolean>(false)
     const [showAgain, setShowAgain] = useState<boolean>(false)
@@ -56,6 +57,7 @@ export default function Tutorial({ onSetGraphName }: Props) {
                                 {
                                     session?.user?.role !== "Read-Only" &&
                                     <CreateGraph
+                                        graphNames={graphNames}
                                         onSetGraphName={handleSetGraphName}
                                         type="Graph"
                                     />

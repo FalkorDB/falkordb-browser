@@ -10,8 +10,11 @@ export async function GET() {
     }
 
     const { client } = session
-
-    const configs = await client.configGet("*")
-
-    return NextResponse.json({ configs }, { status: 200 })
+    try {
+        const configs = await client.configGet("*")
+        return NextResponse.json({ configs }, { status: 200 })
+    } catch (error) {
+        console.error(error)
+        return NextResponse.json({ error: "Failed to get configs" }, { status: 500 })
+    }
 }
