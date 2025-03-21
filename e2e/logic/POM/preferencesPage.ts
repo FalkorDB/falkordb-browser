@@ -1,8 +1,8 @@
-import BasePage from "@/e2e/infra/ui/basePage";
 import { waitForElementCount, waitForElementToBeVisible } from "@/e2e/infra/utils";
 import { Locator } from "@playwright/test";
+import GraphPage from "./graphPage";
 
-export default class PreferencesPage extends BasePage {
+export default class PreferencesPage extends GraphPage {
 
     private get openPreferencesViewBtn(): Locator {
         return this.page.getByRole('button', { name: 'Preferences' });
@@ -42,18 +42,6 @@ export default class PreferencesPage extends BasePage {
 
     private get editColorBtn(): Locator {
         return this.page.getByRole('button', { name: "Edit" });
-    }
-
-    private get selectBtnFromGraphManager(): (index: string) => Locator {
-        return (index: string) => this.page.locator(`//div[@id='graphManager']//button[${index}]`);
-    }
-
-    private get selectGraphList(): (graph: string) => Locator {
-        return (graph: string) => this.page.locator(`//ul[@id='graphsList']/div[descendant::text()[contains(., '${graph}')]]`);
-    }
-
-    private get graphSelectSearchInput(): Locator {
-        return this.page.locator(`//div[@id='graphSearch']//input`);
     }
 
     async clickOnPreferencesBtn(): Promise<void>{
@@ -155,25 +143,5 @@ export default class PreferencesPage extends BasePage {
     async isPreferencesViewOpen(): Promise<boolean> {
         const isVisible = await this.preferencesViewDialog.isVisible();
         return isVisible;
-    }
-
-    async clickOnSelectBtnFromGraphManager(role: string = "admin"): Promise<void>{
-        const index = role === 'readonly' ? "2" : "3";
-        const isSelectBtnFromGraphManager = await waitForElementToBeVisible(this.selectBtnFromGraphManager(index));
-        if (!isSelectBtnFromGraphManager) throw new Error("select from graph manager button is not visible!");
-        await this.selectBtnFromGraphManager(index).click();
-    }
-
-    async selectGraphFromList(graph: string): Promise<void> {
-        await this.graphSelectSearchInput.fill(graph);
-        const graphLocator = this.selectGraphList(graph);
-        const isVisible = await waitForElementToBeVisible(graphLocator);
-        if (!isVisible) throw new Error("select Graph From List button is not visible!");
-        await graphLocator.click();
-    }
-
-    async selectExistingGraph(graph: string, role?: string): Promise<void>{
-        await this.clickOnSelectBtnFromGraphManager(role);
-        await this.selectGraphFromList(graph);
     }
 }

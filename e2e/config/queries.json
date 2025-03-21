@@ -111,6 +111,17 @@
           "name": "fetchFirstTenNodes",
           "query": "MATCH (n) RETURN n LIMIT 10",
           "reason": "Retrieves up to 10 nodes from the database without any filtering."
+        },
+        {
+          "name": "createSamplePersons",
+          "query": "CREATE (:Person {name: 'Alice', age: 30}), (:Person {name: 'Bob', age: 25})",
+          "reason": "Creates two sample Person nodes with name and age properties for testing.",
+          "apiReq": "CREATE%20(%3APerson%20%7Bname%3A%20%27Alice%27%2C%20age%3A%2030%7D)%2C%20(%3APerson%20%7Bname%3A%20%27Bob%27%2C%20age%3A%2025%7D)" 
+        },        
+        {
+          "name": "fetchNodeDetails",
+          "query": "MATCH (n) RETURN n.name AS Name, labels(n) AS Labels, n.age AS Age",
+          "reason": "Retrieves node details including name, labels, and age from the database."
         }
       ]
     }
