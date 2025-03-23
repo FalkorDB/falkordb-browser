@@ -7,7 +7,7 @@ import queryData from '../config/queries.json'
 import QueryHistory from "../logic/POM/queryHistoryComponent";
 import { BATCH_CREATE_PERSONS, BATCH_CREATE_PERSONS_APIREQ, FETCH_FIRST_TEN_NODES } from "../config/constants";
 
-test.describe('Graph Tests', () => {
+test.describe('Query history Tests', () => {
     let browser: BrowserWrapper;
     let apicalls: ApiCalls;
 

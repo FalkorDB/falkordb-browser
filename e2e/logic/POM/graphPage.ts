@@ -134,6 +134,45 @@ export default class GraphPage extends BasePage {
         return this.page.locator("//div[@id='graphSearch']//input");
     }
 
+    private get valueCellByAttributeInDataPanel(): (attribute: string) => Locator {
+        return (attribute: string) => this.page.locator(`//div[contains(@id, 'graphDataPanel')]//tbody//tr[td[contains(text(), '${attribute}')]]/td[last()]/button`);
+    }
+
+    private get nodesGraphStats(): Locator {
+        return this.page.locator("//div[@id='graphStats']//span[1]");
+    }
+
+    private get edgesGraphStats(): Locator {
+        return this.page.locator("//div[@id='graphStats']//span[2]");
+    }
+
+    /**Data panel */
+
+    private get dataPanelHeaderAttr(): Locator {
+        return this.page.locator("//div[contains(@id, 'dataPanelHeader')]/div/ul");
+    }
+
+    private get addButtonInDataPanelHeader(): Locator {
+        return this.page.locator("//div[contains(@id, 'dataPanelHeader')]//button[contains(text(), 'Add')]");
+    }
+
+    private get inputInDataPanelHeader(): Locator {
+        return this.page.locator("//div[contains(@id, 'dataPanelHeader')]//input");
+    }
+
+    private get saveButtonInDataPanelHeader(): Locator {
+        return this.page.locator("//div[contains(@id, 'dataPanelHeader')]//button[contains(text(), 'Save')]");
+    }
+
+    private get removeAttributeButtonInDataPanelHeader(): Locator {
+        return this.page.locator("//div[contains(@id, 'dataPanelHeader')]//li//button").first();
+    }
+
+    private get attributeHeaderLabelInDataPanelHeader(): Locator {
+        return this.page.locator("//div[contains(@id, 'dataPanelHeader')]//li/p");
+    }
+
+
     async countGraphsInMenu(): Promise<number> {
         await waitForTimeOut(this.page, 1000);
 
@@ -225,10 +264,11 @@ export default class GraphPage extends BasePage {
         }
     }    
 
-    async nodeClick(x: number, y: number): Promise<void> {  
+    async nodeClick(x: number, y: number): Promise<void> {
         await this.canvasElement.hover({ position: { x, y } });
         await this.page.waitForTimeout(500);
         await this.canvasElement.click({ position: { x, y }, button: 'right' });
+        await this.page.waitForTimeout(10000);
     }
 
     async clickOnSelectBtnFromGraphManager(role: string = "admin"): Promise<void>{
@@ -431,4 +471,69 @@ export default class GraphPage extends BasePage {
         });
         return { scaleX, scaleY };
     }
+
+    async getDataCellByAttrInDataPanel(attribute: string): Promise<string | null>{
+        const isVisible = await waitForElementToBeVisible(this.valueCellByAttributeInDataPanel(attribute));
+        if (!isVisible) throw new Error("value cell by attr button is not visible!");
+        return await this.valueCellByAttributeInDataPanel(attribute).textContent();
+    }
+
+    async getNodesGraphStats(): Promise<string | null>{
+        const isVisible = await waitForElementToBeVisible(this.nodesGraphStats);
+        if (!isVisible) throw new Error("node graph stats button is not visible!");
+        return await this.nodesGraphStats.textContent();
+    }
+
+    async getEdgesGraphStats(): Promise<string | null>{
+        const isVisible = await waitForElementToBeVisible(this.edgesGraphStats);
+        if (!isVisible) throw new Error("edges graph stats button is not visible!");
+        return await this.edgesGraphStats.textContent();
+    }
+
+    /**data panel */
+
+    async hoverOnDataPanelHeaderAttr(): Promise<void>{
+        const isVisible = await waitForElementToBeVisible(this.dataPanelHeaderAttr);
+        if (!isVisible) throw new Error("data panel header attribute button is not visible!");
+        await this.dataPanelHeaderAttr.hover();
+    }
+
+    async clickOnAddButtonInDataPanelHeader(): Promise<void>{
+        const isVisible = await waitForElementToBeVisible(this.addButtonInDataPanelHeader);
+        if (!isVisible) throw new Error("add button in data panel header button is not visible!");
+         await this.addButtonInDataPanelHeader.click();
+    }
+
+    async fillInputButtonInDataPanelHeader(attribute: string): Promise<void>{
+        const isVisible = await waitForElementToBeVisible(this.inputInDataPanelHeader);
+        if (!isVisible) throw new Error("input in data panel header button is not visible!");
+        await this.inputInDataPanelHeader.fill(attribute);
+    }
+
+    async clickOnSaveButtonInDataPanelHeader(): Promise<void>{
+        const isVisible = await waitForElementToBeVisible(this.saveButtonInDataPanelHeader);
+        if (!isVisible) throw new Error("save in data panel header button is not visible!");
+        await this.saveButtonInDataPanelHeader.click();
+    }
+
+    async clickOnRemoveAttributeButtonInDataPanelHeader(): Promise<void>{
+        const isVisible = await waitForElementToBeVisible(this.removeAttributeButtonInDataPanelHeader);
+        if (!isVisible) throw new Error("remove attr in data panel header button is not visible!");
+        await this.removeAttributeButtonInDataPanelHeader.click();
+    }
+
+    async getAttributeHeaderLabelInDataPanelHeader(): Promise<string | null>{
+        const isVisible = await waitForElementToBeVisible(this.attributeHeaderLabelInDataPanelHeader);
+        if (!isVisible) throw new Error("attr in data panel header text is not visible!");
+        return await this.attributeHeaderLabelInDataPanelHeader.textContent();
+    }
+
+    async modifyNodeHeaderAttribute(attribute: string): Promise<void> {
+        await this.hoverOnDataPanelHeaderAttr();
+        await this.clickOnAddButtonInDataPanelHeader();
+        await this.fillInputButtonInDataPanelHeader(attribute);
+        await this.clickOnSaveButtonInDataPanelHeader();
+        await this.clickOnRemoveAttributeButtonInDataPanelHeader();
+    }
+
 }

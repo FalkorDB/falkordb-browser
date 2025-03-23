@@ -53,7 +53,7 @@ export default class ApiCalls {
     
     async getGraphs(): Promise<GetGraphsResponse> {
         try {
-            const result = await getRequest(`${urls.api.settingsUsers}`);
+            const result = await getRequest(`${urls.api.graphUrl}`);
             return await result.json();
         } catch (error) {
             throw new Error("Failed to retrieve graphs.");

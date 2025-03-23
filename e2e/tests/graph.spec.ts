@@ -8,6 +8,7 @@ import ApiCalls from "../logic/api/apiCalls";
 import GraphPage from "../logic/POM/graphPage";
 import urls from '../config/urls.json'
 import queryData from '../config/queries.json'
+import { CREATE_TEN_CONNECTED_NODES } from "../config/constants";
 
 test.describe('Graph Tests', () => {
     let browser: BrowserWrapper;
@@ -102,4 +103,59 @@ test.describe('Graph Tests', () => {
         await apicalls.removeGraph(graphName);
     });
 
+    test(`@readonly Validate failure & error message when RO user attempts to rename an existing graph via UI`, async () => {
+        const graphName = `graph_${Date.now()}`;
+        await apicalls.addGraph(graphName, "admin");
+        const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+        await browser.setPageToFullScreen();
+        const newGraphName = `graph_${Date.now()}`;
+        await graph.modifyGraphName(graphName, newGraphName);
+        await graph.refreshPage();
+        expect(await graph.verifyGraphExists(newGraphName)).toBe(false);
+        await apicalls.removeGraph(graphName, "admin");
+    });
+
+    test(`@readwrite Validate that creating a graph with an existing name is preventedI`, async () => {
+        const graphName = `graph_${Date.now()}`;
+        await apicalls.addGraph(graphName);
+        const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+        await browser.setPageToFullScreen();
+        await graph.addGraph(graphName);
+        expect(await graph.getErrorNotification()).toBe(true);
+        const graphNames = await apicalls.getGraphs();
+        const count = graphNames.result.filter(name => name === graphName).length;
+        expect(count).toBe(1);
+        await apicalls.removeGraph(graphName);
+    });
+
+    test(`@admin Validate that modifying a graph name to an existing name is prevented`, async () => {
+        const graphName1 = `graph_${Date.now()}`;
+        const graphName2 = `graph_${Date.now()}`;
+        await apicalls.addGraph(graphName1);
+        await apicalls.addGraph(graphName2);
+        const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+        await browser.setPageToFullScreen();
+        await graph.modifyGraphName(graphName2, graphName1);
+        await graph.refreshPage();
+        expect(await graph.verifyGraphExists(graphName1)).toBe(true);
+        await graph.refreshPage();
+        expect(await graph.verifyGraphExists(graphName2)).toBe(true);
+        await apicalls.removeGraph(graphName1);
+        await apicalls.removeGraph(graphName2);
+    });
+
+    test(`@readwrite Validate that running multiple queries updates the node and edge count correctly`, async () => {
+        const graphName = `graph_${crypto.randomUUID()}`;
+        await apicalls.addGraph(graphName);
+        const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+        await browser.setPageToFullScreen();
+        await graph.selectExistingGraph(graphName);
+        await graph.insertQuery(CREATE_TEN_CONNECTED_NODES);
+        await graph.clickRunQuery();
+        const nodes = await graph.getNodesGraphStats();
+        const edges = await graph.getEdgesGraphStats();
+        expect(parseInt(nodes ?? "")).toBe(10);
+        expect(parseInt(edges ?? "")).toBe(9)
+        await apicalls.removeGraph(graphName);
+    });
 })
