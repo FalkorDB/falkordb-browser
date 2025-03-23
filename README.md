@@ -18,12 +18,24 @@ To see a running demo, check: https://browser.falkordb.com/
 ## Run in Docker
 
 ```
-sudo docker run -p 3000:3000 -it falkordb/falkordb-browser:edge
+docker run -p 3000:3000 -p 6379:6379 -it --rm falkordb/falkordb:latest
 ```
 
-## Development - Getting Started 
+## (ALTERNATIVE) Development - Getting Started 
 
 First copy the `.env.local.template` as `.env.local`.
+
+Then, it is a [Next.js](https://nextjs.org/) project. To install dependencies:
+
+```bash
+npm install
+# or
+yarn install
+# or
+pnpm install
+# or
+bun install
+```
 
 Then, it is a [Next.js](https://nextjs.org/) project. To run the development server:
 
@@ -39,9 +51,7 @@ bun dev
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
-
 ## Running FalkorDB database
-
 ```
 docker run -p 6379:6379 -it --rm falkordb/falkordb:latest
 ```
