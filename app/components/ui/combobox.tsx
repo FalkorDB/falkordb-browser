@@ -93,16 +93,16 @@ export default function Combobox({ isSelectGraph = false, disabled = false, inTa
         <Tooltip>
           <TooltipTrigger asChild>
             <SelectTrigger data-type="select" disabled={disabled || options.length === 0} className={cn("w-fit gap-2 border-none p-2", inTable ? "text-sm font-light" : "text-xl font-medium")}>
-              <SelectValue placeholder={`Select ${label || type || "Graph"}`} />
+              <SelectValue placeholder={`Select ${label || type}`} />
             </SelectTrigger>
           </TooltipTrigger>
           <TooltipContent>
-            {options.length === 0 ? "There is no graphs" : selectedValue || `Select ${label || type || "Graph"}`}
+            {options.length === 0 ? "There is no graphs" : selectedValue || `Select ${label || type}`}
           </TooltipContent>
         </Tooltip>
         <SelectContent className="min-w-52 max-h-[40lvh] bg-foreground">
           <div className="p-4" id="graphSearch">
-            <Input ref={ref => ref?.focus()} className="w-full" placeholder={`Search a graph ${type}`} onChange={(e) => {
+            <Input ref={ref => ref?.focus()} className="w-full" placeholder={`Search for a ${label || type}`} onChange={(e) => {
               setSearch(e.target.value)
               setMaxOptions(5)
             }} value={search} />
@@ -133,7 +133,7 @@ export default function Combobox({ isSelectGraph = false, disabled = false, inTa
                   )
                 }
                 {
-                  maxOptions > STEP && (
+                  maxOptions !== 5 && maxOptions > STEP && ( // Excluded 5 because it's the initial after searching
                     <Button onClick={() => setMaxOptions(maxOptions - STEP)}>
                       Show fewer...
                     </Button>
