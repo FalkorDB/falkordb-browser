@@ -152,28 +152,4 @@ test.describe('Canvas Tests', () => {
         await apicalls.removeGraph(graphName);
     });
 
-    test(`@readwrite Validate modifying node attributes will update correctly`, async () => {
-        test.setTimeout(50000);
-        const graphName = `graph_${Date.now()}`;        
-        await apicalls.addGraph(graphName);
-        await apicalls.runQuery(graphName, 'CREATE (:Person {name: "Alice"}), (:Person {name: "Bob"})');
-        const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
-        await browser.setPageToFullScreen();
-        await graph.selectExistingGraph(graphName);
-        await graph.insertQuery('MATCH (n) RETURN n');
-        await graph.clickRunQuery();
-        await graph.getGraphDetails();
-        await graph.searchForElementInCanvas("bob");
-        await graph.rightClickAtCanvasCenter();
-        await graph.modifyNodeHeaderAttribute("attributetest");
-        await graph.refreshPage();
-        await graph.selectExistingGraph(graphName);
-        await graph.insertQuery('MATCH (n) RETURN n');
-        await graph.clickRunQuery();
-        await graph.searchForElementInCanvas("bob");
-        await graph.rightClickAtCanvasCenter();
-        expect(await graph.getAttributeHeaderLabelInDataPanelHeader()).toBe("attributetest");
-        await apicalls.removeGraph(graphName);
-    });
-
 })

@@ -6,3 +6,4 @@ export const BATCH_CREATE_PERSONS_APIREQ = queryData.queries[0].testQueries[0].a
 export const CREATE_SAMPLE_PERSONS_QUERY_APIREQ = queryData.queries[0].testQueries[2].apiReq;
 export const FETCH_NODE_DETAILS_QUERY = queryData.queries[0].testQueries[3].query;
 export const CREATE_TEN_CONNECTED_NODES = queryData.queries[0].testQueries[4].query;
+export const FETCH_ALL_NODES = queryData.queries[0].testQueries[5].query;

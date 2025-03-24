@@ -127,7 +127,12 @@
           "name": "createTenConnectedNodes",
           "query": "UNWIND range(1, 10) AS i CREATE (p:Person {id: i, name: 'Person ' + toString(i)}) WITH collect(p) AS people UNWIND range(0, 8) AS idx WITH people[idx] AS a, people[idx + 1] AS b CREATE (a)-[r:KNOWS]->(b) RETURN a, b, r",
           "reason": "Creates 10 Person nodes and connects each node to the next using KNOWS relationships, then returns the nodes and edges for canvas visualization."
-        }        
+        },
+        {
+          "name": "fetchAllNodes",
+          "query": "MATCH (n) RETURN n",
+          "reason": "Retrieves all nodes with full details for canvas visualization."
+        }                
       ]
     }
   ]
