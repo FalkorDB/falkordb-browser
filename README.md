@@ -36,7 +36,7 @@ docker run -p 6379:6379 -it --rm falkordb/falkordb:latest
 ### Build and run browser from source
 
 * Clone the git repository `git clone git@github.com:FalkorDB/falkordb-browser.git`
-* Create .env.local in the clone directory `cp.env.local.template .env.local`
+* Create .env.local in the clone directory `cp .env.local.template .env.local`
 * Build the node project `npm -i`
 * run the server `npm run dev`
 
