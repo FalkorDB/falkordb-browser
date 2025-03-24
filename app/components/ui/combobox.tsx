@@ -133,7 +133,7 @@ export default function Combobox({ isSelectGraph = false, disabled = false, inTa
                   )
                 }
                 {
-                  maxOptions > STEP && (
+                  maxOptions !== 5 && maxOptions > STEP && (
                     <Button onClick={() => setMaxOptions(maxOptions - STEP)}>
                       Show fewer...
                     </Button>
