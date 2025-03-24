@@ -30,7 +30,6 @@ test.describe('Data panel Tests', () => {
         await graph.selectExistingGraph(graphName);
         await graph.insertQuery(FETCH_ALL_NODES);
         await graph.clickRunQuery();
-        await graph.getGraphDetails();
         await graph.searchForElementInCanvas("bob");
         await graph.rightClickAtCanvasCenter();
         await graph.modifyNodeHeaderAttribute("attributetest");
@@ -65,7 +64,6 @@ test.describe('Data panel Tests', () => {
         await graph.selectExistingGraph(graphName);
         await graph.insertQuery(FETCH_ALL_NODES);
         await graph.clickRunQuery();
-        await graph.getGraphDetails();
         await graph.searchForElementInCanvas("alice");
         await graph.rightClickAtCanvasCenter();
         await graph.addAttribute("age", "30");
@@ -84,7 +82,6 @@ test.describe('Data panel Tests', () => {
         await graph.selectExistingGraph(graphName);
         await graph.insertQuery(FETCH_ALL_NODES);
         await graph.clickRunQuery();
-        await graph.getGraphDetails();
         await graph.searchForElementInCanvas("alice");
         await graph.rightClickAtCanvasCenter();
         expect(await graph.getAttributeValueInGraphDataPanel()).toBe("30");

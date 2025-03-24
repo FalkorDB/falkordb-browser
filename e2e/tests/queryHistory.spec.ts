@@ -26,7 +26,7 @@ test.describe('Query history Tests', () => {
         const graphName = `graph_${Date.now()}`;
         await graph.addGraph(graphName);
         await graph.insertQuery(FETCH_FIRST_TEN_NODES);
-        await graph.clickRunQuery(false);
+        await graph.clickRunQuery();
         await graph.clickOnQueryHistory();
         expect(await graph.getQueryHistory("1")).toBe(true);
         await apicalls.removeGraph(graphName);         
@@ -38,7 +38,7 @@ test.describe('Query history Tests', () => {
         const graphName = `graph_${Date.now()}`;
         await graph.addGraph(graphName);
         await graph.insertQuery(BATCH_CREATE_PERSONS);
-        await graph.clickRunQuery(false);
+        await graph.clickRunQuery();
         await graph.refreshPage();
         await graph.selectExistingGraph(graphName)
         await graph.runAQueryFromHistory("1")

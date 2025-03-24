@@ -71,6 +71,7 @@ export default class QueryHistory extends GraphPage {
     }
 
     async getQueryHistoryEditor(): Promise<string | null> {
+        await this.page.waitForTimeout(500);
         return await this.queryHistoryTextarea.inputValue();
     }
 
