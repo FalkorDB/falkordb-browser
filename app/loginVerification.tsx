@@ -42,7 +42,7 @@ export default function LoginVerification({ children }: { children: React.ReactN
 
         checkStatus()
 
-        const interval = setInterval(checkStatus, 60000)
+        const interval = setInterval(checkStatus, 5000)
 
         return () => clearInterval(interval)
     }, [status])

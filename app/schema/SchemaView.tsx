@@ -108,17 +108,21 @@ export default function SchemaView({ schema, fetchCount }: Props) {
         } else dataPanel.current?.collapse()
     }
 
-    const onExpand = () => {
+    const onExpand = (expand?: boolean) => {
         if (!dataPanel.current) return
-
         const panel = dataPanel.current
-
-        if (panel.isExpanded()) {
-            panel.collapse()
-            setIsAddEntity(false)
-            setIsAddRelation(false)
-        } else {
+        if (expand !== undefined) {
+            if (expand && panel?.isCollapsed()) {
+                panel?.expand()
+            } else if (!expand && panel?.isExpanded()) {
+                panel?.collapse()
+            }
+            return
+        }
+        if (panel.isCollapsed()) {
             panel.expand()
+        } else {
+            panel.collapse()
         }
     }
 
