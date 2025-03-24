@@ -133,7 +133,7 @@ export default function Combobox({ isSelectGraph = false, disabled = false, inTa
                   )
                 }
                 {
-                  maxOptions !== 5 && maxOptions > STEP && (
+                  maxOptions !== 5 && maxOptions > STEP && ( // Excluded 5 because it's the initial after searching
                     <Button onClick={() => setMaxOptions(maxOptions - STEP)}>
                       Show fewer...
                     </Button>
