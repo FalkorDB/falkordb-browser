@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useContext, useEffect, useState } from "react";
 import { HistoryQuery, prepareArg, Query, securedFetch } from "@/lib/utils";
 import { useSession } from "next-auth/react";
 import { useToast } from "@/components/ui/use-toast";
@@ -9,6 +9,7 @@ import Header from "../components/Header";
 import { Graph, Link, Node } from "../api/graph/model";
 import GraphView from "./GraphView";
 import Tutorial from "./Tutorial";
+import { IndicatorContext } from "../components/provider";
 
 const Selector = dynamic(() => import("./Selector"), { ssr: false })
 
@@ -29,6 +30,7 @@ export default function Page() {
     const [currentQuery, setCurrentQuery] = useState<Query | undefined>(undefined)
     const { data: session } = useSession()
     const { toast } = useToast()
+    const { setIndicator } = useContext(IndicatorContext);
 
     useEffect(() => {
         setHistoryQuery({
@@ -46,17 +48,17 @@ export default function Page() {
 
         const nodes = await (await securedFetch(`api/graph/${prepareArg(graphName)}/?query=${prepareArg(q1)}`, {
             method: "GET"
-        }, toast)).json()
+        }, toast, setIndicator)).json()
 
         const edges = await (await securedFetch(`api/graph/${prepareArg(graphName)}/?query=${prepareArg(q2)}`, {
             method: "GET"
-        }, toast)).json()
+        }, toast, setIndicator)).json()
 
         if (!edges || !nodes) return
 
         setEdgesCount(edges.result?.data[0].edges)
         setNodesCount(nodes.result?.data[0].nodes)
-    }, [graphName, toast])
+    }, [graphName, toast, setIndicator])
 
     useEffect(() => {
         if (graphName !== graph.Id) {
@@ -79,7 +81,7 @@ export default function Page() {
 
         const result = await securedFetch(`api/graph/${prepareArg(graphName)}/?query=${prepareArg(q)}`, {
             method: "GET"
-        }, toast)
+        }, toast, setIndicator)
 
         if (!result.ok) return null
 
@@ -95,7 +97,7 @@ export default function Page() {
         if (!result) return undefined
         const explain = await securedFetch(`api/graph/${prepareArg(graphName)}/explain/?query=${prepareArg(q)}`, {
             method: "GET"
-        }, toast)
+        }, toast, setIndicator)
         if (!explain.ok) return undefined
         const explainJson = await explain.json()
         const newQuery = { text: q, metadata: result.metadata, explain: explainJson.result }

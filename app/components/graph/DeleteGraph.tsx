@@ -1,9 +1,10 @@
 import { useToast } from "@/components/ui/use-toast";
 import { prepareArg, securedFetch, Row } from "@/lib/utils";
-import { ReactNode, useState } from "react";
+import React, { ReactNode, useContext, useState } from "react";
 import DialogComponent from "../DialogComponent";
 import Button from "../ui/Button";
 import CloseDialog from "../CloseDialog";
+import { IndicatorContext } from "../provider";
 
 export default function DeleteGraph({ type, trigger, options, rows, handleSetRows, setOpenMenage, setOptions, selectedValue, setSelectedValue }: {
     type: "Schema" | "Graph"
@@ -20,7 +21,8 @@ export default function DeleteGraph({ type, trigger, options, rows, handleSetRow
     const [open, setOpen] = useState(false)
     const { toast } = useToast()
     const [isLoading, setIsLoading] = useState(false)
-
+    const { indicator, setIndicator } = useContext(IndicatorContext)
+    
     const handleDelete = async (opts: string[]) => {
         setIsLoading(true)
         try {
@@ -29,7 +31,7 @@ export default function DeleteGraph({ type, trigger, options, rows, handleSetRow
           const newNames = await Promise.all(names.map(async (name) => {
             const result = await securedFetch(`api/graph/${prepareArg(name)}`, {
               method: "DELETE"
-            }, toast)
+            }, toast, setIndicator)
     
             if (result.ok) return name
     
@@ -59,11 +61,12 @@ export default function DeleteGraph({ type, trigger, options, rows, handleSetRow
             open={open}
             onOpenChange={setOpen}
             title="Delete Graph"
-            trigger={trigger}
+trigger={React.cloneElement(trigger as React.ReactElement, { disabled: indicator === "offline" || (trigger as React.ReactElement).props.disabled })}
             description={`Are you sure you want to delete the selected graph(s)? (${rows.filter(opt => opt.checked).map(opt => opt.cells[0].value as string).join(", ")})`}
           >
             <div className="flex justify-end gap-2">
               <Button
+                disabled={indicator === "offline"}
                 variant="Primary"
                 label="Delete Graph"
                 onClick={() => handleDelete(rows.filter(opt => opt.checked).map(opt => opt.cells[0].value as string))}

@@ -1,22 +1,24 @@
 "use client"
 
 import useSWR from 'swr'
-import React, { useState } from 'react'
+import React, { useState, useContext } from 'react'
 import { securedFetch } from '@/lib/utils'
 import { useToast } from '@/components/ui/use-toast'
+import { IndicatorContext } from '@/app/components/provider'
 import MonitorView from './MonitorView'
 
 export default function Page() {
 
     const [time, setTime] = useState<Date | null>(null)
     const { toast } = useToast()
+    const { setIndicator } = useContext(IndicatorContext)
     
     const fetcher = (url: string) => securedFetch(url, {
         method: 'GET',
         headers: {
             'Content-Type': 'application/json'
         }
-    }, toast).then((result) => {
+    }, toast, setIndicator).then((result) => {
         if (result.ok) {
             setTime(new Date())
             return result.json()

@@ -3,7 +3,7 @@
 'use client'
 
 import { LifeBuoy, LogOut, Settings } from "lucide-react";
-import { Dispatch, SetStateAction } from "react";
+import { Dispatch, SetStateAction, useContext } from "react";
 import Image from "next/image";
 import { cn } from "@/lib/utils";
 import { useRouter, usePathname } from "next/navigation";
@@ -12,8 +12,10 @@ import { NavigationMenu, NavigationMenuContent, NavigationMenuItem, NavigationMe
 import pkg from '@/package.json';
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import { Drawer, DrawerContent, DrawerDescription, DrawerTitle, DrawerTrigger } from "@/components/ui/drawer";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import Button from "./ui/Button";
 import CreateGraph from "./CreateGraph";
+import { IndicatorContext } from "./provider";
 
 interface Props {
     onSetGraphName?: Dispatch<SetStateAction<string>>
@@ -26,6 +28,7 @@ export default function Header({ onSetGraphName, graphNames }: Props) {
     const type = pathname.includes("/schema") ? "Schema" : "Graph"
     const inCreate = pathname.includes("/create")
     const { data: session } = useSession()
+    const { indicator } = useContext(IndicatorContext)
 
     return (
         <div className="flex flex-col">
@@ -53,6 +56,18 @@ export default function Header({ onSetGraphName, graphNames }: Props) {
                             onClick={() => router.push("/schema")}
                         />
                     </div>
+                    {indicator === "offline" && (
+                        <div className="flex gap-2 rounded-lg p-2 border border-red-500">
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <p className="text-red-500">Offline</p>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                    <p>The falkordb server is offline</p>
+                                </TooltipContent>
+                            </Tooltip>
+                        </div>
+                    )}
                 </div>
                 <div className="flex gap-6 items-center">
                     <Drawer direction="right">
@@ -62,6 +77,7 @@ export default function Header({ onSetGraphName, graphNames }: Props) {
                                     session?.user?.role === "Admin" &&
                                     <NavigationMenuLink className="bg-foreground" asChild>
                                         <Button
+                                            disabled={indicator === "offline"}
                                             label="Settings"
                                             title="Adjust application settings"
                                             onClick={() => router.push("/settings")}

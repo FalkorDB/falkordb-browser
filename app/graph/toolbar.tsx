@@ -3,11 +3,12 @@
 /* eslint-disable react/require-default-props */
 
 import { Link, PlusCircle, Shrink, Trash2, ZoomIn, ZoomOut } from "lucide-react";
-import { useState } from "react";
+import { useContext, useState } from "react";
 import { handleZoomToFit, GraphRef } from "@/lib/utils";
 import { useSession } from "next-auth/react";
 import Button from "../components/ui/Button";
 import DeleteElement from "./DeleteElement";
+import { IndicatorContext } from "../components/provider";
 
 interface Props {
     disabled?: boolean,
@@ -33,6 +34,7 @@ export default function Toolbar({
 
     const [deleteOpen, setDeleteOpen] = useState(false)
     const { data: session } = useSession()
+    const { indicator } = useContext(IndicatorContext)
 
     const handleZoomClick = (changeFactor: number) => {
         const chart = chartRef.current
@@ -61,7 +63,7 @@ export default function Toolbar({
                         <>
                             <Button
                                 className="text-nowrap"
-                                disabled={disabled}
+                                disabled={disabled || indicator === "offline"}
                                 variant="Primary"
                                 label="Add Node"
                                 title={`Add a new node to the ${type}`}
@@ -71,7 +73,7 @@ export default function Toolbar({
                             </Button>
                             <Button
                                 className="text-nowrap"
-                                disabled={disabled}
+                                disabled={disabled || indicator === "offline"}
                                 variant="Primary"
                                 label="Add Relation"
                                 title={`Add a new relation to the ${type}`}
@@ -107,7 +109,7 @@ export default function Toolbar({
             <div className="flex items-center gap-4">
                 <Button
                     className="text-nowrap"
-                    disabled={disabled}
+                    disabled={disabled || indicator === "offline"}
                     variant="Secondary"
                     label="Zoom In"
                     title="Zoom in for a closer view"
@@ -117,7 +119,7 @@ export default function Toolbar({
                 </Button>
                 <Button
                     className="text-nowrap"
-                    disabled={disabled}
+                    disabled={disabled || indicator === "offline"}
                     variant="Secondary"
                     label="Zoom Out"
                     title="Zoom out for a broader view"
@@ -127,7 +129,7 @@ export default function Toolbar({
                 </Button>
                 <Button
                     className="text-nowrap"
-                    disabled={disabled}
+                    disabled={disabled || indicator === "offline"}
                     variant="Secondary"
                     label="Fit To Size"
                     title="Center and fit the graph to the screen"

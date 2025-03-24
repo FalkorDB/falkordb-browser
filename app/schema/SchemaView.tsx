@@ -484,7 +484,7 @@ export default function SchemaView({ schema, fetchCount }: Props) {
                     }
                 </div>
             </ResizablePanel>
-            <ResizableHandle disabled={isCollapsed} className={cn(isCollapsed ? "w-0 !cursor-default" : "w-3")} />
+            <ResizableHandle disabled={!selectedElement} className={cn(!selectedElement && "!cursor-default")} />
             <ResizablePanel
                 className={cn("rounded-lg", !isCollapsed && "border-[3px] border-foreground")}
                 collapsible

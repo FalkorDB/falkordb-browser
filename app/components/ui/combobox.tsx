@@ -6,7 +6,7 @@
 
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { cn, prepareArg, Row, securedFetch } from "@/lib/utils"
-import { useEffect, useState } from "react"
+import { useContext, useEffect, useState } from "react"
 import { Select, SelectContent, SelectGroup, SelectItem, SelectSeparator, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useToast } from "@/components/ui/use-toast"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
@@ -18,6 +18,7 @@ import CloseDialog from "../CloseDialog"
 import ExportGraph from "../ExportGraph"
 import DeleteGraph from "../graph/DeleteGraph"
 import Input from "./Input"
+import { IndicatorContext } from "../provider"
 
 interface ComboboxProps {
   options: string[],
@@ -45,6 +46,7 @@ export default function Combobox({ isSelectGraph = false, disabled = false, inTa
   const [maxOptions, setMaxOptions] = useState<number>(STEP)
   const { toast } = useToast()
   const { data: session } = useSession()
+  const { indicator } = useContext(IndicatorContext)
 
   useEffect(() => {
     const timeout = setTimeout(() => {
@@ -86,7 +88,7 @@ export default function Combobox({ isSelectGraph = false, disabled = false, inTa
 
   return (
     <Dialog open={openMenage} onOpenChange={setOpenMenage}>
-      <Select value={selectedValue} onValueChange={setSelectedValue} open={open} onOpenChange={(o) => {
+      <Select disabled={disabled || options.length === 0 || indicator === "offline"} value={selectedValue} onValueChange={setSelectedValue} open={open} onOpenChange={(o) => {
         setOpen(o)
         if (onOpenChange) onOpenChange(o)
       }}>

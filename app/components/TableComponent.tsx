@@ -10,12 +10,13 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { JSONTree } from "react-json-tree"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Cell, cn, Row } from "@/lib/utils";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useContext, useEffect, useState } from "react";
 import { CheckCircle, Pencil, XCircle } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import Button from "./ui/Button";
 import Input from "./ui/Input";
 import Combobox from "./ui/combobox";
+import { IndicatorContext } from "./provider";
 
 interface Props {
     headers: string[],
@@ -34,6 +35,7 @@ export default function TableComponent({ headers, rows, children, setRows, optio
     const [hover, setHover] = useState<string>("")
     const [newValue, setNewValue] = useState<string>("")
     const [filteredRows, setFilteredRows] = useState<Row[]>(rows)
+    const { indicator } = useContext(IndicatorContext)
 
     const handleSearchFilter = useCallback((cell: Cell): boolean => {
         if (!cell.value) return false;
@@ -183,7 +185,7 @@ export default function TableComponent({ headers, rows, children, setRows, optio
                                                         }}
                                                         data={cell.value}
                                                     />
-                                                      : editable === `${i}-${j}` ?
+                                                    : editable === `${i}-${j}` ?
                                                         <div className="w-full flex gap-2 items-center">
                                                             {
                                                                 cell.type === "combobox" ?
@@ -255,7 +257,7 @@ export default function TableComponent({ headers, rows, children, setRows, optio
                                                                     cell.onChange && hover === `${i}` &&
                                                                     <Button
                                                                         className="disabled:cursor-text disabled:opacity-100"
-                                                                        disabled={!cell.onChange}
+                                                                        disabled={!cell.onChange || indicator === "offline"}
                                                                         title="Edit"
                                                                         onClick={() => handleSetEditable(`${i}-${j}`, cell.value!.toString())}
                                                                     >

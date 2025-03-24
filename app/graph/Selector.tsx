@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState, Dispatch, SetStateAction } from "react";
+import { useEffect, useRef, useState, Dispatch, SetStateAction, useContext } from "react";
 import { DialogTitle } from "@/components/ui/dialog";
 import { Editor } from "@monaco-editor/react";
 import { editor } from "monaco-editor";
@@ -21,6 +21,7 @@ import CreateGraph from "../components/CreateGraph";
 import ExportGraph from "../components/ExportGraph";
 import MetadataView from "./MetadataView";
 import Input from "../components/ui/Input";
+import { IndicatorContext } from "../components/provider";
 
 interface Props {
     setGraphName: (selectedGraphName: string) => void
@@ -51,7 +52,7 @@ export default function Selector({ setGraphName, graphName, runQuery, edgesCount
     const [isRotating, setIsRotating] = useState(false);
     const { toast } = useToast()
     const [filteredQueries, setFilteredQueries] = useState<Query[]>(historyQuery?.queries || [])
-
+    const { indicator } = useContext(IndicatorContext)
 
     const focusEditorAtEnd = () => {
         if (editorRef.current) {
@@ -75,7 +76,6 @@ export default function Selector({ setGraphName, graphName, runQuery, edgesCount
             setFilteredQueries(historyQuery.queries?.filter((query, i) => !search || query.text.toLowerCase().includes(search.toLowerCase()) || i === historyQuery.counter - 1) || [])
             focusEditorAtEnd()
         }, 500)
-
 
         return () => {
             clearTimeout(timeout)
@@ -106,6 +106,8 @@ export default function Selector({ setGraphName, graphName, runQuery, edgesCount
     }
 
     const getOptions = async () => {
+        if (indicator === "offline") return
+
         const result = await securedFetch("api/graph", {
             method: "GET"
         }, toast)
@@ -186,6 +188,7 @@ export default function Selector({ setGraphName, graphName, runQuery, edgesCount
                         </>
                     }
                     <Button
+                        disabled={indicator === "offline"}
                         className={cn(
                             "transition-transform",
                             isRotating && "animate-spin duration-1000"
@@ -338,7 +341,7 @@ export default function Selector({ setGraphName, graphName, runQuery, edgesCount
                                     <Button
                                         ref={submitQuery}
                                         className="text-white flex justify-center w-1/3"
-                                        disabled={isLoading || !historyQuery?.counter}
+                                        disabled={isLoading || !historyQuery?.counter || indicator === "offline"}
                                         onClick={async () => {
                                             try {
                                                 setIsLoading(true);

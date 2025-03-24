@@ -1,9 +1,10 @@
-import { FormEvent, useState } from "react";
+import { FormEvent, useContext, useState } from "react";
 import { prepareArg, securedFetch } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
 import DialogComponent from "../components/DialogComponent";
 import Button from "../components/ui/Button";
 import Input from "../components/ui/Input";
+import { IndicatorContext } from "../components/provider";
 
 export default function Duplicate({ open, onOpenChange, selectedValue, onDuplicate, disabled, type }: {
     selectedValue: string,
@@ -17,6 +18,7 @@ export default function Duplicate({ open, onOpenChange, selectedValue, onDuplica
     const [duplicateName, setDuplicateName] = useState("");
     const [isLoading, setIsLoading] = useState(false)
     const { toast } = useToast()
+    const { indicator, setIndicator } = useContext(IndicatorContext)
 
     const handleDuplicate = async (e: FormEvent) => {
         e.preventDefault()
@@ -26,9 +28,9 @@ export default function Duplicate({ open, onOpenChange, selectedValue, onDuplica
             const graphName = type === "Schema" ? `${duplicateName}_schema` : duplicateName
             const sourceName = type === "Schema" ? `${selectedValue}_schema` : selectedValue
 
-        const result = await securedFetch(`api/graph/${prepareArg(graphName)}/?sourceName=${prepareArg(sourceName)}`, {
-            method: "POST"
-        }, toast)
+            const result = await securedFetch(`api/graph/${prepareArg(graphName)}/?sourceName=${prepareArg(sourceName)}`, {
+                method: "POST"
+            }, toast, setIndicator)
 
             if (!result.ok) return
 
@@ -48,10 +50,10 @@ export default function Duplicate({ open, onOpenChange, selectedValue, onDuplica
             open={open}
             onOpenChange={onOpenChange}
             trigger={<Button
-                    label="Duplicate"
-                    disabled={disabled}
-                    title={`Create a copy of the selected ${type}`}
-                />}
+                label="Duplicate"
+                title={`Create a copy of the selected ${type}`}
+                disabled={disabled}
+            />}
             className="w-[25%]"
             title={`Duplicate this ${type}`}
         >
@@ -65,6 +67,7 @@ export default function Duplicate({ open, onOpenChange, selectedValue, onDuplica
                 </div>
                 <div className="flex gap-4">
                     <Button
+                        disabled={indicator === "offline"}
                         variant="Primary"
                         label="Duplicate"
                         title={`Confirm duplication of the ${type}`}
