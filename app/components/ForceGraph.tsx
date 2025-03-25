@@ -6,19 +6,17 @@
 
 import { Dispatch, SetStateAction, useEffect, useRef, useState } from "react"
 import ForceGraph2D from "react-force-graph-2d"
-import { securedFetch, GraphRef, handleZoomToFit } from "@/lib/utils"
+import { securedFetch, GraphRef } from "@/lib/utils"
 import { useToast } from "@/components/ui/use-toast"
 import * as d3 from "d3"
-import { useSession } from "next-auth/react"
-import { Search } from "lucide-react"
 import { Graph, GraphData, Link, Node } from "../api/graph/model"
-import Input from "./ui/Input"
-import Button from "./ui/Button"
 
 interface Props {
     graph: Graph
     chartRef: GraphRef
     data: GraphData
+    onExpand: (expand?: boolean) => void
+    setData: Dispatch<SetStateAction<GraphData>>
     selectedElement: Node | Link | undefined
     setSelectedElement: (element: Node | Link | undefined) => void
     selectedElements: (Node | Link)[]
@@ -37,6 +35,8 @@ export default function ForceGraph({
     graph,
     chartRef,
     data,
+    onExpand,
+    setData,
     selectedElement,
     setSelectedElement,
     selectedElements,
@@ -50,16 +50,10 @@ export default function ForceGraph({
 
     const [parentWidth, setParentWidth] = useState<number>(0)
     const [parentHeight, setParentHeight] = useState<number>(0)
-    const [searchElement, setSearchElement] = useState<string>("")
     const [hoverElement, setHoverElement] = useState<Node | Link | undefined>()
     const parentRef = useRef<HTMLDivElement>(null)
     const lastClick = useRef<{ date: Date, name: string }>({ date: new Date(), name: "" })
     const { toast } = useToast()
-    const { data: session } = useSession()
-
-    useEffect(() => {
-
-    }, [])
 
     useEffect(() => {
         const handleResize = () => {
@@ -89,23 +83,12 @@ export default function ForceGraph({
         const linkForce = chartRef.current.d3Force('link');
         if (linkForce) {
             linkForce
-                .distance(() => 30)
-                .strength((link: any) => 1 / Math.min(
-                    graph.Elements.nodes.filter(n => n.id === link.source.id).length,
-                    graph.Elements.nodes.filter(n => n.id === link.target.id).length
-                ));
-        }
-
-        // Adjust charge force for node repulsion
-        const chargeForce = chartRef.current.d3Force('charge');
-        if (chargeForce) {
-            chargeForce
-                .strength(-30)
-                .distanceMax(150);
+                .distance(() => 50)
+                .strength(0.1);
         }
 
         // Add collision force to prevent node overlap
-        chartRef.current.d3Force('collision', d3.forceCollide(NODE_SIZE * 1.5));
+        chartRef.current.d3Force('collision', d3.forceCollide(NODE_SIZE).strength(-1));
 
         // Center force to keep graph centered
         const centerForce = chartRef.current.d3Force('center');
@@ -120,7 +103,7 @@ export default function ForceGraph({
             headers: {
                 'Content-Type': 'application/json'
             }
-        }, session?.user?.role, toast);
+        }, toast);
 
         if (result.ok) {
             const json = await result.json()
@@ -131,52 +114,55 @@ export default function ForceGraph({
                     description: `No neighbors found`,
                 })
             }
-            return elements
         }
-
-        return []
     }
 
     const deleteNeighbors = (nodes: Node[]) => {
+
         if (nodes.length === 0) return;
 
+        const expandedNodes: Node[] = []
+
         graph.Elements = {
-            nodes: graph.Elements.nodes.map(node => {
-                const isTarget = graph.Elements.links.some(link => link.source.id === node.id && nodes.some(n => n.id === link.target.id));
+            nodes: graph.Elements.nodes.filter(node => {
+                if (!node.collapsed) return true
 
-                if (!isTarget || !node.collapsed) return node
+                const isTarget = graph.Elements.links.some(link => link.target.id === node.id && nodes.some(n => n.id === link.source.id));
 
-                if (node.expand) {
-                    node.expand = false
-                    deleteNeighbors([node])
+                if (!isTarget) return true
+
+                const deleted = graph.NodesMap.delete(Number(node.id))
+
+                if (deleted && node.expand) {
+                    expandedNodes.push(node)
                 }
 
-                graph.NodesMap.delete(Number(node.id))
-
-                return undefined
-            }).filter(node => node !== undefined),
+                return false
+            }),
             links: graph.Elements.links
         }
+
+        deleteNeighbors(expandedNodes)
 
         graph.removeLinks()
     }
 
     const handleNodeClick = async (node: Node) => {
-
         const now = new Date()
         const { date, name } = lastClick.current
+        lastClick.current = { date: now, name: node.data.name || node.id.toString() }
 
         if (now.getTime() - date.getTime() < 1000 && name === (node.data.name || node.id.toString())) {
-            return
-        }
+            if (!node.expand) {
+                await onFetchNode(node)
+            } else {
+                deleteNeighbors([node])
+            }
 
-        if (!node.expand) {
-            await onFetchNode(node)
-        } else {
-            deleteNeighbors([node])
+            node.expand = !node.expand
+            setData({ ...graph.Elements })
+            handleCooldown()
         }
-
-        lastClick.current = { date: new Date(), name: node.data.name || node.id.toString() }
     }
 
     const handleHover = (element: Node | Link | null) => {
@@ -199,17 +185,15 @@ export default function ForceGraph({
             }
         }
 
-        setSelectedElement(element)
-
         if (evt.ctrlKey) {
             if (selectedElements.includes(element)) {
                 setSelectedElements(selectedElements.filter((el) => el !== element))
-                return
+            } else {
+                setSelectedElements([...selectedElements, element])
             }
-            setSelectedElements([...selectedElements, element])
         }
-
         setSelectedElement(element)
+        onExpand(!!selectedElement)
     }
 
     const handleUnselected = (evt?: MouseEvent) => {
@@ -218,40 +202,8 @@ export default function ForceGraph({
         setSelectedElements([])
     }
 
-    const handleSearchElement = () => {
-        if (searchElement) {
-            const element = graph.Elements.nodes.find(node => node.data.name ? node.data.name.toLowerCase().includes(searchElement.toLowerCase()) : node.id.toString().toLowerCase().includes(searchElement.toLowerCase()))
-            if (element) {
-                handleZoomToFit(chartRef, (node: Node) => node.id === element.id)
-                setSelectedElement(element)
-            }
-        }
-    }
-
     return (
         <div ref={parentRef} className="w-full h-full relative">
-            <div className="w-[20dvw] absolute top-4 left-4 z-10">
-                <div className="relative w-full">
-                    <Input
-                        className="w-full"
-                        placeholder="Search for element in the graph"
-                        value={searchElement}
-                        onChange={(e) => setSearchElement(e.target.value)}
-                        onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                                handleSearchElement()
-                                setSearchElement("")
-                            }
-                        }}
-                    />
-                    <Button
-                        className="absolute right-2 top-2"
-                        onClick={handleSearchElement}
-                    >
-                        <Search color="black" />
-                    </Button>
-                </div>
-            </div>
             <ForceGraph2D
                 ref={chartRef}
                 backgroundColor="#191919"
@@ -346,7 +298,7 @@ export default function ForceGraph({
                         textX = rotatedX;
                         textY = rotatedY;
                     }
-                    
+
                     // Get text width
                     ctx.font = '2px Arial';
                     const category = graph.LabelsMap.get(link.label)!
@@ -360,10 +312,10 @@ export default function ForceGraph({
 
                     // Save the current context state
                     ctx.save();
-                    
+
                     // Rotate
                     ctx.rotate(angle);
-                    
+
                     // Draw background and text
                     ctx.fillStyle = '#191919';
                     const padding = 0.5;
@@ -373,7 +325,7 @@ export default function ForceGraph({
                         textWidth + padding * 2,
                         textHeight + padding * 2
                     );
-                    
+
                     ctx.fillStyle = 'white';
                     ctx.textAlign = 'center';
                     ctx.textBaseline = 'middle';
@@ -396,7 +348,7 @@ export default function ForceGraph({
                 nodeVisibility="visible"
                 linkVisibility="visible"
                 cooldownTicks={cooldownTicks}
-                cooldownTime={2000}
+                cooldownTime={6000}
                 linkDirectionalArrowRelPos={1}
                 linkDirectionalArrowLength={(link) => link.source.id === link.target.id ? 0 : 2}
                 linkDirectionalArrowColor={(link) => link.color}

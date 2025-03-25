@@ -9,7 +9,7 @@ export default class SettingsUsersPage extends BasePage {
     }
 
     private get addUserButton(): Locator {
-        return this.page.getByRole("button", { name: "Add User" });
+        return this.page.locator("//button[contains(text(), 'Add User')]");
     }
 
     private get submitUserAddition(): Locator {
@@ -29,11 +29,14 @@ export default class SettingsUsersPage extends BasePage {
     }
     
     private get userSelectRoleBtn(): (selectedUser: string) => Locator {
-        return (selectedUser: string) => this.page.locator(`//tbody/tr[@data-id='${selectedUser}']/td[3]/button`)
+        return (selectedUser: string) => this.page.locator(`//tbody/tr[@data-id='${selectedUser}']/td[3]//button`).first();
     }
 
     private get selectUserRole(): (role: string) => Locator {
         return (role: string) => this.page.locator(`//ul//div[@role='option'][span[contains(text(), '${role}')]]`)
+    }
+    private get confirmModifyingUserRole(): Locator {
+        return this.page.locator("//button[text()='Set User']");
     }
 
     private get userNameField(): Locator {
@@ -65,7 +68,19 @@ export default class SettingsUsersPage extends BasePage {
     }
 
     private get deleteUsersBtn(): Locator {
-        return this.page.getByRole("button", { name: "Delete Users" })
+        return this.page.locator("//button[contains(text(), 'Delete Users')]")
+    }
+
+    private get searchBtn(): Locator {
+        return this.page.locator("//div[@id='tableComponent']/button");
+    }
+
+    private get searchInput(): Locator {
+        return this.page.locator("//div[@id='tableComponent']/input");
+    }
+
+    private get tableRoles(): Locator {
+        return this.page.locator("//table//tbody//tr");
     }
 
     async navigateToUserTab(): Promise<void> {
@@ -106,6 +121,7 @@ export default class SettingsUsersPage extends BasePage {
         await this.userSelectRoleEditBtn(selectedUser).click();
         await this.userSelectRoleBtn(selectedUser).click();
         await this.selectUserRole(role).click();
+        await this.clickOnConfirmModifyingUserRole();
         await waitForTimeOut(this.page, 1500)
     }
 
@@ -123,5 +139,21 @@ export default class SettingsUsersPage extends BasePage {
         await this.userCheckboxBtn(selectedUser).click();
         await this.deleteUsersBtn.click();
         await this.confirmUserDeleteMsg.click();
+    }
+
+    async searchForElement(element: string):  Promise<void>{
+        await this.searchBtn.click();
+        await this.searchInput.fill(element);
+        await this.page.keyboard.press('Enter');
+    }
+
+    async getTableRolesCount(): Promise<number>{
+        await this.page.waitForTimeout(1000);
+        const count = await this.tableRoles.count();
+        return count;
+    }
+
+    async clickOnConfirmModifyingUserRole():  Promise<void>{
+        await this.confirmModifyingUserRole.click();
     }
 }

@@ -3,10 +3,8 @@ import { User } from "@/app/api/user/model";
 import { Trash2 } from "lucide-react";
 import { Dispatch, SetStateAction } from "react";
 import Button from "@/app/components/ui/Button";
-import { securedFetch } from "@/lib/utils";
+import { Row, securedFetch } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
-import { useSession } from "next-auth/react";
-import { Row } from "@/app/components/TableComponent";
 
 interface DeleteUserProps {
     users: User[]
@@ -15,7 +13,6 @@ interface DeleteUserProps {
 }
 
 export default function DeleteUser({ users, setUsers, setRows }: DeleteUserProps) {
-    const { data: session } = useSession()
     const { toast } = useToast()
     
     const deleteSelected = async () => {
@@ -27,7 +24,7 @@ export default function DeleteUser({ users, setUsers, setRows }: DeleteUserProps
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({ users })
-        }, session?.user?.role, toast)
+        }, toast)
 
         if (response.ok) {
             toast({
@@ -46,6 +43,7 @@ export default function DeleteUser({ users, setUsers, setRows }: DeleteUserProps
                     disabled={users.length === 0}
                     variant="Primary"
                     label="Delete Users"
+                    title="Remove selected users"
                 >
                     <Trash2 />
                 </Button>

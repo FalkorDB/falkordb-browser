@@ -9,22 +9,22 @@ import { v4 as uuidv4 } from 'uuid'
 const connections = new Map<string, FalkorDB>();
 
 async function newClient(credentials: { host: string, port: string, password: string, username: string, tls: string, ca: string }, id: string): Promise<{ role: Role, client: FalkorDB }> {
-    const connectionOptions: FalkorDBOptions = credentials.ca === "undefined" ?
+    const connectionOptions: FalkorDBOptions = credentials.tls === "true" ?
         {
-            socket: {
-                host: credentials.host || "localhost",
-                port: credentials.port ? parseInt(credentials.port, 10) : 6379,
-            },
-            password: credentials.password ?? undefined,
-            username: credentials.username ?? undefined
-        }
-        : {
             socket: {
                 host: credentials.host ?? "localhost",
                 port: credentials.port ? parseInt(credentials.port, 10) : 6379,
                 tls: credentials.tls === "true",
                 checkServerIdentity: () => undefined,
-                ca: credentials.ca && [Buffer.from(credentials.ca, "base64").toString("utf8")]
+                ca: credentials.ca === "undefined" ? undefined : [Buffer.from(credentials.ca, "base64").toString("utf8")]
+            },
+            password: credentials.password ?? undefined,
+            username: credentials.username ?? undefined
+        } :
+        {
+            socket: {
+                host: credentials.host || "localhost",
+                port: credentials.port ? parseInt(credentials.port, 10) : 6379,
             },
             password: credentials.password ?? undefined,
             username: credentials.username ?? undefined
@@ -187,7 +187,7 @@ export async function getClient() {
         return NextResponse.json({ message: "Not authenticated" }, { status: 401 })
     }
 
-    return client
+    return { client, user }
 }
 
 export default authOptions

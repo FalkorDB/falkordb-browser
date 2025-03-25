@@ -4,13 +4,21 @@
 
 import React, { useEffect, useState } from "react";
 import { CreateUser, User } from "@/app/api/user/model";
-import { prepareArg, securedFetch } from "@/lib/utils";
-import TableComponent, { Row } from "@/app/components/TableComponent";
+import { prepareArg, securedFetch, Row } from "@/lib/utils";
+import TableComponent from "@/app/components/TableComponent";
 import { useToast } from "@/components/ui/use-toast";
 import { ToastAction } from "@/components/ui/toast";
-import { useSession } from "next-auth/react";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import CloseDialog from "@/app/components/CloseDialog";
 import DeleteUser from "./DeleteUser";
 import AddUser from "./AddUser";
+
+type SetUser = {
+    username: string
+    role: string
+    oldRole?: string
+}
 
 const ROLES = [
     "Admin",
@@ -23,23 +31,26 @@ export default function Users() {
 
     const [users, setUsers] = useState<User[]>([])
     const [rows, setRows] = useState<Row[]>([])
+    const [setUser, setSetUser] = useState<SetUser | null>(null)
+    const [open, setOpen] = useState(false)
     const { toast } = useToast()
-    const { data: session } = useSession()
 
-    const handleSetRole = async (username: string, role: string, oldRole?: string) => {
-        const result = await securedFetch(`api/user/${prepareArg(username)}?userRole=${role}`, {
+    const handleSetRole = async (user: SetUser) => {
+        const { username, role, oldRole } = user
+        const result = await securedFetch(`api/user/${prepareArg(username)}?role=${role}`, {
             method: 'PATCH'
-        }, session?.user?.role, toast)
+        }, toast)
 
         if (result.ok) {
-            setUsers(prev => prev.map(user => user.username === username ? { ...user, role } : user))
+            setUsers(prev => prev.map(u => u.username === username ? { ...u, role } : u))
             setRows(prev => prev.map(row => row.cells[0].value === username ? { ...row, cells: [row.cells[0], { ...row.cells[1], value: role }] } : row))
 
             toast({
                 title: "Success",
                 description: `${username} role updated successfully`,
-                action: oldRole ? <ToastAction altText="Undo" onClick={() => handleSetRole(username, oldRole)}>Undo</ToastAction> : undefined
+                action: oldRole ? <ToastAction altText="Undo" onClick={() => handleSetRole({ username, role: oldRole })}>Undo</ToastAction> : undefined
             })
+            setOpen(false)
         }
     }
 
@@ -50,7 +61,7 @@ export default function Users() {
                 headers: {
                     'Content-Type': 'application/json'
                 }
-            }, session?.user?.role, toast)
+            }, toast)
 
             if (result.ok) {
                 const data = await result.json()
@@ -60,7 +71,10 @@ export default function Users() {
                         value: username,
                     }, {
                         value: role,
-                        onChange: username === "default" ? undefined : (value: string) => handleSetRole(username, value, role),
+                        onChange: username === "default" ? undefined : (value: string) => {
+                            setSetUser({ username, role: value, oldRole: role })
+                            setOpen(true)
+                        },
                         type: "combobox",
                         comboboxType: "Role",
                     }],
@@ -77,7 +91,7 @@ export default function Users() {
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({ username, password, role })
-        }, session?.user?.role, toast)
+        }, toast)
 
         if (response.ok) {
             toast({
@@ -90,7 +104,10 @@ export default function Users() {
                     value: username,
                 }, {
                     value: role,
-                    onChange: (value: string) => handleSetRole(username, value, role),
+                    onChange: (value: string) => {
+                        setSetUser({ username, role: value, oldRole: role })
+                        setOpen(true)
+                    },
                     type: "combobox",
                     comboboxType: "Role"
                 }],
@@ -112,6 +129,19 @@ export default function Users() {
                     <DeleteUser users={rows.filter(row => row.checked).map(row => users.find(user => user.username === row.cells[0].value)!)} setUsers={setUsers} setRows={setRows} />
                 </div>
             </TableComponent>
+            <Dialog open={open} onOpenChange={setOpen}>
+                <DialogContent className="bg-foreground p-8 flex flex-col gap-8 rounded-lg border-none" disableClose>
+                    <DialogHeader className="flex-row justify-between items-center border-b border-secondary pb-4">
+                        <DialogTitle className="text-2xl font-medium">Set User Role</DialogTitle>
+                        <CloseDialog />
+                    </DialogHeader>
+                    <DialogDescription>Are you sure you want to set the user role to {setUser?.role}?</DialogDescription>
+                    <div className="flex justify-end gap-4">
+                        <Button onClick={() => handleSetRole(setUser!)}>Set User</Button>
+                        <CloseDialog label="Cancel" />
+                    </div>
+                </DialogContent>
+            </Dialog>
         </div >
     );
 }

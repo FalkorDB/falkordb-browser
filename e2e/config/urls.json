@@ -1,11 +1,10 @@
 {
     "api": {
-        "addGraphUrl": "http://localhost:3000/api/graph/",
+        "graphUrl": "http://localhost:3000/api/graph/",
         "LoginApiUrl": "http://localhost:3000/api/auth/providers",
-        "deleteGraphUrl": "http://localhost:3000/api/graph/",
-        "settingsConfig": "http://localhost:3000/api/graph?config=",
-        "settingsUsers": "http://localhost:3000/api/user",
-        "runQueryUrl": "http://localhost:3000/api/graph/"
+        "LogoutApiUrl": "http://localhost:3000/api/auth/signout",
+        "settingsConfig": "http://localhost:3000/api/graph/config/",
+        "settingsUsers": "http://localhost:3000/api/user"
     },
   
     "falkorDBWeb": "https://www.falkordb.com/",
@@ -15,5 +14,5 @@
     "schemaUrl": "http://localhost:3000/schema",
     "settingsUrl": "http://localhost:3000/settings",
     "documentationUrl": "https://docs.falkordb.com/",
-    "supportUrl": "https://www.falkordb.com/contact-us/"
+    "supportUrl": "https://discord.com/invite/jyUgBweNQz"
 }

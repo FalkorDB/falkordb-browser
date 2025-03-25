@@ -8,12 +8,16 @@ import { useEffect, useState } from "react";
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/components/ui/use-toast";
+import { useSession } from "next-auth/react";
 import Button from "../components/ui/Button";
 import { ATTRIBUTES, getDefaultAttribute, OPTIONS } from "./SchemaCreateElement";
 import Combobox from "../components/ui/combobox";
 import { Link, Node } from "../api/graph/model";
 import Input from "../components/ui/Input";
 import ToastButton from "../components/ToastButton";
+import DeleteElement from "../graph/DeleteElement";
+import DialogComponent from "../components/DialogComponent";
+import CloseDialog from "../components/CloseDialog";
 
 interface Props {
     obj: Node | Link
@@ -36,7 +40,15 @@ export default function SchemaDataPanel({ obj, onExpand, onSetAttributes, onRemo
     const [labelsEditable, setLabelsEditable] = useState<boolean>(false)
     const [newLabel, setNewLabel] = useState<string>("")
     const [isAddValue, setIsAddValue] = useState<boolean>(false)
+    const [isAddLoading, setIsAddLoading] = useState<boolean>(false)
+    const [isRemoveLoading, setIsRemoveLoading] = useState<boolean>(false)
+    const [isSetLoading, setIsSetLoading] = useState<boolean>(false)
+    const [isLabelLoading, setIsLabelLoading] = useState<boolean>(false)
+    const [isRemoveLabelLoading, setIsRemoveLabelLoading] = useState<boolean>(false)
+    const [deleteOpen, setDeleteOpen] = useState<boolean>(false)
+    const type = !!obj.category
     const { toast } = useToast()
+    const { data: session } = useSession()
 
     useEffect(() => {
         setAttributes(Object.entries(obj.data).filter(([key, val]) => !(key === "name" && Number(val) === obj.id)).map(([key, val]) => [key, Array.isArray(val) ? val : (val as string).split(',')]))
@@ -62,34 +74,42 @@ export default function SchemaDataPanel({ obj, onExpand, onSetAttributes, onRemo
             })
             return
         }
+        try {
+            setIsSetLoading(true)
+            const ok = await onSetAttributes(newAttribute)
+            const oldAttribute = attributes.find(([key]) => key === newAttribute[0])
 
-        const ok = await onSetAttributes(newAttribute)
-        const oldAttribute = attributes.find(([key]) => key === newAttribute[0])
-
-        if (ok) {
-            setAttributes(prev => prev.map((attr) => attr[0] === newAttribute[0] ? newAttribute : attr))
-            handleSetEditable()
-            toast({
-                title: "Success",
-                description: `Property set`,
-                action: isUndo && oldAttribute ? <ToastButton onClick={() => handleSetAttribute(false, oldAttribute)} /> : undefined,
-            })
+            if (ok) {
+                setAttributes(prev => prev.map((attr) => attr[0] === newAttribute[0] ? newAttribute : attr))
+                handleSetEditable()
+                toast({
+                    title: "Success",
+                    description: `Property set`,
+                    action: isUndo && oldAttribute ? <ToastButton onClick={() => handleSetAttribute(false, oldAttribute)} /> : undefined,
+                })
+            }
+        } finally {
+            setIsSetLoading(false)
         }
     }
 
     const handleRemoveAttribute = async (key: string) => {
+        try {
+            setIsRemoveLoading(true)
+            const ok = await onRemoveAttribute(key)
 
-        const ok = await onRemoveAttribute(key)
-
-        if (ok) {
-            const att = attributes.find(([k]) => k === key)
-            setAttributes(prev => prev.filter(([k]) => k !== key))
-            toast({
-                title: "Success",
-                description: "Attribute removed",
-                action: att && <ToastButton onClick={() => handleAddAttribute(att)} />,
-            })
-            setAttribute(getDefaultAttribute())
+            if (ok) {
+                const att = attributes.find(([k]) => k === key)
+                setAttributes(prev => prev.filter(([k]) => k !== key))
+                toast({
+                    title: "Success",
+                    description: "Attribute removed",
+                    action: att && <ToastButton onClick={() => handleAddAttribute(att)} />,
+                })
+                setAttribute(getDefaultAttribute())
+            }
+        } finally {
+            setIsRemoveLoading(false)
         }
     }
 
@@ -103,13 +123,17 @@ export default function SchemaDataPanel({ obj, onExpand, onSetAttributes, onRemo
             })
             return
         }
+        try {
+            setIsAddLoading(true)
+            const ok = await onSetAttributes(newAttribute)
 
-        const ok = await onSetAttributes(newAttribute)
-
-        if (ok) {
-            setAttributes(prev => [...prev, newAttribute])
-            setAttribute(getDefaultAttribute())
-            setIsAddValue(false)
+            if (ok) {
+                setAttributes(prev => [...prev, newAttribute])
+                setAttribute(getDefaultAttribute())
+                setIsAddValue(false)
+            }
+        } finally {
+            setIsAddLoading(false)
         }
     }
 
@@ -119,7 +143,7 @@ export default function SchemaDataPanel({ obj, onExpand, onSetAttributes, onRemo
             handleSetEditable()
         }
 
-        if (evt.code !== "Enter") return
+        if (evt.code !== "Enter" || isSetLoading) return
 
         evt.preventDefault()
         handleSetAttribute(true)
@@ -131,7 +155,7 @@ export default function SchemaDataPanel({ obj, onExpand, onSetAttributes, onRemo
             handleSetEditable()
         }
 
-        if (evt.code !== "Enter") return
+        if (evt.code !== "Enter" || isAddLoading) return
 
         evt.preventDefault()
         handleAddAttribute()
@@ -146,18 +170,28 @@ export default function SchemaDataPanel({ obj, onExpand, onSetAttributes, onRemo
             })
             return
         }
-        const ok = await onAddLabel(newLabel)
-        if (ok) {
-            setLabel([...label, newLabel])
-            setNewLabel("")
-            setLabelsEditable(false)
+        try {
+            setIsLabelLoading(true)
+            const ok = await onAddLabel(newLabel)
+            if (ok) {
+                setLabel([...label, newLabel])
+                setNewLabel("")
+                setLabelsEditable(false)
+            }
+        } finally {
+            setIsLabelLoading(false)
         }
     }
 
     const handleRemoveLabel = async (removeLabel: string) => {
-        const ok = await onRemoveLabel(removeLabel)
-        if (ok) {
-            setLabel(prev => prev.filter(l => l !== removeLabel))
+        try {
+            setIsRemoveLabelLoading(true)
+            const ok = await onRemoveLabel(removeLabel)
+            if (ok) {
+                setLabel(prev => prev.filter(l => l !== removeLabel))
+            }
+        } finally {
+            setIsRemoveLabelLoading(false)
         }
     }
 
@@ -178,21 +212,26 @@ export default function SchemaDataPanel({ obj, onExpand, onSetAttributes, onRemo
                                 {label.map((l) => (
                                     <li key={l} className="flex gap-2 px-2 py-1 bg-foreground rounded-full items-center">
                                         <p>{l}</p>
-                                        <Button
-                                            title="Remove"
-                                            onClick={() => handleRemoveLabel(l)}
-                                        >
-                                            <X size={15} />
-                                        </Button>
+                                        {
+                                            session?.user?.role !== "Read-Only" &&
+                                            <Button
+                                                title="Remove"
+                                                onClick={() => handleRemoveLabel(l)}
+                                                isLoading={isRemoveLabelLoading}
+                                            >
+                                                <X size={15} />
+                                            </Button>
+                                        }
                                     </li>
                                 ))}
                                 <li className="h-8 flex flex-wrap gap-2">
                                     {
-                                        labelsHover && !labelsEditable &&
+                                        labelsHover && !labelsEditable && session?.user?.role !== "Read-Only" &&
                                         <Button
                                             className="p-2 text-xs justify-center border border-foreground"
                                             variant="Secondary"
-                                            label="Edit"
+                                            label="Add"
+                                            title="Add a new label"
                                             onClick={() => setLabelsEditable(true)}
                                         >
                                             <Pencil size={15} />
@@ -214,7 +253,7 @@ export default function SchemaDataPanel({ obj, onExpand, onSetAttributes, onRemo
                                                         setNewLabel("")
                                                     }
 
-                                                    if (e.key !== "Enter") return
+                                                    if (e.key !== "Enter" || isLabelLoading) return
 
                                                     e.preventDefault()
                                                     handleAddLabel()
@@ -224,21 +263,27 @@ export default function SchemaDataPanel({ obj, onExpand, onSetAttributes, onRemo
                                                 className="p-2 text-xs justify-center border border-foreground"
                                                 variant="Secondary"
                                                 label="Save"
+                                                title="Save the new label"
                                                 onClick={() => handleAddLabel()}
+                                                isLoading={isLabelLoading}
                                             >
                                                 <Check size={15} />
                                             </Button>
-                                            <Button
-                                                className="p-2 text-xs justify-center border border-foreground"
-                                                variant="Secondary"
-                                                label="Cancel"
-                                                onClick={() => {
-                                                    setLabelsEditable(false)
-                                                    setNewLabel("")
-                                                }}
-                                            >
-                                                <Check size={15} />
-                                            </Button>
+                                            {
+                                                !isLabelLoading &&
+                                                <Button
+                                                    className="p-2 text-xs justify-center border border-foreground"
+                                                    variant="Secondary"
+                                                    label="Cancel"
+                                                    title="Discard the new label"
+                                                    onClick={() => {
+                                                        setLabelsEditable(false)
+                                                        setNewLabel("")
+                                                    }}
+                                                >
+                                                    <X size={15} />
+                                                </Button>
+                                            }
                                         </>
                                     }
                                 </li>
@@ -295,7 +340,7 @@ export default function SchemaDataPanel({ obj, onExpand, onSetAttributes, onRemo
                                                         return p
                                                     })}
                                                     inTable
-                                                    type="Type"
+                                                    label="Type"
                                                     selectedValue={attribute[1][0]}
                                                 />
                                             </TableCell>
@@ -341,57 +386,84 @@ export default function SchemaDataPanel({ obj, onExpand, onSetAttributes, onRemo
                                 <TableCell>
                                     <div className="flex gap-2 w-44">
                                         {
-                                            editable === key ?
-                                                <>
-                                                    <Button
-                                                        className="p-2 justify-center border border-foreground"
-                                                        variant="Secondary"
-                                                        label="Save"
-                                                        onClick={(e) => {
-                                                            e.stopPropagation()
-                                                            handleSetAttribute(true)
-                                                        }}
-                                                    >
-                                                        <Check size={20} />
-                                                    </Button>
-                                                    <Button
-                                                        className="p-2 justify-center border border-foreground"
-                                                        variant="Secondary"
-                                                        label="Cancel"
-                                                        onClick={(e) => {
-                                                            e.stopPropagation()
-                                                            handleSetEditable()
+                                            session?.user?.role !== "Read-Only" && (
+                                                editable === key ?
+                                                    <>
+                                                        <Button
+                                                            className="p-2 justify-center border border-foreground"
+                                                            variant="Secondary"
+                                                            label="Save"
+                                                            title="Save the attribute changes"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation()
+                                                                handleSetAttribute(true)
+                                                            }}
+                                                            isLoading={isSetLoading}
+                                                        >
+                                                            <Check size={20} />
+                                                        </Button>
+                                                        {
+                                                            !isSetLoading &&
+                                                            <Button
+                                                                className="p-2 justify-center border border-foreground"
+                                                                variant="Secondary"
+                                                                label="Cancel"
+                                                                title="Discard the attribute changes"
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation()
+                                                                    handleSetEditable()
 
-                                                        }}
-                                                    >
-                                                        <X size={20} />
-                                                    </Button>
-                                                </>
-                                                : hover === key &&
-                                                <>
-                                                    <Button
-                                                        className="p-2 justify-center border border-foreground"
-                                                        variant="Secondary"
-                                                        label="Remove"
-                                                        onClick={(e) => {
-                                                            e.stopPropagation()
-                                                            handleRemoveAttribute(key)
-                                                        }}
-                                                    >
-                                                        <Trash2 size={20} />
-                                                    </Button>
-                                                    <Button
-                                                        className="p-2 justify-center border border-foreground"
-                                                        variant="Secondary"
-                                                        label="Edit"
-                                                        onClick={(e) => {
-                                                            e.stopPropagation()
-                                                            handleSetEditable([key, [...val]])
-                                                        }}
-                                                    >
-                                                        <Pencil size={20} />
-                                                    </Button>
-                                                </>
+                                                                }}
+                                                            >
+                                                                <X size={20} />
+                                                            </Button>
+                                                        }
+                                                    </>
+                                                    : hover === key &&
+                                                    <>
+                                                        <DialogComponent
+                                                            trigger={
+                                                                <Button
+                                                                    variant="button"
+                                                                    title="Delete Attribute"
+                                                                >
+                                                                    <Trash2 size={20} />
+                                                                </Button>
+                                                            }
+                                                            title="Delete Attribute"
+                                                            description="Are you sure you want to delete this attribute?"
+                                                        >
+                                                            <div className="flex justify-end gap-4">
+                                                                <Button
+                                                                    variant="Primary"
+                                                                    label="Delete"
+                                                                    title="Confirm the deletion of the attribute"
+                                                                    onClick={() => handleRemoveAttribute(key)}
+                                                                    isLoading={isRemoveLoading}
+                                                                />
+                                                                {
+                                                                    !isRemoveLoading &&
+                                                                    <CloseDialog
+                                                                        label="Cancel"
+                                                                        variant="Cancel"
+                                                                    />
+                                                                }
+                                                            </div>
+                                                        </DialogComponent>
+                                                        <Button
+                                                            className="p-2 justify-center border border-foreground"
+                                                            variant="Secondary"
+                                                            label="Edit"
+                                                            title="Modify this attribute"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation()
+                                                                handleSetEditable([key, [...val]])
+                                                            }}
+                                                        >
+                                                            <Pencil size={20} />
+                                                        </Button>
+                                                    </>
+                                            )
                                         }
                                     </div>
                                 </TableCell>
@@ -422,7 +494,7 @@ export default function SchemaDataPanel({ obj, onExpand, onSetAttributes, onRemo
                                         return p
                                     })}
                                     inTable
-                                    type="Type"
+                                    label="Type"
                                     selectedValue={attribute[1][0]}
                                 />
                             </TableCell>
@@ -466,10 +538,12 @@ export default function SchemaDataPanel({ obj, onExpand, onSetAttributes, onRemo
                                         className="p-2 justify-center border border-foreground"
                                         variant="Secondary"
                                         label="Save"
+                                        title="Save the new attribute"
                                         onClick={(e) => {
                                             e.stopPropagation()
                                             handleAddAttribute()
                                         }}
+                                        isLoading={isAddLoading}
                                     >
                                         <Check size={20} />
                                     </Button>
@@ -477,6 +551,7 @@ export default function SchemaDataPanel({ obj, onExpand, onSetAttributes, onRemo
                                         className="p-2 justify-center border border-foreground"
                                         variant="Secondary"
                                         label="Cancel"
+                                        title="Discard the new attribute"
                                         onClick={(e) => {
                                             e.stopPropagation()
                                             handleSetEditable()
@@ -491,29 +566,30 @@ export default function SchemaDataPanel({ obj, onExpand, onSetAttributes, onRemo
                     }
                 </TableBody>
                 <TableCaption>
-                    <Button
-                        variant="Primary"
-                        label="Add Value"
-                        onClick={() => setIsAddValue(prev => {
-                            if (!prev) {
-                                setAttribute(getDefaultAttribute())
-                                setEditable("")
-                            }
-                            return !prev
-                        })}
-                    >
-                        <PlusCircle size={20} />
-                    </Button>
+                    {
+                        session?.user?.role !== "Read-Only" &&
+                        <Button
+                            variant="Primary"
+                            label="Add Value"
+                            title="Add a new attribute"
+                            onClick={() => setIsAddValue(true)}
+                        >
+                            <PlusCircle size={20} />
+                        </Button>
+                    }
                 </TableCaption>
             </Table>
             <div className="p-8 flex justify-end">
-                <Button
-                    label="Delete"
-                    variant="Secondary"
-                    onClick={() => onDeleteElement()}
-                >
-                    <Trash2 size={20} />
-                </Button>
+                {
+                    session?.user.role !== "Read-Only" &&
+                    <DeleteElement
+                        description={`Are you sure you want to delete this ${type ? "Node" : "Relation"}?`}
+                        open={deleteOpen}
+                        setOpen={setDeleteOpen}
+                        onDeleteElement={onDeleteElement}
+                        trigger={<Button label={`Delete ${type ? "Node" : "Relation"}`} variant="Secondary" title="Remove the selected element" />}
+                    />
+                }
             </div>
         </div>
     )

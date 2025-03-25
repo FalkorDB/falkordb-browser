@@ -30,12 +30,20 @@ export default class NavBarComponent extends BasePage {
         return this.page.getByRole("link", { name: "Support" })
     }
 
+    private get aboutButton(): Locator {
+        return this.page.getByRole("button", { name: "About" })
+    }
+
     private get settingsButton(): Locator {
         return this.page.getByRole("button", { name: "Settings" })
     }
 
     private get LogoutButton(): Locator {
         return this.page.getByRole("button", { name: "Log Out" })
+    }
+
+    private get aboutPopUp(): Locator {
+        return this.page.locator('//div[@id="about"]');
     }
 
     async clickOnFalkorLogo(): Promise<void> {
@@ -56,6 +64,10 @@ export default class NavBarComponent extends BasePage {
         await this.helpButton.click();
     }
 
+    async clickOnAboutBtn(): Promise<void> {
+        await this.aboutButton.click();
+    }
+
     async clickOnDocumentationBtn(): Promise<void> {
         await this.documentationButton.click();
     }
@@ -70,7 +82,7 @@ export default class NavBarComponent extends BasePage {
     }
 
     async isSettingsButtonEnabled(): Promise<boolean> {
-        const isEnabled = await this.settingsButton.isEnabled();
+        const isEnabled = await this.settingsButton.isVisible();
         return isEnabled;
     }
 
@@ -109,4 +121,18 @@ export default class NavBarComponent extends BasePage {
         return newPage
     }
 
+    async isAboutPopUp(): Promise<boolean>{
+        const isVisible = await this.aboutPopUp.isVisible();
+        return isVisible;
+    }
+
+    async closePopUp(): Promise<void>{
+        await this.page.mouse.click(10, 10);
+        await this.page.waitForTimeout(1000);
+    }
+
+    async clickOnAbout(): Promise<void> {
+        await this.clickOnHelpBtn();
+        await this.clickOnAboutBtn();
+    }
 }

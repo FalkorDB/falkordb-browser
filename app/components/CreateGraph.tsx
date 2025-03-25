@@ -7,7 +7,6 @@ import { InfoIcon, PlusCircle } from "lucide-react"
 import { prepareArg, securedFetch } from "@/lib/utils"
 import { useToast } from "@/components/ui/use-toast"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
-import { useSession } from "next-auth/react"
 import DialogComponent from "./DialogComponent"
 import Button from "./ui/Button"
 import CloseDialog from "./CloseDialog"
@@ -16,16 +15,19 @@ import Input from "./ui/Input"
 interface Props {
     onSetGraphName: (name: string) => void
     type: string
+    graphNames: string[]
     trigger?: React.ReactNode
 }
 
 export default function CreateGraph({
     onSetGraphName,
     type,
+    graphNames,
     trigger = (
         <Button
             variant="Primary"
             label={`Create New ${type}`}
+            title={`Create a new ${type}`}
         >
             <PlusCircle />
         </Button>
@@ -34,34 +36,47 @@ export default function CreateGraph({
 
     const [graphName, setGraphName] = useState("")
     const [open, setOpen] = useState(false)
+    const [isLoading, setIsLoading] = useState(false)
     const { toast } = useToast()
-    const { data: session } = useSession()
-    
+
     const handleCreateGraph = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault()
-        const name = graphName.trim()
-        if (!name) {
+        try {
+            setIsLoading(true)
+            const name = graphName.trim()
+            if (!name) {
+                toast({
+                    title: "Error",
+                    description: `${type} name cannot be empty`,
+                    variant: "destructive"
+                })
+                return
+            }
+            if (graphNames.includes(name)) {
+                toast({
+                    title: "Error",
+                    description: `${type} name already exists`,
+                    variant: "destructive"
+                })
+                return
+            }
+            const q = 'RETURN 1'
+            const result = await securedFetch(`api/graph/${prepareArg(name)}/?query=${prepareArg(q)}`, {
+                method: "GET",
+            }, toast)
+
+            if (!result.ok) return
+
+            onSetGraphName(name)
+            setGraphName("")
+            setOpen(false)
             toast({
-                title: "Error",
-                description: `${type} name cannot be empty`,
-                variant: "destructive"
+                title: `${type} created successfully`,
+                description: `The ${type.toLowerCase()} has been created successfully`,
             })
-            return
+        } finally {
+            setIsLoading(false)
         }
-        const q = 'RETURN 1'
-        const result = await securedFetch(`api/graph/${prepareArg(name)}/?query=${prepareArg(q)}`, {
-            method: "GET",
-        }, session?.user?.role, toast)
-
-        if (!result.ok) return
-
-        onSetGraphName(name)
-        setGraphName("")
-        setOpen(false)
-        toast({
-            title: `${type} created successfully`,
-            description: `The ${type.toLowerCase()} has been created successfully`,
-        })
     }
 
     return (
@@ -71,10 +86,7 @@ export default function CreateGraph({
             trigger={trigger}
             title={`Create New ${type}`}
         >
-            <form className="flex flex-col gap-4" onSubmit={(e) => {
-                e.preventDefault()
-                handleCreateGraph(e)
-            }}>
+            <form className="flex flex-col gap-4" onSubmit={isLoading ? undefined : handleCreateGraph}>
                 <div className="flex gap-2 items-center">
                     <Tooltip>
                         <TooltipTrigger asChild>
@@ -96,7 +108,9 @@ export default function CreateGraph({
                     <Button
                         variant="Primary"
                         label={`Create your ${type}`}
+                        title={`Build and customize your ${type}`}
                         type="submit"
+                        isLoading={isLoading}
                     />
                     <CloseDialog
                         variant="Cancel"

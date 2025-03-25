@@ -7,7 +7,6 @@ import { ChevronLeft, Maximize2, Minimize2, Pause, Play } from "lucide-react"
 import { ImperativePanelHandle } from "react-resizable-panels"
 import { useEffect, useRef, useState } from "react"
 import { cn, prepareArg, securedFetch } from "@/lib/utils"
-import { Session } from "next-auth"
 import dynamic from "next/dynamic"
 import { useToast } from "@/components/ui/use-toast"
 import { Switch } from "@/components/ui/switch"
@@ -26,10 +25,9 @@ const ForceGraph = dynamic(() => import("../components/ForceGraph"), { ssr: fals
 interface Props {
     schema: Graph
     fetchCount?: () => void
-    session: Session | null
 }
 
-const getCreateQuery = (type: boolean, selectedNodes: [Node, Node], attributes: [string, string[]][], label?: string) => {
+const getCreateQuery = (type: boolean, selectedNodes: [Node, Node], attributes: [string, string[]][], label?: string[]) => {
     const formateAttributes: [string, string][] = attributes.map((att) => {
         const [key, [t, d, u, r]] = att
         let val = `${t}`
@@ -40,12 +38,12 @@ const getCreateQuery = (type: boolean, selectedNodes: [Node, Node], attributes: 
     })
 
     if (type) {
-        return `CREATE (n${label ? `:${label}` : ""}${formateAttributes?.length > 0 ? ` {${formateAttributes.map(([k, v]) => `${k}: "${v}"`).join(",")}}` : ""}) RETURN n`
+        return `CREATE (n${label ? `:${label.join(":")}` : ""}${formateAttributes?.length > 0 ? ` {${formateAttributes.map(([k, v]) => `${k}: "${v}"`).join(",")}}` : ""}) RETURN n`
     }
     return `MATCH (a), (b) WHERE ID(a) = ${selectedNodes[0].id} AND ID(b) = ${selectedNodes[1].id} CREATE (a)-[e${label ? `:${label}` : ""}${formateAttributes?.length > 0 ? ` {${formateAttributes.map(([k, v]) => `${k}: "${v}"`).join(",")}}` : ""}]->(b) RETURN e`
 }
 
-export default function SchemaView({ schema, fetchCount, session }: Props) {
+export default function SchemaView({ schema, fetchCount }: Props) {
     const [selectedElement, setSelectedElement] = useState<Node | Link | undefined>();
     const [selectedElements, setSelectedElements] = useState<(Node | Link)[]>([]);
     const [selectedNodes, setSelectedNodes] = useState<[Node | undefined, Node | undefined]>([undefined, undefined]);
@@ -58,7 +56,7 @@ export default function SchemaView({ schema, fetchCount, session }: Props) {
     const [cooldownTicks, setCooldownTicks] = useState<number | undefined>(0)
     const [data, setData] = useState<GraphData>(schema.Elements)
     const { toast } = useToast()
-
+    
     useEffect(() => {
         setData({ ...schema.Elements })
     }, [schema.Elements, schema.Id])
@@ -147,7 +145,7 @@ export default function SchemaView({ schema, fetchCount, session }: Props) {
         const q = `${conditionsNodes.length > 0 ? `MATCH (n) WHERE ${conditionsNodes.join(" OR ")} DELETE n` : ""}${conditionsEdges.length > 0 && conditionsNodes.length > 0 ? " WITH * " : ""}${conditionsEdges.length > 0 ? `MATCH ()-[e]-() WHERE ${conditionsEdges.join(" OR ")} DELETE e` : ""}`
         const result = await securedFetch(`api/graph/${prepareArg(schema.Id)}_schema/?query=${prepareArg(q)} `, {
             method: "GET"
-        }, session?.user?.role, toast)
+        }, toast)
 
         if (!result.ok) return
 
@@ -163,12 +161,25 @@ export default function SchemaView({ schema, fetchCount, session }: Props) {
             }
             if (fetchCount) fetchCount()
 
-            const category = type ? schema.CategoriesMap.get(element.category[0]) : schema.LabelsMap.get(element.label)
-            if (category) {
-                category.elements = category.elements.filter(n => n.id !== id)
-                if (category.elements.length === 0) {
-                    schema.Categories.splice(schema.Categories.findIndex(c => c.name === category.name), 1)
-                    schema.CategoriesMap.delete(category.name)
+            if (type) {
+                element.category.forEach((category) => {
+                    const cat = schema.CategoriesMap.get(category)
+                    if (cat) {
+                        cat.elements = cat.elements.filter(n => n.id !== id)
+                        if (cat.elements.length === 0) {
+                            schema.Categories.splice(schema.Categories.findIndex(c => c.name === cat.name), 1)
+                            schema.CategoriesMap.delete(cat.name)
+                        }
+                    }
+                })
+            } else {
+                const cat = schema.CategoriesMap.get(element.label)
+                if (cat) {
+                    cat.elements = cat.elements.filter(n => n.id !== id)
+                    if (cat.elements.length === 0) {
+                        schema.Categories.splice(schema.Categories.findIndex(c => c.name === cat.name), 1)
+                        schema.CategoriesMap.delete(cat.name)
+                    }
                 }
             }
         })
@@ -191,7 +202,7 @@ export default function SchemaView({ schema, fetchCount, session }: Props) {
         const q = `MATCH ${type ? "(e)" : "()-[e]-()"} WHERE ID(e) = ${id} SET e.${key} = "${value.join(",")}"`
         const { ok } = await securedFetch(`api/graph/${prepareArg(schema.Id)}_schema/?query=${prepareArg(q)}`, {
             method: "GET"
-        }, session?.user?.role, toast)
+        }, toast)
 
         if (ok) {
             if (type) {
@@ -265,7 +276,7 @@ export default function SchemaView({ schema, fetchCount, session }: Props) {
         const q = `MATCH ${type ? "(e)" : "()-[e]-()"} WHERE ID(e) = ${id} SET e.${key} = NULL`
         const { ok } = await securedFetch(`api/graph/${prepareArg(schema.Id)}_schema/?query=${prepareArg(q)}`, {
             method: "GET"
-        }, session?.user?.role, toast)
+        }, toast)
 
         if (ok) {
             if (type) {
@@ -292,7 +303,7 @@ export default function SchemaView({ schema, fetchCount, session }: Props) {
         return ok
     }
 
-    const onCreateElement = async (attributes: [string, string[]][], label?: string) => {
+    const onCreateElement = async (attributes: [string, string[]][], label?: string[]) => {
         if (!isAddEntity && selectedNodes[0] === undefined && selectedNodes[1] === undefined) {
             toast({
                 title: "Error",
@@ -304,7 +315,7 @@ export default function SchemaView({ schema, fetchCount, session }: Props) {
 
         const result = await securedFetch(`api/graph/${prepareArg(schema.Id)}_schema/?query=${getCreateQuery(isAddEntity, selectedNodes as [Node, Node], attributes, label)}`, {
             method: "GET"
-        }, session?.user?.role, toast)
+        }, toast)
 
         if (result.ok) {
             const json = await result.json()
@@ -332,7 +343,7 @@ export default function SchemaView({ schema, fetchCount, session }: Props) {
         const q = `MATCH (n) WHERE ID(n) = ${selectedElement?.id} SET n:${label}`
         const result = await securedFetch(`api/graph/${prepareArg(schema.Id)}_schema/?query=${prepareArg(q)}`, {
             method: "GET"
-        }, session?.user?.role, toast)
+        }, toast)
 
         if (result.ok) {
             selectedElement!.displayName = ""
@@ -352,7 +363,7 @@ export default function SchemaView({ schema, fetchCount, session }: Props) {
         const q = `MATCH (n) WHERE ID(n) = ${selectedElement?.id} REMOVE n:${label}`
         const result = await securedFetch(`api/graph/${prepareArg(schema.Id)}_schema/?query=${prepareArg(q)}`, {
             method: "GET"
-        }, session?.user?.role, toast)
+        }, toast)
 
         if (result.ok) {
             selectedElement!.displayName = ""
@@ -385,8 +396,7 @@ export default function SchemaView({ schema, fetchCount, session }: Props) {
             >
                 <div className="flex items-center justify-between">
                     <Toolbar
-                        selectedElementsLength={selectedElements.length}
-                        disabled={session?.user.role === "Read-Only" || !schema.Id}
+                        disabled={!schema.Id}
                         deleteDisabled={Object.values(selectedElements).length === 0 && !selectedElement}
                         onAddEntity={() => {
                             setIsAddEntity(true)
@@ -405,6 +415,7 @@ export default function SchemaView({ schema, fetchCount, session }: Props) {
                         onDeleteElement={handleDeleteElement}
                         chartRef={chartRef}
                         displayAdd
+                        type="Schema"
                     />
                     {
                         isCollapsed &&
@@ -451,7 +462,9 @@ export default function SchemaView({ schema, fetchCount, session }: Props) {
                     <ForceGraph
                         chartRef={chartRef}
                         data={data}
+                        setData={setData}
                         graph={schema}
+                        onExpand={onExpand}
                         selectedElement={selectedElement}
                         setSelectedElement={handleSetSelectedElement}
                         selectedElements={selectedElements}

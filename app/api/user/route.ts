@@ -4,10 +4,13 @@ import { User, CreateUser, ROLE } from "./model";
 
 export async function GET() {
 
-    const client = await getClient()
-    if (client instanceof NextResponse) {
-        return client
+    const session = await getClient()
+    if (session instanceof NextResponse) {
+        return session
     }
+
+    const { client } = session
+
     try {
         const list = await (await client.connection).aclList()
         const result: User[] = list
@@ -38,11 +41,12 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
 
-    const client = await getClient()
-    if (client instanceof NextResponse) {
-        return client
+    const session = await getClient()
+    if (session instanceof NextResponse) {
+        return session
     }
 
+    const { client } = session
     const connection = await client.connection
     const { username, password, role } = await req.json() as CreateUser
 
@@ -79,12 +83,12 @@ export async function POST(req: NextRequest) {
 
 export async function DELETE(req: NextRequest) {
 
-    const client = await getClient()
-
-    if (client instanceof NextResponse) {
-        return client
+    const session = await getClient()
+    if (session instanceof NextResponse) {
+        return session
     }
 
+    const { client } = session
     const connection = await client.connection
     const { users } = await req.json()
 

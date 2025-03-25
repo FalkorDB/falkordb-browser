@@ -11,7 +11,7 @@ import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import { Drawer, DrawerDescription, DrawerContent, DrawerTitle, DrawerTrigger } from "@/components/ui/drawer";
 
 export default function AddUser({ onAddUser }: {
-    onAddUser: (user: CreateUser) => void
+    onAddUser: (user: CreateUser) => Promise<void>
 }) {
     const [open, setOpen] = useState(false)
     const [username, setUsername] = useState("")
@@ -75,7 +75,7 @@ export default function AddUser({ onAddUser }: {
                 {
                     message: "Password must contain at least one special character",
                     condition: (value: string) => !/[!@#$%^&*]/.test(value)
-                },
+                }
             ]
         },
         {
@@ -92,7 +92,7 @@ export default function AddUser({ onAddUser }: {
                 },
                 {
                     message: "Password don't match",
-                    condition: (value: string) => value !== password
+                    condition: (value: string, pass?: string) => value !== (pass ?? password)
                 },
             ]
         },
@@ -115,7 +115,7 @@ export default function AddUser({ onAddUser }: {
     const handleAddUser = async (e: FormEvent) => {
         e.preventDefault();
 
-        onAddUser({ username, password, role })
+        await onAddUser({ username, password, role })
 
         setOpen(false)
 
@@ -128,14 +128,15 @@ export default function AddUser({ onAddUser }: {
                 <Button
                     variant="Primary"
                     label="Add User"
+                    title="Add a new user to the system"
                 >
                     <PlusCircle size={20} />
                 </Button>
-              </DrawerTrigger>
-              <DrawerContent side="right" className="gap-6 after:hidden">
+            </DrawerTrigger>
+            <DrawerContent side="right" className="gap-6 after:hidden">
                 <VisuallyHidden>
-                  <DrawerTitle />
-                  <DrawerDescription />
+                    <DrawerTitle />
+                    <DrawerDescription />
                 </VisuallyHidden>
                 <FormComponent
                     className="p-4"
