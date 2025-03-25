@@ -15,36 +15,33 @@ To see a running demo, check: https://browser.falkordb.com/
 
 ![image](https://github.com/user-attachments/assets/58ebc352-31bd-495e-ad8b-2fdc36f5a656)
 
-## Run in Docker
+
+### Quick start
+
+#### Run graph database and browser from one docker container
 
 ```
-sudo docker run -p 3000:3000 -it falkordb/falkordb-browser:edge
+docker run -p 3000:3000 -p 6379:6379 -it --rm falkordb/falkordb:latest
 ```
+Open [http://localhost:3000](http://localhost:3000) with your browser.
 
-## Development - Getting Started 
+## Alternativly you can run the browser from source and database using docker
 
-First copy the `.env.local.template` as `.env.local`.
-
-Then, it is a [Next.js](https://nextjs.org/) project. To run the development server:
-
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
-
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
-
-
-## Running FalkorDB database
+### Run graph database from docker container
 
 ```
 docker run -p 6379:6379 -it --rm falkordb/falkordb:latest
 ```
+
+### Build and run browser from source
+
+* Clone the git repository `git clone git@github.com:FalkorDB/falkordb-browser.git`
+* Create .env.local in the clone directory `cp .env.local.template .env.local`
+* Build the node project `npm -i`
+* run the server `npm run dev`
+
+Open [http://localhost:3000](http://localhost:3000) with your browser.
+
 
 
 

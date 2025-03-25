@@ -3,7 +3,7 @@
 
 'use client'
 
-import { useRef, useState, useEffect, Dispatch, SetStateAction } from "react";
+import { useRef, useState, useEffect, Dispatch, SetStateAction, useContext } from "react";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { ImperativePanelHandle } from "react-resizable-panels";
 import { ChevronLeft, GitGraph, Info, Maximize2, Minimize2, Pause, Play, Search, Table } from "lucide-react"
@@ -14,6 +14,7 @@ import { useToast } from "@/components/ui/use-toast";
 import { Switch } from "@/components/ui/switch";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { ForceGraphMethods } from "react-force-graph-2d";
+import { IndicatorContext } from "@/app/components/provider";
 import { Category, Graph, GraphData, Link, Node } from "../api/graph/model";
 import DataPanel from "./GraphDataPanel";
 import Labels from "./labels";
@@ -26,7 +27,7 @@ import Input from "../components/ui/Input";
 const ForceGraph = dynamic(() => import("../components/ForceGraph"), { ssr: false });
 const EditorComponent = dynamic(() => import("../components/EditorComponent"), { ssr: false })
 
-function GraphView({ graph, selectedElement, setSelectedElement, runQuery, historyQuery, fetchCount, setHistoryQuery, currentQuery, setCurrentQuery }: {
+function GraphView({ graph, selectedElement, setSelectedElement, runQuery, historyQuery, fetchCount, setHistoryQuery }: {
     graph: Graph
     selectedElement: Node | Link | undefined
     setSelectedElement: Dispatch<SetStateAction<Node | Link | undefined>>
@@ -34,8 +35,6 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
     historyQuery: HistoryQuery
     setHistoryQuery: Dispatch<SetStateAction<HistoryQuery>>
     fetchCount: () => void
-    currentQuery: Query | undefined
-    setCurrentQuery: Dispatch<SetStateAction<Query | undefined>>
 }) {
 
     const [data, setData] = useState<GraphData>(graph.Elements)
@@ -46,8 +45,10 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
     const [maximize, setMaximize] = useState<boolean>(false)
     const [tabsValue, setTabsValue] = useState<string>("")
     const [cooldownTicks, setCooldownTicks] = useState<number | undefined>(0)
+    const [currentQuery, setCurrentQuery] = useState<Query>()
     const [searchElement, setSearchElement] = useState<string>("")
     const { toast } = useToast()
+    const { setIndicator } = useContext(IndicatorContext);
 
     useEffect(() => {
         let timeout: NodeJS.Timeout
@@ -69,7 +70,7 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
             defaultChecked = "Graph"
         } else if (graph.Data.length !== 0) {
             defaultChecked = "Table";
-        } else if (currentQuery && (currentQuery.metadata.length > 0 || currentQuery.explain.length > 0)) {
+        } else if (currentQuery && currentQuery.metadata.length > 0 && graph.Metadata.length > 0 && currentQuery.explain.length > 0) {
             defaultChecked = "Metadata";
         }
 
@@ -170,7 +171,7 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
 
         const result = await securedFetch(`api/graph/${prepareArg(graph.Id)}/?query=${prepareArg(q)} `, {
             method: "GET"
-        }, toast)
+        }, toast, setIndicator)
 
         if (!result.ok) return
 
@@ -321,7 +322,7 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
                             value="Metadata"
                         >
                             <Button
-                                disabled={currentQuery && (currentQuery.metadata.length === 0 || currentQuery.explain.length === 0)}
+                                disabled={!currentQuery || currentQuery.metadata.length === 0 || currentQuery.explain.length === 0 || graph.Metadata.length === 0}
                                 className="tabs-trigger"
                                 onClick={() => setTabsValue("Metadata")}
                                 title="Metadata"
@@ -335,7 +336,7 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
                             <div className="flex items-center justify-between">
                                 <Toolbar
                                     disabled={!graph.Id}
-                                    deleteDisabled={(Object.values(selectedElements).length === 0 && !selectedElement)}
+                                    deleteDisabled={selectedElements.length === 0 || !selectedElement}
                                     onDeleteElement={handleDeleteElement}
                                     chartRef={chartRef}
                                     displayAdd={false}
@@ -438,7 +439,7 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
                     </TabsContent>
                 </Tabs>
             </ResizablePanel>
-            <ResizableHandle disabled={isCollapsed} className={cn(isCollapsed ? "w-0 !cursor-default" : "w-3")} />
+            <ResizableHandle disabled={!selectedElement} className={cn(!selectedElement ? "!cursor-default" : "w-3")} />
             <ResizablePanel
                 className="rounded-lg"
                 collapsible
