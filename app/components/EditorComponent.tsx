@@ -623,7 +623,7 @@ export default function EditorComponent({ historyQuery, maximize, runQuery, grap
                             </div>
                             <Button
                                 ref={submitQuery}
-                                disabled={indicator === "offline"}
+                                indicator={indicator}
                                 className="rounded-none py-2 px-8"
                                 variant="Primary"
                                 title="Run (Ctrl + Enter)"

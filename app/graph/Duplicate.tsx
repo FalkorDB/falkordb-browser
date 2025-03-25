@@ -67,7 +67,7 @@ export default function Duplicate({ open, onOpenChange, selectedValue, onDuplica
                 </div>
                 <div className="flex gap-4">
                     <Button
-                        disabled={indicator === "offline"}
+                        indicator={indicator}
                         variant="Primary"
                         label="Duplicate"
                         title={`Confirm duplication of the ${type}`}

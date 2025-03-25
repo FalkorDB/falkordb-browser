@@ -193,7 +193,7 @@ export default function Selector({ setGraphName, graphName, runQuery, edgesCount
                         </>
                     }
                     <Button
-                        disabled={indicator === "offline"}
+                        indicator={indicator}
                         className={cn(
                             "transition-transform",
                             isRotating && "animate-spin duration-1000"
@@ -346,7 +346,8 @@ export default function Selector({ setGraphName, graphName, runQuery, edgesCount
                                     <Button
                                         ref={submitQuery}
                                         className="text-white flex justify-center w-1/3"
-                                        disabled={isLoading || !historyQuery?.counter || indicator === "offline"}
+                                        disabled={isLoading || !historyQuery?.counter}
+                                        indicator={indicator}
                                         onClick={async () => {
                                             try {
                                                 setIsLoading(true);

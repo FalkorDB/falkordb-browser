@@ -27,7 +27,7 @@ export default function MetadataView({ query, graphName, className = "" }: {
                 <h1 className="text-2xl font-bold p-2">Profile</h1>
                 <div className="flex gap-4">
                     <Button
-                        disabled={indicator === "offline"}
+                        indicator={indicator}
                         variant="Primary"
                         label="Profile"
                         onClick={handleProfile}

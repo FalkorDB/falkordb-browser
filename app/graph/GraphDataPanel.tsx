@@ -266,7 +266,7 @@ export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement,
                                             <Button
                                                 title="Remove"
                                                 onClick={() => handleRemoveLabel(l)}
-                                                disabled={indicator === "offline"}
+                                                indicator={indicator}
                                             >
                                                 <X size={15} />
                                             </Button>
@@ -315,7 +315,7 @@ export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement,
                                                 title="Save the new label"
                                                 onClick={() => handleAddLabel()}
                                                 isLoading={isLabelLoading}
-                                                disabled={indicator === "offline"}
+                                                indicator={indicator}
                                             >
                                                 <Check size={15} />
                                             </Button>
@@ -372,7 +372,7 @@ export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement,
                                                 editable === key ?
                                                     <>
                                                         <Button
-                                                            disabled={indicator === "offline"}
+                                                            indicator={indicator}
                                                             variant="button"
                                                             onClick={(e) => {
                                                                 e.stopPropagation()
@@ -457,7 +457,7 @@ export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement,
                                     title="Save"
                                     onClick={() => handleAddValue(newKey, newVal)}
                                     isLoading={isAddLoading}
-                                    disabled={indicator === "offline"}
+                                    indicator={indicator}
                                 >
                                     <Check size={20} />
                                 </Button>

@@ -257,7 +257,8 @@ export default function TableComponent({ headers, rows, children, setRows, optio
                                                                     cell.onChange && hover === `${i}` &&
                                                                     <Button
                                                                         className="disabled:cursor-text disabled:opacity-100"
-                                                                        disabled={!cell.onChange || indicator === "offline"}
+                                                                        disabled={!cell.onChange}
+                                                                        indicator={indicator}
                                                                         title="Edit"
                                                                         onClick={() => handleSetEditable(`${i}-${j}`, cell.value!.toString())}
                                                                     >

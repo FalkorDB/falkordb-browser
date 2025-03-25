@@ -56,18 +56,6 @@ export default function Header({ onSetGraphName, graphNames }: Props) {
                             onClick={() => router.push("/schema")}
                         />
                     </div>
-                    {indicator === "offline" && (
-                        <div className="flex gap-2 rounded-lg p-2 border border-red-500">
-                            <Tooltip>
-                                <TooltipTrigger asChild>
-                                    <p className="text-red-500">Offline</p>
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                    <p>The falkordb server is offline</p>
-                                </TooltipContent>
-                            </Tooltip>
-                        </div>
-                    )}
                 </div>
                 <div className="flex gap-6 items-center">
                     <Drawer direction="right">
@@ -77,7 +65,7 @@ export default function Header({ onSetGraphName, graphNames }: Props) {
                                     session?.user?.role === "Admin" &&
                                     <NavigationMenuLink className="bg-foreground" asChild>
                                         <Button
-                                            disabled={indicator === "offline"}
+                                            indicator={indicator}
                                             label="Settings"
                                             title="Adjust application settings"
                                             onClick={() => router.push("/settings")}
@@ -122,6 +110,19 @@ export default function Header({ onSetGraphName, graphNames }: Props) {
                                         type={type}
                                         graphNames={graphNames!}
                                     />
+                                }
+                                {
+                                indicator === "offline" && 
+                                    <div className="flex gap-2 rounded-lg p-2 border border-red-500">
+                                        <Tooltip>
+                                            <TooltipTrigger asChild>
+                                                <p className="text-red-500 text-xs">Offline</p>
+                                            </TooltipTrigger>
+                                            <TooltipContent>
+                                                <p>The FalkorDB server is offline</p>
+                                            </TooltipContent>
+                                        </Tooltip>
+                                    </div>
                                 }
                                 <Button
                                     title="Log Out"

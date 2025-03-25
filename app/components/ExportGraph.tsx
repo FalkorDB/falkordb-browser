@@ -66,7 +66,7 @@ export default function ExportGraph({ selectedValues, type, trigger }: Props) {
             <div className="flex gap-4 justify-end">
                 <Button
                     className="flex-1"
-                    disabled={indicator === "offline"}
+                    indicator={indicator}
                     variant="Primary"
                     label="Download"
                     onClick={handleExport}

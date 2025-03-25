@@ -108,7 +108,7 @@ export default function CreateGraph({
                 </div>
                 <div className="flex gap-4 justify-end">
                     <Button
-                        disabled={indicator === "offline"}
+                        indicator={indicator}
                         variant="Primary"
                         label={`Create your ${type}`}
                         title={`Build and customize your ${type}`}

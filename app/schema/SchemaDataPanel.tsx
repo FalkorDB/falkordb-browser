@@ -217,7 +217,7 @@ export default function SchemaDataPanel({ obj, onExpand, onSetAttributes, onRemo
                                         {
                                             session?.user?.role !== "Read-Only" &&
                                             <Button
-                                                disabled={indicator === "offline"}
+                                                indicator={indicator}
                                                 title="Remove"
                                                 onClick={() => handleRemoveLabel(l)}
                                                 isLoading={isRemoveLabelLoading}
@@ -263,7 +263,7 @@ export default function SchemaDataPanel({ obj, onExpand, onSetAttributes, onRemo
                                                 }}
                                             />
                                             <Button
-                                                disabled={indicator === "offline"}
+                                                indicator={indicator}
                                                 className="p-2 text-xs justify-center border border-foreground"
                                                 variant="Secondary"
                                                 label="Save"
@@ -539,7 +539,7 @@ export default function SchemaDataPanel({ obj, onExpand, onSetAttributes, onRemo
                             <TableCell>
                                 <div className="flex gap-2 w-44">
                                     <Button
-                                        disabled={indicator === "offline"}
+                                        indicator={indicator}
                                         className="p-2 justify-center border border-foreground"
                                         variant="Secondary"
                                         label="Save"

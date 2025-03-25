@@ -109,7 +109,8 @@ export default function Toolbar({
             <div className="flex items-center gap-4">
                 <Button
                     className="text-nowrap"
-                    disabled={disabled || indicator === "offline"}
+                    disabled={disabled}
+                    indicator={indicator}
                     variant="Secondary"
                     label="Zoom In"
                     title="Zoom in for a closer view"
@@ -119,7 +120,8 @@ export default function Toolbar({
                 </Button>
                 <Button
                     className="text-nowrap"
-                    disabled={disabled || indicator === "offline"}
+                    disabled={disabled}
+                    indicator={indicator}
                     variant="Secondary"
                     label="Zoom Out"
                     title="Zoom out for a broader view"
@@ -129,7 +131,8 @@ export default function Toolbar({
                 </Button>
                 <Button
                     className="text-nowrap"
-                    disabled={disabled || indicator === "offline"}
+                    disabled={disabled}
+                    indicator={indicator}
                     variant="Secondary"
                     label="Fit To Size"
                     title="Center and fit the graph to the screen"

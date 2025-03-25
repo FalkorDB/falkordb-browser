@@ -99,7 +99,8 @@ export default function Combobox({ isSelectGraph = false, disabled = false, inTa
             </SelectTrigger>
           </TooltipTrigger>
           <TooltipContent>
-            {options.length === 0 ? "There is no graphs" : selectedValue || `Select ${label}`}
+            {indicator === "offline" && "The FalkorDB server is offline"}
+            {indicator !== "offline" && (options.length === 0 ? "There is no graphs" : selectedValue || `Select ${label}`)}
           </TooltipContent>
         </Tooltip>
         <SelectContent className="min-w-52 max-h-[40lvh] bg-foreground">

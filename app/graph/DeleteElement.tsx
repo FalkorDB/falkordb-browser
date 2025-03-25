@@ -46,7 +46,7 @@ export default function DeleteElement({
         >
             <div className="flex justify-end gap-4">
                 <Button
-                    disabled={indicator === "offline"}
+                    indicator={indicator}
                     className="text-nowrap"
                     variant="Primary"
                     label="Delete"

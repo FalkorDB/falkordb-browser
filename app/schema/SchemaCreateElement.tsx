@@ -570,7 +570,7 @@ export default function SchemaCreateElement({ onCreate, onExpand, selectedNodes,
             handleOnCreate();
           }}>
             <Button
-              disabled={indicator === "offline"}
+              indicator={indicator}
               label={`Create new ${type ? "node" : "edge"}`}
               title={`Add a new ${type ? "node" : "edge"} to the schema`}
               variant="Primary"
