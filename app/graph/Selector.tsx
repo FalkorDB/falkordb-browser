@@ -54,39 +54,6 @@ export default function Selector({ setGraphName, graphName, runQuery, edgesCount
     const [filteredQueries, setFilteredQueries] = useState<Query[]>(historyQuery?.queries || [])
     const { indicator } = useContext(IndicatorContext)
 
-    const focusEditorAtEnd = () => {
-        if (editorRef.current) {
-            editorRef.current.focus();
-
-            const model = editorRef.current.getModel();
-            if (model) {
-                const lastLine = model.getLineCount();
-                const lastColumn = model.getLineMaxColumn(lastLine);
-
-                editorRef.current.setPosition({ lineNumber: lastLine, column: lastColumn });
-
-                editorRef.current.revealPositionInCenter({ lineNumber: lastLine, column: lastColumn });
-            }
-        }
-    };
-
-    useEffect(() => {
-        const timeout = setTimeout(() => {
-            if (!historyQuery) return
-            setFilteredQueries(historyQuery.queries?.filter((query, i) => !search || query.text.toLowerCase().includes(search.toLowerCase()) || i === historyQuery.counter - 1) || [])
-            focusEditorAtEnd()
-        }, 500)
-
-        return () => {
-            clearTimeout(timeout)
-        }
-    }, [historyQuery?.queries, search, historyQuery?.counter, historyQuery])
-    const submitQuery = useRef<HTMLButtonElement>(null)
-
-    useEffect(() => {
-        setSelectedValue(graphName)
-    }, [graphName])
-
     const handleOnChange = async (name: string) => {
         const formattedName = name === '""' ? "" : name
         if (runQuery) {
@@ -123,11 +90,49 @@ export default function Selector({ setGraphName, graphName, runQuery, edgesCount
             }) : res.filter(name => !name.endsWith("_schema"))
         setOptions(opts)
         if (opts.length === 1) handleOnChange(opts[0])
+        if (opts.length === 0) handleOnChange("")
     }
 
     useEffect(() => {
         getOptions()
     }, [])
+
+    useEffect(() => {
+        if (indicator === "online") getOptions()
+    }, [indicator, setOptions])
+
+    const focusEditorAtEnd = () => {
+        if (editorRef.current) {
+            editorRef.current.focus();
+
+            const model = editorRef.current.getModel();
+            if (model) {
+                const lastLine = model.getLineCount();
+                const lastColumn = model.getLineMaxColumn(lastLine);
+
+                editorRef.current.setPosition({ lineNumber: lastLine, column: lastColumn });
+
+                editorRef.current.revealPositionInCenter({ lineNumber: lastLine, column: lastColumn });
+            }
+        }
+    };
+
+    useEffect(() => {
+        const timeout = setTimeout(() => {
+            if (!historyQuery) return
+            setFilteredQueries(historyQuery.queries?.filter((query, i) => !search || query.text.toLowerCase().includes(search.toLowerCase()) || i === historyQuery.counter - 1) || [])
+            focusEditorAtEnd()
+        }, 500)
+
+        return () => {
+            clearTimeout(timeout)
+        }
+    }, [historyQuery?.queries, search, historyQuery?.counter, historyQuery])
+    const submitQuery = useRef<HTMLButtonElement>(null)
+
+    useEffect(() => {
+        setSelectedValue(graphName)
+    }, [graphName])
 
     const handleEditorDidMount = (e: editor.IStandaloneCodeEditor) => {
         editorRef.current = e
