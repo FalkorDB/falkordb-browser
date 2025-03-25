@@ -581,13 +581,13 @@ export default function SchemaDataPanel({ obj, onExpand, onSetAttributes, onRemo
             </Table>
             <div className="p-8 flex justify-end">
                 {
-                    session?.user.role &&
+                    session?.user.role !== "Read-Only" &&
                     <DeleteElement
                         description={`Are you sure you want to delete this ${type ? "Node" : "Relation"}?`}
                         open={deleteOpen}
                         setOpen={setDeleteOpen}
                         onDeleteElement={onDeleteElement}
-                        trigger={<Button label="Delete" variant="Secondary" title="Remove the selected element" />}
+                        trigger={<Button label={`Delete ${type ? "Node" : "Relation"}`} variant="Secondary" title="Remove the selected element" />}
                     />
                 }
             </div>
