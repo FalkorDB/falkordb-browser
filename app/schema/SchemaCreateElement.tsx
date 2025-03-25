@@ -3,7 +3,7 @@
 'use client'
 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Dispatch, SetStateAction, useState } from "react";
+import { Dispatch, SetStateAction, useContext, useState } from "react";
 import { ArrowRight, ArrowRightLeft, Check, ChevronRight, Pencil, Plus, Trash2, X } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/components/ui/use-toast";
@@ -12,6 +12,7 @@ import Combobox from "../components/ui/combobox";
 import { Node } from "../api/graph/model";
 import Input from "../components/ui/Input";
 import ToastButton from "../components/ToastButton";
+import { IndicatorContext } from "../components/provider";
 
 interface Props {
   onCreate: (element: [string, string[]][], label?: string[]) => Promise<boolean>
@@ -40,7 +41,8 @@ export default function SchemaCreateElement({ onCreate, onExpand, selectedNodes,
   const [labelsHover, setLabelsHover] = useState<boolean>(false)
   const [labelsEditable, setLabelsEditable] = useState<boolean>(false)
   const { toast } = useToast()
-
+  const { indicator } = useContext(IndicatorContext)
+    
   const handleSetEditable = (att: [string, string[]] = getDefaultAttribute()) => {
     setAttribute(att)
     setEditable(att[0])
@@ -568,6 +570,7 @@ export default function SchemaCreateElement({ onCreate, onExpand, selectedNodes,
             handleOnCreate();
           }}>
             <Button
+              disabled={indicator === "offline"}
               label={`Create new ${type ? "node" : "edge"}`}
               title={`Add a new ${type ? "node" : "edge"} to the schema`}
               variant="Primary"

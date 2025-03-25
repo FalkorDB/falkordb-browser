@@ -36,7 +36,7 @@ interface ComboboxProps {
 
 const STEP = 4
 
-export default function Combobox({ isSelectGraph = false, disabled = false, inTable, type = "Graph", label, options, setOptions, selectedValue, setSelectedValue, defaultOpen = false, onOpenChange }: ComboboxProps) {
+export default function Combobox({ isSelectGraph = false, disabled = false, inTable, type = "Graph", label = type, options, setOptions, selectedValue, setSelectedValue, defaultOpen = false, onOpenChange }: ComboboxProps) {
 
   const [openMenage, setOpenMenage] = useState<boolean>(false)
   const [open, setOpen] = useState<boolean>(defaultOpen)
@@ -88,23 +88,23 @@ export default function Combobox({ isSelectGraph = false, disabled = false, inTa
 
   return (
     <Dialog open={openMenage} onOpenChange={setOpenMenage}>
-      <Select disabled={disabled || options.length === 0 || indicator === "offline"} value={selectedValue} onValueChange={setSelectedValue} open={open} onOpenChange={(o) => {
+      <Select disabled={disabled || options.length === 0 || (indicator === "offline" && label === type)} value={selectedValue} onValueChange={setSelectedValue} open={open} onOpenChange={(o) => {
         setOpen(o)
         if (onOpenChange) onOpenChange(o)
       }}>
         <Tooltip>
           <TooltipTrigger asChild>
-            <SelectTrigger data-type="select" disabled={disabled || options.length === 0} className={cn("w-fit gap-2 border-none p-2", inTable ? "text-sm font-light" : "text-xl font-medium")}>
-              <SelectValue placeholder={`Select ${label || type || "Graph"}`} />
+            <SelectTrigger data-type="select" className={cn("w-fit gap-2 border-none p-2", inTable ? "text-sm font-light" : "text-xl font-medium")}>
+              <SelectValue placeholder={`Select ${label}`} />
             </SelectTrigger>
           </TooltipTrigger>
           <TooltipContent>
-            {options.length === 0 ? "There is no graphs" : selectedValue || `Select ${label || type || "Graph"}`}
+            {options.length === 0 ? "There is no graphs" : selectedValue || `Select ${label}`}
           </TooltipContent>
         </Tooltip>
         <SelectContent className="min-w-52 max-h-[40lvh] bg-foreground">
           <div className="p-4" id="graphSearch">
-            <Input ref={ref => ref?.focus()} className="w-full" placeholder={`Search a graph ${type}`} onChange={(e) => {
+            <Input ref={ref => ref?.focus()} className="w-full" placeholder={`Search a graph ${label}`} onChange={(e) => {
               setSearch(e.target.value)
               setMaxOptions(5)
             }} value={search} />

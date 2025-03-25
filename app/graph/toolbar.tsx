@@ -63,7 +63,7 @@ export default function Toolbar({
                         <>
                             <Button
                                 className="text-nowrap"
-                                disabled={disabled || indicator === "offline"}
+                                disabled={disabled}
                                 variant="Primary"
                                 label="Add Node"
                                 title={`Add a new node to the ${type}`}
@@ -73,7 +73,7 @@ export default function Toolbar({
                             </Button>
                             <Button
                                 className="text-nowrap"
-                                disabled={disabled || indicator === "offline"}
+                                disabled={disabled}
                                 variant="Primary"
                                 label="Add Relation"
                                 title={`Add a new relation to the ${type}`}
