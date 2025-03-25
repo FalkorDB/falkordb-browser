@@ -621,7 +621,7 @@ export default function EditorComponent({ historyQuery, maximize, runQuery, grap
                                 className="rounded-none py-2 px-8"
                                 variant="Primary"
                                 label="Run"
-                                title="Run (Enter)"
+                                title="Press Enter to run the query"
                                 type="submit"
                                 onClick={handleSubmit}
                                 isLoading={isLoading}
