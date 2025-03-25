@@ -9,7 +9,8 @@ interface Props {
 }
 
 export default function TableView({ data }: Props) {
-
+    if (data.length === 0) return undefined
+    
     return (
         <TableComponent
             headers={Object.keys(data[0])}
