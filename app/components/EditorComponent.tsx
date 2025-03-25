@@ -7,7 +7,7 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogTrigger } 
 import { Editor, Monaco } from "@monaco-editor/react"
 import { SetStateAction, Dispatch, useEffect, useRef, useState, useContext } from "react"
 import * as monaco from "monaco-editor";
-import { Maximize2, Minimize2 } from "lucide-react";
+import { Info, Maximize2, Minimize2 } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { HistoryQuery, prepareArg, securedFetch } from "@/lib/utils";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
@@ -609,14 +609,20 @@ export default function EditorComponent({ historyQuery, maximize, runQuery, grap
                                     beforeMount={handleEditorWillMount}
                                     onMount={handleEditorDidMount}
                                 />
-                                <DialogTrigger asChild>
+                                <div className="h-full absolute top-0 px-2 right-0 flex gap-2 items-center justify-center">
+                                    <DialogTrigger asChild>
+                                        <Button
+                                            title="Maximize"
+                                        >
+                                            <Maximize2 size={20} />
+                                        </Button>
+                                    </DialogTrigger>
                                     <Button
-                                        className="absolute top-0 right-3 p-2.5"
-                                        title="Maximize"
+                                        title="Run (Enter) History (Arrow Up/Down) Insert new line (Shift + Enter)"
                                     >
-                                        <Maximize2 size={20} />
+                                        <Info />
                                     </Button>
-                                </DialogTrigger>
+                                </div>
                                 <div ref={placeholderRef} className="absolute top-2 left-2 pointer-events-none">
                                     {PLACEHOLDER}
                                 </div>
@@ -626,8 +632,8 @@ export default function EditorComponent({ historyQuery, maximize, runQuery, grap
                                 indicator={indicator}
                                 className="rounded-none py-2 px-8"
                                 variant="Primary"
-                                title="Run (Ctrl + Enter)"
                                 label="Run"
+                                title="Press Enter to run the query"
                                 type="submit"
                                 onClick={handleSubmit}
                                 isLoading={isLoading}
