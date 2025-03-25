@@ -27,7 +27,6 @@ export default function Page() {
         currentQuery: "",
         counter: 0
     })
-    const [currentQuery, setCurrentQuery] = useState<Query | undefined>(undefined)
     const { data: session } = useSession()
     const { toast } = useToast()
     const { setIndicator } = useContext(IndicatorContext);
@@ -64,7 +63,6 @@ export default function Page() {
         if (graphName !== graph.Id) {
             const colors = JSON.parse(localStorage.getItem(graphName) || "[]")
             setGraph(Graph.empty(graphName, colors))
-            setCurrentQuery(undefined)
         }
         fetchCount()
     }, [fetchCount, graph.Id, graphName])
@@ -137,8 +135,6 @@ export default function Page() {
                 />
                 <GraphView
                     graph={graph}
-                    currentQuery={currentQuery}
-                    setCurrentQuery={setCurrentQuery}
                     selectedElement={selectedElement}
                     setSelectedElement={setSelectedElement}
                     runQuery={runQuery}

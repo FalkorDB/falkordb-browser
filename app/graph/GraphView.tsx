@@ -27,7 +27,7 @@ import Input from "../components/ui/Input";
 const ForceGraph = dynamic(() => import("../components/ForceGraph"), { ssr: false });
 const EditorComponent = dynamic(() => import("../components/EditorComponent"), { ssr: false })
 
-function GraphView({ graph, selectedElement, setSelectedElement, runQuery, historyQuery, fetchCount, setHistoryQuery, currentQuery, setCurrentQuery }: {
+function GraphView({ graph, selectedElement, setSelectedElement, runQuery, historyQuery, fetchCount, setHistoryQuery }: {
     graph: Graph
     selectedElement: Node | Link | undefined
     setSelectedElement: Dispatch<SetStateAction<Node | Link | undefined>>
@@ -35,8 +35,6 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
     historyQuery: HistoryQuery
     setHistoryQuery: Dispatch<SetStateAction<HistoryQuery>>
     fetchCount: () => void
-    currentQuery: Query | undefined
-    setCurrentQuery: Dispatch<SetStateAction<Query | undefined>>
 }) {
 
     const [data, setData] = useState<GraphData>(graph.Elements)
@@ -47,6 +45,7 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
     const [maximize, setMaximize] = useState<boolean>(false)
     const [tabsValue, setTabsValue] = useState<string>("")
     const [cooldownTicks, setCooldownTicks] = useState<number | undefined>(0)
+    const [currentQuery, setCurrentQuery] = useState<Query>()
     const [searchElement, setSearchElement] = useState<string>("")
     const { toast } = useToast()
     const { setIndicator } = useContext(IndicatorContext);
@@ -71,7 +70,7 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
             defaultChecked = "Graph"
         } else if (graph.Data.length !== 0) {
             defaultChecked = "Table";
-        } else if (currentQuery && (currentQuery.metadata.length > 0 || currentQuery.explain.length > 0)) {
+        } else if (currentQuery && currentQuery.metadata.length > 0 && graph.Metadata.length > 0 && currentQuery.explain.length > 0) {
             defaultChecked = "Metadata";
         }
 
@@ -323,7 +322,7 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
                             value="Metadata"
                         >
                             <Button
-                                disabled={!currentQuery || (currentQuery.metadata.length === 0 || currentQuery.explain.length === 0)}
+                                disabled={!currentQuery || currentQuery.metadata.length === 0 || currentQuery.explain.length === 0 || graph.Metadata.length === 0}
                                 className="tabs-trigger"
                                 onClick={() => setTabsValue("Metadata")}
                                 title="Metadata"
