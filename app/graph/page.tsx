@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useContext, useEffect, useState } from "react";
-import { HistoryQuery, prepareArg, Query, securedFetch } from "@/lib/utils";
+import { HistoryQuery, prepareArg, securedFetch } from "@/lib/utils";
 import { useSession } from "next-auth/react";
 import { useToast } from "@/components/ui/use-toast";
 import dynamic from "next/dynamic";
