@@ -5,7 +5,7 @@
 'use client'
 
 import { prepareArg, securedFetch } from "@/lib/utils";
-import { Dispatch, SetStateAction, useEffect, useState } from "react";
+import { Dispatch, SetStateAction, useContext, useEffect, useState } from "react";
 import { Check, ChevronRight, Pencil, Plus, Trash2, X } from "lucide-react";
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from "@/components/ui/use-toast";
@@ -17,6 +17,7 @@ import DialogComponent from "../components/DialogComponent";
 import CloseDialog from "../components/CloseDialog";
 import DeleteElement from "./DeleteElement";
 import ToastButton from "../components/ToastButton";
+import { IndicatorContext } from "../components/provider";
 
 interface Props {
     obj: Node | Link;
@@ -48,6 +49,7 @@ export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement,
     const [isRemoveLoading, setIsRemoveLoading] = useState(false)
     const { toast } = useToast()
     const { data: session } = useSession()
+    const { indicator, setIndicator } = useContext(IndicatorContext)
 
     useEffect(() => {
         if (!obj) {
@@ -83,11 +85,11 @@ export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement,
         try {
             if (actionType === "set") setIsSetLoading(true)
             const q = `MATCH ${type ? "(e)" : "()-[e]-()"} WHERE id(e) = ${id} SET e.${key} = '${val}'`
-            const success = (await securedFetch(`api/graph/${prepareArg(graph.Id)}/?query=${prepareArg(q)}`, {
+            const result = await securedFetch(`api/graph/${prepareArg(graph.Id)}/?query=${prepareArg(q)}`, {
                 method: "GET"
-            }, toast)).ok
+            }, toast, setIndicator)
 
-            if (success) {
+            if (result.ok) {
 
                 graph.setProperty(key, val, id)
 
@@ -121,7 +123,7 @@ export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement,
                 })
             }
 
-            return success
+            return result.ok
         } finally {
             if (actionType === "set") setIsSetLoading(false)
         }
@@ -155,7 +157,7 @@ export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement,
             const q = `MATCH ${type ? "(e)" : "()-[e]-()"} WHERE id(e) = ${id} SET e.${key} = NULL`
             const success = (await securedFetch(`api/graph/${prepareArg(graph.Id)}/?query=${prepareArg(q)}`, {
                 method: "GET"
-            }, toast)).ok
+            }, toast, setIndicator)).ok
 
             if (success) {
                 const value = obj.data[key]
@@ -189,7 +191,7 @@ export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement,
             return
         }
 
-        if (e.key !== "Enter" || isAddLoading) return
+        if (e.key !== "Enter" || isAddLoading || indicator === "offline") return
 
         handleAddValue(newKey, newVal)
     }
@@ -200,7 +202,7 @@ export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement,
             setNewKey("")
         }
 
-        if (e.key !== "Enter" || isSetLoading) return
+        if (e.key !== "Enter" || isSetLoading || indicator === "offline") return
 
         setProperty(editable, newVal, true)
     }
@@ -264,6 +266,7 @@ export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement,
                                             <Button
                                                 title="Remove"
                                                 onClick={() => handleRemoveLabel(l)}
+                                                indicator={indicator}
                                             >
                                                 <X size={15} />
                                             </Button>
@@ -312,6 +315,7 @@ export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement,
                                                 title="Save the new label"
                                                 onClick={() => handleAddLabel()}
                                                 isLoading={isLabelLoading}
+                                                indicator={indicator}
                                             >
                                                 <Check size={15} />
                                             </Button>
@@ -368,6 +372,7 @@ export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement,
                                                 editable === key ?
                                                     <>
                                                         <Button
+                                                            indicator={indicator}
                                                             variant="button"
                                                             onClick={(e) => {
                                                                 e.stopPropagation()
@@ -452,6 +457,7 @@ export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement,
                                     title="Save"
                                     onClick={() => handleAddValue(newKey, newVal)}
                                     isLoading={isAddLoading}
+                                    indicator={indicator}
                                 >
                                     <Check size={20} />
                                 </Button>

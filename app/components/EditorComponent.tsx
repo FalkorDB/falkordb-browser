@@ -5,7 +5,7 @@
 
 import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Editor, Monaco } from "@monaco-editor/react"
-import { SetStateAction, Dispatch, useEffect, useRef, useState } from "react"
+import { SetStateAction, Dispatch, useEffect, useRef, useState, useContext } from "react"
 import * as monaco from "monaco-editor";
 import { Info, Maximize2, Minimize2 } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
@@ -14,6 +14,7 @@ import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import { Graph } from "../api/graph/model";
 import Button from "./ui/Button";
 import CloseDialog from "./CloseDialog";
+import { IndicatorContext } from "./provider";
 
 interface Props {
     historyQuery: HistoryQuery
@@ -192,6 +193,7 @@ const PLACEHOLDER = "Type your query here to start"
 
 export default function EditorComponent({ historyQuery, maximize, runQuery, graph, setHistoryQuery }: Props) {
 
+    const { indicator, setIndicator } = useContext(IndicatorContext)
     const placeholderRef = useRef<HTMLDivElement>(null)
     const [lineNumber, setLineNumber] = useState(1)
     const graphIdRef = useRef(graph.Id)
@@ -202,6 +204,11 @@ export default function EditorComponent({ historyQuery, maximize, runQuery, grap
     const submitQuery = useRef<HTMLButtonElement>(null)
     const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null)
     const containerRef = useRef<HTMLDivElement>(null)
+    const indicatorRef = useRef(indicator)
+
+    useEffect(() => {
+        indicatorRef.current = indicator
+    }, [indicator])
 
     useEffect(() => {
         setHistoryQuery(prev => ({
@@ -270,9 +277,11 @@ export default function EditorComponent({ historyQuery, maximize, runQuery, grap
     }
 
     const fetchSuggestions = async (q: string, detail: string): Promise<monaco.languages.CompletionItem[]> => {
+        if (indicator === "offline") return []
+
         const result = await securedFetch(`api/graph/${graphIdRef.current}/?query=${prepareArg(q)}`, {
             method: 'GET',
-        }, toast)
+        }, toast, setIndicator)
 
         if (!result) return []
 
@@ -482,13 +491,14 @@ export default function EditorComponent({ historyQuery, maximize, runQuery, grap
         });
 
         // eslint-disable-next-line no-bitwise
-        e.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, () => {
-            submitQuery.current?.click();
+        e.addCommand(monaco.KeyMod.Shift | monaco.KeyCode.Enter, () => {
+            e.trigger('keyboard', 'type', { text: '\n' });
         });
 
         // eslint-disable-next-line no-bitwise
-        e.addCommand(monaco.KeyMod.Shift | monaco.KeyCode.Enter, () => {
-            e.trigger('keyboard', 'type', { text: '\n' });
+        e.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, () => {
+            if (indicatorRef.current === "offline") return
+            submitQuery.current?.click();
         });
 
         e.addAction({
@@ -498,6 +508,7 @@ export default function EditorComponent({ historyQuery, maximize, runQuery, grap
             keybindings: [monaco.KeyCode.Enter],
             contextMenuOrder: 1.5,
             run: async () => {
+                if (indicatorRef.current === "offline") return
                 submitQuery.current?.click()
             },
             precondition: '!suggestWidgetVisible',
@@ -618,6 +629,7 @@ export default function EditorComponent({ historyQuery, maximize, runQuery, grap
                             </div>
                             <Button
                                 ref={submitQuery}
+                                indicator={indicator}
                                 className="rounded-none py-2 px-8"
                                 variant="Primary"
                                 label="Run"

@@ -1,9 +1,10 @@
 import { cn, createNestedObject, prepareArg, Query, securedFetch } from "@/lib/utils";
 import { JSONTree } from "react-json-tree";
-import { useState } from "react";
+import { useContext, useState } from "react";
 import { Info } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import Button from "../components/ui/Button";
+import { IndicatorContext } from "../components/provider";
 
 export default function MetadataView({ query, graphName, className = "" }: {
     query: Query,
@@ -11,6 +12,7 @@ export default function MetadataView({ query, graphName, className = "" }: {
     className?: string
 }) {
     const [profile, setProfile] = useState<string[]>([])
+    const { indicator } = useContext(IndicatorContext)
     const { toast } = useToast()
 
     const handleProfile = async () => {
@@ -30,6 +32,7 @@ export default function MetadataView({ query, graphName, className = "" }: {
                 <h1 className="text-2xl font-bold p-2">Profile</h1>
                 <div className="flex gap-4">
                     <Button
+                        indicator={indicator}
                         variant="Primary"
                         label="Profile"
                         onClick={handleProfile}

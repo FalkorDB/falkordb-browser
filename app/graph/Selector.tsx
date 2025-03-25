@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState, Dispatch, SetStateAction } from "react";
+import { useEffect, useRef, useState, Dispatch, SetStateAction, useContext } from "react";
 import { DialogTitle } from "@/components/ui/dialog";
 import { Editor } from "@monaco-editor/react";
 import { editor } from "monaco-editor";
@@ -21,6 +21,7 @@ import CreateGraph from "../components/CreateGraph";
 import ExportGraph from "../components/ExportGraph";
 import MetadataView from "./MetadataView";
 import Input from "../components/ui/Input";
+import { IndicatorContext } from "../components/provider";
 
 interface Props {
     setGraphName: (selectedGraphName: string) => void
@@ -51,7 +52,54 @@ export default function Selector({ setGraphName, graphName, runQuery, edgesCount
     const [isRotating, setIsRotating] = useState(false);
     const { toast } = useToast()
     const [filteredQueries, setFilteredQueries] = useState<Query[]>(historyQuery?.queries || [])
+    const { indicator } = useContext(IndicatorContext)
 
+    const handleOnChange = async (name: string) => {
+        const formattedName = name === '""' ? "" : name
+        if (runQuery) {
+            const result = await securedFetch(`api/graph/${prepareArg(name)}_schema/?query=${prepareArg(defaultQuery())}&create=false`, {
+                method: "GET"
+            }, toast)
+
+            if (!result.ok) return
+
+            const json = await result.json()
+            if (json.result) {
+                setSchema(Graph.create(name, json.result, false, true))
+            }
+        }
+        setGraphName(formattedName)
+        setSelectedValue(name)
+    }
+
+    const getOptions = async () => {
+        if (indicator === "offline") return
+
+        const result = await securedFetch("api/graph", {
+            method: "GET"
+        }, toast)
+        if (!result.ok) return
+        const res = (await result.json()).result as string[]
+        const opts = !runQuery ?
+            res.filter(name => name.endsWith("_schema")).map(name => {
+                let split = name.split("_schema")[0]
+                if (split.startsWith("{") && split.endsWith("}")) {
+                    split = split.substring(1, split.length - 1)
+                }
+                return split
+            }) : res.filter(name => !name.endsWith("_schema"))
+        setOptions(opts)
+        if (opts.length === 1) handleOnChange(opts[0])
+        if (opts.length === 0) handleOnChange("")
+    }
+
+    useEffect(() => {
+        getOptions()
+    }, [])
+
+    useEffect(() => {
+        if (indicator === "online") getOptions()
+    }, [indicator, setOptions])
 
     const focusEditorAtEnd = () => {
         if (editorRef.current) {
@@ -76,7 +124,6 @@ export default function Selector({ setGraphName, graphName, runQuery, edgesCount
             focusEditorAtEnd()
         }, 500)
 
-
         return () => {
             clearTimeout(timeout)
         }
@@ -86,46 +133,6 @@ export default function Selector({ setGraphName, graphName, runQuery, edgesCount
     useEffect(() => {
         setSelectedValue(graphName)
     }, [graphName])
-
-    const handleOnChange = async (name: string) => {
-        const formattedName = name === '""' ? "" : name
-        if (runQuery) {
-            const result = await securedFetch(`api/graph/${prepareArg(name)}_schema/?query=${prepareArg(defaultQuery())}&create=false`, {
-                method: "GET"
-            }, toast)
-
-            if (!result.ok) return
-
-            const json = await result.json()
-            if (json.result) {
-                setSchema(Graph.create(name, json.result, false, true))
-            }
-        }
-        setGraphName(formattedName)
-        setSelectedValue(name)
-    }
-
-    const getOptions = async () => {
-        const result = await securedFetch("api/graph", {
-            method: "GET"
-        }, toast)
-        if (!result.ok) return
-        const res = (await result.json()).result as string[]
-        const opts = !runQuery ?
-            res.filter(name => name.endsWith("_schema")).map(name => {
-                let split = name.split("_schema")[0]
-                if (split.startsWith("{") && split.endsWith("}")) {
-                    split = split.substring(1, split.length - 1)
-                }
-                return split
-            }) : res.filter(name => !name.endsWith("_schema"))
-        setOptions(opts)
-        if (opts.length === 1) handleOnChange(opts[0])
-    }
-
-    useEffect(() => {
-        getOptions()
-    }, [])
 
     const handleEditorDidMount = (e: editor.IStandaloneCodeEditor) => {
         editorRef.current = e
@@ -186,6 +193,7 @@ export default function Selector({ setGraphName, graphName, runQuery, edgesCount
                         </>
                     }
                     <Button
+                        indicator={indicator}
                         className={cn(
                             "transition-transform",
                             isRotating && "animate-spin duration-1000"
@@ -339,6 +347,7 @@ export default function Selector({ setGraphName, graphName, runQuery, edgesCount
                                         ref={submitQuery}
                                         className="text-white flex justify-center w-1/3"
                                         disabled={isLoading || !historyQuery?.counter}
+                                        indicator={indicator}
                                         onClick={async () => {
                                             try {
                                                 setIsLoading(true);
