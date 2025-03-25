@@ -331,7 +331,7 @@ export default function Selector({ setGraphName, graphName, runQuery, edgesCount
                                         </ul>
                                     </div>
                                     <div className="w-1 grow">
-                                        {historyQuery && historyQuery.queries.length > 0 && historyQuery.counter && <MetadataView query={historyQuery.queries[historyQuery.counter - 1]} graphName={selectedValue} />}
+                                        {historyQuery && historyQuery.queries.length > 0 && historyQuery.counter ? <MetadataView query={historyQuery.queries[historyQuery.counter - 1]} graphName={selectedValue} /> : undefined}
                                     </div>
                                 </div>
                                 <div className="flex justify-end">
