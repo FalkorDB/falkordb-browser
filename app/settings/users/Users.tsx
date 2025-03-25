@@ -11,9 +11,9 @@ import { ToastAction } from "@/components/ui/toast";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import CloseDialog from "@/app/components/CloseDialog";
+import { IndicatorContext } from "@/app/components/provider";
 import DeleteUser from "./DeleteUser";
 import AddUser from "./AddUser";
-import { IndicatorContext } from "@/app/components/provider";
 
 type SetUser = {
     username: string
