@@ -7,7 +7,6 @@
 import { Locator, Download } from "@playwright/test";
 import BasePage from "@/e2e/infra/ui/basePage";
 import { waitForElementToBeVisible, waitForTimeOut } from "@/e2e/infra/utils";
-import { waitForElementToBeVisible, waitForTimeOut } from "@/e2e/infra/utils";
 
 export default class GraphPage extends BasePage {
 
