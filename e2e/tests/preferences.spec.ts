@@ -1,7 +1,7 @@
 import test, { expect } from "playwright/test";
 import urls from '../config/urls.json'
 import BrowserWrapper from "../infra/ui/browserWrapper";
-import PreferencesPage from "../logic/POM/preferencesPage";
+import PreferencesView from "../logic/POM/preferencesView";
 import ApiCalls from "../logic/api/apiCalls";
 
 test.describe('Preferences Tests', () => {
