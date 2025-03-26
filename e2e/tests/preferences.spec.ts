@@ -20,7 +20,7 @@ test.describe('Preferences Tests', () => {
     test(`@readonly remove color via UI -> verify color is removed via UI`, async () => {
         const graphName = `preferences_${Date.now()}`;
         await apicalls.addGraph(graphName, "admin");
-        const preferencesPage = await browser.createNewPage(PreferencesPage, urls.graphUrl);
+        const preferencesPage = await browser.createNewPage(PreferencesView, urls.graphUrl);
         await preferencesPage.selectExistingGraph(graphName, "readonly");
         await preferencesPage.addColor();
         const colorsCount = await preferencesPage.getColorsCount();
@@ -33,7 +33,7 @@ test.describe('Preferences Tests', () => {
     test(`@readonly Modify color via UI -> verify color is modified via UI`, async () => {
         const graphName = `preferences_${Date.now()}`;
         await apicalls.addGraph(graphName, "admin");
-        const preferencesPage = await browser.createNewPage(PreferencesPage, urls.graphUrl);
+        const preferencesPage = await browser.createNewPage(PreferencesView, urls.graphUrl);
         await preferencesPage.selectExistingGraph(graphName, "readonly");
         const color = await preferencesPage.getColorText();
         await preferencesPage.modifyColor();
@@ -45,7 +45,7 @@ test.describe('Preferences Tests', () => {
     test(`@readonly Add color via UI -> reset colors via UI -> verify color is reset via UI`, async () => {
         const graphName = `preferences_${Date.now()}`;
         await apicalls.addGraph(graphName, "admin");
-        const preferencesPage = await browser.createNewPage(PreferencesPage, urls.graphUrl);
+        const preferencesPage = await browser.createNewPage(PreferencesView, urls.graphUrl);
         await preferencesPage.selectExistingGraph(graphName, "readonly");
         const colorsCount = await preferencesPage.getColorsCount();
         await preferencesPage.addColor();
