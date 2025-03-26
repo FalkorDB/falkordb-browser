@@ -9,7 +9,6 @@ import { v4 as uuidv4 } from 'uuid'
 const connections = new Map<string, FalkorDB>();
 
 async function newClient(credentials: { host: string, port: string, password: string, username: string, tls: string, ca: string }, id: string): Promise<{ role: Role, client: FalkorDB }> {
-
     const connectionOptions: FalkorDBOptions = credentials.tls === "true" ?
         {
             socket: {

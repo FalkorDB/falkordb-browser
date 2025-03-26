@@ -3,7 +3,7 @@
 
 'use client'
 
-import { useRef, useState, useEffect, Dispatch, SetStateAction } from "react";
+import { useRef, useState, useEffect, Dispatch, SetStateAction, useContext } from "react";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { ImperativePanelHandle } from "react-resizable-panels";
 import { ChevronLeft, GitGraph, Info, Maximize2, Minimize2, Pause, Play, Search, Table } from "lucide-react"
@@ -14,6 +14,7 @@ import { useToast } from "@/components/ui/use-toast";
 import { Switch } from "@/components/ui/switch";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { ForceGraphMethods } from "react-force-graph-2d";
+import { IndicatorContext } from "@/app/components/provider";
 import { Category, Graph, GraphData, Link, Node } from "../api/graph/model";
 import DataPanel from "./GraphDataPanel";
 import Labels from "./labels";
@@ -47,6 +48,7 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
     const [currentQuery, setCurrentQuery] = useState<Query>()
     const [searchElement, setSearchElement] = useState<string>("")
     const { toast } = useToast()
+    const { setIndicator } = useContext(IndicatorContext);
 
     useEffect(() => {
         let timeout: NodeJS.Timeout
@@ -169,7 +171,7 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
 
         const result = await securedFetch(`api/graph/${prepareArg(graph.Id)}/?query=${prepareArg(q)} `, {
             method: "GET"
-        }, toast)
+        }, toast, setIndicator)
 
         if (!result.ok) return
 
@@ -334,7 +336,7 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
                             <div className="flex items-center justify-between">
                                 <Toolbar
                                     disabled={!graph.Id}
-                                    deleteDisabled={(Object.values(selectedElements).length === 0 && !selectedElement)}
+                                    deleteDisabled={selectedElements.length === 0 || !selectedElement}
                                     onDeleteElement={handleDeleteElement}
                                     chartRef={chartRef}
                                     displayAdd={false}
@@ -437,7 +439,7 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
                     </TabsContent>
                 </Tabs>
             </ResizablePanel>
-            <ResizableHandle disabled={isCollapsed} className={cn(isCollapsed ? "w-0 !cursor-default" : "w-3")} />
+            <ResizableHandle disabled={!selectedElement} className={cn(!selectedElement ? "!cursor-default" : "w-3")} />
             <ResizablePanel
                 className="rounded-lg"
                 collapsible

@@ -108,17 +108,21 @@ export default function SchemaView({ schema, fetchCount }: Props) {
         } else dataPanel.current?.collapse()
     }
 
-    const onExpand = () => {
+    const onExpand = (expand?: boolean) => {
         if (!dataPanel.current) return
-
         const panel = dataPanel.current
-
-        if (panel.isExpanded()) {
-            panel.collapse()
-            setIsAddEntity(false)
-            setIsAddRelation(false)
-        } else {
+        if (expand !== undefined) {
+            if (expand && panel?.isCollapsed()) {
+                panel?.expand()
+            } else if (!expand && panel?.isExpanded()) {
+                panel?.collapse()
+            }
+            return
+        }
+        if (panel.isCollapsed()) {
             panel.expand()
+        } else {
+            panel.collapse()
         }
     }
 
@@ -484,7 +488,7 @@ export default function SchemaView({ schema, fetchCount }: Props) {
                     }
                 </div>
             </ResizablePanel>
-            <ResizableHandle disabled={isCollapsed} className={cn(isCollapsed ? "w-0 !cursor-default" : "w-3")} />
+            <ResizableHandle disabled={!selectedElement} className={cn(!selectedElement && "!cursor-default")} />
             <ResizablePanel
                 className={cn("rounded-lg", !isCollapsed && "border-[3px] border-foreground")}
                 collapsible
