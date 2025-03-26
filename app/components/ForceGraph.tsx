@@ -6,7 +6,7 @@
 
 import { Dispatch, SetStateAction, useContext, useEffect, useRef, useState } from "react"
 import ForceGraph2D from "react-force-graph-2d"
-import { securedFetch, GraphRef } from "@/lib/utils"
+import { securedFetch, GraphRef, handleZoomToFit } from "@/lib/utils"
 import { useToast } from "@/components/ui/use-toast"
 import * as d3 from "d3"
 import { Graph, GraphData, Link, Node } from "../api/graph/model"
@@ -56,7 +56,7 @@ export default function ForceGraph({
     const lastClick = useRef<{ date: Date, name: string }>({ date: new Date(), name: "" })
     const { toast } = useToast()
     const { indicator } = useContext(IndicatorContext)
-    
+
     useEffect(() => {
         const handleResize = () => {
             if (!parentRef.current) return
@@ -345,6 +345,7 @@ export default function ForceGraph({
                 onBackgroundRightClick={handleUnselected}
                 onEngineStop={() => {
                     handleCooldown(0)
+                    handleZoomToFit(chartRef)
                 }}
                 linkCurvature="curve"
                 nodeVisibility="visible"
