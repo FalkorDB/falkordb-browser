@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useContext, useState } from "react";
 import { defaultQuery, prepareArg, securedFetch } from "@/lib/utils";
 import { useSession } from "next-auth/react";
 import { useToast } from "@/components/ui/use-toast";
@@ -8,6 +8,7 @@ import dynamic from "next/dynamic";
 import Header from "../components/Header";
 import SchemaView from "./SchemaView";
 import { Graph } from "../api/graph/model";
+import { IndicatorContext } from "../components/provider";
 
 const Selector = dynamic(() => import("../graph/Selector"), { ssr: false })
 
@@ -20,6 +21,7 @@ export default function Page() {
     const [schemaNames, setSchemaNames] = useState<string[]>([])
     const { data: session } = useSession()
     const { toast } = useToast()
+    const { indicator, setIndicator } = useContext(IndicatorContext);
 
     const fetchCount = useCallback(async () => {
         const name = `${schemaName}_schema`
@@ -28,24 +30,24 @@ export default function Page() {
 
         const nodes = await (await securedFetch(`api/graph/${prepareArg(name)}/?query=${q1}`, {
             method: "GET"
-        }, toast)).json()
+        }, toast, setIndicator)).json()
 
         const edges = await (await securedFetch(`api/graph/${prepareArg(name)}/?query=${q2}`, {
             method: "GET"
-        }, toast)).json()
+        }, toast, setIndicator)).json()
 
         if (!edges || !nodes) return
 
         setEdgesCount(edges.result?.data[0].edges)
         setNodesCount(nodes.result?.data[0].nodes)
-    }, [schemaName, toast])
+    }, [schemaName, toast, setIndicator])
 
     useEffect(() => {
-        if (!schemaName) return
+        if (!schemaName || indicator === "offline") return
         const run = async () => {
             const result = await securedFetch(`/api/graph/${prepareArg(schemaName)}_schema/?query=${prepareArg(defaultQuery())}`, {
                 method: "GET"
-            }, toast)
+            }, toast, setIndicator)
             if (!result.ok) return
             const json = await result.json()
             const colors = localStorage.getItem(schemaName)?.split(/[[\]",]/).filter(c => c)
@@ -55,7 +57,7 @@ export default function Page() {
 
         }
         run()
-    }, [fetchCount, schemaName, toast])
+    }, [fetchCount, schemaName, toast, setIndicator, indicator])
 
     return (
         <div className="Page">

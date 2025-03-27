@@ -4,7 +4,7 @@
 "use client";
 
 import { Check, ChevronRight, Pencil, PlusCircle, Trash2, X } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useContext, useEffect, useState } from "react";
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/components/ui/use-toast";
@@ -18,6 +18,7 @@ import ToastButton from "../components/ToastButton";
 import DeleteElement from "../graph/DeleteElement";
 import DialogComponent from "../components/DialogComponent";
 import CloseDialog from "../components/CloseDialog";
+import { IndicatorContext } from "../components/provider";
 
 interface Props {
     obj: Node | Link
@@ -49,6 +50,7 @@ export default function SchemaDataPanel({ obj, onExpand, onSetAttributes, onRemo
     const type = !!obj.category
     const { toast } = useToast()
     const { data: session } = useSession()
+    const { indicator } = useContext(IndicatorContext)
 
     useEffect(() => {
         setAttributes(Object.entries(obj.data).filter(([key, val]) => !(key === "name" && Number(val) === obj.id)).map(([key, val]) => [key, Array.isArray(val) ? val : (val as string).split(',')]))
@@ -143,7 +145,7 @@ export default function SchemaDataPanel({ obj, onExpand, onSetAttributes, onRemo
             handleSetEditable()
         }
 
-        if (evt.code !== "Enter" || isSetLoading) return
+        if (evt.code !== "Enter" || isSetLoading || indicator === "offline") return
 
         evt.preventDefault()
         handleSetAttribute(true)
@@ -155,7 +157,7 @@ export default function SchemaDataPanel({ obj, onExpand, onSetAttributes, onRemo
             handleSetEditable()
         }
 
-        if (evt.code !== "Enter" || isAddLoading) return
+        if (evt.code !== "Enter" || isAddLoading || indicator === "offline") return
 
         evt.preventDefault()
         handleAddAttribute()
@@ -215,6 +217,7 @@ export default function SchemaDataPanel({ obj, onExpand, onSetAttributes, onRemo
                                         {
                                             session?.user?.role !== "Read-Only" &&
                                             <Button
+                                                indicator={indicator}
                                                 title="Remove"
                                                 onClick={() => handleRemoveLabel(l)}
                                                 isLoading={isRemoveLabelLoading}
@@ -253,13 +256,14 @@ export default function SchemaDataPanel({ obj, onExpand, onSetAttributes, onRemo
                                                         setNewLabel("")
                                                     }
 
-                                                    if (e.key !== "Enter" || isLabelLoading) return
+                                                    if (e.key !== "Enter" || isLabelLoading || indicator === "offline") return
 
                                                     e.preventDefault()
                                                     handleAddLabel()
                                                 }}
                                             />
                                             <Button
+                                                indicator={indicator}
                                                 className="p-2 text-xs justify-center border border-foreground"
                                                 variant="Secondary"
                                                 label="Save"
@@ -535,6 +539,7 @@ export default function SchemaDataPanel({ obj, onExpand, onSetAttributes, onRemo
                             <TableCell>
                                 <div className="flex gap-2 w-44">
                                     <Button
+                                        indicator={indicator}
                                         className="p-2 justify-center border border-foreground"
                                         variant="Secondary"
                                         label="Save"

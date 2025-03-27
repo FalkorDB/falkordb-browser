@@ -1,9 +1,10 @@
-import { ReactNode, useState } from "react"
+import React, { ReactNode, useContext, useState } from "react"
 import { prepareArg, securedFetch } from "@/lib/utils"
 import { useToast } from "@/components/ui/use-toast"
 import DialogComponent from "./DialogComponent"
 import Button from "./ui/Button"
 import CloseDialog from "./CloseDialog"
+import { IndicatorContext } from "./provider"
 
 interface Props {
     selectedValues: string[]
@@ -16,7 +17,8 @@ export default function ExportGraph({ selectedValues, type, trigger }: Props) {
     const [open, setOpen] = useState(false)
     const [isLoading, setIsLoading] = useState(false)
     const { toast } = useToast()
-    
+    const { indicator, setIndicator } = useContext(IndicatorContext)
+
     const handleExport = async () => {
         try {
             setIsLoading(true)
@@ -24,7 +26,7 @@ export default function ExportGraph({ selectedValues, type, trigger }: Props) {
                 const name = `${value}${type === "Schema" ? "_schema" : ""}`
                 const result = await securedFetch(`api/graph/${prepareArg(name)}/export`, {
                     method: "GET"
-                }, toast)
+                }, toast, setIndicator)
 
                 if (!result.ok) return
 
@@ -64,6 +66,7 @@ export default function ExportGraph({ selectedValues, type, trigger }: Props) {
             <div className="flex gap-4 justify-end">
                 <Button
                     className="flex-1"
+                    indicator={indicator}
                     variant="Primary"
                     label="Download"
                     onClick={handleExport}

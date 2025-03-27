@@ -2,7 +2,7 @@
 
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useContext } from "react";
 import { CreateUser, User } from "@/app/api/user/model";
 import { prepareArg, securedFetch, Row } from "@/lib/utils";
 import TableComponent from "@/app/components/TableComponent";
@@ -11,6 +11,7 @@ import { ToastAction } from "@/components/ui/toast";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import CloseDialog from "@/app/components/CloseDialog";
+import { IndicatorContext } from "@/app/components/provider";
 import DeleteUser from "./DeleteUser";
 import AddUser from "./AddUser";
 
@@ -34,12 +35,13 @@ export default function Users() {
     const [setUser, setSetUser] = useState<SetUser | null>(null)
     const [open, setOpen] = useState(false)
     const { toast } = useToast()
+    const { setIndicator } = useContext(IndicatorContext);
 
     const handleSetRole = async (user: SetUser) => {
         const { username, role, oldRole } = user
         const result = await securedFetch(`api/user/${prepareArg(username)}?role=${role}`, {
             method: 'PATCH'
-        }, toast)
+        }, toast, setIndicator)
 
         if (result.ok) {
             setUsers(prev => prev.map(u => u.username === username ? { ...u, role } : u))
@@ -61,7 +63,7 @@ export default function Users() {
                 headers: {
                     'Content-Type': 'application/json'
                 }
-            }, toast)
+            }, toast, setIndicator)
 
             if (result.ok) {
                 const data = await result.json()
@@ -82,7 +84,7 @@ export default function Users() {
                 })))
             }
         })()
-    }, [toast])
+    }, [toast, setIndicator])
 
     const handleAddUser = async ({ username, password, role }: CreateUser) => {
         const response = await securedFetch('/api/user/', {
@@ -91,7 +93,7 @@ export default function Users() {
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({ username, password, role })
-        }, toast)
+        }, toast, setIndicator)
 
         if (response.ok) {
             toast({

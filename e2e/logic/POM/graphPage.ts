@@ -6,7 +6,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { Locator, Download } from "@playwright/test";
 import BasePage from "@/e2e/infra/ui/basePage";
-import { waitForElementCount, waitForElementToBeVisible, waitForTimeOut } from "@/e2e/infra/utils";
+import { waitForElementToBeVisible, waitForTimeOut } from "@/e2e/infra/utils";
 
 export default class GraphPage extends BasePage {
 
@@ -242,7 +242,7 @@ export default class GraphPage extends BasePage {
         await this.page.keyboard.type(query);
     }
 
-    async clickRunQuery(waitForAnimation: boolean = true): Promise<void> {
+    async clickRunQuery(waitForAnimation = true): Promise<void> {
         const isVisible = await waitForElementToBeVisible(this.queryRunBtn);
         if (!isVisible) throw new Error("run query button is not visible!");
         await this.queryRunBtn.click();
@@ -412,7 +412,8 @@ export default class GraphPage extends BasePage {
 
     async getQueryHistoryEditor(): Promise<string | null> {
         await this.page.waitForTimeout(500);
-        return await this.queryHistoryTextarea.inputValue();
+        const value = await this.queryHistoryTextarea.inputValue();
+        return value;
     }
 
     async getQueryHistoryPanel(): Promise<string[]> {
@@ -431,7 +432,7 @@ export default class GraphPage extends BasePage {
         return formattedText;
     }
     
-    /* End of QUERY History*/
+    /* End of QUERY History */
 
     async changeNodePosition(x: number, y: number): Promise<void> {
         const box = (await this.canvasElement.boundingBox())!;

@@ -2,10 +2,11 @@
 
 "use client"
 
-import { useState } from "react";
+import React, { useState, useContext } from "react";
 import CloseDialog from "../components/CloseDialog";
 import DialogComponent from "../components/DialogComponent";
 import Button from "../components/ui/Button";
+import { IndicatorContext } from "../components/provider";
 
 interface Props {
     onDeleteElement: () => void
@@ -23,6 +24,7 @@ export default function DeleteElement({
     description,
 }: Props) {
 
+    const { indicator } = useContext(IndicatorContext)
     const [isLoading, setIsLoading] = useState(false)
 
     const handleDelete = async () => {
@@ -44,6 +46,7 @@ export default function DeleteElement({
         >
             <div className="flex justify-end gap-4">
                 <Button
+                    indicator={indicator}
                     className="text-nowrap"
                     variant="Primary"
                     label="Delete"

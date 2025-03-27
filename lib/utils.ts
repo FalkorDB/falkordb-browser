@@ -4,7 +4,6 @@
 "use client"
 
 import { type ClassValue, clsx } from "clsx"
-import { signOut } from "next-auth/react"
 import { twMerge } from "tailwind-merge"
 import { MutableRefObject } from "react"
 import { ForceGraphMethods } from "react-force-graph-2d"
@@ -44,6 +43,7 @@ export async function securedFetch(
   input: string,
   init: RequestInit,
   toast?: any,
+  setIndicator?: (indicator: "online" | "offline") => void
 ): Promise<Response> {
   const response = await fetch(input, init)
   const { status } = response
@@ -57,7 +57,9 @@ export async function securedFetch(
       })
     }
     if (status === 401 || status >= 500) {
-      signOut({ callbackUrl: '/login' })
+      if (setIndicator) {
+        setIndicator("offline")
+      }
     }
   }
   return response

@@ -1,10 +1,11 @@
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { User } from "@/app/api/user/model";
 import { Trash2 } from "lucide-react";
-import { Dispatch, SetStateAction } from "react";
+import { Dispatch, SetStateAction, useContext } from "react";
 import Button from "@/app/components/ui/Button";
 import { Row, securedFetch } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
+import { IndicatorContext } from "@/app/components/provider";
 
 interface DeleteUserProps {
     users: User[]
@@ -14,6 +15,7 @@ interface DeleteUserProps {
 
 export default function DeleteUser({ users, setUsers, setRows }: DeleteUserProps) {
     const { toast } = useToast()
+    const { setIndicator } = useContext(IndicatorContext)
     
     const deleteSelected = async () => {
         if (!users) return
@@ -24,7 +26,7 @@ export default function DeleteUser({ users, setUsers, setRows }: DeleteUserProps
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({ users })
-        }, toast)
+        }, toast, setIndicator)
 
         if (response.ok) {
             toast({

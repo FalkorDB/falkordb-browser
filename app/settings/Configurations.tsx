@@ -5,12 +5,13 @@
 
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useContext } from "react";
 import { prepareArg, securedFetch, Row } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
 import TableComponent from "../components/TableComponent";
 import ToastButton from "../components/ToastButton";
 import { DataCell } from "../api/graph/model";
+import { IndicatorContext } from "../components/provider";
 
 type Config = {
     name: string,
@@ -128,6 +129,7 @@ const Configs: Map<string, Config> = new Map([
 export default function Configurations() {
     const [configs, setConfigs] = useState<Row[]>([]);
     const { toast } = useToast();
+    const { setIndicator } = useContext(IndicatorContext);
 
     const handleSetConfig = async (name: string, value: string, isUndo: boolean) => {
         if (!value) {
@@ -153,7 +155,8 @@ export default function Configurations() {
         const result = await securedFetch(
             `api/graph/config/${prepareArg(name)}?value=${prepareArg(value)}`,
             { method: 'POST' },
-            toast
+            toast,
+            setIndicator
         );
 
         if (!result.ok) return false;
@@ -189,7 +192,7 @@ export default function Configurations() {
     const fetchConfigs = async () => {
         const result = await securedFetch("/api/graph/config", {
             method: "GET"
-        }, toast);
+        }, toast, setIndicator);
 
         if (!result.ok) return;
 
