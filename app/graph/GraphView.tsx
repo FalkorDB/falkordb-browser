@@ -230,7 +230,7 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
         const q = `MATCH (n) WHERE ID(n) = ${selectedElement?.id} SET n:${label}`
         const result = await securedFetch(`api/graph/${prepareArg(graph.Id)}/?query=${prepareArg(q)}`, {
             method: "GET"
-        }, toast)
+        }, toast, setIndicator)
 
         if (result.ok) {
 
@@ -246,7 +246,7 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
         const q = `MATCH (n) WHERE ID(n) = ${selectedElement?.id} REMOVE n:${label}`
         const result = await securedFetch(`api/graph/${prepareArg(graph.Id)}/?query=${prepareArg(q)}`, {
             method: "GET"
-        }, toast)
+        }, toast, setIndicator)
 
         if (result.ok) {
             const category = graph.CategoriesMap.get(label)

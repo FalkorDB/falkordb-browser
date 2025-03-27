@@ -55,7 +55,7 @@ export default function ForceGraph({
     const parentRef = useRef<HTMLDivElement>(null)
     const lastClick = useRef<{ date: Date, name: string }>({ date: new Date(), name: "" })
     const { toast } = useToast()
-    const { indicator } = useContext(IndicatorContext)
+    const { indicator, setIndicator } = useContext(IndicatorContext)
     
     useEffect(() => {
         const handleResize = () => {
@@ -105,7 +105,7 @@ export default function ForceGraph({
             headers: {
                 'Content-Type': 'application/json'
             }
-        }, toast);
+        }, toast, setIndicator);
 
         if (result.ok) {
             const json = await result.json()

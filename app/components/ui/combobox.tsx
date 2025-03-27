@@ -46,7 +46,7 @@ export default function Combobox({ isSelectGraph = false, disabled = false, inTa
   const [maxOptions, setMaxOptions] = useState<number>(STEP)
   const { toast } = useToast()
   const { data: session } = useSession()
-  const { indicator } = useContext(IndicatorContext)
+  const { indicator, setIndicator } = useContext(IndicatorContext)
 
   useEffect(() => {
     const timeout = setTimeout(() => {
@@ -63,7 +63,7 @@ export default function Combobox({ isSelectGraph = false, disabled = false, inTa
         "Content-Type": "application/json"
       },
       body: JSON.stringify({ name: optionName })
-    }, toast)
+    }, toast, setIndicator)
 
     if (result.ok) {
 
