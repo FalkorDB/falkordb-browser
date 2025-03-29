@@ -52,14 +52,14 @@ export default function Selector({ setGraphName, graphName, runQuery, edgesCount
     const [isRotating, setIsRotating] = useState(false);
     const { toast } = useToast()
     const [filteredQueries, setFilteredQueries] = useState<Query[]>(historyQuery?.queries || [])
-    const { indicator } = useContext(IndicatorContext)
+    const { indicator, setIndicator } = useContext(IndicatorContext)
 
     const handleOnChange = async (name: string) => {
         const formattedName = name === '""' ? "" : name
         if (runQuery) {
             const result = await securedFetch(`api/graph/${prepareArg(name)}_schema/?query=${prepareArg(defaultQuery())}&create=false`, {
                 method: "GET"
-            }, toast)
+            }, toast, setIndicator)
 
             if (!result.ok) return
 
@@ -77,7 +77,7 @@ export default function Selector({ setGraphName, graphName, runQuery, edgesCount
 
         const result = await securedFetch("api/graph", {
             method: "GET"
-        }, toast)
+        }, toast, setIndicator)
         if (!result.ok) return
         const res = (await result.json()).result as string[]
         const opts = !runQuery ?

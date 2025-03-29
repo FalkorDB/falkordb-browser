@@ -5,7 +5,7 @@
 import { ResizablePanel, ResizablePanelGroup, ResizableHandle } from "@/components/ui/resizable"
 import { ChevronLeft, Maximize2, Minimize2, Pause, Play } from "lucide-react"
 import { ImperativePanelHandle } from "react-resizable-panels"
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useRef, useState, useContext } from "react"
 import { cn, prepareArg, securedFetch } from "@/lib/utils"
 import dynamic from "next/dynamic"
 import { useToast } from "@/components/ui/use-toast"
@@ -18,6 +18,7 @@ import Labels from "../graph/labels"
 import { Category, Graph, Link, Node, GraphData } from "../api/graph/model"
 import Button from "../components/ui/Button"
 import CreateElement from "./SchemaCreateElement"
+import { IndicatorContext } from "../components/provider"
 
 const ForceGraph = dynamic(() => import("../components/ForceGraph"), { ssr: false })
 
@@ -56,6 +57,7 @@ export default function SchemaView({ schema, fetchCount }: Props) {
     const [cooldownTicks, setCooldownTicks] = useState<number | undefined>(0)
     const [data, setData] = useState<GraphData>(schema.Elements)
     const { toast } = useToast()
+    const { setIndicator } = useContext(IndicatorContext)
     
     useEffect(() => {
         setData({ ...schema.Elements })
@@ -149,7 +151,7 @@ export default function SchemaView({ schema, fetchCount }: Props) {
         const q = `${conditionsNodes.length > 0 ? `MATCH (n) WHERE ${conditionsNodes.join(" OR ")} DELETE n` : ""}${conditionsEdges.length > 0 && conditionsNodes.length > 0 ? " WITH * " : ""}${conditionsEdges.length > 0 ? `MATCH ()-[e]-() WHERE ${conditionsEdges.join(" OR ")} DELETE e` : ""}`
         const result = await securedFetch(`api/graph/${prepareArg(schema.Id)}_schema/?query=${prepareArg(q)} `, {
             method: "GET"
-        }, toast)
+        }, toast, setIndicator)
 
         if (!result.ok) return
 
@@ -206,7 +208,7 @@ export default function SchemaView({ schema, fetchCount }: Props) {
         const q = `MATCH ${type ? "(e)" : "()-[e]-()"} WHERE ID(e) = ${id} SET e.${key} = "${value.join(",")}"`
         const { ok } = await securedFetch(`api/graph/${prepareArg(schema.Id)}_schema/?query=${prepareArg(q)}`, {
             method: "GET"
-        }, toast)
+        }, toast, setIndicator)
 
         if (ok) {
             if (type) {
@@ -280,7 +282,7 @@ export default function SchemaView({ schema, fetchCount }: Props) {
         const q = `MATCH ${type ? "(e)" : "()-[e]-()"} WHERE ID(e) = ${id} SET e.${key} = NULL`
         const { ok } = await securedFetch(`api/graph/${prepareArg(schema.Id)}_schema/?query=${prepareArg(q)}`, {
             method: "GET"
-        }, toast)
+        }, toast, setIndicator)
 
         if (ok) {
             if (type) {
@@ -319,7 +321,7 @@ export default function SchemaView({ schema, fetchCount }: Props) {
 
         const result = await securedFetch(`api/graph/${prepareArg(schema.Id)}_schema/?query=${getCreateQuery(isAddEntity, selectedNodes as [Node, Node], attributes, label)}`, {
             method: "GET"
-        }, toast)
+        }, toast, setIndicator)
 
         if (result.ok) {
             const json = await result.json()
@@ -347,7 +349,7 @@ export default function SchemaView({ schema, fetchCount }: Props) {
         const q = `MATCH (n) WHERE ID(n) = ${selectedElement?.id} SET n:${label}`
         const result = await securedFetch(`api/graph/${prepareArg(schema.Id)}_schema/?query=${prepareArg(q)}`, {
             method: "GET"
-        }, toast)
+        }, toast, setIndicator)
 
         if (result.ok) {
             selectedElement!.displayName = ""
@@ -367,7 +369,7 @@ export default function SchemaView({ schema, fetchCount }: Props) {
         const q = `MATCH (n) WHERE ID(n) = ${selectedElement?.id} REMOVE n:${label}`
         const result = await securedFetch(`api/graph/${prepareArg(schema.Id)}_schema/?query=${prepareArg(q)}`, {
             method: "GET"
-        }, toast)
+        }, toast, setIndicator)
 
         if (result.ok) {
             selectedElement!.displayName = ""
