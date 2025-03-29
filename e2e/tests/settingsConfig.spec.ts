@@ -8,9 +8,11 @@ import Data from '../config/settingsConfigData.json';
 
 test.describe('Settings Tests', () => {
     let browser: BrowserWrapper;
+    let apicalls: ApiCalls;
 
     test.beforeAll(async () => {
         browser = new BrowserWrapper();
+        apicalls = new ApiCalls();
     })
 
     test.afterAll(async () => {
@@ -155,12 +157,12 @@ test.describe('Settings Tests', () => {
     });
 
     test(`@admin Modify TimeOut via UI validation via API: Input value: ${Data.roleModificationData[1].input}`, async () => {
-        const settingsConfigPage = await browser.createNewPage(SettingsConfigPage, urls.settingsUrl)
-        await settingsConfigPage.modifyRoleValue(roles.TimeOut, Data.roleModificationData[1].input)
-        const apiCall = new ApiCalls()
-        const value = String((await apiCall.getSettingsRoleValue(roles.TimeOut)).config[1]);
+        const settingsConfigPage = await browser.createNewPage(SettingsConfigPage, urls.settingsUrl);
+        await settingsConfigPage.modifyRoleValue(roles.TimeOut, Data.roleModificationData[1].input);
+        await settingsConfigPage.isUndoBtnInToastMsg();
+        const value = String((await apicalls.getSettingsRoleValue(roles.TimeOut)).config[1]);
         expect(value === Data.roleModificationData[1].input).toBe(true);
-        await apiCall.modifySettingsRole(roles.TimeOut, "1000")
+        await apicalls.modifySettingsRole(roles.TimeOut, "1000")
     });
 
     test(`@admin Modify maxTimeOut via UI validation via API: Input value: ${Data.roleModificationData[2].input}`, async () => {

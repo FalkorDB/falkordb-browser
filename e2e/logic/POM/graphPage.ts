@@ -241,7 +241,6 @@ export default class GraphPage extends BasePage {
         await this.canvasElement.hover({ position: { x, y } });
         await this.page.waitForTimeout(500);
         await this.canvasElement.click({ position: { x, y }, button: 'right' });
-        await this.page.waitForTimeout(10000);
     }
 
     async clickOnSelectBtnFromGraphManager(role: string = "admin"): Promise<void>{
@@ -290,7 +289,7 @@ export default class GraphPage extends BasePage {
     }
 
     async getNodeCanvasToolTip(): Promise<string | null>{
-        await this.page.waitForTimeout(500);
+        await this.page.waitForTimeout(1000);
         const toolTipText = await this.nodeCanvasToolTip.textContent();
         return toolTipText;
     }

@@ -7,6 +7,7 @@ import ApiCalls from "../logic/api/apiCalls";
 import GraphPage from "../logic/POM/graphPage";
 import urls from '../config/urls.json'
 import { BATCH_CREATE_PERSONS } from "../config/constants";
+import { getRandomString } from "../infra/utils";
 
 test.describe('Canvas Tests', () => {
     let browser: BrowserWrapper;
@@ -26,7 +27,7 @@ test.describe('Canvas Tests', () => {
         test(`@admin Validate search for Person ${node} in the canvas and ensure focus`, async () => {
             const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
             await browser.setPageToFullScreen();
-            const graphName = `graph_${Date.now()}`;
+            const graphName = getRandomString('canvas');
             await graph.addGraph(graphName);
             await graph.insertQuery(BATCH_CREATE_PERSONS);
             await graph.clickRunQuery();
@@ -43,7 +44,7 @@ test.describe('Canvas Tests', () => {
     test(`@admin Validate zoom-in functionality upon clicking the zoom in button`, async () => {
         const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
         await browser.setPageToFullScreen();
-        const graphName = `graph_${Date.now()}`;
+        const graphName = getRandomString('canvas');
         await graph.addGraph(graphName);
         await graph.insertQuery(BATCH_CREATE_PERSONS);
         await graph.clickRunQuery();
@@ -59,7 +60,7 @@ test.describe('Canvas Tests', () => {
     test(`@admin Validate zoom-out functionality upon clicking the zoom in button`, async () => {
         const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
         await browser.setPageToFullScreen();
-        const graphName = `graph_${Date.now()}`;
+        const graphName = getRandomString('canvas');
         await graph.addGraph(graphName);
         await graph.insertQuery(BATCH_CREATE_PERSONS);
         await graph.clickRunQuery();
@@ -76,7 +77,7 @@ test.describe('Canvas Tests', () => {
     test(`@admin Validate fit to size functionality upon clicking the fit to size button`, async () => {
         const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
         await browser.setPageToFullScreen();
-        const graphName = `graph_${Date.now()}`;
+        const graphName = getRandomString('canvas');
         await graph.addGraph(graphName);
         await graph.clickRunQuery();
         await graph.clickOnFitToSize();
@@ -93,7 +94,7 @@ test.describe('Canvas Tests', () => {
     test(`@admin Validate that dragging a node on the canvas updates its position`, async () => {
         const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
         await browser.setPageToFullScreen();
-        const graphName = `graph_${Date.now()}`;
+        const graphName = getRandomString('canvas');
         await graph.addGraph(graphName);
         await graph.insertQuery(BATCH_CREATE_PERSONS);
         await graph.clickRunQuery();
@@ -108,7 +109,7 @@ test.describe('Canvas Tests', () => {
     test(`@admin Validate success when creating a node and confirming its display on the canvas`, async () => {
         const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
         await browser.setPageToFullScreen();
-        const graphName = `graph_${Date.now()}`;
+        const graphName = getRandomString('canvas');
         await graph.addGraph(graphName,);
         await graph.insertQuery('CREATE (p:Person {name: "Alice", age: 30}) return p');
         await graph.clickRunQuery();
@@ -119,8 +120,8 @@ test.describe('Canvas Tests', () => {
         await apicalls.removeGraph(graphName);
     });
 
-    test(`@readwrite Validate success when updating node properties and seeing the update on the canvas`, async () => {
-        const graphName = `graph_${Date.now()}`;
+    test(`@admin Validate success when updating node properties and seeing the update on the canvas`, async () => {
+        const graphName = getRandomString('canvas');
         await apicalls.addGraph(graphName);
         await apicalls.runQuery(graphName, 'CREATE (:Person {name: "Bob"})');
         await apicalls.runQuery(graphName, 'MATCH (p:Person {name: "Bob"}) SET p.age = 40');
@@ -136,8 +137,8 @@ test.describe('Canvas Tests', () => {
         await apicalls.removeGraph(graphName);
     });
 
-    test(`@readwrite Validate success when deleting a node and ensuring its removed from the canvas`, async () => {
-        const graphName = `graph_${Date.now()}`;
+    test(`@admin Validate success when deleting a node and ensuring its removed from the canvas`, async () => {
+        const graphName = getRandomString('canvas');
         await apicalls.addGraph(graphName);
         await apicalls.runQuery(graphName, 'CREATE (:Person {name: "Alice"}), (:Person {name: "Bob"}) WITH * MATCH (p:Person {name: "Bob"}) DELETE p');
         const graph = await browser.createNewPage(GraphPage, urls.graphUrl);

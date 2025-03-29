@@ -3,9 +3,9 @@ import { expect, test } from "@playwright/test";
 import BrowserWrapper from "../infra/ui/browserWrapper";
 import ApiCalls from "../logic/api/apiCalls";
 import urls from '../config/urls.json'
-import queryData from '../config/queries.json'
 import QueryHistory from "../logic/POM/queryHistoryComponent";
 import { BATCH_CREATE_PERSONS, BATCH_CREATE_PERSONS_APIREQ, FETCH_FIRST_TEN_NODES } from "../config/constants";
+import { getRandomString } from "../infra/utils";
 
 test.describe('Query history Tests', () => {
     let browser: BrowserWrapper;
@@ -21,10 +21,11 @@ test.describe('Query history Tests', () => {
     })
 
     test(`@admin Validate that running a query in the UI saves it in the query history`, async () => {
+        const graphName = getRandomString('queryhistory');
+        await apicalls.addGraph(graphName);
         const graph = await browser.createNewPage(QueryHistory, urls.graphUrl);
         await browser.setPageToFullScreen();
-        const graphName = `graph_${Date.now()}`;
-        await graph.addGraph(graphName);
+        await graph.selectExistingGraph(graphName);
         await graph.insertQuery(FETCH_FIRST_TEN_NODES);
         await graph.clickRunQuery();
         await graph.clickOnQueryHistory();
@@ -33,10 +34,11 @@ test.describe('Query history Tests', () => {
     });
 
     test(`@admin Validate that executing a query from the query history correctly displays the results in the canvas`, async () => {
+        const graphName = getRandomString('queryhistory');
+        await apicalls.addGraph(graphName);
         const graph = await browser.createNewPage(QueryHistory, urls.graphUrl);
         await browser.setPageToFullScreen();
-        const graphName = `graph_${Date.now()}`;
-        await graph.addGraph(graphName);
+        await graph.selectExistingGraph(graphName);
         await graph.insertQuery(BATCH_CREATE_PERSONS);
         await graph.clickRunQuery();
         await graph.refreshPage();
@@ -52,7 +54,7 @@ test.describe('Query history Tests', () => {
     test(`@admin verify query selection from history displays the correct query`, async () => {
         const graph = await browser.createNewPage(QueryHistory, urls.graphUrl);
         await browser.setPageToFullScreen();
-        const graphName = `graph_${Date.now()}`;
+        const graphName = getRandomString('queryhistory');
         await graph.addGraph(graphName);
         await graph.insertQuery(BATCH_CREATE_PERSONS);
         await graph.clickRunQuery(false);
@@ -63,14 +65,14 @@ test.describe('Query history Tests', () => {
     });
 
     test(`@admin verify metadata accuracy in query history`, async () => {
-        const testGraphName = `graph_${Date.now()}`;
+        const testGraphName = getRandomString('graph');
         await apicalls.addGraph(testGraphName);
         const response = await apicalls.runQuery(testGraphName, BATCH_CREATE_PERSONS_APIREQ ?? "");
         const apiMetadata = response.result.metadata;
         
         const graph = await browser.createNewPage(QueryHistory, urls.graphUrl);
         await browser.setPageToFullScreen();
-        const graphName = `graph_${Date.now()}`;
+        const graphName = getRandomString('queryhistory');
         await graph.addGraph(graphName);
         await graph.insertQuery(BATCH_CREATE_PERSONS);
         await graph.clickRunQuery(false);

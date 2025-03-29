@@ -108,3 +108,6 @@ export async function getAdminToken(): Promise<Record<string, string> | undefine
     }
 }
 
+export function getRandomString(prefix = '', delimiter = '_'): string {
+    return `${prefix}${prefix ? delimiter : ''}${crypto.randomUUID()}`;
+}

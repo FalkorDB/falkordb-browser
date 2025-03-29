@@ -43,7 +43,8 @@ export default class QueryHistory extends GraphPage {
     }
 
     async getQueryHistory(query: string): Promise<boolean> {
-        const isVisible = await this.queryInHistory(query).isVisible();
+        const isVisible = await waitForElementToBeVisible(this.queryInHistory(query));
+        if (!isVisible) throw new Error("query history item is not visible!");
         return isVisible;
     }
 

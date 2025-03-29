@@ -1,6 +1,6 @@
 import { Locator } from "@playwright/test";
 import BasePage from "@/e2e/infra/ui/basePage";
-import { waitForTimeOut } from '../../infra/utils'
+import { waitForElementToBeVisible, waitForTimeOut } from '../../infra/utils'
 
 export default class SettingsUsersPage extends BasePage {
 
@@ -94,17 +94,59 @@ export default class SettingsUsersPage extends BasePage {
         return isVisible;
     }
 
+    async clickOnAddUserBtn(): Promise<void>{
+        const isVisible = await waitForElementToBeVisible(this.addUserButton);
+        if (!isVisible) throw new Error("add user button is not visible!");
+        await this.addUserButton.click();
+    }
+
+    async fillUserNameField(userName: string): Promise<void>{
+        const isVisible = await waitForElementToBeVisible(this.userNameField);
+        if (!isVisible) throw new Error("user name input is not visible!");
+        await this.userNameField.fill(userName);
+    }
+
+    async fillPasswordField(password: string): Promise<void>{
+        const isVisible = await waitForElementToBeVisible(this.passwordField);
+        if (!isVisible) throw new Error("password input is not visible!");
+        await this.passwordField.fill(password);
+    }
+
+    async fillConfirmPasswordField(confirmPassword: string): Promise<void>{
+        const isVisible = await waitForElementToBeVisible(this.passwordField);
+        if (!isVisible) throw new Error("confirm password input is not visible!");
+        await this.confirmPasswordField.fill(confirmPassword);
+    }
+
+    async clickOnSelectRoleBtnInAddUser(): Promise<void>{
+        const isVisible = await waitForElementToBeVisible(this.selectRoleBtnInAddUser);
+        if (!isVisible) throw new Error("select role button is not visible!");
+        await this.selectRoleBtnInAddUser.click();
+    }
+
+    async clickOnSelectUserRole(role: string): Promise<void>{
+        const isVisible = await waitForElementToBeVisible(this.selectRoleBtnInAddUser);
+        if (!isVisible) throw new Error("select role button is not visible!");
+        await this.selectUserRole(role).click();
+    }
+
+    async clickOnSubmitUserAddition(): Promise<void>{
+        const isVisible = await waitForElementToBeVisible(this.submitUserAddition);
+        if (!isVisible) throw new Error("submit user addition button is not visible!");
+        await this.submitUserAddition.click();
+    }
+
     async addUser(userDetails: { [key: string]: string }): Promise<void> {
         await this.page.waitForLoadState('networkidle');
-        await this.addUserButton.click();
-        await this.userNameField.fill(userDetails.userName);
-        await this.passwordField.fill(userDetails.password);
-        await this.confirmPasswordField.fill(userDetails.confirmPassword);
+        await this.clickOnAddUserBtn();
+        await this.fillUserNameField(userDetails.userName);
+        await this.fillPasswordField(userDetails.password);
+        await this.fillConfirmPasswordField(userDetails.confirmPassword);
         if (userDetails.role) {
-            await this.selectRoleBtnInAddUser.click();
-            await this.selectUserRole(userDetails.role).click();
+            await this.clickOnSelectRoleBtnInAddUser();
+            await this.clickOnSelectUserRole(userDetails.role);
         }
-        await this.submitUserAddition.click();
+        await this.clickOnSubmitUserAddition();
         await waitForTimeOut(this.page, 1500)
     }
 

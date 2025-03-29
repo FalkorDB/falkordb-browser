@@ -9,6 +9,7 @@ import GraphPage from "../logic/POM/graphPage";
 import urls from '../config/urls.json'
 import queryData from '../config/queries.json'
 import { CREATE_TEN_CONNECTED_NODES } from "../config/constants";
+import { getRandomString } from "../infra/utils";
 
 test.describe('Graph Tests', () => {
     let browser: BrowserWrapper;
@@ -26,7 +27,7 @@ test.describe('Graph Tests', () => {
     test(`@admin Add graph via API -> verify display in UI test -> remove graph via UI`, async () => {
         const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
         const apiCall = new ApiCalls();
-        const graphName = `graph_${Date.now()}`;
+        const graphName = getRandomString('graph');
         await apiCall.addGraph(graphName);
         await graph.refreshPage();
         expect(await graph.verifyGraphExists(graphName)).toBe(true);
@@ -37,7 +38,7 @@ test.describe('Graph Tests', () => {
 
     test(`@admin Add graph via UI -> remove graph via API -> Verify graph removal in UI test`, async () => {
         const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
-        const graphName = `graph_${Date.now()}`;
+        const graphName = getRandomString('graph');
         await graph.addGraph(graphName);
         await new Promise(resolve => { setTimeout(resolve, 1000) });
         const apiCall = new ApiCalls();
@@ -48,7 +49,7 @@ test.describe('Graph Tests', () => {
 
     test(`@admin Create graph -> click the Export Data button -> verify the file has been successfully downloaded`, async () => {
         const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
-        const graphName = `graph_${Date.now()}`;
+        const graphName = getRandomString('graph');
         await graph.addGraph(graphName);
         const download = await graph.exportGraph();
         const downloadPath = await download.path();
@@ -59,7 +60,7 @@ test.describe('Graph Tests', () => {
     queryData.queries[0].failedQueries.forEach((query) => {
         test(`@admin Validate failure & error message when any user runs an invalid queries: ${query.name}`, async () => {
             const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
-            const graphName = `graph_${Date.now()}`;
+            const graphName = getRandomString('graph');
             await graph.addGraph(graphName);
             await graph.insertQuery(query.query);
             await graph.clickRunQuery(false);
@@ -69,7 +70,7 @@ test.describe('Graph Tests', () => {
     })
     
     test(`@admin Validate that the reload graph list function works by adding a graph via API and testing the reload button`, async () => {
-        const graphName = `graph_${Date.now()}`;
+        const graphName = getRandomString('graph');
         await apicalls.addGraph(graphName);
         const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
         await browser.setPageToFullScreen();
@@ -79,11 +80,11 @@ test.describe('Graph Tests', () => {
     });
 
     test(`@admin Validate that modifying the graph name updates it correctly`, async () => {
-        const graphName = `graph_${Date.now()}`;
+        const graphName = getRandomString('graph');
         await apicalls.addGraph(graphName);
         const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
         await browser.setPageToFullScreen();
-        const newGraphName = `graph_${Date.now()}`;
+        const newGraphName = getRandomString('graph');
         await graph.modifyGraphName(graphName, newGraphName);
         await graph.refreshPage();
         expect(await graph.verifyGraphExists(newGraphName)).toBe(true);
@@ -93,10 +94,10 @@ test.describe('Graph Tests', () => {
     test(`@readwrite Validate that modifying a graph name fails and does not apply the change`, async () => {
         const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
         await browser.setPageToFullScreen();
-        const graphName = `graph_${Date.now()}`;
+        const graphName = getRandomString('graph');
         await graph.addGraph(graphName);
         await graph.refreshPage();
-        const newGraphName = `graph_${Date.now()}`;
+        const newGraphName = getRandomString('graph');
         await graph.modifyGraphName(graphName, newGraphName);
         await graph.refreshPage();
         expect(await graph.verifyGraphExists(newGraphName)).toBe(false);
@@ -104,11 +105,11 @@ test.describe('Graph Tests', () => {
     });
 
     test(`@readonly Validate failure & error message when RO user attempts to rename an existing graph via UI`, async () => {
-        const graphName = `graph_${Date.now()}`;
+        const graphName = getRandomString('graph');
         await apicalls.addGraph(graphName, "admin");
         const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
         await browser.setPageToFullScreen();
-        const newGraphName = `graph_${Date.now()}`;
+        const newGraphName = getRandomString('graph');
         await graph.modifyGraphName(graphName, newGraphName);
         await graph.refreshPage();
         expect(await graph.verifyGraphExists(newGraphName)).toBe(false);
@@ -116,7 +117,7 @@ test.describe('Graph Tests', () => {
     });
 
     test(`@readwrite Validate that creating a graph with an existing name is preventedI`, async () => {
-        const graphName = `graph_${Date.now()}`;
+        const graphName = getRandomString('graph');
         await apicalls.addGraph(graphName);
         const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
         await browser.setPageToFullScreen();
@@ -129,8 +130,8 @@ test.describe('Graph Tests', () => {
     });
 
     test(`@admin Validate that modifying a graph name to an existing name is prevented`, async () => {
-        const graphName1 = `graph_${Date.now()}`;
-        const graphName2 = `graph_${Date.now()}`;
+        const graphName1 = getRandomString('graph');
+        const graphName2 = getRandomString('graph');
         await apicalls.addGraph(graphName1);
         await apicalls.addGraph(graphName2);
         const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
