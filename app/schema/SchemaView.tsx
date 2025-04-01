@@ -369,7 +369,6 @@ export default function SchemaView({ schema, fetchCount }: Props) {
                     selectedElement ?
                         <SchemaDataPanel
                             obj={selectedElement}
-                            setObject={setSelectedElement}
                             onExpand={onExpand}
                             onDeleteElement={handleDeleteElement}
                             schema={schema}
