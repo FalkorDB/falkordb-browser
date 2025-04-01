@@ -12,13 +12,13 @@ export default function MetadataView({ query, graphName, className = "" }: {
     className?: string
 }) {
     const [profile, setProfile] = useState<string[]>([])
-    const { indicator } = useContext(IndicatorContext)
+    const { indicator, setIndicator } = useContext(IndicatorContext)
     const { toast } = useToast()
 
     const handleProfile = async () => {
         const result = await securedFetch(`/api/graph/${graphName}/profile?query=${prepareArg(query.text)}`, {
             method: "GET",
-        }, toast)
+        }, toast, setIndicator)
 
         if (!result.ok) return
 
