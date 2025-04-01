@@ -202,6 +202,7 @@ export default function ForceGraph({
         if (evt?.ctrlKey || (!selectedElement && selectedElements.length === 0)) return
         setSelectedElement(undefined)
         setSelectedElements([])
+        onExpand(false)
     }
 
     return (
