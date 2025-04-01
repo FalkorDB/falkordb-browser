@@ -1,6 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getClient } from "@/app/api/auth/[...nextauth]/options";
-import { prepareArg, securedFetch } from "@/lib/utils";
+import { GraphReply } from "falkordb/dist/src/graph";
+import NodeCache from "node-cache";
+
+const INITIAL = 3000
+
+const results = new NodeCache();
+
+function* generateId(): Generator<number, number, number> {
+    let id = 0;
+    while (true) {
+        yield id;
+        id += 1;
+    }
+}
+
+const idGenerator = generateId()
 
 export async function DELETE(request: NextRequest, { params }: { params: Promise<{ graph: string }> }) {
 
@@ -29,57 +44,26 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
 }
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ graph: string }> }) {
-
     const session = await getClient()
+
     if (session instanceof NextResponse) {
         return session
     }
 
     const { client } = session
 
-    const { graph: name } = await params;
-    const sourceName = request.nextUrl.searchParams.get("sourceName")
+    const { graph: graphId } = await params
 
     try {
-        if (sourceName) {
-            const graph = client.selectGraph(sourceName);
-            const success = await graph.copy(name)
-            if (!success) throw new Error("Failed to copy graph")
-            return NextResponse.json({ success }, { status: 200 })
-        }
+        const graph = client.selectGraph(graphId)
+        const result = await graph.query("RETURN 1")
 
-        const type = request.nextUrl.searchParams.get("type")
-        const openaikey = request.nextUrl.searchParams.get("key")
-        const srcs = await request.json()
+        if (!result) throw new Error("Something went wrong")
 
-
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const { host, port } = (await client.connection).options?.socket as any
-
-        if (!openaikey || !srcs || !host || !port || !type) throw new Error("Missing parameters")
-
-        const res = await securedFetch(`http://localhost:5000/${prepareArg(type!)}`, {
-            method: "POST",
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                host,
-                port,
-                name,
-                srcs,
-                openaikey,
-            })
-        })
-
-        const result = await res.json()
-
-        if (!res.ok) throw new Error(res.statusText)
-
-        return NextResponse.json({ result }, { status: 200 })
-    } catch (err: unknown) {
-        console.error(err)
-        return NextResponse.json({ message: (err as Error).message }, { status: 400 })
+        return NextResponse.json({ message: "Graph created successfully" }, { status: 200 })
+    } catch (error) {
+        console.error(error)
+        return NextResponse.json({ error: (error as Error).message }, { status: 400 })
     }
 }
 
@@ -120,22 +104,73 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
     const { graph: graphId } = await params
 
+    const resultId = request.nextUrl.searchParams.get("id")
+
     try {
+        if (resultId) {
+            const id = Number(resultId)
+            let result = results.get<GraphReply<unknown> | Error | undefined>(id)
+            if (!result) {
+                await new Promise(resolve => { setTimeout(resolve, INITIAL) })
+                result = results.get<GraphReply<unknown> | Error | undefined>(id)
+                if (!result) {
+                    results.ttl(id, INITIAL * 2)
+                    return NextResponse.json({ result: id }, { status: 200 })
+                }
+            }
+
+            results.del(id)
+
+            if (result instanceof Error) {
+                return NextResponse.json({ error: result.message }, { status: 400 })
+            }
+
+            return NextResponse.json({ result }, { status: 200 })
+        }
 
         const query = request.nextUrl.searchParams.get("query")
-        const create = request.nextUrl.searchParams.get("create")
         const { role } = user
 
         if (!query) throw new Error("Missing parameter query")
 
-        if (create === "false" && !(await client.list()).some((g) => g === graphId))
-            return NextResponse.json({}, { status: 200 })
-
         const graph = client.selectGraph(graphId)
 
-        const result = role === "Read-Only"
-            ? await graph.roQuery(query)
-            : await graph.query(query)
+        const result = await new Promise<GraphReply<unknown> | number>((resolve, reject) => {
+            const id = idGenerator.next().value
+
+            const timeout = setTimeout(() => {
+                results.set(id, undefined, INITIAL * 2)
+                resolve(id)
+            }, INITIAL)
+
+            const res = role === "Read-Only"
+                ? graph.roQuery(query)
+                : graph.query(query)
+
+            res.then((r) => {
+                if (!r) throw new Error("Something went wrong")
+
+                if (results.has(id)) {
+                    results.set(id, r)
+                    return
+                }
+
+                clearTimeout(timeout)
+                resolve(r)
+            }).catch((error) => {
+                if (results.has(id)) {
+                    results.set(id, error as Error)
+                    return
+                }
+
+                clearTimeout(timeout)
+                reject(error)
+            })
+        })
+
+        if (typeof result === "number") {
+            return NextResponse.json({ result }, { status: 200 })
+        }
 
         if (!result) throw new Error("Something went wrong")
 

@@ -25,11 +25,9 @@ interface Props {
     onExpand: () => void;
     graph: Graph;
     onDeleteElement: () => Promise<void>;
-    onAddLabel: (label: string) => Promise<boolean>;
-    onRemoveLabel: (label: string) => Promise<boolean>;
 }
 
-export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement, graph, onAddLabel, onRemoveLabel }: Props) {
+export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement, graph }: Props) {
 
     const [attributes, setAttributes] = useState<string[]>([]);
     const [editable, setEditable] = useState<string>("");
@@ -84,9 +82,12 @@ export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement,
         }
         try {
             if (actionType === "set") setIsSetLoading(true)
-            const q = `MATCH ${type ? "(e)" : "()-[e]-()"} WHERE id(e) = ${id} SET e.${key} = '${val}'`
-            const result = await securedFetch(`api/graph/${prepareArg(graph.Id)}/?query=${prepareArg(q)}`, {
-                method: "GET"
+            const result = await securedFetch(`api/graph/${prepareArg(graph.Id)}/${id}`, {
+                method: "POST",
+                body: JSON.stringify({
+                    key,
+                    value: val
+                })
             }, toast, setIndicator)
 
             if (result.ok) {
@@ -94,25 +95,7 @@ export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement,
                 graph.setProperty(key, val, id)
 
                 const value = obj.data[key]
-                setObj((prev) => {
-                    if (!prev) return prev
-                    if ("source" in prev) {
-                        return {
-                            ...prev,
-                            data: {
-                                ...prev.data,
-                                [key]: val
-                            }
-                        } as Link
-                    }
-                    return {
-                        ...prev,
-                        data: {
-                            ...prev.data,
-                            [key]: val
-                        }
-                    } as Node
-                })
+                setObj({ ...obj, data: { ...obj.data, [key]: val } })
 
                 handleSetEditable("", "")
                 toast({
@@ -154,20 +137,18 @@ export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement,
         try {
             setIsRemoveLoading(true)
             const { id } = obj
-            const q = `MATCH ${type ? "(e)" : "()-[e]-()"} WHERE id(e) = ${id} SET e.${key} = NULL`
-            const success = (await securedFetch(`api/graph/${prepareArg(graph.Id)}/?query=${prepareArg(q)}`, {
-                method: "GET"
+            const success = (await securedFetch(`api/graph/${prepareArg(graph.Id)}/${id}`, {
+                method: "DELETE",
+                body: JSON.stringify({
+                    key,
+                })
             }, toast, setIndicator)).ok
 
             if (success) {
                 const value = obj.data[key]
 
                 graph.removeProperty(key, id)
-
-                const newObj = { ...obj }
-
-                delete newObj.data[key]
-                setObj(newObj)
+                setObj({ ...obj, data: { ...obj.data, [key]: undefined } })
 
                 toast({
                     title: "Success",
@@ -208,6 +189,7 @@ export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement,
     }
 
     const handleAddLabel = async () => {
+        const node = obj as Node
         if (newLabel === "") {
             toast({
                 title: "Error",
@@ -226,9 +208,17 @@ export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement,
         }
         try {
             setIsLabelLoading(true)
-            const ok = await onAddLabel(newLabel)
-            if (ok) {
-                setLabel(prev => [...prev, newLabel])
+            const result = await securedFetch(`api/graph/${prepareArg(graph.Id)}/${node.id}/label`, {
+                method: "POST",
+                body: JSON.stringify({
+                    label: newLabel
+                })
+            }, toast, setIndicator)
+
+            if (result.ok) {
+                graph.createCategory([newLabel], node)
+                graph.addLabel(newLabel, node)
+                setObj({ ...node, category: [...node.category, newLabel] })
                 setNewLabel("")
                 setLabelsEditable(false)
             }
@@ -238,9 +228,27 @@ export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement,
     }
 
     const handleRemoveLabel = async (removeLabel: string) => {
-        const ok = await onRemoveLabel(removeLabel)
-        if (ok) {
-            setLabel(prev => prev.filter(l => l !== removeLabel))
+        const node = obj as Node
+        const result = await securedFetch(`api/graph/${prepareArg(graph.Id)}/${node.id}/label`, {
+            method: "DELETE",
+            body: JSON.stringify({
+                label: removeLabel
+            })
+        }, toast, setIndicator)
+
+        if (result.ok) {
+            const category = graph.CategoriesMap.get(removeLabel)
+
+            if (category) {
+                category.elements = category.elements.filter((element) => element.id !== node.id)
+                if (category.elements.length === 0) {
+                    graph.Categories.splice(graph.Categories.findIndex(c => c.name === category.name), 1)
+                    graph.CategoriesMap.delete(category.name)
+                }
+            }
+
+            graph.removeLabel(removeLabel, node)
+            setObj({ ...node, category: node.category.filter((c) => c !== removeLabel) })
         }
     }
 

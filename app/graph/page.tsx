@@ -42,21 +42,15 @@ export default function Page() {
 
     const fetchCount = useCallback(async () => {
         if (!graphName) return
-        const q1 = "MATCH (n) RETURN COUNT(n) as nodes"
-        const q2 = "MATCH ()-[e]->() RETURN COUNT(e) as edges"
 
-        const nodes = await (await securedFetch(`api/graph/${prepareArg(graphName)}/?query=${prepareArg(q1)}`, {
+        const result = await (await securedFetch(`api/graph/${prepareArg(graphName)}/count`, {
             method: "GET"
-        }, toast, setIndicator)).json()
+        }, toast, setIndicator))
 
-        const edges = await (await securedFetch(`api/graph/${prepareArg(graphName)}/?query=${prepareArg(q2)}`, {
-            method: "GET"
-        }, toast, setIndicator)).json()
+        const json = await result.json()
 
-        if (!edges || !nodes) return
-
-        setEdgesCount(edges.result?.data[0].edges)
-        setNodesCount(nodes.result?.data[0].nodes)
+        setEdgesCount(json.result.edges || 0)
+        setNodesCount(json.result.nodes || 0)
     }, [graphName, toast, setIndicator])
 
     useEffect(() => {
@@ -83,10 +77,23 @@ export default function Page() {
 
         if (!result.ok) return null
 
-        const json = await result.json()
+        let json = await result.json()
+        
+        while (typeof json.result === "number") {
+            // eslint-disable-next-line no-await-in-loop
+            const res = await securedFetch(`api/graph/${prepareArg(graphName)}/?id=${prepareArg(json.result.toString())}`, {
+                method: "GET"
+            }, toast, setIndicator)
+            
+            if (!res.ok) return null
+            
+            // eslint-disable-next-line no-await-in-loop
+            json = await res.json()
+        }
+        
         fetchCount()
         setSelectedElement(undefined)
-
+        
         return json.result
     }
 

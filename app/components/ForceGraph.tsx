@@ -56,7 +56,7 @@ export default function ForceGraph({
     const lastClick = useRef<{ date: Date, name: string }>({ date: new Date(), name: "" })
     const { toast } = useToast()
     const { indicator } = useContext(IndicatorContext)
-    
+
     useEffect(() => {
         const handleResize = () => {
             if (!parentRef.current) return
@@ -211,7 +211,7 @@ export default function ForceGraph({
                 backgroundColor="#191919"
                 width={parentWidth}
                 height={parentHeight}
-                nodeLabel={(node) => node.data.name || node.id.toString()}
+                nodeLabel={(node) => type === "graph" ? node.data.name || node.id.toString() : node.category[0]}
                 graphData={data}
                 nodeRelSize={NODE_SIZE}
                 nodeCanvasObjectMode={() => 'after'}
