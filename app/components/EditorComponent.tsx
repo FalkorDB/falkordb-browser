@@ -634,7 +634,6 @@ export default function EditorComponent({ historyQuery, maximize, runQuery, grap
                                 variant="Primary"
                                 label="Run"
                                 title="Press Enter to run the query"
-                                type="submit"
                                 onClick={handleSubmit}
                                 isLoading={isLoading}
                             />
@@ -645,11 +644,22 @@ export default function EditorComponent({ historyQuery, maximize, runQuery, grap
                                     <DialogTitle />
                                     <DialogDescription />
                                 </VisuallyHidden>
-                                <CloseDialog
-                                    className="z-10 absolute top-1 right-6"
-                                >
-                                    <Minimize2 size={20} />
-                                </CloseDialog>
+                                <div className="z-10 absolute right-0 top-0 bottom-0 py-4 px-8 flex flex-col items-end justify-between pointer-events-none">
+                                    <CloseDialog
+                                        className="pointer-events-auto"
+                                    >
+                                        <Minimize2 size={20} />
+                                    </CloseDialog>
+                                    <Button
+                                        className="pointer-events-auto py-2 px-8"
+                                        indicator={indicator}
+                                        variant="Primary"
+                                        label="Run"
+                                        title="Press Enter to run the query"
+                                        onClick={handleSubmit}
+                                        isLoading={isLoading}
+                                    />
+                                </div>
                                 <Editor
                                     className="w-full h-full"
                                     onMount={handleEditorDidMount}
@@ -662,7 +672,7 @@ export default function EditorComponent({ historyQuery, maximize, runQuery, grap
                                         lineNumbersMinChars: 3,
                                         minimap: { enabled: false },
                                         lineHeight: 30,
-                                        fontSize: 25
+                                        fontSize: 25,
                                     }}
                                     value={(blur ? historyQuery.query.replace(/\s+/g, ' ').trim() : historyQuery.query)}
                                     onChange={(val) => {
@@ -674,6 +684,7 @@ export default function EditorComponent({ historyQuery, maximize, runQuery, grap
                                         } else {
                                             setHistoryQuery(prev => ({
                                                 ...prev,
+                                                query: val || "",
                                                 currentQuery: val || ""
                                             }))
                                         }
