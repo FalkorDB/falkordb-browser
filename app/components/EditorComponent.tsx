@@ -270,6 +270,7 @@ export default function EditorComponent({ historyQuery, maximize, runQuery, grap
                 'editorSuggestWidget.foreground': '#FFFFFF',
                 'editorSuggestWidget.selectedBackground': '#57577B',
                 'editorSuggestWidget.hoverBackground': '#28283F',
+                'focusBorder': '#00000000',
             },
         });
 
@@ -650,7 +651,7 @@ export default function EditorComponent({ historyQuery, maximize, runQuery, grap
                                     >
                                         <Minimize2 size={20} />
                                     </CloseDialog>
-                                    <Button
+                                    <CloseDialog
                                         className="pointer-events-auto py-2 px-8"
                                         indicator={indicator}
                                         variant="Primary"

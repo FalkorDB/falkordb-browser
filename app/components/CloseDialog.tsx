@@ -2,10 +2,10 @@
 
 import { DialogClose } from "@/components/ui/dialog";
 import { X } from "lucide-react";
-import Button, { Variant } from "./ui/Button";
+import Button, { Variant, Props as ButtonProps } from "./ui/Button";
 
 /* eslint-disable react/require-default-props */
-interface Props extends React.DetailedHTMLProps<React.ButtonHTMLAttributes<HTMLButtonElement>, HTMLButtonElement> {
+interface Props extends ButtonProps {
     label?: string
     variant?: Variant
 }
