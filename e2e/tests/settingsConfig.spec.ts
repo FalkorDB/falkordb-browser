@@ -6,6 +6,7 @@ import SettingsConfigPage from "../logic/POM/settingsConfigPage";
 import ApiCalls from "../logic/api/apiCalls";
 import Data from '../config/settingsConfigData.json';
 
+test.describe.configure({ mode: 'serial' });
 test.describe('Settings config tests', () => {
     let browser: BrowserWrapper;
     let apiCall: ApiCalls;
@@ -144,8 +145,6 @@ test.describe('Settings config tests', () => {
         await settingsConfigPage.isUndoBtnInToastMsg();
         await settingsConfigPage.waitForPageIdle();
         const value = String((await apiCall.getSettingsRoleValue(roles.maxQueuedQueries)).config[1]);
-        console.log(value);
-        
         expect(value === Data.roleModificationData[0].input).toBe(true);
         await apiCall.modifySettingsRole(roles.maxQueuedQueries, "25")
     });

@@ -133,7 +133,8 @@ export default defineConfig({
         '[Read-Write] - Chromium',
         '[Read-Write] - Firefox',
         '[Read-Only] - Chromium',
-        '[Read-Only] - Firefox'
+        '[Read-Only] - Firefox',
+        '[Admin: Serial Config - Chromium]'
       ],
     },  
 
