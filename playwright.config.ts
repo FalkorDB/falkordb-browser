@@ -19,7 +19,7 @@ export default defineConfig({
   /* Retry on CI only */
   retries: process.env.CI ? 2 : 0,
   /* Opt out of parallel tests on CI. */
-  workers: process.env.CI ? 1 : undefined,
+  workers: process.env.CI ? 2 : undefined,
   /* Reporter to use. See https://playwright.dev/docs/test-reporters */
   reporter: [['html', { outputFolder: 'playwright-report' }]],
   outputDir: 'playwright-report/artifacts',
@@ -44,6 +44,7 @@ export default defineConfig({
       },
       dependencies: ['setup'],
       grep: /@admin/,
+      testIgnore: /.*settingsConfig\.spec\.ts$/,
     },
     {
       name: '[Admin] Firefox',
@@ -53,6 +54,7 @@ export default defineConfig({
       },
       dependencies: ['setup'],
       grep: /@admin/,
+      testIgnore: /.*settingsConfig\.spec\.ts$/,
     },
 
     // Read-Write user projects
@@ -94,6 +96,46 @@ export default defineConfig({
       dependencies: ['setup'],
       grep: /@readonly/,
     },
+    {
+      name: '[Admin: Serial Config - Chromium]',
+      use: {
+        ...devices['Desktop Chrome'],
+        storageState: 'playwright/.auth/admin.json',
+      },
+      grep: /@admin/,
+      testMatch: /.*settingsConfig\.spec\.ts$/,
+      fullyParallel: false,
+      retries: 1,
+      dependencies: [
+        'setup',
+        '[Admin] Chromium',
+        '[Admin] Firefox',
+        '[Read-Write] - Chromium',
+        '[Read-Write] - Firefox',
+        '[Read-Only] - Chromium',
+        '[Read-Only] - Firefox'
+      ],
+    },
+    {
+      name: '[Admin: Serial Config - Firefox]',
+      use: {
+        ...devices['Desktop Firefox'],
+        storageState: 'playwright/.auth/admin.json',
+      },
+      grep: /@admin/,
+      testMatch: /.*settingsConfig\.spec\.ts$/,
+      fullyParallel: false,
+      retries: 1,
+      dependencies: [
+        'setup',
+        '[Admin] Chromium',
+        '[Admin] Firefox',
+        '[Read-Write] - Chromium',
+        '[Read-Write] - Firefox',
+        '[Read-Only] - Chromium',
+        '[Read-Only] - Firefox'
+      ],
+    },  
 
     // {
     //   name: 'webkit',

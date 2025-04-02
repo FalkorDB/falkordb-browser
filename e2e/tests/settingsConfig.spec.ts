@@ -6,7 +6,7 @@ import SettingsConfigPage from "../logic/POM/settingsConfigPage";
 import ApiCalls from "../logic/api/apiCalls";
 import Data from '../config/settingsConfigData.json';
 
-test.describe('Settings Tests', () => {
+test.describe('Settings config tests', () => {
     let browser: BrowserWrapper;
     let apicalls: ApiCalls;
 

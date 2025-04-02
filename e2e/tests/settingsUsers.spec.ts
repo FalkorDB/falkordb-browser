@@ -6,7 +6,7 @@ import { user } from '../config/user.json'
 import ApiCalls from "../logic/api/apiCalls";
 import { getRandomString } from "../infra/utils";
 
-test.describe('Settings Tests', () => {
+test.describe('Settings users tests', () => {
     let browser: BrowserWrapper;
 
     test.beforeAll(async () => {
