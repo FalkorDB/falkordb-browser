@@ -8,7 +8,7 @@ import { forwardRef } from "react"
 export type Variant = "Large" | "Primary" | "Secondary" | "Cancel" | "button"
 
 /* eslint-disable react/require-default-props */
-interface Props extends React.DetailedHTMLProps<React.ButtonHTMLAttributes<HTMLButtonElement>, HTMLButtonElement> {
+export interface Props extends React.DetailedHTMLProps<React.ButtonHTMLAttributes<HTMLButtonElement>, HTMLButtonElement> {
     label?: string
     variant?: Variant
     open?: boolean
