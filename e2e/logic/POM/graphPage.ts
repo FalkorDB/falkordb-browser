@@ -178,7 +178,7 @@ export default class GraphPage extends BasePage {
     }
 
     async exportGraph(): Promise<Download> {
-        await this.page.waitForLoadState('networkidle');
+        await this.waitForPageIdle();
         const [download] = await Promise.all([
             this.page.waitForEvent('download'),
             this.exportDataBtn.click(),

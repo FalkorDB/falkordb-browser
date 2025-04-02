@@ -84,12 +84,12 @@ export default class SettingsUsersPage extends BasePage {
     }
 
     async navigateToUserTab(): Promise<void> {
-        await this.page.waitForLoadState('networkidle');
+        await this.waitForPageIdle();
         await this.usersTabBtn.click();
     }
 
     async verifyUserExists(selectedUser: string): Promise<boolean> {
-        await this.page.waitForLoadState('networkidle');
+        await this.waitForPageIdle();
         const isVisible = await this.findUserNameInTable(selectedUser).isVisible();
         return isVisible;
     }
@@ -137,7 +137,7 @@ export default class SettingsUsersPage extends BasePage {
     }
 
     async addUser(userDetails: { [key: string]: string }): Promise<void> {
-        await this.page.waitForLoadState('networkidle');
+        await this.waitForPageIdle();
         await this.clickOnAddUserBtn();
         await this.fillUserNameField(userDetails.userName);
         await this.fillPasswordField(userDetails.password);
@@ -151,13 +151,13 @@ export default class SettingsUsersPage extends BasePage {
     }
 
     async getUserRole(selectedUser: string): Promise<string | null> {
-        await this.page.waitForLoadState('networkidle');
+        await this.waitForPageIdle();
         const role = await this.userRoleContent(selectedUser).textContent();
         return role;
     }
 
     async modifyUserRole(selectedUser: string, role: string): Promise<void> {
-        await this.page.waitForLoadState('networkidle');
+        await this.waitForPageIdle();
         await this.userRow(selectedUser).hover();
         await this.userSelectRoleEditBtn(selectedUser).waitFor({ state: "visible" });
         await this.userSelectRoleEditBtn(selectedUser).click();
@@ -168,7 +168,7 @@ export default class SettingsUsersPage extends BasePage {
     }
 
     async deleteTwoUsers(selectedUser1: string, selectedUser2: string): Promise<void> {
-        await this.page.waitForLoadState('networkidle');
+        await this.waitForPageIdle();
         await this.userCheckboxBtn(selectedUser1).click()
         await this.userCheckboxBtn(selectedUser2).click()
         await this.deleteUsersBtn.click()
@@ -177,7 +177,7 @@ export default class SettingsUsersPage extends BasePage {
     }
 
     async removeUser(selectedUser: string): Promise<void> {
-        await this.page.waitForLoadState('networkidle');
+        await this.waitForPageIdle();
         await this.userCheckboxBtn(selectedUser).click();
         await this.deleteUsersBtn.click();
         await this.confirmUserDeleteMsg.click();

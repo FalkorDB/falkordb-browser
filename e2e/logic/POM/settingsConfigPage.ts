@@ -82,7 +82,7 @@ export default class SettingsConfigPage extends BasePage {
     }
 
     async isUndoBtnInToastMsg(): Promise<void> {
-        this.page.waitForTimeout(500);
+        await this.page.waitForTimeout(500);
         await this.undoBtnInToastMsg.isVisible();
     }
 
