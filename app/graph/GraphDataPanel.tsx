@@ -5,7 +5,7 @@
 'use client'
 
 import { prepareArg, securedFetch } from "@/lib/utils";
-import { Dispatch, SetStateAction, useContext, useEffect, useState } from "react";
+import { Dispatch, SetStateAction, useContext, useEffect, useRef, useState } from "react";
 import { Check, ChevronRight, Pencil, Plus, Trash2, X } from "lucide-react";
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from "@/components/ui/use-toast";
@@ -48,13 +48,7 @@ export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement,
     const { toast } = useToast()
     const { data: session } = useSession()
     const { indicator, setIndicator } = useContext(IndicatorContext)
-
-    useEffect(() => {
-        if (!obj) {
-            setLabelsEditable(false)
-            setLabelsHover(false)
-        }
-    }, [obj])
+    const lastObjId = useRef<number | undefined>(undefined)
 
     const handleSetEditable = (key: string, val: string) => {
         if (key !== "") {
@@ -66,8 +60,17 @@ export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement,
     }
 
     useEffect(() => {
+        if (lastObjId.current !== obj.id) {
+            setEditable("")
+            setNewVal("")
+            setNewKey("")
+            setLabelsEditable(false)
+            setLabelsHover(false)
+            setIsAddValue(false)
+        }
         setAttributes(Object.keys(obj.data).filter((key) => (key !== "name" || obj.data.name !== obj.id)));
         setLabel(type ? [...obj.category.filter((c) => c !== "")] : [obj.label]);
+        lastObjId.current = obj.id
     }, [obj, type]);
 
     const setProperty = async (key: string, val: string, isUndo: boolean, actionType: ("added" | "set") = "set") => {
