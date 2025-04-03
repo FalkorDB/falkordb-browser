@@ -4,7 +4,6 @@
 "use client"
 
 import { type ClassValue, clsx } from "clsx"
-import { signOut } from "next-auth/react"
 import { twMerge } from "tailwind-merge"
 import { MutableRefObject } from "react"
 import { ForceGraphMethods } from "react-force-graph-2d"
@@ -44,6 +43,7 @@ export async function securedFetch(
   input: string,
   init: RequestInit,
   toast?: any,
+  setIndicator?: (indicator: "online" | "offline") => void
 ): Promise<Response> {
   const response = await fetch(input, init)
   const { status } = response
@@ -57,7 +57,9 @@ export async function securedFetch(
       })
     }
     if (status === 401 || status >= 500) {
-      signOut({ callbackUrl: '/login' })
+      if (setIndicator) {
+        setIndicator("offline")
+      }
     }
   }
   return response
@@ -67,7 +69,7 @@ export function prepareArg(arg: string) {
   return encodeURIComponent(arg.trim())
 }
 
-export const defaultQuery = (q?: string) => q || "MATCH (n) OPTIONAL MATCH (n)-[e]-(m) return n,e,m LIMIT 100"
+export const defaultQuery = (q?: string) => q || "MATCH (n) OPTIONAL MATCH (n)-[e]-(m) return * LIMIT 100"
 
 export function rgbToHSL(hex: string): string {
   // Remove the # if present

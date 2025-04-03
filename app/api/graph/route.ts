@@ -1,8 +1,8 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { getClient } from "@/app/api/auth/[...nextauth]/options";
 
 // eslint-disable-next-line import/prefer-default-export, @typescript-eslint/no-unused-vars
-export async function GET(request: NextRequest) {
+export async function GET() {
 
     const session = await getClient()
 
@@ -15,7 +15,9 @@ export async function GET(request: NextRequest) {
     try {
         const result = await client.list()
 
-        return NextResponse.json({ result }, { status: 200 })
+        const graphNames = result.filter(name => !name.endsWith("_schema"))
+
+        return NextResponse.json({ opts: graphNames }, { status: 200 })
     } catch (err: unknown) {
         console.error(err)
         return NextResponse.json({ message: (err as Error).message }, { status: 400 })

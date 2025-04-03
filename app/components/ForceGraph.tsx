@@ -4,12 +4,13 @@
 
 "use client"
 
-import { Dispatch, SetStateAction, useEffect, useRef, useState } from "react"
+import { Dispatch, SetStateAction, useContext, useEffect, useRef, useState } from "react"
 import ForceGraph2D from "react-force-graph-2d"
 import { securedFetch, GraphRef } from "@/lib/utils"
 import { useToast } from "@/components/ui/use-toast"
 import * as d3 from "d3"
 import { Graph, GraphData, Link, Node } from "../api/graph/model"
+import { IndicatorContext } from "./provider"
 
 interface Props {
     graph: Graph
@@ -54,7 +55,8 @@ export default function ForceGraph({
     const parentRef = useRef<HTMLDivElement>(null)
     const lastClick = useRef<{ date: Date, name: string }>({ date: new Date(), name: "" })
     const { toast } = useToast()
-
+    const { indicator, setIndicator } = useContext(IndicatorContext)
+    
     useEffect(() => {
         const handleResize = () => {
             if (!parentRef.current) return
@@ -103,7 +105,7 @@ export default function ForceGraph({
             headers: {
                 'Content-Type': 'application/json'
             }
-        }, toast);
+        }, toast, setIndicator);
 
         if (result.ok) {
             const json = await result.json()
@@ -193,13 +195,14 @@ export default function ForceGraph({
             }
         }
         setSelectedElement(element)
-        onExpand(!!selectedElement)
+        onExpand(!!element)
     }
 
     const handleUnselected = (evt?: MouseEvent) => {
         if (evt?.ctrlKey || (!selectedElement && selectedElements.length === 0)) return
         setSelectedElement(undefined)
         setSelectedElements([])
+        onExpand(false)
     }
 
     return (
@@ -209,7 +212,7 @@ export default function ForceGraph({
                 backgroundColor="#191919"
                 width={parentWidth}
                 height={parentHeight}
-                nodeLabel={(node) => node.data.name || node.id.toString()}
+                nodeLabel={(node) => type === "graph" ? node.data.name || node.id.toString() : node.category[0]}
                 graphData={data}
                 nodeRelSize={NODE_SIZE}
                 nodeCanvasObjectMode={() => 'after'}
@@ -334,7 +337,7 @@ export default function ForceGraph({
                     // Restore the context to its original state
                     ctx.restore();
                 }}
-                onNodeClick={handleNodeClick}
+                onNodeClick={indicator === "offline" ? undefined : handleNodeClick}
                 onNodeHover={handleHover}
                 onLinkHover={handleHover}
                 onNodeRightClick={handleRightClick}

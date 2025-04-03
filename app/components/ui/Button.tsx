@@ -8,13 +8,14 @@ import { forwardRef } from "react"
 export type Variant = "Large" | "Primary" | "Secondary" | "Cancel" | "button"
 
 /* eslint-disable react/require-default-props */
-interface Props extends React.DetailedHTMLProps<React.ButtonHTMLAttributes<HTMLButtonElement>, HTMLButtonElement> {
+export interface Props extends React.DetailedHTMLProps<React.ButtonHTMLAttributes<HTMLButtonElement>, HTMLButtonElement> {
     label?: string
     variant?: Variant
     open?: boolean
     side?: "down" | "left" | "right"
     children?: React.ReactNode
     isLoading?: boolean
+    indicator?: "offline" | "online"
 }
 
 const getClassName = (variant: Variant, disable: boolean | undefined, open: boolean | undefined, isLoading: boolean, classN: string | undefined) => {
@@ -46,14 +47,14 @@ const getClassName = (variant: Variant, disable: boolean | undefined, open: bool
     return className
 }
 
-const Button = forwardRef<HTMLButtonElement, Props>(({ label, variant = "button", open, className, title, type = "button", disabled, children, isLoading = false, ...props }, ref) =>
-    (title || label) ? (
+const Button = forwardRef<HTMLButtonElement, Props>(({ label, variant = "button", open, className, title, type = "button", disabled, children, isLoading = false, indicator, ...props }, ref) =>
+    (title || label || indicator === "offline") ? (
         <Tooltip>
             <TooltipTrigger asChild>
                 <button
                     ref={ref}
                     className={getClassName(variant, disabled, open, isLoading, className)}
-                    disabled={disabled || isLoading}
+                    disabled={disabled || isLoading || indicator === "offline"}
                     aria-label={title}
                     type={type}
                     {...props}
@@ -69,7 +70,16 @@ const Button = forwardRef<HTMLButtonElement, Props>(({ label, variant = "button"
                 </button>
             </TooltipTrigger>
             <TooltipContent>
-                {isLoading ? "Loading..." : title || label}
+                {
+                    indicator === "offline" && "The FalkorDB server is offline"
+                }
+                {
+                    indicator !== "offline" && (
+                        isLoading ?
+                            "Loading..."
+                            : title || label
+                    )
+                }
             </TooltipContent>
         </Tooltip>
     ) : (
