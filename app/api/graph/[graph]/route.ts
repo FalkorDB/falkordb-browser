@@ -1,12 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getClient } from "@/app/api/auth/[...nextauth]/options";
 import { GraphReply } from "falkordb/dist/src/graph";
-import NodeCache from "node-cache";
 
-const INITIAL = 3000
+const INITIAL = Number(process.env.INITIAL) || 0
 
-const results = new NodeCache();
-
+// Generate a unique id for each request
 function* generateId(): Generator<number, number, number> {
     let id = 0;
     while (true) {
@@ -15,6 +13,7 @@ function* generateId(): Generator<number, number, number> {
     }
 }
 
+// create a generator for the unique ids
 const idGenerator = generateId()
 
 export async function DELETE(request: NextRequest, { params }: { params: Promise<{ graph: string }> }) {
@@ -93,87 +92,83 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     }
 }
 
+// send a query to the graph and return the result
+// if the query is taking too long, return a timeout and save the result in the cache
 export async function GET(request: NextRequest, { params }: { params: Promise<{ graph: string }> }) {
-
     const session = await getClient()
     if (session instanceof NextResponse) {
         return session
     }
 
-    const { client, user } = session
-
+    const { client, user, cache } = session
     const { graph: graphId } = await params
-
-    const resultId = request.nextUrl.searchParams.get("id")
+    const query = request.nextUrl.searchParams.get("query")
+    const { role } = user
 
     try {
-        if (resultId) {
-            const id = Number(resultId)
-            let result = results.get<GraphReply<unknown> | Error | undefined>(id)
-            if (!result) {
-                await new Promise(resolve => { setTimeout(resolve, INITIAL) })
-                result = results.get<GraphReply<unknown> | Error | undefined>(id)
-                if (!result) {
-                    results.ttl(id, INITIAL * 2)
-                    return NextResponse.json({ result: id }, { status: 200 })
-                }
-            }
-
-            results.del(id)
-
-            if (result instanceof Error) {
-                return NextResponse.json({ error: result.message }, { status: 400 })
-            }
-
-            return NextResponse.json({ result }, { status: 200 })
-        }
-
-        const query = request.nextUrl.searchParams.get("query")
-        const { role } = user
-
         if (!query) throw new Error("Missing parameter query")
 
         const graph = client.selectGraph(graphId)
 
+        // Create a promise to resolve the result
         const result = await new Promise<GraphReply<unknown> | number>((resolve, reject) => {
             const id = idGenerator.next().value
 
+            // Set a timeout to resolve the result if it takes too long
             const timeout = setTimeout(() => {
-                results.set(id, undefined, INITIAL * 2)
+                cache.set(id, { callback: undefined, result: undefined })
+                console.log("Setting timeout");
                 resolve(id)
             }, INITIAL)
 
-            const res = role === "Read-Only"
-                ? graph.roQuery(query)
-                : graph.query(query)
+            setTimeout(() => {
+                const res = role === "Read-Only"
+                    ? graph.roQuery(query)
+                    : graph.query(query)
 
-            res.then((r) => {
-                if (!r) throw new Error("Something went wrong")
+                res.then((r) => {
+                    if (!r) throw new Error("Something went wrong")
 
-                if (results.has(id)) {
-                    results.set(id, r)
-                    return
-                }
+                    // If the result is already in the cache, save it
+                    const cached = cache.get(id)
+                    if (cached) {
+                        cached.result = r
+                        console.log("Setting result");
+                        if (typeof cached.callback === "function") {
+                            cached.callback()
+                        }
+                        return
+                    }
 
-                clearTimeout(timeout)
-                resolve(r)
-            }).catch((error) => {
-                if (results.has(id)) {
-                    results.set(id, error as Error)
-                    return
-                }
+                    clearTimeout(timeout)
+                    resolve(r)
+                }).catch((error) => {
+                    // If the error is already in the cache, save it
+                    const cached = cache.get(id)
+                    if (cached) {
+                        cached.result = error as Error
+                        console.log("Setting error");
+                        if (typeof cached.callback === "function") {
+                            cached.callback()
+                        }
+                        return
+                    }
 
-                clearTimeout(timeout)
-                reject(error)
-            })
+                    clearTimeout(timeout)
+                    reject(error)
+                })
+            }, INITIAL * 2)
         })
 
+        // If the result is a number, return the id
         if (typeof result === "number") {
             return NextResponse.json({ result }, { status: 200 })
         }
 
+        // If the result is does not exist, throw an error
         if (!result) throw new Error("Something went wrong")
 
+        // Return the result
         return NextResponse.json({ result }, { status: 200 })
     } catch (err: unknown) {
         console.error(err)

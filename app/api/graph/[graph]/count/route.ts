@@ -15,7 +15,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
     try {
         const graph = client.selectGraph(graphId)
-        const query = "MATCH (n) OPTIONAL MATCH (n)-[e]-() WITH count(n) as nodes, count(e) as edges RETURN nodes, edges"
+        const query = "MATCH (n) OPTIONAL MATCH (n)-[e]->() WITH count(n) as nodes, count(e) as edges RETURN nodes, edges"
         const { data } = await graph.query(query)
 
         if (!data) throw new Error("Something went wrong")
