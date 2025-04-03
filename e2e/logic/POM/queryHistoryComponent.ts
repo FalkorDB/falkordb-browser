@@ -1,4 +1,4 @@
-import { Locator } from "playwright";
+import { Locator } from "@playwright/test";
 import GraphPage from "./graphPage";
 import { waitForElementToBeVisible } from "@/e2e/infra/utils";
 
@@ -52,8 +52,8 @@ export default class QueryHistory extends GraphPage {
         await this.runBtnInQueryHistory.click();
     }
 
-    async isQueryHistoryDialog(): Promise<void> {
-        await this.queryHistoryDialog.isVisible();
+    async isQueryHistoryDialog(): Promise<boolean> {
+        return await this.queryHistoryDialog.isVisible();
     }
 
     async ClickOnSelectQueryInHistoryBtn(queryNumber: string): Promise<void> {
