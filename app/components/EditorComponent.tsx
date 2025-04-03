@@ -7,7 +7,7 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogTrigger } 
 import { Editor, Monaco } from "@monaco-editor/react"
 import { SetStateAction, Dispatch, useEffect, useRef, useState, useContext } from "react"
 import * as monaco from "monaco-editor";
-import { Info, Maximize2, Minimize2 } from "lucide-react";
+import { Info, Maximize2, Minimize2, Minus, Plus } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { HistoryQuery, prepareArg, securedFetch } from "@/lib/utils";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
@@ -15,11 +15,12 @@ import { Graph } from "../api/graph/model";
 import Button from "./ui/Button";
 import CloseDialog from "./CloseDialog";
 import { IndicatorContext } from "./provider";
+import Input from "./ui/Input";
 
 interface Props {
     historyQuery: HistoryQuery
     maximize: boolean
-    runQuery: (query: string) => Promise<boolean>
+    runQuery: (query: string, timeout?: number) => Promise<boolean>
     graph: Graph
     setHistoryQuery: Dispatch<SetStateAction<HistoryQuery>>
 }
@@ -200,11 +201,24 @@ export default function EditorComponent({ historyQuery, maximize, runQuery, grap
     const [blur, setBlur] = useState(false)
     const [sugDisposed, setSugDisposed] = useState<monaco.IDisposable>()
     const [isLoading, setIsLoading] = useState(false)
+    const [showTimeout, setShowTimeout] = useState(false)
+    const [timeout, setTimeout] = useState(0)
+    const inputRef = useRef<HTMLInputElement>(null)
+    const spanRef = useRef<HTMLSpanElement>(null)
     const { toast } = useToast()
     const submitQuery = useRef<HTMLButtonElement>(null)
     const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null)
     const containerRef = useRef<HTMLDivElement>(null)
     const indicatorRef = useRef(indicator)
+
+    useEffect(() => {
+        if (spanRef.current && inputRef.current) {
+            // Set the span's text to the input's value
+            spanRef.current.textContent = timeout.toString() || ' ';
+            // Adjust the input's width to match the span's width
+            inputRef.current.style.width = `${spanRef.current.offsetWidth}px`;
+        }
+    }, [timeout, showTimeout]);
 
     useEffect(() => {
         indicatorRef.current = indicator
@@ -385,7 +399,7 @@ export default function EditorComponent({ historyQuery, maximize, runQuery, grap
     const handleSubmit = async () => {
         try {
             setIsLoading(true)
-            await runQuery(historyQuery.query)
+            await runQuery(historyQuery.query, timeout)
         } finally {
             setIsLoading(false)
         }
@@ -623,6 +637,10 @@ export default function EditorComponent({ historyQuery, maximize, runQuery, grap
                                     >
                                         <Info />
                                     </Button>
+                                    <Button
+                                        label={showTimeout ? "Hide Timeout" : "Show Timeout"}
+                                        onClick={() => setShowTimeout(prev => !prev)}
+                                    />
                                 </div>
                                 <div ref={placeholderRef} className="absolute top-2 left-2 pointer-events-none">
                                     {PLACEHOLDER}
@@ -639,6 +657,44 @@ export default function EditorComponent({ historyQuery, maximize, runQuery, grap
                                 isLoading={isLoading}
                             />
                         </div>
+                        {
+                            showTimeout &&
+                            <div className="flex items-center gap-2">
+                                <Button
+                                    title="Timeout value in seconds"
+                                >
+                                    <Info />
+                                </Button>
+                                <div className="h-full flex items-center border rounded-lg">
+                                    <Button
+                                        className="p-2 border-r"
+                                        onClick={() => setTimeout(prev => prev + 1)}
+                                    >
+                                        <Plus size={20} />
+                                    </Button>
+                                    <Input
+                                        ref={inputRef}
+                                        type="text"
+                                        className="text-center h-full bg-foreground rounded-none border-none text-white"
+                                        value={timeout}
+                                        min={0}
+                                        onChange={(e) => {
+                                            const value = Number(e.target.value)
+                                            if (Number.isNaN(value)) return
+                                            setTimeout(value)
+                                        }}
+                                        style={{ boxSizing: "content-box" }}
+                                    />
+                                    <span ref={spanRef} className="absolute invisible whitespace-pre" />
+                                    <Button
+                                        className="p-2 border-l"
+                                        onClick={() => setTimeout(prev => !prev ? prev : prev - 1)}
+                                    >
+                                        <Minus size={20} />
+                                    </Button>
+                                </div>
+                            </div>
+                        }
                         <DialogContent disableClose className="w-full h-full">
                             <div className="relative w-full h-full">
                                 <VisuallyHidden>

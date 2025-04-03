@@ -67,7 +67,7 @@ export default function Page() {
         fetchCount()
     }, [fetchCount, graph.Id, graphName])
 
-    const run = async (q: string) => {
+    const run = async (q: string, timeout?: number) => {
         if (!graphName) {
             toast({
                 title: "Error",
@@ -76,8 +76,8 @@ export default function Page() {
             })
             return null
         }
-
-        const result = await securedFetch(`api/graph/${prepareArg(graphName)}/?query=${prepareArg(q)}`, {
+        console.log(timeout)
+        const result = await securedFetch(`api/graph/${prepareArg(graphName)}/?query=${prepareArg(q)}&timeout=${timeout}`, {
             method: "GET"
         }, toast, setIndicator)
 
@@ -90,8 +90,8 @@ export default function Page() {
         return json.result
     }
 
-    const runQuery = async (q: string) => {
-        const result = await run(q)
+    const runQuery = async (q: string, timeout?: number) => {
+        const result = await run(q, timeout)
         if (!result) return undefined
         const explain = await securedFetch(`api/graph/${prepareArg(graphName)}/explain/?query=${prepareArg(q)}`, {
             method: "GET"

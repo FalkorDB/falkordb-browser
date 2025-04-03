@@ -123,6 +123,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     try {
 
         const query = request.nextUrl.searchParams.get("query")
+        const timeout = request.nextUrl.searchParams.get("timeout")
         const create = request.nextUrl.searchParams.get("create")
         const { role } = user
 
@@ -132,10 +133,11 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
             return NextResponse.json({}, { status: 200 })
 
         const graph = client.selectGraph(graphId)
-
+        const timeoutNumber = timeout ? Number(timeout) * 1000 : undefined
+        console.log(timeoutNumber)
         const result = role === "Read-Only"
-            ? await graph.roQuery(query)
-            : await graph.query(query)
+            ? await graph.roQuery(query, { TIMEOUT: timeoutNumber })
+            : await graph.query(query, { TIMEOUT: timeoutNumber })
 
         if (!result) throw new Error("Something went wrong")
 
