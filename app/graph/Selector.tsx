@@ -1,10 +1,10 @@
 'use client'
 
-import { useEffect, useRef, useState, Dispatch, SetStateAction, useContext } from "react";
+import { useEffect, useRef, useState, Dispatch, SetStateAction, useContext, useCallback } from "react";
 import { DialogTitle } from "@/components/ui/dialog";
 import { Editor } from "@monaco-editor/react";
 import { editor } from "monaco-editor";
-import { cn, defaultQuery, HistoryQuery, prepareArg, Query, securedFetch } from "@/lib/utils";
+import { cn, HistoryQuery, prepareArg, Query, securedFetch } from "@/lib/utils";
 import { Session } from "next-auth";
 import { PlusCircle, RefreshCcw } from "lucide-react";
 import { usePathname } from "next/navigation";
@@ -54,52 +54,44 @@ export default function Selector({ setGraphName, graphName, runQuery, edgesCount
     const [filteredQueries, setFilteredQueries] = useState<Query[]>(historyQuery?.queries || [])
     const { indicator, setIndicator } = useContext(IndicatorContext)
 
-    const handleOnChange = async (name: string) => {
+    const handleOnChange = useCallback(async (name: string) => {
         const formattedName = name === '""' ? "" : name
-        if (runQuery) {
-            const result = await securedFetch(`api/graph/${prepareArg(name)}_schema/?query=${prepareArg(defaultQuery())}&create=false`, {
+        if (type === "Graph") {
+            const result = await securedFetch(`api/schema/${prepareArg(name)}`, {
                 method: "GET"
             }, toast, setIndicator)
 
-            if (!result.ok) return
-
-            const json = await result.json()
-            if (json.result) {
-                setSchema(Graph.create(name, json.result, false, true))
+            if (result.ok) {
+                const json = await result.json()
+                if (json.result) {
+                    setSchema(Graph.create(name, json.result, false, true))
+                }
             }
         }
         setGraphName(formattedName)
         setSelectedValue(name)
-    }
+    }, [setGraphName, setIndicator, toast, type])
 
-    const getOptions = async () => {
+    const getOptions = useCallback(async () => {
         if (indicator === "offline") return
 
-        const result = await securedFetch("api/graph", {
+        const result = await securedFetch(`api/${type === "Graph" ? "graph" : "schema"}`, {
             method: "GET"
         }, toast, setIndicator)
         if (!result.ok) return
-        const res = (await result.json()).result as string[]
-        const opts = !runQuery ?
-            res.filter(name => name.endsWith("_schema")).map(name => {
-                let split = name.split("_schema")[0]
-                if (split.startsWith("{") && split.endsWith("}")) {
-                    split = split.substring(1, split.length - 1)
-                }
-                return split
-            }) : res.filter(name => !name.endsWith("_schema"))
+        const { opts } = (await result.json()) as { opts: string[] }
         setOptions(opts)
         if (opts.length === 1) handleOnChange(opts[0])
         if (opts.length === 0) handleOnChange("")
-    }
+    }, [indicator, type, toast, setIndicator, setOptions, handleOnChange])
 
     useEffect(() => {
         getOptions()
-    }, [])
+    }, [getOptions])
 
     useEffect(() => {
         if (indicator === "online") getOptions()
-    }, [indicator, setOptions])
+    }, [indicator, getOptions])
 
     const focusEditorAtEnd = () => {
         if (editorRef.current) {

@@ -69,7 +69,7 @@ export function prepareArg(arg: string) {
   return encodeURIComponent(arg.trim())
 }
 
-export const defaultQuery = (q?: string) => q || "MATCH (n) OPTIONAL MATCH (n)-[e]-(m) return n,e,m LIMIT 100"
+export const defaultQuery = (q?: string) => q || "MATCH (n) OPTIONAL MATCH (n)-[e]-(m) return * LIMIT 100"
 
 export function rgbToHSL(hex: string): string {
   // Remove the # if present
