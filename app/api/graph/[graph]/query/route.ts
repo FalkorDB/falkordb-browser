@@ -28,7 +28,7 @@ export async function GET(request: NextRequest) {
             await new Promise<void>(resolve => {
                 const timeout = setTimeout(() => {
                     resolve()
-                }, INITIAL)
+                }, INITIAL * 10)
 
                 cached.callback = () => {
                     clearTimeout(timeout)
