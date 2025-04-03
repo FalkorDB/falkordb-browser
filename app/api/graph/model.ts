@@ -593,7 +593,7 @@ export class Graph {
 
     public removeLabel(label: string, selectedElement: Node) {
         this.Elements.nodes.forEach((node) => {
-            if (node.id === selectedElement?.id) {
+            if (node.id === selectedElement.id) {
                 node.category = node.category.filter(c => c !== label)
                 if (node.category.length === 0) {
                     node.category.push(this.createCategory([""], node as Node)[0].name)
@@ -603,7 +603,7 @@ export class Graph {
         })
 
         this.Data = this.Data.map(row => Object.fromEntries(Object.entries(row).map(([key, cell]) => {
-            if (cell && typeof cell === "object" && cell.id === selectedElement?.id && "labels" in cell) {
+            if (cell && typeof cell === "object" && cell.id === selectedElement.id && "labels" in cell) {
                 const newCell = { ...cell }
                 newCell.labels = newCell.labels.filter((l) => l !== label)
                 return [key, newCell]
@@ -614,14 +614,16 @@ export class Graph {
 
     public addLabel(label: string, selectedElement: Node) {
         this.Elements.nodes.forEach((node) => {
-            if (node.id === selectedElement?.id) {
-                const emptyCategory = this.CategoriesMap.get(selectedElement?.category.find((c: string) => c === "") as string)
-                if (emptyCategory) {
-                    emptyCategory.elements = emptyCategory.elements.filter((element) => element.id !== selectedElement?.id)
-                    if (emptyCategory.elements.length === 0) {
-                        this.Categories.splice(this.Categories.findIndex(c => c.name === emptyCategory.name), 1)
-                        this.CategoriesMap.delete(emptyCategory.name)
-                        node.category = node.category.filter((c) => c !== "")
+            if (node.id === selectedElement.id) {
+                if (node.category.includes("")) {
+                    const emptyCategory = this.CategoriesMap.get("")
+                    if (emptyCategory) {
+                        emptyCategory.elements = emptyCategory.elements.filter((element) => element.id !== node.id)
+                        if (emptyCategory.elements.length === 0) {
+                            this.Categories.splice(this.Categories.findIndex(c => c.name === emptyCategory.name), 1)
+                            this.CategoriesMap.delete(emptyCategory.name)
+                            node.category = node.category.filter((c) => c !== "")
+                        }
                     }
                 }
                 if (node.category.length === 0) {
@@ -632,7 +634,7 @@ export class Graph {
         })
 
         this.Data = this.Data.map(row => Object.fromEntries(Object.entries(row).map(([key, cell]) => {
-            if (cell && typeof cell === "object" && cell.id === selectedElement?.id && "labels" in cell) {
+            if (cell && typeof cell === "object" && cell.id === selectedElement.id && "labels" in cell) {
                 const newCell = { ...cell }
                 newCell.labels.push(label)
                 return [key, newCell]
@@ -664,7 +666,7 @@ export class Graph {
             if (e.id !== id) return
             e.data[key] = val
         })
-        
+
         this.Data = this.Data.map(row => Object.fromEntries(Object.entries(row).map(([k, cell]) => {
             if (cell && typeof cell === "object" && cell.id === id) {
                 return [k, { ...cell, properties: { ...cell.properties, [key]: val } }]
