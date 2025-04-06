@@ -668,11 +668,13 @@ export default function EditorComponent({ historyQuery, maximize, runQuery, grap
                                 <div className="h-full flex items-center border rounded-lg">
                                     <Button
                                         className="p-2 border-r"
+                                        title="Increase Timeout"
                                         onClick={() => setTimeout(prev => prev + 1)}
                                     >
                                         <Plus size={20} />
                                     </Button>
                                     <Input
+                                        id="timeoutInput"
                                         ref={inputTimeoutRef}
                                         type="text"
                                         className="text-center h-full bg-foreground rounded-none border-none text-white"
@@ -688,6 +690,7 @@ export default function EditorComponent({ historyQuery, maximize, runQuery, grap
                                     <span ref={spanTimeoutRef} className="absolute invisible whitespace-pre" />
                                     <Button
                                         className="p-2 border-l"
+                                        title="Decrease Timeout"
                                         onClick={() => setTimeout(prev => !prev ? prev : prev - 1)}
                                     >
                                         <Minus size={20} />
