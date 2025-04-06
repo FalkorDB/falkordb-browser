@@ -673,7 +673,7 @@ export default function EditorComponent({ historyQuery, maximize, runQuery, grap
                             showLimit &&
                             <div className="flex items-center gap-2">
                                 <Button
-                                    title="limit nodes in graph only if limit not set in query"
+                                    title="Limit nodes in graph only if limit not set in query"
                                 >
                                     <Info />
                                 </Button>
