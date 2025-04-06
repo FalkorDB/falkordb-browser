@@ -62,9 +62,8 @@ export default function CreateGraph({
                 })
                 return
             }
-            const q = 'RETURN 1'
-            const result = await securedFetch(`api/graph/${prepareArg(name)}/?query=${prepareArg(q)}`, {
-                method: "GET",
+            const result = await securedFetch(`api/${type === "Schema" ? "schema" : "graph"}/${prepareArg(name)}`, {
+                method: "POST",
             }, toast, setIndicator)
 
             if (!result.ok) return

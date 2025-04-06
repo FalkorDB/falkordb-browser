@@ -5,7 +5,7 @@
 import { ResizablePanel, ResizablePanelGroup, ResizableHandle } from "@/components/ui/resizable"
 import { ChevronLeft, Maximize2, Minimize2, Pause, Play } from "lucide-react"
 import { ImperativePanelHandle } from "react-resizable-panels"
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useRef, useState, useContext } from "react"
 import { cn, prepareArg, securedFetch } from "@/lib/utils"
 import dynamic from "next/dynamic"
 import { useToast } from "@/components/ui/use-toast"
@@ -18,6 +18,7 @@ import Labels from "../graph/labels"
 import { Category, Graph, Link, Node, GraphData } from "../api/graph/model"
 import Button from "../components/ui/Button"
 import CreateElement from "./SchemaCreateElement"
+import { IndicatorContext } from "../components/provider"
 
 const ForceGraph = dynamic(() => import("../components/ForceGraph"), { ssr: false })
 
@@ -25,22 +26,6 @@ const ForceGraph = dynamic(() => import("../components/ForceGraph"), { ssr: fals
 interface Props {
     schema: Graph
     fetchCount?: () => void
-}
-
-const getCreateQuery = (type: boolean, selectedNodes: [Node, Node], attributes: [string, string[]][], label?: string[]) => {
-    const formateAttributes: [string, string][] = attributes.map((att) => {
-        const [key, [t, d, u, r]] = att
-        let val = `${t}`
-        if (u === "true") val += "!"
-        if (r === "true") val += "*"
-        if (d) val += `-${d}`
-        return [key, val]
-    })
-
-    if (type) {
-        return `CREATE (n${label ? `:${label.join(":")}` : ""}${formateAttributes?.length > 0 ? ` {${formateAttributes.map(([k, v]) => `${k}: "${v}"`).join(",")}}` : ""}) RETURN n`
-    }
-    return `MATCH (a), (b) WHERE ID(a) = ${selectedNodes[0].id} AND ID(b) = ${selectedNodes[1].id} CREATE (a)-[e${label ? `:${label}` : ""}${formateAttributes?.length > 0 ? ` {${formateAttributes.map(([k, v]) => `${k}: "${v}"`).join(",")}}` : ""}]->(b) RETURN e`
 }
 
 export default function SchemaView({ schema, fetchCount }: Props) {
@@ -56,6 +41,7 @@ export default function SchemaView({ schema, fetchCount }: Props) {
     const [cooldownTicks, setCooldownTicks] = useState<number | undefined>(0)
     const [data, setData] = useState<GraphData>(schema.Elements)
     const { toast } = useToast()
+    const { setIndicator } = useContext(IndicatorContext)
     
     useEffect(() => {
         setData({ ...schema.Elements })
@@ -149,7 +135,7 @@ export default function SchemaView({ schema, fetchCount }: Props) {
         const q = `${conditionsNodes.length > 0 ? `MATCH (n) WHERE ${conditionsNodes.join(" OR ")} DELETE n` : ""}${conditionsEdges.length > 0 && conditionsNodes.length > 0 ? " WITH * " : ""}${conditionsEdges.length > 0 ? `MATCH ()-[e]-() WHERE ${conditionsEdges.join(" OR ")} DELETE e` : ""}`
         const result = await securedFetch(`api/graph/${prepareArg(schema.Id)}_schema/?query=${prepareArg(q)} `, {
             method: "GET"
-        }, toast)
+        }, toast, setIndicator)
 
         if (!result.ok) return
 
@@ -197,42 +183,6 @@ export default function SchemaView({ schema, fetchCount }: Props) {
         dataPanel.current?.collapse()
     }
 
-    const handleSetAttributes = async (attribute: [string, string[]]) => {
-        if (!selectedElement) return false
-
-        const [key, value] = attribute;
-        const type = !("source" in selectedElement)
-        const { id } = selectedElement
-        const q = `MATCH ${type ? "(e)" : "()-[e]-()"} WHERE ID(e) = ${id} SET e.${key} = "${value.join(",")}"`
-        const { ok } = await securedFetch(`api/graph/${prepareArg(schema.Id)}_schema/?query=${prepareArg(q)}`, {
-            method: "GET"
-        }, toast)
-
-        if (ok) {
-            if (type) {
-                schema.Elements.nodes.forEach((node) => {
-                    if (node.id !== selectedElement.id) return
-                    node.data[key] = value;
-                })
-            } else {
-                schema.Elements.links.forEach((link) => {
-                    if (link.id !== selectedElement.id) return
-                    link.data[key] = value;
-                })
-            }
-        } else {
-            toast({
-                title: "Error",
-                description: "Failed to set property",
-                variant: "destructive"
-            })
-        }
-
-        setData({ ...schema.Elements })
-
-        return ok
-    }
-
     // const handleSetCategory = async (category: string) => {
     //     if (!selectedElement) return false
 
@@ -272,41 +222,6 @@ export default function SchemaView({ schema, fetchCount }: Props) {
     //     return success
     // }
 
-    const handleRemoveProperty = async (key: string) => {
-        if (!selectedElement) return false
-
-        const type = !("source" in selectedElement)
-        const { id } = selectedElement
-        const q = `MATCH ${type ? "(e)" : "()-[e]-()"} WHERE ID(e) = ${id} SET e.${key} = NULL`
-        const { ok } = await securedFetch(`api/graph/${prepareArg(schema.Id)}_schema/?query=${prepareArg(q)}`, {
-            method: "GET"
-        }, toast)
-
-        if (ok) {
-            if (type) {
-                schema.Elements.nodes.forEach((node) => {
-                    if (node.id === id) {
-                        delete node.data[key]
-                    }
-
-                    return node
-                })
-            } else {
-                schema.Elements.links.forEach((link) => {
-                    if (link.id === id) {
-                        delete link.data[key]
-                    }
-
-                    return link
-                })
-            }
-        }
-
-        setData({ ...schema.Elements })
-
-        return ok
-    }
-
     const onCreateElement = async (attributes: [string, string[]][], label?: string[]) => {
         if (!isAddEntity && selectedNodes[0] === undefined && selectedNodes[1] === undefined) {
             toast({
@@ -317,9 +232,11 @@ export default function SchemaView({ schema, fetchCount }: Props) {
             return false
         }
 
-        const result = await securedFetch(`api/graph/${prepareArg(schema.Id)}_schema/?query=${getCreateQuery(isAddEntity, selectedNodes as [Node, Node], attributes, label)}`, {
-            method: "GET"
-        }, toast)
+        const fakeId = "-1"
+        const result = await securedFetch(`api/schema/${prepareArg(schema.Id)}/${prepareArg(fakeId)}`, {
+            method: "POST",
+            body: JSON.stringify({ type: isAddEntity, label, attributes, selectedNodes })
+        }, toast, setIndicator)
 
         if (result.ok) {
             const json = await result.json()
@@ -339,55 +256,6 @@ export default function SchemaView({ schema, fetchCount }: Props) {
         }
 
         setData({ ...schema.Elements })
-
-        return result.ok
-    }
-
-    const handleAddLabel = async (label: string) => {
-        const q = `MATCH (n) WHERE ID(n) = ${selectedElement?.id} SET n:${label}`
-        const result = await securedFetch(`api/graph/${prepareArg(schema.Id)}_schema/?query=${prepareArg(q)}`, {
-            method: "GET"
-        }, toast)
-
-        if (result.ok) {
-            selectedElement!.displayName = ""
-            schema.createCategory([label], selectedElement as Node)
-            schema.Elements.nodes.forEach((node) => {
-                if (node.id === selectedElement?.id) {
-                    node.category.push(label)
-                }
-            })
-            setData({ ...schema.Elements })
-        }
-
-        return result.ok
-    }
-
-    const handleRemoveLabel = async (label: string) => {
-        const q = `MATCH (n) WHERE ID(n) = ${selectedElement?.id} REMOVE n:${label}`
-        const result = await securedFetch(`api/graph/${prepareArg(schema.Id)}_schema/?query=${prepareArg(q)}`, {
-            method: "GET"
-        }, toast)
-
-        if (result.ok) {
-            selectedElement!.displayName = ""
-            const category = schema.CategoriesMap.get(label)
-
-            if (category) {
-                category.elements = category.elements.filter((element) => element.id !== selectedElement?.id)
-                if (category.elements.length === 0) {
-                    schema.Categories.splice(schema.Categories.findIndex(c => c.name === category.name), 1)
-                    schema.CategoriesMap.delete(category.name)
-                }
-            }
-            schema.Elements.nodes.forEach((node) => {
-                if (node.id === selectedElement?.id) {
-                    node.category = node.category.filter(c => c !== label)
-                    node.color = schema.getCategoryColorValue(schema.CategoriesMap.get(node.category[0])?.index)
-                }
-            })
-            setData({ ...schema.Elements })
-        }
 
         return result.ok
     }
@@ -504,11 +372,8 @@ export default function SchemaView({ schema, fetchCount }: Props) {
                         <SchemaDataPanel
                             obj={selectedElement}
                             onExpand={onExpand}
-                            onSetAttributes={handleSetAttributes}
-                            onRemoveAttribute={handleRemoveProperty}
                             onDeleteElement={handleDeleteElement}
-                            onAddLabel={handleAddLabel}
-                            onRemoveLabel={handleRemoveLabel}
+                            schema={schema}
                         />
                         : (isAddEntity || isAddRelation) &&
                         <CreateElement

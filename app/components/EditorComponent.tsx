@@ -294,16 +294,17 @@ export default function EditorComponent({ historyQuery, maximize, runQuery, grap
                 'editorSuggestWidget.foreground': '#FFFFFF',
                 'editorSuggestWidget.selectedBackground': '#57577B',
                 'editorSuggestWidget.hoverBackground': '#28283F',
+                'focusBorder': '#00000000',
             },
         });
 
         monacoI.editor.setTheme('custom-theme')
     }
 
-    const fetchSuggestions = async (q: string, detail: string): Promise<monaco.languages.CompletionItem[]> => {
+    const fetchSuggestions = async (detail: string): Promise<monaco.languages.CompletionItem[]> => {
         if (indicator === "offline") return []
 
-        const result = await securedFetch(`api/graph/${graphIdRef.current}/?query=${prepareArg(q)}`, {
+        const result = await securedFetch(`api/graph/${graphIdRef.current}/suggestions/?type=${prepareArg(detail)}`, {
             method: 'GET',
         }, toast, setIndicator)
 
@@ -333,10 +334,10 @@ export default function EditorComponent({ historyQuery, maximize, runQuery, grap
     }
 
     const getSuggestions = async () => (await Promise.all([
-        fetchSuggestions('CALL dbms.procedures() YIELD name as sug', '(function)'),
-        fetchSuggestions('CALL db.propertyKeys() YIELD propertyKey as sug', '(property key)'),
-        fetchSuggestions('CALL db.labels() YIELD label as sug', '(label)'),
-        fetchSuggestions('CALL db.relationshipTypes() YIELD relationshipType as sug', '(relationship type)')
+        fetchSuggestions('(function)'),
+        fetchSuggestions('(property key)'),
+        fetchSuggestions('(label)'),
+        fetchSuggestions('(relationship type)')
     ])).flat()
 
     const addSuggestions = async (monacoI: Monaco) => {
@@ -554,6 +555,10 @@ export default function EditorComponent({ historyQuery, maximize, runQuery, grap
                     let counter;
                     if (prev.counter !== 1) {
                         counter = prev.counter ? prev.counter - 1 : prev.queries.length;
+                        // Run provideCompletion when counter changes from 0 to queries.length
+                        if (!prev.counter && counter === prev.queries.length) {
+                            e.trigger('keyboard', 'editor.action.triggerSuggest', {});
+                        }
                     } else {
                         counter = 1;
                     }
@@ -717,11 +722,22 @@ export default function EditorComponent({ historyQuery, maximize, runQuery, grap
                                     <DialogTitle />
                                     <DialogDescription />
                                 </VisuallyHidden>
-                                <CloseDialog
-                                    className="z-10 absolute top-1 right-6"
-                                >
-                                    <Minimize2 size={20} />
-                                </CloseDialog>
+                                <div className="z-10 absolute right-0 top-0 bottom-0 py-4 px-8 flex flex-col items-end justify-between pointer-events-none">
+                                    <CloseDialog
+                                        className="pointer-events-auto"
+                                    >
+                                        <Minimize2 size={20} />
+                                    </CloseDialog>
+                                    <CloseDialog
+                                        className="pointer-events-auto py-2 px-8"
+                                        indicator={indicator}
+                                        variant="Primary"
+                                        label="Run"
+                                        title="Press Enter to run the query"
+                                        onClick={handleSubmit}
+                                        isLoading={isLoading}
+                                    />
+                                </div>
                                 <Editor
                                     className="w-full h-full"
                                     onMount={handleEditorDidMount}
@@ -734,7 +750,7 @@ export default function EditorComponent({ historyQuery, maximize, runQuery, grap
                                         lineNumbersMinChars: 3,
                                         minimap: { enabled: false },
                                         lineHeight: 30,
-                                        fontSize: 25
+                                        fontSize: 25,
                                     }}
                                     value={(blur ? historyQuery.query.replace(/\s+/g, ' ').trim() : historyQuery.query)}
                                     onChange={(val) => {
@@ -746,6 +762,7 @@ export default function EditorComponent({ historyQuery, maximize, runQuery, grap
                                         } else {
                                             setHistoryQuery(prev => ({
                                                 ...prev,
+                                                query: val || "",
                                                 currentQuery: val || ""
                                             }))
                                         }

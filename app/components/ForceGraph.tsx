@@ -55,7 +55,7 @@ export default function ForceGraph({
     const parentRef = useRef<HTMLDivElement>(null)
     const lastClick = useRef<{ date: Date, name: string }>({ date: new Date(), name: "" })
     const { toast } = useToast()
-    const { indicator } = useContext(IndicatorContext)
+    const { indicator, setIndicator } = useContext(IndicatorContext)
 
     useEffect(() => {
         const handleResize = () => {
@@ -105,7 +105,7 @@ export default function ForceGraph({
             headers: {
                 'Content-Type': 'application/json'
             }
-        }, toast);
+        }, toast, setIndicator);
 
         if (result.ok) {
             const json = await result.json()
@@ -202,6 +202,7 @@ export default function ForceGraph({
         if (evt?.ctrlKey || (!selectedElement && selectedElements.length === 0)) return
         setSelectedElement(undefined)
         setSelectedElements([])
+        onExpand(false)
     }
 
     return (
@@ -211,7 +212,7 @@ export default function ForceGraph({
                 backgroundColor="#191919"
                 width={parentWidth}
                 height={parentHeight}
-                nodeLabel={(node) => node.data.name || node.id.toString()}
+                nodeLabel={(node) => type === "graph" ? node.data.name || node.id.toString() : node.category[0]}
                 graphData={data}
                 nodeRelSize={NODE_SIZE}
                 nodeCanvasObjectMode={() => 'after'}
