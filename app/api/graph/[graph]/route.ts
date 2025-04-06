@@ -134,7 +134,6 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
         const graph = client.selectGraph(graphId)
         const timeoutNumber = timeout ? Number(timeout) * 1000 : undefined
-        console.log(timeoutNumber)
         const result = role === "Read-Only"
             ? await graph.roQuery(query, { TIMEOUT: timeoutNumber })
             : await graph.query(query, { TIMEOUT: timeoutNumber })
