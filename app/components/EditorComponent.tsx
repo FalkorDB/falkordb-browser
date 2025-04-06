@@ -673,35 +673,33 @@ export default function EditorComponent({ historyQuery, maximize, runQuery, grap
                         {
                             showLimit &&
                             <div className="flex flex-col items-center gap-2">
-                                <div className="flex items-center gap-2">
-                                    <div className="h-full flex items-center border rounded-lg">
-                                        <Button
-                                            className="p-2 border-r"
-                                            onClick={() => setLimit(prev => prev + 1)}
-                                        >
-                                            <Plus size={20} />
-                                        </Button>
-                                        <Input
-                                            ref={inputLimitRef}
-                                            type="text"
-                                            className="text-center h-full bg-foreground rounded-none border-none text-white"
-                                            value={limit}
-                                            min={0}
-                                            onChange={(e) => {
-                                                const value = Number(e.target.value)
-                                                if (Number.isNaN(value)) return
-                                                setLimit(value)
-                                            }}
-                                            style={{ boxSizing: "content-box" }}
-                                        />
-                                        <span ref={spanLimitRef} className="absolute invisible whitespace-pre" />
-                                        <Button
-                                            className="p-2 border-l"
-                                            onClick={() => setLimit(prev => !prev ? prev : prev - 1)}
-                                        >
-                                            <Minus size={20} />
-                                        </Button>
-                                    </div>
+                                <div className="flex items-center border rounded-lg">
+                                    <Button
+                                        className="p-2 border-r"
+                                        onClick={() => setLimit(prev => prev + 1)}
+                                    >
+                                        <Plus size={20} />
+                                    </Button>
+                                    <Input
+                                        ref={inputLimitRef}
+                                        type="text"
+                                        className="text-center bg-foreground rounded-none border-none text-white"
+                                        value={limit}
+                                        min={0}
+                                        onChange={(e) => {
+                                            const value = Number(e.target.value)
+                                            if (Number.isNaN(value)) return
+                                            setLimit(value)
+                                        }}
+                                        style={{ boxSizing: "content-box" }}
+                                    />
+                                    <span ref={spanLimitRef} className="absolute invisible whitespace-pre" />
+                                    <Button
+                                        className="p-2 border-l"
+                                        onClick={() => setLimit(prev => !prev ? prev : prev - 1)}
+                                    >
+                                        <Minus size={20} />
+                                    </Button>
                                 </div>
                                 <Tooltip>
                                     <TooltipTrigger>
