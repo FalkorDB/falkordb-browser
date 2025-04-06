@@ -72,7 +72,7 @@ test.describe('Graph Tests', () => {
         });
     })
 
-    test.only(`@admin Validate that running a query with timeout returns an error`, async () => {
+    test(`@admin Validate that running a query with timeout returns an error`, async () => {
         const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
         const graphName = `graph_${Date.now()}`;
         await graph.addGraph(graphName);
