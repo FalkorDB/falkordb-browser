@@ -292,10 +292,10 @@ export default function EditorComponent({ historyQuery, maximize, runQuery, grap
         monacoI.editor.setTheme('custom-theme')
     }
 
-    const fetchSuggestions = async (q: string, detail: string): Promise<monaco.languages.CompletionItem[]> => {
+    const fetchSuggestions = async (detail: string): Promise<monaco.languages.CompletionItem[]> => {
         if (indicator === "offline") return []
 
-        const result = await securedFetch(`api/graph/${graphIdRef.current}/?query=${prepareArg(q)}`, {
+        const result = await securedFetch(`api/graph/${graphIdRef.current}/suggestions/?type=${prepareArg(detail)}`, {
             method: 'GET',
         }, toast, setIndicator)
 
@@ -325,10 +325,10 @@ export default function EditorComponent({ historyQuery, maximize, runQuery, grap
     }
 
     const getSuggestions = async () => (await Promise.all([
-        fetchSuggestions('CALL dbms.procedures() YIELD name as sug', '(function)'),
-        fetchSuggestions('CALL db.propertyKeys() YIELD propertyKey as sug', '(property key)'),
-        fetchSuggestions('CALL db.labels() YIELD label as sug', '(label)'),
-        fetchSuggestions('CALL db.relationshipTypes() YIELD relationshipType as sug', '(relationship type)')
+        fetchSuggestions('(function)'),
+        fetchSuggestions('(property key)'),
+        fetchSuggestions('(label)'),
+        fetchSuggestions('(relationship type)')
     ])).flat()
 
     const addSuggestions = async (monacoI: Monaco) => {
@@ -542,6 +542,10 @@ export default function EditorComponent({ historyQuery, maximize, runQuery, grap
                     let counter;
                     if (prev.counter !== 1) {
                         counter = prev.counter ? prev.counter - 1 : prev.queries.length;
+                        // Run provideCompletion when counter changes from 0 to queries.length
+                        if (!prev.counter && counter === prev.queries.length) {
+                            e.trigger('keyboard', 'editor.action.triggerSuggest', {});
+                        }
                     } else {
                         counter = 1;
                     }

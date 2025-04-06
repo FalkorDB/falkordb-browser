@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useContext, useState } from "react";
-import { defaultQuery, prepareArg, securedFetch } from "@/lib/utils";
+import { prepareArg, securedFetch } from "@/lib/utils";
 import { useSession } from "next-auth/react";
 import { useToast } from "@/components/ui/use-toast";
 import dynamic from "next/dynamic";
@@ -24,28 +24,22 @@ export default function Page() {
     const { indicator, setIndicator } = useContext(IndicatorContext);
 
     const fetchCount = useCallback(async () => {
-        const name = `${schemaName}_schema`
-        const q1 = "MATCH (n) RETURN COUNT(n) as nodes"
-        const q2 = "MATCH ()-[e]->() RETURN COUNT(e) as edges"
-
-        const nodes = await (await securedFetch(`api/graph/${prepareArg(name)}/?query=${q1}`, {
+        const result = await securedFetch(`api/schema/${prepareArg(schemaName)}/count`, {
             method: "GET"
-        }, toast, setIndicator)).json()
+        }, toast, setIndicator)
 
-        const edges = await (await securedFetch(`api/graph/${prepareArg(name)}/?query=${q2}`, {
-            method: "GET"
-        }, toast, setIndicator)).json()
+        if (!result) return
 
-        if (!edges || !nodes) return
+        const json = await result.json()
 
-        setEdgesCount(edges.result?.data[0].edges)
-        setNodesCount(nodes.result?.data[0].nodes)
+        setEdgesCount(json.result.edges)
+        setNodesCount(json.result.nodes)
     }, [schemaName, toast, setIndicator])
 
     useEffect(() => {
         if (!schemaName || indicator === "offline") return
         const run = async () => {
-            const result = await securedFetch(`/api/graph/${prepareArg(schemaName)}_schema/?query=${prepareArg(defaultQuery())}`, {
+            const result = await securedFetch(`/api/schema/${prepareArg(schemaName)}`, {
                 method: "GET"
             }, toast, setIndicator)
             if (!result.ok) return

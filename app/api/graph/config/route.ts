@@ -15,6 +15,6 @@ export async function GET() {
         return NextResponse.json({ configs }, { status: 200 })
     } catch (error) {
         console.error(error)
-        return NextResponse.json({ error: "Failed to get configs" }, { status: 500 })
+        return NextResponse.json({ error: (error as Error).message }, { status: 500 })
     }
 }
