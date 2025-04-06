@@ -192,6 +192,15 @@ const LINE_HEIGHT = 38
 
 const PLACEHOLDER = "Type your query here to start"
 
+function hasMainReturnLimit(query: string) {
+    // Regular expression to match the main RETURN statement followed by LIMIT
+    const regex = /RETURN\s+[^;]*?(LIMIT\s+\d+)?\s*$/i;
+    const match = query.match(regex);
+
+    // Check if the match has a LIMIT clause
+    return match && match[1] !== undefined;
+}
+
 export default function EditorComponent({ historyQuery, maximize, runQuery, graph, setHistoryQuery }: Props) {
 
     const { indicator, setIndicator } = useContext(IndicatorContext)
@@ -203,20 +212,33 @@ export default function EditorComponent({ historyQuery, maximize, runQuery, grap
     const [isLoading, setIsLoading] = useState(false)
     const [showTimeout, setShowTimeout] = useState(false)
     const [timeout, setTimeout] = useState(0)
-    const inputRef = useRef<HTMLInputElement>(null)
-    const spanRef = useRef<HTMLSpanElement>(null)
+    const [limit, setLimit] = useState(0)
+    const [showLimit, setShowLimit] = useState(false)
     const { toast } = useToast()
     const submitQuery = useRef<HTMLButtonElement>(null)
     const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null)
     const containerRef = useRef<HTMLDivElement>(null)
     const indicatorRef = useRef(indicator)
+    const inputTimeoutRef = useRef<HTMLInputElement>(null);
+    const spanTimeoutRef = useRef<HTMLSpanElement>(null);
+    const inputLimitRef = useRef<HTMLInputElement>(null);
+    const spanLimitRef = useRef<HTMLSpanElement>(null);
 
     useEffect(() => {
-        if (spanRef.current && inputRef.current) {
+        if (spanLimitRef.current && inputLimitRef.current) {
             // Set the span's text to the input's value
-            spanRef.current.textContent = timeout.toString() || ' ';
+            spanLimitRef.current.textContent = limit.toString() || ' ';
             // Adjust the input's width to match the span's width
-            inputRef.current.style.width = `${spanRef.current.offsetWidth}px`;
+            inputLimitRef.current.style.width = `${spanLimitRef.current.offsetWidth}px`;
+        }
+    }, [limit, showLimit]);
+
+    useEffect(() => {
+        if (spanTimeoutRef.current && inputTimeoutRef.current) {
+            // Set the span's text to the input's value
+            spanTimeoutRef.current.textContent = timeout.toString() || ' ';
+            // Adjust the input's width to match the span's width
+            inputTimeoutRef.current.style.width = `${spanTimeoutRef.current.offsetWidth}px`;
         }
     }, [timeout, showTimeout]);
 
@@ -399,7 +421,11 @@ export default function EditorComponent({ historyQuery, maximize, runQuery, grap
     const handleSubmit = async () => {
         try {
             setIsLoading(true)
-            await runQuery(historyQuery.query, timeout)
+            let q = historyQuery.query
+            if (limit !== 0 && !hasMainReturnLimit(historyQuery.query)) {
+                q = `${historyQuery.query} LIMIT ${limit}`
+            }
+            await runQuery(q, timeout)
         } finally {
             setIsLoading(false)
         }
@@ -593,9 +619,7 @@ export default function EditorComponent({ historyQuery, maximize, runQuery, grap
                 <Dialog>
                     <div className="w-full flex items-center gap-8">
                         <p>Query</p>
-                        <div
-                            className="w-1 grow flex rounded-lg overflow-hidden"
-                        >
+                        <div className="w-1 grow flex rounded-lg overflow-hidden">
                             <div ref={containerRef} className="relative grow w-1" id="editor-container">
                                 <Editor
                                     // eslint-disable-next-line no-nested-ternary
@@ -605,7 +629,7 @@ export default function EditorComponent({ historyQuery, maximize, runQuery, grap
                                         ...monacoOptions,
                                         lineNumbers: lineNumber > 1 ? "on" : "off",
                                     }}
-                                    value={(blur ? historyQuery.query.replace(/\s+/g, ' ').trim() : historyQuery.query)}
+                                    value={blur ? historyQuery.query.replace(/\s+/g, ' ').trim() : historyQuery.query}
                                     onChange={(val) => {
                                         if (!historyQuery.counter) {
                                             setHistoryQuery(prev => ({
@@ -624,8 +648,8 @@ export default function EditorComponent({ historyQuery, maximize, runQuery, grap
                                     beforeMount={handleEditorWillMount}
                                     onMount={handleEditorDidMount}
                                 />
-                                <div className="h-full absolute top-0 px-2 right-0 flex gap-2 items-center justify-center">
-                                    <DialogTrigger asChild>
+                                <div className="h-full absolute top-0 px-2 right-0 flex gap-2 items-center justify-center pointer-events-none">
+                                    <DialogTrigger className="pointer-events-auto" asChild>
                                         <Button
                                             title="Maximize"
                                         >
@@ -633,6 +657,7 @@ export default function EditorComponent({ historyQuery, maximize, runQuery, grap
                                         </Button>
                                     </DialogTrigger>
                                     <Button
+                                        className="pointer-events-auto"
                                         title="Run (Enter) History (Arrow Up/Down) Insert new line (Shift + Enter)"
                                     >
                                         <Info />
@@ -640,6 +665,11 @@ export default function EditorComponent({ historyQuery, maximize, runQuery, grap
                                     <Button
                                         label={showTimeout ? "Hide Timeout" : "Show Timeout"}
                                         onClick={() => setShowTimeout(prev => !prev)}
+                                        className="pointer-events-auto"
+                                    />
+                                    <Button
+                                        label={showLimit ? "Hide Limit" : "Show Limit"}
+                                        onClick={() => setShowLimit(!showLimit)}
                                     />
                                 </div>
                                 <div ref={placeholderRef} className="absolute top-2 left-2 pointer-events-none">
@@ -673,7 +703,7 @@ export default function EditorComponent({ historyQuery, maximize, runQuery, grap
                                         <Plus size={20} />
                                     </Button>
                                     <Input
-                                        ref={inputRef}
+                                        ref={inputTimeoutRef}
                                         type="text"
                                         className="text-center h-full bg-foreground rounded-none border-none text-white"
                                         value={timeout}
@@ -685,10 +715,48 @@ export default function EditorComponent({ historyQuery, maximize, runQuery, grap
                                         }}
                                         style={{ boxSizing: "content-box" }}
                                     />
-                                    <span ref={spanRef} className="absolute invisible whitespace-pre" />
+                                    <span ref={spanTimeoutRef} className="absolute invisible whitespace-pre" />
                                     <Button
                                         className="p-2 border-l"
                                         onClick={() => setTimeout(prev => !prev ? prev : prev - 1)}
+                                    >
+                                        <Minus size={20} />
+                                    </Button>
+                                </div>
+                            </div>
+                        }
+                        {
+                            showLimit &&
+                            <div className="flex items-center gap-2">
+                                <Button
+                                    title=""
+                                >
+                                    <Info />
+                                </Button>
+                                <div className="h-full flex items-center border rounded-lg">
+                                    <Button
+                                        className="p-2 border-r"
+                                        onClick={() => setLimit(prev => prev + 1)}
+                                    >
+                                        <Plus size={20} />
+                                    </Button>
+                                    <Input
+                                        ref={inputLimitRef}
+                                        type="text"
+                                        className="text-center h-full bg-foreground rounded-none border-none text-white"
+                                        value={limit}
+                                        min={0}
+                                        onChange={(e) => {
+                                            const value = Number(e.target.value)
+                                            if (Number.isNaN(value)) return
+                                            setLimit(value)
+                                        }}
+                                        style={{ boxSizing: "content-box" }}
+                                    />
+                                    <span ref={spanLimitRef} className="absolute invisible whitespace-pre" />
+                                    <Button
+                                        className="p-2 border-l"
+                                        onClick={() => setLimit(prev => !prev ? prev : prev - 1)}
                                     >
                                         <Minus size={20} />
                                     </Button>
@@ -753,6 +821,6 @@ export default function EditorComponent({ historyQuery, maximize, runQuery, grap
                     </div>
                 </Dialog>
             }
-        </div>
+        </div >
     )
 }
