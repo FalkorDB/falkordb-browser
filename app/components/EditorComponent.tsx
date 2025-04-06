@@ -11,6 +11,7 @@ import { Info, Maximize2, Minimize2, Minus, Plus } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { HistoryQuery, prepareArg, securedFetch } from "@/lib/utils";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Graph } from "../api/graph/model";
 import Button from "./ui/Button";
 import CloseDialog from "./CloseDialog";
@@ -217,15 +218,15 @@ export default function EditorComponent({ historyQuery, maximize, runQuery, grap
     const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null)
     const containerRef = useRef<HTMLDivElement>(null)
     const indicatorRef = useRef(indicator)
-    const inputRef = useRef<HTMLInputElement>(null);
-    const spanRef = useRef<HTMLSpanElement>(null);
-    
+    const inputLimitRef = useRef<HTMLInputElement>(null);
+    const spanLimitRef = useRef<HTMLSpanElement>(null);
+
     useEffect(() => {
-        if (spanRef.current && inputRef.current) {
+        if (spanLimitRef.current && inputLimitRef.current) {
             // Set the span's text to the input's value
-            spanRef.current.textContent = limit.toString() || ' ';
+            spanLimitRef.current.textContent = limit.toString() || ' ';
             // Adjust the input's width to match the span's width
-            inputRef.current.style.width = `${spanRef.current.offsetWidth}px`;
+            inputLimitRef.current.style.width = `${spanLimitRef.current.offsetWidth}px`;
         }
     }, [limit, showLimit]);
 
@@ -650,8 +651,8 @@ export default function EditorComponent({ historyQuery, maximize, runQuery, grap
                                     </Button>
                                     <Button
                                         className="pointer-events-auto"
-                                        label="Show Limit"
-                                        onClick={() => setShowLimit(!showLimit)}
+                                        label={showLimit ? "Hide Limit" : "Show Limit"}
+                                        onClick={() => setShowLimit(prev => !prev)}
                                     />
                                 </div>
                                 <div ref={placeholderRef} className="absolute top-2 left-2 pointer-events-none">
@@ -671,40 +672,45 @@ export default function EditorComponent({ historyQuery, maximize, runQuery, grap
                         </div>
                         {
                             showLimit &&
-                            <div className="flex items-center gap-2">
-                                <Button
-                                    title="Limit nodes in graph only if limit not set in query"
-                                >
-                                    <Info />
-                                </Button>
-                                <div className="h-full flex items-center border rounded-lg">
-                                    <Button
-                                        className="p-2 border-r"
-                                        onClick={() => setLimit(prev => prev + 1)}
-                                    >
-                                        <Plus size={20} />
-                                    </Button>
-                                    <Input
-                                        ref={inputRef}
-                                        type="text"
-                                        className="text-center h-full bg-foreground rounded-none border-none text-white"
-                                        value={limit}
-                                        min={0}
-                                        onChange={(e) => {
-                                            const value = Number(e.target.value)
-                                            if (Number.isNaN(value)) return
-                                            setLimit(value)
-                                        }}
-                                        style={{ boxSizing: "content-box" }}
-                                    />
-                                    <span ref={spanRef} className="absolute invisible whitespace-pre" />
-                                    <Button
-                                        className="p-2 border-l"
-                                        onClick={() => setLimit(prev => !prev ? prev : prev - 1)}
-                                    >
-                                        <Minus size={20} />
-                                    </Button>
+                            <div className="flex flex-col items-center gap-2">
+                                <div className="flex items-center gap-2">
+                                    <div className="h-full flex items-center border rounded-lg">
+                                        <Button
+                                            className="p-2 border-r"
+                                            onClick={() => setLimit(prev => prev + 1)}
+                                        >
+                                            <Plus size={20} />
+                                        </Button>
+                                        <Input
+                                            ref={inputLimitRef}
+                                            type="text"
+                                            className="text-center h-full bg-foreground rounded-none border-none text-white"
+                                            value={limit}
+                                            min={0}
+                                            onChange={(e) => {
+                                                const value = Number(e.target.value)
+                                                if (Number.isNaN(value)) return
+                                                setLimit(value)
+                                            }}
+                                            style={{ boxSizing: "content-box" }}
+                                        />
+                                        <span ref={spanLimitRef} className="absolute invisible whitespace-pre" />
+                                        <Button
+                                            className="p-2 border-l"
+                                            onClick={() => setLimit(prev => !prev ? prev : prev - 1)}
+                                        >
+                                            <Minus size={20} />
+                                        </Button>
+                                    </div>
                                 </div>
+                                <Tooltip>
+                                    <TooltipTrigger>
+                                        <p>Limit</p>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                        Limit nodes in graph only if limit not set in query
+                                    </TooltipContent>
+                                </Tooltip>
                             </div>
                         }
                         <DialogContent disableClose className="w-full h-full">
