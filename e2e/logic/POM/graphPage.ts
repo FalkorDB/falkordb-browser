@@ -74,7 +74,7 @@ export default class GraphPage extends BasePage {
         return this.page.locator("//button[text()='Run']");
     }
 
-    private get canvasElement(): Locator {
+    protected get canvasElement(): Locator {
         return this.page.locator("//div[contains(@class, 'force-graph-container')]//canvas");
     }
 
@@ -130,10 +130,6 @@ export default class GraphPage extends BasePage {
         return (graph: string) => this.page.locator(`//table//tbody/tr[@data-id='${graph}']//td[2]//button[1]`);
     }
 
-    private get graphsearchInCombobox(): Locator {
-        return this.page.locator("//div[@id='graphSearch']//input");
-    }
-
     private get valueCellByAttributeInDataPanel(): (attribute: string) => Locator {
         return (attribute: string) => this.page.locator(`//div[contains(@id, 'graphDataPanel')]//tbody//tr[td[contains(text(), '${attribute}')]]/td[last()]/button`);
     }
@@ -144,6 +140,12 @@ export default class GraphPage extends BasePage {
 
     private get edgesGraphStats(): Locator {
         return this.page.locator("//div[@id='graphStats']//span[2]");
+    }
+
+    async insertGraphInSearchInput(graph: string): Promise<void>{
+        const isVisible = await waitForElementToBeVisible(this.graphSelectSearchInput);
+        if (!isVisible) throw new Error("graph search input is not visible!");
+        await this.graphSelectSearchInput.fill(graph);
     }
 
     async countGraphsInMenu(): Promise<number> {
@@ -251,7 +253,7 @@ export default class GraphPage extends BasePage {
     }
 
     async selectGraphFromList(graph: string): Promise<void> {
-        await this.graphSelectSearchInput.fill(graph);
+        await this.insertGraphInSearchInput(graph);
         const graphLocator = this.selectGraphList(graph);
         const isVisible = await waitForElementToBeVisible(graphLocator);
         if (!isVisible) throw new Error("select Graph From List button is not visible!");
@@ -260,7 +262,6 @@ export default class GraphPage extends BasePage {
 
     async selectExistingGraph(graph: string, role?: string): Promise<void>{
         await this.clickOnSelectBtnFromGraphManager(role);
-        await this.graphsearchInCombobox.fill(graph);
         await this.selectGraphFromList(graph);
     }
 

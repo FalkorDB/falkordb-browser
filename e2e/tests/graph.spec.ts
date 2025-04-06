@@ -146,7 +146,7 @@ test.describe('Graph Tests', () => {
     });
 
     test(`@readwrite Validate that running multiple queries updates the node and edge count correctly`, async () => {
-        const graphName = `graph_${crypto.randomUUID()}`;
+        const graphName = getRandomString('graph');
         await apicalls.addGraph(graphName);
         const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
         await browser.setPageToFullScreen();
