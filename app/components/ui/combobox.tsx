@@ -104,14 +104,14 @@ export default function Combobox({ isSelectGraph = false, disabled = false, inTa
           </TooltipContent>
         </Tooltip>
         <SelectContent className="min-w-52 max-h-[40lvh] bg-foreground">
-          <div className="p-4" id="graphSearch">
+          <div className="p-4" id={`${label}Search`}>
             <Input ref={ref => ref?.focus()} className="w-full" placeholder={`Search for a ${label}`} onChange={(e) => {
               setSearch(e.target.value)
               setMaxOptions(5)
             }} value={search} />
           </div>
           <SelectGroup>
-            <ul className="shrink grow overflow-auto" id="graphsList">
+            <ul className="shrink grow overflow-auto" id={`${label}List`}>
               {selectedValue && (
                 <SelectItem value={selectedValue}>
                   {selectedValue}
