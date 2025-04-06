@@ -11,6 +11,7 @@ import { Info, Maximize2, Minimize2, Minus, Plus } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { HistoryQuery, prepareArg, securedFetch } from "@/lib/utils";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Graph } from "../api/graph/model";
 import Button from "./ui/Button";
 import CloseDialog from "./CloseDialog";
@@ -203,8 +204,8 @@ export default function EditorComponent({ historyQuery, maximize, runQuery, grap
     const [isLoading, setIsLoading] = useState(false)
     const [showTimeout, setShowTimeout] = useState(false)
     const [timeout, setTimeout] = useState(0)
-    const inputRef = useRef<HTMLInputElement>(null)
-    const spanRef = useRef<HTMLSpanElement>(null)
+    const inputTimeoutRef = useRef<HTMLInputElement>(null)
+    const spanTimeoutRef = useRef<HTMLSpanElement>(null)
     const { toast } = useToast()
     const submitQuery = useRef<HTMLButtonElement>(null)
     const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null)
@@ -212,11 +213,11 @@ export default function EditorComponent({ historyQuery, maximize, runQuery, grap
     const indicatorRef = useRef(indicator)
 
     useEffect(() => {
-        if (spanRef.current && inputRef.current) {
+        if (spanTimeoutRef.current && inputTimeoutRef.current) {
             // Set the span's text to the input's value
-            spanRef.current.textContent = timeout.toString() || ' ';
+            spanTimeoutRef.current.textContent = timeout.toString() || ' ';
             // Adjust the input's width to match the span's width
-            inputRef.current.style.width = `${spanRef.current.offsetWidth}px`;
+            inputTimeoutRef.current.style.width = `${spanTimeoutRef.current.offsetWidth}px`;
         }
     }, [timeout, showTimeout]);
 
@@ -659,12 +660,7 @@ export default function EditorComponent({ historyQuery, maximize, runQuery, grap
                         </div>
                         {
                             showTimeout &&
-                            <div className="flex items-center gap-2">
-                                <Button
-                                    title="Timeout value in seconds"
-                                >
-                                    <Info />
-                                </Button>
+                            <div className="flex flex-col items-center gap-2">
                                 <div className="h-full flex items-center border rounded-lg">
                                     <Button
                                         className="p-2 border-r"
@@ -673,7 +669,7 @@ export default function EditorComponent({ historyQuery, maximize, runQuery, grap
                                         <Plus size={20} />
                                     </Button>
                                     <Input
-                                        ref={inputRef}
+                                        ref={inputTimeoutRef}
                                         type="text"
                                         className="text-center h-full bg-foreground rounded-none border-none text-white"
                                         value={timeout}
@@ -685,7 +681,7 @@ export default function EditorComponent({ historyQuery, maximize, runQuery, grap
                                         }}
                                         style={{ boxSizing: "content-box" }}
                                     />
-                                    <span ref={spanRef} className="absolute invisible whitespace-pre" />
+                                    <span ref={spanTimeoutRef} className="absolute invisible whitespace-pre" />
                                     <Button
                                         className="p-2 border-l"
                                         onClick={() => setTimeout(prev => !prev ? prev : prev - 1)}
@@ -693,6 +689,14 @@ export default function EditorComponent({ historyQuery, maximize, runQuery, grap
                                         <Minus size={20} />
                                     </Button>
                                 </div>
+                                <Tooltip>
+                                    <TooltipTrigger>
+                                        <p>Timeout</p>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                        Timeout value in seconds
+                                    </TooltipContent>
+                                </Tooltip>
                             </div>
                         }
                         <DialogContent disableClose className="w-full h-full">
