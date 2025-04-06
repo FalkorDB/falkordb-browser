@@ -405,7 +405,11 @@ export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement,
                                                     </>
                                                     : hover === key &&
                                                     <>
-                                                        <Button variant="button" onClick={() => handleSetEditable(key, obj.data[key])}>
+                                                        <Button
+                                                            variant="button"
+                                                            onClick={() => handleSetEditable(key, obj.data[key])}
+                                                            disabled={isAddValue}
+                                                        >
                                                             <Pencil size={20} />
                                                         </Button>
                                                         <DialogComponent
@@ -507,6 +511,7 @@ export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement,
                     {
                         session?.user?.role !== "Read-Only" &&
                         <Button
+                            disabled={attributes.some((key) => key === editable)}
                             variant="Primary"
                             label="Add Attribute"
                             title="Add a new attribute"
