@@ -180,7 +180,6 @@ export async function getClient() {
 
     // If client is not found, create a new one
     if (!connection) {
-        console.log("Creating new client");
         connection = (await newClient({
             host: user.host,
             port: user.port.toString() ?? "6379",
