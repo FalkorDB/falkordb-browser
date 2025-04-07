@@ -71,7 +71,20 @@ test.describe('Graph Tests', () => {
             await apicalls.removeGraph(graphName);
         });
     })
-    
+
+    test(`@admin Validate that running a query with timeout returns an error`, async () => {
+        const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+        const graphName = `graph_${Date.now()}`;
+        await graph.addGraph(graphName);
+        await graph.addTimeout();
+        const query = `UNWIND range(1, 100000000) as x RETURN count(x)`;
+        await graph.insertQuery(query);
+        await graph.clickRunQuery(false);
+        await graph.waitForRunQueryToBeEnabled();
+        expect(await graph.getErrorNotification()).toBe(true);
+        await apicalls.removeGraph(graphName);
+    });
+
     test(`@admin Validate that running a query in the UI saves it in the query history`, async () => {
         const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
         await browser.setPageToFullScreen();
