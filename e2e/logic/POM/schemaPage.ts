@@ -106,6 +106,14 @@ export default class SchemaPage extends GraphPage {
         return this.page.locator('//div[contains(@class, "DataPanel")]//tbody//tr');
     }
 
+    private get deleteNodeInDataPanel(): Locator {
+        return this.page.locator('//div[contains(@class, "DataPanel")]//button[contains(text(), "Delete Node")]');
+    }
+
+    private get confirmDeleteNodeInDataPanel(): Locator {
+        return this.page.locator('//div[@role="dialog"]//button[contains(text(), "Delete")]');
+    }
+
     async clickAddNewSchemaBtn(): Promise<void>{
         const isVisible = await waitForElementToBeVisible(this.addSchemaBtnInNavBar);
         if (!isVisible) throw new Error("add new schema button is not visible!");
@@ -251,6 +259,19 @@ export default class SchemaPage extends GraphPage {
         return count;
     }
 
+    async clickDeleteNodeInDataPanel(): Promise<void>{
+        const isVisible = await waitForElementToBeVisible(this.deleteNodeInDataPanel);
+        if (!isVisible) throw new Error("attribute rows in data panel is not visible!");
+        await this.deleteNodeInDataPanel.click();
+    }
+
+    async clickConfirmDeleteNodeInDataPanel(): Promise<void>{
+        const isVisible = await waitForElementToBeVisible(this.confirmDeleteNodeInDataPanel);
+        if (!isVisible) throw new Error("confirm delete in data panel is not visible!");
+        await this.confirmDeleteNodeInDataPanel.click();
+    }
+
+
     async addSchema(schemaName: string): Promise<void> {
         await this.clickAddNewSchemaBtn();
         await this.fillSchemaNameInput(schemaName);
@@ -266,8 +287,13 @@ export default class SchemaPage extends GraphPage {
         await this.clickCreateNewNodeBtnInDataPanel();
     }
 
-    async deleteNode(node: string): Promise<void>{
-
+    async deleteNode(x: number, y: number): Promise<void>{
+        await this.nodeClick(x, y);
+        await this.clickDeleteNodeInDataPanel();
+        await Promise.all([
+            this.page.waitForResponse(res => res.status() === 200),
+            this.clickConfirmDeleteNodeInDataPanel()
+          ]);          
     }
 
     async addRelation(title: string, key: string, type: string, desc: string, unique: boolean, required: boolean): Promise<void> {
