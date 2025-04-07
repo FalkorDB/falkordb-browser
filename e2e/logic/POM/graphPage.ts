@@ -74,7 +74,7 @@ export default class GraphPage extends BasePage {
         return this.page.locator("//button[text()='Run']");
     }
 
-    private get canvasElement(): Locator {
+    protected get canvasElement(): Locator {
         return this.page.locator("//div[contains(@class, 'force-graph-container')]//canvas");
     }
 

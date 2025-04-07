@@ -320,7 +320,7 @@ export default function SchemaDataPanel({ obj, onExpand, onDeleteElement, schema
 
     return (
         <div className="DataPanel">
-            <div className="w-full flex justify-between items-center p-4">
+            <div className="w-full flex justify-between items-center p-4" id="headerDataPanel">
                 <div className="flex gap-4 items-center">
                     <Button
                         onClick={() => onExpand()}

@@ -150,7 +150,7 @@ export default function SchemaCreateElement({ onCreate, onExpand, selectedNodes,
 
   return (
     <div className="DataPanel">
-      <div className="w-full flex justify-between items-center p-4">
+      <div className="w-full flex justify-between items-center p-4" id="headerDataPanel">
         <div className="flex gap-4 items-center">
           <Button
             onClick={() => onExpand()}
