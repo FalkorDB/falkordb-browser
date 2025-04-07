@@ -680,12 +680,14 @@ export default function EditorComponent({ historyQuery, maximize, runQuery, grap
                             <div className="flex flex-col items-center gap-2">
                                 <div className="flex items-center border rounded-lg">
                                     <Button
+                                        title="Increase Limit"
                                         className="p-2 border-r"
                                         onClick={() => setLimit(prev => prev + 1)}
                                     >
                                         <Plus size={20} />
                                     </Button>
                                     <Input
+                                        id="limitInput"
                                         ref={inputLimitRef}
                                         type="text"
                                         className="text-center bg-foreground rounded-none border-none text-white"
@@ -702,6 +704,7 @@ export default function EditorComponent({ historyQuery, maximize, runQuery, grap
                                     <Button
                                         className="p-2 border-l"
                                         onClick={() => setLimit(prev => !prev ? prev : prev - 1)}
+                                        title="Decrease Limit"
                                     >
                                         <Minus size={20} />
                                     </Button>

@@ -71,7 +71,54 @@ test.describe('Graph Tests', () => {
             await apicalls.removeGraph(graphName);
         });
     })
-    
+
+    test.only(`@admin Validate that running a query with limit returns limited results`, async () => {
+        const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+        const graphName = `graph_${Date.now()}`;
+        await graph.addGraph(graphName);
+        await graph.insertQuery("UNWIND range(1, 20) as x CREATE (n:n)-[e:e]->(m:m) RETURN *");
+        await graph.addLimit(10);
+        let [result] = await Promise.all([
+            graph.waitForResponse(`${urls.api.graphUrl}${graphName}?query=UNWIND%20range(1%2C%2020)%20as%20x%20CREATE%20(n%3An)-%5Be%3Ae%5D-%3E(m%3Am)%20RETURN%20*%20LIMIT%2010`),
+            graph.clickRunQuery(false),
+        ]);
+        let json = await result.json();
+
+        if (typeof json.result === "number") {
+
+            [result] = await Promise.all([
+                graph.waitForResponse(`${urls.api.graphUrl}${graphName}/query?id=${json.result}`),
+            ])
+            json = await result.json();
+        }
+
+        expect(json.result.data.length).toBe(10);
+        await apicalls.removeGraph(graphName);
+    });
+
+    test.only(`@admin Validate that running a query with limit inside the query returns limited results ad override the limit in the UI input`, async () => {
+        const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+        const graphName = `graph_${Date.now()}`;
+        await graph.addGraph(graphName);
+        await graph.insertQuery("UNWIND range(1, 20) as x CREATE (n:n)-[e:e]->(m:m) RETURN * LIMIT 15");
+        await graph.addLimit(10);
+        let [result] = await Promise.all([
+            graph.waitForResponse(`${urls.api.graphUrl}${graphName}?query=UNWIND%20range(1%2C%2020)%20as%20x%20CREATE%20(n%3An)-%5Be%3Ae%5D-%3E(m%3Am)%20RETURN%20*%20LIMIT%2015`),
+            graph.clickRunQuery(false),
+        ]);
+        let json = await result.json();
+
+        if (typeof json.result === "number") {
+            [result] = await Promise.all([
+                graph.waitForResponse(`${urls.api.graphUrl}${graphName}/query?id=${json.result}`),
+            ])
+            json = await result.json();
+        }
+
+        expect(json.result.data.length).toBe(15);
+        await apicalls.removeGraph(graphName);
+    });
+
     test(`@admin Validate that running a query in the UI saves it in the query history`, async () => {
         const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
         await browser.setPageToFullScreen();
@@ -81,7 +128,7 @@ test.describe('Graph Tests', () => {
         await graph.clickRunQuery(false);
         await graph.clickOnQueryHistory();
         expect(await graph.getQueryHistory("1")).toBe(true);
-        await apicalls.removeGraph(graphName);         
+        await apicalls.removeGraph(graphName);
     });
 
     test(`@admin Validate that executing a query from the query history correctly displays the results in the canvas`, async () => {
@@ -96,7 +143,7 @@ test.describe('Graph Tests', () => {
         await graph.searchForElementInCanvas(searchQuery);
         await graph.hoverAtCanvasCenter();
         expect(await graph.getNodeCanvasToolTip()).toBe(searchQuery);
-        await apicalls.removeGraph(graphName);        
+        await apicalls.removeGraph(graphName);
     });
 
     test(`@admin verify query selection from history displays the correct query`, async () => {
@@ -117,7 +164,7 @@ test.describe('Graph Tests', () => {
         await apicalls.addGraph(testGraphName);
         const response = await apicalls.runQuery(testGraphName, BATCH_CREATE_PERSONS_APIREQ ?? "");
         const apiMetadata = response.result.metadata;
-        
+
         const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
         await browser.setPageToFullScreen();
         const graphName = `graph_${Date.now()}`;
@@ -126,7 +173,7 @@ test.describe('Graph Tests', () => {
         await graph.clickRunQuery(false);
         await graph.clickOnQueryHistory();
         await graph.ClickOnSelectQueryInHistoryBtn("1");
-        const queryDetails  = await graph.getQueryHistoryPanel();
+        const queryDetails = await graph.getQueryHistoryPanel();
         queryDetails.forEach(uiValue => {
             expect(apiMetadata).toContain(uiValue);
         });

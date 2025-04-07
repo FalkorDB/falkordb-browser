@@ -15,7 +15,7 @@ export default class GraphPage extends BasePage {
     }
 
     private get manageGraphBtn(): Locator {
-      return this.page.locator("//button[contains(text(), 'Manage Graphs')]")
+        return this.page.locator("//button[contains(text(), 'Manage Graphs')]")
     }
 
     private get deleteGraphBtn(): Locator {
@@ -76,6 +76,22 @@ export default class GraphPage extends BasePage {
 
     private get canvasElement(): Locator {
         return this.page.locator("//div[contains(@class, 'force-graph-container')]//canvas");
+    }
+
+    private get showLimitBtn(): Locator {
+        return this.page.getByRole("button", { name: "Show Limit" });
+    }
+
+    private get limitInput(): Locator {
+        return this.page.locator("#limitInput");
+    }
+
+    private get increaseLimitBtn(): Locator {
+        return this.page.getByRole("button", { name: "Increase Limit" });
+    }
+
+    private get decreaseLimitBtn(): Locator {
+        return this.page.getByRole("button", { name: "Decrease Limit" });
     }
 
     private get selectBtnFromGraphManager(): (buttonNumber: string) => Locator {
@@ -231,13 +247,13 @@ export default class GraphPage extends BasePage {
         await this.deleteGraphConfirmBtn.click();
     }
 
-    async getErrorNotification(): Promise<boolean>{
+    async getErrorNotification(): Promise<boolean> {
         await this.page.waitForTimeout(500);
         const isVisible = await this.errorNotification.isVisible();
         return isVisible;
     }
 
-    async insertQuery(query: string): Promise<void>{
+    async insertQuery(query: string): Promise<void> {
         await this.queryInput.click();
         await this.page.keyboard.type(query);
     }
@@ -249,15 +265,15 @@ export default class GraphPage extends BasePage {
         if (waitForAnimation) {
             await this.waitForCanvasAnimationToEnd();
         }
-    }    
+    }
 
-    async nodeClick(x: number, y: number): Promise<void> {  
+    async nodeClick(x: number, y: number): Promise<void> {
         await this.canvasElement.hover({ position: { x, y } });
         await this.page.waitForTimeout(500);
         await this.canvasElement.click({ position: { x, y }, button: 'right' });
     }
 
-    async clickOnSelectBtnFromGraphManager(role: string = "admin"): Promise<void>{
+    async clickOnSelectBtnFromGraphManager(role: string = "admin"): Promise<void> {
         const index = role === 'readonly' ? "2" : "3";
         const isSelectBtnFromGraphManager = await waitForElementToBeVisible(this.selectBtnFromGraphManager(index));
         if (!isSelectBtnFromGraphManager) throw new Error("select from graph manager button is not visible!");
@@ -272,78 +288,78 @@ export default class GraphPage extends BasePage {
         await graphLocator.click();
     }
 
-    async selectExistingGraph(graph: string, role?: string): Promise<void>{
+    async selectExistingGraph(graph: string, role?: string): Promise<void> {
         await this.clickOnSelectBtnFromGraphManager(role);
         await this.selectGraphFromList(graph);
     }
 
-    async insertElementInCanvasSearch(node: string): Promise<void>{
+    async insertElementInCanvasSearch(node: string): Promise<void> {
         const isCanvasElementSearchInput = await waitForElementToBeVisible(this.canvasElementSearchInput);
         if (!isCanvasElementSearchInput) throw new Error("canvas element search input is not visible!");
         await this.canvasElementSearchInput.fill(node);
     }
 
-    async clickOnElementSearchInCanvas(): Promise<void>{
+    async clickOnElementSearchInCanvas(): Promise<void> {
         const isCanvasElementSearchBtn = await waitForElementToBeVisible(this.canvasElementSearchBtn);
         if (!isCanvasElementSearchBtn) throw new Error("canvas element search button is not visible!");
         await this.canvasElementSearchBtn.click();
     }
 
-    async searchForElementInCanvas(node: string): Promise<void>{
+    async searchForElementInCanvas(node: string): Promise<void> {
         await this.insertElementInCanvasSearch(node);
         await this.clickOnElementSearchInCanvas();
         await this.waitForCanvasAnimationToEnd();
     }
 
-    async isNodeCanvasToolTip(): Promise<boolean>{
+    async isNodeCanvasToolTip(): Promise<boolean> {
         await this.page.waitForTimeout(500);
         const isVisible = await this.nodeCanvasToolTip.isVisible();
         return isVisible;
     }
 
-    async getNodeCanvasToolTip(): Promise<string | null>{
+    async getNodeCanvasToolTip(): Promise<string | null> {
         await this.page.waitForTimeout(500);
         const toolTipText = await this.nodeCanvasToolTip.textContent();
         return toolTipText;
     }
 
-    async reloadGraphList(role: string = "admin"): Promise<void>{
+    async reloadGraphList(role: string = "admin"): Promise<void> {
         const index = role === 'readonly' ? "1" : "2";
         const isVisible = await waitForElementToBeVisible(this.reloadGraphListBtn(index));
         if (!isVisible) throw new Error("reload graph button is not visible!");
         await this.reloadGraphListBtn(index).click();
     }
 
-    async clickOnZoomIn(): Promise<void>{
+    async clickOnZoomIn(): Promise<void> {
         const isVisible = await waitForElementToBeVisible(this.zoomInBtn);
         if (!isVisible) throw new Error("zoom in button is not visible!");
         await this.zoomInBtn.click();
     }
 
-    async clickOnZoomOut(): Promise<void>{
+    async clickOnZoomOut(): Promise<void> {
         const isVisible = await waitForElementToBeVisible(this.zoomOutBtn);
         if (!isVisible) throw new Error("zoom out button is not visible!");
         await this.zoomOutBtn.click();
     }
 
-    async clickOnFitToSize(): Promise<void>{
+    async clickOnFitToSize(): Promise<void> {
         const isVisible = await waitForElementToBeVisible(this.fitToSizeBtn);
         if (!isVisible) throw new Error("fit to size button is not visible!");
         await this.fitToSizeBtn.click();
         await this.waitForCanvasAnimationToEnd();
     }
-    
+
     async getGraphDetails(): Promise<any[]> {
         await this.page.waitForTimeout(2000);
-    
+
         const graphData = await this.page.evaluate(() => {
             return (window as any).graph;
         });
-    
+
         let transformData: any = null;
         for (let attempt = 0; attempt < 3; attempt++) {
             await this.page.waitForTimeout(1000);
-    
+
             transformData = await this.canvasElement.evaluate((canvas: HTMLCanvasElement) => {
                 const rect = canvas.getBoundingClientRect();
                 const ctx = canvas.getContext('2d');
@@ -353,13 +369,13 @@ export default class GraphPage extends BasePage {
                     transform: ctx?.getTransform() || null,
                 };
             });
-    
+
             if (transformData.transform) break;
             console.warn(`Attempt ${attempt + 1}: Transform data not available, retrying...`);
         }
-    
+
         if (!transformData?.transform) throw new Error("Canvas transform data not available!");
-    
+
         const { a, e, d, f } = transformData.transform;
         return graphData.elements.nodes.map((node: any) => ({
             ...node,
@@ -367,7 +383,7 @@ export default class GraphPage extends BasePage {
             screenY: transformData.top + node.y * d + f - 380,
         }));
     }
-    
+
     /* QUERY History */
 
     async clickOnQueryHistory(): Promise<void> {
@@ -418,7 +434,7 @@ export default class GraphPage extends BasePage {
 
     async getQueryHistoryPanel(): Promise<string[]> {
         const rawText = await this.queryHistoryPanel.allTextContents();
-    
+
         if (!rawText || rawText.length === 0) {
             return [];
         }
@@ -428,10 +444,10 @@ export default class GraphPage extends BasePage {
             .split('\n')
             .map(line => line.trim())
             .filter(line => line.length > 0);
-    
+
         return formattedText;
     }
-    
+
     /* End of QUERY History */
 
     async changeNodePosition(x: number, y: number): Promise<void> {
@@ -463,32 +479,32 @@ export default class GraphPage extends BasePage {
         const centerY = boundingBox.y + boundingBox.height / 2;
         await this.page.mouse.move(centerX, centerY);
     }
-    
+
     async waitForCanvasAnimationToEnd(timeout = 15000, checkInterval = 500): Promise<void> {
         const canvasHandle = await this.canvasElement.elementHandle();
-    
+
         if (!canvasHandle) {
             throw new Error("Canvas element not found!");
         }
-    
+
         await this.page.waitForFunction(
             async ({ canvas, checkInterval, timeout }) => {
                 const ctx = canvas.getContext('2d');
                 if (!ctx) return false;
-    
+
                 const width = canvas.width;
                 const height = canvas.height;
-    
+
                 let previousData = ctx.getImageData(0, 0, width, height).data;
                 const startTime = Date.now();
-    
+
                 return new Promise<boolean>((resolve) => {
                     const checkCanvas = () => {
                         if (Date.now() - startTime > timeout) {
                             resolve(true);
                             return;
                         }
-    
+
                         setTimeout(() => {
                             const currentData = ctx.getImageData(0, 0, width, height).data;
                             if (JSON.stringify(previousData) === JSON.stringify(currentData)) {
@@ -502,7 +518,7 @@ export default class GraphPage extends BasePage {
                     checkCanvas();
                 });
             },
-            { 
+            {
                 canvas: await canvasHandle.evaluateHandle((el) => el as HTMLCanvasElement),
                 checkInterval,
                 timeout
@@ -522,4 +538,15 @@ export default class GraphPage extends BasePage {
         });
         return { scaleX, scaleY };
     }
+
+    async addLimit(limit?: number): Promise<void> {
+        await this.showLimitBtn.click();
+        if (limit) {
+            await this.limitInput.fill(limit.toString());
+        } else {
+            await this.increaseLimitBtn.click();
+        }
+    }
+
+
 }

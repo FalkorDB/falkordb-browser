@@ -19,4 +19,9 @@ export default class BasePage {
         await this.page.reload({ waitUntil: 'networkidle' });
     }
 
+    async waitForResponse(url: string) {
+        const response = await this.page.waitForResponse(url);
+        return response;
+    }
+
 }
