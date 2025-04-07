@@ -5,7 +5,7 @@
 /* eslint-disable arrow-body-style */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { Locator, Download } from "@playwright/test";
-import { waitForElementToBeVisible, waitForTimeOut } from "@/e2e/infra/utils";
+import {interactWhenVisible, waitForElementToBeVisible } from "@/e2e/infra/utils";
 import GraphPage from "./graphPage";
 
 export default class SchemaPage extends GraphPage {
@@ -114,163 +114,137 @@ export default class SchemaPage extends GraphPage {
         return this.page.locator('//div[@role="dialog"]//button[contains(text(), "Delete")]');
     }
 
-    async clickAddNewSchemaBtn(): Promise<void>{
-        const isVisible = await waitForElementToBeVisible(this.addSchemaBtnInNavBar);
-        if (!isVisible) throw new Error("add new schema button is not visible!");
-        await this.addSchemaBtnInNavBar.click();
+    private get categoriesPanelBtn(): Locator {
+        return this.page.locator('//div[contains(@id, "CategoriesPanel")]//button');
     }
 
-    async fillSchemaNameInput(schemaName: string): Promise<void>{
-        const isVisible = await waitForElementToBeVisible(this.schemahNameInput);
-        if (!isVisible) throw new Error("schema name input is not visible!");
-        await this.schemahNameInput.fill(schemaName);
+    private get relationshipTypesPanelBtn(): Locator {
+        return this.page.locator('//div[contains(@id, "RelationshipTypesPanel")]//button');
     }
 
-    async clickCreateSchemaBtn(): Promise<void>{
-        const isVisible = await waitForElementToBeVisible(this.createSchemaBtn);
-        if (!isVisible) throw new Error("create schema button is not visible!");
-        await this.createSchemaBtn.click();
+    async clickAddNewSchemaBtn(): Promise<void> {
+        await interactWhenVisible(this.addSchemaBtnInNavBar, el => el.click(), "add new schema button");
     }
-
-    async clickAddNode(): Promise<void>{
-        const isVisible = await waitForElementToBeVisible(this.addNodeBtn);
-        if (!isVisible) throw new Error("Add Node button is not visible!");
-        await this.addNodeBtn.click();
+      
+    async fillSchemaNameInput(schemaName: string): Promise<void> {
+        await interactWhenVisible(this.schemahNameInput, el => el.fill(schemaName), "schema name input");
     }
-
-    async clickAddRelation(): Promise<void>{
-        const isVisible = await waitForElementToBeVisible(this.addRelationBtn);
-        if (!isVisible) throw new Error("Add Relation button is not visible!");
-        await this.addRelationBtn.click();
+      
+    async clickCreateSchemaBtn(): Promise<void> {
+        await interactWhenVisible(this.createSchemaBtn, el => el.click(), "create schema button");
     }
-
-    async clickCloseBtnInHeaderDataPanel(): Promise<void>{
-        const isVisible = await waitForElementToBeVisible(this.closeBtnInHeaderDataPanel);
-        if (!isVisible) throw new Error("close button in header data panels is not visible!");
-        await this.closeBtnInHeaderDataPanel.click();
+      
+    async clickAddNode(): Promise<void> {
+        await interactWhenVisible(this.addNodeBtn, el => el.click(), "add node button");
     }
-
-    async clickAddBtnInHeaderDataPanel(): Promise<void>{
-        const isVisible = await waitForElementToBeVisible(this.addBtnInHeaderDataPanel);
-        if (!isVisible) throw new Error("Add button in header data panels is not visible!");
-        await this.addBtnInHeaderDataPanel.click();
+      
+    async clickAddRelation(): Promise<void> {
+        await interactWhenVisible(this.addRelationBtn, el => el.click(), "add relation button");
     }
-
-    async insertDataPanelHeader(title: string): Promise<void>{
-        const isVisible = await waitForElementToBeVisible(this.dataPanelHeaderInput);
-        if (!isVisible) throw new Error("data panel header input is not visible!");
-        await this.dataPanelHeaderInput.fill(title);
+      
+    async clickCloseBtnInHeaderDataPanel(): Promise<void> {
+        await interactWhenVisible(this.closeBtnInHeaderDataPanel, el => el.click(), "close button in header data panel");
     }
-
-    async clickSaveBtnInHeaderDataPanel(): Promise<void>{
-        const isVisible = await waitForElementToBeVisible(this.saveBtnInHeaderDataPanel);
-        if (!isVisible) throw new Error("save button in header data panel is not visible!");
-        await this.saveBtnInHeaderDataPanel.click();
+      
+    async clickAddBtnInHeaderDataPanel(): Promise<void> {
+        await interactWhenVisible(this.addBtnInHeaderDataPanel, el => el.click(), "add button in header data panel");
     }
-
-    async insertActiveKeyInputInDataPanelAttr(key: string): Promise<void>{
-        const isVisible = await waitForElementToBeVisible(this.activekeyInputInDataPanel);
-        if (!isVisible) throw new Error("active key input in data panel is not visible!");
-        await this.activekeyInputInDataPanel.fill(key);
+      
+    async insertDataPanelHeader(title: string): Promise<void> {
+        await interactWhenVisible(this.dataPanelHeaderInput, el => el.fill(title), "data panel header input");
     }
-
-    async getKeyInDataPanelAttr(keyIndex: string): Promise<string | null>{
-        const isVisible = await waitForElementToBeVisible(this.keyInDataPanel(keyIndex));
-        if (!isVisible) throw new Error("key input in data panel is not visible!");
-        return await this.keyInDataPanel(keyIndex).textContent();
+      
+    async clickSaveBtnInHeaderDataPanel(): Promise<void> {
+        await interactWhenVisible(this.saveBtnInHeaderDataPanel, el => el.click(), "save button in header data panel");
     }
-
-    async insertActiveDescInputInDataPanelAttr(desc: string): Promise<void>{
-        const isVisible = await waitForElementToBeVisible(this.activeDescInputInDataPanel);
-        if (!isVisible) throw new Error("desc input in data panel is not visible!");
-        await this.activeDescInputInDataPanel.fill(desc);
+      
+    async insertActiveKeyInputInDataPanelAttr(key: string): Promise<void> {
+        await interactWhenVisible(this.activekeyInputInDataPanel, el => el.fill(key), "active key input in data panel");
     }
-
-    async getDescInDataPanelAttr(descIndex: string): Promise<string | null>{
-        const isVisible = await waitForElementToBeVisible(this.descInDataPanel(descIndex));
-        if (!isVisible) throw new Error("desc input in data panel is not visible!");
-        return await this.descInDataPanel(descIndex).textContent();
+      
+    async getKeyInDataPanelAttr(keyIndex: string): Promise<string | null> {
+        return await interactWhenVisible(this.keyInDataPanel(keyIndex), el => el.textContent(), "key input in data panel");
     }
-
-    async clickTypeActiveBtnInDataPanel(): Promise<void>{
-        const isVisible = await waitForElementToBeVisible(this.typeActiveBtnInDataPanel);
-        if (!isVisible) throw new Error("type active button in data panel is not visible!");
-        await this.typeActiveBtnInDataPanel.click();
+      
+    async insertActiveDescInputInDataPanelAttr(desc: string): Promise<void> {
+        await interactWhenVisible(this.activeDescInputInDataPanel, el => el.fill(desc), "desc input in data panel");
     }
-
-    async clickUniqueAtiveRadioBtn(): Promise<void>{
-        const isVisible = await waitForElementToBeVisible(this.uniqueAtiveRadioBtn);
-        if (!isVisible) throw new Error("unique active button in data panel is not visible!");
-        await this.uniqueAtiveRadioBtn.click();
+      
+    async getDescInDataPanelAttr(descIndex: string): Promise<string | null> {
+        return await interactWhenVisible(this.descInDataPanel(descIndex), el => el.textContent(), "desc input in data panel");
     }
-
-    async clickRequiredAtiveRadioBtn(): Promise<void>{
-        const isVisible = await waitForElementToBeVisible(this.requiredAtiveRadioBtn);
-        if (!isVisible) throw new Error("required active button in data panel is not visible!");
-        await this.requiredAtiveRadioBtn.click();
+      
+    async clickTypeActiveBtnInDataPanel(): Promise<void> {
+        await interactWhenVisible(this.typeActiveBtnInDataPanel, el => el.click(), "type active button in data panel");
     }
-
-    async clickAddActiveBtnInDataPanel(): Promise<void>{
-        const isVisible = await waitForElementToBeVisible(this.addActiveBtnInDataPanel);
-        if (!isVisible) throw new Error("add active button in data panel is not visible!");
-        await this.addActiveBtnInDataPanel.click();
+      
+    async clickUniqueAtiveRadioBtn(): Promise<void> {
+        await interactWhenVisible(this.uniqueAtiveRadioBtn, el => el.click(), "unique active button in data panel");
     }
-
-    async clickCancelActiveBtnInDataPanel(): Promise<void>{
-        const isVisible = await waitForElementToBeVisible(this.cancelActiveBtnInDataPanel);
-        if (!isVisible) throw new Error("cancel active button in data panel is not visible!");
-        await this.cancelActiveBtnInDataPanel.click();
+      
+    async clickRequiredAtiveRadioBtn(): Promise<void> {
+        await interactWhenVisible(this.requiredAtiveRadioBtn, el => el.click(), "required active button in data panel");
     }
-
-    async clickCreateNewNodeBtnInDataPanel(): Promise<void>{
-        const isVisible = await waitForElementToBeVisible(this.createNewNodeBtnInDataPanel);
-        if (!isVisible) throw new Error("create new node button in data panel is not visible!");
-        await this.createNewNodeBtnInDataPanel.click();
+      
+    async clickAddActiveBtnInDataPanel(): Promise<void> {
+        await interactWhenVisible(this.addActiveBtnInDataPanel, el => el.click(), "add active button in data panel");
     }
-
-    async clickCreateNewEdgeBtnInDataPanel(): Promise<void>{
-        const isVisible = await waitForElementToBeVisible(this.createNewEdgeBtnInDataPanel);
-        if (!isVisible) throw new Error("create new edge button in data panel is not visible!");
-        await this.createNewEdgeBtnInDataPanel.click();
+      
+    async clickCancelActiveBtnInDataPanel(): Promise<void> {
+        await interactWhenVisible(this.cancelActiveBtnInDataPanel, el => el.click(), "cancel active button in data panel");
     }
-
-    async clickAddValueBtnInDataPanel(): Promise<void>{
-        const isVisible = await waitForElementToBeVisible(this.addValueBtnInDataPanel);
-        if (!isVisible) throw new Error("add value button in data panel is not visible!");
-        await this.addValueBtnInDataPanel.click();
+      
+    async clickCreateNewNodeBtnInDataPanel(): Promise<void> {
+        await interactWhenVisible(this.createNewNodeBtnInDataPanel, el => el.click(), "create new node button in data panel");
     }
-
-    async clickDeleteValueBtnInDataPanel(): Promise<void>{
-        const isVisible = await waitForElementToBeVisible(this.deleteValueBtnInDataPanel);
-        if (!isVisible) throw new Error("delete value button in data panel is not visible!");
-        await this.deleteValueBtnInDataPanel.click();
+      
+    async clickCreateNewEdgeBtnInDataPanel(): Promise<void> {
+        await interactWhenVisible(this.createNewEdgeBtnInDataPanel, el => el.click(), "create new edge button in data panel");
     }
-
-    async clickEditeValueBtnInDataPanel(): Promise<void>{
-        const isVisible = await waitForElementToBeVisible(this.editValueBtnInDataPanel);
-        if (!isVisible) throw new Error("edit value button in data panel is not visible!");
-        await this.editValueBtnInDataPanel.click();
+      
+    async clickAddValueBtnInDataPanel(): Promise<void> {
+        await interactWhenVisible(this.addValueBtnInDataPanel, el => el.click(), "add value button in data panel");
     }
-
-    async getAttributeRowsCount(): Promise<boolean>{
-        const isVisible = await waitForElementToBeVisible(this.attributeRows);
-        if (!isVisible) throw new Error("attribute rows in data panel is not visible!");
-        const count = await this.attributeRows.count() > 0 ? true : false;
-        return count;
+      
+    async clickDeleteValueBtnInDataPanel(): Promise<void> {
+        await interactWhenVisible(this.deleteValueBtnInDataPanel, el => el.click(), "delete value button in data panel");
     }
-
-    async clickDeleteNodeInDataPanel(): Promise<void>{
-        const isVisible = await waitForElementToBeVisible(this.deleteNodeInDataPanel);
-        if (!isVisible) throw new Error("attribute rows in data panel is not visible!");
-        await this.deleteNodeInDataPanel.click();
+      
+    async clickEditeValueBtnInDataPanel(): Promise<void> {
+        await interactWhenVisible(this.editValueBtnInDataPanel, el => el.click(), "edit value button in data panel");
     }
-
-    async clickConfirmDeleteNodeInDataPanel(): Promise<void>{
-        const isVisible = await waitForElementToBeVisible(this.confirmDeleteNodeInDataPanel);
-        if (!isVisible) throw new Error("confirm delete in data panel is not visible!");
-        await this.confirmDeleteNodeInDataPanel.click();
+      
+    async getAttributeRowsCount(): Promise<boolean> {
+        return await interactWhenVisible(
+          this.attributeRows,
+          async el => (await el.count()) > 0,
+          "attribute rows in data panel"
+        );
     }
-
+      
+    async clickDeleteNodeInDataPanel(): Promise<void> {
+        await interactWhenVisible(this.deleteNodeInDataPanel, el => el.click(), "delete node in data panel");
+    }
+      
+    async clickConfirmDeleteNodeInDataPanel(): Promise<void> {
+        await interactWhenVisible(this.confirmDeleteNodeInDataPanel, el => el.click(), "confirm delete in data panel");
+    }
+      
+    async clickCategoriesPanelBtn(): Promise<void> {
+        await interactWhenVisible(this.categoriesPanelBtn, el => el.click(), "categories panel button");
+    }
+      
+    async clickRelationshipTypesPanelBtn(): Promise<void> {
+        await interactWhenVisible(this.relationshipTypesPanelBtn, el => el.click(), "relationship types panel button");
+    }
+      
+    async getCategoriesPanelBtn(): Promise<string | null> {
+        return await interactWhenVisible(this.categoriesPanelBtn, el => el.textContent(), "categories panel button");
+    }
+      
+    async getRelationshipTypesPanelBtn(): Promise<string | null> {
+        return await interactWhenVisible(this.relationshipTypesPanelBtn, el => el.textContent(), "relationship types panel button");
+    }
 
     async addSchema(schemaName: string): Promise<void> {
         await this.clickAddNewSchemaBtn();
@@ -310,7 +284,6 @@ export default class SchemaPage extends GraphPage {
 
     async deleteRelation(node: string): Promise<void> {
         await this.clickAddRelation();
-        
     }
 
     async addAttribute(key: string, type: string, desc: string, unique: boolean, required: boolean): Promise<void>{

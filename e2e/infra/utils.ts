@@ -137,4 +137,9 @@ export async function waitForApiSuccess<T>(
     throw new Error('API condition was not met within timeout');
 }
 
-
+export async function interactWhenVisible<T>(element: Locator, action: (el: Locator) => Promise<T>, name: string): Promise<T> {
+    const isVisible = await waitForElementToBeVisible(element);
+    if (!isVisible) throw new Error(`${name} is not visible!`);
+    return action(element);
+}
+  
