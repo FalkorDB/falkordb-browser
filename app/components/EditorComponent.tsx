@@ -670,7 +670,7 @@ export default function EditorComponent({ historyQuery, maximize, runQuery, grap
                                     <Button
                                         className="pointer-events-auto"
                                         label={showTimeout ? "Hide Timeout" : "Show Timeout"}
-                                        onClick={() => setTimeout(prev => !prev)}
+                                        onClick={() => setShowTimeout(prev => !prev)}
                                     />
                                   <Button
                                         className="pointer-events-auto"
