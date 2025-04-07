@@ -4,8 +4,8 @@
 /* eslint-disable no-await-in-loop */
 /* eslint-disable arrow-body-style */
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { Locator, Download } from "@playwright/test";
-import {interactWhenVisible, waitForElementToBeVisible } from "@/e2e/infra/utils";
+import { Locator } from "@playwright/test";
+import {interactWhenVisible } from "@/e2e/infra/utils";
 import GraphPage from "./graphPage";
 
 export default class SchemaPage extends GraphPage {
@@ -289,7 +289,7 @@ export default class SchemaPage extends GraphPage {
     async addAttribute(key: string, type: string, desc: string, unique: boolean, required: boolean): Promise<void>{
         await this.insertActiveKeyInputInDataPanelAttr(key);
         await this.clickTypeActiveBtnInDataPanel();
-        await this.selectGraphFromList(type); //should be changed for select type from list after #835 fix
+        await this.selectGraphFromList(type);
         await this.insertActiveDescInputInDataPanelAttr(desc);
         if(unique){
             await this.clickUniqueAtiveRadioBtn();
