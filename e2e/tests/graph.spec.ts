@@ -72,7 +72,7 @@ test.describe('Graph Tests', () => {
         });
     })
 
-    test.only(`@admin Validate that running a query with limit returns limited results`, async () => {
+    test(`@admin Validate that running a query with limit returns limited results`, async () => {
         const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
         const graphName = `graph_${Date.now()}`;
         await graph.addGraph(graphName);
@@ -96,7 +96,7 @@ test.describe('Graph Tests', () => {
         await apicalls.removeGraph(graphName);
     });
 
-    test.only(`@admin Validate that running a query with limit inside the query returns limited results ad override the limit in the UI input`, async () => {
+    test(`@admin Validate that running a query with limit inside the query returns limited results ad override the limit in the UI input`, async () => {
         const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
         const graphName = `graph_${Date.now()}`;
         await graph.addGraph(graphName);
