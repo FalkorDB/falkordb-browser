@@ -213,8 +213,6 @@ export default function EditorComponent({ historyQuery, maximize, runQuery, grap
     const [isLoading, setIsLoading] = useState(false)
     const [showTimeout, setShowTimeout] = useState(false)
     const [timeout, setTimeout] = useState(0)
-    const inputTimeoutRef = useRef<HTMLInputElement>(null)
-    const spanTimeoutRef = useRef<HTMLSpanElement>(null)
     const [limit, setLimit] = useState(0)
     const [showLimit, setShowLimit] = useState(false)
     const { toast } = useToast()
@@ -222,6 +220,8 @@ export default function EditorComponent({ historyQuery, maximize, runQuery, grap
     const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null)
     const containerRef = useRef<HTMLDivElement>(null)
     const indicatorRef = useRef(indicator)
+    const inputTimeoutRef = useRef<HTMLInputElement>(null)
+    const spanTimeoutRef = useRef<HTMLSpanElement>(null)
     const inputLimitRef = useRef<HTMLInputElement>(null);
     const spanLimitRef = useRef<HTMLSpanElement>(null);
 
