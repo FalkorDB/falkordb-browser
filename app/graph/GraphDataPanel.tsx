@@ -151,8 +151,7 @@ export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement,
                 const value = obj.data[key]
 
                 graph.removeProperty(key, id)
-                delete obj.data[key]
-                setObj({ ...obj })
+                setObj({ ...obj, data: { ...obj.data, [key]: undefined } })
 
                 toast({
                     title: "Success",
