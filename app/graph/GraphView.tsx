@@ -219,7 +219,6 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
         const newQuery = await runQuery(q, timeout)
         if (newQuery) {
             setCurrentQuery(newQuery)
-            handleZoomToFit(chartRef)
             handleCooldown()
         }
         return !!newQuery
