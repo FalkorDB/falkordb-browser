@@ -237,6 +237,14 @@ export default function SchemaDataPanel({ obj, onExpand, onDeleteElement, schema
             return
         }
 
+        if (label.includes(newLabel)) {
+            toast({
+                title: "Error",
+                description: "Label already exists",
+                variant: "destructive"
+            })
+            return
+        }
         try {
             setIsLabelLoading(true)
 
