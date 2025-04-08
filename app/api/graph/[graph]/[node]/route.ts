@@ -30,40 +30,6 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     }
 }
 
-export async function POST(request: NextRequest, { params }: { params: Promise<{ graph: string, node: string }> }) {
-    const session = await getClient()
-
-    if (session instanceof NextResponse) {
-        return session
-    }
-
-    const { client } = session
-
-    const { graph: graphId, node } = await params
-    const nodeId = Number(node)
-    const { key, value } = await request.json()
-
-    try {
-        const graph = client.selectGraph(graphId);
-
-        if (!key) throw new Error("Missing key")
-        if (!value) throw new Error("Missing value")
-
-        const query = `MATCH (n) WHERE ID(n) = $nodeId SET n.${key} = $value`;
-
-        const result = await graph.query(query, { params: { nodeId, value } });
-
-        if (!result) {
-            throw new Error("Something went wrong")
-        }
-
-        return NextResponse.json({ result }, { status: 200 })
-    } catch (err: unknown) {
-        console.error(err)
-        return NextResponse.json({ message: (err as Error).message }, { status: 400 })
-    }
-}
-
 export async function DELETE(request: NextRequest, { params }: { params: Promise<{ graph: string, node: string }> }) {
     const session = await getClient()
     if (session instanceof NextResponse) {
@@ -74,20 +40,20 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
 
     const { graph: graphId, node } = await params
     const nodeId = Number(node)
-    const { key } = await request.json()
-    
+    const { type } = await request.json()
+
     try {
+        if (type === undefined) throw new Error("Type is required")
+
         const graph = client.selectGraph(graphId);
-
-        if (!key) throw new Error("Missing key")
-
-        const query = `MATCH (n) WHERE ID(n) = $nodeId SET n.${key} = NULL`;
-
+        const query = type
+            ? `MATCH (n) WHERE ID(n) = $nodeId DELETE n`
+            : `MATCH (n)-[e]-(m) WHERE ID(e) = $nodeId AND ID(m) = $nodeId DELETE e`;
         const result = await graph.query(query, { params: { nodeId } });
 
         if (!result) throw new Error("Something went wrong")
 
-        return NextResponse.json({ result }, { status: 200 })
+        return NextResponse.json({ message: "Node deleted successfully" }, { status: 200 })
     } catch (err: unknown) {
         console.error(err)
         return NextResponse.json({ message: (err as Error).message }, { status: 400 })

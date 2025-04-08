@@ -68,7 +68,151 @@ test.describe('Graph Tests', () => {
             await apicalls.removeGraph(graphName);
         });
     })
-    
+
+    test(`@admin Validate that running a query with timeout returns an error`, async () => {
+        const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+        const graphName = `graph_${Date.now()}`;
+        await graph.addGraph(graphName);
+        await graph.addTimeout();
+        const query = `UNWIND range(1, 100000000) as x RETURN count(x)`;
+        await graph.insertQuery(query);
+        await graph.clickRunQuery(false);
+        await graph.waitForRunQueryToBeEnabled();
+        expect(await graph.getErrorNotification()).toBe(true);
+        await apicalls.removeGraph(graphName);
+    });
+
+    test(`@admin Validate that running a query in the UI saves it in the query history`, async () => {
+        const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+        await browser.setPageToFullScreen();
+        const graphName = `graph_${Date.now()}`;
+        await graph.addGraph(graphName);
+        await graph.insertQuery(BATCH_CREATE_PERSONS);
+        await graph.clickRunQuery(false);
+        await graph.clickOnQueryHistory();
+        expect(await graph.getQueryHistory("1")).toBe(true);
+        await apicalls.removeGraph(graphName);         
+    });
+
+    test(`@admin Validate that executing a query from the query history correctly displays the results in the canvas`, async () => {
+        const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+        await browser.setPageToFullScreen();
+        const graphName = `graph_${Date.now()}`;
+        await graph.addGraph(graphName);
+        await graph.insertQuery(BATCH_CREATE_PERSONS);
+        await graph.clickRunQuery(false);
+        await graph.runAQueryFromHistory("1");
+        const searchQuery = `Person 1`;
+        await graph.searchForElementInCanvas(searchQuery);
+        await graph.hoverAtCanvasCenter();
+        expect(await graph.getNodeCanvasToolTip()).toBe(searchQuery);
+        await apicalls.removeGraph(graphName);        
+    });
+
+    test(`@admin verify query selection from history displays the correct query`, async () => {
+        const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+        await browser.setPageToFullScreen();
+        const graphName = `graph_${Date.now()}`;
+        await graph.addGraph(graphName);
+        await graph.insertQuery(BATCH_CREATE_PERSONS);
+        await graph.clickRunQuery(false);
+        await graph.clickOnQueryHistory();
+        await graph.ClickOnSelectQueryInHistoryBtn("1");
+        expect(await graph.getQueryHistoryEditor()).toBe(await graph.getSelectQueryInHistoryText("1"));
+        await apicalls.removeGraph(graphName);
+    });
+
+    test(`@admin verify metadata accuracy in query history`, async () => {
+        const testGraphName = `graph_${Date.now()}`;
+        await apicalls.addGraph(testGraphName);
+        const response = await apicalls.runQuery(testGraphName, BATCH_CREATE_PERSONS_APIREQ ?? "");
+        const apiMetadata = response.result.metadata;
+        
+        const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+        await browser.setPageToFullScreen();
+        const graphName = `graph_${Date.now()}`;
+        await graph.addGraph(graphName);
+        await graph.insertQuery(BATCH_CREATE_PERSONS);
+        await graph.clickRunQuery(false);
+        await graph.clickOnQueryHistory();
+        await graph.ClickOnSelectQueryInHistoryBtn("1");
+        const queryDetails  = await graph.getQueryHistoryPanel();
+        queryDetails.forEach(uiValue => {
+            expect(apiMetadata).toContain(uiValue);
+        });
+        await apicalls.removeGraph(testGraphName);
+        await apicalls.removeGraph(graphName);
+    });
+
+    const testNodes = [1, 5, 10];
+    for (const node of testNodes) {
+        test(`@admin Validate search for Person ${node} in the canvas and ensure focus`, async () => {
+            const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+            await browser.setPageToFullScreen();
+            const graphName = `graph_${Date.now()}`;
+            await graph.addGraph(graphName);
+            await graph.insertQuery(BATCH_CREATE_PERSONS);
+            await graph.clickRunQuery();
+
+            const searchQuery = `Person ${node}`;
+            await graph.searchForElementInCanvas(searchQuery);
+            await graph.hoverAtCanvasCenter();
+            expect(await graph.getNodeCanvasToolTip()).toBe(searchQuery);
+
+            await apicalls.removeGraph(graphName);
+        });
+    }
+
+    test(`@admin Validate zoom-in functionality upon clicking the zoom in button`, async () => {
+        const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+        await browser.setPageToFullScreen();
+        const graphName = `graph_${Date.now()}`;
+        await graph.addGraph(graphName);
+        await graph.insertQuery(BATCH_CREATE_PERSONS);
+        await graph.clickRunQuery();
+        const initialGraph = await graph.getCanvasScaling();
+        await graph.clickOnZoomIn();
+        await graph.clickOnZoomIn();
+        const updatedGraph = await graph.getCanvasScaling();
+        expect(updatedGraph.scaleX).toBeGreaterThan(initialGraph.scaleX);
+        expect(updatedGraph.scaleY).toBeGreaterThan(initialGraph.scaleY);
+        await apicalls.removeGraph(graphName);
+    });
+
+    test(`@admin Validate zoom-out functionality upon clicking the zoom in button`, async () => {
+        const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+        await browser.setPageToFullScreen();
+        const graphName = `graph_${Date.now()}`;
+        await graph.addGraph(graphName);
+        await graph.insertQuery(BATCH_CREATE_PERSONS);
+        await graph.clickRunQuery();
+        const initialGraph = await graph.getCanvasScaling();
+        await graph.clickOnZoomOut();
+        await graph.clickOnZoomOut();
+        const updatedGraph = await graph.getCanvasScaling();
+        expect(updatedGraph.scaleX).toBeLessThan(initialGraph.scaleX);
+        expect(updatedGraph.scaleY).toBeLessThan(initialGraph.scaleY);
+        await apicalls.removeGraph(graphName);
+    });
+
+
+    test(`@admin Validate fit to size functionality upon clicking the fit to size button`, async () => {
+        const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+        await browser.setPageToFullScreen();
+        const graphName = `graph_${Date.now()}`;
+        await graph.addGraph(graphName);
+        await graph.clickRunQuery();
+        await graph.clickOnFitToSize();
+        const initialGraph = await graph.getCanvasScaling();
+        await graph.clickOnZoomOut();
+        await graph.clickOnZoomOut();
+        await graph.clickOnFitToSize();
+        const updatedGraph = await graph.getCanvasScaling();
+        expect(Math.abs(initialGraph.scaleX - updatedGraph.scaleX)).toBeLessThanOrEqual(0.2);
+        expect(Math.abs(initialGraph.scaleY - updatedGraph.scaleY)).toBeLessThanOrEqual(0.2);
+        await apicalls.removeGraph(graphName);
+    });
+  
     test(`@admin Validate that the reload graph list function works by adding a graph via API and testing the reload button`, async () => {
         const graphName = getRandomString('graph');
         await apicalls.addGraph(graphName);

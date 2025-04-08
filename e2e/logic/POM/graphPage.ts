@@ -148,6 +148,22 @@ export default class GraphPage extends BasePage {
         await this.graphSelectSearchInput.fill(graph);
     }
 
+    private get showTimeoutInput(): Locator {
+        return this.page.getByRole("button", { name: "Show Timeout" });
+    }
+
+    private get increaseTimeoutBtn(): Locator {
+        return this.page.getByRole("button", { name: "Increase Timeout" });
+    }
+
+    private get decreaseTimeoutBtn(): Locator {
+        return this.page.getByRole("button", { name: "Decrease Timeout" });
+    }
+
+    private get timeoutInput(): Locator {
+        return this.page.locator("#timeoutInput");
+    }
+    
     async countGraphsInMenu(): Promise<number> {
         await waitForTimeOut(this.page, 1000);
 
@@ -237,7 +253,13 @@ export default class GraphPage extends BasePage {
         if (waitForAnimation) {
             await this.waitForCanvasAnimationToEnd();
         }
-    }    
+    }
+
+    async waitForRunQueryToBeEnabled(): Promise<void> {
+        while (await this.queryRunBtn.isDisabled()) {
+            await this.page.waitForTimeout(1000);
+        }
+    }
 
     async nodeClick(x: number, y: number): Promise<void> {
         await this.canvasElement.hover({ position: { x, y } });
@@ -462,5 +484,13 @@ export default class GraphPage extends BasePage {
         if (!isVisible) throw new Error("edges graph stats button is not visible!");
         return await this.edgesGraphStats.textContent();
     }
-
+    
+    async addTimeout(timeout?: number): Promise<void> {
+        await this.showTimeoutInput.click();
+        if (timeout) {
+            await this.timeoutInput.fill(timeout.toString());
+        } else {
+            await this.increaseTimeoutBtn.click();
+        }
+    }
 }

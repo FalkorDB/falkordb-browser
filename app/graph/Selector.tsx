@@ -26,7 +26,7 @@ import { IndicatorContext } from "../components/provider";
 interface Props {
     setGraphName: (selectedGraphName: string) => void
     graphName: string
-    runQuery?: (query: string) => Promise<Query | undefined>
+    runQuery?: (query: string, timeout?: number) => Promise<Query | undefined>
     historyQuery?: HistoryQuery
     setHistoryQuery?: Dispatch<SetStateAction<HistoryQuery>>
     edgesCount: number
