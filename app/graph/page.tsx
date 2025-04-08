@@ -70,7 +70,7 @@ export default function Page() {
             })
             return null
         }
-        
+        console.log(timeout)
         const result = await securedFetch(`api/graph/${prepareArg(graphName)}/?query=${prepareArg(q)}&timeout=${timeout}`, {
             method: "GET"
         }, toast, setIndicator)
