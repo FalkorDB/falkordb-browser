@@ -1,17 +1,10 @@
-import { getClient } from "@/app/api/auth/[...nextauth]/options"
 import { NextRequest, NextResponse } from "next/server"
-
-const formatAttribute = (att: [string, string[]]) => {
-    const [key, [t, d, u, r]] = att
-    let val = `${t}`
-    if (u === "true") val += "!"
-    if (r === "true") val += "*"
-    if (d) val += `-${d}`
-    return [key, val]
-}
+import { getClient } from "@/app/api/auth/[...nextauth]/options"
+import { formatAttribute } from "./[key]/route"
 
 const formatAttributes = (attributes: [string, string[]][]) => attributes.map((att) => formatAttribute(att))
 
+// eslint-disable-next-line import/prefer-default-export
 export async function POST(request: NextRequest, { params }: { params: Promise<{ schema: string, node: string }> }) {
     const session = await getClient()
 
@@ -42,43 +35,11 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
         if (!result) throw new Error("Something went wrong")
 
+        
         return NextResponse.json({ result }, { status: 200 })
     } catch (error) {
         console.error(error)
         return NextResponse.json({ error: (error as Error).message }, { status: 500 })
-    }
-}
-
-export async function PATCH(request: NextRequest, { params }: { params: Promise<{ schema: string, node: string }> }) {
-    const session = await getClient()
-
-    if (session instanceof NextResponse) {
-        return session
-    }
-
-    const { client } = session
-
-    const { schema, node } = await params
-    const schemaName = `${schema}_schema`
-    const { type, attribute } = await request.json()
-
-    try {
-        if (!attribute) throw new Error("Attribute is required")
-        if (type === undefined) throw new Error("Type is required")
-
-        const [formattedKey, formattedValue] = formatAttribute(attribute)
-        const graph = client.selectGraph(schemaName)
-        const q = type
-            ? `MATCH (n) WHERE ID(n) = ${node} SET n.${formattedKey} = "${formattedValue}"`
-            : `MATCH (n)-[e]-(m) WHERE ID(e) = ${node} SET e.${formattedKey} = "${formattedValue}"`
-        const result = await graph.query(q)
-
-        if (!result) throw new Error("Something went wrong")
-
-        return NextResponse.json({ result }, { status: 200 })
-    } catch (error) {
-        console.error(error)
-        return NextResponse.json({ error: (error as Error).message }, { status: 400 })
     }
 }
 
@@ -93,23 +54,22 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
 
     const { schema, node } = await params
     const schemaName = `${schema}_schema`
-    const { type, key } = await request.json()
+    const { type } = await request.json()
 
     try {
-        if (!key) throw new Error("Key is required")
         if (type === undefined) throw new Error("Type is required")
 
         const graph = client.selectGraph(schemaName)
-        const q = type
-            ? `MATCH (n) WHERE ID(n) = ${node} SET n.${key} = NULL`
-            : `MATCH (n)-[e]-(m) WHERE ID(e) = ${node} SET e.${key} = NULL`
-        const result = await graph.query(q)
+        const query = type
+            ? `MATCH (n) WHERE ID(n) = ${node} DELETE n`
+            : `MATCH (a)-[e]-(b) WHERE ID(a) = ${node} AND ID(b) = ${node} DELETE e`
+        const result = await graph.query(query)
 
         if (!result) throw new Error("Something went wrong")
 
-        return NextResponse.json({ result }, { status: 200 })
+        return NextResponse.json({ message: "Node deleted successfully" }, { status: 200 })
     } catch (error) {
         console.error(error)
-        return NextResponse.json({ error: (error as Error).message }, { status: 400 })
+        return NextResponse.json({ error: (error as Error).message }, { status: 500 })
     }
 }
