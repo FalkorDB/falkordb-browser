@@ -7,6 +7,8 @@
 import { Locator, Download } from "@playwright/test";
 import BasePage from "@/e2e/infra/ui/basePage";
 import { waitForElementToBeVisible, waitForTimeOut } from "@/e2e/infra/utils";
+import urls from "@/e2e/config/urls.json";
+import { prepareArg } from "@/lib/utils";
 
 export default class GraphPage extends BasePage {
 
@@ -548,5 +550,24 @@ export default class GraphPage extends BasePage {
         }
     }
 
+    async runQueryWithLimit(limit: number, query: string, graphName: string): Promise<any[]> {
+        await this.insertQuery(query);
+        await this.addLimit(limit);
+        let [result] = await Promise.all([
+            this.waitForResponse(`${urls.api.graphUrl}${graphName}?query=${prepareArg(query)}`),
+            this.clickRunQuery(false),
+        ]);
+        let json = await result.json();
+
+        if (typeof json.result === "number") {
+
+            [result] = await Promise.all([
+                this.waitForResponse(`${urls.api.graphUrl}${graphName}/query?id=${json.result}`),
+            ])
+            json = await result.json();
+        }
+
+        return json.result.data;
+    }
 
 }

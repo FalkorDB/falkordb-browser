@@ -13,7 +13,6 @@ test.describe('Graph Tests', () => {
     let browser: BrowserWrapper;
     let apicalls: ApiCalls;
     const BATCH_CREATE_PERSONS = queryData.queries[0].testQueries[0].query;
-    const FETCH_FIRST_TEN_NODES = queryData.queries[0].testQueries[1].query;
     const BATCH_CREATE_PERSONS_APIREQ = queryData.queries[0].testQueries[0].apiReq;
 
     test.beforeAll(async () => {
@@ -76,23 +75,8 @@ test.describe('Graph Tests', () => {
         const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
         const graphName = `graph_${Date.now()}`;
         await graph.addGraph(graphName);
-        await graph.insertQuery("UNWIND range(1, 20) as x CREATE (n:n)-[e:e]->(m:m) RETURN *");
-        await graph.addLimit(10);
-        let [result] = await Promise.all([
-            graph.waitForResponse(`${urls.api.graphUrl}${graphName}?query=UNWIND%20range(1%2C%2020)%20as%20x%20CREATE%20(n%3An)-%5Be%3Ae%5D-%3E(m%3Am)%20RETURN%20*%20LIMIT%2010`),
-            graph.clickRunQuery(false),
-        ]);
-        let json = await result.json();
-
-        if (typeof json.result === "number") {
-
-            [result] = await Promise.all([
-                graph.waitForResponse(`${urls.api.graphUrl}${graphName}/query?id=${json.result}`),
-            ])
-            json = await result.json();
-        }
-
-        expect(json.result.data.length).toBe(10);
+        const data = await graph.runQueryWithLimit(10, "UNWIND range(1, 20) as x CREATE (n:n)-[e:e]->(m:m) RETURN *", graphName);
+        expect(data.length).toBe(10);
         await apicalls.removeGraph(graphName);
     });
 
@@ -100,22 +84,8 @@ test.describe('Graph Tests', () => {
         const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
         const graphName = `graph_${Date.now()}`;
         await graph.addGraph(graphName);
-        await graph.insertQuery("UNWIND range(1, 20) as x CREATE (n:n)-[e:e]->(m:m) RETURN * LIMIT 15");
-        await graph.addLimit(10);
-        let [result] = await Promise.all([
-            graph.waitForResponse(`${urls.api.graphUrl}${graphName}?query=UNWIND%20range(1%2C%2020)%20as%20x%20CREATE%20(n%3An)-%5Be%3Ae%5D-%3E(m%3Am)%20RETURN%20*%20LIMIT%2015`),
-            graph.clickRunQuery(false),
-        ]);
-        let json = await result.json();
-
-        if (typeof json.result === "number") {
-            [result] = await Promise.all([
-                graph.waitForResponse(`${urls.api.graphUrl}${graphName}/query?id=${json.result}`),
-            ])
-            json = await result.json();
-        }
-
-        expect(json.result.data.length).toBe(15);
+        const data = await graph.runQueryWithLimit(10, "UNWIND range(1, 20) as x CREATE (n:n)-[e:e]->(m:m) RETURN * LIMIT 15", graphName);
+        expect(data.length).toBe(15);
         await apicalls.removeGraph(graphName);
     });
 
@@ -182,7 +152,7 @@ test.describe('Graph Tests', () => {
     });
 
     const testNodes = [1, 5, 10];
-    for (const node of testNodes) {
+    testNodes.forEach(async (node) => {
         test(`@admin Validate search for Person ${node} in the canvas and ensure focus`, async () => {
             const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
             await browser.setPageToFullScreen();
@@ -198,7 +168,7 @@ test.describe('Graph Tests', () => {
 
             await apicalls.removeGraph(graphName);
         });
-    }
+    });
 
     test(`@admin Validate zoom-in functionality upon clicking the zoom in button`, async () => {
         const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
