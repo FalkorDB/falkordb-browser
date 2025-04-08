@@ -187,12 +187,12 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
                 }
             } else {
                 element.category.forEach((category) => {
-                    const cat = graph.CategoriesMap.get(category)
+                    const cat = graph.LabelsMap.get(category)
                     if (cat) {
                         cat.elements = cat.elements.filter((e) => e.id !== element.id)
                         if (cat.elements.length === 0) {
-                            graph.Categories.splice(graph.Categories.findIndex(c => c.name === cat.name), 1)
-                            graph.CategoriesMap.delete(cat.name)
+                            graph.Labels.splice(graph.Labels.findIndex(l => l.name === cat.name), 1)
+                            graph.LabelsMap.delete(cat.name)
                         }
                     }
                 })

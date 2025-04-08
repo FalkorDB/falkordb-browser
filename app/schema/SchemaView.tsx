@@ -163,12 +163,12 @@ export default function SchemaView({ schema, fetchCount }: Props) {
                     }
                 })
             } else {
-                const cat = schema.CategoriesMap.get(element.label)
+                const cat = schema.LabelsMap.get(element.label)
                 if (cat) {
                     cat.elements = cat.elements.filter(n => n.id !== id)
                     if (cat.elements.length === 0) {
-                        schema.Categories.splice(schema.Categories.findIndex(c => c.name === cat.name), 1)
-                        schema.CategoriesMap.delete(cat.name)
+                        schema.Labels.splice(schema.Labels.findIndex(c => c.name === cat.name), 1)
+                        schema.LabelsMap.delete(cat.name)
                     }
                 }
             }
