@@ -103,6 +103,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     const { client, user, cache } = session
     const { graph: graphId } = await params
     const query = request.nextUrl.searchParams.get("query")
+    const timeout = request.nextUrl.searchParams.get("timeout")
     const { role } = user
 
     try {
@@ -115,49 +116,45 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
             const id = idGenerator.next().value
 
             // Set a timeout to resolve the result if it takes too long
-            const timeout = setTimeout(() => {
+            const timeoutHook = setTimeout(() => {
                 cache.set(id, { callback: undefined, result: undefined })
-                console.log("Setting timeout");
                 resolve(id)
             }, INITIAL)
 
-            setTimeout(() => {
-                const res = role === "Read-Only"
-                    ? graph.roQuery(query)
-                    : graph.query(query)
+            const timeoutNumber = timeout ? Number(timeout) * 1000 : undefined
+            const res = role === "Read-Only"
+                ? graph.roQuery(query, { TIMEOUT: timeoutNumber })
+                : graph.query(query, { TIMEOUT: timeoutNumber })
 
-                res.then((r) => {
-                    if (!r) throw new Error("Something went wrong")
+            res.then((r) => {
+                if (!r) throw new Error("Something went wrong")
 
-                    // If the result is already in the cache, save it
-                    const cached = cache.get(id)
-                    if (cached) {
-                        cached.result = r
-                        console.log("Setting result");
-                        if (typeof cached.callback === "function") {
-                            cached.callback()
-                        }
-                        return
+                // If the result is already in the cache, save it
+                const cached = cache.get(id)
+                if (cached) {
+                    cached.result = r
+                    if (typeof cached.callback === "function") {
+                        cached.callback()
                     }
+                    return
+                }
 
-                    clearTimeout(timeout)
-                    resolve(r)
-                }).catch((error) => {
-                    // If the error is already in the cache, save it
-                    const cached = cache.get(id)
-                    if (cached) {
-                        cached.result = error as Error
-                        console.log("Setting error");
-                        if (typeof cached.callback === "function") {
-                            cached.callback()
-                        }
-                        return
+                clearTimeout(timeoutHook)
+                resolve(r)
+            }).catch((error) => {
+                // If the error is already in the cache, save it
+                const cached = cache.get(id)
+                if (cached) {
+                    cached.result = error as Error
+                    if (typeof cached.callback === "function") {
+                        cached.callback()
                     }
+                    return
+                }
 
-                    clearTimeout(timeout)
-                    reject(error)
-                })
-            }, INITIAL * 2)
+                clearTimeout(timeoutHook)
+                reject(error)
+            })
         })
 
         // If the result is a number, return the id

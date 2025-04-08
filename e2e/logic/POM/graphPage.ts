@@ -178,6 +178,22 @@ export default class GraphPage extends BasePage {
         return this.page.locator("//div[@id='queryHistoryPanel']//ul");
     }
 
+    private get showTimeoutInput(): Locator {
+        return this.page.getByRole("button", { name: "Show Timeout" });
+    }
+
+    private get increaseTimeoutBtn(): Locator {
+        return this.page.getByRole("button", { name: "Increase Timeout" });
+    }
+
+    private get decreaseTimeoutBtn(): Locator {
+        return this.page.getByRole("button", { name: "Decrease Timeout" });
+    }
+
+    private get timeoutInput(): Locator {
+        return this.page.locator("#timeoutInput");
+    }
+    
     async countGraphsInMenu(): Promise<number> {
         await waitForTimeOut(this.page, 1000);
 
@@ -266,6 +282,12 @@ export default class GraphPage extends BasePage {
         await this.queryRunBtn.click();
         if (waitForAnimation) {
             await this.waitForCanvasAnimationToEnd();
+        }
+    }
+
+    async waitForRunQueryToBeEnabled(): Promise<void> {
+        while (await this.queryRunBtn.isDisabled()) {
+            await this.page.waitForTimeout(1000);
         }
     }
 
@@ -570,4 +592,12 @@ export default class GraphPage extends BasePage {
         return json.result.data;
     }
 
+    async addTimeout(timeout?: number): Promise<void> {
+        await this.showTimeoutInput.click();
+        if (timeout) {
+            await this.timeoutInput.fill(timeout.toString());
+        } else {
+            await this.increaseTimeoutBtn.click();
+        }
+    }
 }

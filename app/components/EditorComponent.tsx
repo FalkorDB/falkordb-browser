@@ -21,7 +21,7 @@ import Input from "./ui/Input";
 interface Props {
     historyQuery: HistoryQuery
     maximize: boolean
-    runQuery: (query: string) => Promise<boolean>
+    runQuery: (query: string, timeout?: number) => Promise<boolean>
     graph: Graph
     setHistoryQuery: Dispatch<SetStateAction<HistoryQuery>>
 }
@@ -211,6 +211,8 @@ export default function EditorComponent({ historyQuery, maximize, runQuery, grap
     const [blur, setBlur] = useState(false)
     const [sugDisposed, setSugDisposed] = useState<monaco.IDisposable>()
     const [isLoading, setIsLoading] = useState(false)
+    const [showTimeout, setShowTimeout] = useState(false)
+    const [timeout, setTimeout] = useState(0)
     const [limit, setLimit] = useState(0)
     const [showLimit, setShowLimit] = useState(false)
     const { toast } = useToast()
@@ -218,6 +220,8 @@ export default function EditorComponent({ historyQuery, maximize, runQuery, grap
     const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null)
     const containerRef = useRef<HTMLDivElement>(null)
     const indicatorRef = useRef(indicator)
+    const inputTimeoutRef = useRef<HTMLInputElement>(null)
+    const spanTimeoutRef = useRef<HTMLSpanElement>(null)
     const inputLimitRef = useRef<HTMLInputElement>(null);
     const spanLimitRef = useRef<HTMLSpanElement>(null);
 
@@ -229,6 +233,15 @@ export default function EditorComponent({ historyQuery, maximize, runQuery, grap
             inputLimitRef.current.style.width = `${spanLimitRef.current.offsetWidth}px`;
         }
     }, [limit, showLimit]);
+
+    useEffect(() => {
+        if (spanTimeoutRef.current && inputTimeoutRef.current) {
+            // Set the span's text to the input's value
+            spanTimeoutRef.current.textContent = timeout.toString() || ' ';
+            // Adjust the input's width to match the span's width
+            inputTimeoutRef.current.style.width = `${spanTimeoutRef.current.offsetWidth}px`;
+        }
+    }, [timeout, showTimeout]);
 
     useEffect(() => {
         indicatorRef.current = indicator
@@ -413,7 +426,7 @@ export default function EditorComponent({ historyQuery, maximize, runQuery, grap
             if (limit !== 0 && !hasMainReturnLimit(historyQuery.query)) {
                 q = `${historyQuery.query} LIMIT ${limit}`
             }
-            await runQuery(q)
+            await runQuery(q, timeout)
         } finally {
             setIsLoading(false)
         }
@@ -656,6 +669,11 @@ export default function EditorComponent({ historyQuery, maximize, runQuery, grap
                                     </Button>
                                     <Button
                                         className="pointer-events-auto"
+                                        label={showTimeout ? "Hide Timeout" : "Show Timeout"}
+                                        onClick={() => setShowTimeout(prev => !prev)}
+                                    />
+                                  <Button
+                                        className="pointer-events-auto"
                                         label={showLimit ? "Hide Limit" : "Show Limit"}
                                         onClick={() => setShowLimit(prev => !prev)}
                                     />
@@ -675,6 +693,50 @@ export default function EditorComponent({ historyQuery, maximize, runQuery, grap
                                 isLoading={isLoading}
                             />
                         </div>
+                        {
+                            showTimeout &&
+                            <div className="flex flex-col items-center gap-2">
+                                <div className="h-full flex items-center border rounded-lg">
+                                    <Button
+                                        className="p-2 border-r"
+                                        title="Increase Timeout"
+                                        onClick={() => setTimeout(prev => prev + 1)}
+                                    >
+                                        <Plus size={20} />
+                                    </Button>
+                                    <Input
+                                        id="timeoutInput"
+                                        ref={inputTimeoutRef}
+                                        type="text"
+                                        className="text-center h-full bg-foreground rounded-none border-none text-white"
+                                        value={timeout}
+                                        min={0}
+                                        onChange={(e) => {
+                                            const value = Number(e.target.value)
+                                            if (Number.isNaN(value)) return
+                                            setTimeout(value)
+                                        }}
+                                        style={{ boxSizing: "content-box" }}
+                                    />
+                                    <span ref={spanTimeoutRef} className="absolute invisible whitespace-pre" />
+                                    <Button
+                                        className="p-2 border-l"
+                                        title="Decrease Timeout"
+                                        onClick={() => setTimeout(prev => !prev ? prev : prev - 1)}
+                                    >
+                                        <Minus size={20} />
+                                    </Button>
+                                </div>
+                                <Tooltip>
+                                    <TooltipTrigger>
+                                        <p>Timeout</p>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                        Timeout value in seconds
+                                    </TooltipContent>
+                                </Tooltip>
+                            </div>
+                        }
                         {
                             showLimit &&
                             <div className="flex flex-col items-center gap-2">

@@ -31,7 +31,7 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
     graph: Graph
     selectedElement: Node | Link | undefined
     setSelectedElement: Dispatch<SetStateAction<Node | Link | undefined>>
-    runQuery: (query: string) => Promise<Query | undefined>
+    runQuery: (query: string, timeout?: number) => Promise<Query | undefined>
     historyQuery: HistoryQuery
     setHistoryQuery: Dispatch<SetStateAction<HistoryQuery>>
     fetchCount: () => void
@@ -215,11 +215,10 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
         handleCooldown()
     }
 
-    const handleRunQuery = async (q: string) => {
-        const newQuery = await runQuery(q)
+    const handleRunQuery = async (q: string, timeout?: number) => {
+        const newQuery = await runQuery(q, timeout)
         if (newQuery) {
             setCurrentQuery(newQuery)
-            handleZoomToFit(chartRef)
             handleCooldown()
         }
         return !!newQuery
