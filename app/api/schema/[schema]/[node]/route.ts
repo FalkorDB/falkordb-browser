@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getClient } from "@/app/api/auth/[...nextauth]/options"
-import { formatAttribute } from "./[key]/route"
-
-const formatAttributes = (attributes: [string, string[]][]) => attributes.map((att) => formatAttribute(att))
+import { formatAttributes } from "./utils"
 
 // eslint-disable-next-line import/prefer-default-export
 export async function POST(request: NextRequest, { params }: { params: Promise<{ schema: string, node: string }> }) {
