@@ -104,8 +104,6 @@ export default defineConfig({
       },
       grep: /@admin/,
       testMatch: /.*settingsConfig\.spec\.ts$/,
-      fullyParallel: false,
-      retries: 1,
     },
     {
       name: '[Admin: Serial Config - Firefox]',
@@ -115,8 +113,6 @@ export default defineConfig({
       },
       grep: /@admin/,
       testMatch: /.*settingsConfig\.spec\.ts$/,
-      fullyParallel: false,
-      retries: 1,
     },  
 
     // {

@@ -3,7 +3,7 @@
 
 'use client'
 
-import { useRef, useState, useEffect, Dispatch, SetStateAction, useContext } from "react";
+import { useRef, useState, useEffect, Dispatch, SetStateAction, useContext, useMemo } from "react";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { ImperativePanelHandle } from "react-resizable-panels";
 import { ChevronLeft, GitGraph, Info, Maximize2, Minimize2, Pause, Play, Search, Table } from "lucide-react"
@@ -80,6 +80,15 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
 
     const handleCooldown = (ticks?: number) => {
         setCooldownTicks(ticks)
+        if (typeof window === 'undefined') return;
+
+        const canvas = document.querySelector('.force-graph-container canvas');
+        if(!canvas) return
+        if(ticks === 0){
+            canvas.setAttribute('data-engine-status', 'stop')
+        } else {
+            canvas.setAttribute('data-engine-status', 'running')
+        }
     }
 
     useEffect(() => {

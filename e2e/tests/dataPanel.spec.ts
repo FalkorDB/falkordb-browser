@@ -7,7 +7,7 @@ import ApiCalls from "../logic/api/apiCalls";
 import urls from '../config/urls.json'
 import { FETCH_ALL_NODES } from "../config/constants";
 import DataPanel from "../logic/POM/dataPanelComponent";
-import { getRandomString } from "../infra/utils";
+import { getRandomString, waitForApiSuccess } from "../infra/utils";
 
 test.describe('Data panel Tests', () => {
     let browser: BrowserWrapper;
@@ -26,6 +26,7 @@ test.describe('Data panel Tests', () => {
         const graphName = getRandomString('datapanel');        
         await apicalls.addGraph(graphName);
         await apicalls.runQuery(graphName, 'CREATE (:Person {name: "Alice"}), (:Person {name: "Bob"})');
+        await waitForApiSuccess(() => apicalls.runQuery(graphName, FETCH_ALL_NODES ?? ""), res => res.result.data.length > 0);
         const graph = await browser.createNewPage(DataPanel, urls.graphUrl);
         await browser.setPageToFullScreen();
         await graph.selectExistingGraph(graphName);
@@ -45,6 +46,7 @@ test.describe('Data panel Tests', () => {
         await apicalls.addGraph(graphName);
         await apicalls.runQuery(graphName, 'CREATE (:Person {name: "Alice"}), (:Person {name: "Bob"})');
         await apicalls.runQuery(graphName, 'MATCH (n {name: "Alice"}) SET n:TestHeader REMOVE n:Person');
+        await waitForApiSuccess(() => apicalls.runQuery(graphName, FETCH_ALL_NODES ?? ""), res => res.result.data.length > 0);
         const graph = await browser.createNewPage(DataPanel, urls.graphUrl);
         await browser.setPageToFullScreen();
         await graph.selectExistingGraph(graphName);
@@ -60,6 +62,7 @@ test.describe('Data panel Tests', () => {
         const graphName = getRandomString('datapanel');        
         await apicalls.addGraph(graphName);
         await apicalls.runQuery(graphName, 'CREATE (:Person {name: "Alice"}), (:Person {name: "Bob"})');
+        await waitForApiSuccess(() => apicalls.runQuery(graphName, FETCH_ALL_NODES ?? ""), res => res.result.data.length > 0);
         const graph = await browser.createNewPage(DataPanel, urls.graphUrl);
         await browser.setPageToFullScreen();
         await graph.selectExistingGraph(graphName);
@@ -78,6 +81,7 @@ test.describe('Data panel Tests', () => {
         const graphName = getRandomString('datapanel');        
         await apicalls.addGraph(graphName);
         await apicalls.runQuery(graphName, 'CREATE (a:Person {name: "Alice", age: 30}), (b:Person {name: "Bob"})');
+        await waitForApiSuccess(() => apicalls.runQuery(graphName, FETCH_ALL_NODES ?? ""), res => res.result.data.length > 0);
         const graph = await browser.createNewPage(DataPanel, urls.graphUrl);
         await browser.setPageToFullScreen();
         await graph.selectExistingGraph(graphName);
@@ -93,6 +97,7 @@ test.describe('Data panel Tests', () => {
         const graphName = getRandomString('datapanel');        
         await apicalls.addGraph(graphName);
         await apicalls.runQuery(graphName, 'CREATE (a:Person {name: "Alice", age: 30}), (b:Person {name: "Bob"})');
+        await waitForApiSuccess(() => apicalls.runQuery(graphName, FETCH_ALL_NODES ?? ""), res => res.result.data.length > 0);
         const graph = await browser.createNewPage(DataPanel, urls.graphUrl);
         await browser.setPageToFullScreen();
         await graph.selectExistingGraph(graphName);
@@ -112,6 +117,7 @@ test.describe('Data panel Tests', () => {
         await apicalls.addGraph(graphName);
         await apicalls.runQuery(graphName, 'CREATE (a:Person {name: "Alice", age: 30}), (b:Person {name: "Bob"})');
         await apicalls.runQuery(graphName, 'MATCH (a:Person {name: "Alice"}) REMOVE a.age');
+        await waitForApiSuccess(() => apicalls.runQuery(graphName, FETCH_ALL_NODES ?? ""), res => res.result.data.length > 0);
         const graph = await browser.createNewPage(DataPanel, urls.graphUrl);
         await browser.setPageToFullScreen();
         await graph.selectExistingGraph(graphName);
@@ -127,6 +133,7 @@ test.describe('Data panel Tests', () => {
         const graphName = getRandomString('datapanel');        
         await apicalls.addGraph(graphName);
         await apicalls.runQuery(graphName, 'CREATE (a:Person {name: "Alice", age: 30}), (b:Person {name: "Bob"})');
+        await waitForApiSuccess(() => apicalls.runQuery(graphName, FETCH_ALL_NODES ?? ""), res => res.result.data.length > 0);
         const graph = await browser.createNewPage(DataPanel, urls.graphUrl);
         await browser.setPageToFullScreen();
         await graph.selectExistingGraph(graphName);
@@ -136,6 +143,7 @@ test.describe('Data panel Tests', () => {
         await graph.rightClickAtCanvasCenter();
         await graph.modifyAttribute("70");
         const response = await apicalls.runQuery(graphName, FETCH_ALL_NODES ?? "");
+        await waitForApiSuccess(() => apicalls.runQuery(graphName, FETCH_ALL_NODES ?? ""), res => res.result.data.length > 0);
         const person = response.result.data.find(item => 'age' in item.n.properties);
         expect(person?.n.properties.age).toBe("70");
         await apicalls.removeGraph(graphName);
@@ -146,6 +154,7 @@ test.describe('Data panel Tests', () => {
         await apicalls.addGraph(graphName);
         await apicalls.runQuery(graphName, 'CREATE (a:Person {name: "Alice", age: 30}), (b:Person {name: "Bob"})');
         await apicalls.runQuery(graphName, 'MATCH (a:Person {name: "Alice"}) SET a.age = 35');
+        await waitForApiSuccess(() => apicalls.runQuery(graphName, FETCH_ALL_NODES ?? ""), res => res.result.data.length > 0);
         const graph = await browser.createNewPage(DataPanel, urls.graphUrl);
         await browser.setPageToFullScreen();
         await graph.selectExistingGraph(graphName);
@@ -161,6 +170,7 @@ test.describe('Data panel Tests', () => {
         const graphName = getRandomString('datapanel');        
         await apicalls.addGraph(graphName);
         await apicalls.runQuery(graphName, 'CREATE (a:Person {name: "Alice", age: 30}), (b:Person {name: "Bob"})');
+        await waitForApiSuccess(() => apicalls.runQuery(graphName, FETCH_ALL_NODES ?? ""), res => res.result.data.length > 0);
         const graph = await browser.createNewPage(DataPanel, urls.graphUrl);
         await browser.setPageToFullScreen();
         await graph.selectExistingGraph(graphName);
@@ -170,6 +180,7 @@ test.describe('Data panel Tests', () => {
         await graph.rightClickAtCanvasCenter();
         await graph.deleteNodeViaDataPanel();
         const response = await apicalls.runQuery(graphName, FETCH_ALL_NODES ?? "");
+        await waitForApiSuccess(() => apicalls.runQuery(graphName, FETCH_ALL_NODES ?? ""), res => res.result.data.length > 0);
         expect(response.result.data.length).toBe(1);
         await apicalls.removeGraph(graphName);
     });
@@ -179,6 +190,7 @@ test.describe('Data panel Tests', () => {
         await apicalls.addGraph(graphName);
         await apicalls.runQuery(graphName, 'CREATE (a:Person {name: "Alice", age: 30}), (b:Person {name: "Bob"})');
         await apicalls.runQuery(graphName, 'MATCH (b:Person {name: "Alice"}) DELETE b');
+        await waitForApiSuccess(() => apicalls.runQuery(graphName, FETCH_ALL_NODES ?? ""), res => res.result.data.length > 0);
         const graph = await browser.createNewPage(DataPanel, urls.graphUrl);
         await browser.setPageToFullScreen();
         await graph.selectExistingGraph(graphName);

@@ -73,7 +73,6 @@ test.describe('Canvas Tests', () => {
         await apicalls.removeGraph(graphName);
     });
 
-
     test(`@admin Validate fit to size functionality upon clicking the fit to size button`, async () => {
         const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
         await browser.setPageToFullScreen();
@@ -123,8 +122,7 @@ test.describe('Canvas Tests', () => {
     test(`@admin Validate success when updating node properties and seeing the update on the canvas`, async () => {
         const graphName = getRandomString('canvas');
         await apicalls.addGraph(graphName);
-        await apicalls.runQuery(graphName, 'CREATE (:Person {name: "Bob"})');
-        await apicalls.runQuery(graphName, 'MATCH (p:Person {name: "Bob"}) SET p.age = 40');
+        await apicalls.runQuery(graphName, 'CREATE (:Person {name: "Bob", age: 40})');
         const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
         await browser.setPageToFullScreen();
         await graph.selectExistingGraph(graphName);

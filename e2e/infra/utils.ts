@@ -111,3 +111,33 @@ export async function getAdminToken(): Promise<Record<string, string> | undefine
 export function getRandomString(prefix = '', delimiter = '_'): string {
     return `${prefix}${prefix ? delimiter : ''}${crypto.randomUUID()}`;
 }
+
+export async function waitForApiSuccess<T>(
+    apiCall: () => Promise<T>,
+    successCondition: (response: T) => boolean,
+    timeout = 5000,
+    interval = 250
+): Promise<T> {
+    const start = Date.now();
+
+    while (Date.now() - start < timeout) {
+        try {
+            const response = await apiCall();
+            if (successCondition(response)) {
+                return response;
+            }
+        } catch {
+            // ignore errors during polling
+        }
+
+        await new Promise(res => setTimeout(res, interval));
+    }
+
+    throw new Error('API condition was not met within timeout');
+}
+
+export async function interactWhenVisible<T>(element: Locator, action: (el: Locator) => Promise<T>, name: string): Promise<T> {
+    const isVisible = await waitForElementToBeVisible(element);
+    if (!isVisible) throw new Error(`${name} is not visible!`);
+    return action(element);
+}

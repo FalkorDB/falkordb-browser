@@ -408,53 +408,19 @@ export default class GraphPage extends BasePage {
         await this.page.mouse.move(centerX, centerY);
     }
     
-    async waitForCanvasAnimationToEnd(timeout = 15000, checkInterval = 500): Promise<void> {
-        const canvasHandle = await this.canvasElement.elementHandle();
-    
-        if (!canvasHandle) {
-            throw new Error("Canvas element not found!");
-        }
-    
+    async waitForCanvasAnimationToEnd(timeout = 5000): Promise<void> {
+        await this.page.waitForTimeout(1500); // fit to size animation 
+      
         await this.page.waitForFunction(
-            async ({ canvas, checkInterval, timeout }) => {
-                const ctx = canvas.getContext('2d');
-                if (!ctx) return false;
-    
-                const width = canvas.width;
-                const height = canvas.height;
-    
-                let previousData = ctx.getImageData(0, 0, width, height).data;
-                const startTime = Date.now();
-    
-                return new Promise<boolean>((resolve) => {
-                    const checkCanvas = () => {
-                        if (Date.now() - startTime > timeout) {
-                            resolve(true);
-                            return;
-                        }
-    
-                        setTimeout(() => {
-                            const currentData = ctx.getImageData(0, 0, width, height).data;
-                            if (JSON.stringify(previousData) === JSON.stringify(currentData)) {
-                                resolve(true);
-                            } else {
-                                previousData = currentData;
-                                checkCanvas();
-                            }
-                        }, checkInterval);
-                    };
-                    checkCanvas();
-                });
-            },
-            { 
-                canvas: await canvasHandle.evaluateHandle((el) => el as HTMLCanvasElement),
-                checkInterval,
-                timeout
-            },
-            { timeout }
+          (selector) => {
+            const canvas = document.querySelector(selector);
+            return canvas?.getAttribute("data-engine-status") === "stop";
+          },
+          '.force-graph-container canvas',
+          { timeout }
         );
     }
-
+      
     async getCanvasScaling(): Promise<{ scaleX: number; scaleY: number }> {
         const { scaleX, scaleY } = await this.canvasElement.evaluate((canvas: HTMLCanvasElement) => {
             const ctx = canvas.getContext('2d');

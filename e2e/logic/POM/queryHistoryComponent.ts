@@ -69,6 +69,7 @@ export default class QueryHistory extends GraphPage {
         await this.clickOnQueryHistory();
         await this.ClickOnSelectQueryInHistoryBtn(queryNumber);
         await this.clickOnRunBtnInQueryHistory();
+        await this.waitForCanvasAnimationToEnd();
     }
 
     async getQueryHistoryEditor(): Promise<string | null> {
