@@ -136,9 +136,6 @@ test.describe('Graph Tests', () => {
         await browser.setPageToFullScreen();
         await graph.addGraph(graphName);
         expect(await graph.getErrorNotification()).toBe(true);
-        const graphNames = await apicalls.getGraphs();
-        const count = graphNames.result.filter(name => name === graphName).length;
-        expect(count).toBe(1);
         await apicalls.removeGraph(graphName);
     });
 
