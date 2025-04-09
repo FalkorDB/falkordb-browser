@@ -3,7 +3,7 @@
 'use client'
 
 import { LifeBuoy, LogOut, Settings } from "lucide-react";
-import { Dispatch, SetStateAction, useContext } from "react";
+import { useContext } from "react";
 import Image from "next/image";
 import { cn } from "@/lib/utils";
 import { useRouter, usePathname } from "next/navigation";
@@ -18,7 +18,7 @@ import CreateGraph from "./CreateGraph";
 import { IndicatorContext } from "./provider";
 
 interface Props {
-    onSetGraphName?: Dispatch<SetStateAction<string>>
+    onSetGraphName?: (newGraphName: string) => void
     graphNames?: string[]
 }
 
