@@ -5,7 +5,7 @@ import { expect, test } from "@playwright/test";
 import BrowserWrapper from "../infra/ui/browserWrapper";
 import ApiCalls from "../logic/api/apiCalls";
 import urls from '../config/urls.json'
-import { FETCH_ALL_NODES } from "../config/constants";
+import { FETCH_FIRST_TEN_NODES } from "../config/constants";
 import DataPanel from "../logic/POM/dataPanelComponent";
 import { getRandomString } from "../infra/utils";
 
@@ -29,12 +29,12 @@ test.describe('Data panel Tests', () => {
         const graph = await browser.createNewPage(DataPanel, urls.graphUrl);
         await browser.setPageToFullScreen();
         await graph.selectExistingGraph(graphName);
-        await graph.insertQuery(FETCH_ALL_NODES);
+        await graph.insertQuery(FETCH_FIRST_TEN_NODES);
         await graph.clickRunQuery();
         await graph.searchForElementInCanvas("bob");
         await graph.rightClickAtCanvasCenter();
         await graph.modifyNodeHeaderAttribute("attributetest");
-        const response = await apicalls.runQuery(graphName, FETCH_ALL_NODES ?? "");
+        const response = await apicalls.runQuery(graphName, FETCH_FIRST_TEN_NODES ?? "");
         console.log(response);
         
         const labels = response.result.data.map(item => item.n.labels);
@@ -50,7 +50,7 @@ test.describe('Data panel Tests', () => {
         const graph = await browser.createNewPage(DataPanel, urls.graphUrl);
         await browser.setPageToFullScreen();
         await graph.selectExistingGraph(graphName);
-        await graph.insertQuery(FETCH_ALL_NODES);
+        await graph.insertQuery(FETCH_FIRST_TEN_NODES);
         await graph.clickRunQuery();
         await graph.searchForElementInCanvas("alice");
         await graph.rightClickAtCanvasCenter();
@@ -65,12 +65,12 @@ test.describe('Data panel Tests', () => {
         const graph = await browser.createNewPage(DataPanel, urls.graphUrl);
         await browser.setPageToFullScreen();
         await graph.selectExistingGraph(graphName);
-        await graph.insertQuery(FETCH_ALL_NODES);
+        await graph.insertQuery(FETCH_FIRST_TEN_NODES);
         await graph.clickRunQuery();
         await graph.searchForElementInCanvas("alice");
         await graph.rightClickAtCanvasCenter();
         await graph.addAttribute("age", "30");
-        const response = await apicalls.runQuery(graphName, FETCH_ALL_NODES ?? "");
+        const response = await apicalls.runQuery(graphName, FETCH_FIRST_TEN_NODES ?? "");
         const person = response.result.data.find(item => 'age' in item.n.properties);
         console.log(response);
         expect(person?.n.properties.age).toBe("30");
@@ -84,7 +84,7 @@ test.describe('Data panel Tests', () => {
         const graph = await browser.createNewPage(DataPanel, urls.graphUrl);
         await browser.setPageToFullScreen();
         await graph.selectExistingGraph(graphName);
-        await graph.insertQuery(FETCH_ALL_NODES);
+        await graph.insertQuery(FETCH_FIRST_TEN_NODES);
         await graph.clickRunQuery();
         await graph.searchForElementInCanvas("alice");
         await graph.rightClickAtCanvasCenter();
@@ -99,12 +99,12 @@ test.describe('Data panel Tests', () => {
         const graph = await browser.createNewPage(DataPanel, urls.graphUrl);
         await browser.setPageToFullScreen();
         await graph.selectExistingGraph(graphName);
-        await graph.insertQuery(FETCH_ALL_NODES);
+        await graph.insertQuery(FETCH_FIRST_TEN_NODES);
         await graph.clickRunQuery();
         await graph.searchForElementInCanvas("alice");
         await graph.rightClickAtCanvasCenter();
         await graph.removeAttribute();
-        const response = await apicalls.runQuery(graphName, FETCH_ALL_NODES ?? "");
+        const response = await apicalls.runQuery(graphName, FETCH_FIRST_TEN_NODES ?? "");
         console.log(response);
         const person = response.result.data.find(item => 'age' in item.n.properties);
         expect(person?.n.properties.age).toBeUndefined();
@@ -119,7 +119,7 @@ test.describe('Data panel Tests', () => {
         const graph = await browser.createNewPage(DataPanel, urls.graphUrl);
         await browser.setPageToFullScreen();
         await graph.selectExistingGraph(graphName);
-        await graph.insertQuery(FETCH_ALL_NODES);
+        await graph.insertQuery(FETCH_FIRST_TEN_NODES);
         await graph.clickRunQuery();
         await graph.searchForElementInCanvas("alice");
         await graph.rightClickAtCanvasCenter(); 
@@ -134,12 +134,12 @@ test.describe('Data panel Tests', () => {
         const graph = await browser.createNewPage(DataPanel, urls.graphUrl);
         await browser.setPageToFullScreen();
         await graph.selectExistingGraph(graphName);
-        await graph.insertQuery(FETCH_ALL_NODES);
+        await graph.insertQuery(FETCH_FIRST_TEN_NODES);
         await graph.clickRunQuery();
         await graph.searchForElementInCanvas("alice");
         await graph.rightClickAtCanvasCenter();
         await graph.modifyAttribute("70");
-        const response = await apicalls.runQuery(graphName, FETCH_ALL_NODES ?? "");
+        const response = await apicalls.runQuery(graphName, FETCH_FIRST_TEN_NODES ?? "");
         console.log(response);
         const person = response.result.data.find(item => 'age' in item.n.properties);
         expect(person?.n.properties.age).toBe("70");
@@ -154,7 +154,7 @@ test.describe('Data panel Tests', () => {
         const graph = await browser.createNewPage(DataPanel, urls.graphUrl);
         await browser.setPageToFullScreen();
         await graph.selectExistingGraph(graphName);
-        await graph.insertQuery(FETCH_ALL_NODES);
+        await graph.insertQuery(FETCH_FIRST_TEN_NODES);
         await graph.clickRunQuery();
         await graph.searchForElementInCanvas("alice");
         await graph.rightClickAtCanvasCenter();
@@ -169,12 +169,12 @@ test.describe('Data panel Tests', () => {
         const graph = await browser.createNewPage(DataPanel, urls.graphUrl);
         await browser.setPageToFullScreen();
         await graph.selectExistingGraph(graphName);
-        await graph.insertQuery(FETCH_ALL_NODES);
+        await graph.insertQuery(FETCH_FIRST_TEN_NODES);
         await graph.clickRunQuery();
         await graph.searchForElementInCanvas("alice");
         await graph.rightClickAtCanvasCenter();
         await graph.deleteNodeViaDataPanel();
-        const response = await apicalls.runQuery(graphName, FETCH_ALL_NODES ?? "");
+        const response = await apicalls.runQuery(graphName, FETCH_FIRST_TEN_NODES ?? "");
         console.log(response);
         
         expect(response.result.data.length).toBe(1);
@@ -189,7 +189,7 @@ test.describe('Data panel Tests', () => {
         const graph = await browser.createNewPage(DataPanel, urls.graphUrl);
         await browser.setPageToFullScreen();
         await graph.selectExistingGraph(graphName);
-        await graph.insertQuery(FETCH_ALL_NODES);
+        await graph.insertQuery(FETCH_FIRST_TEN_NODES);
         await graph.clickRunQuery();
         const nodes = await graph.getNodesGraphStats();
         expect(parseInt(nodes ?? "")).toBe(1);
