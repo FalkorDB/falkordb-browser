@@ -7,7 +7,7 @@ import ApiCalls from "../logic/api/apiCalls";
 import Data from '../config/settingsConfigData.json';
 
 test.describe.configure({ mode: 'serial' });
-test.describe('Settings config tests', () => {
+test.describe('@config Settings config tests', () => {
     let browser: BrowserWrapper;
     let apiCall: ApiCalls;
 

@@ -106,15 +106,6 @@ export default defineConfig({
       testMatch: /.*settingsConfig\.spec\.ts$/,
       fullyParallel: false,
       retries: 1,
-      dependencies: [
-        'setup',
-        '[Admin] Chromium',
-        '[Admin] Firefox',
-        '[Read-Write] - Chromium',
-        '[Read-Write] - Firefox',
-        '[Read-Only] - Chromium',
-        '[Read-Only] - Firefox'
-      ],
     },
     {
       name: '[Admin: Serial Config - Firefox]',
@@ -126,16 +117,6 @@ export default defineConfig({
       testMatch: /.*settingsConfig\.spec\.ts$/,
       fullyParallel: false,
       retries: 1,
-      dependencies: [
-        'setup',
-        '[Admin] Chromium',
-        '[Admin] Firefox',
-        '[Read-Write] - Chromium',
-        '[Read-Write] - Firefox',
-        '[Read-Only] - Chromium',
-        '[Read-Only] - Firefox',
-        '[Admin: Serial Config - Chromium]'
-      ],
     },  
 
     // {
