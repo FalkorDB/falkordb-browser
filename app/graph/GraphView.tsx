@@ -3,7 +3,7 @@
 
 'use client'
 
-import { useRef, useState, useEffect, Dispatch, SetStateAction, useContext, useMemo } from "react";
+import { useRef, useState, useEffect, Dispatch, SetStateAction, useContext } from "react";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { ImperativePanelHandle } from "react-resizable-panels";
 import { ChevronLeft, GitGraph, Info, Maximize2, Minimize2, Pause, Play, Search, Table } from "lucide-react"
