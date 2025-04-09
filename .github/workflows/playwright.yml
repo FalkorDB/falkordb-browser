@@ -75,8 +75,7 @@ jobs:
       - name: Run only config test
         run: |
           npm run build
-          NEXTAUTH_SECRET=SECRET npm start & \
-          npx playwright test --grep @config --workers=1
+          NEXTAUTH_SECRET=SECRET npm start & npx playwright test --grep @config --workers=1
       - name: Ensure required directories exist
         run: |
           mkdir -p playwright-report
