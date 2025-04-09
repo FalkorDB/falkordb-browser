@@ -101,8 +101,14 @@ export default class ApiCalls {
         try {
             const headers = role === "admin" ? await getAdminToken() : undefined;
             const result = await getRequest(urls.api.graphUrl + graphName + "?query=" + query, headers);
-            return await result.json();
+            const rawText = await result.text();
+            console.log(`runQuery raw response for query "${query}":`, rawText);
+        
+            return JSON.parse(rawText);
+
         } catch (error) {
+            console.log(error);
+            
             throw new Error("Failed to run query.");
         }
     }
