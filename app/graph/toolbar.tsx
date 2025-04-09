@@ -13,7 +13,7 @@ import { IndicatorContext } from "../components/provider";
 interface Props {
     disabled?: boolean,
     chartRef: GraphRef,
-    onDeleteElement?: () => Promise<void>,
+    onDeleteElement: () => Promise<void>,
     onAddEntity?: () => void,
     onAddRelation?: () => void,
     deleteDisabled?: boolean,
@@ -101,11 +101,9 @@ export default function Toolbar({
                             </Button>
                         }
                     />
-                </div>}
-            {
-                (onAddEntity || onAddRelation || onDeleteElement) && session?.user?.role !== "Read-Only" &&
-                <p className="text-slate-600">|</p>
+                </div>
             }
+            <p className="text-slate-600">|</p>
             <div className="flex items-center gap-4">
                 <Button
                     className="text-nowrap"
@@ -115,7 +113,7 @@ export default function Toolbar({
                     label="Zoom In"
                     title="Zoom in for a closer view"
                     onClick={() => handleZoomClick(1.1)}
-                >   
+                >
                     <ZoomIn size={20} />
                 </Button>
                 <Button

@@ -154,30 +154,29 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
             selectedElements.push(selectedElement)
             setSelectedElement(undefined)
         }
+      
+        await Promise.all(selectedElements.map(async (element) => {
+            const type = !element.source
+            const result = await securedFetch(`api/graph/${prepareArg(graph.Id)}/${element.id} `, {
+                method: "DELETE",
+                body: JSON.stringify({ type })
+            }, toast, setIndicator)
 
-        const conditionsNodes: string[] = []
-        const conditionsEdges: string[] = []
+            if (!result.ok) return
 
-        selectedElements.forEach((element) => {
-            const { id } = element
-            if ("source" in element) {
-                conditionsEdges.push(`id(e) = ${id}`)
+            if (type) {
+                (element as Node).category.forEach((category) => {
+                    const cat = graph.CategoriesMap.get(category)
+                    if (cat) {
+                        cat.elements = cat.elements.filter((e) => e.id !== element.id)
+                        if (cat.elements.length === 0) {
+                            graph.Categories.splice(graph.Labels.findIndex(l => l.name === cat.name), 1)
+                            graph.CategoriesMap.delete(cat.name)
+                        }
+                    }
+                })
             } else {
-                conditionsNodes.push(`id(n) = ${id}`)
-            }
-        })
-
-        const q = `${conditionsNodes.length !== 0 ? `MATCH (n) WHERE ${conditionsNodes.join(" OR ")} DELETE n` : ""}${conditionsEdges.length > 0 && conditionsNodes.length > 0 ? " WITH * " : ""}${conditionsEdges.length !== 0 ? `MATCH ()-[e]-() WHERE ${conditionsEdges.join(" OR ")} DELETE e` : ""}`
-
-        const result = await securedFetch(`api/graph/${prepareArg(graph.Id)}/?query=${prepareArg(q)} `, {
-            method: "GET"
-        }, toast, setIndicator)
-
-        if (!result.ok) return
-
-        selectedElements.forEach((element) => {
-            if ("source" in element) {
-                const category = graph.LabelsMap.get(element.label)
+                const category = graph.LabelsMap.get((element as Link).label)
                 if (category) {
                     category.elements = category.elements.filter((e) => e.id !== element.id)
                     if (category.elements.length === 0) {
@@ -185,19 +184,8 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
                         graph.LabelsMap.delete(category.name)
                     }
                 }
-            } else {
-                element.category.forEach((category) => {
-                    const cat = graph.LabelsMap.get(category)
-                    if (cat) {
-                        cat.elements = cat.elements.filter((e) => e.id !== element.id)
-                        if (cat.elements.length === 0) {
-                            graph.Labels.splice(graph.Labels.findIndex(l => l.name === cat.name), 1)
-                            graph.LabelsMap.delete(cat.name)
-                        }
-                    }
-                })
             }
-        })
+        }))
 
         graph.removeElements(selectedElements)
 
@@ -213,6 +201,7 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
             description: `${selectedElements.length > 1 ? "Elements" : "Element"} deleted`,
         })
         handleCooldown()
+        onExpand(false)
     }
 
     const handleRunQuery = async (q: string, timeout?: number) => {
@@ -294,7 +283,7 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
                             <div className="flex items-center justify-between">
                                 <Toolbar
                                     disabled={!graph.Id}
-                                    deleteDisabled={selectedElements.length === 0 || !selectedElement}
+                                    deleteDisabled={selectedElements.length === 0 && !selectedElement}
                                     onDeleteElement={handleDeleteElement}
                                     chartRef={chartRef}
                                     displayAdd={false}

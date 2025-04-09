@@ -23,7 +23,7 @@ import { IndicatorContext } from "../components/provider";
 
 interface Props {
     obj: Node | Link
-    onExpand: () => void;
+    onExpand: (expand?: boolean) => void;
     onDeleteElement: () => Promise<void>;
     schema: Graph
 }
@@ -65,9 +65,9 @@ export default function SchemaDataPanel({ obj, onExpand, onDeleteElement, schema
     }
 
     const onSetAttribute = async (att: [string, string[]]) => {
-        const { ok } = await securedFetch(`api/schema/${prepareArg(schema.Id)}/${prepareArg(obj.id.toString())}`, {
+        const { ok } = await securedFetch(`api/schema/${prepareArg(schema.Id)}/${prepareArg(obj.id.toString())}/${prepareArg(att[0])}`, {
             method: "PATCH",
-            body: JSON.stringify({ type, attribute: att })
+            body: JSON.stringify({ type, attribute: att[1] })
         }, toast)
 
         return ok
@@ -125,9 +125,9 @@ export default function SchemaDataPanel({ obj, onExpand, onDeleteElement, schema
         try {
             setIsRemoveLoading(true)
 
-            const { ok } = await securedFetch(`api/schema/${prepareArg(schema.Id)}/${prepareArg(obj.id.toString())}`, {
+            const { ok } = await securedFetch(`api/schema/${prepareArg(schema.Id)}/${prepareArg(obj.id.toString())}/${prepareArg(key)}`, {
                 method: "DELETE",
-                body: JSON.stringify({ type, key })
+                body: JSON.stringify({ type })
             }, toast)
 
             if (ok) {
@@ -237,6 +237,14 @@ export default function SchemaDataPanel({ obj, onExpand, onDeleteElement, schema
             return
         }
 
+        if (label.includes(newLabel)) {
+            toast({
+                title: "Error",
+                description: "Label already exists",
+                variant: "destructive"
+            })
+            return
+        }
         try {
             setIsLabelLoading(true)
 
@@ -310,7 +318,7 @@ export default function SchemaDataPanel({ obj, onExpand, onDeleteElement, schema
                         links: schema.Elements.links.filter(element => element.id !== node.id)
                     }
                 }
-                
+
                 setLabel(prev => prev.filter(l => l !== removeLabel))
             }
         } finally {

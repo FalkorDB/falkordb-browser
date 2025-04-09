@@ -22,7 +22,7 @@ import { IndicatorContext } from "../components/provider";
 interface Props {
     obj: Node | Link;
     setObj: Dispatch<SetStateAction<Node | Link | undefined>>;
-    onExpand: () => void;
+    onExpand: (expand?: boolean) => void;
     graph: Graph;
     onDeleteElement: () => Promise<void>;
 }
@@ -85,11 +85,11 @@ export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement,
         }
         try {
             if (actionType === "set") setIsSetLoading(true)
-            const result = await securedFetch(`api/graph/${prepareArg(graph.Id)}/${id}`, {
+            const result = await securedFetch(`api/graph/${prepareArg(graph.Id)}/${id}/${key}`, {
                 method: "POST",
                 body: JSON.stringify({
-                    key,
-                    value: val
+                    value: val,
+                    type
                 })
             }, toast, setIndicator)
 
@@ -140,18 +140,17 @@ export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement,
         try {
             setIsRemoveLoading(true)
             const { id } = obj
-            const success = (await securedFetch(`api/graph/${prepareArg(graph.Id)}/${id}`, {
+            const success = (await securedFetch(`api/graph/${prepareArg(graph.Id)}/${id}/${key}`, {
                 method: "DELETE",
-                body: JSON.stringify({
-                    key,
-                })
+                body: JSON.stringify({ type }),
             }, toast, setIndicator)).ok
 
             if (success) {
                 const value = obj.data[key]
 
                 graph.removeProperty(key, id)
-                setObj({ ...obj, data: { ...obj.data, [key]: undefined } })
+                delete obj.data[key]
+                setObj({ ...obj })
 
                 toast({
                     title: "Success",
@@ -253,6 +252,11 @@ export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement,
             graph.removeLabel(removeLabel, node)
             setObj({ ...node, category: node.category.filter((c) => c !== removeLabel) })
         }
+    }
+
+    const handleDeleteElement = async () => {
+        await onDeleteElement()
+        setDeleteOpen(false)
     }
 
     return (
@@ -405,7 +409,11 @@ export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement,
                                                     </>
                                                     : hover === key &&
                                                     <>
-                                                        <Button variant="button" onClick={() => handleSetEditable(key, obj.data[key])}>
+                                                        <Button
+                                                            variant="button"
+                                                            onClick={() => handleSetEditable(key, obj.data[key])}
+                                                            disabled={isAddValue}
+                                                        >
                                                             <Pencil size={20} />
                                                         </Button>
                                                         <DialogComponent
@@ -507,6 +515,7 @@ export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement,
                     {
                         session?.user?.role !== "Read-Only" &&
                         <Button
+                            disabled={attributes.some((key) => key === editable)}
                             variant="Primary"
                             label="Add Attribute"
                             title="Add a new attribute"
@@ -524,7 +533,7 @@ export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement,
                         description={`Are you sure you want to delete this ${type ? "Node" : "Relation"}?`}
                         open={deleteOpen}
                         setOpen={setDeleteOpen}
-                        onDeleteElement={onDeleteElement}
+                        onDeleteElement={handleDeleteElement}
                         trigger={
                             <Button
                                 variant="Primary"

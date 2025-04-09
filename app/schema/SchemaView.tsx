@@ -42,7 +42,7 @@ export default function SchemaView({ schema, fetchCount }: Props) {
     const [data, setData] = useState<GraphData>(schema.Elements)
     const { toast } = useToast()
     const { setIndicator } = useContext(IndicatorContext)
-    
+
     useEffect(() => {
         setData({ ...schema.Elements })
     }, [schema.Elements, schema.Id])
@@ -120,28 +120,16 @@ export default function SchemaView({ schema, fetchCount }: Props) {
             setSelectedElement(undefined)
         }
 
-        const conditionsNodes: string[] = []
-        const conditionsEdges: string[] = []
-
-        stateSelectedElements.forEach((element) => {
-            const { id } = element
-            if (element.source) {
-                conditionsEdges.push(`id(e) = ${id}`)
-            } else {
-                conditionsNodes.push(`id(n) = ${id}`)
-            }
-        })
-
-        const q = `${conditionsNodes.length > 0 ? `MATCH (n) WHERE ${conditionsNodes.join(" OR ")} DELETE n` : ""}${conditionsEdges.length > 0 && conditionsNodes.length > 0 ? " WITH * " : ""}${conditionsEdges.length > 0 ? `MATCH ()-[e]-() WHERE ${conditionsEdges.join(" OR ")} DELETE e` : ""}`
-        const result = await securedFetch(`api/graph/${prepareArg(schema.Id)}_schema/?query=${prepareArg(q)} `, {
-            method: "GET"
-        }, toast, setIndicator)
-
-        if (!result.ok) return
-
-        stateSelectedElements.forEach((element) => {
+        await Promise.all(stateSelectedElements.map(async (element) => {
             const { id } = element
             const type = !("source" in element)
+            const result = await securedFetch(`api/schema/${prepareArg(schema.Id)}/${prepareArg(id.toString())}`, {
+                method: "DELETE",
+                body: JSON.stringify({ type }),
+            }, toast, setIndicator)
+
+            if (!result.ok) return
+
             if (type) {
                 schema.Elements.nodes.splice(schema.Elements.nodes.findIndex(node => node.id === element.id), 1)
                 schema.NodesMap.delete(id)
@@ -149,6 +137,7 @@ export default function SchemaView({ schema, fetchCount }: Props) {
                 schema.Elements.links.splice(schema.Elements.links.findIndex(link => link.id === element.id), 1)
                 schema.EdgesMap.delete(id)
             }
+
             if (fetchCount) fetchCount()
 
             if (type) {
@@ -172,55 +161,15 @@ export default function SchemaView({ schema, fetchCount }: Props) {
                     }
                 }
             }
-        })
+        }))
 
         schema.removeLinks()
 
         setSelectedElement(undefined)
         setSelectedElements([])
         setData({ ...schema.Elements })
-
-        dataPanel.current?.collapse()
+        onExpand(false)
     }
-
-    // const handleSetCategory = async (category: string) => {
-    //     if (!selectedElement) return false
-
-    //     const { id } = getElementId(selectedElement)
-    //     const q = `MATCH (n) WHERE ID(n) = ${id} REMOVE n:${selectedElement.category} SET n:${category}`
-    //     const success = (await securedFetch(`api/graph/${prepareArg(schema.Id)}_schema/?query=${prepareArg(q)}`, {
-    //         method: "GET"
-    //     })).ok
-
-    //     if (success) {
-    //         schema.Elements.forEach(({ data: d }) => {
-    //             if (d.id !== id) return
-
-    //             // eslint-disable-next-line no-param-reassign
-    //             d.category = category
-
-    //             setSelectedElement({ ...selectedElement, category })
-
-    //             const prevCategory = schema.CategoriesMap.get(selectedElement.category) as Category
-
-    //             schema.updateCategories(prevCategory.name, true)
-
-    //             const [c] = schema.createCategory([category])
-
-    //             chartRef.current?.elements().forEach(n => {
-    //                 if (n.data().category === category) {
-    //                     // eslint-disable-next-line no-param-reassign
-    //                     n.data().category = category
-    //                     // eslint-disable-next-line no-param-reassign
-    //                     n.data().color = schema.getCategoryColorValue(c.index)
-    //                 }
-    //             });
-    //             chartRef.current?.elements().layout(LAYOUT).run();
-
-    //         })
-    //     }
-    //     return success
-    // }
 
     const onCreateElement = async (attributes: [string, string[]][], label?: string[]) => {
         if (!isAddEntity && selectedNodes[0] === undefined && selectedNodes[1] === undefined) {

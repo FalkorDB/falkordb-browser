@@ -9,7 +9,7 @@ import Button from "../components/ui/Button";
 import { IndicatorContext } from "../components/provider";
 
 interface Props {
-    onDeleteElement: () => void
+    onDeleteElement: () => Promise<void>
     trigger: React.ReactNode
     open: boolean
     setOpen: (open: boolean) => void
