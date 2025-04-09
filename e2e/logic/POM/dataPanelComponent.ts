@@ -195,32 +195,47 @@ export default class DataPanel extends GraphPage {
         await this.clickOnAddButtonInDataPanelHeader();
         await this.fillInputButtonInDataPanelHeader(attribute);
         await this.clickOnSaveButtonInDataPanelHeader();
-        await this.clickOnRemoveAttributeButtonInDataPanelHeader();
+        await Promise.all([
+            this.page.waitForResponse(res => res.status() === 200),
+            this.clickOnRemoveAttributeButtonInDataPanelHeader()
+        ]);
     }
 
     async addAttribute(attribute: string, attributeValue: string): Promise<void>{
         await this.clickAddAttributeButtonInGraphDataPanel();
         await this.fillAttributeInputInGraphDataPanel(0, attribute);
         await this.fillAttributeInputInGraphDataPanel(1, attributeValue);
-        await this.clickSaveAttributeButtonInGraphDataPanel();
+        await Promise.all([
+            this.page.waitForResponse(res => res.status() === 200),
+            this.clickSaveAttributeButtonInGraphDataPanel()
+        ]);
     }
 
     async removeAttribute(): Promise<void>{
         await this.hoverLastAttributeRowInGraphDataPanell();
         await this.clickDeleteAttributeButtonForFirstRowInGraphDataPanel();
-        await this.clickDeleteButtonInDialog();
+        await Promise.all([
+            this.page.waitForResponse(res => res.status() === 200),
+            this.clickDeleteButtonInDialog()
+        ]);
     }
 
     async modifyAttribute(input: string): Promise<void>{
         await this.hoverLastAttributeRowInGraphDataPanell();
         await this.clickEditAttributeButtonForFirstRowInGraphDataPanel();
-        await this.fillAttributeValueInputInGraphDataPanel(input)
-        await this.clickSaveAttributeButtonInGraphDataPanel();
+        await this.fillAttributeValueInputInGraphDataPanel(input);
+        await Promise.all([
+            this.page.waitForResponse(res => res.status() === 200),
+            this.clickSaveAttributeButtonInGraphDataPanel()
+        ]);
     }
 
     async deleteNodeViaDataPanel(): Promise<void>{
         await this.clickDeleteNodeButtonInGraphDataPanel();
-        await this.clickDeleteButtonInDialog();
+        await Promise.all([
+            this.page.waitForResponse(res => res.status() === 200),
+            this.clickDeleteButtonInDialog()
+        ]);
     }
 
 }
