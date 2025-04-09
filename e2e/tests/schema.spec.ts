@@ -156,7 +156,7 @@ test.describe('Schema Tests', () => {
     });
 
     invalidNodeInputs.forEach(({ description, key, type, value, isRequired, isUnique }) => {
-        test.skip(`@admin Validate relation attribute with invalid input doesn't update list: ${description}`, async () => {
+        test(`@admin Validate relation attribute with invalid input doesn't update list: ${description}`, async () => {
             const schemaName = getRandomString('schema');
             await apicalls.addSchemaNode(schemaName, 'CREATE (a:person1 {id: "Integer!*-1"}), (b:person2 {id: "Integer!*-2"}) RETURN a, b');
             await waitForApiSuccess(() => apicalls.getSchemas(), res => res.opts.includes(schemaName));
