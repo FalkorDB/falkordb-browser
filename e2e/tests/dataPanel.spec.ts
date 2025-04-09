@@ -7,7 +7,7 @@ import ApiCalls from "../logic/api/apiCalls";
 import urls from '../config/urls.json'
 import { FETCH_ALL_NODES } from "../config/constants";
 import DataPanel from "../logic/POM/dataPanelComponent";
-import { getRandomString, waitForApiSuccess } from "../infra/utils";
+import { getRandomString } from "../infra/utils";
 
 test.describe('Data panel Tests', () => {
     let browser: BrowserWrapper;
@@ -22,7 +22,7 @@ test.describe('Data panel Tests', () => {
         await browser.closeBrowser();
     })
 
-    test(`@readwrite Validate modifying node attributes header via UI and validate via API`, async () => {
+    test(`@readwrite Validate modifying node attributes header via UI and validate via API`, async () => {//x
         const graphName = getRandomString('datapanel');        
         await apicalls.addGraph(graphName);
         await apicalls.runQuery(graphName, 'CREATE (:Person {name: "Alice"}), (:Person {name: "Bob"})');
@@ -35,6 +35,8 @@ test.describe('Data panel Tests', () => {
         await graph.rightClickAtCanvasCenter();
         await graph.modifyNodeHeaderAttribute("attributetest");
         const response = await apicalls.runQuery(graphName, FETCH_ALL_NODES ?? "");
+        console.log(response);
+        
         const labels = response.result.data.map(item => item.n.labels);
         expect(labels.flat()).toContain('attributetest');
         await apicalls.removeGraph(graphName);
@@ -56,7 +58,7 @@ test.describe('Data panel Tests', () => {
         await apicalls.removeGraph(graphName);
     });
 
-    test(`@readwrite Validate adding new attribute for node via ui and validation via API`, async () => {
+    test(`@readwrite Validate adding new attribute for node via ui and validation via API`, async () => {//x
         const graphName = getRandomString('datapanel');        
         await apicalls.addGraph(graphName);
         await apicalls.runQuery(graphName, 'CREATE (:Person {name: "Alice"}), (:Person {name: "Bob"})');
@@ -70,6 +72,7 @@ test.describe('Data panel Tests', () => {
         await graph.addAttribute("age", "30");
         const response = await apicalls.runQuery(graphName, FETCH_ALL_NODES ?? "");
         const person = response.result.data.find(item => 'age' in item.n.properties);
+        console.log(response);
         expect(person?.n.properties.age).toBe("30");
         await apicalls.removeGraph(graphName);
     });
@@ -89,7 +92,7 @@ test.describe('Data panel Tests', () => {
         await apicalls.removeGraph(graphName);
     });
 
-    test(`@readwrite Validate remove attribute for node via ui and validation via API`, async () => {
+    test(`@readwrite Validate remove attribute for node via ui and validation via API`, async () => {//x
         const graphName = getRandomString('datapanel');        
         await apicalls.addGraph(graphName);
         await apicalls.runQuery(graphName, 'CREATE (a:Person {name: "Alice", age: 30}), (b:Person {name: "Bob"})');
@@ -102,6 +105,7 @@ test.describe('Data panel Tests', () => {
         await graph.rightClickAtCanvasCenter();
         await graph.removeAttribute();
         const response = await apicalls.runQuery(graphName, FETCH_ALL_NODES ?? "");
+        console.log(response);
         const person = response.result.data.find(item => 'age' in item.n.properties);
         expect(person?.n.properties.age).toBeUndefined();
         await apicalls.removeGraph(graphName);
@@ -123,7 +127,7 @@ test.describe('Data panel Tests', () => {
         await apicalls.removeGraph(graphName);
     });
 
-    test(`@readwrite Validate modify attribute for node via ui and validation via API`, async () => {
+    test(`@readwrite Validate modify attribute for node via ui and validation via API`, async () => {//x
         const graphName = getRandomString('datapanel');        
         await apicalls.addGraph(graphName);
         await apicalls.runQuery(graphName, 'CREATE (a:Person {name: "Alice", age: 30}), (b:Person {name: "Bob"})');
@@ -136,6 +140,7 @@ test.describe('Data panel Tests', () => {
         await graph.rightClickAtCanvasCenter();
         await graph.modifyAttribute("70");
         const response = await apicalls.runQuery(graphName, FETCH_ALL_NODES ?? "");
+        console.log(response);
         const person = response.result.data.find(item => 'age' in item.n.properties);
         expect(person?.n.properties.age).toBe("70");
         await apicalls.removeGraph(graphName);
@@ -157,7 +162,7 @@ test.describe('Data panel Tests', () => {
         await apicalls.removeGraph(graphName);
     });
 
-    test(`@readwrite Validate delete node via ui and validation via API`, async () => {
+    test(`@readwrite Validate delete node via ui and validation via API`, async () => {//x
         const graphName = getRandomString('datapanel');        
         await apicalls.addGraph(graphName);
         await apicalls.runQuery(graphName, 'CREATE (a:Person {name: "Alice", age: 30}), (b:Person {name: "Bob"})');
@@ -170,6 +175,8 @@ test.describe('Data panel Tests', () => {
         await graph.rightClickAtCanvasCenter();
         await graph.deleteNodeViaDataPanel();
         const response = await apicalls.runQuery(graphName, FETCH_ALL_NODES ?? "");
+        console.log(response);
+        
         expect(response.result.data.length).toBe(1);
         await apicalls.removeGraph(graphName);
     });
