@@ -31,12 +31,10 @@ test.describe('Canvas Tests', () => {
             await graph.addGraph(graphName);
             await graph.insertQuery(BATCH_CREATE_PERSONS);
             await graph.clickRunQuery();
-
             const searchQuery = `Person ${node}`;
             await graph.searchForElementInCanvas(searchQuery);
             await graph.hoverAtCanvasCenter();
             expect(await graph.getNodeCanvasToolTip()).toBe(searchQuery);
-
             await apicalls.removeGraph(graphName);
         });
     }
