@@ -70,7 +70,7 @@ export default function Page() {
             })
             return null
         }
-        
+
         const result = await securedFetch(`api/graph/${prepareArg(graphName)}/?query=${prepareArg(q)}&timeout=${timeout}`, {
             method: "GET"
         }, toast, setIndicator)
@@ -124,7 +124,10 @@ export default function Page() {
 
     return (
         <div className="Page">
-            <Header onSetGraphName={setGraphName} graphNames={graphNames} />
+            <Header onSetGraphName={(newGraphName) => {
+                setGraphName(newGraphName)
+                setGraphNames(prev => [...prev, newGraphName])
+            }} graphNames={graphNames} />
             <div className="h-1 grow p-8 px-10 flex flex-col gap-4">
                 <Selector
                     setGraphName={setGraphName}

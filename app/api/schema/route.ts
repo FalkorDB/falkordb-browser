@@ -16,7 +16,7 @@ export async function GET() {
         const schemaNames = result
             .filter(name => name.endsWith("_schema"))
             .map(name => {
-                let graphName = name.split("_")[0]
+                let graphName = name.replace(/_schema(?=[^_]*$)/, "");
                 if (graphName.startsWith("{") && graphName.endsWith("}")) {
                     graphName = graphName.substring(1, graphName.length - 1)
                 }

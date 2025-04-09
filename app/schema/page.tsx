@@ -55,7 +55,10 @@ export default function Page() {
 
     return (
         <div className="Page">
-            <Header onSetGraphName={setSchemaName} graphNames={schemaNames} />
+            <Header onSetGraphName={(newSchemaName) => {
+                setSchemaName(newSchemaName)
+                setSchemaNames(prev => [...prev, newSchemaName])
+            }} graphNames={schemaNames} />
             <div className="h-1 grow p-8 px-10 flex flex-col gap-8">
                 <Selector
                     setGraphName={setSchemaName}
