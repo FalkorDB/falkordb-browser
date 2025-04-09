@@ -103,6 +103,7 @@ export default defineConfig({
         storageState: 'playwright/.auth/admin.json',
       },
       grep: /@admin/,
+      dependencies: ['setup'],
       testMatch: /.*settingsConfig\.spec\.ts$/,
     },
     {
@@ -112,6 +113,7 @@ export default defineConfig({
         storageState: 'playwright/.auth/admin.json',
       },
       grep: /@admin/,
+      dependencies: ['setup'],
       testMatch: /.*settingsConfig\.spec\.ts$/,
     },  
 
