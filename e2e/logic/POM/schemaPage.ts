@@ -5,7 +5,7 @@
 /* eslint-disable arrow-body-style */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { Locator } from "@playwright/test";
-import {interactWhenVisible } from "@/e2e/infra/utils";
+import {interactWhenVisible, waitForElementToBeVisible } from "@/e2e/infra/utils";
 import GraphPage from "./graphPage";
 
 export default class SchemaPage extends GraphPage {
@@ -108,6 +108,10 @@ export default class SchemaPage extends GraphPage {
 
     private get deleteNodeInDataPanel(): Locator {
         return this.page.locator('//div[contains(@class, "DataPanel")]//button[contains(text(), "Delete Node")]');
+    }
+
+    private get deleteRelationInDataPanel(): Locator {
+        return this.page.locator('//div[contains(@class, "DataPanel")]//button[contains(text(), "Delete Relation")]');
     }
 
     private get confirmDeleteNodeInDataPanel(): Locator {
@@ -214,16 +218,24 @@ export default class SchemaPage extends GraphPage {
         await interactWhenVisible(this.editValueBtnInDataPanel, el => el.click(), "edit value button in data panel");
     }
       
-    async getAttributeRowsCount(): Promise<boolean> {
+    async hasAttributeRows(): Promise<boolean> {
         return await interactWhenVisible(
           this.attributeRows,
           async el => (await el.count()) > 0,
           "attribute rows in data panel"
         );
-    }
+      }
+      
+    async getAttributeRowsCount(): Promise<number> {
+        return await this.attributeRows.count();
+    }      
       
     async clickDeleteNodeInDataPanel(): Promise<void> {
         await interactWhenVisible(this.deleteNodeInDataPanel, el => el.click(), "delete node in data panel");
+    }
+
+    async clickDeleteRelationInDataPanel(): Promise<void> {
+        await interactWhenVisible(this.deleteRelationInDataPanel, el => el.click(), "delete relation in data panel");
     }
       
     async clickConfirmDeleteNodeInDataPanel(): Promise<void> {
@@ -244,6 +256,14 @@ export default class SchemaPage extends GraphPage {
       
     async getRelationshipTypesPanelBtn(): Promise<string | null> {
         return await interactWhenVisible(this.relationshipTypesPanelBtn, el => el.textContent(), "relationship types panel button");
+    }
+
+    async isRelationshipTypesPanelBtnHidden(): Promise<boolean> {
+        return await this.relationshipTypesPanelBtn.isHidden();
+    }
+    
+    async isCategoriesPanelBtnHidden(): Promise<boolean> {
+        return await this.categoriesPanelBtn.isHidden();
     }
 
     async addSchema(schemaName: string): Promise<void> {
@@ -267,23 +287,35 @@ export default class SchemaPage extends GraphPage {
         await Promise.all([
             this.page.waitForResponse(res => res.status() === 200),
             this.clickConfirmDeleteNodeInDataPanel()
-          ]);          
+        ]);          
     }
 
-    async addRelation(title: string, key: string, type: string, desc: string, unique: boolean, required: boolean): Promise<void> {
+    async addLabel(title: string): Promise<void>{
         await this.clickAddRelation();
         await this.clickAddBtnInHeaderDataPanel();
         await this.insertDataPanelHeader(title);
         await this.clickSaveBtnInHeaderDataPanel();
+    }
+
+    async prepareRelation(title: string, key: string, type: string, desc: string, unique: boolean, required: boolean): Promise<void> {
+        await this.addLabel(title);
         await this.addAttribute(key, type, desc, unique, required);
+    }
+    
+    async clickRelationBetweenNodes(): Promise<void> {
         const schema = await this.getNodeScreenPositions();
         await this.nodeClick(schema[0].screenX, schema[0].screenY);
         await this.nodeClick(schema[1].screenX, schema[1].screenY);
         await this.clickCreateNewEdgeBtnInDataPanel();
-    }
+    }    
 
-    async deleteRelation(node: string): Promise<void> {
-        await this.clickAddRelation();
+    async deleteRelation(x: number, y: number): Promise<void> {
+        await this.nodeClick(x, y);
+        await this.clickDeleteRelationInDataPanel();
+        await Promise.all([
+            this.page.waitForResponse(res => res.status() === 200),
+            this.clickConfirmDeleteNodeInDataPanel()
+        ]);
     }
 
     async addAttribute(key: string, type: string, desc: string, unique: boolean, required: boolean): Promise<void>{
@@ -298,6 +330,10 @@ export default class SchemaPage extends GraphPage {
             await this.clickRequiredAtiveRadioBtn();
         }
         await this.clickAddActiveBtnInDataPanel();
+    }
+
+    async deleteAttribute(key: string): Promise<void>{
+       
     }
 
     async getCanvasTransform(canvasElement: Locator): Promise<any> {
@@ -365,6 +401,7 @@ export default class SchemaPage extends GraphPage {
                 targetScreenY: top + target.y * d + f - 370,
                 midX: (left + source.x * a + e - 40 + left + target.x * a + e - 40) / 2,
                 midY: (top + source.y * d + f - 370 + top + target.y * d + f - 370) / 2,
+                ...link
             };
         });
     

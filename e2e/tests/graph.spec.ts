@@ -8,6 +8,7 @@ import ApiCalls from "../logic/api/apiCalls";
 import GraphPage from "../logic/POM/graphPage";
 import urls from '../config/urls.json'
 import queryData from '../config/queries.json'
+import { getRandomString } from "../infra/utils";
 
 test.describe('Graph Tests', () => {
     let browser: BrowserWrapper;
@@ -263,6 +264,16 @@ test.describe('Graph Tests', () => {
         const updateGraph = await graph.getGraphDetails();
         expect(updateGraph[0].x).not.toBe(initialGraph[0].x);
         expect(updateGraph[0].y).not.toBe(initialGraph[0].y);
+        await apicalls.removeGraph(graphName);
+    });
+
+    test(`@admin validate that attempting to duplicate a graph with the same name displays an error notification`, async () => {
+        const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+        await browser.setPageToFullScreen();
+        const graphName = getRandomString('graph');
+        await graph.addGraph(graphName);
+        await graph.addGraph(graphName);
+        expect(await graph.getErrorNotification()).toBe(true);
         await apicalls.removeGraph(graphName);
     });
 
