@@ -154,6 +154,7 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
             selectedElements.push(selectedElement)
             setSelectedElement(undefined)
         }
+      
         await Promise.all(selectedElements.map(async (element) => {
             const type = !element.source
             const result = await securedFetch(`api/graph/${prepareArg(graph.Id)}/${element.id} `, {
@@ -169,7 +170,7 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
                     if (cat) {
                         cat.elements = cat.elements.filter((e) => e.id !== element.id)
                         if (cat.elements.length === 0) {
-                            graph.Categories.splice(graph.Categories.findIndex(c => c.name === cat.name), 1)
+                            graph.Categories.splice(graph.Labels.findIndex(l => l.name === cat.name), 1)
                             graph.CategoriesMap.delete(cat.name)
                         }
                     }
