@@ -592,16 +592,6 @@ export class Graph {
     }
 
     public removeLabel(label: string, selectedElement: Node) {
-        this.Elements.nodes.forEach((node) => {
-            if (node.id === selectedElement.id) {
-                node.category = node.category.filter(c => c !== label)
-                if (node.category.length === 0) {
-                    node.category.push(this.createCategory([""], node as Node)[0].name)
-                }
-                node.color = this.getCategoryColorValue(this.CategoriesMap.get(node.category[0])?.index)
-            }
-        })
-
         this.Data = this.Data.map(row => Object.fromEntries(Object.entries(row).map(([key, cell]) => {
             if (cell && typeof cell === "object" && cell.id === selectedElement.id && "labels" in cell) {
                 const newCell = { ...cell }
@@ -613,26 +603,6 @@ export class Graph {
     }
 
     public addLabel(label: string, selectedElement: Node) {
-        this.Elements.nodes.forEach((node) => {
-            if (node.id === selectedElement.id) {
-                if (node.category.includes("")) {
-                    const emptyCategory = this.CategoriesMap.get("")
-                    if (emptyCategory) {
-                        emptyCategory.elements = emptyCategory.elements.filter((element) => element.id !== node.id)
-                        if (emptyCategory.elements.length === 0) {
-                            this.Categories.splice(this.Categories.findIndex(c => c.name === emptyCategory.name), 1)
-                            this.CategoriesMap.delete(emptyCategory.name)
-                            node.category = node.category.filter((c) => c !== "")
-                        }
-                    }
-                }
-                if (node.category.length === 0) {
-                    node.color = this.getCategoryColorValue(this.CategoriesMap.get(label)?.index)
-                }
-                node.category.push(label)
-            }
-        })
-
         this.Data = this.Data.map(row => Object.fromEntries(Object.entries(row).map(([key, cell]) => {
             if (cell && typeof cell === "object" && cell.id === selectedElement.id && "labels" in cell) {
                 const newCell = { ...cell }
@@ -644,11 +614,6 @@ export class Graph {
     }
 
     public removeProperty(key: string, id: number) {
-        this.getElements().forEach((e) => {
-            if (e.id !== id) return
-            delete e.data[key]
-        })
-
         this.Data = this.Data.map(row => {
             const newRow = Object.entries(row).map(([k, cell]) => {
                 if (cell && typeof cell === "object" && cell.id === id) {
@@ -662,11 +627,6 @@ export class Graph {
     }
 
     public setProperty(key: string, val: string, id: number) {
-        this.getElements().forEach(e => {
-            if (e.id !== id) return
-            e.data[key] = val
-        })
-
         this.Data = this.Data.map(row => Object.fromEntries(Object.entries(row).map(([k, cell]) => {
             if (cell && typeof cell === "object" && cell.id === id) {
                 return [k, { ...cell, properties: { ...cell.properties, [key]: val } }]
