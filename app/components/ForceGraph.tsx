@@ -218,7 +218,8 @@ export default function ForceGraph({
                 nodeCanvasObjectMode={() => 'after'}
                 linkCanvasObjectMode={() => 'after'}
                 linkWidth={(link) => (selectedElement && ("source" in selectedElement) && selectedElement.id === link.id
-                    || hoverElement && ("source" in hoverElement) && hoverElement.id === link.id) ? 2 : 1}
+                    || hoverElement && ("source" in hoverElement) && hoverElement.id === link.id)
+                    || (selectedElements.length > 0 && selectedElements.some(el => el.id === link.id && !("source" in el))) ? 2 : 1}
                 nodeCanvasObject={(node, ctx) => {
                     if (graph.Elements.nodes.length === 1) {
                         node.x = 0
