@@ -100,18 +100,30 @@ export default class ApiCalls {
     async runQuery(graphName: string, query: string, role?: string): Promise<RunQueryResponse> {
         try {
             const headers = role === "admin" ? await getAdminToken() : undefined;
-            const result = await getRequest(urls.api.graphUrl + graphName + "?query=" + query, headers);
-            const rawText = await result.text();
-            console.log(`runQuery raw response for query "${query}":`, rawText);
-        
-            return JSON.parse(rawText);
-
+    
+            let result = await getRequest(`${urls.api.graphUrl}${graphName}?query=${encodeURIComponent(query)}`, headers);
+            let rawText = await result.text();
+            console.log(`Initial runQuery response for "${query}":`, rawText);
+    
+            let json = JSON.parse(rawText);
+    
+            // Poll if response contains a numeric result (job ID)
+            while (typeof json.result === "number") {
+                const jobId = json.result;
+                result = await getRequest(`${urls.api.graphUrl}${graphName}/query/?id=${jobId}`, headers);
+                rawText = await result.text();
+                console.log(`Polling runQuery response for job ${jobId}:`, rawText);
+                json = JSON.parse(rawText);
+            }
+    
+            return json;
+    
         } catch (error) {
-            console.log(error);
-            
+            console.error(error);
             throw new Error("Failed to run query.");
         }
     }
+    
     
     async modifySettingsRole(roleName: string, roleValue: string): Promise<ModifySettingsRoleResponse> {
         try {
