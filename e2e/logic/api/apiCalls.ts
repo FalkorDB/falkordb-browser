@@ -103,8 +103,7 @@ export default class ApiCalls {
     
             let result = await getRequest(`${urls.api.graphUrl}${graphName}?query=${encodeURIComponent(query)}`, headers);
             let rawText = await result.text();
-            console.log(`Initial runQuery response for "${query}":`, rawText);
-    
+
             let json = JSON.parse(rawText);
     
             // Poll if response contains a numeric result (job ID)
@@ -112,7 +111,6 @@ export default class ApiCalls {
                 const jobId = json.result;
                 result = await getRequest(`${urls.api.graphUrl}${graphName}/query/?id=${jobId}`, headers);
                 rawText = await result.text();
-                console.log(`Polling runQuery response for job ${jobId}:`, rawText);
                 json = JSON.parse(rawText);
             }
     

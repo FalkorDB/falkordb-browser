@@ -195,29 +195,20 @@ export default class DataPanel extends GraphPage {
         await this.clickOnAddButtonInDataPanelHeader();
         await this.fillInputButtonInDataPanelHeader(attribute);
         await this.clickOnSaveButtonInDataPanelHeader();
-        await Promise.all([
-            this.page.waitForResponse(res => res.status() === 200),
-            this.clickOnRemoveAttributeButtonInDataPanelHeader()
-        ]);
+        await this.clickOnRemoveAttributeButtonInDataPanelHeader();
     }
 
     async addAttribute(attribute: string, attributeValue: string): Promise<void>{
         await this.clickAddAttributeButtonInGraphDataPanel();
         await this.fillAttributeInputInGraphDataPanel(0, attribute);
         await this.fillAttributeInputInGraphDataPanel(1, attributeValue);
-        await Promise.all([
-            this.page.waitForResponse(res => res.status() === 200),
-            this.clickSaveAttributeButtonInGraphDataPanel()
-        ]);
+        await this.clickSaveAttributeButtonInGraphDataPanel();
     }
 
     async removeAttribute(): Promise<void>{
         await this.hoverLastAttributeRowInGraphDataPanell();
         await this.clickDeleteAttributeButtonForFirstRowInGraphDataPanel();
-        await Promise.all([
-            this.page.waitForResponse(res => res.status() === 200),
-            this.clickDeleteButtonInDialog()
-        ]);
+        await this.clickDeleteButtonInDialog();
     }
 
     async modifyAttribute(input: string): Promise<void>{
@@ -232,10 +223,7 @@ export default class DataPanel extends GraphPage {
 
     async deleteNodeViaDataPanel(): Promise<void>{
         await this.clickDeleteNodeButtonInGraphDataPanel();
-        await Promise.all([
-            this.page.waitForResponse(res => res.status() === 200),
-            this.clickDeleteButtonInDialog()
-        ]);
+        await this.clickDeleteButtonInDialog();
     }
 
 }
