@@ -35,8 +35,6 @@ test.describe('Data panel Tests', () => {
         await graph.rightClickAtCanvasCenter();
         await graph.modifyNodeHeaderAttribute("attributetest");
         const response = await apicalls.runQuery(graphName, FETCH_FIRST_TEN_NODES ?? "");
-        console.log(response);
-        
         const labels = response.result.data.map(item => item.n.labels);
         expect(labels.flat()).toContain('attributetest');
         await apicalls.removeGraph(graphName);
@@ -72,7 +70,6 @@ test.describe('Data panel Tests', () => {
         await graph.addAttribute("age", "30");
         const response = await apicalls.runQuery(graphName, FETCH_FIRST_TEN_NODES ?? "");
         const person = response.result.data.find(item => 'age' in item.n.properties);
-        console.log(response);
         expect(person?.n.properties.age).toBe("30");
         await apicalls.removeGraph(graphName);
     });
@@ -105,7 +102,6 @@ test.describe('Data panel Tests', () => {
         await graph.rightClickAtCanvasCenter();
         await graph.removeAttribute();
         const response = await apicalls.runQuery(graphName, FETCH_FIRST_TEN_NODES ?? "");
-        console.log(response);
         const person = response.result.data.find(item => 'age' in item.n.properties);
         expect(person?.n.properties.age).toBeUndefined();
         await apicalls.removeGraph(graphName);
@@ -140,7 +136,6 @@ test.describe('Data panel Tests', () => {
         await graph.rightClickAtCanvasCenter();
         await graph.modifyAttribute("70");
         const response = await apicalls.runQuery(graphName, FETCH_FIRST_TEN_NODES ?? "");
-        console.log(response);
         const person = response.result.data.find(item => 'age' in item.n.properties);
         expect(person?.n.properties.age).toBe("70");
         await apicalls.removeGraph(graphName);
@@ -175,8 +170,6 @@ test.describe('Data panel Tests', () => {
         await graph.rightClickAtCanvasCenter();
         await graph.deleteNodeViaDataPanel();
         const response = await apicalls.runQuery(graphName, FETCH_FIRST_TEN_NODES ?? "");
-        console.log(response);
-        
         expect(response.result.data.length).toBe(1);
         await apicalls.removeGraph(graphName);
     });
