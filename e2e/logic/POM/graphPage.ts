@@ -440,12 +440,14 @@ export default class GraphPage extends BasePage {
     }
 
     async getNodesGraphStats(): Promise<string | null>{
+        await this.page.waitForTimeout(300);
         const isVisible = await waitForElementToBeVisible(this.nodesGraphStats);
         if (!isVisible) throw new Error("node graph stats button is not visible!");
         return await this.nodesGraphStats.textContent();
     }
 
     async getEdgesGraphStats(): Promise<string | null>{
+        await this.page.waitForTimeout(300);
         const isVisible = await waitForElementToBeVisible(this.edgesGraphStats);
         if (!isVisible) throw new Error("edges graph stats button is not visible!");
         return await this.edgesGraphStats.textContent();

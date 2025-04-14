@@ -175,6 +175,6 @@ test.describe('Graph Tests', () => {
         await graph.addGraph(graphName);
         await graph.addGraph(graphName);
         expect(await graph.getErrorNotification()).toBe(true);
-        await apicalls.removeGraph(graphName);
+        await apiCall.removeGraph(graphName);
     });
 })

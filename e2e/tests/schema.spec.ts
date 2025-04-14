@@ -208,4 +208,75 @@ test.describe('Schema Tests', () => {
         expect(await schema.getErrorNotification()).toBe(true);
         await apicalls.removeSchema(schemaName);
     });
+
+    test(`@admin validate that deleting a schema node decreases node count`, async () => {
+        const schemaName = getRandomString('schema');
+        await apicalls.addSchemaNode(schemaName, 'CREATE (a:person1 {id: "Integer!*-1"}), (b:person2 {id: "Integer!*-2"}) RETURN a, b');
+        await waitForApiSuccess(() => apicalls.getSchemas(), res => res.opts.includes(schemaName));
+        const schema = await browser.createNewPage(SchemaPage, urls.schemaUrl);
+        await browser.setPageToFullScreen();
+        await schema.selectExistingGraph(schemaName);
+        const nodes = await schema.getNodeScreenPositions();
+        const initCount = parseInt(await schema.getNodesGraphStats() ?? "");
+        await schema.deleteNode(nodes[0].screenX, nodes[0].screenY);
+        expect(parseInt(await schema.getNodesGraphStats() ?? "")).toBe(initCount - 1);
+        await apicalls.removeSchema(schemaName);
+    });
+
+    test(`@admin validate that adding a schema node increases node count`, async () => {
+        const schemaName = getRandomString('schema');
+        await apicalls.addSchemaNode(schemaName, 'CREATE (a:person1 {id: "Integer!*-1"}), (b:person2 {id: "Integer!*-2"}) RETURN a, b');
+        await waitForApiSuccess(() => apicalls.getSchemas(), res => res.opts.includes(schemaName));
+        const schema = await browser.createNewPage(SchemaPage, urls.schemaUrl);
+        await browser.setPageToFullScreen();
+        await schema.selectExistingGraph(schemaName);
+        const initCount = parseInt(await schema.getNodesGraphStats() ?? "");
+        await schema.addNode("person", 'id', "Integer", "100", true, true);
+        expect(parseInt(await schema.getNodesGraphStats() ?? "")).toBe(initCount + 1);
+        await apicalls.removeSchema(schemaName);
+    });
+
+    test(`@admin validate that adding a schema relation increases edge count`, async () => {
+        const schemaName = getRandomString('schema');
+        await apicalls.addSchemaNode(schemaName, 'CREATE (a:person1 {id: "Integer!*-1"}), (b:person2 {id: "Integer!*-2"}) RETURN a, b');
+        await waitForApiSuccess(() => apicalls.getSchemas(), res => res.opts.includes(schemaName));
+        const schema = await browser.createNewPage(SchemaPage, urls.schemaUrl);
+        await browser.setPageToFullScreen();
+        await schema.selectExistingGraph(schemaName);
+        const initCount = parseInt(await schema.getEdgesGraphStats() ?? "");
+        await schema.prepareRelation("knows", 'id', "Integer", "100", true, true);
+        await schema.clickRelationBetweenNodes();
+        expect(parseInt(await schema.getEdgesGraphStats() ?? "")).toBe(initCount + 1);
+        await apicalls.removeSchema(schemaName);
+    });
+
+    test(`@admin validate that deleting a schema relation decreases edge count`, async () => {
+        const schemaName = getRandomString('schema');
+        await apicalls.addSchemaNode(schemaName, 'CREATE (a:person1 {id: "Integer!*-1"}), (b:person2 {id: "Integer!*-2"}), (a)-[:knows]->(b) RETURN a, b');
+        await waitForApiSuccess(() => apicalls.getSchemas(), res => res.opts.includes(schemaName));
+        const schema = await browser.createNewPage(SchemaPage, urls.schemaUrl);
+        await browser.setPageToFullScreen();
+        await schema.selectExistingGraph(schemaName);
+        const initCount = parseInt(await schema.getEdgesGraphStats() ?? "");
+        const links1 = await schema.getLinkScreenPositions();
+        await schema.deleteRelation(links1[0].midX, links1[0].midY);
+        expect(parseInt(await schema.getEdgesGraphStats() ?? "")).toBe(initCount - 1);
+        await apicalls.removeSchema(schemaName);
+    });
+
+    test(`@admin Validate that deleting a node with connection also removes the node and its connected edges`, async () => {
+        const schemaName = getRandomString('schema');
+        await apicalls.addSchemaNode(schemaName, 'CREATE (a:person1 {id: "Integer!*-1"}), (b:person2 {id: "Integer!*-2"}), (a)-[:knows]->(b) RETURN a, b');
+        await waitForApiSuccess(() => apicalls.getSchemas(), res => res.opts.includes(schemaName));
+        const schema = await browser.createNewPage(SchemaPage, urls.schemaUrl);
+        await browser.setPageToFullScreen();
+        await schema.selectExistingGraph(schemaName);
+        const initEdgeCount = parseInt(await schema.getEdgesGraphStats() ?? "");
+        const initNodeCount = parseInt(await schema.getNodesGraphStats() ?? "");
+        const nodes = await schema.getNodeScreenPositions();
+        await schema.deleteNode(nodes[0].screenX, nodes[0].screenY);
+        expect(parseInt(await schema.getEdgesGraphStats() ?? "")).toBe(initEdgeCount - 1);
+        expect(parseInt(await schema.getNodesGraphStats() ?? "")).toBe(initNodeCount - 1);
+        await apicalls.removeSchema(schemaName);
+    });
 })
