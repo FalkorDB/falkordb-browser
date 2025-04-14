@@ -3,6 +3,7 @@ import urls from '../config/urls.json'
 import BrowserWrapper from "../infra/ui/browserWrapper";
 import PreferencesView from "../logic/POM/preferencesView";
 import ApiCalls from "../logic/api/apiCalls";
+import { getRandomString } from "../infra/utils";
 
 test.describe('Preferences Tests', () => {
     let browser: BrowserWrapper;
@@ -18,7 +19,7 @@ test.describe('Preferences Tests', () => {
     })
 
     test(`@admin remove color via UI -> verify color is removed via UI`, async () => {
-        const graphName = `preferences_${Date.now()}`;
+        const graphName = getRandomString('preferences');
         await apicalls.addGraph(graphName);
         const preferencesPage = await browser.createNewPage(PreferencesView, urls.graphUrl);
         await preferencesPage.selectExistingGraph(graphName);
@@ -31,19 +32,19 @@ test.describe('Preferences Tests', () => {
     })
 
     test(`@admin Modify color via UI -> verify color is modified via UI`, async () => {
-        const graphName = `preferences_${Date.now()}`;
+        const graphName = getRandomString('preferences');
         await apicalls.addGraph(graphName);
         const preferencesPage = await browser.createNewPage(PreferencesView, urls.graphUrl);
         await preferencesPage.selectExistingGraph(graphName);
         const color = await preferencesPage.getColorText();
         await preferencesPage.modifyColor();
         const modifiedColor = await preferencesPage.getColorText();
-        expect(modifiedColor).not.toBe(color);        expect(modifiedColor).not.toBe(color);
+        expect(modifiedColor).not.toBe(color);
         await apicalls.removeGraph(graphName);
     })
 
     test(`@admin Add color via UI -> reset colors via UI -> verify color is reset via UI`, async () => {
-        const graphName = `preferences_${Date.now()}`;
+        const graphName = getRandomString('preferences');
         await apicalls.addGraph(graphName);
         const preferencesPage = await browser.createNewPage(PreferencesView, urls.graphUrl);
         await preferencesPage.selectExistingGraph(graphName);
@@ -52,7 +53,6 @@ test.describe('Preferences Tests', () => {
         await preferencesPage.resetColors();
         const resetColorsCount = await preferencesPage.getColorsCount();
         expect(resetColorsCount).toBe(colorsCount);
-        await apicalls.removeGraph(graphName);
         await apicalls.removeGraph(graphName);
     })
 

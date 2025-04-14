@@ -238,7 +238,7 @@ export default function Selector({ setGraphName, graphName, runQuery, edgesCount
             <div className={cn("bg-foreground flex gap-4 justify-between items-center p-4 rounded-xl min-h-14", !selectedValue && "justify-end")}>
                 {
                     selectedValue &&
-                    <div className="flex gap-6">
+                    <div className="flex gap-6" id="graphStats">
                         <span>{nodesCount}&ensp;Nodes</span>
                         <p className="text-secondary">|</p>
                         <span>{edgesCount}&ensp;Edges</span>

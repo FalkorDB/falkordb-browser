@@ -7,11 +7,11 @@ import { useToast } from "@/components/ui/use-toast";
 import dynamic from "next/dynamic";
 import Header from "../components/Header";
 import { Graph, Link, Node } from "../api/graph/model";
-import GraphView from "./GraphView";
 import Tutorial from "./Tutorial";
 import { IndicatorContext } from "../components/provider";
 
 const Selector = dynamic(() => import("./Selector"), { ssr: false })
+const GraphView = dynamic(() => import("./GraphView"), { ssr: false })
 
 export default function Page() {
 
