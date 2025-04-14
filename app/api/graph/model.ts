@@ -300,13 +300,10 @@ export class Graph {
 
                 if (!source) {
                     [category] = this.createCategory([""])
-                }
-
-                if (!source) {
                     source = {
                         id: cell.sourceId,
                         category: [category!.name],
-                        color: this.getCategoryColorValue(),
+                        color: this.getCategoryColorValue(category!.index),
                         expand: false,
                         collapsed,
                         visible: true,
@@ -343,7 +340,7 @@ export class Graph {
                     source = {
                         id: cell.sourceId,
                         category: [category!.name],
-                        color: this.getCategoryColorValue(),
+                        color: this.getCategoryColorValue(category!.index),
                         expand: false,
                         collapsed,
                         visible: true,
@@ -361,7 +358,7 @@ export class Graph {
                     target = {
                         id: cell.destinationId,
                         category: [category!.name],
-                        color: this.getCategoryColorValue(),
+                        color: this.getCategoryColorValue(category!.index),
                         expand: false,
                         collapsed,
                         visible: true,
@@ -538,7 +535,7 @@ export class Graph {
         }
     }
 
-    public getCategoryColorValue(index = 0) {
+    public getCategoryColorValue(index: number) {
         if (index < this.COLORS_ORDER_VALUE.length) {
             return this.COLORS_ORDER_VALUE[index];
         }

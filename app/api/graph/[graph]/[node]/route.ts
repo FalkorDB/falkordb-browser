@@ -48,7 +48,7 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
         const graph = client.selectGraph(graphId);
         const query = type
             ? `MATCH (n) WHERE ID(n) = $nodeId DELETE n`
-            : `MATCH (n)-[e]-(m) WHERE ID(e) = $nodeId AND ID(m) = $nodeId DELETE e`;
+            : `MATCH ()-[e]-() WHERE ID(e) = $nodeId DELETE e`;
         const result = await graph.query(query, { params: { nodeId } });
 
         if (!result) throw new Error("Something went wrong")
