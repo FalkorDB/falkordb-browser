@@ -53,7 +53,7 @@ export default class ApiCalls {
     
     async getGraphs(): Promise<GetGraphsResponse> {
         try {
-            const result = await getRequest(`${urls.api.settingsUsers}`);
+            const result = await getRequest(`${urls.api.graphUrl}`);
             return await result.json();
         } catch (error) {
             throw new Error("Failed to retrieve graphs.");
@@ -100,12 +100,28 @@ export default class ApiCalls {
     async runQuery(graphName: string, query: string, role?: string): Promise<RunQueryResponse> {
         try {
             const headers = role === "admin" ? await getAdminToken() : undefined;
-            const result = await getRequest(urls.api.graphUrl + graphName + "?query=" + query, headers);
-            return await result.json();
+    
+            let result = await getRequest(`${urls.api.graphUrl}${graphName}?query=${encodeURIComponent(query)}`, headers);
+            let rawText = await result.text();
+
+            let json = JSON.parse(rawText);
+    
+            // Poll if response contains a numeric result (job ID)
+            while (typeof json.result === "number") {
+                const jobId = json.result;
+                result = await getRequest(`${urls.api.graphUrl}${graphName}/query/?id=${jobId}`, headers);
+                rawText = await result.text();
+                json = JSON.parse(rawText);
+            }
+    
+            return json;
+    
         } catch (error) {
+            console.error(error);
             throw new Error("Failed to run query.");
         }
     }
+    
     
     async modifySettingsRole(roleName: string, roleValue: string): Promise<ModifySettingsRoleResponse> {
         try {

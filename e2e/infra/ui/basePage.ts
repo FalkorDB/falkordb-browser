@@ -19,4 +19,7 @@ export default class BasePage {
         await this.page.reload({ waitUntil: 'networkidle' });
     }
 
+    async waitForPageIdle() {
+        await this.page.waitForLoadState('networkidle')
+    }
 }

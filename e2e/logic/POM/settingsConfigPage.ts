@@ -1,15 +1,11 @@
 import { Locator } from "@playwright/test";
 import BasePage from "@/e2e/infra/ui/basePage";
+import { waitForElementToBeVisible } from "@/e2e/infra/utils";
 
 export default class SettingsConfigPage extends BasePage {
 
     private get roleContentValue(): (role: string) => Locator {
         return (role: string) => this.page.locator(`//tbody/tr[@data-id='${role}']/td[3]/div/p`)
-    }
-
-    async getRoleContentValue(role: string): Promise<string | null> {
-        const value = await this.roleContentValue(role).textContent();
-        return value
     }
 
     private get EditRoleButton(): (role: string) => Locator {
@@ -44,12 +40,58 @@ export default class SettingsConfigPage extends BasePage {
         return this.page.locator("//table//tbody//tr");
     }
 
-    async modifyRoleValue(role: string, input: string): Promise<string | null> {
+    private get undoBtnInToastMsg(): Locator {
+        return this.page.locator("//button[contains(text(), 'Undo')]");
+    }
+
+    async hoverOnRoleContentValue(role: string): Promise<void>{
+        const isVisible = await waitForElementToBeVisible(this.roleContentValue(role));
+        if (!isVisible) throw new Error("role content value is not visible!");
         await this.roleContentValue(role).hover();
+    }
+
+    async clickEditRoleButton(role: string): Promise<void>{
+        const isVisible = await waitForElementToBeVisible(this.EditRoleButton(role));
+        if (!isVisible) throw new Error("edit role button is not visible!");
         await this.EditRoleButton(role).click();
+    }
+
+    async fillRoleValueInput(role: string, input: string): Promise<void>{
+        const isVisible = await waitForElementToBeVisible(this.roleValueInput(role));
+        if (!isVisible) throw new Error("role value input is not visible!");
         await this.roleValueInput(role).fill(input);
+    }
+
+    async clickConfirmValueInputBtn(role: string): Promise<void>{
+        const isVisible = await waitForElementToBeVisible(this.confirmValueInputBtn(role));
+        if (!isVisible) throw new Error("confirm value input button is not visible!");
         await this.confirmValueInputBtn(role).click();
-        const value = await this.getRoleContentValue(role)
+    }
+
+    async getRoleContentValue(role: string): Promise<string | null> {
+        const isVisible = await waitForElementToBeVisible(this.roleContentValue(role));
+        if (!isVisible) throw new Error("role content value is not visible!");
+        const value = await this.roleContentValue(role).textContent();
+        return value
+    }
+
+    async clickOnUndoBtnInToastMsg(): Promise<void> {
+        const isVisible = await waitForElementToBeVisible(this.undoBtnInToastMsg);
+        if (!isVisible) throw new Error("undo button in toast is not visible!");
+        await this.undoBtnInToastMsg.click();
+    }
+
+    async isUndoBtnInToastMsg(): Promise<void> {
+        await this.page.waitForTimeout(500);
+        await this.undoBtnInToastMsg.isVisible();
+    }
+
+    async modifyRoleValue(role: string, input: string): Promise<string | null> {
+        await this.hoverOnRoleContentValue(role);
+        await this.clickEditRoleButton(role);
+        await this.roleValueInput(role).fill(input);
+        await this.clickConfirmValueInputBtn(role);
+        const value = await this.getRoleContentValue(role);
         return value
     }
 
