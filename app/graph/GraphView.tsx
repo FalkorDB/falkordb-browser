@@ -80,7 +80,6 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
 
     const handleCooldown = (ticks?: number) => {
         setCooldownTicks(ticks)
-        if (typeof window === 'undefined') return;
 
         const canvas = document.querySelector('.force-graph-container canvas');
         if(!canvas) return
