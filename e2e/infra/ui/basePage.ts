@@ -22,5 +22,4 @@ export default class BasePage {
     async waitForPageIdle() {
         await this.page.waitForLoadState('networkidle')
     }
-
 }

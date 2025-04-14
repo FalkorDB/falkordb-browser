@@ -130,34 +130,22 @@ export default class GraphPage extends BasePage {
         return (graph: string) => this.page.locator(`//table//tbody/tr[@data-id='${graph}']//td[2]//button[1]`);
     }
 
-    /* QUERY History */
-
-    private get queryHistoryDialog(): Locator {
-        return this.page.locator("//div[contains(@id, 'queryHistory')]");
+    private get valueCellByAttributeInDataPanel(): (attribute: string) => Locator {
+        return (attribute: string) => this.page.locator(`//div[contains(@id, 'graphDataPanel')]//tbody//tr[td[contains(text(), '${attribute}')]]/td[last()]/button`);
     }
 
-    private get queryHistory(): Locator {
-        return this.page.locator("//button[contains(text(), 'Query History')]");
+    private get nodesGraphStats(): Locator {
+        return this.page.locator("//div[@id='graphStats']//span[1]");
     }
 
-    private get queryInHistory(): (query: string) => Locator {
-        return (query: string) => this.page.locator(`//div[contains(@id, 'queryHistory')]//ul//li[${query}]`);
+    private get edgesGraphStats(): Locator {
+        return this.page.locator("//div[@id='graphStats']//span[2]");
     }
 
-    private get selectQueryInHistoryBtn(): (query: string) => Locator {
-        return (query: string) => this.page.locator(`//div[contains(@id, 'queryHistory')]//ul//li[${query}]/button`);
-    }
-
-    private get runBtnInQueryHistory(): Locator {
-        return this.page.locator("//div[contains(@id, 'queryHistory')]//button[contains(text(), 'Run')]");
-    }
-
-    private get queryHistoryTextarea(): Locator {
-        return this.page.locator("#queryHistoryEditor textarea");
-    }
-
-    private get queryHistoryPanel(): Locator {
-        return this.page.locator("//div[@id='queryHistoryPanel']//ul");
+    async insertGraphInSearchInput(graph: string): Promise<void>{
+        const isVisible = await waitForElementToBeVisible(this.graphSelectSearchInput);
+        if (!isVisible) throw new Error("graph search input is not visible!");
+        await this.graphSelectSearchInput.fill(graph);
     }
 
     private get showTimeoutInput(): Locator {
@@ -208,7 +196,7 @@ export default class GraphPage extends BasePage {
     }
 
     async exportGraph(): Promise<Download> {
-        await this.page.waitForLoadState('networkidle');
+        await this.waitForPageIdle();
         const [download] = await Promise.all([
             this.page.waitForEvent('download'),
             this.exportDataBtn.click(),
@@ -273,7 +261,7 @@ export default class GraphPage extends BasePage {
         }
     }
 
-    async nodeClick(x: number, y: number): Promise<void> {  
+    async nodeClick(x: number, y: number): Promise<void> {
         await this.canvasElement.hover({ position: { x, y } });
         await this.page.waitForTimeout(500);
         await this.canvasElement.click({ position: { x, y }, button: 'right' });
@@ -287,7 +275,7 @@ export default class GraphPage extends BasePage {
     }
 
     async selectGraphFromList(graph: string): Promise<void> {
-        await this.graphSelectSearchInput.fill(graph);
+        await this.insertGraphInSearchInput(graph);
         const graphLocator = this.selectGraphList(graph);
         const isVisible = await waitForElementToBeVisible(graphLocator);
         if (!isVisible) throw new Error("select Graph From List button is not visible!");
@@ -324,7 +312,7 @@ export default class GraphPage extends BasePage {
     }
 
     async getNodeCanvasToolTip(): Promise<string | null>{
-        await this.page.waitForTimeout(500);
+        await this.page.waitForTimeout(1000);
         const toolTipText = await this.nodeCanvasToolTip.textContent();
         return toolTipText;
     }
@@ -389,72 +377,6 @@ export default class GraphPage extends BasePage {
             screenY: transformData.top + node.y * d + f - 380,
         }));
     }
-    
-    /* QUERY History */
-
-    async clickOnQueryHistory(): Promise<void> {
-        const isVisible = await waitForElementToBeVisible(this.queryHistory);
-        if (!isVisible) throw new Error("query history button is not visible!");
-        await this.queryHistory.click();
-    }
-
-    async selectQueryInHistory(query: string): Promise<void> {
-        await this.queryInHistory(query).click();
-    }
-
-    async getQueryHistory(query: string): Promise<boolean> {
-        await this.page.waitForTimeout(500);
-        const isVisible = await this.queryInHistory(query).isVisible();
-        return isVisible;
-    }
-
-    async clickOnRunBtnInQueryHistory(): Promise<void> {
-        await this.runBtnInQueryHistory.click();
-    }
-
-    async isQueryHistoryDialog(): Promise<void> {
-        await this.queryHistoryDialog.isVisible();
-    }
-
-    async ClickOnSelectQueryInHistoryBtn(queryNumber: string): Promise<void> {
-        await this.selectQueryInHistoryBtn(queryNumber).click();
-    }
-
-    async getSelectQueryInHistoryText(queryNumber: string): Promise<string | null> {
-        const text = await this.selectQueryInHistoryBtn(queryNumber).textContent();
-        return text;
-    }
-
-    async runAQueryFromHistory(queryNumber: string): Promise<void> {
-        await this.clickOnQueryHistory();
-        await this.ClickOnSelectQueryInHistoryBtn(queryNumber);
-        await this.clickOnRunBtnInQueryHistory();
-        await this.waitForCanvasAnimationToEnd();
-    }
-
-    async getQueryHistoryEditor(): Promise<string | null> {
-        await this.page.waitForTimeout(500);
-        const value = await this.queryHistoryTextarea.inputValue();
-        return value;
-    }
-
-    async getQueryHistoryPanel(): Promise<string[]> {
-        const rawText = await this.queryHistoryPanel.allTextContents();
-    
-        if (!rawText || rawText.length === 0) {
-            return [];
-        }
-        const formattedText = rawText[0]
-            .replace(/Query internal execution time:.*/, '')
-            .replace(/([a-z]+: \d+)/gi, '$1\n')
-            .split('\n')
-            .map(line => line.trim())
-            .filter(line => line.length > 0);
-    
-        return formattedText;
-    }
-    
-    /* End of QUERY History */
 
     async changeNodePosition(x: number, y: number): Promise<void> {
         const box = (await this.canvasElement.boundingBox())!;
@@ -486,53 +408,19 @@ export default class GraphPage extends BasePage {
         await this.page.mouse.move(centerX, centerY);
     }
     
-    async waitForCanvasAnimationToEnd(timeout = 15000, checkInterval = 500): Promise<void> {
-        const canvasHandle = await this.canvasElement.elementHandle();
-    
-        if (!canvasHandle) {
-            throw new Error("Canvas element not found!");
-        }
-    
+    async waitForCanvasAnimationToEnd(timeout = 5000): Promise<void> {
+        await this.page.waitForTimeout(1500); // fit to size animation 
+      
         await this.page.waitForFunction(
-            async ({ canvas, checkInterval, timeout }) => {
-                const ctx = canvas.getContext('2d');
-                if (!ctx) return false;
-    
-                const width = canvas.width;
-                const height = canvas.height;
-    
-                let previousData = ctx.getImageData(0, 0, width, height).data;
-                const startTime = Date.now();
-    
-                return new Promise<boolean>((resolve) => {
-                    const checkCanvas = () => {
-                        if (Date.now() - startTime > timeout) {
-                            resolve(true);
-                            return;
-                        }
-    
-                        setTimeout(() => {
-                            const currentData = ctx.getImageData(0, 0, width, height).data;
-                            if (JSON.stringify(previousData) === JSON.stringify(currentData)) {
-                                resolve(true);
-                            } else {
-                                previousData = currentData;
-                                checkCanvas();
-                            }
-                        }, checkInterval);
-                    };
-                    checkCanvas();
-                });
-            },
-            { 
-                canvas: await canvasHandle.evaluateHandle((el) => el as HTMLCanvasElement),
-                checkInterval,
-                timeout
-            },
-            { timeout }
+          (selector) => {
+            const canvas = document.querySelector(selector);
+            return canvas?.getAttribute("data-engine-status") === "stop";
+          },
+          '.force-graph-container canvas',
+          { timeout }
         );
     }
-
+      
     async getCanvasScaling(): Promise<{ scaleX: number; scaleY: number }> {
         const { scaleX, scaleY } = await this.canvasElement.evaluate((canvas: HTMLCanvasElement) => {
             const ctx = canvas.getContext('2d');
@@ -545,6 +433,24 @@ export default class GraphPage extends BasePage {
         return { scaleX, scaleY };
     }
 
+    async getDataCellByAttrInDataPanel(attribute: string): Promise<string | null>{
+        const isVisible = await waitForElementToBeVisible(this.valueCellByAttributeInDataPanel(attribute));
+        if (!isVisible) throw new Error("value cell by attr button is not visible!");
+        return await this.valueCellByAttributeInDataPanel(attribute).textContent();
+    }
+
+    async getNodesGraphStats(): Promise<string | null>{
+        const isVisible = await waitForElementToBeVisible(this.nodesGraphStats);
+        if (!isVisible) throw new Error("node graph stats button is not visible!");
+        return await this.nodesGraphStats.textContent();
+    }
+
+    async getEdgesGraphStats(): Promise<string | null>{
+        const isVisible = await waitForElementToBeVisible(this.edgesGraphStats);
+        if (!isVisible) throw new Error("edges graph stats button is not visible!");
+        return await this.edgesGraphStats.textContent();
+    }
+    
     async addTimeout(timeout?: number): Promise<void> {
         await this.showTimeoutInput.click();
         if (timeout) {

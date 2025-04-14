@@ -80,6 +80,14 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
 
     const handleCooldown = (ticks?: number) => {
         setCooldownTicks(ticks)
+
+        const canvas = document.querySelector('.force-graph-container canvas');
+        if(!canvas) return
+        if(ticks === 0){
+            canvas.setAttribute('data-engine-status', 'stop')
+        } else {
+            canvas.setAttribute('data-engine-status', 'running')
+        }
     }
 
     useEffect(() => {

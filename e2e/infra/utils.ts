@@ -110,7 +110,9 @@ export async function getAdminToken(): Promise<Record<string, string> | undefine
 }
 
 export function getRandomString(prefix = '', delimiter = '_'): string {
-    return `${prefix}${prefix ? delimiter : ''}${crypto.randomUUID()}`;
+    const uuid = crypto.randomUUID();
+    const timestamp = Date.now();
+    return `${prefix}${prefix ? delimiter : ''}${uuid}-${timestamp}`;
 }
 
 export async function waitForApiSuccess<T>(
@@ -142,4 +144,3 @@ export async function interactWhenVisible<T>(element: Locator, action: (el: Loca
     if (!isVisible) throw new Error(`${name} is not visible!`);
     return action(element);
 }
-  

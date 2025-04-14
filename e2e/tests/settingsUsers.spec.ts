@@ -4,8 +4,9 @@ import BrowserWrapper from "../infra/ui/browserWrapper";
 import SettingsUsersPage from "../logic/POM/settingsUsersPage";
 import { user } from '../config/user.json'
 import ApiCalls from "../logic/api/apiCalls";
+import { getRandomString } from "../infra/utils";
 
-test.describe('Settings Tests', () => {
+test.describe('Settings users tests', () => {
     let browser: BrowserWrapper;
 
     test.beforeAll(async () => {
@@ -19,7 +20,7 @@ test.describe('Settings Tests', () => {
     test("@admin Add one new user -> validating user exists in the users list", async () => {
         const settingsUsersPage = await browser.createNewPage(SettingsUsersPage, urls.settingsUrl);
         await settingsUsersPage.navigateToUserTab();
-        const username = `user_${Date.now()}`;
+        const username = getRandomString('user');
         await settingsUsersPage.addUser({ userName: username, role: user.ReadWrite, password: user.password, confirmPassword: user.confirmPassword });
         const isVisible = await settingsUsersPage.verifyUserExists(username);
         await settingsUsersPage.removeUser(username);
@@ -29,7 +30,7 @@ test.describe('Settings Tests', () => {
     test("@admin Add one user -> remove one user -> Validate that the user has been removed", async () => {
         const settingsUsersPage = await browser.createNewPage(SettingsUsersPage, urls.settingsUrl);
         await settingsUsersPage.navigateToUserTab();
-        const username = `user_${Date.now()}`;
+        const username = getRandomString('user');
         await settingsUsersPage.addUser({ userName: username, role: user.ReadWrite, password: user.password, confirmPassword: user.confirmPassword });
         await settingsUsersPage.removeUser(username);
         await settingsUsersPage.refreshPage();
@@ -41,7 +42,7 @@ test.describe('Settings Tests', () => {
     test("@admin Add one user -> change the role -> Validate that the user role have been changed", async () => {
         const settingsUsersPage = await browser.createNewPage(SettingsUsersPage, urls.settingsUrl);
         await settingsUsersPage.navigateToUserTab();
-        const username = `user_${Date.now()}`
+        const username = getRandomString('user');
         await settingsUsersPage.addUser({ userName: username, role: user.ReadWrite, password: user.password, confirmPassword: user.confirmPassword });
         await settingsUsersPage.modifyUserRole(username, user.ReadOnly);
         await settingsUsersPage.refreshPage();
@@ -64,7 +65,7 @@ test.describe('Settings Tests', () => {
         test(`@admin Enter password for new user: ${invalidPassword} reason: ${description} `, async () => {
             const settingsUsersPage = await browser.createNewPage(SettingsUsersPage, urls.settingsUrl);
             await settingsUsersPage.navigateToUserTab();
-            const username = `user_${Date.now()}`;
+            const username = getRandomString('user');
             await settingsUsersPage.addUser({ userName: username, role: user.ReadWrite, password: invalidPassword, confirmPassword: invalidPassword });
             await settingsUsersPage.refreshPage();
             await settingsUsersPage.navigateToUserTab();
@@ -76,7 +77,7 @@ test.describe('Settings Tests', () => {
     test("@admin Attempt to add a user without assigning a role -> Verify that the user has not been added", async () => {
         const settingsUsersPage = await browser.createNewPage(SettingsUsersPage, urls.settingsUrl);
         await settingsUsersPage.navigateToUserTab();
-        const username = `user_${Date.now()}`;
+        const username = getRandomString('user');
         await settingsUsersPage.addUser({ userName: username, password: user.password, confirmPassword: user.confirmPassword });
         await settingsUsersPage.refreshPage();
         await settingsUsersPage.navigateToUserTab();
@@ -94,7 +95,7 @@ test.describe('Settings Tests', () => {
 
     test("@admin API Test: Add user via API -> Validated user existing via UI -> Delete user via API.", async () => {
         const apiCall = new ApiCalls();
-        const username = `user_${Date.now()}`;
+        const username = getRandomString('user');
         await apiCall.createUsers({ username, password: user.password, role: user.ReadOnly });
         const settingsUsersPage = await browser.createNewPage(SettingsUsersPage, urls.settingsUrl);
         await settingsUsersPage.navigateToUserTab();
@@ -115,7 +116,7 @@ test.describe('Settings Tests', () => {
 
     test(`@admin API Test: without passing a role, Attempt to add a user via api and validate the user was not added via ui`, async () => {
         const apiCall = new ApiCalls();
-        const username = `user_${Date.now()}`
+        const username = getRandomString('user');
         await apiCall.createUsers({ username, password: user.password, role: '' });
         const settingsUsersPage = await browser.createNewPage(SettingsUsersPage, urls.settingsUrl);
         await settingsUsersPage.navigateToUserTab();
@@ -125,7 +126,7 @@ test.describe('Settings Tests', () => {
     
     test(`@admin API Test: without passing a password, Attempt to add a user via api and validate the user was not added via ui`, async () => {
         const apiCall = new ApiCalls();
-        const username = `user_${Date.now()}`
+        const username = getRandomString('user');
         await apiCall.createUsers({ username, password: '', role: user.ReadOnly });
         const settingsUsersPage = await browser.createNewPage(SettingsUsersPage, urls.settingsUrl);
         await settingsUsersPage.navigateToUserTab();
@@ -135,7 +136,7 @@ test.describe('Settings Tests', () => {
 
     test(`@admin Validate user search filters table results`, async () => {
         const apiCall = new ApiCalls()
-        const username = `user_${Date.now()}`;
+        const username = getRandomString('user');
         await apiCall.createUsers({ username, password: user.password, role: user.ReadOnly })
         const settingsUsersPage = await browser.createNewPage(SettingsUsersPage, urls.settingsUrl)
         await settingsUsersPage.navigateToUserTab();

@@ -87,13 +87,13 @@ export default class NavBarComponent extends BasePage {
     }
 
     async Logout(): Promise<void> {
-        await this.page.waitForLoadState('networkidle');
+        await this.waitForPageIdle();
         await this.LogoutButton.click()
         await waitForURL(this.page, urls.loginUrl);
     }
 
     async clickOnFalkor(): Promise<Page> {
-        await this.page.waitForLoadState('networkidle');
+        await this.waitForPageIdle();
         const [newPage] = await Promise.all([
             this.page.waitForEvent('popup'),
             this.clickOnFalkorLogo(),
@@ -102,7 +102,7 @@ export default class NavBarComponent extends BasePage {
     }
 
     async clickOnDocumentation(): Promise<Page> {
-        await this.page.waitForLoadState('networkidle');
+        await this.waitForPageIdle();
         const [newPage] = await Promise.all([
             this.page.waitForEvent('popup'),
             this.clickOnHelpBtn(),
@@ -112,7 +112,7 @@ export default class NavBarComponent extends BasePage {
     }
 
     async clickOnSupport(): Promise<Page> {
-        await this.page.waitForLoadState('networkidle');
+        await this.waitForPageIdle();
         const [newPage] = await Promise.all([
             this.page.waitForEvent('popup'),
             this.clickOnHelpBtn(),
