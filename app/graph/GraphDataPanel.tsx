@@ -260,8 +260,8 @@ export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement,
     }
 
     return (
-        <div className="h-full flex flex-col gap-4 border-foreground border-[3px] rounded-lg">
-            <div className="flex justify-between items-center p-4">
+        <div className="h-full flex flex-col gap-4 border-foreground border-[3px] rounded-lg" id="graphDataPanel">
+            <div className="flex justify-between items-center p-4" id="dataPanelHeader">
                 <div className="flex gap-4 items-center">
                     <Button
                         variant="button"

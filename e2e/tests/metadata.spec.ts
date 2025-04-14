@@ -3,11 +3,12 @@ import BrowserWrapper from "../infra/ui/browserWrapper";
 import MetadataView from "../logic/POM/metadataView";
 import urls from "../config/urls.json";
 import APICalls from "../logic/api/apiCalls";
+import { getRandomString } from "../infra/utils";
 
 test.describe('Metadata Tests', () => {
     let browser: BrowserWrapper;
     let apiCalls : APICalls;
-    const GRAPH_NAME = "metadata-test";
+    const GRAPH_NAME = getRandomString('metadata');
 
     test.beforeAll(async () => {
         browser = new BrowserWrapper();
