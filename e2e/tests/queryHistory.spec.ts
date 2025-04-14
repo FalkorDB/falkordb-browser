@@ -44,7 +44,7 @@ test.describe('Query history Tests', () => {
         await graph.refreshPage();
         await graph.selectExistingGraph(graphName)
         await graph.runAQueryFromHistory("1")
-        const searchQuery = `Person 1`;
+        const searchQuery = `Alice`;
         await graph.searchForElementInCanvas(searchQuery);
         await graph.hoverAtCanvasCenter();
         expect(await graph.getNodeCanvasToolTip()).toBe(searchQuery);
