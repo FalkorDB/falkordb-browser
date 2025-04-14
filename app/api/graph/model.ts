@@ -528,6 +528,18 @@ export class Graph {
                 if (this.elements.nodes.map(n => n.id).includes(link.source.id) && this.elements.nodes.map(n => n.id).includes(link.target.id)) {
                     return link
                 }
+
+                const category = this.labelsMap.get(link.label)
+
+                if (category) {
+                    category.elements = category.elements.filter(e => e.id !== link.id)
+                 
+                    if (category.elements.length === 0) {
+                        this.labels.splice(this.labels.findIndex(c => c.name === category.name), 1)
+                        this.labelsMap.delete(category.name)
+                    }
+                }
+
                 this.linksMap.delete(link.id)
 
                 return undefined
