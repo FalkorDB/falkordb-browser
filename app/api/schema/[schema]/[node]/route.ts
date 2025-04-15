@@ -33,11 +33,11 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
         if (!result) throw new Error("Something went wrong")
 
-        
+
         return NextResponse.json({ result }, { status: 200 })
     } catch (error) {
         console.error(error)
-        return NextResponse.json({ error: (error as Error).message }, { status: 500 })
+        return NextResponse.json({ error: (error as Error).message }, { status: 400 })
     }
 }
 
@@ -52,6 +52,7 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
 
     const { schema, node } = await params
     const schemaName = `${schema}_schema`
+    const nodeId = Number(node)
     const { type } = await request.json()
 
     try {
@@ -59,15 +60,15 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
 
         const graph = client.selectGraph(schemaName)
         const query = type
-            ? `MATCH (n) WHERE ID(n) = ${node} DELETE n`
-            : `MATCH (a)-[e]-(b) WHERE ID(a) = ${node} AND ID(b) = ${node} DELETE e`
-        const result = await graph.query(query)
+            ? `MATCH (n) WHERE ID(n) = $nodeId DELETE n`
+            : `MATCH ()-[e]-() WHERE ID(e) = $nodeId DELETE e`
+        const result = await graph.query(query, { params: { nodeId } })
 
         if (!result) throw new Error("Something went wrong")
 
         return NextResponse.json({ message: "Node deleted successfully" }, { status: 200 })
     } catch (error) {
         console.error(error)
-        return NextResponse.json({ error: (error as Error).message }, { status: 500 })
+        return NextResponse.json({ error: (error as Error).message }, { status: 400 })
     }
 }
