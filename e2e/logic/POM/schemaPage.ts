@@ -5,7 +5,7 @@
 /* eslint-disable arrow-body-style */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { Locator } from "@playwright/test";
-import {interactWhenVisible, waitForElementToBeVisible } from "@/e2e/infra/utils";
+import { interactWhenVisible } from "@/e2e/infra/utils";
 import GraphPage from "./graphPage";
 
 export default class SchemaPage extends GraphPage {
@@ -303,7 +303,7 @@ export default class SchemaPage extends GraphPage {
     }
     
     async clickRelationBetweenNodes(): Promise<void> {
-        const schema = await this.getNodeScreenPositions();
+        const schema = await this.getNodeScreenPositions('schema');
         await this.nodeClick(schema[0].screenX, schema[0].screenY);
         await this.nodeClick(schema[1].screenX, schema[1].screenY);
         await this.clickCreateNewEdgeBtnInDataPanel();
@@ -334,78 +334,6 @@ export default class SchemaPage extends GraphPage {
 
     async deleteAttribute(key: string): Promise<void>{
        
-    }
-
-    async getCanvasTransform(canvasElement: Locator): Promise<any> {
-        let transformData = null;
-        for (let attempt = 0; attempt < 3; attempt++) {
-            transformData = await canvasElement.evaluate((canvas: HTMLCanvasElement) => {
-                const rect = canvas.getBoundingClientRect();
-                const ctx = canvas.getContext('2d');
-                return {
-                    left: rect.left,
-                    top: rect.top,
-                    transform: ctx?.getTransform() || null,
-                };
-            });
-    
-            if (transformData?.transform) return transformData;
-            await new Promise(res => setTimeout(res, 1000));
-        }
-    
-        throw new Error("Canvas transform data not available!");
-    }
-
-    async getNodeScreenPositions(): Promise<any[]> {
-        await this.page.waitForTimeout(2000);
-        const graphData = await this.page.evaluate(() => {
-            return (window as any).schema;
-        });
-    
-        const transformData = await this.getCanvasTransform(this.canvasElement);
-        const { a, e, d, f } = transformData.transform;
-        const { left, top } = transformData;
-    
-        return graphData.elements.nodes.map((node: any) => ({
-            ...node,
-            screenX: left + node.x * a + e - 40,
-            screenY: top + node.y * d + f - 370,
-        }));
-    }
-
-    async getLinkScreenPositions(): Promise<any[]> {
-        await this.page.waitForTimeout(2000);
-    
-        const graphData = await this.page.evaluate(() => {
-            return (window as any).schema;
-        });
-    
-        const transformData = await this.getCanvasTransform(this.canvasElement);
-        const { a, e, d, f } = transformData.transform;
-        const { left, top } = transformData;
-    
-        const linkPositions = graphData.elements.links.map((link: any) => {
-            const sourceId = typeof link.source === 'object' ? link.source.id : link.source;
-            const targetId = typeof link.target === 'object' ? link.target.id : link.target;
-    
-            const source = graphData.elements.nodes.find((n: any) => n.id === sourceId);
-            const target = graphData.elements.nodes.find((n: any) => n.id === targetId);
-    
-            return {
-                id: link.id,
-                sourceId,
-                targetId,
-                sourceScreenX: left + source.x * a + e - 40,
-                sourceScreenY: top + source.y * d + f - 370,
-                targetScreenX: left + target.x * a + e - 40,
-                targetScreenY: top + target.y * d + f - 370,
-                midX: (left + source.x * a + e - 40 + left + target.x * a + e - 40) / 2,
-                midY: (top + source.y * d + f - 370 + top + target.y * d + f - 370) / 2,
-                ...link
-            };
-        });
-    
-        return linkPositions;
     }
     
 }

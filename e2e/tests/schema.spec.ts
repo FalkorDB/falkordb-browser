@@ -38,7 +38,7 @@ test.describe('Schema Tests', () => {
         const schemaName = getRandomString('schema');
         await schema.addSchema(schemaName);
         await schema.addNode("person", 'id', "Integer", "100", true, true);
-        const graph = await schema.getNodeScreenPositions();
+        const graph = await schema.getNodeScreenPositions('schema');
         await schema.nodeClick(graph[0].screenX, graph[0].screenY);
         expect(await schema.hasAttributeRows()).toBe(true);
         expect(await schema.getCategoriesPanelBtn()).toBe("person")
@@ -54,7 +54,7 @@ test.describe('Schema Tests', () => {
         await schema.selectExistingGraph(schemaName);
         await schema.prepareRelation("knows", 'id', "Integer", "100", true, true);
         await schema.clickRelationBetweenNodes();
-        const links = await schema.getLinkScreenPositions();
+        const links = await schema.getLinksScreenPositions('schema');
         await schema.nodeClick(links[0].midX, links[0].midY);
         expect(await schema.hasAttributeRows()).toBe(true);
         expect(await schema.isRelationshipTypesPanelBtnHidden()).toBeFalsy();
@@ -68,9 +68,9 @@ test.describe('Schema Tests', () => {
         const schema = await browser.createNewPage(SchemaPage, urls.schemaUrl);
         await browser.setPageToFullScreen();
         await schema.selectExistingGraph(schemaName);
-        const nodes1 = await schema.getNodeScreenPositions();
+        const nodes1 = await schema.getNodeScreenPositions('schema');
         await schema.deleteNode(nodes1[0].screenX, nodes1[0].screenY);
-        const nodes2 = await schema.getNodeScreenPositions();
+        const nodes2 = await schema.getNodeScreenPositions('schema');
         expect(nodes2.length).toEqual(nodes1.length - 1);
         expect(await schema.isCategoriesPanelBtnHidden()).toBeTruthy();
         await apicalls.removeSchema(schemaName);
@@ -85,10 +85,10 @@ test.describe('Schema Tests', () => {
         await schema.selectExistingGraph(schemaName);
         await schema.clickCategoriesPanelBtn();
         expect(await schema.getCategoriesPanelBtn()).toBe("person1")
-        const nodes1 = await schema.getNodeScreenPositions();
+        const nodes1 = await schema.getNodeScreenPositions('schema');
         expect(nodes1[0].visible).toBeFalsy();
         await schema.clickCategoriesPanelBtn();
-        const nodes2 = await schema.getNodeScreenPositions();
+        const nodes2 = await schema.getNodeScreenPositions('schema');
         expect(nodes2[0].visible).toBeTruthy();
         await apicalls.removeSchema(schemaName);
     });
@@ -102,10 +102,10 @@ test.describe('Schema Tests', () => {
         await schema.selectExistingGraph(schemaName);
         await schema.clickRelationshipTypesPanelBtn();
         expect(await schema.getRelationshipTypesPanelBtn()).toBe("knows");
-        const links1 = await schema.getLinkScreenPositions();
+        const links1 = await schema.getLinksScreenPositions('schema');
         expect(links1[0].visible).toBeFalsy();
         await schema.clickRelationshipTypesPanelBtn();
-        const links2 = await schema.getLinkScreenPositions(); 
+        const links2 = await schema.getLinksScreenPositions('schema'); 
         expect(links2[0].visible).toBeTruthy();
         await apicalls.removeSchema(schemaName);
     });
@@ -117,9 +117,9 @@ test.describe('Schema Tests', () => {
         const schema = await browser.createNewPage(SchemaPage, urls.schemaUrl);
         await browser.setPageToFullScreen();
         await schema.selectExistingGraph(schemaName);
-        const links1 = await schema.getLinkScreenPositions();
+        const links1 = await schema.getLinksScreenPositions('schema');
         await schema.deleteRelation(links1[0].midX, links1[0].midY);
-        const links2 = await schema.getLinkScreenPositions();
+        const links2 = await schema.getLinksScreenPositions('schema');
         expect(links2.length).toEqual(links1.length - 1);
         expect(await schema.isRelationshipTypesPanelBtnHidden()).toBeTruthy();
         await apicalls.removeSchema(schemaName);
@@ -131,7 +131,7 @@ test.describe('Schema Tests', () => {
         const schemaName = getRandomString('schema');
         await schema.addSchema(schemaName);
         await schema.addNode("", 'id', "Integer", "100", true, true);
-        const nodes = await schema.getNodeScreenPositions();
+        const nodes = await schema.getNodeScreenPositions('schema');
         expect(nodes.length).toBe(0);
         await apicalls.removeSchema(schemaName);
     });
@@ -180,7 +180,7 @@ test.describe('Schema Tests', () => {
         await schema.selectExistingGraph(schemaName);
         await schema.addLabel("");
         await schema.clickCreateNewEdgeBtnInDataPanel();
-        const links = await schema.getLinkScreenPositions();
+        const links = await schema.getLinksScreenPositions('schema');
         expect(links.length).toBe(0);
         await apicalls.removeSchema(schemaName);
     });
@@ -194,7 +194,7 @@ test.describe('Schema Tests', () => {
         await schema.selectExistingGraph(schemaName);
         await schema.prepareRelation("knows", 'id', "Integer", "100", true, true);
         await schema.clickCreateNewEdgeBtnInDataPanel();
-        const links = await schema.getLinkScreenPositions();
+        const links = await schema.getLinksScreenPositions('schema');
         expect(links.length).toBe(0);
         await apicalls.removeSchema(schemaName);
     });
@@ -216,7 +216,7 @@ test.describe('Schema Tests', () => {
         const schema = await browser.createNewPage(SchemaPage, urls.schemaUrl);
         await browser.setPageToFullScreen();
         await schema.selectExistingGraph(schemaName);
-        const nodes = await schema.getNodeScreenPositions();
+        const nodes = await schema.getNodeScreenPositions('schema');
         const initCount = parseInt(await schema.getNodesGraphStats() ?? "");
         await schema.deleteNode(nodes[0].screenX, nodes[0].screenY);
         expect(parseInt(await schema.getNodesGraphStats() ?? "")).toBe(initCount - 1);
@@ -258,7 +258,7 @@ test.describe('Schema Tests', () => {
         await browser.setPageToFullScreen();
         await schema.selectExistingGraph(schemaName);
         const initCount = parseInt(await schema.getEdgesGraphStats() ?? "");
-        const links1 = await schema.getLinkScreenPositions();
+        const links1 = await schema.getLinksScreenPositions('schema');
         await schema.deleteRelation(links1[0].midX, links1[0].midY);
         expect(parseInt(await schema.getEdgesGraphStats() ?? "")).toBe(initCount - 1);
         await apicalls.removeSchema(schemaName);
@@ -272,7 +272,7 @@ test.describe('Schema Tests', () => {
         await browser.setPageToFullScreen();
         await schema.selectExistingGraph(schemaName);
         const initCount = parseInt(await schema.getNodesGraphStats() ?? "");
-        const links = await schema.getLinkScreenPositions();
+        const links = await schema.getLinksScreenPositions('schema');
         await schema.deleteRelation(links[0].midX, links[0].midY);
         expect(parseInt(await schema.getNodesGraphStats() ?? "")).toBe(initCount);
         await apicalls.removeSchema(schemaName);
@@ -286,7 +286,7 @@ test.describe('Schema Tests', () => {
         await browser.setPageToFullScreen();
         await schema.selectExistingGraph(schemaName);
         const initCount = parseInt(await schema.getEdgesGraphStats() ?? "");
-        const nodes = await schema.getNodeScreenPositions();
+        const nodes = await schema.getNodeScreenPositions('schema');
         await schema.deleteNode(nodes[2].screenX, nodes[2].screenY);
         expect(parseInt(await schema.getEdgesGraphStats() ?? "")).toBe(initCount);
         await apicalls.removeSchema(schemaName);
@@ -328,7 +328,7 @@ test.describe('Schema Tests', () => {
         await schema.selectExistingGraph(schemaName);
         const initEdgeCount = parseInt(await schema.getEdgesGraphStats() ?? "");
         const initNodeCount = parseInt(await schema.getNodesGraphStats() ?? "");
-        const nodes = await schema.getNodeScreenPositions();
+        const nodes = await schema.getNodeScreenPositions('schema');
         await schema.deleteNode(nodes[0].screenX, nodes[0].screenY);
         expect(parseInt(await schema.getEdgesGraphStats() ?? "")).toBe(initEdgeCount - 1);
         expect(parseInt(await schema.getNodesGraphStats() ?? "")).toBe(initNodeCount - 1);
