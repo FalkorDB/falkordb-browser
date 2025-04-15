@@ -192,7 +192,7 @@ test.describe('Graph Tests', () => {
         await apiCall.removeSchema(graphName);
     });
 
-    test.skip(`@admin validate that deleting a graph node doesn't decreases relation count`, async () => {
+    test(`@admin validate that deleting a graph node doesn't decreases relation count`, async () => {
         const graphName = getRandomString('schema');
         await apiCall.addGraph(graphName);
         const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
