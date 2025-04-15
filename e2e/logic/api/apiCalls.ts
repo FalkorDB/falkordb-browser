@@ -152,7 +152,7 @@ export default class ApiCalls {
         }
     }
     
-    async createUsers(request : APIRequestContext, data: any): Promise<CreateUsersResponse> {
+    async createUsers(data?: any, request?: APIRequestContext): Promise<CreateUsersResponse> {
         try {
             const result = await postRequest(urls.api.settingsUsers ,data, request);
             return await result.json();

@@ -22,8 +22,8 @@ setup("setup authentication", async () => {
         await context!.storageState({ path: adminAuthFile });
         const adminContext = await playwrightRequest.newContext({ storageState: adminAuthFile });
         const apiCall = new ApiCalls();
-        await apiCall.createUsers(adminContext, { username: 'readwriteuser', role: user.ReadWrite, password: user.password});
-        await apiCall.createUsers(adminContext, { username: 'readonlyuser', role: user.ReadOnly, password: user.password});
+        await apiCall.createUsers({ username: 'readwriteuser', role: user.ReadWrite, password: user.password}, adminContext);
+        await apiCall.createUsers({ username: 'readonlyuser', role: user.ReadOnly, password: user.password}, adminContext);
 
         const userRoles = [
             { name: 'readwrite', file: readWriteAuthFile, userName: 'readwriteuser' },
