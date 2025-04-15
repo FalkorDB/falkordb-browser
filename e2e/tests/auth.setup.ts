@@ -1,11 +1,11 @@
 /* eslint-disable no-restricted-syntax */
 /* eslint-disable no-await-in-loop */
-import { test as setup } from "@playwright/test"
+import { test as setup, request as playwrightRequest } from "@playwright/test"
 import urls from '../config/urls.json'
 import BrowserWrapper from "../infra/ui/browserWrapper";
 import LoginPage from "../logic/POM/loginPage";
 import { user } from '../config/user.json'
-import SettingsUsersPage from "../logic/POM/settingsUsersPage";
+import ApiCalls from "../logic/api/apiCalls";
 
 const adminAuthFile = 'playwright/.auth/admin.json'
 const readWriteAuthFile = 'playwright/.auth/readwriteuser.json'
@@ -20,11 +20,10 @@ setup("setup authentication", async () => {
         await loginPage.dismissDialogAtStart();
         const context = browserWrapper.getContext();
         await context!.storageState({ path: adminAuthFile });
-
-        const settings = await browserWrapper.createNewPage(SettingsUsersPage, urls.settingsUrl);
-        await settings.navigateToUserTab();
-        await settings.addUser({ userName: "readwriteuser", role: user.ReadWrite, password: user.password, confirmPassword: user.confirmPassword });
-        await settings.addUser({ userName: "readonlyuser", role: user.ReadOnly, password: user.password, confirmPassword: user.confirmPassword });
+        const adminContext = await playwrightRequest.newContext({ storageState: adminAuthFile });
+        const apiCall = new ApiCalls();
+        await apiCall.createUsers(adminContext, { username: 'readwriteuser', role: user.ReadWrite, password: user.password});
+        await apiCall.createUsers(adminContext, { username: 'readonlyuser', role: user.ReadOnly, password: user.password});
 
         const userRoles = [
             { name: 'readwrite', file: readWriteAuthFile, userName: 'readwriteuser' },
