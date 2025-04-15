@@ -162,6 +162,22 @@ export default class GraphPage extends BasePage {
         return this.page.locator("#timeoutInput");
     }
 
+    private get deleteNodeInGraphDataPanel(): Locator {
+        return this.page.locator('//div[contains(@id, "graphDataPanel")]//button[contains(text(), "Delete Node")]');
+    }
+
+    private get confirmDeleteNodeInDataPanel(): Locator {
+        return this.page.locator('//div[@role="dialog"]//button[contains(text(), "Delete")]');
+    }
+
+    private get deleteRelationInGraphDataPanel(): Locator {
+        return this.page.locator('//div[contains(@id, "graphDataPanel")]//button[contains(text(), "Delete Relation")]');
+    }
+
+    private get deleteNodeInCanvasPanel(): Locator {
+        return this.page.locator('//button[normalize-space(text()) = "Delete"]');
+    }
+
     async insertGraphInSearchInput(graph: string): Promise<void> {
         await interactWhenVisible(this.graphSelectSearchInput, el => el.fill(graph), "graph search input");
     }
@@ -315,6 +331,22 @@ export default class GraphPage extends BasePage {
 
     async clickAddGraphBtnInGraphManager(): Promise<void> {
         await interactWhenVisible(this.addGraphBtnInGraphManager, el => el.click(), "add graph button in graph manager");
+    }
+
+    async clickDeleteNodeInGraphDataPanel(): Promise<void> {
+        await interactWhenVisible(this.deleteNodeInGraphDataPanel, el => el.click(), "delete node in data panel");
+    }
+
+    async clickConfirmDeleteNodeInDataPanel(): Promise<void> {
+        await interactWhenVisible(this.confirmDeleteNodeInDataPanel, el => el.click(), "confirm delete in data panel");
+    }
+
+    async clickDeleteRelationInGraphDataPanel(): Promise<void> {
+        await interactWhenVisible(this.deleteRelationInGraphDataPanel, el => el.click(), "delete relation in data panel");
+    }
+
+    async clickDeleteNodeInCanvasPanel(): Promise<void> {
+        await interactWhenVisible(this.deleteNodeInCanvasPanel, el => el.click(), "delete node in canvas panel");
     }
     
     async countGraphsInMenu(): Promise<number> {
@@ -586,5 +618,33 @@ export default class GraphPage extends BasePage {
         } else {
             await this.increaseTimeoutBtn.click();
         }
+    }
+
+    async deleteNodeViaCanvasPanel(x: number, y: number): Promise<void>{
+        await this.nodeClick(x, y);
+        await this.clickDeleteNodeInCanvasPanel();
+        await Promise.all([
+            this.page.waitForResponse(res => res.status() === 200),
+            this.clickConfirmDeleteNodeInDataPanel()
+        ]);    
+    }
+
+
+    async deleteNode(x: number, y: number): Promise<void>{
+        await this.nodeClick(x, y);
+        await this.clickDeleteNodeInGraphDataPanel();
+        await Promise.all([
+            this.page.waitForResponse(res => res.status() === 200),
+            this.clickConfirmDeleteNodeInDataPanel()
+        ]);    
+    }
+
+    async deleteRelation(x: number, y: number): Promise<void> {
+        await this.nodeClick(x, y);
+        await this.clickDeleteRelationInGraphDataPanel();
+        await Promise.all([
+            this.page.waitForResponse(res => res.status() === 200),
+            this.clickConfirmDeleteNodeInDataPanel()
+        ]);
     }
 }

@@ -114,10 +114,6 @@ export default class SchemaPage extends GraphPage {
         return this.page.locator('//div[contains(@class, "DataPanel")]//button[contains(text(), "Delete Relation")]');
     }
 
-    private get confirmDeleteNodeInDataPanel(): Locator {
-        return this.page.locator('//div[@role="dialog"]//button[contains(text(), "Delete")]');
-    }
-
     private get categoriesPanelBtn(): Locator {
         return this.page.locator('//div[contains(@id, "CategoriesPanel")]//button');
     }
@@ -238,10 +234,6 @@ export default class SchemaPage extends GraphPage {
         await interactWhenVisible(this.deleteRelationInDataPanel, el => el.click(), "delete relation in data panel");
     }
       
-    async clickConfirmDeleteNodeInDataPanel(): Promise<void> {
-        await interactWhenVisible(this.confirmDeleteNodeInDataPanel, el => el.click(), "confirm delete in data panel");
-    }
-      
     async clickCategoriesPanelBtn(): Promise<void> {
         await interactWhenVisible(this.categoriesPanelBtn, el => el.click(), "categories panel button");
     }
@@ -330,10 +322,6 @@ export default class SchemaPage extends GraphPage {
             await this.clickRequiredAtiveRadioBtn();
         }
         await this.clickAddActiveBtnInDataPanel();
-    }
-
-    async deleteAttribute(key: string): Promise<void>{
-       
     }
     
 }
