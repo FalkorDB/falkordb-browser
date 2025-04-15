@@ -138,13 +138,13 @@ export default function SchemaView({ schema, fetchCount }: Props) {
                 schema.EdgesMap.delete(id)
             }
 
-            if (fetchCount) fetchCount()
-
             if (type) {
                 element.category.forEach((category) => {
                     const cat = schema.CategoriesMap.get(category)
+
                     if (cat) {
                         cat.elements = cat.elements.filter(n => n.id !== id)
+
                         if (cat.elements.length === 0) {
                             schema.Categories.splice(schema.Categories.findIndex(c => c.name === cat.name), 1)
                             schema.CategoriesMap.delete(cat.name)
@@ -153,8 +153,10 @@ export default function SchemaView({ schema, fetchCount }: Props) {
                 })
             } else {
                 const cat = schema.LabelsMap.get(element.label)
+
                 if (cat) {
                     cat.elements = cat.elements.filter(n => n.id !== id)
+
                     if (cat.elements.length === 0) {
                         schema.Labels.splice(schema.Labels.findIndex(c => c.name === cat.name), 1)
                         schema.LabelsMap.delete(cat.name)
@@ -164,6 +166,8 @@ export default function SchemaView({ schema, fetchCount }: Props) {
         }))
 
         schema.removeLinks()
+
+        if (fetchCount) fetchCount()
 
         setSelectedElement(undefined)
         setSelectedElements([])
