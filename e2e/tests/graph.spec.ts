@@ -34,7 +34,6 @@ test.describe('Graph Tests', () => {
         await graph.deleteGraph(graphName);
     });
 
-
     test(`@admin Add graph via UI -> remove graph via API -> Verify graph removal in UI test`, async () => {
         const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
         const graphName = getRandomString('graph');
@@ -159,12 +158,12 @@ test.describe('Graph Tests', () => {
         const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
         await browser.setPageToFullScreen();
         await graph.selectExistingGraph(graphName);
-        await graph.insertQuery(CREATE_TEN_CONNECTED_NODES);
+        await graph.insertQuery("UNWIND range(1, 10) as x CREATE (n:n)-[e:e]->(m:m) RETURN *");
         await graph.clickRunQuery();
         const nodes = await graph.getNodesGraphStats();
         const edges = await graph.getEdgesGraphStats();
-        expect(parseInt(nodes ?? "")).toBe(10);
-        expect(parseInt(edges ?? "")).toBe(9)
+        expect(parseInt(nodes ?? "")).toBe(20);
+        expect(parseInt(edges ?? "")).toBe(10);
         await apiCall.removeGraph(graphName);
     });
 
