@@ -2,6 +2,7 @@
 /* eslint-disable no-await-in-loop */
 import { Locator, Page } from "playwright";
 import { readFileSync } from "fs";
+import ApiCalls from "../logic/api/apiCalls";
 
 const adminAuthFile = 'playwright/.auth/admin.json'
 
@@ -112,7 +113,7 @@ export function getRandomString(prefix = '', delimiter = '_'): string {
     const uuid = crypto.randomUUID();
     const timestamp = Date.now();
     return `${prefix}${prefix ? delimiter : ''}${uuid}-${timestamp}`;
-}  
+}
 
 export async function waitForApiSuccess<T>(
     apiCall: () => Promise<T>,
