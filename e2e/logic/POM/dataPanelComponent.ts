@@ -5,7 +5,7 @@
 /* eslint-disable arrow-body-style */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { Locator } from "@playwright/test";
-import { waitForElementToBeVisible } from "@/e2e/infra/utils";
+import { interactWhenVisible, waitForElementToBeVisible } from "@/e2e/infra/utils";
 import GraphPage from "./graphPage";
 
 export default class DataPanel extends GraphPage {
@@ -78,115 +78,82 @@ export default class DataPanel extends GraphPage {
         return this.page.locator("//div[contains(@id, 'dataPanelHeader')]//li/p");
     }
 
-    async clickAddAttributeButtonInGraphDataPanel(): Promise<void>{
-        const isVisible = await waitForElementToBeVisible(this.addAttributeButtonInGraphDataPanel);
-        if (!isVisible) throw new Error("add attribute button is not visible!");
-        await this.addAttributeButtonInGraphDataPanel.click();
+    async clickAddAttributeButtonInGraphDataPanel(): Promise<void> {
+        await interactWhenVisible(this.addAttributeButtonInGraphDataPanel, el => el.click(), "add attribute button in graph data panel");
     }
-
-    async clickDeleteNodeButtonInGraphDataPanel(): Promise<void>{
-        const isVisible = await waitForElementToBeVisible(this.deleteNodeButtonInGraphDataPanel);
-        if (!isVisible) throw new Error("delete node button is not visible!");
-        await this.deleteNodeButtonInGraphDataPanel.click();
+    
+    async clickDeleteNodeButtonInGraphDataPanel(): Promise<void> {
+        await interactWhenVisible(this.deleteNodeButtonInGraphDataPanel, el => el.click(), "delete node button in graph data panel");
     }
-
-    async fillAttributeInputInGraphDataPanel(index: number, input: string): Promise<void>{
-        const isVisible = await waitForElementToBeVisible(this.attributeInputInGraphDataPanel(index));
-        if (!isVisible) throw new Error("attribute input in data panel input is not visible!");
-        await this.attributeInputInGraphDataPanel(index).fill(input);
+    
+    async fillAttributeInputInGraphDataPanel(index: number, input: string): Promise<void> {
+        await interactWhenVisible(this.attributeInputInGraphDataPanel(index), el => el.fill(input), `attribute input in graph data panel [index ${index}]`);
     }
-
-    async clickSaveAttributeButtonInGraphDataPanel(): Promise<void>{
-        const isVisible = await waitForElementToBeVisible(this.saveAttributeButtonInGraphDataPanel);
-        if (!isVisible) throw new Error("save attribute in graph panel button is not visible!");
-        await this.saveAttributeButtonInGraphDataPanel.click();
+    
+    async clickSaveAttributeButtonInGraphDataPanel(): Promise<void> {
+        await interactWhenVisible(this.saveAttributeButtonInGraphDataPanel, el => el.click(), "save attribute button in graph data panel");
     }
-
-    async getAttributeValueInGraphDataPanel(): Promise<string | null>{
-        const isVisible = await waitForElementToBeVisible(this.saveAttributeButtonInGraphDataPanel);
-        if (!isVisible) throw new Error("save attribute in graph panel button is not visible!");
+    
+    async getAttributeValueInGraphDataPanel(): Promise<string | null> {
+        await interactWhenVisible(this.saveAttributeButtonInGraphDataPanel, async () => {}, "save attribute button in graph data panel");
         return await this.saveAttributeButtonInGraphDataPanel.textContent();
-    }
+    }    
 
-    async clickModifyAttributeButtonInLastRowOfGraphDataPanel(): Promise<void>{
-        const isVisible = await waitForElementToBeVisible(this.modifyAttributeButtonInLastRowOfGraphDataPanel);
-        if (!isVisible) throw new Error("modify attribute in data panel button is not visible!");
-        await this.modifyAttributeButtonInLastRowOfGraphDataPanel.click();
+    async clickModifyAttributeButtonInLastRowOfGraphDataPanel(): Promise<void> {
+        await interactWhenVisible(this.modifyAttributeButtonInLastRowOfGraphDataPanel, el => el.click(), "modify attribute button in last row of graph data panel");
     }
-
-    async hoverLastAttributeRowInGraphDataPanell(): Promise<void>{
-        const isVisible = await waitForElementToBeVisible(this.lastAttributeRowInGraphDataPanel);
-        if (!isVisible) throw new Error("last attribute is not visible!");
-        await this.lastAttributeRowInGraphDataPanel.hover();
+    
+    async hoverLastAttributeRowInGraphDataPanell(): Promise<void> {
+        await interactWhenVisible(this.lastAttributeRowInGraphDataPanel, el => el.hover(), "last attribute row in graph data panel");
     }
-
-    async clickEditAttributeButtonForFirstRowInGraphDataPanel(): Promise<void>{
-        const isVisible = await waitForElementToBeVisible(this.editAttributeButtonForFirstRowInGraphDataPanel);
-        if (!isVisible) throw new Error("edit attribute button is not visible!");
-        await this.editAttributeButtonForFirstRowInGraphDataPanel.click();
+    
+    async clickEditAttributeButtonForFirstRowInGraphDataPanel(): Promise<void> {
+        await interactWhenVisible(this.editAttributeButtonForFirstRowInGraphDataPanel, el => el.click(), "edit attribute button in first row of graph data panel");
     }
-
-    async clickDeleteAttributeButtonForFirstRowInGraphDataPanel(): Promise<void>{
-        const isVisible = await waitForElementToBeVisible(this.deleteAttributeButtonForFirstRowInGraphDataPanel);
-        if (!isVisible) throw new Error("delete attribute button is not visible!");
-        await this.deleteAttributeButtonForFirstRowInGraphDataPanel.click();
+    
+    async clickDeleteAttributeButtonForFirstRowInGraphDataPanel(): Promise<void> {
+        await interactWhenVisible(this.deleteAttributeButtonForFirstRowInGraphDataPanel, el => el.click(), "delete attribute button in first row of graph data panel");
     }
-
-    async clickDeleteButtonInDialog(): Promise<void>{
-        const isVisible = await waitForElementToBeVisible(this.deleteButtonInDialog);
-        if (!isVisible) throw new Error("dialog delete button is not visible!");
-        await this.deleteButtonInDialog.click();
-    }
+    
+    async clickDeleteButtonInDialog(): Promise<void> {
+        await interactWhenVisible(this.deleteButtonInDialog, el => el.click(), "delete button in dialog");
+    }    
 
     async isLastAttributeNameCellInGraphDataPanel(attribute: string): Promise<boolean>{
         return await this.lastAttributeNameCellInGraphDataPanel(attribute).isVisible();
     }
 
-    async getLastAttributeNameCellInGraphDataPanel(attribute: string): Promise<string | null>{
-        const isVisible = await waitForElementToBeVisible(this.lastAttributeNameCellInGraphDataPanel(attribute));
-        if (!isVisible) throw new Error("last attribute bame cell is not visible!");
+    async getLastAttributeNameCellInGraphDataPanel(attribute: string): Promise<string | null> {
+        await interactWhenVisible(this.lastAttributeNameCellInGraphDataPanel(attribute), async () => {}, `last attribute name cell for "${attribute}"`);
         return await this.lastAttributeNameCellInGraphDataPanel(attribute).textContent();
     }
-
-    async fillAttributeValueInputInGraphDataPanel(input: string): Promise<void>{
-        const isVisible = await waitForElementToBeVisible(this.attributeValueInputInGraphDataPanel);
-        if (!isVisible) throw new Error("attribute value input is not visible!");
-        await this.attributeValueInputInGraphDataPanel.fill(input);
+    
+    async fillAttributeValueInputInGraphDataPanel(input: string): Promise<void> {
+        await interactWhenVisible(this.attributeValueInputInGraphDataPanel, el => el.fill(input), "attribute value input in graph data panel");
     }
-
-    async hoverOnDataPanelHeaderAttr(): Promise<void>{
-        const isVisible = await waitForElementToBeVisible(this.dataPanelHeaderAttr);
-        if (!isVisible) throw new Error("data panel header attribute button is not visible!");
-        await this.dataPanelHeaderAttr.hover();
+    
+    async hoverOnDataPanelHeaderAttr(): Promise<void> {
+        await interactWhenVisible(this.dataPanelHeaderAttr, el => el.hover(), "data panel header attribute hover");
     }
-
-    async clickOnAddButtonInDataPanelHeader(): Promise<void>{
-        const isVisible = await waitForElementToBeVisible(this.addButtonInDataPanelHeader);
-        if (!isVisible) throw new Error("add button in data panel header button is not visible!");
-         await this.addButtonInDataPanelHeader.click();
+    
+    async clickOnAddButtonInDataPanelHeader(): Promise<void> {
+        await interactWhenVisible(this.addButtonInDataPanelHeader, el => el.click(), "add button in data panel header");
     }
-
-    async fillInputButtonInDataPanelHeader(attribute: string): Promise<void>{
-        const isVisible = await waitForElementToBeVisible(this.inputInDataPanelHeader);
-        if (!isVisible) throw new Error("input in data panel header button is not visible!");
-        await this.inputInDataPanelHeader.fill(attribute);
+    
+    async fillInputButtonInDataPanelHeader(attribute: string): Promise<void> {
+        await interactWhenVisible(this.inputInDataPanelHeader, el => el.fill(attribute), "input in data panel header");
     }
-
-    async clickOnSaveButtonInDataPanelHeader(): Promise<void>{
-        const isVisible = await waitForElementToBeVisible(this.saveButtonInDataPanelHeader);
-        if (!isVisible) throw new Error("save in data panel header button is not visible!");
-        await this.saveButtonInDataPanelHeader.click();
+    
+    async clickOnSaveButtonInDataPanelHeader(): Promise<void> {
+        await interactWhenVisible(this.saveButtonInDataPanelHeader, el => el.click(), "save button in data panel header");
     }
-
-    async clickOnRemoveAttributeButtonInDataPanelHeader(): Promise<void>{
-        const isVisible = await waitForElementToBeVisible(this.removeAttributeButtonInDataPanelHeader);
-        if (!isVisible) throw new Error("remove attr in data panel header button is not visible!");
-        await this.removeAttributeButtonInDataPanelHeader.click();
+    
+    async clickOnRemoveAttributeButtonInDataPanelHeader(): Promise<void> {
+        await interactWhenVisible(this.removeAttributeButtonInDataPanelHeader, el => el.click(), "remove attribute button in data panel header");
     }
-
-    async getAttributeHeaderLabelInDataPanelHeader(): Promise<string | null>{
-        const isVisible = await waitForElementToBeVisible(this.attributeHeaderLabelInDataPanelHeader);
-        if (!isVisible) throw new Error("attr in data panel header text is not visible!");
+    
+    async getAttributeHeaderLabelInDataPanelHeader(): Promise<string | null> {
+        await interactWhenVisible(this.attributeHeaderLabelInDataPanelHeader, async () => {}, "attribute header label in data panel header");
         return await this.attributeHeaderLabelInDataPanelHeader.textContent();
     }
 

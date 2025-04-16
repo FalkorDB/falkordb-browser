@@ -162,6 +162,22 @@ export default class GraphPage extends BasePage {
         return this.page.locator("#timeoutInput");
     }
 
+    private get deleteNodeInGraphDataPanel(): Locator {
+        return this.page.locator('//div[contains(@id, "graphDataPanel")]//button[contains(text(), "Delete Node")]');
+    }
+
+    private get confirmDeleteNodeInDataPanel(): Locator {
+        return this.page.locator('//div[@role="dialog"]//button[contains(text(), "Delete")]');
+    }
+
+    private get deleteRelationInGraphDataPanel(): Locator {
+        return this.page.locator('//div[contains(@id, "graphDataPanel")]//button[contains(text(), "Delete Relation")]');
+    }
+
+    private get deleteNodeInCanvasPanel(): Locator {
+        return this.page.locator('//button[normalize-space(text()) = "Delete"]');
+    }
+
     async insertGraphInSearchInput(graph: string): Promise<void> {
         await interactWhenVisible(this.graphSelectSearchInput, el => el.fill(graph), "graph search input");
     }
@@ -316,6 +332,22 @@ export default class GraphPage extends BasePage {
     async clickAddGraphBtnInGraphManager(): Promise<void> {
         await interactWhenVisible(this.addGraphBtnInGraphManager, el => el.click(), "add graph button in graph manager");
     }
+
+    async clickDeleteNodeInGraphDataPanel(): Promise<void> {
+        await interactWhenVisible(this.deleteNodeInGraphDataPanel, el => el.click(), "delete node in data panel");
+    }
+
+    async clickConfirmDeleteNodeInDataPanel(): Promise<void> {
+        await interactWhenVisible(this.confirmDeleteNodeInDataPanel, el => el.click(), "confirm delete in data panel");
+    }
+
+    async clickDeleteRelationInGraphDataPanel(): Promise<void> {
+        await interactWhenVisible(this.deleteRelationInGraphDataPanel, el => el.click(), "delete relation in data panel");
+    }
+
+    async clickDeleteNodeInCanvasPanel(): Promise<void> {
+        await interactWhenVisible(this.deleteNodeInCanvasPanel, el => el.click(), "delete node in canvas panel");
+    }
     
     async countGraphsInMenu(): Promise<number> {
         await waitForTimeOut(this.page, 1000);
@@ -434,18 +466,10 @@ export default class GraphPage extends BasePage {
         return toolTipText;
     }
     
-    async getGraphDetails(): Promise<any[]> {
-        await this.page.waitForTimeout(2000);
-    
-        const graphData = await this.page.evaluate(() => {
-            return (window as any).graph;
-        });
-    
-        let transformData: any = null;
+    async getCanvasTransform(canvasElement: Locator): Promise<any> {
+        let transformData = null;
         for (let attempt = 0; attempt < 3; attempt++) {
-            await this.page.waitForTimeout(1000);
-    
-            transformData = await this.canvasElement.evaluate((canvas: HTMLCanvasElement) => {
+            transformData = await canvasElement.evaluate((canvas: HTMLCanvasElement) => {
                 const rect = canvas.getBoundingClientRect();
                 const ctx = canvas.getContext('2d');
                 return {
@@ -455,18 +479,81 @@ export default class GraphPage extends BasePage {
                 };
             });
     
-            if (transformData.transform) break;
-            console.warn(`Attempt ${attempt + 1}: Transform data not available, retrying...`);
+            if (transformData?.transform) return transformData;
+            await new Promise(res => setTimeout(res, 1000));
         }
     
-        if (!transformData?.transform) throw new Error("Canvas transform data not available!");
+        throw new Error("Canvas transform data not available!");
+    }
+
+    async getNodeScreenPositions(windowKey: 'graph' | 'schema'): Promise<any[]> {
+        await this.page.waitForTimeout(2000);
     
+        const graphData = await this.page.evaluate((key) => {
+            return (window as any)[key];
+        }, windowKey);
+    
+        const transformData = await this.getCanvasTransform(this.canvasElement);
         const { a, e, d, f } = transformData.transform;
+        const { left, top } = transformData;
+    
+        const offsets = {
+            graph: { x: -105, y: -380 },
+            schema: { x: -40, y: -370 }
+        };
+    
+        const { x: offsetX, y: offsetY } = offsets[windowKey];
+    
         return graphData.elements.nodes.map((node: any) => ({
             ...node,
-            screenX: transformData.left + node.x * a + e - 105,
-            screenY: transformData.top + node.y * d + f - 380,
+            screenX: left + node.x * a + e + offsetX,
+            screenY: top + node.y * d + f + offsetY,
         }));
+    }
+    
+    async getLinksScreenPositions(windowKey: 'graph' | 'schema'): Promise<any[]> {
+        await this.page.waitForTimeout(2000);
+    
+        const graphData = await this.page.evaluate((key) => {
+            return (window as any)[key];
+        }, windowKey);
+    
+        const transformData = await this.getCanvasTransform(this.canvasElement);
+        const { a, e, d, f } = transformData.transform;
+        const { left, top } = transformData;
+    
+        const offsets = {
+            graph: { x: -105, y: -380 },
+            schema: { x: -40, y: -370 }
+        };
+    
+        const { x: offsetX, y: offsetY } = offsets[windowKey];
+    
+        return graphData.elements.links.map((link: any) => {
+            const sourceId = typeof link.source === 'object' ? link.source.id : link.source;
+            const targetId = typeof link.target === 'object' ? link.target.id : link.target;
+    
+            const source = graphData.elements.nodes.find((n: any) => n.id === sourceId);
+            const target = graphData.elements.nodes.find((n: any) => n.id === targetId);
+    
+            const sourceScreenX = left + source.x * a + e + offsetX;
+            const sourceScreenY = top + source.y * d + f + offsetY;
+            const targetScreenX = left + target.x * a + e + offsetX;
+            const targetScreenY = top + target.y * d + f + offsetY;
+    
+            return {
+                id: link.id,
+                sourceId,
+                targetId,
+                sourceScreenX,
+                sourceScreenY,
+                targetScreenX,
+                targetScreenY,
+                midX: (sourceScreenX + targetScreenX) / 2,
+                midY: (sourceScreenY + targetScreenY) / 2,
+                ...link
+            };
+        });
     }
 
     async changeNodePosition(x: number, y: number): Promise<void> {
@@ -531,5 +618,33 @@ export default class GraphPage extends BasePage {
         } else {
             await this.increaseTimeoutBtn.click();
         }
+    }
+
+    async deleteNodeViaCanvasPanel(x: number, y: number): Promise<void>{
+        await this.nodeClick(x, y);
+        await this.clickDeleteNodeInCanvasPanel();
+        await Promise.all([
+            this.page.waitForResponse(res => res.status() === 200),
+            this.clickConfirmDeleteNodeInDataPanel()
+        ]);    
+    }
+
+
+    async deleteNode(x: number, y: number): Promise<void>{
+        await this.nodeClick(x, y);
+        await this.clickDeleteNodeInGraphDataPanel();
+        await Promise.all([
+            this.page.waitForResponse(res => res.status() === 200),
+            this.clickConfirmDeleteNodeInDataPanel()
+        ]);    
+    }
+
+    async deleteRelation(x: number, y: number): Promise<void> {
+        await this.nodeClick(x, y);
+        await this.clickDeleteRelationInGraphDataPanel();
+        await Promise.all([
+            this.page.waitForResponse(res => res.status() === 200),
+            this.clickConfirmDeleteNodeInDataPanel()
+        ]);
     }
 }
