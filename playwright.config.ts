@@ -104,7 +104,7 @@ export default defineConfig({
       },
       grep: /@admin/,
       dependencies: ['setup'],
-      testMatch: /.*settingsConfig\.spec\.ts$/,
+      testMatch: /.*(settingsConfig|settingsUsers)\.spec\.ts$/,
     },
     {
       name: '[Admin: Serial Config - Firefox]',
@@ -114,7 +114,7 @@ export default defineConfig({
       },
       grep: /@admin/,
       dependencies: ['setup'],
-      testMatch: /.*settingsConfig\.spec\.ts$/,
+      testMatch: /.*(settingsConfig|settingsUsers)\.spec\.ts$/,
     },  
 
     // {
