@@ -95,9 +95,9 @@ test.describe('Canvas Tests', () => {
         await graph.addGraph(graphName);
         await graph.insertQuery(BATCH_CREATE_PERSONS);
         await graph.clickRunQuery();
-        const initialGraph = await graph.getGraphDetails();
+        const initialGraph = await graph.getNodeScreenPositions('graph');
         await graph.changeNodePosition(initialGraph[0].screenX, initialGraph[0].screenY);
-        const updateGraph = await graph.getGraphDetails();
+        const updateGraph = await graph.getNodeScreenPositions('graph');
         expect(updateGraph[0].x).not.toBe(initialGraph[0].x);
         expect(updateGraph[0].y).not.toBe(initialGraph[0].y);
         await apicalls.removeGraph(graphName);
@@ -110,7 +110,7 @@ test.describe('Canvas Tests', () => {
         await graph.addGraph(graphName,);
         await graph.insertQuery('CREATE (p:Person {name: "Alice", age: 30}) return p');
         await graph.clickRunQuery();
-        await graph.getGraphDetails();
+        await graph.getNodeScreenPositions('graph');
         await graph.searchForElementInCanvas("Alice");
         await graph.hoverAtCanvasCenter();
         expect(await graph.getNodeCanvasToolTip()).toBe("Alice");
@@ -126,7 +126,7 @@ test.describe('Canvas Tests', () => {
         await graph.selectExistingGraph(graphName);
         await graph.insertQuery('MATCH (p:Person {name: "Bob"}) RETURN p');
         await graph.clickRunQuery();
-        await graph.getGraphDetails();
+        await graph.getNodeScreenPositions('graph');
         await graph.searchForElementInCanvas("bob");
         await graph.rightClickAtCanvasCenter();
         expect(await graph.getDataCellByAttrInDataPanel("age")).toBe("40");
@@ -142,7 +142,7 @@ test.describe('Canvas Tests', () => {
         await graph.selectExistingGraph(graphName);
         await graph.insertQuery('MATCH (n) RETURN n');
         await graph.clickRunQuery();
-        await graph.getGraphDetails();
+        await graph.getNodeScreenPositions('graph');
         await graph.searchForElementInCanvas("bob");
         await graph.rightClickAtCanvasCenter();
         expect(await graph.getNodeCanvasToolTip()).not.toBe("bob");

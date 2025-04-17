@@ -17,6 +17,14 @@ export default class LoginPage extends BasePage {
         return this.page.locator("//input[@id='Password']");
     }
 
+    private get hostInput(): Locator {
+        return this.page.locator("//input[@id='Host']");
+    }
+
+    private get portInput(): Locator {
+        return this.page.locator("//input[@id='Port']");
+    }
+
     private get dissmissDialogCheckbox(): Locator {
         return this.page.locator("//div[p[text()=\"Don't show this again\"]]//button");
     }
@@ -26,11 +34,12 @@ export default class LoginPage extends BasePage {
         await waitForURL(this.page, urls.graphUrl);
     }
 
-    async connectWithCredentials(username: string, password: string): Promise<void> {
+    async connectWithCredentials(username: string, password: string, host?: string, port?: string): Promise<void> {
         await this.usernameInput.fill(username)
         await this.passwordInput.fill(password)
+        if(host){ await this.hostInput.fill(host) }
+        if(port){ await this.portInput.fill(port) }
         await this.connectBtn.click();
-        await waitForURL(this.page, urls.graphUrl);
     }
 
     async dismissDialogAtStart(): Promise<void>{
