@@ -9,7 +9,7 @@ import GraphPage from "../logic/POM/graphPage";
 import urls from '../config/urls.json'
 import queryData from '../config/queries.json'
 import { CREATE_TEN_CONNECTED_NODES } from "../config/constants";
-import { getRandomString } from "../infra/utils";
+import { getRandomString, waitForApiSuccess } from "../infra/utils";
 
 test.describe('Graph Tests', () => {
     let browser: BrowserWrapper;
@@ -33,7 +33,6 @@ test.describe('Graph Tests', () => {
         await graph.refreshPage();
         await graph.deleteGraph(graphName);
     });
-
 
     test(`@admin Add graph via UI -> remove graph via API -> Verify graph removal in UI test`, async () => {
         const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
@@ -177,12 +176,97 @@ test.describe('Graph Tests', () => {
         const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
         await browser.setPageToFullScreen();
         await graph.selectExistingGraph(graphName);
-        await graph.insertQuery(CREATE_TEN_CONNECTED_NODES);
+        await graph.insertQuery("UNWIND range(1, 10) as x CREATE (n:n)-[e:e]->(m:m) RETURN *");
         await graph.clickRunQuery();
         const nodes = await graph.getNodesGraphStats();
         const edges = await graph.getEdgesGraphStats();
-        expect(parseInt(nodes ?? "")).toBe(10);
-        expect(parseInt(edges ?? "")).toBe(9)
+        expect(parseInt(nodes ?? "")).toBe(20);
+        expect(parseInt(edges ?? "")).toBe(10);
         await apiCall.removeGraph(graphName);
+    });
+
+    test(`@admin validate that attempting to duplicate a graph with the same name displays an error notification`, async () => {
+        const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+        await browser.setPageToFullScreen();
+        const graphName = getRandomString('graph');
+        await graph.addGraph(graphName);
+        await graph.addGraph(graphName);
+        expect(await graph.getErrorNotification()).toBe(true);
+        await apiCall.removeGraph(graphName);
+    });
+
+    test(`@admin validate that deleting a graph relation doesn't decreases node count`, async () => {
+        const graphName = getRandomString('schema');
+        await apiCall.addGraph(graphName);
+        const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+        await browser.setPageToFullScreen();
+        await graph.selectExistingGraph(graphName);
+        await graph.insertQuery('CREATE (a:person1 {id: "1"}), (b:person2 {id: "2"}), (a)-[c:knows]->(b) RETURN a, b, c');
+        await graph.clickRunQuery();
+        const initCount = parseInt(await graph.getNodesGraphStats() ?? "");
+        const links = await graph.getLinksScreenPositions('graph');
+        await graph.deleteRelation(links[0].midX, links[0].midY);
+        expect(parseInt(await graph.getNodesGraphStats() ?? "")).toBe(initCount);
+        await apiCall.removeSchema(graphName);
+    });
+
+    test(`@admin validate that deleting a graph node doesn't decreases relation count`, async () => {
+        const graphName = getRandomString('schema');
+        await apiCall.addGraph(graphName);
+        const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+        await browser.setPageToFullScreen();
+        await graph.selectExistingGraph(graphName);
+        await graph.insertQuery('CREATE (a:person1 {id: "1"}), (b:person2 {id: "2"}), (c:person3 {id: "3"}), (a)-[d:knows]->(b) RETURN a, b, c, d');
+        await graph.clickRunQuery();
+        const initCount = parseInt(await graph.getEdgesGraphStats() ?? "");
+        const nodes = await graph.getNodeScreenPositions('graph');
+        await graph.deleteNode(nodes[2].screenX, nodes[2].screenY);
+        expect(parseInt(await graph.getEdgesGraphStats() ?? "")).toBe(initCount);
+        await apiCall.removeSchema(graphName);
+    });
+
+    test(`@admin validate that deleting a graph relation decreases relation count`, async () => {
+        const graphName = getRandomString('schema');
+        await apiCall.addGraph(graphName);
+        const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+        await browser.setPageToFullScreen();
+        await graph.selectExistingGraph(graphName);
+        await graph.insertQuery('CREATE (a:person1 {id: "1"}), (b:person2 {id: "2"}), (c:person3 {id: "3"}), (a)-[d:knows]->(b) RETURN a, b, c, d');
+        await graph.clickRunQuery();
+        const initCount = parseInt(await graph.getEdgesGraphStats() ?? "");
+        const links = await graph.getLinksScreenPositions('graph');
+        await graph.deleteRelation(links[0].midX, links[0].midY);
+        expect(parseInt(await graph.getEdgesGraphStats() ?? "")).toBe(initCount -1);
+        await apiCall.removeSchema(graphName);
+    });
+
+    test(`@admin validate that deleting a graph node decreases node count`, async () => {
+        const graphName = getRandomString('schema');
+        await apiCall.addGraph(graphName);
+        const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+        await browser.setPageToFullScreen();
+        await graph.selectExistingGraph(graphName);
+        await graph.insertQuery('CREATE (a:person1 {id: "1"}), (b:person2 {id: "2"}) RETURN a, b');
+        await graph.clickRunQuery();
+        const initCount = parseInt(await graph.getNodesGraphStats() ?? "");
+        const nodes = await graph.getNodeScreenPositions('graph');
+        await graph.deleteNode(nodes[0].screenX, nodes[0].screenY);
+        expect(parseInt(await graph.getNodesGraphStats() ?? "")).toBe(initCount -1);
+        await apiCall.removeSchema(graphName);
+    });
+
+    test(`@admin Validate deleting node via the canvas panel`, async () => {
+        const graphName = getRandomString('schema');
+        await apiCall.addGraph(graphName);
+        const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+        await browser.setPageToFullScreen();
+        await graph.selectExistingGraph(graphName);
+        await graph.insertQuery('CREATE (a:person1 {id: "1"}), (b:person2 {id: "2"}) RETURN a, b');
+        await graph.clickRunQuery();
+        const initCount = parseInt(await graph.getNodesGraphStats() ?? "");
+        const nodes = await graph.getNodeScreenPositions('graph');
+        await graph.deleteNodeViaCanvasPanel(nodes[0].screenX, nodes[0].screenY);
+        expect(parseInt(await graph.getNodesGraphStats() ?? "")).toBe(initCount -1);
+        await apiCall.removeSchema(graphName);
     });
 })

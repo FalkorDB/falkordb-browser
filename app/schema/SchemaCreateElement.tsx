@@ -39,7 +39,7 @@ export default function SchemaCreateElement({ onCreate, onExpand, selectedNodes,
   const [hover, setHover] = useState<string>("")
   const [isLoading, setIsLoading] = useState<boolean>(false)
   const [labelsHover, setLabelsHover] = useState<boolean>(false)
-  const [labelsEditable, setLabelsEditable] = useState<boolean>(false)
+  const [isAddLabel, setIsAddLabel] = useState<boolean>(false)
   const { toast } = useToast()
   const { indicator } = useContext(IndicatorContext)
     
@@ -132,7 +132,7 @@ export default function SchemaCreateElement({ onCreate, onExpand, selectedNodes,
       setAttributes([])
       setAttribute(getDefaultAttribute())
       setLabel([])
-      setLabelsEditable(false)
+      setIsAddLabel(false)
     } finally {
       setIsLoading(false)
     }
@@ -145,15 +145,27 @@ export default function SchemaCreateElement({ onCreate, onExpand, selectedNodes,
   const handleAddLabel = () => {
     setLabel(prev => [...prev, newLabel])
     setNewLabel("")
-    setLabelsEditable(false)
+    setIsAddLabel(false)
+  }
+
+  const handleClose = () => {
+    setSelectedNodes([undefined, undefined])
+    setAttributes([])
+    setLabel([])
+    setNewLabel("")
+    setNewAttribute(getDefaultAttribute())
+    setAttribute(getDefaultAttribute())
+    setEditable("")
+    setIsAddLabel(false)
+    onExpand()
   }
 
   return (
     <div className="DataPanel">
-      <div className="w-full flex justify-between items-center p-4">
+      <div className="w-full flex justify-between items-center p-4" id="headerDataPanel">
         <div className="flex gap-4 items-center">
           <Button
-            onClick={() => onExpand()}
+            onClick={() => handleClose()}
           >
             <ChevronRight size={20} />
           </Button>
@@ -171,19 +183,19 @@ export default function SchemaCreateElement({ onCreate, onExpand, selectedNodes,
             ))}
             <li className="h-8 flex flex-wrap gap-2">
               {
-                (type ? (labelsHover || label.length === 0) && !labelsEditable : label.length < 1 && !labelsEditable) &&
+                (type ? (labelsHover || label.length === 0) && !isAddLabel : label.length < 1 && !isAddLabel) &&
                 <Button
                   className="p-2 text-xs justify-center border border-foreground"
                   variant="Secondary"
                   label="Add"
                   title="Add a new label"
-                  onClick={() => setLabelsEditable(true)}
+                  onClick={() => setIsAddLabel(true)}
                 >
                   <Pencil size={15} />
                 </Button>
               }
               {
-                labelsEditable &&
+                isAddLabel &&
                 <>
                   <Input
                     ref={ref => ref?.focus()}
@@ -194,7 +206,7 @@ export default function SchemaCreateElement({ onCreate, onExpand, selectedNodes,
 
                       if (e.key === "Escape") {
                         e.preventDefault()
-                        setLabelsEditable(false)
+                        setIsAddLabel(false)
                         setNewLabel("")
                       }
 
@@ -219,7 +231,7 @@ export default function SchemaCreateElement({ onCreate, onExpand, selectedNodes,
                     label="Cancel"
                     title="Discard new label"
                     onClick={() => {
-                      setLabelsEditable(false)
+                      setIsAddLabel(false)
                       setNewLabel("")
                     }}
                   >
