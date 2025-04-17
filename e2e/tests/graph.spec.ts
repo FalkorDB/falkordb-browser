@@ -161,8 +161,8 @@ test.describe('Graph Tests', () => {
         await graph.clickRunQuery();
         const nodes = await graph.getNodesGraphStats();
         const edges = await graph.getEdgesGraphStats();
-        expect(parseInt(nodes ?? "")).toBe(20);
-        expect(parseInt(edges ?? "")).toBe(10);
+        expect(parseInt(nodes ?? "", 10)).toBe(20);
+        expect(parseInt(edges ?? "", 10)).toBe(10);
         await apiCall.removeGraph(graphName);
     });
 
@@ -184,10 +184,10 @@ test.describe('Graph Tests', () => {
         await graph.selectExistingGraph(graphName);
         await graph.insertQuery('CREATE (a:person1 {id: "1"}), (b:person2 {id: "2"}), (a)-[c:knows]->(b) RETURN a, b, c');
         await graph.clickRunQuery();
-        const initCount = parseInt(await graph.getNodesGraphStats() ?? "");
+        const initCount = parseInt(await graph.getNodesGraphStats() ?? "", 10);
         const links = await graph.getLinksScreenPositions('graph');
         await graph.deleteRelation(links[0].midX, links[0].midY);
-        expect(parseInt(await graph.getNodesGraphStats() ?? "")).toBe(initCount);
+        expect(parseInt(await graph.getNodesGraphStats() ?? "", 10)).toBe(initCount);
         await apiCall.removeSchema(graphName);
     });
 
@@ -199,10 +199,10 @@ test.describe('Graph Tests', () => {
         await graph.selectExistingGraph(graphName);
         await graph.insertQuery('CREATE (a:person1 {id: "1"}), (b:person2 {id: "2"}), (c:person3 {id: "3"}), (a)-[d:knows]->(b) RETURN a, b, c, d');
         await graph.clickRunQuery();
-        const initCount = parseInt(await graph.getEdgesGraphStats() ?? "");
+        const initCount = parseInt(await graph.getEdgesGraphStats() ?? "", 10);
         const nodes = await graph.getNodeScreenPositions('graph');
         await graph.deleteNode(nodes[2].screenX, nodes[2].screenY);
-        expect(parseInt(await graph.getEdgesGraphStats() ?? "")).toBe(initCount);
+        expect(parseInt(await graph.getEdgesGraphStats() ?? "", 10)).toBe(initCount);
         await apiCall.removeSchema(graphName);
     });
 
@@ -214,10 +214,10 @@ test.describe('Graph Tests', () => {
         await graph.selectExistingGraph(graphName);
         await graph.insertQuery('CREATE (a:person1 {id: "1"}), (b:person2 {id: "2"}), (c:person3 {id: "3"}), (a)-[d:knows]->(b) RETURN a, b, c, d');
         await graph.clickRunQuery();
-        const initCount = parseInt(await graph.getEdgesGraphStats() ?? "");
+        const initCount = parseInt(await graph.getEdgesGraphStats() ?? "", 10);
         const links = await graph.getLinksScreenPositions('graph');
         await graph.deleteRelation(links[0].midX, links[0].midY);
-        expect(parseInt(await graph.getEdgesGraphStats() ?? "")).toBe(initCount -1);
+        expect(parseInt(await graph.getEdgesGraphStats() ?? "", 10)).toBe(initCount -1);
         await apiCall.removeSchema(graphName);
     });
 
@@ -229,10 +229,10 @@ test.describe('Graph Tests', () => {
         await graph.selectExistingGraph(graphName);
         await graph.insertQuery('CREATE (a:person1 {id: "1"}), (b:person2 {id: "2"}) RETURN a, b');
         await graph.clickRunQuery();
-        const initCount = parseInt(await graph.getNodesGraphStats() ?? "");
+        const initCount = parseInt(await graph.getNodesGraphStats() ?? "", 10);
         const nodes = await graph.getNodeScreenPositions('graph');
         await graph.deleteNode(nodes[0].screenX, nodes[0].screenY);
-        expect(parseInt(await graph.getNodesGraphStats() ?? "")).toBe(initCount -1);
+        expect(parseInt(await graph.getNodesGraphStats() ?? "", 10)).toBe(initCount -1);
         await apiCall.removeSchema(graphName);
     });
 
@@ -244,10 +244,10 @@ test.describe('Graph Tests', () => {
         await graph.selectExistingGraph(graphName);
         await graph.insertQuery('CREATE (a:person1 {id: "1"}), (b:person2 {id: "2"}) RETURN a, b');
         await graph.clickRunQuery();
-        const initCount = parseInt(await graph.getNodesGraphStats() ?? "");
+        const initCount = parseInt(await graph.getNodesGraphStats() ?? "", 10);
         const nodes = await graph.getNodeScreenPositions('graph');
         await graph.deleteNodeViaCanvasPanel(nodes[0].screenX, nodes[0].screenY);
-        expect(parseInt(await graph.getNodesGraphStats() ?? "")).toBe(initCount -1);
+        expect(parseInt(await graph.getNodesGraphStats() ?? "", 10)).toBe(initCount -1);
         await apiCall.removeSchema(graphName);
     });
 
@@ -305,7 +305,7 @@ test.describe('Graph Tests', () => {
         await graph.insertQuery('CREATE (a:person1 {id: "1"}), (b:person2 {id: "2"}) RETURN a, b');
         await graph.clickRunQuery();
         await graph.addGraphAttribute("1", "name", "Naseem");
-        expect(parseInt(await graph.getAttriubutesStatsInDataPanel() ?? "")).toBe(2);
+        expect(parseInt(await graph.getAttributesStatsInDataPanel() ?? "", 10)).toBe(2);
         await apiCall.removeSchema(graphName);
     });
 
@@ -319,7 +319,7 @@ test.describe('Graph Tests', () => {
         await graph.clickRunQuery();
         await graph.openDataPanelForElementInCanvas("Alice");
         await graph.deleteGraphAttribute();
-        expect(parseInt(await graph.getAttriubutesStatsInDataPanel() ?? "")).toBe(1);
+        expect(parseInt(await graph.getAttributesStatsInDataPanel() ?? "", 10)).toBe(1);
         await apiCall.removeSchema(graphName);
     });
 
@@ -361,10 +361,10 @@ test.describe('Graph Tests', () => {
         await graph.selectExistingGraph(graphName);
         await graph.insertQuery('CREATE (a:Person {id: "1"}), (b:Person {id: "2"}), (a)-[c:KNOWS]->(b) RETURN a, b, c');
         await graph.clickRunQuery();
-        const initCount = parseInt(await graph.getEdgesGraphStats() ?? "");
+        const initCount = parseInt(await graph.getEdgesGraphStats() ?? "", 10);
         const links = await graph.getLinksScreenPositions('graph');
         await graph.deleteGraphRelation(links[0].midX, links[0].midY);
-        expect(parseInt(await graph.getEdgesGraphStats() ?? "")).toBe(initCount - 1);
+        expect(parseInt(await graph.getEdgesGraphStats() ?? "", 10)).toBe(initCount - 1);
         expect(await graph.isRelationshipTypesPanelBtnHidden()).toBeTruthy();
         await apiCall.removeSchema(graphName);
     });
@@ -392,7 +392,7 @@ test.describe('Graph Tests', () => {
         await graph.openDataPanelForElementInCanvas("Alice");
         await graph.deleteGraphAttribute();
         await graph.clickUndoBtnInNotification();
-        expect(parseInt(await graph.getAttriubutesStatsInDataPanel() ?? "")).toBe(2);
+        expect(parseInt(await graph.getAttributesStatsInDataPanel() ?? "", 10)).toBe(2);
         await apiCall.removeSchema(graphName);
     });
 

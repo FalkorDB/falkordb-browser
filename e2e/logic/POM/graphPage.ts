@@ -246,7 +246,7 @@ export default class GraphPage extends BasePage {
         return this.page.locator('//div[contains(@id, "graphDataPanel")]//tr[last()]//td[1]');
     }
 
-    private get attriubutesStatsInDataPanel(): Locator {
+    private get attributesStatsInDataPanel(): Locator {
         return this.page.locator('(//div[contains(@id, "graphDataPanel")]//p)[2]');
     }
 
@@ -513,8 +513,8 @@ export default class GraphPage extends BasePage {
         await interactWhenVisible(this.lastAttributeValue, el => el.hover(), "hover on last attribute in data panel");
     }
 
-    async getAttriubutesStatsInDataPanel(): Promise<string | null> {
-        return await interactWhenVisible(this.attriubutesStatsInDataPanel, el => el.innerText(), "attributes stats in data panel");
+    async getAttributesStatsInDataPanel(): Promise<string | null> {
+        return await interactWhenVisible(this.attributesStatsInDataPanel, el => el.innerText(), "attributes stats in data panel");
     }
 
     async clickDeleteRelationBtnInDataPanel(): Promise<void> {
