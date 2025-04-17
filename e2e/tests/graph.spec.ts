@@ -353,7 +353,7 @@ test.describe('Graph Tests', () => {
         await apiCall.removeSchema(graphName);
     });
 
-    test(`@readwrite validate deleting connection between two nodes updates canvas panels`, async () => {//working
+    test(`@readwrite validate deleting connection between two nodes updates canvas panels`, async () => {
         const graphName = getRandomString('graph');
         await apiCall.addGraph(graphName);
         const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
@@ -368,4 +368,95 @@ test.describe('Graph Tests', () => {
         expect(await graph.isRelationshipTypesPanelBtnHidden()).toBeTruthy();
         await apiCall.removeSchema(graphName);
     });
+
+    test(`@readwrite validate adding connection between two nodes updates canvas panels`, async () => {
+        const graphName = getRandomString('graph');
+        await apiCall.addGraph(graphName);
+        const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+        await browser.setPageToFullScreen();
+        await graph.selectExistingGraph(graphName);
+        await graph.insertQuery('CREATE (a:Person {id: "1"}), (b:Person {id: "2"}), (a)-[c:KNOWS]->(b) RETURN a, b, c');
+        await graph.clickRunQuery();
+        expect(await graph.getRelationshipTypesPanelBtn()).toBe('KNOWS');        
+        await apiCall.removeSchema(graphName);
+    });
+
+    test(`@readwrite validate undo functionally after deleting attribute update correctly `, async () => {
+        const graphName = getRandomString('graph');
+        await apiCall.addGraph(graphName);
+        const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+        await browser.setPageToFullScreen();
+        await graph.selectExistingGraph(graphName);
+        await graph.insertQuery('CREATE (a:Person {id: "1", name: "Alice"}) RETURN a');
+        await graph.clickRunQuery();
+        await graph.openDataPanelForElementInCanvas("Alice");
+        await graph.deleteGraphAttribute();
+        await graph.clickUndoBtnInNotification();
+        expect(parseInt(await graph.getAttriubutesStatsInDataPanel() ?? "")).toBe(2);
+        await apiCall.removeSchema(graphName);
+    });
+
+    test(`@readwrite Attempting to add existing label name for a node display error`, async () => {
+        const graphName = getRandomString('graph');
+        await apiCall.addGraph(graphName);
+        const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+        await browser.setPageToFullScreen();
+        await graph.selectExistingGraph(graphName);
+        await graph.insertQuery('CREATE (a:Person {id: "1", name: "Alice"}) RETURN a');
+        await graph.clickRunQuery();
+        await graph.modifyLabel("Alice", "Person");
+        expect(await graph.getLabesCountlInDataPanel()).toBe(2)
+        expect(await graph.getErrorNotification()).toBeTruthy();
+        await apiCall.removeSchema(graphName);
+    });
+
+    test(`@readwrite moving a node to another node's position while animation is off should place them at the same position`, async () => {
+        const graphName = getRandomString('graph');
+        await apiCall.addGraph(graphName);
+        const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+        await browser.setPageToFullScreen();
+        await graph.selectExistingGraph(graphName);
+        await graph.insertQuery('CREATE (a:person1 {id: "1"}), (b:person2 {id: "2"}) RETURN a, b');
+        await graph.clickRunQuery();
+        const initNodes = await graph.getNodeScreenPositions('graph');
+        expect(await graph.getAnimationControlPanelState()).toBe("unchecked");
+
+        const fromX = initNodes[0].screenX;
+        const fromY = initNodes[0].screenY;
+        const toX = initNodes[1].screenX;;
+        const toY = initNodes[1].screenY;
+        await graph.changeNodePosition(fromX, fromY, toX, toY);
+        await graph.waitForCanvasAnimationToEnd();
+        const nodes = await graph.getNodeScreenPositions('graph');
+        
+        expect(nodes[1].screenX - nodes[0].screenX).toBeLessThanOrEqual(2);
+        expect(nodes[1].screenY - nodes[0].screenY).toBeLessThanOrEqual(2);
+        await apiCall.removeSchema(graphName);
+    });
+
+    test(`@readwrite moving a node to another node's position while animation is on should push them apart`, async () => {
+        const graphName = getRandomString('graph');
+        await apiCall.addGraph(graphName);
+        const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+        await browser.setPageToFullScreen();
+        await graph.selectExistingGraph(graphName);
+        await graph.insertQuery('CREATE (a:person1 {id: "1"}), (b:person2 {id: "2"}) RETURN a, b');
+        await graph.clickRunQuery();
+        const initNodes = await graph.getNodeScreenPositions('graph');
+        await graph.clickAnimationControlPanelbtn();
+        expect(await graph.getAnimationControlPanelState()).toBe("checked");
+
+        const fromX = initNodes[0].screenX;
+        const fromY = initNodes[0].screenY;
+        const toX = initNodes[1].screenX;;
+        const toY = initNodes[1].screenY;
+        await graph.changeNodePosition(fromX, fromY, toX, toY);
+        await graph.waitForCanvasAnimationToEnd();
+        const nodes = await graph.getNodeScreenPositions('graph');
+        
+        expect(Math.abs(nodes[1].screenX - nodes[0].screenX)).toBeGreaterThan(2);
+        expect(Math.abs(nodes[1].screenY - nodes[0].screenY)).toBeGreaterThan(2);
+        await apiCall.removeSchema(graphName);
+    });
+
 })

@@ -96,7 +96,11 @@ test.describe('Canvas Tests', () => {
         await graph.insertQuery(BATCH_CREATE_PERSONS);
         await graph.clickRunQuery();
         const initialGraph = await graph.getNodeScreenPositions('graph');
-        await graph.changeNodePosition(initialGraph[0].screenX, initialGraph[0].screenY);
+        const fromX = initialGraph[0].screenX;
+        const fromY = initialGraph[0].screenY;
+        const toX = fromX + 100;
+        const toY = fromY + 50;
+        await graph.changeNodePosition(fromX, fromY, toX, toY);
         const updateGraph = await graph.getNodeScreenPositions('graph');
         expect(updateGraph[0].x).not.toBe(initialGraph[0].x);
         expect(updateGraph[0].y).not.toBe(initialGraph[0].y);

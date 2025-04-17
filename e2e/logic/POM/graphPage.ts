@@ -258,6 +258,10 @@ export default class GraphPage extends BasePage {
         return this.page.locator('//div[contains(@id, "RelationshipTypesPanel")]//button');
     }
 
+    private get animationControlBtn(): Locator {
+        return this.page.locator('//div[contains(@id, "canvasPanel")]//button[@role="switch"]');
+    }
+
     async insertGraphInSearchInput(graph: string): Promise<void> {
         await interactWhenVisible(this.graphSelectSearchInput, el => el.fill(graph), "graph search input");
     }
@@ -528,6 +532,14 @@ export default class GraphPage extends BasePage {
     async isRelationshipTypesPanelBtnHidden(): Promise<boolean> {
         return await this.relationshipTypesPanelBtn.isHidden();
     }
+
+    async clickAnimationControlPanelbtn(): Promise<void> {
+        await interactWhenVisible(this.animationControlBtn, el => el.click(), "animation control button");
+    }
+
+    async getAnimationControlPanelState(): Promise<string | null> {
+        return await this.animationControlBtn.getAttribute('data-state');
+    }
     
     async countGraphsInMenu(): Promise<number> {
         await waitForTimeOut(this.page, 1000);
@@ -736,19 +748,18 @@ export default class GraphPage extends BasePage {
         });
     }
 
-    async changeNodePosition(x: number, y: number): Promise<void> {
+    async changeNodePosition(fromX: number, fromY: number, toX: number, toY: number): Promise<void> {
         const box = (await this.canvasElement.boundingBox())!;
-        const targetX = x + 100;
-        const targetY = y + 50;
-        const absStartX = box.x + x;
-        const absStartY = box.y + y;
-        const absEndX = box.x + targetX;
-        const absEndY = box.y + targetY;
+        const absStartX = box.x + fromX;
+        const absStartY = box.y + fromY;
+        const absEndX = box.x + toX;
+        const absEndY = box.y + toY;
+    
         await this.page.mouse.move(absStartX, absStartY);
         await this.page.mouse.down();
         await this.page.mouse.move(absEndX, absEndY);
         await this.page.mouse.up();
-    }
+    }    
 
     async rightClickAtCanvasCenter(): Promise<void> {
         const boundingBox = await this.canvasElement.boundingBox();
