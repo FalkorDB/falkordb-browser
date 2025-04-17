@@ -178,6 +178,86 @@ export default class GraphPage extends BasePage {
         return this.page.locator('//button[normalize-space(text()) = "Delete"]');
     }
 
+    private get addBtnInHeaderGraphDataPanel(): Locator {
+        return this.page.locator('//div[contains(@id, "graphDataPanel")]//button[normalize-space(text()) = "Add"]');
+    }
+
+    private get graphDataPanelHeaderInput(): Locator {
+        return this.page.locator('//div[contains(@id, "graphDataPanel")]//input');
+    }
+    
+    private get saveBtnInGraphHeaderDataPanel(): Locator {
+        return this.page.locator('//div[contains(@id, "graphDataPanel")]//button[contains(text(), "Save")]');
+    }
+
+    private get headerDataPanelList(): Locator {
+        return this.page.locator('//div[contains(@id, "graphDataPanel")]//ul');
+    }
+
+    private get labelsInCanvas(): Locator {
+        return this.page.locator('//div[contains(@id, "LabelsPanel")]//ul/li');
+    }
+
+    private get labelsInDataPanel(): Locator {
+        return this.page.locator('//div[contains(@id, "graphDataPanel")]//ul//li');
+    }
+
+    private get deleteFirstLabelDataPanelBtn(): Locator {
+        return this.page.locator('//div[contains(@id, "graphDataPanel")]//ul//li[1]//button');
+    }
+
+    private get keyInputInDataPanel(): Locator {
+        return this.page.locator('(//div[contains(@id, "graphDataPanel")]//tr//input)[1]');
+    }
+
+    private get valueInputInDataPanel(): Locator {
+        return this.page.locator('(//div[contains(@id, "graphDataPanel")]//tr//input)[2]');
+    }
+
+    private get addAttributeBtnInDataPanel(): Locator {
+        return this.page.locator('//div[contains(@id, "graphDataPanel")]//button[contains(text(), "Add Attribute")]');
+    }
+
+    private get saveAttributeBtnInDataPanel(): Locator {
+        return this.page.locator('//div[contains(@id, "graphDataPanel")]//tr[last()]//button[1]');
+    }
+
+    private get deleteLastAttributeInDataPanel(): Locator {
+        return this.page.locator('//div[contains(@id, "graphDataPanel")]//tr[last()]//td[1]//button[2]');
+    }
+
+    private get modifyLastAttributeInDataPanel(): Locator {
+        return this.page.locator('//div[contains(@id, "graphDataPanel")]//tr[last()]//td[1]//button[1]');
+    }
+
+    private get valueInputLastAttributeInDataPanel(): Locator {
+        return this.page.locator('//div[contains(@id, "graphDataPanel")]//tr[last()]//td//input');
+    }
+
+    private get undoBtnInNotification(): Locator {
+        return this.page.locator('//ol//li//button[contains(text(), "Undo")]');
+    }
+
+    private get lastAttributeValueBtn(): Locator {
+        return this.page.locator('//div[contains(@id, "graphDataPanel")]//tr[last()]//td[3]//button');
+    }
+
+    private get lastAttributeValue(): Locator {
+        return this.page.locator('//div[contains(@id, "graphDataPanel")]//tr[last()]//td[1]');
+    }
+
+    private get attriubutesStatsInDataPanel(): Locator {
+        return this.page.locator('(//div[contains(@id, "graphDataPanel")]//p)[2]');
+    }
+
+    private get deleteRelationBtnInDataPanel(): Locator {
+        return this.page.locator('//div[contains(@id, "graphDataPanel")]//button[contains(text(), "Delete Relation")]');
+    }
+
+    private get relationshipTypesPanelBtn(): Locator {
+        return this.page.locator('//div[contains(@id, "RelationshipTypesPanel")]//button');
+    }
+
     async insertGraphInSearchInput(graph: string): Promise<void> {
         await interactWhenVisible(this.graphSelectSearchInput, el => el.fill(graph), "graph search input");
     }
@@ -348,6 +428,106 @@ export default class GraphPage extends BasePage {
     async clickDeleteNodeInCanvasPanel(): Promise<void> {
         await interactWhenVisible(this.deleteNodeInCanvasPanel, el => el.click(), "delete node in canvas panel");
     }
+
+    async clickAddBtnInHeaderGraphDataPanel(): Promise<void> {
+        await interactWhenVisible(this.addBtnInHeaderGraphDataPanel, el => el.click(), "add button node in graph data panel");
+    }
+
+    async fillGraphDataPanelHeaderInput(label: string): Promise<void> {
+        await interactWhenVisible(this.graphDataPanelHeaderInput, el => el.fill(label), "graph data panel header input"); 
+    }
+
+    async clickSaveBtnInGraphHeaderDataPanel(): Promise<void> {
+        await interactWhenVisible(this.saveBtnInGraphHeaderDataPanel, el => el.click(), "save label button in graph data panel");
+    }
+
+    async hoverOnHeaderDataPanelList(): Promise<void> {
+        await interactWhenVisible(this.headerDataPanelList, async (el) => {
+            await el.hover();
+        }, `Header data panel list`);
+    }
+
+    async getLastLabelInCanvas(): Promise<string | null> {
+        return await interactWhenVisible(this.labelsInCanvas.last(), el => el.textContent(), "last label in canvas");
+    }
+
+    async getFirstLabelInCanvas(): Promise<string | null> {
+        return await interactWhenVisible(this.labelsInCanvas.first(), el => el.textContent(), "first label in canvas");
+    }
+
+    async fillkeyInputInDataPanel(key: string): Promise<void> {
+        await interactWhenVisible(this.keyInputInDataPanel.first(), el => el.fill(key), "key input in data panel");
+    }
+
+    async fillValueInputInDataPanel(key: string): Promise<void> {
+        await interactWhenVisible(this.valueInputInDataPanel.first(), el => el.fill(key), "value input in data panel");
+    }
+
+    async getLabesCountlInDataPanel(): Promise<number> {
+        await this.page.waitForTimeout(500);
+        return await this.labelsInDataPanel.count();
+    }
+
+    async getLabesCountlInCanvas(): Promise<number> {
+        await this.page.waitForTimeout(500);
+        return await this.labelsInCanvas.count();
+    }
+
+    async clickDeleteBtnInFirstLabelDataPanel(): Promise<void> {
+        await interactWhenVisible(this.deleteFirstLabelDataPanelBtn, el => el.click(), "delete button for first label in data panel");
+    }
+
+    async clickAddAttributeBtnInDataPanel(): Promise<void> {
+        await interactWhenVisible(this.addAttributeBtnInDataPanel, el => el.click(), "add attribute button in data panel");
+    }
+
+    async clickSaveAttributeBtnInDataPanel(): Promise<void> {
+        await interactWhenVisible(this.saveAttributeBtnInDataPanel, el => el.click(), "save attribute button in data panel");
+    }
+
+    async clickDeleteLastAttributeInDataPanel(): Promise<void> {
+        await interactWhenVisible(this.deleteLastAttributeInDataPanel, el => el.click(), "delete last attribute button in data panel");
+    }
+
+    async clickModifyLastAttributeInDataPanel(): Promise<void> {
+        await interactWhenVisible(this.modifyLastAttributeInDataPanel, el => el.click(), "modify last attribute button in data panel");
+    }
+
+    async fillValueInputLastAttributeInDataPanel(value: string): Promise<void> {
+        await interactWhenVisible(this.valueInputLastAttributeInDataPanel, el => el.fill(value), "value input last attribute in data panel");
+    }
+
+    async clickUndoBtnInNotification(): Promise<void> {
+        await interactWhenVisible(this.undoBtnInNotification, el => el.click(), "undo button in notification");
+    }
+
+    async getLastAttributeValue(): Promise<string | null> {
+        return await interactWhenVisible(this.lastAttributeValueBtn, el => el.innerText(), "last attribute value in data panel");
+    }
+
+    async hoverOnLastAttributeInDataPanel(): Promise<void> {
+        await interactWhenVisible(this.lastAttributeValue, el => el.hover(), "hover on last attribute in data panel");
+    }
+
+    async getAttriubutesStatsInDataPanel(): Promise<string | null> {
+        return await interactWhenVisible(this.attriubutesStatsInDataPanel, el => el.innerText(), "attributes stats in data panel");
+    }
+
+    async clickDeleteRelationBtnInDataPanel(): Promise<void> {
+        await interactWhenVisible(this.deleteRelationBtnInDataPanel, el => el.click(), "delete relation button in data panel");
+    }
+
+    async clickRelationshipTypesPanelBtn(): Promise<void> {
+        await interactWhenVisible(this.relationshipTypesPanelBtn, el => el.click(), "relationship types panel button");
+    }
+
+    async getRelationshipTypesPanelBtn(): Promise<string | null> {
+        return await interactWhenVisible(this.relationshipTypesPanelBtn, el => el.textContent(), "relationship types panel button");
+    }
+
+    async isRelationshipTypesPanelBtnHidden(): Promise<boolean> {
+        return await this.relationshipTypesPanelBtn.isHidden();
+    }
     
     async countGraphsInMenu(): Promise<number> {
         await waitForTimeOut(this.page, 1000);
@@ -416,7 +596,7 @@ export default class GraphPage extends BasePage {
     }
 
     async getErrorNotification(): Promise<boolean>{
-        await this.page.waitForTimeout(500);
+        await this.page.waitForTimeout(1000);
         const isVisible = await this.errorNotification.isVisible();
         return isVisible;
     }
@@ -620,7 +800,7 @@ export default class GraphPage extends BasePage {
         }
     }
 
-    async deleteNodeViaCanvasPanel(x: number, y: number): Promise<void>{
+    async deleteNodeViaCanvasPanel(x: number, y: number): Promise<void> {
         await this.nodeClick(x, y);
         await this.clickDeleteNodeInCanvasPanel();
         await Promise.all([
@@ -629,8 +809,7 @@ export default class GraphPage extends BasePage {
         ]);    
     }
 
-
-    async deleteNode(x: number, y: number): Promise<void>{
+    async deleteNode(x: number, y: number): Promise<void> {
         await this.nodeClick(x, y);
         await this.clickDeleteNodeInGraphDataPanel();
         await Promise.all([
@@ -639,9 +818,58 @@ export default class GraphPage extends BasePage {
         ]);    
     }
 
+    async openDataPanelForElementInCanvas(node: string): Promise<void> {
+        await this.searchForElementInCanvas(node);
+        await this.rightClickAtCanvasCenter();
+    }
+
+    async modifyLabel(node: string, label: string): Promise<void> {
+        await this.openDataPanelForElementInCanvas(node);
+        await this.hoverOnHeaderDataPanelList();
+        await this.clickAddBtnInHeaderGraphDataPanel();
+        await this.fillGraphDataPanelHeaderInput(label);
+        await this.clickSaveBtnInGraphHeaderDataPanel();
+    }
+
     async deleteRelation(x: number, y: number): Promise<void> {
         await this.nodeClick(x, y);
         await this.clickDeleteRelationInGraphDataPanel();
+        await Promise.all([
+            this.page.waitForResponse(res => res.status() === 200),
+            this.clickConfirmDeleteNodeInDataPanel()
+        ]);
+    }
+
+    async deleteLabel(node: string): Promise<void> {
+        await this.openDataPanelForElementInCanvas(node);
+        await this.clickDeleteBtnInFirstLabelDataPanel();
+    }
+
+    async addGraphAttribute(node: string, key: string, value: string): Promise<void> {
+        await this.openDataPanelForElementInCanvas(node);
+        await this.clickAddAttributeBtnInDataPanel();
+        await this.fillkeyInputInDataPanel(key);
+        await this.fillValueInputInDataPanel(value);
+        await this.clickSaveAttributeBtnInDataPanel();
+    }
+
+    async modifyAttribute(value: string): Promise<void> {
+        await this.hoverOnLastAttributeInDataPanel();
+        await this.clickModifyLastAttributeInDataPanel();
+        await this.fillValueInputLastAttributeInDataPanel(value);
+        await this.clickSaveAttributeBtnInDataPanel();
+        await this.waitForPageIdle();
+    }
+
+    async deleteGraphAttribute(): Promise<void> {
+        await this.hoverOnLastAttributeInDataPanel();
+        await this.clickDeleteLastAttributeInDataPanel();
+        await this.clickConfirmDeleteNodeInDataPanel();
+    }
+
+    async deleteGraphRelation(x: number, y: number): Promise<void> {
+        await this.nodeClick(x, y);
+        await this.clickDeleteRelationBtnInDataPanel();
         await Promise.all([
             this.page.waitForResponse(res => res.status() === 200),
             this.clickConfirmDeleteNodeInDataPanel()

@@ -118,10 +118,6 @@ export default class SchemaPage extends GraphPage {
         return this.page.locator('//div[contains(@id, "CategoriesPanel")]//button');
     }
 
-    private get relationshipTypesPanelBtn(): Locator {
-        return this.page.locator('//div[contains(@id, "RelationshipTypesPanel")]//button');
-    }
-
     async clickAddNewSchemaBtn(): Promise<void> {
         await interactWhenVisible(this.addSchemaBtnInNavBar, el => el.click(), "add new schema button");
     }
@@ -238,20 +234,8 @@ export default class SchemaPage extends GraphPage {
         await interactWhenVisible(this.categoriesPanelBtn, el => el.click(), "categories panel button");
     }
       
-    async clickRelationshipTypesPanelBtn(): Promise<void> {
-        await interactWhenVisible(this.relationshipTypesPanelBtn, el => el.click(), "relationship types panel button");
-    }
-      
     async getCategoriesPanelBtn(): Promise<string | null> {
         return await interactWhenVisible(this.categoriesPanelBtn, el => el.textContent(), "categories panel button");
-    }
-      
-    async getRelationshipTypesPanelBtn(): Promise<string | null> {
-        return await interactWhenVisible(this.relationshipTypesPanelBtn, el => el.textContent(), "relationship types panel button");
-    }
-
-    async isRelationshipTypesPanelBtnHidden(): Promise<boolean> {
-        return await this.relationshipTypesPanelBtn.isHidden();
     }
     
     async isCategoriesPanelBtnHidden(): Promise<boolean> {
@@ -322,6 +306,10 @@ export default class SchemaPage extends GraphPage {
             await this.clickRequiredAtiveRadioBtn();
         }
         await this.clickAddActiveBtnInDataPanel();
+    }
+
+    async deleteAttribute(key: string): Promise<void>{
+       
     }
     
 }
