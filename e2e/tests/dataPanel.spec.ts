@@ -22,7 +22,7 @@ test.describe('Data panel Tests', () => {
         await browser.closeBrowser();
     })
 
-    test(`@readwrite Validate modifying node attributes header via UI and validate via API`, async () => {//x
+    test(`@readwrite Validate modifying node attributes header via UI and validate via API`, async () => {
         const graphName = getRandomString('datapanel');        
         await apicalls.addGraph(graphName);
         await apicalls.runQuery(graphName, 'CREATE (:Person {name: "Alice"}), (:Person {name: "Bob"})');
@@ -56,7 +56,7 @@ test.describe('Data panel Tests', () => {
         await apicalls.removeGraph(graphName);
     });
 
-    test(`@readwrite Validate adding new attribute for node via ui and validation via API`, async () => {//x
+    test(`@readwrite Validate adding new attribute for node via ui and validation via API`, async () => {
         const graphName = getRandomString('datapanel');        
         await apicalls.addGraph(graphName);
         await apicalls.runQuery(graphName, 'CREATE (:Person {name: "Alice"}), (:Person {name: "Bob"})');
@@ -89,7 +89,7 @@ test.describe('Data panel Tests', () => {
         await apicalls.removeGraph(graphName);
     });
 
-    test(`@readwrite Validate remove attribute for node via ui and validation via API`, async () => {//x
+    test(`@readwrite Validate remove attribute for node via ui and validation via API`, async () => {
         const graphName = getRandomString('datapanel');        
         await apicalls.addGraph(graphName);
         await apicalls.runQuery(graphName, 'CREATE (a:Person {name: "Alice", age: 30}), (b:Person {name: "Bob"})');
@@ -123,7 +123,7 @@ test.describe('Data panel Tests', () => {
         await apicalls.removeGraph(graphName);
     });
 
-    test(`@readwrite Validate modify attribute for node via ui and validation via API`, async () => {//x
+    test(`@readwrite Validate modify attribute for node via ui and validation via API`, async () => {
         const graphName = getRandomString('datapanel');        
         await apicalls.addGraph(graphName);
         await apicalls.runQuery(graphName, 'CREATE (a:Person {name: "Alice", age: 30}), (b:Person {name: "Bob"})');
@@ -157,7 +157,7 @@ test.describe('Data panel Tests', () => {
         await apicalls.removeGraph(graphName);
     });
 
-    test(`@readwrite Validate delete node via ui and validation via API`, async () => {//x
+    test(`@readwrite Validate delete node via ui and validation via API`, async () => {
         const graphName = getRandomString('datapanel');        
         await apicalls.addGraph(graphName);
         await apicalls.runQuery(graphName, 'CREATE (a:Person {name: "Alice", age: 30}), (b:Person {name: "Bob"})');

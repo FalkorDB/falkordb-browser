@@ -18,7 +18,7 @@ concurrency:
 
 jobs:
   test:
-    name: Run all tests except config
+    name: Run all tests except settings
     timeout-minutes: 60
     runs-on: ubuntu-latest
 
@@ -52,8 +52,8 @@ jobs:
         path: playwright-report/
         retention-days: 30
 
-  run-config-tests:
-    name: Run config tests only
+  run-settings-tests:
+    name: Run settings tests
     runs-on: ubuntu-latest
 
     services:
@@ -74,7 +74,7 @@ jobs:
       - name: Run only config test
         run: |
           npm run build
-          NEXTAUTH_SECRET=SECRET npm start & npx playwright test --grep @config --workers 1 --reporter=dot,list
+          NEXTAUTH_SECRET=SECRET npm start & npx playwright test --grep @config --reporter=dot,list
       - name: Ensure required directories exist
         run: |
           mkdir -p playwright-report
