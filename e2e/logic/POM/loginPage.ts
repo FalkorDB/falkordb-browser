@@ -1,9 +1,9 @@
 import { Locator } from "@playwright/test";
-import BasePage from "@/e2e/infra/ui/basePage";
 import { waitForURL } from "@/e2e/infra/utils";
 import urls from '../../config/urls.json'
+import NavBarComponent from "./navBarComponent";
 
-export default class LoginPage extends BasePage {
+export default class LoginPage extends NavBarComponent {
 
     private get connectBtn(): Locator {
         return this.page.getByRole("button", { name: "Log in" });
