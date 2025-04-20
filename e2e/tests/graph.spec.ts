@@ -188,7 +188,7 @@ test.describe('Graph Tests', () => {
         const links = await graph.getLinksScreenPositions('graph');
         await graph.deleteRelation(links[0].midX, links[0].midY);
         expect(parseInt(await graph.getNodesGraphStats() ?? "", 10)).toBe(initCount);
-        await apiCall.removeSchema(graphName);
+        await apiCall.removeGraph(graphName);
     });
 
     test(`@readwrite validate that deleting a graph node doesn't decreases relation count`, async () => {
@@ -203,7 +203,7 @@ test.describe('Graph Tests', () => {
         const nodes = await graph.getNodeScreenPositions('graph');
         await graph.deleteNode(nodes[2].screenX, nodes[2].screenY);
         expect(parseInt(await graph.getEdgesGraphStats() ?? "", 10)).toBe(initCount);
-        await apiCall.removeSchema(graphName);
+        await apiCall.removeGraph(graphName);
     });
 
     test(`@readwrite validate that deleting a graph relation decreases relation count`, async () => {
@@ -218,7 +218,7 @@ test.describe('Graph Tests', () => {
         const links = await graph.getLinksScreenPositions('graph');
         await graph.deleteRelation(links[0].midX, links[0].midY);
         expect(parseInt(await graph.getEdgesGraphStats() ?? "", 10)).toBe(initCount -1);
-        await apiCall.removeSchema(graphName);
+        await apiCall.removeGraph(graphName);
     });
 
     test(`@readwrite validate that deleting a graph node decreases node count`, async () => {
@@ -233,7 +233,7 @@ test.describe('Graph Tests', () => {
         const nodes = await graph.getNodeScreenPositions('graph');
         await graph.deleteNode(nodes[0].screenX, nodes[0].screenY);
         expect(parseInt(await graph.getNodesGraphStats() ?? "", 10)).toBe(initCount -1);
-        await apiCall.removeSchema(graphName);
+        await apiCall.removeGraph(graphName);
     });
 
     test(`@readwrite Validate deleting node via the canvas panel`, async () => {
@@ -248,7 +248,7 @@ test.describe('Graph Tests', () => {
         const nodes = await graph.getNodeScreenPositions('graph');
         await graph.deleteNodeViaCanvasPanel(nodes[0].screenX, nodes[0].screenY);
         expect(parseInt(await graph.getNodesGraphStats() ?? "", 10)).toBe(initCount -1);
-        await apiCall.removeSchema(graphName);
+        await apiCall.removeGraph(graphName);
     });
 
     test(`@readwrite validate modifying node label updates label in data and canvas panels correctly`, async () => {
@@ -262,7 +262,7 @@ test.describe('Graph Tests', () => {
         await graph.modifyLabel("1", "artist");
         expect(await graph.getLabesCountlInDataPanel()).toBe(3)
         expect(await graph.getLastLabelInCanvas()).toBe("artist");
-        await apiCall.removeSchema(graphName);
+        await apiCall.removeGraph(graphName);
     });
 
     test(`@readwrite validate removing node label updates label in data and canvas panels correctly`, async () => {
@@ -277,7 +277,7 @@ test.describe('Graph Tests', () => {
         await graph.deleteLabel("1");
         expect(await graph.getLabesCountlInDataPanel()).toBe(1);
         expect(await graph.getLabesCountlInCanvas()).toBe(labelsCountInCanvas - 1);
-        await apiCall.removeSchema(graphName);
+        await apiCall.removeGraph(graphName);
     });
 
     test(`@readwrite validate undo functionally after modifying node attributes update correctly`, async () => {
@@ -293,7 +293,7 @@ test.describe('Graph Tests', () => {
         await graph.modifyAttribute("10");
         await graph.clickUndoBtnInNotification();
         expect(await graph.getLastAttributeValue()).toBe(valueAttribute);
-        await apiCall.removeSchema(graphName);
+        await apiCall.removeGraph(graphName);
     });
 
     test(`@readwrite validate adding attribute updates attributes stats in data panel`, async () => {
@@ -306,7 +306,7 @@ test.describe('Graph Tests', () => {
         await graph.clickRunQuery();
         await graph.addGraphAttribute("1", "name", "Naseem");
         expect(parseInt(await graph.getAttributesStatsInDataPanel() ?? "", 10)).toBe(2);
-        await apiCall.removeSchema(graphName);
+        await apiCall.removeGraph(graphName);
     });
 
     test(`@readwrite validate removing attribute updates attributes stats in data panel`, async () => {
@@ -320,7 +320,7 @@ test.describe('Graph Tests', () => {
         await graph.openDataPanelForElementInCanvas("Alice");
         await graph.deleteGraphAttribute();
         expect(parseInt(await graph.getAttributesStatsInDataPanel() ?? "", 10)).toBe(1);
-        await apiCall.removeSchema(graphName);
+        await apiCall.removeGraph(graphName);
     });
 
     test(`@readwrite validate modifying attribute via UI and verify via API`, async () => {
@@ -335,7 +335,7 @@ test.describe('Graph Tests', () => {
         await graph.modifyAttribute("10");
         const response  = await apiCall.runQuery(graphName, "match (n) return n");
         expect(response.result.data[1].n.properties.id).toBe('10')
-        await apiCall.removeSchema(graphName);
+        await apiCall.removeGraph(graphName);
     });
 
     test(`@readwrite validate deleting attribute via UI and verify via API`, async () => {
@@ -350,7 +350,7 @@ test.describe('Graph Tests', () => {
         await graph.deleteGraphAttribute();
         const response  = await apiCall.runQuery(graphName, "match (n) return n");
         expect(response.result.data[0].n.properties).not.toHaveProperty('name');
-        await apiCall.removeSchema(graphName);
+        await apiCall.removeGraph(graphName);
     });
 
     test(`@readwrite validate deleting connection between two nodes updates canvas panels`, async () => {
@@ -366,7 +366,7 @@ test.describe('Graph Tests', () => {
         await graph.deleteGraphRelation(links[0].midX, links[0].midY);
         expect(parseInt(await graph.getEdgesGraphStats() ?? "", 10)).toBe(initCount - 1);
         expect(await graph.isRelationshipTypesPanelBtnHidden()).toBeTruthy();
-        await apiCall.removeSchema(graphName);
+        await apiCall.removeGraph(graphName);
     });
 
     test(`@readwrite validate adding connection between two nodes updates canvas panels`, async () => {
@@ -378,7 +378,7 @@ test.describe('Graph Tests', () => {
         await graph.insertQuery('CREATE (a:Person {id: "1"}), (b:Person {id: "2"}), (a)-[c:KNOWS]->(b) RETURN a, b, c');
         await graph.clickRunQuery();
         expect(await graph.getRelationshipTypesPanelBtn()).toBe('KNOWS');        
-        await apiCall.removeSchema(graphName);
+        await apiCall.removeGraph(graphName);
     });
 
     test(`@readwrite validate undo functionally after deleting attribute update correctly`, async () => {
@@ -393,7 +393,7 @@ test.describe('Graph Tests', () => {
         await graph.deleteGraphAttribute();
         await graph.clickUndoBtnInNotification();
         expect(parseInt(await graph.getAttributesStatsInDataPanel() ?? "", 10)).toBe(2);
-        await apiCall.removeSchema(graphName);
+        await apiCall.removeGraph(graphName);
     });
 
     test(`@readwrite Attempting to add existing label name for a node display error`, async () => {
@@ -407,7 +407,7 @@ test.describe('Graph Tests', () => {
         await graph.modifyLabel("Alice", "Person");
         expect(await graph.getLabesCountlInDataPanel()).toBe(2)
         expect(await graph.getErrorNotification()).toBeTruthy();
-        await apiCall.removeSchema(graphName);
+        await apiCall.removeGraph(graphName);
     });
 
     test(`@readwrite moving a node to another node's position while animation is off should place them at the same position`, async () => {
@@ -431,7 +431,7 @@ test.describe('Graph Tests', () => {
         
         expect(nodes[1].screenX - nodes[0].screenX).toBeLessThanOrEqual(2);
         expect(nodes[1].screenY - nodes[0].screenY).toBeLessThanOrEqual(2);
-        await apiCall.removeSchema(graphName);
+        await apiCall.removeGraph(graphName);
     });
 
     test(`@readwrite moving a node to another node's position while animation is on should push them apart`, async () => {
@@ -456,7 +456,7 @@ test.describe('Graph Tests', () => {
         
         expect(Math.abs(nodes[1].screenX - nodes[0].screenX)).toBeGreaterThan(2);
         expect(Math.abs(nodes[1].screenY - nodes[0].screenY)).toBeGreaterThan(2);
-        await apiCall.removeSchema(graphName);
+        await apiCall.removeGraph(graphName);
     });
 
     test(`@admin Validate that toggling a category label updates edge visibility on the canvas`, async () => {
