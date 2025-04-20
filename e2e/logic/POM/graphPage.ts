@@ -262,6 +262,18 @@ export default class GraphPage extends BasePage {
         return this.page.locator('//div[contains(@id, "canvasPanel")]//button[@role="switch"]');
     }
 
+    private get labelsPanelBtn(): Locator {
+        return this.page.locator('//div[contains(@id, "LabelsPanel")]//button');
+    }
+
+    private get querySearchList(): Locator {
+        return this.page.locator("//div[contains(@class, 'tree')]");
+    }
+
+    private get querySearchListItems(): Locator {
+        return this.page.locator("//div[contains(@class, 'tree')]//div[contains(@class, 'contents')]");
+    }
+
     async insertGraphInSearchInput(graph: string): Promise<void> {
         await interactWhenVisible(this.graphSelectSearchInput, el => el.fill(graph), "graph search input");
     }
@@ -540,6 +552,30 @@ export default class GraphPage extends BasePage {
     async getAnimationControlPanelState(): Promise<string | null> {
         return await this.animationControlBtn.getAttribute('data-state');
     }
+
+    async clickLabelsPanelBtn(): Promise<void> {
+        await interactWhenVisible(this.labelsPanelBtn, el => el.click(), "Labels panel button");
+    }
+
+    async getLabelsPanelBtn(): Promise<string | null> {
+        return await interactWhenVisible(this.labelsPanelBtn, el => el.textContent(), "Labels panel button");
+    }
+
+    async getQuerySearchListText(): Promise<string[]> {
+        await waitForElementToBeVisible(this.querySearchList);
+        const elements = this.querySearchListItems;
+        const count = await elements.count();
+        const texts: string[] = [];
+    
+        for (let i = 0; i < count; i++) {
+            const item = elements.nth(i);
+            const text = await interactWhenVisible(item, el => el.textContent(), `Query search list item #${i}`);
+            if (text) texts.push(text.trim());
+        }
+    
+        return texts;
+    }
+    
     
     async countGraphsInMenu(): Promise<number> {
         await waitForTimeOut(this.page, 1000);

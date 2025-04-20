@@ -381,7 +381,7 @@ test.describe('Graph Tests', () => {
         await apiCall.removeSchema(graphName);
     });
 
-    test(`@readwrite validate undo functionally after deleting attribute update correctly `, async () => {
+    test(`@readwrite validate undo functionally after deleting attribute update correctly`, async () => {
         const graphName = getRandomString('graph');
         await apiCall.addGraph(graphName);
         const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
@@ -459,4 +459,95 @@ test.describe('Graph Tests', () => {
         await apiCall.removeSchema(graphName);
     });
 
+    test(`@admin Validate that toggling a category label updates edge visibility on the canvas`, async () => {
+        const graphName = getRandomString('graph');
+        await apiCall.addGraph(graphName);
+        const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+        await browser.setPageToFullScreen();
+        await graph.selectExistingGraph(graphName);
+        await graph.insertQuery('CREATE (n:person1 {id: "1"}) RETURN n');
+        await graph.clickRunQuery();
+        await graph.clickLabelsPanelBtn();
+        expect(await graph.getLabelsPanelBtn()).toBe("person1")
+        const nodes1 = await graph.getNodeScreenPositions('graph');
+        expect(nodes1[0].visible).toBeFalsy();
+        await graph.clickLabelsPanelBtn();
+        const nodes2 = await graph.getNodeScreenPositions('graph');
+        expect(nodes2[0].visible).toBeTruthy();
+        await apiCall.removeGraph(graphName);
+    });
+
+    test(`@admin Validate that toggling a relationship label updates edge visibility on the canvas`, async () => {
+        const graphName = getRandomString('graph');
+        await apiCall.addGraph(graphName);
+        const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+        await browser.setPageToFullScreen();
+        await graph.selectExistingGraph(graphName);
+        await graph.insertQuery('CREATE (a:person1 {id: "1"}), (b:person2 {id: "2"}), (a)-[c:knows]->(b) RETURN a, b, c');
+        await graph.clickRunQuery();
+        await graph.clickRelationshipTypesPanelBtn();
+        expect(await graph.getRelationshipTypesPanelBtn()).toBe("knows");
+        const links1 = await graph.getLinksScreenPositions('graph');
+        expect(links1[0].visible).toBeFalsy();
+        await graph.clickRelationshipTypesPanelBtn();
+        const links2 = await graph.getLinksScreenPositions('graph'); 
+        expect(links2[0].visible).toBeTruthy();
+        await apiCall.removeGraph(graphName);
+    });
+
+
+    const invalidQueriesRO = [
+        { query: "CREATE (n:Person { name: 'Alice' }) RETURN n", description: 'create node query' },
+        { query: "MATCH (n:Person { name: 'Alice' }) SET n.age = 30 RETURN n", description: 'update node query' },
+        { query: "MATCH (n:Person { name: 'Alice' }) DELETE n", description: 'delete node query' },
+        { query: "CREATE INDEX ON :Person(name)", description: 'create index query' },
+        { query: "MERGE (n:Person { name: 'Alice' }) RETURN n", description: 'merge query that creates node' },
+        { query: "UNWIND [1,2,3] AS x CREATE (:Number {value: x})", description: 'unwind with create query' }
+    ];
+    
+    invalidQueriesRO.forEach(({ query, description }) => {
+        test(`@readonly Validate failure when RO user attempts to execute : ${description}`, async () => {
+            const graphName = getRandomString('graph');
+            await apiCall.addGraph(graphName, "admin");
+            const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+            await browser.setPageToFullScreen();
+            await graph.selectExistingGraph(graphName, "readonly");
+            await graph.insertQuery(query);
+            await graph.clickRunQuery();
+            expect(await graph.getErrorNotification()).toBeTruthy();
+            await apiCall.removeGraph(graphName, "admin");
+        });
+    });
+      
+    test(`@readonly Validate success when RO user attempts to execute ro query`, async () => {
+        const graphName = getRandomString('graph');
+        await apiCall.addGraph(graphName, "admin");
+        await apiCall.runQuery(graphName, "CREATE (:Person {name: 'Alice'})-[:KNOWS]->(:Person {name: 'Bob'})", "admin")
+        const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+        await browser.setPageToFullScreen();
+        await graph.selectExistingGraph(graphName, "readonly");
+        await graph.insertQuery("MATCH (n)-[r]->(m) RETURN n, r, m LIMIT 10");
+        await graph.clickRunQuery();
+        expect(await graph.getErrorNotification()).toBeFalsy();
+        await apiCall.removeGraph(graphName, "admin");
+    });
+
+    const queriesInput = [
+        { query: "C", keywords: ['call', 'collect', 'count', 'create'] },
+        { query: "M", keywords: ['max', 'min', 'match', 'merge'] },
+    ]; 
+    queriesInput.forEach(({query, keywords}) => {
+        test(`@readwrite Validate auto complete in query search for: ${query}`, async () => {
+            const graphName = getRandomString('graph');
+            await apiCall.addGraph(graphName);
+            const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+            await browser.setPageToFullScreen();
+            await graph.selectExistingGraph(graphName);
+            await graph.insertQuery(query);
+            const response = await graph.getQuerySearchListText();
+            const hasAny = response.some(s => keywords.some(k => s.includes(k)));
+            expect(hasAny).toBeTruthy();
+            await apiCall.removeGraph(graphName);
+        });
+    })
 })
