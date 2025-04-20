@@ -40,12 +40,11 @@ test.describe(`Login tests`, () => {
     ];
 
     invalidInputs.forEach(({ description, host, port, username, password }, index) => {
-        test.skip(`@admin validate user login with wrong credentials: ${description}`, async () => {
+        test(`@admin validate user login with wrong credentials: ${description}`, async () => {
             const login = await browser.createNewPage(LoginPage, urls.loginUrl);
-            if (index === 0) await login.Logout();
+            if (login.getCurrentURL() === urls.graphUrl) await login.Logout();
             await browser.setPageToFullScreen();
             await login.connectWithCredentials(username, password, host, port);
-            await login.refreshPage();
             await new Promise((res) => setTimeout(res, 500));
             expect(login.getCurrentURL()).not.toBe(urls.graphUrl)
         })
