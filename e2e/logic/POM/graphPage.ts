@@ -146,22 +146,6 @@ export default class GraphPage extends BasePage {
         return this.page.locator("//div[@id='graphStats']//span[2]");
     }
 
-    private get showTimeoutInput(): Locator {
-        return this.page.getByRole("button", { name: "Show Timeout" });
-    }
-
-    private get increaseTimeoutBtn(): Locator {
-        return this.page.getByRole("button", { name: "Increase Timeout" });
-    }
-
-    private get decreaseTimeoutBtn(): Locator {
-        return this.page.getByRole("button", { name: "Decrease Timeout" });
-    }
-
-    private get timeoutInput(): Locator {
-        return this.page.locator("#timeoutInput");
-    }
-
     private get deleteNodeInGraphDataPanel(): Locator {
         return this.page.locator('//div[contains(@id, "graphDataPanel")]//button[contains(text(), "Delete Node")]');
     }
@@ -329,22 +313,6 @@ export default class GraphPage extends BasePage {
         if (waitForAnimation) {
             await this.waitForCanvasAnimationToEnd();
         }
-    }
-
-    async clickShowTimeout(): Promise<void> {
-        await interactWhenVisible(this.showTimeoutInput, el => el.click(), "show timeout button");
-    }
-
-    async clickIncreaseTimeout(): Promise<void> {
-        await interactWhenVisible(this.increaseTimeoutBtn, el => el.click(), "increase timeout button");
-    }
-
-    async clickDecreaseTimeout(): Promise<void> {
-        await interactWhenVisible(this.decreaseTimeoutBtn, el => el.click(), "decrease timeout button");
-    }
-
-    async insertTimeoutValue(value: string): Promise<void> {
-        await interactWhenVisible(this.timeoutInput, el => el.fill(value), "timeout input");
     }
 
     async clickOnQueryInput(): Promise<void> {
