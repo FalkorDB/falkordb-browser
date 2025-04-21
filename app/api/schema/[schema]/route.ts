@@ -12,11 +12,12 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
     const { schema } = await params
     const schemaName = `${schema}_schema`
+    const create = request.nextUrl.searchParams.get("create")
 
     try {
         const schemas = await client.list()
 
-        if (!schemas.includes(schemaName)) return NextResponse.json({ message: "Schema not found" }, { status: 200 })
+        if (create === "false" && !schemas.includes(schemaName)) return NextResponse.json({ message: "Schema not found" }, { status: 200 })
 
         const graph = client.selectGraph(schemaName)
         const result = await graph.query("MATCH (n) OPTIONAL MATCH (n)-[e]-(m) RETURN * LIMIT 100")
