@@ -148,22 +148,6 @@ export default class GraphPage extends BasePage {
         await this.graphSelectSearchInput.fill(graph);
     }
 
-    private get showTimeoutInput(): Locator {
-        return this.page.getByRole("button", { name: "Show Timeout" });
-    }
-
-    private get increaseTimeoutBtn(): Locator {
-        return this.page.getByRole("button", { name: "Increase Timeout" });
-    }
-
-    private get decreaseTimeoutBtn(): Locator {
-        return this.page.getByRole("button", { name: "Decrease Timeout" });
-    }
-
-    private get timeoutInput(): Locator {
-        return this.page.locator("#timeoutInput");
-    }
-    
     async countGraphsInMenu(): Promise<number> {
         await waitForTimeOut(this.page, 1000);
 
@@ -436,27 +420,21 @@ export default class GraphPage extends BasePage {
     async getDataCellByAttrInDataPanel(attribute: string): Promise<string | null>{
         const isVisible = await waitForElementToBeVisible(this.valueCellByAttributeInDataPanel(attribute));
         if (!isVisible) throw new Error("value cell by attr button is not visible!");
-        return await this.valueCellByAttributeInDataPanel(attribute).textContent();
+        const text = await this.valueCellByAttributeInDataPanel(attribute).textContent();
+        return text;
     }
 
     async getNodesGraphStats(): Promise<string | null>{
         const isVisible = await waitForElementToBeVisible(this.nodesGraphStats);
         if (!isVisible) throw new Error("node graph stats button is not visible!");
-        return await this.nodesGraphStats.textContent();
+        const text = await this.nodesGraphStats.textContent();
+        return text;
     }
 
     async getEdgesGraphStats(): Promise<string | null>{
         const isVisible = await waitForElementToBeVisible(this.edgesGraphStats);
         if (!isVisible) throw new Error("edges graph stats button is not visible!");
-        return await this.edgesGraphStats.textContent();
-    }
-    
-    async addTimeout(timeout?: number): Promise<void> {
-        await this.showTimeoutInput.click();
-        if (timeout) {
-            await this.timeoutInput.fill(timeout.toString());
-        } else {
-            await this.increaseTimeoutBtn.click();
-        }
+        const text = await this.edgesGraphStats.textContent();
+        return text;
     }
 }

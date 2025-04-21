@@ -2,6 +2,7 @@
 /* eslint-disable no-await-in-loop */
 import { Locator, Page } from "playwright";
 import { readFileSync } from "fs";
+import crypto from "crypto";
 
 const adminAuthFile = 'playwright/.auth/admin.json'
 
@@ -132,7 +133,7 @@ export async function waitForApiSuccess<T>(
             // ignore errors during polling
         }
 
-        await new Promise(res => setTimeout(res, interval));
+        await new Promise(resolve => { setTimeout(resolve, interval) });
     }
 
     throw new Error('API condition was not met within timeout');

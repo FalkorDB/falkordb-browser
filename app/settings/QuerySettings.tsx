@@ -27,12 +27,14 @@ export default function QuerySettings() {
                     </Tooltip>
                     <div className="flex border rounded-md w-fit">
                         <Button
+                            id="increaseTimeoutBtn"
                             className="p-2"
                             onClick={() => setTimeout(prev => prev + 1)}
                         >
                             <Plus />
                         </Button>
                         <Input
+                            id="timeoutInput"
                             className="text-center bg-foreground rounded-none border-y-0 text-white font-xl"
                             value={timeout === 0 ? "∞" : timeout}
                             onChange={(e) => {
@@ -44,6 +46,7 @@ export default function QuerySettings() {
                             }}
                         />
                         <Button
+                            id="decreaseTimeoutBtn"
                             className="p-2"
                             onClick={() => setTimeout(prev => prev - 1)}
                         >
@@ -65,12 +68,14 @@ export default function QuerySettings() {
                     </Tooltip>
                     <div className="flex border rounded-md w-fit">
                         <Button
+                            id="increaseLimitBtn"
                             className="p-2"
                             onClick={() => setLimit(prev => prev + 1)}
                         >
                             <Plus />
                         </Button>
                         <Input
+                            id="limitInput"
                             className="text-center bg-foreground rounded-none border-y-0 text-white font-xl"
                             value={limit === 0 ? "∞" : limit}
                             onChange={(e) => {
@@ -82,6 +87,7 @@ export default function QuerySettings() {
                             }}
                         />
                         <Button
+                            id="decreaseLimitBtn"
                             className="p-2"
                             onClick={() => setLimit(prev => prev - 1)}
                         >

@@ -66,19 +66,6 @@ test.describe('Graph Tests', () => {
             await apiCall.removeGraph(graphName);
         });
     })
-
-    test(`@admin Validate that running a query with timeout returns an error`, async () => {
-        const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
-        const graphName = `graph_${Date.now()}`;
-        await graph.addGraph(graphName);
-        await graph.addTimeout();
-        const query = `UNWIND range(1, 100000000) as x RETURN count(x)`;
-        await graph.insertQuery(query);
-        await graph.clickRunQuery(false);
-        await graph.waitForRunQueryToBeEnabled();
-        expect(await graph.getErrorNotification()).toBe(true);
-        await apiCall.removeGraph(graphName);
-    });
   
     test(`@admin Validate that the reload graph list function works by adding a graph via API and testing the reload button`, async () => {
         const graphName = getRandomString('graph');
@@ -163,8 +150,8 @@ test.describe('Graph Tests', () => {
         await graph.clickRunQuery();
         const nodes = await graph.getNodesGraphStats();
         const edges = await graph.getEdgesGraphStats();
-        expect(parseInt(nodes ?? "")).toBe(10);
-        expect(parseInt(edges ?? "")).toBe(9)
+        expect(parseInt(nodes ?? "", 10)).toBe(10);
+        expect(parseInt(edges ?? "", 10)).toBe(9)
         await apiCall.removeGraph(graphName);
     });
 })
