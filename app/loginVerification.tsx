@@ -3,7 +3,7 @@
 import { signOut, useSession } from "next-auth/react"
 import { usePathname, useRouter } from "next/navigation"
 import { useEffect, useMemo, useState } from "react"
-import { IndicatorContext } from "./components/provider"
+import { IndicatorContext, LimitContext, TimeoutContext } from "./components/provider"
 
 export default function LoginVerification({ children }: { children: React.ReactNode }) {
 
@@ -11,6 +11,8 @@ export default function LoginVerification({ children }: { children: React.ReactN
     const { status } = useSession()
     const url = usePathname()
     const [indicator, setIndicator] = useState<"online" | "offline">("online")
+    const [timeout, setTimeout] = useState(0)
+    const [limit, setLimit] = useState(0)
     const { data } = useSession()
 
     useEffect(() => {
@@ -42,16 +44,22 @@ export default function LoginVerification({ children }: { children: React.ReactN
 
         checkStatus()
 
-        const interval = setInterval(checkStatus, 30000)
+        const interval = setInterval(checkStatus, 30000)    
 
         return () => clearInterval(interval)
     }, [status])
 
     const indicatorContext = useMemo(() => ({ indicator, setIndicator }), [indicator, setIndicator])
+    const timeoutContext = useMemo(() => ({ timeout, setTimeout }), [timeout, setTimeout])
+    const limitContext = useMemo(() => ({ limit, setLimit }), [limit, setLimit])
 
     return (
         <IndicatorContext.Provider value={indicatorContext}>
-            {children}
+            <TimeoutContext.Provider value={timeoutContext}>
+                <LimitContext.Provider value={limitContext}>
+                    {children}
+                </LimitContext.Provider>
+            </TimeoutContext.Provider>
         </IndicatorContext.Provider>
     )
 }

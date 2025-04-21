@@ -1,14 +1,14 @@
 'use client'
 
 import { useCallback, useContext, useEffect, useState } from "react";
-import { HistoryQuery, prepareArg, securedFetch } from "@/lib/utils";
+import { getQueryWithLimit, HistoryQuery, prepareArg, securedFetch } from "@/lib/utils";
 import { useSession } from "next-auth/react";
 import { useToast } from "@/components/ui/use-toast";
 import dynamic from "next/dynamic";
 import Header from "../components/Header";
 import { Graph, Link, Node } from "../api/graph/model";
 import Tutorial from "./Tutorial";
-import { IndicatorContext } from "../components/provider";
+import { IndicatorContext, LimitContext, TimeoutContext } from "../components/provider";
 
 const Selector = dynamic(() => import("./Selector"), { ssr: false })
 const GraphView = dynamic(() => import("./GraphView"), { ssr: false })
@@ -30,6 +30,8 @@ export default function Page() {
     const { data: session } = useSession()
     const { toast } = useToast()
     const { setIndicator } = useContext(IndicatorContext);
+    const { timeout } = useContext(TimeoutContext);
+    const { limit } = useContext(LimitContext);
 
     useEffect(() => {
         setHistoryQuery({
@@ -61,7 +63,7 @@ export default function Page() {
         fetchCount()
     }, [fetchCount, graph.Id, graphName])
 
-    const run = async (q: string, timeout?: number) => {
+    const run = async (q: string) => {
         if (!graphName) {
             toast({
                 title: "Error",
@@ -71,7 +73,7 @@ export default function Page() {
             return null
         }
 
-        const result = await securedFetch(`api/graph/${prepareArg(graphName)}/?query=${prepareArg(q)}&timeout=${timeout}`, {
+        const result = await securedFetch(`api/graph/${prepareArg(graphName)}/?query=${prepareArg(getQueryWithLimit(q, limit))}&timeout=${timeout}`, {
             method: "GET"
         }, toast, setIndicator)
 
@@ -97,8 +99,8 @@ export default function Page() {
         return json.result
     }
 
-    const runQuery = async (q: string, timeout?: number) => {
-        const result = await run(q, timeout)
+    const runQuery = async (q: string) => {
+        const result = await run(q)
         if (!result) return undefined
         const explain = await securedFetch(`api/graph/${prepareArg(graphName)}/explain/?query=${prepareArg(q)}`, {
             method: "GET"
