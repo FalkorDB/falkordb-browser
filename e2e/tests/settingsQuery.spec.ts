@@ -48,5 +48,6 @@ test.describe("Query Settings", () => {
         await querySettings.clickRunQuery()
         const res = await querySettings.getNodeScreenPositions('graph');
         expect(res.length).toBe(5);
+        await apiCall.removeGraph(graphName);
     });
 });
