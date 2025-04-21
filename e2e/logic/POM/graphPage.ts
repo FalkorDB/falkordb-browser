@@ -590,6 +590,7 @@ export default class GraphPage extends BasePage {
     }
 
     async verifyGraphExists(graph: string): Promise<boolean> {
+        await this.page.waitForTimeout(500);
         if (await this.graphsMenu.isDisabled()) return false;
 
         await this.openGraphsMenu();

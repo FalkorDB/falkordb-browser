@@ -46,6 +46,7 @@ test.describe('Canvas Tests', () => {
         await graph.addGraph(graphName);
         await graph.insertQuery(BATCH_CREATE_PERSONS);
         await graph.clickRunQuery();
+        await graph.clickOnFitToSize();
         const initialGraph = await graph.getCanvasScaling();
         await graph.clickOnZoomIn();
         await graph.clickOnZoomIn();
@@ -62,6 +63,7 @@ test.describe('Canvas Tests', () => {
         await graph.addGraph(graphName);
         await graph.insertQuery(BATCH_CREATE_PERSONS);
         await graph.clickRunQuery();
+        await graph.clickOnFitToSize();
         const initialGraph = await graph.getCanvasScaling();
         await graph.clickOnZoomOut();
         await graph.clickOnZoomOut();
