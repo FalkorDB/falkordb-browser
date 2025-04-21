@@ -1,6 +1,5 @@
 import { expect } from "@playwright/test";
 import test from "playwright/test";
-import { prepareArg } from "@/lib/utils";
 import ApiCalls from "../logic/api/apiCalls";
 import BrowserWrapper from "../infra/ui/browserWrapper";
 import urls from "../config/urls.json";
@@ -28,7 +27,7 @@ test.describe("Query Settings", () => {
         await querySettings.addTimeout(timeout);
         await querySettings.clickOnGraph();
         await querySettings.selectExistingGraph(graphName)
-        const query = `UNWIND range(1, 10000000) AS x RETURN count(x)`;
+        const query = `UNWIND range(1, 100000000) AS x RETURN count(x)`;
         await querySettings.insertQuery(query);
         await querySettings.clickRunQuery(false);
         await querySettings.waitForRunQueryToBeEnabled();

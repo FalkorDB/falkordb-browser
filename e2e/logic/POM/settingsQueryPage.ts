@@ -46,7 +46,7 @@ export default class SettingsQueryPage extends GraphPage {
 
     async addLimit(limit?: number): Promise<void> {
         if (limit) {
-            await this.fillTimeoutInput(limit.toString())
+            await this.fillLimitInput(limit.toString())
         } else {
             await this.clickIncreaseLimit();
         }

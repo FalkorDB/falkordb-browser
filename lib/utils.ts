@@ -146,6 +146,8 @@ export function removeMainReturnLimit(query: string) {
 }
 
 export function getQueryWithLimit(query: string, limit: number) {
+  if (limit === 0) return query
+
   const mainReturnLimit = getMainReturnLimit(query)
 
   if (mainReturnLimit !== -1) {
