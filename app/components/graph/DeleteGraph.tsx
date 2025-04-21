@@ -26,20 +26,18 @@ export default function DeleteGraph({ type, trigger, options, rows, handleSetRow
   const handleDelete = async (opts: string[]) => {
     setIsLoading(true)
     try {
-      const names = opts.map(opt => type === "Schema" ? `${opt}_schema` : opt)
-
-      const newNames = await Promise.all(names.map(async (name) => {
-        const result = await securedFetch(`api/graph/${prepareArg(name)}`, {
+      const newNames = await Promise.all(opts.map(async (opt) => {
+        const result = await securedFetch(`api/${type === "Schema" ? "schema" : "graph"}/${prepareArg(opt)}`, {
           method: "DELETE"
         }, toast, setIndicator)
 
-        if (result.ok) return name
+        if (result.ok) return ""
 
-        return ""
+        return opt
 
-      })).then(newGraphNames => options.filter(opt => !newGraphNames.filter(name => name !== "").includes(opt)))
+      })).then(newGraphNames => newGraphNames.filter(opt => opt !== ""))
 
-      setOptions!(newNames)
+      setOptions(newNames)
 
       if (opts.includes(selectedValue) && setSelectedValue) setSelectedValue(newNames.length > 0 ? newNames[newNames.length - 1] : "")
 
