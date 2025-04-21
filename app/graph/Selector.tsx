@@ -57,7 +57,7 @@ export default function Selector({ setGraphName, graphName, runQuery, edgesCount
     const handleOnChange = useCallback(async (name: string) => {
         const formattedName = name === '""' ? "" : name
         if (type === "Graph") {
-            const result = await securedFetch(`api/schema/${prepareArg(name)}`, {
+            const result = await securedFetch(`api/schema/${prepareArg(name)}?create=false`, {
                 method: "GET"
             }, toast, setIndicator)
 

@@ -8,15 +8,16 @@ import { getRandomString } from "../infra/utils";
 test.describe('Metadata Tests', () => {
     let browser: BrowserWrapper;
     let apiCalls : APICalls;
-    const GRAPH_NAME = getRandomString('metadata');
+    let GRAPH_NAME: string;
 
-    test.beforeAll(async () => {
+    test.beforeEach(async () => {
         browser = new BrowserWrapper();
         apiCalls = new APICalls();
+        GRAPH_NAME = getRandomString('metadata');
         await apiCalls.addGraph(GRAPH_NAME);
     })
     
-    test.afterAll(async () => {
+    test.afterEach(async () => {
         await apiCalls.removeGraph(GRAPH_NAME);
         await browser.closeBrowser();
     })

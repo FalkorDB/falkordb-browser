@@ -112,7 +112,12 @@ export default class ApiCalls {
             let json = JSON.parse(rawText);
     
             // Poll if response contains a numeric result (job ID)
+            const MAX_POLLS = 10;
+            let polls = 0;
             while (typeof json.result === "number") {
+                if (++polls > MAX_POLLS) {
+                    throw new Error(`Query polling exceeded ${MAX_POLLS} attempts`);
+                }
                 const jobId = json.result;
                 result = await getRequest(`${urls.api.graphUrl}${graphName}/query/?id=${jobId}`, headers);
                 rawText = await result.text();
@@ -244,15 +249,32 @@ export default class ApiCalls {
         }
     }
 
-    async addSchemaNode(schemaName: string, schema: string): Promise<AddSchemaResponse> {
+    async runSchemaQuery(schemaName: string, schema: string): Promise<AddSchemaResponse> {
         try {
-            const result = await getRequest(`${urls.api.graphUrl + schemaName}_schema?query=${schema}`);
-            return await result.json();
+            let result = await getRequest(`${urls.api.graphUrl + schemaName}_schema?query=${encodeURIComponent(schema)}`);
+            let json = await result.json();
+    
+            const MAX_POLLS = 10;
+            let polls = 0;
+    
+            while (typeof json.result === "number") {
+                if (++polls > MAX_POLLS) {
+                    throw new Error(`Schema polling exceeded ${MAX_POLLS} attempts`);
+                }
+                const jobId = json.result;
+                await new Promise(r => setTimeout(r, 500)); // Wait before polling again
+                result = await getRequest(`${urls.api.graphUrl + schemaName}_schema/query/?id=${jobId}`);
+                json = await result.json();
+            }
+    
+            return json;
+    
         } catch (error) {
+            console.error(error);
             throw new Error("Failed to add schema.");
         }
     }
-
+    
     async getSchemas(): Promise<SchemaListResponse> {
         try {
             const result = await getRequest(`${urls.api.schemaUrl}`);

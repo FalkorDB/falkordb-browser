@@ -7,11 +7,11 @@ import { userRoles, user } from '../config/user.json'
 test.describe(`Login tests`, () => {
     let browser: BrowserWrapper;
 
-    test.beforeAll(async () => {
+    test.beforeEach(async () => {
         browser = new BrowserWrapper();
     });
 
-    test.afterAll(async () => {
+    test.afterEach(async () => {
         await browser.closeBrowser();
     });
 

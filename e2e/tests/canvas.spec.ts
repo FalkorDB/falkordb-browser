@@ -13,12 +13,12 @@ test.describe('Canvas Tests', () => {
     let browser: BrowserWrapper;
     let apicalls: ApiCalls;
 
-    test.beforeAll(async () => {
+    test.beforeEach(async () => {
         browser = new BrowserWrapper();
         apicalls = new ApiCalls();
     })
 
-    test.afterAll(async () => {
+    test.afterEach(async () => {
         await browser.closeBrowser();
     })
     
@@ -46,6 +46,7 @@ test.describe('Canvas Tests', () => {
         await graph.addGraph(graphName);
         await graph.insertQuery(BATCH_CREATE_PERSONS);
         await graph.clickRunQuery();
+        await graph.clickOnFitToSize();
         const initialGraph = await graph.getCanvasScaling();
         await graph.clickOnZoomIn();
         await graph.clickOnZoomIn();
@@ -62,6 +63,7 @@ test.describe('Canvas Tests', () => {
         await graph.addGraph(graphName);
         await graph.insertQuery(BATCH_CREATE_PERSONS);
         await graph.clickRunQuery();
+        await graph.clickOnFitToSize();
         const initialGraph = await graph.getCanvasScaling();
         await graph.clickOnZoomOut();
         await graph.clickOnZoomOut();

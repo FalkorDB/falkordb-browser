@@ -8,11 +8,11 @@ const roles = [{ name: "admin" }, { name: "readwrite" }, { name: "readonly" }];
 test.describe(`Navbar tests`, () => {
     let browser: BrowserWrapper;
 
-    test.beforeAll(async () => {
+    test.beforeEach(async () => {
         browser = new BrowserWrapper();
     });
 
-    test.afterAll(async () => {
+    test.afterEach(async () => {
         await browser.closeBrowser();
     });
 

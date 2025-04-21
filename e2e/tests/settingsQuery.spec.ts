@@ -10,12 +10,12 @@ test.describe("Query Settings", () => {
     let browser: BrowserWrapper;
     let apiCall: ApiCalls;
 
-    test.beforeAll(async () => {
+    test.beforeEach(async () => {
         browser = new BrowserWrapper();
         apiCall = new ApiCalls();
     })
 
-    test.afterAll(async () => {
+    test.afterEach(async () => {
         await browser.closeBrowser();
     })
 
@@ -48,5 +48,6 @@ test.describe("Query Settings", () => {
         await querySettings.clickRunQuery()
         const res = await querySettings.getNodeScreenPositions('graph');
         expect(res.length).toBe(5);
+        await apiCall.removeGraph(graphName);
     });
 });

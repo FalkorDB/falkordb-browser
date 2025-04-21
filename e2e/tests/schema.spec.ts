@@ -5,26 +5,25 @@ import { expect, test } from "@playwright/test";
 import BrowserWrapper from "../infra/ui/browserWrapper";
 import ApiCalls from "../logic/api/apiCalls";
 import urls from '../config/urls.json'
-import { getRandomString, waitForApiSuccess } from "../infra/utils";
+import { getRandomString } from "../infra/utils";
 import SchemaPage from "../logic/POM/schemaPage";
 
 test.describe('Schema Tests', () => {
     let browser: BrowserWrapper;
     let apicalls: ApiCalls;
 
-    test.beforeAll(async () => {
+    test.beforeEach(async () => {
         browser = new BrowserWrapper();
         apicalls = new ApiCalls();
     })
 
-    test.afterAll(async () => {
+    test.afterEach(async () => {
         await browser.closeBrowser();
     })
 
     test(`@admin Validate that the reload schema list function works by adding a schema via API and testing the reload button`, async () => {
         const schemaName = getRandomString('schema');
         await apicalls.addSchema(schemaName);
-        await waitForApiSuccess(() => apicalls.getSchemas(), res => res.opts.includes(schemaName));
         const schema = await browser.createNewPage(SchemaPage, urls.schemaUrl);
         await browser.setPageToFullScreen();
         await schema.reloadGraphList();
@@ -47,8 +46,7 @@ test.describe('Schema Tests', () => {
 
     test(`@admin Validate that a created relationship appears in the canvas, opens the data panel, and updates the relationship types panel`, async () => {
         const schemaName = getRandomString('schema');
-        await apicalls.addSchemaNode(schemaName, 'CREATE (a:person1 {id: "Integer!*-1"}), (b:person2 {id: "Integer!*-2"}) RETURN a, b');
-        await waitForApiSuccess(() => apicalls.getSchemas(), res => res.opts.includes(schemaName));
+        await apicalls.runSchemaQuery(schemaName, 'CREATE (a:person1 {id: "Integer!*-1"}), (b:person2 {id: "Integer!*-2"}) RETURN a, b');
         const schema = await browser.createNewPage(SchemaPage, urls.schemaUrl);
         await browser.setPageToFullScreen();
         await schema.selectExistingGraph(schemaName);
@@ -63,8 +61,7 @@ test.describe('Schema Tests', () => {
 
     test(`@admin Validate that deleting a node removes it from the canvas and updates the category panel`, async () => {
         const schemaName = getRandomString('schema');
-        await apicalls.addSchemaNode(schemaName, 'CREATE (n:person1 {id: "Integer!*-1"}) RETURN n');
-        await waitForApiSuccess(() => apicalls.getSchemas(), res => res.opts.includes(schemaName));
+        await apicalls.runSchemaQuery(schemaName, 'CREATE (n:person1 {id: "Integer!*-1"}) RETURN n');
         const schema = await browser.createNewPage(SchemaPage, urls.schemaUrl);
         await browser.setPageToFullScreen();
         await schema.selectExistingGraph(schemaName);
@@ -78,8 +75,7 @@ test.describe('Schema Tests', () => {
 
     test(`@admin Validate that toggling a category label updates edge visibility on the canvas`, async () => {
         const schemaName = getRandomString('schema');
-        await apicalls.addSchemaNode(schemaName, 'CREATE (n:person1 {id: "Integer!*-1"}) RETURN n');
-        await waitForApiSuccess(() => apicalls.getSchemas(), res => res.opts.includes(schemaName));
+        await apicalls.runSchemaQuery(schemaName, 'CREATE (n:person1 {id: "Integer!*-1"}) RETURN n');
         const schema = await browser.createNewPage(SchemaPage, urls.schemaUrl);
         await browser.setPageToFullScreen();
         await schema.selectExistingGraph(schemaName);
@@ -95,8 +91,7 @@ test.describe('Schema Tests', () => {
 
     test(`@admin Validate that toggling a relationship label updates edge visibility on the canvas`, async () => {
         const schemaName = getRandomString('schema');
-        await apicalls.addSchemaNode(schemaName, 'CREATE (a:person1 {id: "Integer!*-1"}), (b:person2 {id: "Integer!*-2"}), (a)-[:knows]->(b) RETURN a, b');
-        await waitForApiSuccess(() => apicalls.getSchemas(), res => res.opts.includes(schemaName));
+        await apicalls.runSchemaQuery(schemaName, 'CREATE (a:person1 {id: "Integer!*-1"}), (b:person2 {id: "Integer!*-2"}), (a)-[:knows]->(b) RETURN a, b');
         const schema = await browser.createNewPage(SchemaPage, urls.schemaUrl);
         await browser.setPageToFullScreen();
         await schema.selectExistingGraph(schemaName);
@@ -110,10 +105,9 @@ test.describe('Schema Tests', () => {
         await apicalls.removeSchema(schemaName);
     });
 
-    test(`@admin Validate that deleting a relationship removes it from the canvas and updates the relationship types panel`, async () => { //#849
+    test(`@admin Validate that deleting a relationship removes it from the canvas and updates the relationship types panel`, async () => {
         const schemaName = getRandomString('schema');
-        await apicalls.addSchemaNode(schemaName, 'CREATE (a:person1 {id: "Integer!*-1"}), (b:person2 {id: "Integer!*-2"}), (a)-[:knows]->(b) RETURN a, b');
-        await waitForApiSuccess(() => apicalls.getSchemas(), res => res.opts.includes(schemaName));
+        await apicalls.runSchemaQuery(schemaName, 'CREATE (a:person1 {id: "Integer!*-1"}), (b:person2 {id: "Integer!*-2"}), (a)-[:knows]->(b) RETURN a, b');
         const schema = await browser.createNewPage(SchemaPage, urls.schemaUrl);
         await browser.setPageToFullScreen();
         await schema.selectExistingGraph(schemaName);
@@ -158,8 +152,7 @@ test.describe('Schema Tests', () => {
     invalidNodeInputs.forEach(({ description, key, type, value, isRequired, isUnique }) => {
         test(`@admin Validate relation attribute with invalid input doesn't update list: ${description}`, async () => {
             const schemaName = getRandomString('schema');
-            await apicalls.addSchemaNode(schemaName, 'CREATE (a:person1 {id: "Integer!*-1"}), (b:person2 {id: "Integer!*-2"}) RETURN a, b');
-            await waitForApiSuccess(() => apicalls.getSchemas(), res => res.opts.includes(schemaName));
+            await apicalls.runSchemaQuery(schemaName, 'CREATE (a:person1 {id: "Integer!*-1"}), (b:person2 {id: "Integer!*-2"}) RETURN a, b');
             const schema = await browser.createNewPage(SchemaPage, urls.schemaUrl);
             await browser.setPageToFullScreen();
             await schema.selectExistingGraph(schemaName);
@@ -173,8 +166,7 @@ test.describe('Schema Tests', () => {
 
     test(`@admin Validate that adding a relation without a label is not allowed`, async () => {
         const schemaName = getRandomString('schema');
-        await apicalls.addSchemaNode(schemaName, 'CREATE (a:person1 {id: "Integer!*-1"}), (b:person2 {id: "Integer!*-2"}) RETURN a, b');
-        await waitForApiSuccess(() => apicalls.getSchemas(), res => res.opts.includes(schemaName));
+        await apicalls.runSchemaQuery(schemaName, 'CREATE (a:person1 {id: "Integer!*-1"}), (b:person2 {id: "Integer!*-2"}) RETURN a, b');
         const schema = await browser.createNewPage(SchemaPage, urls.schemaUrl);
         await browser.setPageToFullScreen();
         await schema.selectExistingGraph(schemaName);
@@ -187,8 +179,7 @@ test.describe('Schema Tests', () => {
 
     test(`@admin Attempt to add relation without selecting two nodes`, async () => {
         const schemaName = getRandomString('schema');
-        await apicalls.addSchemaNode(schemaName, 'CREATE (a:person1 {id: "Integer!*-1"}), (b:person2 {id: "Integer!*-2"}) RETURN a, b');
-        await waitForApiSuccess(() => apicalls.getSchemas(), res => res.opts.includes(schemaName));
+        await apicalls.runSchemaQuery(schemaName, 'CREATE (a:person1 {id: "Integer!*-1"}), (b:person2 {id: "Integer!*-2"}) RETURN a, b');
         const schema = await browser.createNewPage(SchemaPage, urls.schemaUrl);
         await browser.setPageToFullScreen();
         await schema.selectExistingGraph(schemaName);
@@ -211,8 +202,7 @@ test.describe('Schema Tests', () => {
 
     test(`@admin validate that deleting a schema node decreases node count`, async () => {
         const schemaName = getRandomString('schema');
-        await apicalls.addSchemaNode(schemaName, 'CREATE (a:person1 {id: "Integer!*-1"}), (b:person2 {id: "Integer!*-2"}) RETURN a, b');
-        await waitForApiSuccess(() => apicalls.getSchemas(), res => res.opts.includes(schemaName));
+        await apicalls.runSchemaQuery(schemaName, 'CREATE (a:person1 {id: "Integer!*-1"}), (b:person2 {id: "Integer!*-2"}) RETURN a, b');
         const schema = await browser.createNewPage(SchemaPage, urls.schemaUrl);
         await browser.setPageToFullScreen();
         await schema.selectExistingGraph(schemaName);
@@ -225,8 +215,7 @@ test.describe('Schema Tests', () => {
 
     test(`@admin validate that adding a schema node increases node count`, async () => {
         const schemaName = getRandomString('schema');
-        await apicalls.addSchemaNode(schemaName, 'CREATE (a:person1 {id: "Integer!*-1"}), (b:person2 {id: "Integer!*-2"}) RETURN a, b');
-        await waitForApiSuccess(() => apicalls.getSchemas(), res => res.opts.includes(schemaName));
+        await apicalls.runSchemaQuery(schemaName, 'CREATE (a:person1 {id: "Integer!*-1"}), (b:person2 {id: "Integer!*-2"}) RETURN a, b');
         const schema = await browser.createNewPage(SchemaPage, urls.schemaUrl);
         await browser.setPageToFullScreen();
         await schema.selectExistingGraph(schemaName);
@@ -238,8 +227,7 @@ test.describe('Schema Tests', () => {
 
     test(`@admin validate that adding a schema relation increases edge count`, async () => {
         const schemaName = getRandomString('schema');
-        await apicalls.addSchemaNode(schemaName, 'CREATE (a:person1 {id: "Integer!*-1"}), (b:person2 {id: "Integer!*-2"}) RETURN a, b');
-        await waitForApiSuccess(() => apicalls.getSchemas(), res => res.opts.includes(schemaName));
+        await apicalls.runSchemaQuery(schemaName, 'CREATE (a:person1 {id: "Integer!*-1"}), (b:person2 {id: "Integer!*-2"}) RETURN a, b');
         const schema = await browser.createNewPage(SchemaPage, urls.schemaUrl);
         await browser.setPageToFullScreen();
         await schema.selectExistingGraph(schemaName);
@@ -252,8 +240,7 @@ test.describe('Schema Tests', () => {
 
     test(`@admin validate that deleting a schema relation decreases edge count`, async () => {
         const schemaName = getRandomString('schema');
-        await apicalls.addSchemaNode(schemaName, 'CREATE (a:person1 {id: "Integer!*-1"}), (b:person2 {id: "Integer!*-2"}), (a)-[:knows]->(b) RETURN a, b');
-        await waitForApiSuccess(() => apicalls.getSchemas(), res => res.opts.includes(schemaName));
+        await apicalls.runSchemaQuery(schemaName, 'CREATE (a:person1 {id: "Integer!*-1"}), (b:person2 {id: "Integer!*-2"}), (a)-[:knows]->(b) RETURN a, b');
         const schema = await browser.createNewPage(SchemaPage, urls.schemaUrl);
         await browser.setPageToFullScreen();
         await schema.selectExistingGraph(schemaName);
@@ -266,8 +253,7 @@ test.describe('Schema Tests', () => {
 
     test(`@admin validate that deleting a schema relation doesn't decreases node count`, async () => {
         const schemaName = getRandomString('schema');
-        await apicalls.addSchemaNode(schemaName, 'CREATE (a:person1 {id: "Integer!*-1"}), (b:person2 {id: "Integer!*-2"}), (a)-[:knows]->(b) RETURN a, b');
-        await waitForApiSuccess(() => apicalls.getSchemas(), res => res.opts.includes(schemaName));
+        await apicalls.runSchemaQuery(schemaName, 'CREATE (a:person1 {id: "Integer!*-1"}), (b:person2 {id: "Integer!*-2"}), (a)-[:knows]->(b) RETURN a, b');
         const schema = await browser.createNewPage(SchemaPage, urls.schemaUrl);
         await browser.setPageToFullScreen();
         await schema.selectExistingGraph(schemaName);
@@ -280,8 +266,7 @@ test.describe('Schema Tests', () => {
 
     test(`@admin validate that deleting a schema node doesn't decreases relations count`, async () => {
         const schemaName = getRandomString('schema');
-        await apicalls.addSchemaNode(schemaName, 'CREATE (a:person1 {id: "Integer!*-1"}), (b:person2 {id: "Integer!*-2"}), (c:person3 {id: "Integer!*-3"}), (a)-[:knows]->(b) RETURN a, b, c');
-        await waitForApiSuccess(() => apicalls.getSchemas(), res => res.opts.includes(schemaName));
+        await apicalls.runSchemaQuery(schemaName, 'CREATE (a:person1 {id: "Integer!*-1"}), (b:person2 {id: "Integer!*-2"}), (c:person3 {id: "Integer!*-3"}), (a)-[:knows]->(b) RETURN a, b, c');
         const schema = await browser.createNewPage(SchemaPage, urls.schemaUrl);
         await browser.setPageToFullScreen();
         await schema.selectExistingGraph(schemaName);
@@ -294,7 +279,7 @@ test.describe('Schema Tests', () => {
 
     test(`@admin validate that adding a node doesn't increases edges count`, async () => {
         const schemaName = getRandomString('schema');
-        apicalls.addSchema(schemaName)
+        await apicalls.addSchema(schemaName)
         const schema = await browser.createNewPage(SchemaPage, urls.schemaUrl);
         await browser.setPageToFullScreen();
         await schema.selectExistingGraph(schemaName);
@@ -306,9 +291,8 @@ test.describe('Schema Tests', () => {
 
     test(`@admin validate that adding a relation doesn't increases node count`, async () => {
         const schemaName = getRandomString('schema');
-        apicalls.addSchema(schemaName);
-        await apicalls.addSchemaNode(schemaName, 'CREATE (a:person1 {id: "1"}), (b:person2 {id: "2"}) RETURN a, b');
-        await waitForApiSuccess(() => apicalls.getSchemas(), res => res.opts.includes(schemaName));
+        await apicalls.addSchema(schemaName);
+        await apicalls.runSchemaQuery(schemaName, 'CREATE (a:person1 {id: "1"}), (b:person2 {id: "2"}) RETURN a, b');
         const schema = await browser.createNewPage(SchemaPage, urls.schemaUrl);
         await browser.setPageToFullScreen();
         await schema.selectExistingGraph(schemaName);
@@ -321,8 +305,7 @@ test.describe('Schema Tests', () => {
 
     test(`@admin Validate that deleting a node with connection also removes the node and its connected edges`, async () => {
         const schemaName = getRandomString('schema');
-        await apicalls.addSchemaNode(schemaName, 'CREATE (a:person1 {id: "Integer!*-1"}), (b:person2 {id: "Integer!*-2"}), (a)-[:knows]->(b) RETURN a, b');
-        await waitForApiSuccess(() => apicalls.getSchemas(), res => res.opts.includes(schemaName));
+        await apicalls.runSchemaQuery(schemaName, 'CREATE (a:person1 {id: "Integer!*-1"}), (b:person2 {id: "Integer!*-2"}), (a)-[:knows]->(b) RETURN a, b');
         const schema = await browser.createNewPage(SchemaPage, urls.schemaUrl);
         await browser.setPageToFullScreen();
         await schema.selectExistingGraph(schemaName);

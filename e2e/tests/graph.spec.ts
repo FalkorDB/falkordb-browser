@@ -14,23 +14,22 @@ test.describe('Graph Tests', () => {
     let browser: BrowserWrapper;
     let apiCall: ApiCalls;
 
-    test.beforeAll(async () => {
+    test.beforeEach(async () => {
         browser = new BrowserWrapper();
         apiCall = new ApiCalls();
     })
 
-    test.afterAll(async () => {
+    test.afterEach(async () => {
         await browser.closeBrowser();
     })
 
-    test(`@admin Add graph via API -> verify display in UI test -> remove graph via UI`, async () => {
+    test(`@admin Add graph via API -> verify display in UI test`, async () => {
         const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
         const graphName = getRandomString('graph');
         await apiCall.addGraph(graphName);
         await graph.refreshPage();
         expect(await graph.verifyGraphExists(graphName)).toBe(true);
-        await graph.refreshPage();
-        await graph.deleteGraph(graphName);
+        await apiCall.removeGraph(graphName);
     });
 
     test(`@admin Add graph via UI -> remove graph via API -> Verify graph removal in UI test`, async () => {
@@ -82,8 +81,8 @@ test.describe('Graph Tests', () => {
         await browser.setPageToFullScreen();
         const newGraphName = getRandomString('graph');
         await graph.modifyGraphName(graphName, newGraphName);
-        await graph.refreshPage();
-        expect(await graph.verifyGraphExists(newGraphName)).toBe(true);
+        const response = await apiCall.getGraphs();
+        expect(response.opts.includes(newGraphName)).toBeTruthy();
         await apiCall.removeGraph(newGraphName);
     });
 

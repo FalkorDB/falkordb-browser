@@ -519,6 +519,20 @@ export default class GraphPage extends BasePage {
         return await interactWhenVisible(this.labelsPanelBtn, el => el.textContent(), "Labels panel button");
     }
 
+    async getDataCellByAttrInDataPanel(attribute: string): Promise<string | null> {
+        return await interactWhenVisible(this.valueCellByAttributeInDataPanel(attribute), el => el.textContent(), "value cell by attribute button");
+    }
+
+    async getNodesGraphStats(): Promise<string | null> {
+        await this.page.waitForTimeout(500);
+        return await interactWhenVisible(this.nodesGraphStats, el => el.textContent(), "node graph stats button");
+    }
+
+    async getEdgesGraphStats(): Promise<string | null> {
+        await this.page.waitForTimeout(500);
+        return await interactWhenVisible(this.edgesGraphStats, el => el.textContent(), "edges graph stats button");
+    }
+
     async getQuerySearchListText(): Promise<string[]> {
         await waitForElementToBeVisible(this.querySearchList);
         const elements = this.querySearchListItems;
@@ -576,6 +590,7 @@ export default class GraphPage extends BasePage {
     }
 
     async verifyGraphExists(graph: string): Promise<boolean> {
+        await this.page.waitForTimeout(500);
         if (await this.graphsMenu.isDisabled()) return false;
 
         await this.openGraphsMenu();
@@ -613,7 +628,12 @@ export default class GraphPage extends BasePage {
     }
 
     async waitForRunQueryToBeEnabled(): Promise<void> {
+        const maxRetries = 5;
+        let retries = 0;
         while (await this.queryRunBtn.isDisabled()) {
+            if (retries++ >= maxRetries) {
+                throw new Error("Timed out waiting for Run Query button to be enabled.");
+            }
             await this.page.waitForTimeout(1000);
         }
     }
@@ -636,8 +656,7 @@ export default class GraphPage extends BasePage {
 
     async selectExistingGraph(graph: string, role?: string): Promise<void>{
         const resolvedLabel = this.inferLabelFromGraph(graph);
-      
-      await this.clickSelectBtnFromGraphManager(role);
+        await this.clickSelectBtnFromGraphManager(role);
         await this.selectGraphFromList(graph, resolvedLabel);
     }
 
@@ -804,43 +823,16 @@ export default class GraphPage extends BasePage {
         return { scaleX, scaleY };
     }
 
-    async getDataCellByAttrInDataPanel(attribute: string): Promise<string | null> {
-        const isVisible = await waitForElementToBeVisible(this.valueCellByAttributeInDataPanel(attribute));
-        if (!isVisible) throw new Error("value cell by attr button is not visible!");
-        const text = await this.valueCellByAttributeInDataPanel(attribute).textContent();
-        return text;
-    }
-
-    async getNodesGraphStats(): Promise<string | null> {
-        const isVisible = await waitForElementToBeVisible(this.nodesGraphStats);
-        if (!isVisible) throw new Error("node graph stats button is not visible!");
-        const text = await this.nodesGraphStats.textContent();
-        return text;
-    }
-
-    async getEdgesGraphStats(): Promise<string | null> {
-        const isVisible = await waitForElementToBeVisible(this.edgesGraphStats);
-        if (!isVisible) throw new Error("edges graph stats button is not visible!");
-        const text = await this.edgesGraphStats.textContent();
-        return text;
-    }
-
     async deleteNodeViaCanvasPanel(x: number, y: number): Promise<void> {
         await this.nodeClick(x, y);
         await this.clickDeleteNodeInCanvasPanel();
-        await Promise.all([
-            this.page.waitForResponse(res => res.status() === 200),
-            this.clickConfirmDeleteNodeInDataPanel()
-        ]);
+        await this.clickConfirmDeleteNodeInDataPanel();
     }
 
     async deleteNode(x: number, y: number): Promise<void> {
         await this.nodeClick(x, y);
         await this.clickDeleteNodeInGraphDataPanel();
-        await Promise.all([
-            this.page.waitForResponse(res => res.status() === 200),
-            this.clickConfirmDeleteNodeInDataPanel()
-        ]);
+        await this.clickConfirmDeleteNodeInDataPanel();
     }
 
     async openDataPanelForElementInCanvas(node: string): Promise<void> {
@@ -854,15 +846,13 @@ export default class GraphPage extends BasePage {
         await this.clickAddBtnInHeaderGraphDataPanel();
         await this.fillGraphDataPanelHeaderInput(label);
         await this.clickSaveBtnInGraphHeaderDataPanel();
+        await this.waitForPageIdle();
     }
 
     async deleteRelation(x: number, y: number): Promise<void> {
         await this.nodeClick(x, y);
         await this.clickDeleteRelationInGraphDataPanel();
-        await Promise.all([
-            this.page.waitForResponse(res => res.status() === 200),
-            this.clickConfirmDeleteNodeInDataPanel()
-        ]);
+        await this.clickConfirmDeleteNodeInDataPanel();
     }
 
     async deleteLabel(node: string): Promise<void> {
@@ -895,9 +885,6 @@ export default class GraphPage extends BasePage {
     async deleteGraphRelation(x: number, y: number): Promise<void> {
         await this.nodeClick(x, y);
         await this.clickDeleteRelationBtnInDataPanel();
-        await Promise.all([
-            this.page.waitForResponse(res => res.status() === 200),
-            this.clickConfirmDeleteNodeInDataPanel()
-        ]);
+        await this.clickConfirmDeleteNodeInDataPanel();
     }
 }

@@ -142,7 +142,7 @@ export function getMainReturnLimit(query: string): number {
 }
 
 export function removeMainReturnLimit(query: string) {
-  return query.replace(/RETURN\s+[^;]*?LIMIT\s+\d+\s*$/i, '$1').trim();
+  return query.replace(/(\bRETURN\b\s+[^;]*?)\bLIMIT\b\s+\d+\s*$/i, '$1').trim();
 }
 
 export function getQueryWithLimit(query: string, limit: number) {
