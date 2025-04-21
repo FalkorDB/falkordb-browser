@@ -113,7 +113,7 @@ export function getRandomString(prefix = '', delimiter = '_'): string {
     const uuid = crypto.randomUUID();
     const timestamp = Date.now();
     return `${prefix}${prefix ? delimiter : ''}${uuid}-${timestamp}`;
-}  
+}
 
 export async function waitForApiSuccess<T>(
     apiCall: () => Promise<T>,

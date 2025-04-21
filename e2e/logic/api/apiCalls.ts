@@ -18,12 +18,14 @@ import { LogoutResponse } from "./responses/logoutResponse";
 import { AddSchemaResponse } from "./responses/addSchemaResponse";
 import { GetGraphsResponse } from "./responses/getGraphsResponse";
 import { getAdminToken } from "@/e2e/infra/utils";
+import { APIRequestContext } from "playwright";
+import { SchemaListResponse } from "./responses/getSchemaResponse";
 
 export default class ApiCalls {
 
-    async login(): Promise<AuthCredentialsResponse> {
+    async login(request : APIRequestContext, username?: string, password?: string): Promise<AuthCredentialsResponse> {
         try {
-            const result = await getRequest(`${urls.api.LoginApiUrl}`);
+            const result = await getRequest(`${urls.api.LoginApiUrl}`,undefined, {username, password}, request);
             return await result.json();
         } catch (error) {
             throw new Error("Failed to login. Please try again.");
@@ -150,9 +152,9 @@ export default class ApiCalls {
         }
     }
     
-    async createUsers(data?: any): Promise<CreateUsersResponse> {
+    async createUsers(data?: any, request?: APIRequestContext): Promise<CreateUsersResponse> {
         try {
-            const result = await postRequest(urls.api.settingsUsers ,data);
+            const result = await postRequest(urls.api.settingsUsers ,data, request);
             return await result.json();
         } catch (error) {
             throw new Error("Failed to create users.");
@@ -170,7 +172,7 @@ export default class ApiCalls {
     
     async addSchema(schemaName: string): Promise<AddSchemaResponse> {
         try {
-            const result = await getRequest(`${urls.api.graphUrl + schemaName}?query=RETURN%201`);
+            const result = await getRequest(`${urls.api.graphUrl + schemaName}_schema?query=MATCH%20(n)%20RETURN%20n%20LIMIT%201`);
             return await result.json();
         } catch (error) {
             throw new Error("Failed to add schema.");
@@ -183,6 +185,24 @@ export default class ApiCalls {
             return await result.json();
         } catch (error) {
             throw new Error("Failed to remove schema.");
+        }
+    }
+
+    async addSchemaNode(schemaName: string, schema: string): Promise<AddSchemaResponse> {
+        try {
+            const result = await getRequest(`${urls.api.graphUrl + schemaName}_schema?query=${schema}`);
+            return await result.json();
+        } catch (error) {
+            throw new Error("Failed to add schema.");
+        }
+    }
+
+    async getSchemas(): Promise<SchemaListResponse> {
+        try {
+            const result = await getRequest(`${urls.api.schemaUrl}`);
+            return await result.json();
+        } catch (error) {
+            throw new Error("Failed to get schema.");
         }
     }
     

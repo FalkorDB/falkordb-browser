@@ -300,13 +300,10 @@ export class Graph {
 
                 if (!source) {
                     [category] = this.createCategory([""])
-                }
-
-                if (!source) {
                     source = {
                         id: cell.sourceId,
                         category: [category!.name],
-                        color: this.getCategoryColorValue(),
+                        color: this.getCategoryColorValue(category!.index),
                         expand: false,
                         collapsed,
                         visible: true,
@@ -343,7 +340,7 @@ export class Graph {
                     source = {
                         id: cell.sourceId,
                         category: [category!.name],
-                        color: this.getCategoryColorValue(),
+                        color: this.getCategoryColorValue(category!.index),
                         expand: false,
                         collapsed,
                         visible: true,
@@ -361,7 +358,7 @@ export class Graph {
                     target = {
                         id: cell.destinationId,
                         category: [category!.name],
-                        color: this.getCategoryColorValue(),
+                        color: this.getCategoryColorValue(category!.index),
                         expand: false,
                         collapsed,
                         visible: true,
@@ -531,6 +528,18 @@ export class Graph {
                 if (this.elements.nodes.map(n => n.id).includes(link.source.id) && this.elements.nodes.map(n => n.id).includes(link.target.id)) {
                     return link
                 }
+
+                const category = this.labelsMap.get(link.label)
+
+                if (category) {
+                    category.elements = category.elements.filter(e => e.id !== link.id)
+                 
+                    if (category.elements.length === 0) {
+                        this.labels.splice(this.labels.findIndex(c => c.name === category.name), 1)
+                        this.labelsMap.delete(category.name)
+                    }
+                }
+
                 this.linksMap.delete(link.id)
 
                 return undefined
@@ -538,7 +547,7 @@ export class Graph {
         }
     }
 
-    public getCategoryColorValue(index = 0) {
+    public getCategoryColorValue(index: number) {
         if (index < this.COLORS_ORDER_VALUE.length) {
             return this.COLORS_ORDER_VALUE[index];
         }
