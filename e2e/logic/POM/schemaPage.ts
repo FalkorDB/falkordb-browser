@@ -14,7 +14,7 @@ export default class SchemaPage extends GraphPage {
         return this.page.getByText("Create New Schema");
     }
 
-    private get schemahNameInput(): Locator {
+    private get schemaNameInput(): Locator {
         return this.page.getByRole("textbox");
     }
 
@@ -66,11 +66,11 @@ export default class SchemaPage extends GraphPage {
         return this.page.locator('//div[contains(@class, "DataPanel")]//td[2]//button[not(@disabled)]');
     }
 
-    private get uniqueAtiveRadioBtn(): Locator {
+    private get uniqueActiveRadioBtn(): Locator {
         return this.page.locator('//div[contains(@class, "DataPanel")]//tr//td[4]//button[not(@disabled)]');
     }
 
-    private get requiredAtiveRadioBtn(): Locator {
+    private get requiredActiveRadioBtn(): Locator {
         return this.page.locator('//div[contains(@class, "DataPanel")]//tr//td[5]//button[not(@disabled)]');
     }
 
@@ -131,7 +131,7 @@ export default class SchemaPage extends GraphPage {
     }
       
     async fillSchemaNameInput(schemaName: string): Promise<void> {
-        await interactWhenVisible(this.schemahNameInput, el => el.fill(schemaName), "schema name input");
+        await interactWhenVisible(this.schemaNameInput, el => el.fill(schemaName), "schema name input");
     }
       
     async clickCreateSchemaBtn(): Promise<void> {
@@ -182,12 +182,12 @@ export default class SchemaPage extends GraphPage {
         await interactWhenVisible(this.typeActiveBtnInDataPanel, el => el.click(), "type active button in data panel");
     }
       
-    async clickUniqueAtiveRadioBtn(): Promise<void> {
-        await interactWhenVisible(this.uniqueAtiveRadioBtn, el => el.click(), "unique active button in data panel");
+    async clickUniqueActiveRadioBtn(): Promise<void> {
+        await interactWhenVisible(this.uniqueActiveRadioBtn, el => el.click(), "unique active button in data panel");
     }
       
-    async clickRequiredAtiveRadioBtn(): Promise<void> {
-        await interactWhenVisible(this.requiredAtiveRadioBtn, el => el.click(), "required active button in data panel");
+    async clickRequiredActiveRadioBtn(): Promise<void> {
+        await interactWhenVisible(this.requiredActiveRadioBtn, el => el.click(), "required active button in data panel");
     }
       
     async clickAddActiveBtnInDataPanel(): Promise<void> {
@@ -214,7 +214,7 @@ export default class SchemaPage extends GraphPage {
         await interactWhenVisible(this.deleteValueBtnInDataPanel, el => el.click(), "delete value button in data panel");
     }
       
-    async clickEditeValueBtnInDataPanel(): Promise<void> {
+    async clickEditValueBtnInDataPanel(): Promise<void> {
         await interactWhenVisible(this.editValueBtnInDataPanel, el => el.click(), "edit value button in data panel");
     }
       
@@ -321,10 +321,10 @@ export default class SchemaPage extends GraphPage {
         await this.selectTypeFromList(type);
         await this.insertActiveDescInputInDataPanelAttr(desc);
         if(unique){
-            await this.clickUniqueAtiveRadioBtn();
+            await this.clickUniqueActiveRadioBtn();
         }
         if(required){
-            await this.clickRequiredAtiveRadioBtn();
+            await this.clickRequiredActiveRadioBtn();
         }
         await this.clickAddActiveBtnInDataPanel();
     }

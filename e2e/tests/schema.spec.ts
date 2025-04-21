@@ -217,9 +217,9 @@ test.describe('Schema Tests', () => {
         await browser.setPageToFullScreen();
         await schema.selectExistingGraph(schemaName);
         const nodes = await schema.getNodeScreenPositions('schema');
-        const initCount = parseInt(await schema.getNodesGraphStats() ?? "");
+        const initCount = parseInt(await schema.getNodesGraphStats() ?? "", 10);
         await schema.deleteNode(nodes[0].screenX, nodes[0].screenY);
-        expect(parseInt(await schema.getNodesGraphStats() ?? "")).toBe(initCount - 1);
+        expect(parseInt(await schema.getNodesGraphStats() ?? "", 10)).toBe(initCount - 1);
         await apicalls.removeSchema(schemaName);
     });
 
@@ -230,9 +230,9 @@ test.describe('Schema Tests', () => {
         const schema = await browser.createNewPage(SchemaPage, urls.schemaUrl);
         await browser.setPageToFullScreen();
         await schema.selectExistingGraph(schemaName);
-        const initCount = parseInt(await schema.getNodesGraphStats() ?? "");
+        const initCount = parseInt(await schema.getNodesGraphStats() ?? "", 10);
         await schema.addNode("person", 'id', "Integer", "100", true, true);
-        expect(parseInt(await schema.getNodesGraphStats() ?? "")).toBe(initCount + 1);
+        expect(parseInt(await schema.getNodesGraphStats() ?? "", 10)).toBe(initCount + 1);
         await apicalls.removeSchema(schemaName);
     });
 
@@ -243,10 +243,10 @@ test.describe('Schema Tests', () => {
         const schema = await browser.createNewPage(SchemaPage, urls.schemaUrl);
         await browser.setPageToFullScreen();
         await schema.selectExistingGraph(schemaName);
-        const initCount = parseInt(await schema.getEdgesGraphStats() ?? "");
+        const initCount = parseInt(await schema.getEdgesGraphStats() ?? "", 10);
         await schema.prepareRelation("knows", 'id', "Integer", "100", true, true);
         await schema.clickRelationBetweenNodes();
-        expect(parseInt(await schema.getEdgesGraphStats() ?? "")).toBe(initCount + 1);
+        expect(parseInt(await schema.getEdgesGraphStats() ?? "", 10)).toBe(initCount + 1);
         await apicalls.removeSchema(schemaName);
     });
 
@@ -257,10 +257,10 @@ test.describe('Schema Tests', () => {
         const schema = await browser.createNewPage(SchemaPage, urls.schemaUrl);
         await browser.setPageToFullScreen();
         await schema.selectExistingGraph(schemaName);
-        const initCount = parseInt(await schema.getEdgesGraphStats() ?? "");
+        const initCount = parseInt(await schema.getEdgesGraphStats() ?? "", 10);
         const links1 = await schema.getLinksScreenPositions('schema');
         await schema.deleteRelation(links1[0].midX, links1[0].midY);
-        expect(parseInt(await schema.getEdgesGraphStats() ?? "")).toBe(initCount - 1);
+        expect(parseInt(await schema.getEdgesGraphStats() ?? "", 10)).toBe(initCount - 1);
         await apicalls.removeSchema(schemaName);
     });
 
@@ -271,10 +271,10 @@ test.describe('Schema Tests', () => {
         const schema = await browser.createNewPage(SchemaPage, urls.schemaUrl);
         await browser.setPageToFullScreen();
         await schema.selectExistingGraph(schemaName);
-        const initCount = parseInt(await schema.getNodesGraphStats() ?? "");
+        const initCount = parseInt(await schema.getNodesGraphStats() ?? "", 10);
         const links = await schema.getLinksScreenPositions('schema');
         await schema.deleteRelation(links[0].midX, links[0].midY);
-        expect(parseInt(await schema.getNodesGraphStats() ?? "")).toBe(initCount);
+        expect(parseInt(await schema.getNodesGraphStats() ?? "", 10)).toBe(initCount);
         await apicalls.removeSchema(schemaName);
     });
 
@@ -285,10 +285,10 @@ test.describe('Schema Tests', () => {
         const schema = await browser.createNewPage(SchemaPage, urls.schemaUrl);
         await browser.setPageToFullScreen();
         await schema.selectExistingGraph(schemaName);
-        const initCount = parseInt(await schema.getEdgesGraphStats() ?? "");
+        const initCount = parseInt(await schema.getEdgesGraphStats() ?? "", 10);
         const nodes = await schema.getNodeScreenPositions('schema');
         await schema.deleteNode(nodes[2].screenX, nodes[2].screenY);
-        expect(parseInt(await schema.getEdgesGraphStats() ?? "")).toBe(initCount);
+        expect(parseInt(await schema.getEdgesGraphStats() ?? "", 10)).toBe(initCount);
         await apicalls.removeSchema(schemaName);
     });
 
@@ -298,9 +298,9 @@ test.describe('Schema Tests', () => {
         const schema = await browser.createNewPage(SchemaPage, urls.schemaUrl);
         await browser.setPageToFullScreen();
         await schema.selectExistingGraph(schemaName);
-        const initCount = parseInt(await schema.getEdgesGraphStats() ?? "");
+        const initCount = parseInt(await schema.getEdgesGraphStats() ?? "", 10);
         await schema.addNode("person", 'id', "Integer", "100", true, true);
-        expect(parseInt(await schema.getEdgesGraphStats() ?? "")).toBe(initCount);
+        expect(parseInt(await schema.getEdgesGraphStats() ?? "", 10)).toBe(initCount);
         await apicalls.removeSchema(schemaName);
     });
 
@@ -312,10 +312,10 @@ test.describe('Schema Tests', () => {
         const schema = await browser.createNewPage(SchemaPage, urls.schemaUrl);
         await browser.setPageToFullScreen();
         await schema.selectExistingGraph(schemaName);
-        const initCount = parseInt(await schema.getNodesGraphStats() ?? "");
+        const initCount = parseInt(await schema.getNodesGraphStats() ?? "", 10);
         await schema.prepareRelation("knows", 'id', "Integer", "100", true, true);
         await schema.clickRelationBetweenNodes();
-        expect(parseInt(await schema.getNodesGraphStats() ?? "")).toBe(initCount);
+        expect(parseInt(await schema.getNodesGraphStats() ?? "", 10)).toBe(initCount);
         await apicalls.removeSchema(schemaName);
     });
 
@@ -326,12 +326,12 @@ test.describe('Schema Tests', () => {
         const schema = await browser.createNewPage(SchemaPage, urls.schemaUrl);
         await browser.setPageToFullScreen();
         await schema.selectExistingGraph(schemaName);
-        const initEdgeCount = parseInt(await schema.getEdgesGraphStats() ?? "");
-        const initNodeCount = parseInt(await schema.getNodesGraphStats() ?? "");
+        const initEdgeCount = parseInt(await schema.getEdgesGraphStats() ?? "", 10);
+        const initNodeCount = parseInt(await schema.getNodesGraphStats() ?? "", 10);
         const nodes = await schema.getNodeScreenPositions('schema');
         await schema.deleteNode(nodes[0].screenX, nodes[0].screenY);
-        expect(parseInt(await schema.getEdgesGraphStats() ?? "")).toBe(initEdgeCount - 1);
-        expect(parseInt(await schema.getNodesGraphStats() ?? "")).toBe(initNodeCount - 1);
+        expect(parseInt(await schema.getEdgesGraphStats() ?? "", 10)).toBe(initEdgeCount - 1);
+        expect(parseInt(await schema.getNodesGraphStats() ?? "", 10)).toBe(initNodeCount - 1);
         await apicalls.removeSchema(schemaName);
     });
 })
