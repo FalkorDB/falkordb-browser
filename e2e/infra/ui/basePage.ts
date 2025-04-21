@@ -22,4 +22,9 @@ export default class BasePage {
     async waitForPageIdle() {
         await this.page.waitForLoadState('networkidle')
     }
+
+    async waitForResponse(url: string) {
+        const response = await this.page.waitForResponse(url);
+        return response;
+    }
 }

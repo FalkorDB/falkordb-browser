@@ -52,3 +52,27 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         return NextResponse.json({ error: (error as Error).message }, { status: 400 })
     }
 }
+
+export async function DELETE(request: NextRequest, { params }: { params: Promise<{ schema: string }> }) {
+    const session = await getClient()
+
+    if (session instanceof NextResponse) {
+        return session
+    }
+
+    const { client } = session
+
+    const { schema } = await params
+    const schemaName = `${schema}_schema`
+
+    try {
+        const graph = client.selectGraph(schemaName)
+
+        await graph.delete()
+
+        return NextResponse.json({ message: `${schemaName} schema deleted` }, { status: 200 })
+    } catch (error) {
+        console.error(error)
+        return NextResponse.json({ error: (error as Error).message }, { status: 400 })
+    }
+}

@@ -42,7 +42,7 @@ export default function SchemaCreateElement({ onCreate, onExpand, selectedNodes,
   const [isAddLabel, setIsAddLabel] = useState<boolean>(false)
   const { toast } = useToast()
   const { indicator } = useContext(IndicatorContext)
-    
+
   const handleSetEditable = (att: [string, string[]] = getDefaultAttribute()) => {
     setAttribute(att)
     setEditable(att[0])
@@ -117,18 +117,34 @@ export default function SchemaCreateElement({ onCreate, onExpand, selectedNodes,
   }
 
   const handleOnCreate = async () => {
-    if (!label && !type) {
-      toast({
-        title: "Error",
-        description: "You must type a label",
-        variant: "destructive"
-      })
-      return
+    if (!type) {
+      if (label.length === 0) {
+        toast({
+          title: "Error",
+          description: "You must type a label",
+          variant: "destructive"
+        })
+      
+        return
+      }
+
+      if (!selectedNodes[0] || !selectedNodes[1]) {
+        toast({
+          title: "Error",
+          description: "You must select two nodes to create a relation",
+          variant: "destructive"
+        })
+      
+        return
+      }
     }
+    
     try {
       setIsLoading(true)
       const ok = await onCreate(attributes, label)
+    
       if (!ok) return
+    
       setAttributes([])
       setAttribute(getDefaultAttribute())
       setLabel([])
@@ -143,6 +159,25 @@ export default function SchemaCreateElement({ onCreate, onExpand, selectedNodes,
   }
 
   const handleAddLabel = () => {
+    if (newLabel === "") {
+      toast({
+        title: "Error",
+        description: "Label cannot be empty",
+        variant: "destructive"
+      })
+      return
+    }
+
+    if (label.includes(newLabel)) {
+      toast({
+        title: "Error",
+        description: "Label already exists",
+        variant: "destructive"
+      })
+
+      return
+    }
+
     setLabel(prev => [...prev, newLabel])
     setNewLabel("")
     setIsAddLabel(false)

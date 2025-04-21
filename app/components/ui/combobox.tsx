@@ -179,7 +179,7 @@ export default function Combobox({ isSelectGraph = false, disabled = false, inTa
           {
             session?.user?.role !== "Read-Only" &&
             <DeleteGraph
-              type={type!}
+              type={type}
               options={options}
               rows={rows}
               handleSetRows={handleSetRows}
@@ -205,7 +205,7 @@ export default function Combobox({ isSelectGraph = false, disabled = false, inTa
               />
             }
             selectedValues={rows.filter(opt => opt.checked).map(opt => opt.cells[0].value as string)}
-            type={type!}
+            type={type}
           />
         </TableComponent>
       </DialogContent>

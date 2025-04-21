@@ -176,15 +176,6 @@ export default function SchemaView({ schema, fetchCount }: Props) {
     }
 
     const onCreateElement = async (attributes: [string, string[]][], label?: string[]) => {
-        if (!isAddEntity && selectedNodes[0] === undefined && selectedNodes[1] === undefined) {
-            toast({
-                title: "Error",
-                description: "Select nodes to create a relation",
-                variant: "destructive"
-            })
-            return false
-        }
-
         const fakeId = "-1"
         const result = await securedFetch(`api/schema/${prepareArg(schema.Id)}/${prepareArg(fakeId)}`, {
             method: "POST",
