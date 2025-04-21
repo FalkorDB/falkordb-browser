@@ -86,12 +86,12 @@ export default class GraphPage extends BasePage {
         return (buttonNumber: string) => this.page.locator(`//div[@id='graphManager']//button[${buttonNumber}]`);
     }
 
-    private get selectGraphList(): (graph: string) => Locator {
-        return (graph: string) => this.page.locator(`//ul[@id='graphsList']/div[descendant::text()[contains(., '${graph}')]]`);
+    private get selectGraphList(): (graph: string, label: string) => Locator {
+        return (graph: string, label: string) => this.page.locator(`//ul[@id='${label}List']/div[descendant::text()[contains(., '${graph}')]]`);
     }
 
-    private get graphSelectSearchInput(): Locator {
-        return this.page.locator(`//div[@id='graphSearch']//input`);
+    private get graphSelectSearchInput(): (label: string) => Locator {
+        return (label: string) => this.page.locator(`//div[@id='${label}Search']//input`);
     }
 
     private get canvasElementSearchInput(): Locator {
@@ -258,8 +258,8 @@ export default class GraphPage extends BasePage {
         return this.page.locator("//div[contains(@class, 'tree')]//div[contains(@class, 'contents')]");
     }
 
-    async insertGraphInSearchInput(graph: string): Promise<void> {
-        await interactWhenVisible(this.graphSelectSearchInput, el => el.fill(graph), "graph search input");
+    async insertGraphInSearchInput(graph: string, label: string): Promise<void> {
+        await interactWhenVisible(this.graphSelectSearchInput(label), el => el.fill(graph), "graph search input");
     }
 
     async insertElementInCanvasSearch(node: string): Promise<void> {
@@ -369,9 +369,10 @@ export default class GraphPage extends BasePage {
         const saveBtn = this.editSaveBtnInGraphListMenu(graph);
         await interactWhenVisible(saveBtn, el => el.click(), `save button for graph "${graph}"`);
     }
+    
+    async clickGraphFromList(graph: string, label: string): Promise<void> {
+        const graphItem = this.selectGraphList(graph, label);
 
-    async clickGraphFromList(graph: string): Promise<void> {
-        const graphItem = this.selectGraphList(graph);
         await interactWhenVisible(graphItem, el => el.click(), `graph item "${graph}" in graph list`);
     }
 
@@ -623,14 +624,21 @@ export default class GraphPage extends BasePage {
         await this.canvasElement.click({ position: { x, y }, button: 'right' });
     }
 
-    async selectGraphFromList(graph: string): Promise<void> {
-        await this.insertGraphInSearchInput(graph);
-        await this.clickGraphFromList(graph);
+    async selectGraphFromList(graph: string, label: string): Promise<void> {
+        await this.insertGraphInSearchInput(graph, label);
+        await this.clickGraphFromList(graph, label);
     }
 
-    async selectExistingGraph(graph: string, role?: string): Promise<void> {
-        await this.clickSelectBtnFromGraphManager(role);
-        await this.selectGraphFromList(graph);
+    private inferLabelFromGraph(graph: string): string {
+        if (graph.toLowerCase().includes('schema')) return 'Schema';
+        return 'Graph';
+    }
+
+    async selectExistingGraph(graph: string, role?: string): Promise<void>{
+        const resolvedLabel = this.inferLabelFromGraph(graph);
+      
+      await this.clickSelectBtnFromGraphManager(role);
+        await this.selectGraphFromList(graph, resolvedLabel);
     }
 
     async searchForElementInCanvas(node: string): Promise<void> {
