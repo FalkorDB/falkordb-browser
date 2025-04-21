@@ -82,8 +82,8 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
         setCooldownTicks(ticks)
 
         const canvas = document.querySelector('.force-graph-container canvas');
-        if(!canvas) return
-        if(ticks === 0){
+        if (!canvas) return
+        if (ticks === 0) {
             canvas.setAttribute('data-engine-status', 'stop')
         } else {
             canvas.setAttribute('data-engine-status', 'running')
@@ -162,7 +162,7 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
             selectedElements.push(selectedElement)
             setSelectedElement(undefined)
         }
-      
+
         await Promise.all(selectedElements.map(async (element) => {
             const type = !element.source
             const result = await securedFetch(`api/graph/${prepareArg(graph.Id)}/${element.id} `, {
@@ -178,8 +178,11 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
                     if (cat) {
                         cat.elements = cat.elements.filter((e) => e.id !== element.id)
                         if (cat.elements.length === 0) {
-                            graph.Categories.splice(graph.Labels.findIndex(l => l.name === cat.name), 1)
-                            graph.CategoriesMap.delete(cat.name)
+                            const index = graph.Categories.findIndex(c => c.name === cat.name)
+                            if (index !== -1) {
+                                graph.Categories.splice(index, 1)
+                                graph.CategoriesMap.delete(cat.name)
+                            }
                         }
                     }
                 })
@@ -188,8 +191,11 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
                 if (category) {
                     category.elements = category.elements.filter((e) => e.id !== element.id)
                     if (category.elements.length === 0) {
-                        graph.Labels.splice(graph.Labels.findIndex(l => l.name === category.name), 1)
-                        graph.LabelsMap.delete(category.name)
+                        const index = graph.Labels.findIndex(l => l.name === category.name)
+                        if (index !== -1) {
+                            graph.Labels.splice(index, 1)
+                            graph.LabelsMap.delete(category.name)
+                        }
                     }
                 }
             }
