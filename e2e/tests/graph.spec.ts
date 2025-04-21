@@ -175,7 +175,7 @@ test.describe('Graph Tests', () => {
         const links = await graph.getLinksScreenPositions('graph');
         await graph.deleteRelation(links[0].midX, links[0].midY);
         expect(parseInt(await graph.getNodesGraphStats() ?? "", 10)).toBe(initCount);
-        await apiCall.removeSchema(graphName);
+        await apiCall.removeGraph(graphName);
     });
 
     test(`@readwrite validate that deleting a graph node doesn't decreases relation count`, async () => {
@@ -190,7 +190,7 @@ test.describe('Graph Tests', () => {
         const nodes = await graph.getNodeScreenPositions('graph');
         await graph.deleteNode(nodes[2].screenX, nodes[2].screenY);
         expect(parseInt(await graph.getEdgesGraphStats() ?? "", 10)).toBe(initCount);
-        await apiCall.removeSchema(graphName);
+        await apiCall.removeGraph(graphName);   
     });
 
     test(`@readwrite validate that deleting a graph relation decreases relation count`, async () => {
@@ -205,7 +205,7 @@ test.describe('Graph Tests', () => {
         const links = await graph.getLinksScreenPositions('graph');
         await graph.deleteRelation(links[0].midX, links[0].midY);
         expect(parseInt(await graph.getEdgesGraphStats() ?? "", 10)).toBe(initCount -1);
-        await apiCall.removeSchema(graphName);
+        await apiCall.removeGraph(graphName); 
     });
 
     test(`@readwrite validate that deleting a graph node decreases node count`, async () => {
@@ -220,7 +220,7 @@ test.describe('Graph Tests', () => {
         const nodes = await graph.getNodeScreenPositions('graph');
         await graph.deleteNode(nodes[0].screenX, nodes[0].screenY);
         expect(parseInt(await graph.getNodesGraphStats() ?? "", 10)).toBe(initCount -1);
-        await apiCall.removeSchema(graphName);
+        await apiCall.removeGraph(graphName); 
     });
 
     test(`@readwrite Validate deleting node via the canvas panel`, async () => {
@@ -234,8 +234,8 @@ test.describe('Graph Tests', () => {
         const initCount = parseInt(await graph.getNodesGraphStats() ?? "", 10);
         const nodes = await graph.getNodeScreenPositions('graph');
         await graph.deleteNodeViaCanvasPanel(nodes[0].screenX, nodes[0].screenY);
-        expect(parseInt(await graph.getNodesGraphStats() ?? "", 10)).toBe(initCount -1);
-        await apiCall.removeSchema(graphName);
+        expect(parseInt(await graph.getNodesGraphStats() ?? "", 10)).toBe(initCount -1); 
+        await apiCall.removeGraph(graphName); 
     });
 
     test(`@readwrite validate modifying node label updates label in data and canvas panels correctly`, async () => {
@@ -249,7 +249,7 @@ test.describe('Graph Tests', () => {
         await graph.modifyLabel("1", "artist");
         expect(await graph.getLabesCountlInDataPanel()).toBe(3)
         expect(await graph.getLastLabelInCanvas()).toBe("artist");
-        await apiCall.removeSchema(graphName);
+        await apiCall.removeGraph(graphName);
     });
 
     test(`@readwrite validate removing node label updates label in data and canvas panels correctly`, async () => {
@@ -264,7 +264,7 @@ test.describe('Graph Tests', () => {
         await graph.deleteLabel("1");
         expect(await graph.getLabesCountlInDataPanel()).toBe(1);
         expect(await graph.getLabesCountlInCanvas()).toBe(labelsCountInCanvas - 1);
-        await apiCall.removeSchema(graphName);
+        await apiCall.removeGraph(graphName);
     });
 
     test(`@readwrite validate undo functionally after modifying node attributes update correctly`, async () => {
@@ -280,7 +280,7 @@ test.describe('Graph Tests', () => {
         await graph.modifyAttribute("10");
         await graph.clickUndoBtnInNotification();
         expect(await graph.getLastAttributeValue()).toBe(valueAttribute);
-        await apiCall.removeSchema(graphName);
+        await apiCall.removeGraph(graphName);
     });
 
     test(`@readwrite validate adding attribute updates attributes stats in data panel`, async () => {
@@ -292,8 +292,8 @@ test.describe('Graph Tests', () => {
         await graph.insertQuery('CREATE (a:person1 {id: "1"}), (b:person2 {id: "2"}) RETURN a, b');
         await graph.clickRunQuery();
         await graph.addGraphAttribute("1", "name", "Naseem");
-        expect(parseInt(await graph.getAttriubutesStatsInDataPanel() ?? "", 10)).toBe(2);
-        await apiCall.removeSchema(graphName);
+        expect(parseInt(await graph.getAttributesStatsInDataPanel() ?? "", 10)).toBe(2);
+        await apiCall.removeGraph(graphName); 
     });
 
     test(`@readwrite validate removing attribute updates attributes stats in data panel`, async () => {
@@ -305,9 +305,9 @@ test.describe('Graph Tests', () => {
         await graph.insertQuery('CREATE (a:Person {id: "1", name: "Alice"}) RETURN a');
         await graph.clickRunQuery();
         await graph.openDataPanelForElementInCanvas("Alice");
-        await graph.deleteGraphAttribute();
-        expect(parseInt(await graph.getAttriubutesStatsInDataPanel() ?? "", 10)).toBe(1);
-        await apiCall.removeSchema(graphName);
+        await graph.deleteGraphAttribute(); 
+        expect(parseInt(await graph.getAttributesStatsInDataPanel() ?? "", 10)).toBe(1);
+        await apiCall.removeGraph(graphName);
     });
 
     test(`@readwrite validate modifying attribute via UI and verify via API`, async () => {
@@ -322,7 +322,7 @@ test.describe('Graph Tests', () => {
         await graph.modifyAttribute("10");
         const response  = await apiCall.runQuery(graphName, "match (n) return n");
         expect(response.result.data[1].n.properties.id).toBe('10')
-        await apiCall.removeSchema(graphName);
+        await apiCall.removeGraph(graphName);
     });
 
     test(`@readwrite validate deleting attribute via UI and verify via API`, async () => {
@@ -337,7 +337,7 @@ test.describe('Graph Tests', () => {
         await graph.deleteGraphAttribute();
         const response  = await apiCall.runQuery(graphName, "match (n) return n");
         expect(response.result.data[0].n.properties).not.toHaveProperty('name');
-        await apiCall.removeSchema(graphName);
+        await apiCall.removeGraph(graphName);
     });
 
     test(`@readwrite validate deleting connection between two nodes updates canvas panels`, async () => {
@@ -353,6 +353,281 @@ test.describe('Graph Tests', () => {
         await graph.deleteGraphRelation(links[0].midX, links[0].midY);
         expect(parseInt(await graph.getEdgesGraphStats() ?? "", 10)).toBe(initCount - 1);
         expect(await graph.isRelationshipTypesPanelBtnHidden()).toBeTruthy();
-        await apiCall.removeSchema(graphName);
+        await apiCall.removeGraph(graphName);
+    });
+
+    test(`@readwrite validate adding connection between two nodes updates canvas panels`, async () => {
+        const graphName = getRandomString('graph');
+        await apiCall.addGraph(graphName);
+        const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+        await browser.setPageToFullScreen();
+        await graph.selectExistingGraph(graphName);
+        await graph.insertQuery('CREATE (a:Person {id: "1"}), (b:Person {id: "2"}), (a)-[c:KNOWS]->(b) RETURN a, b, c');
+        await graph.clickRunQuery();
+        expect(await graph.getRelationshipTypesPanelBtn()).toBe('KNOWS');        
+        await apiCall.removeGraph(graphName);
+    });
+
+    test(`@readwrite validate undo functionally after deleting attribute update correctly`, async () => {
+        const graphName = getRandomString('graph');
+        await apiCall.addGraph(graphName);
+        const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+        await browser.setPageToFullScreen();
+        await graph.selectExistingGraph(graphName);
+        await graph.insertQuery('CREATE (a:Person {id: "1", name: "Alice"}) RETURN a');
+        await graph.clickRunQuery();
+        await graph.openDataPanelForElementInCanvas("Alice");
+        await graph.deleteGraphAttribute();
+        await graph.clickUndoBtnInNotification();
+        expect(parseInt(await graph.getAttributesStatsInDataPanel() ?? "", 10)).toBe(2);
+        await apiCall.removeGraph(graphName);
+    });
+
+    test(`@readwrite Attempting to add existing label name for a node display error`, async () => {
+        const graphName = getRandomString('graph');
+        await apiCall.addGraph(graphName);
+        const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+        await browser.setPageToFullScreen();
+        await graph.selectExistingGraph(graphName);
+        await graph.insertQuery('CREATE (a:Person {id: "1", name: "Alice"}) RETURN a');
+        await graph.clickRunQuery();
+        await graph.modifyLabel("Alice", "Person");
+        expect(await graph.getLabesCountlInDataPanel()).toBe(2)
+        expect(await graph.getErrorNotification()).toBeTruthy();
+        await apiCall.removeGraph(graphName);
+    });
+
+    test(`@readwrite moving a node to another node's position while animation is off should place them at the same position`, async () => {
+        const graphName = getRandomString('graph');
+        await apiCall.addGraph(graphName);
+        const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+        await browser.setPageToFullScreen();
+        await graph.selectExistingGraph(graphName);
+        await graph.insertQuery('CREATE (a:person1 {id: "1"}), (b:person2 {id: "2"}) RETURN a, b');
+        await graph.clickRunQuery();
+        const initNodes = await graph.getNodeScreenPositions('graph');
+        expect(await graph.getAnimationControlPanelState()).toBe("unchecked");
+
+        const fromX = initNodes[0].screenX;
+        const fromY = initNodes[0].screenY;
+        const toX = initNodes[1].screenX;;
+        const toY = initNodes[1].screenY;
+        await graph.changeNodePosition(fromX, fromY, toX, toY);
+        await graph.waitForCanvasAnimationToEnd();
+        const nodes = await graph.getNodeScreenPositions('graph');
+        
+        expect(nodes[1].screenX - nodes[0].screenX).toBeLessThanOrEqual(2);
+        expect(nodes[1].screenY - nodes[0].screenY).toBeLessThanOrEqual(2);
+        await apiCall.removeGraph(graphName);
+    });
+
+    test(`@readwrite moving a node to another node's position while animation is on should push them apart`, async () => {
+        const graphName = getRandomString('graph');
+        await apiCall.addGraph(graphName);
+        const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+        await browser.setPageToFullScreen();
+        await graph.selectExistingGraph(graphName);
+        await graph.insertQuery('CREATE (a:person1 {id: "1"}), (b:person2 {id: "2"}) RETURN a, b');
+        await graph.clickRunQuery();
+        const initNodes = await graph.getNodeScreenPositions('graph');
+        await graph.clickAnimationControlPanelbtn();
+        expect(await graph.getAnimationControlPanelState()).toBe("checked");
+
+        const fromX = initNodes[0].screenX;
+        const fromY = initNodes[0].screenY;
+        const toX = initNodes[1].screenX;;
+        const toY = initNodes[1].screenY;
+        await graph.changeNodePosition(fromX, fromY, toX, toY);
+        await graph.waitForCanvasAnimationToEnd();
+        const nodes = await graph.getNodeScreenPositions('graph');
+        
+        expect(Math.abs(nodes[1].screenX - nodes[0].screenX)).toBeGreaterThan(2);
+        expect(Math.abs(nodes[1].screenY - nodes[0].screenY)).toBeGreaterThan(2);
+        await apiCall.removeGraph(graphName);
+    });
+
+    test(`@admin Validate that toggling a category label updates edge visibility on the canvas`, async () => {
+        const graphName = getRandomString('graph');
+        await apiCall.addGraph(graphName);
+        const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+        await browser.setPageToFullScreen();
+        await graph.selectExistingGraph(graphName);
+        await graph.insertQuery('CREATE (n:person1 {id: "1"}) RETURN n');
+        await graph.clickRunQuery();
+        await graph.clickLabelsPanelBtn();
+        expect(await graph.getLabelsPanelBtn()).toBe("person1")
+        const nodes1 = await graph.getNodeScreenPositions('graph');
+        expect(nodes1[0].visible).toBeFalsy();
+        await graph.clickLabelsPanelBtn();
+        const nodes2 = await graph.getNodeScreenPositions('graph');
+        expect(nodes2[0].visible).toBeTruthy();
+        await apiCall.removeGraph(graphName);
+    });
+
+    test(`@admin Validate that toggling a relationship label updates edge visibility on the canvas`, async () => {
+        const graphName = getRandomString('graph');
+        await apiCall.addGraph(graphName);
+        const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+        await browser.setPageToFullScreen();
+        await graph.selectExistingGraph(graphName);
+        await graph.insertQuery('CREATE (a:person1 {id: "1"}), (b:person2 {id: "2"}), (a)-[c:knows]->(b) RETURN a, b, c');
+        await graph.clickRunQuery();
+        await graph.clickRelationshipTypesPanelBtn();
+        expect(await graph.getRelationshipTypesPanelBtn()).toBe("knows");
+        const links1 = await graph.getLinksScreenPositions('graph');
+        expect(links1[0].visible).toBeFalsy();
+        await graph.clickRelationshipTypesPanelBtn();
+        const links2 = await graph.getLinksScreenPositions('graph'); 
+        expect(links2[0].visible).toBeTruthy();
+        await apiCall.removeGraph(graphName);
+    });
+
+
+    const invalidQueriesRO = [
+        { query: "CREATE (n:Person { name: 'Alice' }) RETURN n", description: 'create node query' },
+        { query: "MATCH (n:Person { name: 'Alice' }) SET n.age = 30 RETURN n", description: 'update node query' },
+        { query: "MATCH (n:Person { name: 'Alice' }) DELETE n", description: 'delete node query' },
+        { query: "CREATE INDEX ON :Person(name)", description: 'create index query' },
+        { query: "MERGE (n:Person { name: 'Alice' }) RETURN n", description: 'merge query that creates node' },
+        { query: "UNWIND [1,2,3] AS x CREATE (:Number {value: x})", description: 'unwind with create query' }
+    ];
+    
+    invalidQueriesRO.forEach(({ query, description }) => {
+        test(`@readonly Validate failure when RO user attempts to execute : ${description}`, async () => {
+            const graphName = getRandomString('graph');
+            await apiCall.addGraph(graphName, "admin");
+            const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+            await browser.setPageToFullScreen();
+            await graph.selectExistingGraph(graphName, "readonly");
+            await graph.insertQuery(query);
+            await graph.clickRunQuery();
+            expect(await graph.getErrorNotification()).toBeTruthy();
+            await apiCall.removeGraph(graphName, "admin");
+        });
+    });
+      
+    test(`@readonly Validate success when RO user attempts to execute ro query`, async () => {
+        const graphName = getRandomString('graph');
+        await apiCall.addGraph(graphName, "admin");
+        await apiCall.runQuery(graphName, "CREATE (:Person {name: 'Alice'})-[:KNOWS]->(:Person {name: 'Bob'})", "admin")
+        const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+        await browser.setPageToFullScreen();
+        await graph.selectExistingGraph(graphName, "readonly");
+        await graph.insertQuery("MATCH (n)-[r]->(m) RETURN n, r, m LIMIT 10");
+        await graph.clickRunQuery();
+        expect(await graph.getErrorNotification()).toBeFalsy();
+        await apiCall.removeGraph(graphName, "admin");
+    });
+
+    const queriesInput = [
+        { query: "C", keywords: ['call', 'collect', 'count', 'create'] },
+        { query: "M", keywords: ['max', 'min', 'match', 'merge'] },
+    ]; 
+    queriesInput.forEach(({query, keywords}) => {
+        test(`@readwrite Validate auto complete in query search for: ${query}`, async () => {
+            const graphName = getRandomString('graph');
+            await apiCall.addGraph(graphName);
+            const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+            await browser.setPageToFullScreen();
+            await graph.selectExistingGraph(graphName);
+            await graph.insertQuery(query);
+            const response = await graph.getQuerySearchListText();
+            const hasAny = response.some(s => keywords.some(k => s.includes(k)));
+            expect(hasAny).toBeTruthy();
+            await apiCall.removeGraph(graphName);
+        });
+    })
+
+    test(`@readwrite run graph query via UI and validate node and edge count via API`, async () => {
+        const graphName = getRandomString('graph');
+        await apiCall.addGraph(graphName);
+        const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+        await browser.setPageToFullScreen();
+        await graph.selectExistingGraph(graphName);
+        await graph.insertQuery("CREATE (a:Person {name: 'Alice'})-[c:KNOWS]->(b:Person {name: 'Bob'}) return *");
+        await graph.clickRunQuery();
+        const count = await apiCall.getGraphCount(graphName);
+        expect(count.result.edges).toBe(1);
+        expect(count.result.nodes).toBe(2);
+        await apiCall.removeGraph(graphName);
+    });
+
+    test(`@readwrite add node label via API and validate label count via UI`, async () => {
+        const graphName = getRandomString('graph');
+        await apiCall.addGraph(graphName);
+        await apiCall.runQuery(graphName, "CREATE (a:Person {name: 'Alice'})-[c:KNOWS]->(b:Person {name: 'Bob'}) return *");
+        await apiCall.addGraphNodeLabel(graphName, "0", { "label" : "artist"});
+        
+        const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+        await browser.setPageToFullScreen();
+        await graph.selectExistingGraph(graphName);
+        await graph.insertQuery("match(n) return *");
+        await graph.clickRunQuery();
+        expect(await graph.getLabesCountlInCanvas()).toBe(2);
+        await apiCall.removeGraph(graphName);
+    });
+
+    test(`@readwrite delete node label via API and validate label count via UI`, async () => {
+        const graphName = getRandomString('graph');
+        await apiCall.addGraph(graphName);
+        const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+        await browser.setPageToFullScreen();
+        await graph.selectExistingGraph(graphName);
+        await graph.insertQuery("CREATE (a:Person:Employee {name: 'Alice'}) RETURN *");
+        await graph.clickRunQuery(false);
+        await apiCall.deleteGraphNodeLabel(graphName, "0", { "label" : "Employee"})
+        await graph.refreshPage();
+        await graph.selectExistingGraph(graphName);
+        await graph.insertQuery("match(n) return *");
+        await graph.clickRunQuery(false);
+        expect(await graph.getLabesCountlInCanvas()).toBe(1);
+        await apiCall.removeGraph(graphName);
+    });
+
+    test(`@readwrite delete node via API and validate node count via UI`, async () => {
+        const graphName = getRandomString('graph');
+        await apiCall.addGraph(graphName);
+        const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+        await browser.setPageToFullScreen();
+        await graph.selectExistingGraph(graphName);
+        await graph.insertQuery('CREATE (a:person1 {id: "1"}), (b:person2 {id: "2"}) RETURN a, b');
+        await graph.clickRunQuery(false);
+        await apiCall.deleteGraphNode(graphName, "0", { "type" : "true"})
+        await graph.refreshPage();
+        await graph.selectExistingGraph(graphName);
+        await graph.insertQuery("match(n) return *");
+        await graph.clickRunQuery(false);
+        expect(parseInt(await graph.getNodesGraphStats() ?? "", 10)).toBe(1);
+        await apiCall.removeGraph(graphName);
+    });
+
+    test(`@readwrite add node attribute via API and validate attribute count via UI`, async () => {
+        const graphName = getRandomString('graph');
+        await apiCall.addGraph(graphName);
+        await apiCall.runQuery(graphName, 'CREATE (a:person1 {id: "1"}) RETURN a');
+        await apiCall.addGraphNodeAttribute(graphName, "0", "age", { "value": "31", "type": true })
+        const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+        await browser.setPageToFullScreen();
+        await graph.selectExistingGraph(graphName);
+        await graph.insertQuery('match(n) return n');
+        await graph.clickRunQuery();
+        await graph.openDataPanelForElementInCanvas("0");
+        expect(parseInt(await graph.getAttributesStatsInDataPanel() ?? "", 10)).toBe(2);
+        await apiCall.removeGraph(graphName);
+    });
+
+    test(`@readwrite delete node attribute via API and validate attribute count via UI`, async () => {
+        const graphName = getRandomString('graph');
+        await apiCall.addGraph(graphName);
+        await apiCall.runQuery(graphName, 'CREATE (a:person1 {id: "1", age: "30"}) RETURN a');
+        await apiCall.deleteGraphNodeAttribute(graphName, "0", "age", { "type": true })
+        const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+        await browser.setPageToFullScreen();
+        await graph.selectExistingGraph(graphName);
+        await graph.insertQuery('match(n) return n');
+        await graph.clickRunQuery();
+        await graph.openDataPanelForElementInCanvas("0");
+        expect(parseInt(await graph.getAttributesStatsInDataPanel() ?? "", 10)).toBe(1);
+        await apiCall.removeGraph(graphName);
     });
 })

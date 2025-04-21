@@ -20,6 +20,9 @@ import { GetGraphsResponse } from "./responses/getGraphsResponse";
 import { getAdminToken } from "@/e2e/infra/utils";
 import { APIRequestContext } from "playwright";
 import { SchemaListResponse } from "./responses/getSchemaResponse";
+import { GraphCountResponse } from "./responses/graphCountResponse";
+import { GraphNodeResponse } from "./responses/graphNodeResponse";
+import { GraphAttributeResponse } from "./responses/graphAttributeResponse";
 
 export default class ApiCalls {
 
@@ -123,7 +126,60 @@ export default class ApiCalls {
             throw new Error("Failed to run query.");
         }
     }
-    
+
+    async getGraphCount(graph: string): Promise<GraphCountResponse> {
+        try {
+            const result = await getRequest(`${urls.api.graphUrl}${graph}/count`);
+            return await result.json();
+        } catch (error) {
+            throw new Error("Failed to get graph count.");
+        }
+    }
+
+    async addGraphNodeLabel(graph: string, node: string, data: Record<string, string>): Promise<GraphNodeResponse> {
+        try {
+            const result = await postRequest(`${urls.api.graphUrl}${graph}/${node}/label`, data);
+            return await result.json();
+        } catch (error) {
+            throw new Error("Failed to add graph node label.");
+        }
+    }
+
+    async deleteGraphNodeLabel(graph: string, node: string, data: Record<string, string>): Promise<GraphNodeResponse> {
+        try {
+            const result = await deleteRequest(`${urls.api.graphUrl}${graph}/${node}/label`,undefined ,data);
+            return await result.json();
+        } catch (error) {
+            throw new Error("Failed to delete graph node label.");
+        }
+    }
+
+    async deleteGraphNode(graph: string, node: string, data: Record<string, string>): Promise<GraphNodeResponse> {
+        try {
+            const result = await deleteRequest(`${urls.api.graphUrl}${graph}/${node}`,undefined ,data);
+            return await result.json();
+        } catch (error) {
+            throw new Error("Failed to delete graph node.");
+        }
+    }
+
+    async addGraphNodeAttribute(graph: string, node: string, attribute: string, data: Record<string, string | boolean>): Promise<GraphAttributeResponse> {
+        try {
+            const result = await postRequest(`${urls.api.graphUrl}${graph}/${node}/${attribute}`, data);
+            return await result.json();
+        } catch (error) {
+            throw new Error("Failed to add graph node attribute.");
+        }
+    }
+
+    async deleteGraphNodeAttribute(graph: string, node: string, attribute: string, data: Record<string, boolean>): Promise<GraphAttributeResponse> {
+        try {
+            const result = await deleteRequest(`${urls.api.graphUrl}${graph}/${node}/${attribute}`, undefined, data);
+            return await result.json();
+        } catch (error) {
+            throw new Error("Failed to delete graph node attribute.");
+        }
+    }
     
     async modifySettingsRole(roleName: string, roleValue: string): Promise<ModifySettingsRoleResponse> {
         try {

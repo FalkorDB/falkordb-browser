@@ -5,7 +5,7 @@
 /* eslint-disable arrow-body-style */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { Locator } from "@playwright/test";
-import { interactWhenVisible, waitForElementToBeVisible } from "@/e2e/infra/utils";
+import { interactWhenVisible } from "@/e2e/infra/utils";
 import GraphPage from "./graphPage";
 
 export default class DataPanel extends GraphPage {
@@ -103,7 +103,7 @@ export default class DataPanel extends GraphPage {
         await interactWhenVisible(this.modifyAttributeButtonInLastRowOfGraphDataPanel, el => el.click(), "modify attribute button in last row of graph data panel");
     }
     
-    async hoverLastAttributeRowInGraphDataPanell(): Promise<void> {
+    async hoverLastAttributeRowInGraphDataPanel(): Promise<void> {
         await interactWhenVisible(this.lastAttributeRowInGraphDataPanel, el => el.hover(), "last attribute row in graph data panel");
     }
     
@@ -140,7 +140,7 @@ export default class DataPanel extends GraphPage {
         await interactWhenVisible(this.addButtonInDataPanelHeader, el => el.click(), "add button in data panel header");
     }
     
-    async fillInputButtonInDataPanelHeader(attribute: string): Promise<void> {
+    async fillInputInDataPanelHeader(attribute: string): Promise<void> {
         await interactWhenVisible(this.inputInDataPanelHeader, el => el.fill(attribute), "input in data panel header");
     }
     
@@ -160,7 +160,7 @@ export default class DataPanel extends GraphPage {
     async modifyNodeHeaderAttribute(attribute: string): Promise<void> {
         await this.hoverOnDataPanelHeaderAttr();
         await this.clickOnAddButtonInDataPanelHeader();
-        await this.fillInputButtonInDataPanelHeader(attribute);
+        await this.fillInputInDataPanelHeader(attribute);
         await this.clickOnSaveButtonInDataPanelHeader();
         await this.clickOnRemoveAttributeButtonInDataPanelHeader();
     }
@@ -173,13 +173,13 @@ export default class DataPanel extends GraphPage {
     }
 
     async removeAttribute(): Promise<void>{
-        await this.hoverLastAttributeRowInGraphDataPanell();
+        await this.hoverLastAttributeRowInGraphDataPanel();
         await this.clickDeleteAttributeButtonForFirstRowInGraphDataPanel();
         await this.clickDeleteButtonInDialog();
     }
 
     async modifyAttribute(input: string): Promise<void>{
-        await this.hoverLastAttributeRowInGraphDataPanell();
+        await this.hoverLastAttributeRowInGraphDataPanel();
         await this.clickEditAttributeButtonForFirstRowInGraphDataPanel();
         await this.fillAttributeValueInputInGraphDataPanel(input);
         await Promise.all([

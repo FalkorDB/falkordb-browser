@@ -324,7 +324,7 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
                                 </Button>
                                 {
                                     graph.getElements().length > 0 &&
-                                    <div className="z-10 absolute top-4 left-4 pointer-events-none flex gap-4">
+                                    <div className="z-10 absolute top-4 left-4 pointer-events-none flex gap-4" id="canvasPanel">
                                         <Tooltip>
                                             <TooltipTrigger asChild>
                                                 <div className="flex items-center gap-2">
