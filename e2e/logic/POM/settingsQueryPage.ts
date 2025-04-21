@@ -20,23 +20,43 @@ export default class SettingsQueryPage extends GraphPage {
         return this.page.locator("#increaseTimeoutBtn");
     }
 
+    private get graphsButton(): Locator {
+        return this.page.locator("//button[contains(text(), 'Graphs')]");
+    }
+
+    async clickOnGraph(): Promise<void> {
+        await interactWhenVisible(this.graphsButton, el => el.click(), "graph button");
+    }
+
+    async clickIncreaseLimit(): Promise<void> {
+        await interactWhenVisible(this.increaseLimitBtn, el => el.click(), "increase Limit button");
+    }
+
+    async clickIncreaseTimeout(): Promise<void> {
+        await interactWhenVisible(this.increaseTimeoutBtn, el => el.click(), "increase timeout button");
+    }
+
+    async fillTimeoutInput(input: string): Promise<void> {
+        await interactWhenVisible(this.timeoutInput, el => el.fill(input), "time out input");
+    }
+
+    async fillLimitInput(input: string): Promise<void> {
+        await interactWhenVisible(this.limitInput, el => el.fill(input), "limit input");
+    }
+
     async addLimit(limit?: number): Promise<void> {
-        await interactWhenVisible(this.limitInput, async (el) => {
-            if (limit) {
-                await el.fill(limit.toString())
-            } else {
-                await this.increaseLimitBtn.click();
-            }
-        }, "Limit input");
+        if (limit) {
+            await this.fillTimeoutInput(limit.toString())
+        } else {
+            await this.clickIncreaseLimit();
+        }
     }
 
     async addTimeout(timeout?: number): Promise<void> {
-        await interactWhenVisible(this.timeoutInput, async (el) => {
-            if (timeout) {
-                await el.fill(timeout.toString())
-            } else {
-                await this.increaseTimeoutBtn.click();
-            }
-        }, "Timeout input");
+        if (timeout) {
+            await this.fillTimeoutInput(timeout.toString())
+        } else {
+            await this.clickIncreaseTimeout();
+        }
     }
 }
