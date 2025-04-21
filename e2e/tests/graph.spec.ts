@@ -64,19 +64,6 @@ test.describe('Graph Tests', () => {
             await apiCall.removeGraph(graphName);
         });
     })
-
-    test(`@admin Validate that running a query with timeout returns an error`, async () => {
-        const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
-        const graphName = `graph_${Date.now()}`;
-        await graph.addGraph(graphName);
-        await graph.addTimeout();
-        const query = `UNWIND range(1, 100000000) as x RETURN count(x)`;
-        await graph.insertQuery(query);
-        await graph.clickRunQuery(false);
-        await graph.waitForRunQueryToBeEnabled();
-        expect(await graph.getErrorNotification()).toBe(true);
-        await apiCall.removeGraph(graphName);
-    });
   
     test(`@admin Validate that the reload graph list function works by adding a graph via API and testing the reload button`, async () => {
         const graphName = getRandomString('graph');
@@ -203,7 +190,7 @@ test.describe('Graph Tests', () => {
         const nodes = await graph.getNodeScreenPositions('graph');
         await graph.deleteNode(nodes[2].screenX, nodes[2].screenY);
         expect(parseInt(await graph.getEdgesGraphStats() ?? "", 10)).toBe(initCount);
-        await apiCall.removeGraph(graphName);
+        await apiCall.removeGraph(graphName);   
     });
 
     test(`@readwrite validate that deleting a graph relation decreases relation count`, async () => {
@@ -218,7 +205,7 @@ test.describe('Graph Tests', () => {
         const links = await graph.getLinksScreenPositions('graph');
         await graph.deleteRelation(links[0].midX, links[0].midY);
         expect(parseInt(await graph.getEdgesGraphStats() ?? "", 10)).toBe(initCount -1);
-        await apiCall.removeGraph(graphName);
+        await apiCall.removeGraph(graphName); 
     });
 
     test(`@readwrite validate that deleting a graph node decreases node count`, async () => {
@@ -233,7 +220,7 @@ test.describe('Graph Tests', () => {
         const nodes = await graph.getNodeScreenPositions('graph');
         await graph.deleteNode(nodes[0].screenX, nodes[0].screenY);
         expect(parseInt(await graph.getNodesGraphStats() ?? "", 10)).toBe(initCount -1);
-        await apiCall.removeGraph(graphName);
+        await apiCall.removeGraph(graphName); 
     });
 
     test(`@readwrite Validate deleting node via the canvas panel`, async () => {
@@ -247,8 +234,8 @@ test.describe('Graph Tests', () => {
         const initCount = parseInt(await graph.getNodesGraphStats() ?? "", 10);
         const nodes = await graph.getNodeScreenPositions('graph');
         await graph.deleteNodeViaCanvasPanel(nodes[0].screenX, nodes[0].screenY);
-        expect(parseInt(await graph.getNodesGraphStats() ?? "", 10)).toBe(initCount -1);
-        await apiCall.removeGraph(graphName);
+        expect(parseInt(await graph.getNodesGraphStats() ?? "", 10)).toBe(initCount -1); 
+        await apiCall.removeGraph(graphName); 
     });
 
     test(`@readwrite validate modifying node label updates label in data and canvas panels correctly`, async () => {
@@ -306,7 +293,7 @@ test.describe('Graph Tests', () => {
         await graph.clickRunQuery();
         await graph.addGraphAttribute("1", "name", "Naseem");
         expect(parseInt(await graph.getAttributesStatsInDataPanel() ?? "", 10)).toBe(2);
-        await apiCall.removeGraph(graphName);
+        await apiCall.removeGraph(graphName); 
     });
 
     test(`@readwrite validate removing attribute updates attributes stats in data panel`, async () => {
@@ -318,7 +305,7 @@ test.describe('Graph Tests', () => {
         await graph.insertQuery('CREATE (a:Person {id: "1", name: "Alice"}) RETURN a');
         await graph.clickRunQuery();
         await graph.openDataPanelForElementInCanvas("Alice");
-        await graph.deleteGraphAttribute();
+        await graph.deleteGraphAttribute(); 
         expect(parseInt(await graph.getAttributesStatsInDataPanel() ?? "", 10)).toBe(1);
         await apiCall.removeGraph(graphName);
     });

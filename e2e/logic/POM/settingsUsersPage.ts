@@ -35,6 +35,7 @@ export default class SettingsUsersPage extends BasePage {
     private get selectUserRole(): (role: string) => Locator {
         return (role: string) => this.page.locator(`//ul//div[@role='option'][span[contains(text(), '${role}')]]`)
     }
+    
     private get confirmModifyingUserRole(): Locator {
         return this.page.locator("//button[text()='Set User']");
     }

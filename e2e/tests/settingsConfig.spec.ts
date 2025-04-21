@@ -23,6 +23,7 @@ test.describe('@config Settings config tests', () => {
     Data.inputDataRejectsZero.forEach(({ input, description, expected }, index) => {
         test(`@admin Modify ${roles.maxQueuedQueries} via API validation via UI: Input value: ${input} description: ${description}`, async () => {
             const settingsConfigPage = await browser.createNewPage(SettingsConfigPage, urls.settingsUrl)
+            await settingsConfigPage.navigateToDBConfigurationTab();
             await new Promise(resolve => { setTimeout(resolve, 1000) });
             await apiCall.modifySettingsRole(roles.maxQueuedQueries, input)
             await settingsConfigPage.refreshPage()
@@ -37,6 +38,7 @@ test.describe('@config Settings config tests', () => {
     Data.inputDataAcceptsZero.forEach(({ input, description, expected }, index) => {
         test(`@admin Modify ${roles.TimeOut} via API validation via UI: Input value: ${input} description: ${description}`, async () => {
             const settingsConfigPage = await browser.createNewPage(SettingsConfigPage, urls.settingsUrl)
+            await settingsConfigPage.navigateToDBConfigurationTab();
             await new Promise(resolve => { setTimeout(resolve, 1000) });
             await apiCall.modifySettingsRole(roles.TimeOut, input)
             await settingsConfigPage.refreshPage()
@@ -51,6 +53,7 @@ test.describe('@config Settings config tests', () => {
     Data.maxTimeOut.forEach(({ input, description, expected }, index) => {
         test(`@admin Modify ${roles.maxTimeOut} via API validation via UI: Input value: ${input} description: ${description}`, async () => {
             const settingsConfigPage = await browser.createNewPage(SettingsConfigPage, urls.settingsUrl)
+            await settingsConfigPage.navigateToDBConfigurationTab();
             await apiCall.modifySettingsRole(roles.maxTimeOut, input)
             await settingsConfigPage.refreshPage()
             const value = await settingsConfigPage.getRoleContentValue(roles.maxTimeOut)
@@ -64,6 +67,7 @@ test.describe('@config Settings config tests', () => {
     Data.inputDataAcceptsZero.forEach(({ input, description, expected }, index) => {
         test(`@admin Modify ${roles.defaultTimeOut} via API validation via UI: Input value: ${input} description: ${description}`, async () => {
             const settingsConfigPage = await browser.createNewPage(SettingsConfigPage, urls.settingsUrl)
+            await settingsConfigPage.navigateToDBConfigurationTab();
             await apiCall.modifySettingsRole(roles.defaultTimeOut, input)
             await settingsConfigPage.refreshPage()
             const value = await settingsConfigPage.getRoleContentValue(roles.defaultTimeOut)
@@ -77,6 +81,7 @@ test.describe('@config Settings config tests', () => {
     Data.inputDataAcceptsZero.forEach(({ input, description, expected }, index) => {
         test(`@admin Modify ${roles.resultSetSize} via API validation via UI: Input value: ${input} description: ${description}`, async () => {
             const settingsConfigPage = await browser.createNewPage(SettingsConfigPage, urls.settingsUrl)
+            await settingsConfigPage.navigateToDBConfigurationTab();
             await apiCall.modifySettingsRole(roles.resultSetSize, input)
             await settingsConfigPage.refreshPage()
             const value = await settingsConfigPage.getRoleContentValue(roles.resultSetSize)
@@ -90,9 +95,10 @@ test.describe('@config Settings config tests', () => {
     Data.inputDataAcceptsZero.forEach(({ input, description, expected }, index) => {
         test(`@admin Modify ${roles.queryMemCapacity} via API validation via UI: Input value: ${input} description: ${description}`, async () => {
             const settingsConfigPage = await browser.createNewPage(SettingsConfigPage, urls.settingsUrl)
+            await settingsConfigPage.navigateToDBConfigurationTab();
             await apiCall.modifySettingsRole(roles.queryMemCapacity, input)
             await settingsConfigPage.refreshPage()
-            const value = await settingsConfigPage.getRoleContentValue(roles.queryMemCapacity) 
+            const value = await settingsConfigPage.getRoleContentValue(roles.queryMemCapacity)
             expect(value === input).toBe(expected);
             if (index === Data.inputDataAcceptsZero.length - 1) {
                 await apiCall.modifySettingsRole(roles.queryMemCapacity, "0")
@@ -103,6 +109,7 @@ test.describe('@config Settings config tests', () => {
     Data.inputDataAcceptsZero.forEach(({ input, description, expected }, index) => {
         test(`@admin Modify ${roles.vKeyMaxEntityCount} via API validation via UI: Input value: ${input} description: ${description}`, async () => {
             const settingsConfigPage = await browser.createNewPage(SettingsConfigPage, urls.settingsUrl)
+            await settingsConfigPage.navigateToDBConfigurationTab();
             await apiCall.modifySettingsRole(roles.vKeyMaxEntityCount, input)
             await settingsConfigPage.refreshPage()
             const value = await settingsConfigPage.getRoleContentValue(roles.vKeyMaxEntityCount)
@@ -116,6 +123,7 @@ test.describe('@config Settings config tests', () => {
     Data.CMDData.forEach(({ input, description, expected }, index) => {
         test(`@admin Modify ${roles.cmdInfo} via API validation via UI: Input value: ${input} description: ${description}`, async () => {
             const settingsConfigPage = await browser.createNewPage(SettingsConfigPage, urls.settingsUrl)
+            await settingsConfigPage.navigateToDBConfigurationTab();
             await apiCall.modifySettingsRole(roles.cmdInfo, input)
             await settingsConfigPage.refreshPage()
             const value = await settingsConfigPage.getRoleContentValue(roles.cmdInfo)
@@ -129,6 +137,7 @@ test.describe('@config Settings config tests', () => {
     Data.inputDataAcceptsZero.forEach(({ input, description, expected }, index) => {
         test(`@admin Modify ${roles.maxInfoQueries} via API validation via UI: Input value: ${input} description: ${description}`, async () => {
             const settingsConfigPage = await browser.createNewPage(SettingsConfigPage, urls.settingsUrl)
+            await settingsConfigPage.navigateToDBConfigurationTab();
             await apiCall.modifySettingsRole(roles.maxInfoQueries, input)
             await settingsConfigPage.refreshPage()
             const value = await settingsConfigPage.getRoleContentValue(roles.maxInfoQueries)
@@ -141,6 +150,7 @@ test.describe('@config Settings config tests', () => {
 
     test(`@admin Modify maxQueuedQueries via UI validation via API: Input value: ${Data.roleModificationData[0].input}`, async () => {
         const settingsConfigPage = await browser.createNewPage(SettingsConfigPage, urls.settingsUrl)
+        await settingsConfigPage.navigateToDBConfigurationTab();
         await settingsConfigPage.modifyRoleValue(roles.maxQueuedQueries, Data.roleModificationData[0].input)
         await settingsConfigPage.isUndoBtnInToastMsg();
         await settingsConfigPage.waitForPageIdle();
@@ -151,6 +161,7 @@ test.describe('@config Settings config tests', () => {
 
     test(`@admin Modify TimeOut via UI validation via API: Input value: ${Data.roleModificationData[1].input}`, async () => {
         const settingsConfigPage = await browser.createNewPage(SettingsConfigPage, urls.settingsUrl);
+        await settingsConfigPage.navigateToDBConfigurationTab();
         await settingsConfigPage.modifyRoleValue(roles.TimeOut, Data.roleModificationData[1].input);
         await settingsConfigPage.isUndoBtnInToastMsg();
         await settingsConfigPage.waitForPageIdle();
@@ -161,6 +172,7 @@ test.describe('@config Settings config tests', () => {
 
     test(`@admin Modify maxTimeOut via UI validation via API: Input value: ${Data.roleModificationData[2].input}`, async () => {
         const settingsConfigPage = await browser.createNewPage(SettingsConfigPage, urls.settingsUrl)
+        await settingsConfigPage.navigateToDBConfigurationTab();
         await settingsConfigPage.modifyRoleValue(roles.maxTimeOut, Data.roleModificationData[2].input)
         await settingsConfigPage.isUndoBtnInToastMsg();
         await settingsConfigPage.waitForPageIdle();
@@ -171,6 +183,7 @@ test.describe('@config Settings config tests', () => {
 
     test(`@admin Modify defaultTimeOut via UI validation via API: Input value: ${Data.roleModificationData[3].input}`, async () => {
         const settingsConfigPage = await browser.createNewPage(SettingsConfigPage, urls.settingsUrl)
+        await settingsConfigPage.navigateToDBConfigurationTab();
         await settingsConfigPage.modifyRoleValue(roles.defaultTimeOut, Data.roleModificationData[3].input)
         await settingsConfigPage.isUndoBtnInToastMsg();
         await settingsConfigPage.waitForPageIdle();
@@ -181,6 +194,7 @@ test.describe('@config Settings config tests', () => {
 
     test(`@admin Modify resultSetSize via UI validation via API: Input value: ${Data.roleModificationData[4].input}`, async () => {
         const settingsConfigPage = await browser.createNewPage(SettingsConfigPage, urls.settingsUrl)
+        await settingsConfigPage.navigateToDBConfigurationTab();
         await settingsConfigPage.modifyRoleValue(roles.resultSetSize, Data.roleModificationData[4].input)
         await settingsConfigPage.isUndoBtnInToastMsg();
         await settingsConfigPage.waitForPageIdle();
@@ -191,6 +205,7 @@ test.describe('@config Settings config tests', () => {
 
     test(`@admin Modify queryMemCapacity via UI validation via API: Input value: ${Data.roleModificationData[5].input}`, async () => {
         const settingsConfigPage = await browser.createNewPage(SettingsConfigPage, urls.settingsUrl)
+        await settingsConfigPage.navigateToDBConfigurationTab();
         await settingsConfigPage.modifyRoleValue(roles.queryMemCapacity, Data.roleModificationData[5].input)
         await settingsConfigPage.isUndoBtnInToastMsg();
         await settingsConfigPage.waitForPageIdle();
@@ -201,6 +216,7 @@ test.describe('@config Settings config tests', () => {
 
     test(`@admin Modify vKeyMaxEntityCount via UI validation via API: Input value: ${Data.roleModificationData[6].input}`, async () => {
         const settingsConfigPage = await browser.createNewPage(SettingsConfigPage, urls.settingsUrl)
+        await settingsConfigPage.navigateToDBConfigurationTab();
         await settingsConfigPage.modifyRoleValue(roles.vKeyMaxEntityCount, Data.roleModificationData[6].input)
         await settingsConfigPage.isUndoBtnInToastMsg();
         await settingsConfigPage.waitForPageIdle();
@@ -211,6 +227,7 @@ test.describe('@config Settings config tests', () => {
 
     test(`@admin Modify cmdInfo via UI validation via API: Input value: ${Data.roleModificationData[7].input}`, async () => {
         const settingsConfigPage = await browser.createNewPage(SettingsConfigPage, urls.settingsUrl)
+        await settingsConfigPage.navigateToDBConfigurationTab();
         await settingsConfigPage.modifyRoleValue(roles.cmdInfo, Data.roleModificationData[7].input)
         await settingsConfigPage.isUndoBtnInToastMsg();
         await settingsConfigPage.waitForPageIdle();
@@ -229,6 +246,7 @@ test.describe('@config Settings config tests', () => {
 
     test(`@admin Modify maxInfoQueries via UI validation via API: Input value: ${Data.roleModificationData[8].input}`, async () => {
         const settingsConfigPage = await browser.createNewPage(SettingsConfigPage, urls.settingsUrl)
+        await settingsConfigPage.navigateToDBConfigurationTab();
         await settingsConfigPage.modifyRoleValue(roles.maxInfoQueries, Data.roleModificationData[8].input)
         await settingsConfigPage.isUndoBtnInToastMsg();
         await settingsConfigPage.waitForPageIdle();
@@ -237,9 +255,10 @@ test.describe('@config Settings config tests', () => {
         await apiCall.modifySettingsRole(roles.maxInfoQueries, "1000");
     });
 
-    Data.searchElements.forEach(({input, expected}) => {
+    Data.searchElements.forEach(({ input, expected }) => {
         test(`@admin Validate role filtering via search input: (${input})`, async () => {
             const settingsConfigPage = await browser.createNewPage(SettingsConfigPage, urls.settingsUrl)
+            await settingsConfigPage.navigateToDBConfigurationTab();
             await settingsConfigPage.searchForElement(input);
             expect(await settingsConfigPage.getTableRolesCount()).toBe(expected);
         });
