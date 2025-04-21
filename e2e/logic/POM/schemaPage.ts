@@ -118,6 +118,14 @@ export default class SchemaPage extends GraphPage {
         return this.page.locator('//div[contains(@id, "CategoriesPanel")]//button');
     }
 
+    private get typeSelectSearchInput(): Locator {
+        return this.page.locator(`//div[@id='TypeSearch']//input`);
+    }
+
+    private get selectSearchType(): Locator {
+        return this.page.locator(`//ul[@id='TypeList']//div[@role="option"]`);
+    }
+
     async clickAddNewSchemaBtn(): Promise<void> {
         await interactWhenVisible(this.addSchemaBtnInNavBar, el => el.click(), "add new schema button");
     }
@@ -237,6 +245,14 @@ export default class SchemaPage extends GraphPage {
     async getCategoriesPanelBtn(): Promise<string | null> {
         return await interactWhenVisible(this.categoriesPanelBtn, el => el.textContent(), "categories panel button");
     }
+
+    async fillTypeSelectSearchInput(type: string): Promise<void> {
+        await interactWhenVisible(this.typeSelectSearchInput, el => el.fill(type), "type search input");
+    }
+
+    async clickSearchedType(): Promise<void> {
+        await interactWhenVisible(this.selectSearchType, el => el.click(), "type search input");
+    }
     
     async isCategoriesPanelBtnHidden(): Promise<boolean> {
         return await this.categoriesPanelBtn.isHidden();
@@ -294,10 +310,15 @@ export default class SchemaPage extends GraphPage {
         ]);
     }
 
+    async selectTypeFromList(type: string): Promise<void> {
+        await this.fillTypeSelectSearchInput(type);
+        await this.clickSearchedType();
+    }
+
     async addAttribute(key: string, type: string, desc: string, unique: boolean, required: boolean): Promise<void>{
         await this.insertActiveKeyInputInDataPanelAttr(key);
         await this.clickTypeActiveBtnInDataPanel();
-        await this.selectGraphFromList(type);
+        await this.selectTypeFromList(type);
         await this.insertActiveDescInputInDataPanelAttr(desc);
         if(unique){
             await this.clickUniqueAtiveRadioBtn();
