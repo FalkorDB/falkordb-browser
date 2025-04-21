@@ -28,7 +28,7 @@ test.describe("Query Settings", () => {
         await querySettings.addTimeout(timeout);
         await querySettings.clickOnGraph();
         await querySettings.selectExistingGraph(graphName)
-        const query = `UNWIND range(1, 70000000) AS i CREATE (a:Person {id: i}) CREATE (b:Person {ref: i}) CREATE (a)-[:KNOWS]->(b) RETURN count(a)`;
+        const query = `UNWIND range(1, 10000000) AS x RETURN count(x)`;
         await querySettings.insertQuery(query);
         await querySettings.clickRunQuery(false);
         await querySettings.waitForRunQueryToBeEnabled();
