@@ -30,14 +30,12 @@ export default class BrowserWrapper {
     }
 
     private async launchBrowser(projectName: string): Promise<Browser> {
-        switch (projectName) {
-            case 'firefox':
-                return await firefox.launch();
-            case 'chromium':
-            default:
-                return await chromium.launch();
+        if (projectName.toLowerCase().includes('firefox')) {
+            return await firefox.launch();
+        } else {
+            return await chromium.launch();
         }
-    }
+    }    
 
     getContext(): BrowserContext | null {
         return this.context;

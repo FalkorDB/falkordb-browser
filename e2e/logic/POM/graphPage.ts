@@ -655,8 +655,7 @@ export default class GraphPage extends BasePage {
 
     async selectExistingGraph(graph: string, role?: string): Promise<void>{
         const resolvedLabel = this.inferLabelFromGraph(graph);
-      
-      await this.clickSelectBtnFromGraphManager(role);
+        await this.clickSelectBtnFromGraphManager(role);
         await this.selectGraphFromList(graph, resolvedLabel);
     }
 
