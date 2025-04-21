@@ -10,13 +10,13 @@ test.describe('Metadata Tests', () => {
     let apiCalls : APICalls;
     const GRAPH_NAME = getRandomString('metadata');
 
-    test.beforeAll(async () => {
+    test.beforeEach(async () => {
         browser = new BrowserWrapper();
         apiCalls = new APICalls();
         await apiCalls.addGraph(GRAPH_NAME);
     })
     
-    test.afterAll(async () => {
+    test.beforeEach(async () => {
         await apiCalls.removeGraph(GRAPH_NAME);
         await browser.closeBrowser();
     })

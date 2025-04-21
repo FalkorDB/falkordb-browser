@@ -276,10 +276,7 @@ export default class SchemaPage extends GraphPage {
     async deleteNode(x: number, y: number): Promise<void>{
         await this.nodeClick(x, y);
         await this.clickDeleteNodeInDataPanel();
-        await Promise.all([
-            this.page.waitForResponse(res => res.status() === 200),
-            this.clickConfirmDeleteNodeInDataPanel()
-        ]);          
+        await this.clickConfirmDeleteNodeInDataPanel();      
     }
 
     async addLabel(title: string): Promise<void>{
@@ -304,10 +301,7 @@ export default class SchemaPage extends GraphPage {
     async deleteRelation(x: number, y: number): Promise<void> {
         await this.nodeClick(x, y);
         await this.clickDeleteRelationInDataPanel();
-        await Promise.all([
-            this.page.waitForResponse(res => res.status() === 200),
-            this.clickConfirmDeleteNodeInDataPanel()
-        ]);
+        await this.clickConfirmDeleteNodeInDataPanel();
     }
 
     async selectTypeFromList(type: string): Promise<void> {
@@ -327,10 +321,6 @@ export default class SchemaPage extends GraphPage {
             await this.clickRequiredActiveRadioBtn();
         }
         await this.clickAddActiveBtnInDataPanel();
-    }
-
-    async deleteAttribute(key: string): Promise<void>{
-       
     }
     
 }

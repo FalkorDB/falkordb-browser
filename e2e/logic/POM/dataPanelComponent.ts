@@ -175,7 +175,10 @@ export default class DataPanel extends GraphPage {
     async removeAttribute(): Promise<void>{
         await this.hoverLastAttributeRowInGraphDataPanel();
         await this.clickDeleteAttributeButtonForFirstRowInGraphDataPanel();
-        await this.clickDeleteButtonInDialog();
+        await Promise.all([
+            this.page.waitForResponse(res => res.status() === 200),
+            this.clickDeleteButtonInDialog()
+        ]);
     }
 
     async modifyAttribute(input: string): Promise<void>{
@@ -190,7 +193,10 @@ export default class DataPanel extends GraphPage {
 
     async deleteNodeViaDataPanel(): Promise<void>{
         await this.clickDeleteNodeButtonInGraphDataPanel();
-        await this.clickDeleteButtonInDialog();
+        await Promise.all([
+            this.page.waitForResponse(res => res.status() === 200),
+            this.clickDeleteButtonInDialog()
+        ]);
     }
 
 }

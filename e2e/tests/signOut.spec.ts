@@ -8,11 +8,11 @@ roles.userRoles.forEach((role) => {
     test.describe(`@${role.role} SignOut Test`, () => {
         let browser: BrowserWrapper;
 
-        test.beforeAll(async () => {
+        test.beforeEach(async () => {
             browser = new BrowserWrapper();
         })
 
-        test.afterAll(async () => {
+        test.afterEach(async () => {
             await browser.closeBrowser();
         })
 

@@ -9,12 +9,12 @@ test.describe('Preferences Tests', () => {
     let browser: BrowserWrapper;
     let apicalls: ApiCalls;
 
-    test.beforeAll(async () => {
+    test.beforeEach(async () => {
         browser = new BrowserWrapper();
         apicalls = new ApiCalls();
     })
 
-    test.afterAll(async () => {
+    test.afterEach(async () => {
         await browser.closeBrowser();
     })
 

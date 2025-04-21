@@ -10,12 +10,12 @@ test.describe("Query Settings", () => {
     let browser: BrowserWrapper;
     let apiCall: ApiCalls;
 
-    test.beforeAll(async () => {
+    test.beforeEach(async () => {
         browser = new BrowserWrapper();
         apiCall = new ApiCalls();
     })
 
-    test.afterAll(async () => {
+    test.afterEach(async () => {
         await browser.closeBrowser();
     })
 

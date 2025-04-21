@@ -9,11 +9,11 @@ import { getRandomString } from "../infra/utils";
 test.describe('@Config Settings users tests', () => {
     let browser: BrowserWrapper;
 
-    test.beforeAll(async () => {
+    test.beforeEach(async () => {
         browser = new BrowserWrapper();
     })
 
-    test.afterAll(async () => {
+    test.afterEach(async () => {
         await browser.closeBrowser();
     })
 
