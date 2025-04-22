@@ -5,7 +5,7 @@
 /* eslint-disable arrow-body-style */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { Locator } from "@playwright/test";
-import { interactWhenVisible } from "@/e2e/infra/utils";
+import { interactWhenVisible, waitForElementToBeVisible } from "@/e2e/infra/utils";
 import GraphPage from "./graphPage";
 
 export default class SchemaPage extends GraphPage {
@@ -219,12 +219,11 @@ export default class SchemaPage extends GraphPage {
     }
       
     async hasAttributeRows(): Promise<boolean> {
-        return await interactWhenVisible(
-          this.attributeRows,
-          async el => (await el.count()) > 0,
-          "attribute rows in data panel"
-        );
-      }
+        const isVisible = await waitForElementToBeVisible(this.attributeRows);
+        if (!isVisible) return false;
+        const rows = await this.attributeRows.count();
+        return rows > 0;
+    }
       
     async getAttributeRowsCount(): Promise<number> {
         return await this.attributeRows.count();
