@@ -2,7 +2,7 @@
 
 "use client"
 
-import { useState } from "react"
+import React, { useState, useContext } from "react"
 import { InfoIcon, PlusCircle } from "lucide-react"
 import { prepareArg, securedFetch } from "@/lib/utils"
 import { useToast } from "@/components/ui/use-toast"
@@ -11,6 +11,7 @@ import DialogComponent from "./DialogComponent"
 import Button from "./ui/Button"
 import CloseDialog from "./CloseDialog"
 import Input from "./ui/Input"
+import { IndicatorContext } from "./provider"
 
 interface Props {
     onSetGraphName: (name: string) => void
@@ -34,6 +35,7 @@ export default function CreateGraph({
     ),
 }: Props) {
 
+    const { indicator, setIndicator } = useContext(IndicatorContext)
     const [graphName, setGraphName] = useState("")
     const [open, setOpen] = useState(false)
     const [isLoading, setIsLoading] = useState(false)
@@ -60,10 +62,9 @@ export default function CreateGraph({
                 })
                 return
             }
-            const q = 'RETURN 1'
-            const result = await securedFetch(`api/graph/${prepareArg(name)}/?query=${prepareArg(q)}`, {
-                method: "GET",
-            }, toast)
+            const result = await securedFetch(`api/${type === "Schema" ? "schema" : "graph"}/${prepareArg(name)}`, {
+                method: "POST",
+            }, toast, setIndicator)
 
             if (!result.ok) return
 
@@ -106,6 +107,7 @@ export default function CreateGraph({
                 </div>
                 <div className="flex gap-4 justify-end">
                     <Button
+                        indicator={indicator}
                         variant="Primary"
                         label={`Create your ${type}`}
                         title={`Build and customize your ${type}`}

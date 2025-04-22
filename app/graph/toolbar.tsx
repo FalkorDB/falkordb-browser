@@ -3,16 +3,17 @@
 /* eslint-disable react/require-default-props */
 
 import { Link, PlusCircle, Shrink, Trash2, ZoomIn, ZoomOut } from "lucide-react";
-import { useState } from "react";
+import { useContext, useState } from "react";
 import { handleZoomToFit, GraphRef } from "@/lib/utils";
 import { useSession } from "next-auth/react";
 import Button from "../components/ui/Button";
 import DeleteElement from "./DeleteElement";
+import { IndicatorContext } from "../components/provider";
 
 interface Props {
     disabled?: boolean,
     chartRef: GraphRef,
-    onDeleteElement?: () => Promise<void>,
+    onDeleteElement: () => Promise<void>,
     onAddEntity?: () => void,
     onAddRelation?: () => void,
     deleteDisabled?: boolean,
@@ -33,6 +34,7 @@ export default function Toolbar({
 
     const [deleteOpen, setDeleteOpen] = useState(false)
     const { data: session } = useSession()
+    const { indicator } = useContext(IndicatorContext)
 
     const handleZoomClick = (changeFactor: number) => {
         const chart = chartRef.current
@@ -99,25 +101,25 @@ export default function Toolbar({
                             </Button>
                         }
                     />
-                </div>}
-            {
-                (onAddEntity || onAddRelation || onDeleteElement) && session?.user?.role !== "Read-Only" &&
-                <p className="text-slate-600">|</p>
+                </div>
             }
+            <p className="text-slate-600">|</p>
             <div className="flex items-center gap-4">
                 <Button
                     className="text-nowrap"
                     disabled={disabled}
+                    indicator={indicator}
                     variant="Secondary"
                     label="Zoom In"
                     title="Zoom in for a closer view"
                     onClick={() => handleZoomClick(1.1)}
-                >   
+                >
                     <ZoomIn size={20} />
                 </Button>
                 <Button
                     className="text-nowrap"
                     disabled={disabled}
+                    indicator={indicator}
                     variant="Secondary"
                     label="Zoom Out"
                     title="Zoom out for a broader view"
@@ -128,6 +130,7 @@ export default function Toolbar({
                 <Button
                     className="text-nowrap"
                     disabled={disabled}
+                    indicator={indicator}
                     variant="Secondary"
                     label="Fit To Size"
                     title="Center and fit the graph to the screen"

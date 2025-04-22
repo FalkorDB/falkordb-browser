@@ -6,7 +6,7 @@
 
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { cn, prepareArg, Row, securedFetch } from "@/lib/utils"
-import { useEffect, useState } from "react"
+import { useContext, useEffect, useState } from "react"
 import { Select, SelectContent, SelectGroup, SelectItem, SelectSeparator, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useToast } from "@/components/ui/use-toast"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
@@ -18,6 +18,7 @@ import CloseDialog from "../CloseDialog"
 import ExportGraph from "../ExportGraph"
 import DeleteGraph from "../graph/DeleteGraph"
 import Input from "./Input"
+import { IndicatorContext } from "../provider"
 
 interface ComboboxProps {
   options: string[],
@@ -35,7 +36,7 @@ interface ComboboxProps {
 
 const STEP = 4
 
-export default function Combobox({ isSelectGraph = false, disabled = false, inTable, type = "Graph", label, options, setOptions, selectedValue, setSelectedValue, defaultOpen = false, onOpenChange }: ComboboxProps) {
+export default function Combobox({ isSelectGraph = false, disabled = false, inTable, type = "Graph", label = type, options, setOptions, selectedValue, setSelectedValue, defaultOpen = false, onOpenChange }: ComboboxProps) {
 
   const [openMenage, setOpenMenage] = useState<boolean>(false)
   const [open, setOpen] = useState<boolean>(defaultOpen)
@@ -45,6 +46,7 @@ export default function Combobox({ isSelectGraph = false, disabled = false, inTa
   const [maxOptions, setMaxOptions] = useState<number>(STEP)
   const { toast } = useToast()
   const { data: session } = useSession()
+  const { indicator, setIndicator } = useContext(IndicatorContext)
 
   useEffect(() => {
     const timeout = setTimeout(() => {
@@ -61,7 +63,7 @@ export default function Combobox({ isSelectGraph = false, disabled = false, inTa
         "Content-Type": "application/json"
       },
       body: JSON.stringify({ name: optionName })
-    }, toast)
+    }, toast, setIndicator)
 
     if (result.ok) {
 
@@ -86,29 +88,30 @@ export default function Combobox({ isSelectGraph = false, disabled = false, inTa
 
   return (
     <Dialog open={openMenage} onOpenChange={setOpenMenage}>
-      <Select value={selectedValue} onValueChange={setSelectedValue} open={open} onOpenChange={(o) => {
+      <Select disabled={disabled || options.length === 0 || (indicator === "offline" && label === type)} value={selectedValue} onValueChange={setSelectedValue} open={open} onOpenChange={(o) => {
         setOpen(o)
         if (onOpenChange) onOpenChange(o)
       }}>
         <Tooltip>
           <TooltipTrigger asChild>
-            <SelectTrigger data-type="select" disabled={disabled || options.length === 0} className={cn("w-fit gap-2 border-none p-2", inTable ? "text-sm font-light" : "text-xl font-medium")}>
-              <SelectValue placeholder={`Select ${label || type}`} />
+            <SelectTrigger data-type="select" className={cn("w-fit gap-2 border-none p-2", inTable ? "text-sm font-light" : "text-xl font-medium")}>
+              <SelectValue placeholder={`Select ${label}`} />
             </SelectTrigger>
           </TooltipTrigger>
           <TooltipContent>
-            {options.length === 0 ? "There is no graphs" : selectedValue || `Select ${label || type}`}
+            {indicator === "offline" && "The FalkorDB server is offline"}
+            {indicator !== "offline" && (options.length === 0 ? "There is no graphs" : selectedValue || `Select ${label}`)}
           </TooltipContent>
         </Tooltip>
         <SelectContent className="min-w-52 max-h-[40lvh] bg-foreground">
-          <div className="p-4" id="graphSearch">
-            <Input ref={ref => ref?.focus()} className="w-full" placeholder={`Search for a ${label || type}`} onChange={(e) => {
+          <div className="p-4" id={`${label}Search`}>
+            <Input ref={ref => ref?.focus()} className="w-full" placeholder={`Search for a ${label}`} onChange={(e) => {
               setSearch(e.target.value)
               setMaxOptions(5)
             }} value={search} />
           </div>
           <SelectGroup>
-            <ul className="shrink grow overflow-auto" id="graphsList">
+            <ul className="shrink grow overflow-auto" id={`${label}List`}>
               {selectedValue && (
                 <SelectItem value={selectedValue}>
                   {selectedValue}
@@ -176,7 +179,7 @@ export default function Combobox({ isSelectGraph = false, disabled = false, inTa
           {
             session?.user?.role !== "Read-Only" &&
             <DeleteGraph
-              type={type!}
+              type={type}
               options={options}
               rows={rows}
               handleSetRows={handleSetRows}
@@ -202,7 +205,7 @@ export default function Combobox({ isSelectGraph = false, disabled = false, inTa
               />
             }
             selectedValues={rows.filter(opt => opt.checked).map(opt => opt.cells[0].value as string)}
-            type={type!}
+            type={type}
           />
         </TableComponent>
       </DialogContent>

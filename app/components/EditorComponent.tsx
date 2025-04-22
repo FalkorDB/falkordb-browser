@@ -5,20 +5,21 @@
 
 import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Editor, Monaco } from "@monaco-editor/react"
-import { SetStateAction, Dispatch, useEffect, useRef, useState } from "react"
+import { SetStateAction, Dispatch, useEffect, useRef, useState, useContext } from "react"
 import * as monaco from "monaco-editor";
-import { Maximize2, Minimize2 } from "lucide-react";
+import { Info, Maximize2, Minimize2 } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { HistoryQuery, prepareArg, securedFetch } from "@/lib/utils";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import { Graph } from "../api/graph/model";
 import Button from "./ui/Button";
 import CloseDialog from "./CloseDialog";
+import { IndicatorContext } from "./provider";
 
 interface Props {
     historyQuery: HistoryQuery
     maximize: boolean
-    runQuery: (query: string) => Promise<boolean>
+    runQuery: (query: string, timeout?: number) => Promise<boolean>
     graph: Graph
     setHistoryQuery: Dispatch<SetStateAction<HistoryQuery>>
 }
@@ -192,6 +193,7 @@ const PLACEHOLDER = "Type your query here to start"
 
 export default function EditorComponent({ historyQuery, maximize, runQuery, graph, setHistoryQuery }: Props) {
 
+    const { indicator, setIndicator } = useContext(IndicatorContext)
     const placeholderRef = useRef<HTMLDivElement>(null)
     const [lineNumber, setLineNumber] = useState(1)
     const graphIdRef = useRef(graph.Id)
@@ -202,6 +204,11 @@ export default function EditorComponent({ historyQuery, maximize, runQuery, grap
     const submitQuery = useRef<HTMLButtonElement>(null)
     const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null)
     const containerRef = useRef<HTMLDivElement>(null)
+    const indicatorRef = useRef(indicator)
+
+    useEffect(() => {
+        indicatorRef.current = indicator
+    }, [indicator])
 
     useEffect(() => {
         setHistoryQuery(prev => ({
@@ -263,16 +270,19 @@ export default function EditorComponent({ historyQuery, maximize, runQuery, grap
                 'editorSuggestWidget.foreground': '#FFFFFF',
                 'editorSuggestWidget.selectedBackground': '#57577B',
                 'editorSuggestWidget.hoverBackground': '#28283F',
+                'focusBorder': '#00000000',
             },
         });
 
         monacoI.editor.setTheme('custom-theme')
     }
 
-    const fetchSuggestions = async (q: string, detail: string): Promise<monaco.languages.CompletionItem[]> => {
-        const result = await securedFetch(`api/graph/${graphIdRef.current}/?query=${prepareArg(q)}`, {
+    const fetchSuggestions = async (detail: string): Promise<monaco.languages.CompletionItem[]> => {
+        if (indicator === "offline") return []
+
+        const result = await securedFetch(`api/graph/${graphIdRef.current}/suggestions/?type=${prepareArg(detail)}`, {
             method: 'GET',
-        }, toast)
+        }, toast, setIndicator)
 
         if (!result) return []
 
@@ -300,10 +310,10 @@ export default function EditorComponent({ historyQuery, maximize, runQuery, grap
     }
 
     const getSuggestions = async () => (await Promise.all([
-        fetchSuggestions('CALL dbms.procedures() YIELD name as sug', '(function)'),
-        fetchSuggestions('CALL db.propertyKeys() YIELD propertyKey as sug', '(property key)'),
-        fetchSuggestions('CALL db.labels() YIELD label as sug', '(label)'),
-        fetchSuggestions('CALL db.relationshipTypes() YIELD relationshipType as sug', '(relationship type)')
+        fetchSuggestions('(function)'),
+        fetchSuggestions('(property key)'),
+        fetchSuggestions('(label)'),
+        fetchSuggestions('(relationship type)')
     ])).flat()
 
     const addSuggestions = async (monacoI: Monaco) => {
@@ -482,13 +492,14 @@ export default function EditorComponent({ historyQuery, maximize, runQuery, grap
         });
 
         // eslint-disable-next-line no-bitwise
-        e.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, () => {
-            submitQuery.current?.click();
+        e.addCommand(monaco.KeyMod.Shift | monaco.KeyCode.Enter, () => {
+            e.trigger('keyboard', 'type', { text: '\n' });
         });
 
         // eslint-disable-next-line no-bitwise
-        e.addCommand(monaco.KeyMod.Shift | monaco.KeyCode.Enter, () => {
-            e.trigger('keyboard', 'type', { text: '\n' });
+        e.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, () => {
+            if (indicatorRef.current === "offline") return
+            submitQuery.current?.click();
         });
 
         e.addAction({
@@ -498,6 +509,7 @@ export default function EditorComponent({ historyQuery, maximize, runQuery, grap
             keybindings: [monaco.KeyCode.Enter],
             contextMenuOrder: 1.5,
             run: async () => {
+                if (indicatorRef.current === "offline") return
                 submitQuery.current?.click()
             },
             precondition: '!suggestWidgetVisible',
@@ -515,6 +527,10 @@ export default function EditorComponent({ historyQuery, maximize, runQuery, grap
                     let counter;
                     if (prev.counter !== 1) {
                         counter = prev.counter ? prev.counter - 1 : prev.queries.length;
+                        // Run provideCompletion when counter changes from 0 to queries.length
+                        if (!prev.counter && counter === prev.queries.length) {
+                            e.trigger('keyboard', 'editor.action.triggerSuggest', {});
+                        }
                     } else {
                         counter = 1;
                     }
@@ -567,9 +583,7 @@ export default function EditorComponent({ historyQuery, maximize, runQuery, grap
                 <Dialog>
                     <div className="w-full flex items-center gap-8">
                         <p>Query</p>
-                        <div
-                            className="w-1 grow flex rounded-lg overflow-hidden"
-                        >
+                        <div className="w-1 grow flex rounded-lg overflow-hidden">
                             <div ref={containerRef} className="relative grow w-1" id="editor-container">
                                 <Editor
                                     // eslint-disable-next-line no-nested-ternary
@@ -579,7 +593,7 @@ export default function EditorComponent({ historyQuery, maximize, runQuery, grap
                                         ...monacoOptions,
                                         lineNumbers: lineNumber > 1 ? "on" : "off",
                                     }}
-                                    value={(blur ? historyQuery.query.replace(/\s+/g, ' ').trim() : historyQuery.query)}
+                                    value={blur ? historyQuery.query.replace(/\s+/g, ' ').trim() : historyQuery.query}
                                     onChange={(val) => {
                                         if (!historyQuery.counter) {
                                             setHistoryQuery(prev => ({
@@ -598,25 +612,33 @@ export default function EditorComponent({ historyQuery, maximize, runQuery, grap
                                     beforeMount={handleEditorWillMount}
                                     onMount={handleEditorDidMount}
                                 />
-                                <DialogTrigger asChild>
+                                <div className="h-full absolute top-0 px-2 right-0 flex gap-2 items-center justify-center pointer-events-none">
+                                    <DialogTrigger className="pointer-events-auto" asChild>
+                                        <Button
+                                            title="Maximize"
+                                        >
+                                            <Maximize2 size={20} />
+                                        </Button>
+                                    </DialogTrigger>
                                     <Button
-                                        className="absolute top-0 right-3 p-2.5"
-                                        title="Maximize"
+                                        className="pointer-events-auto"
+                                        title="Run (Enter) History (Arrow Up/Down) Insert new line (Shift + Enter)"
                                     >
-                                        <Maximize2 size={20} />
+                                        <Info />
+                        
                                     </Button>
-                                </DialogTrigger>
+                                </div>
                                 <div ref={placeholderRef} className="absolute top-2 left-2 pointer-events-none">
                                     {PLACEHOLDER}
                                 </div>
                             </div>
                             <Button
                                 ref={submitQuery}
+                                indicator={indicator}
                                 className="rounded-none py-2 px-8"
                                 variant="Primary"
-                                title="Run (Ctrl + Enter)"
                                 label="Run"
-                                type="submit"
+                                title="Press Enter to run the query"
                                 onClick={handleSubmit}
                                 isLoading={isLoading}
                             />
@@ -627,11 +649,22 @@ export default function EditorComponent({ historyQuery, maximize, runQuery, grap
                                     <DialogTitle />
                                     <DialogDescription />
                                 </VisuallyHidden>
-                                <CloseDialog
-                                    className="z-10 absolute top-1 right-6"
-                                >
-                                    <Minimize2 size={20} />
-                                </CloseDialog>
+                                <div className="z-10 absolute right-0 top-0 bottom-0 py-4 px-8 flex flex-col items-end justify-between pointer-events-none">
+                                    <CloseDialog
+                                        className="pointer-events-auto"
+                                    >
+                                        <Minimize2 size={20} />
+                                    </CloseDialog>
+                                    <CloseDialog
+                                        className="pointer-events-auto py-2 px-8"
+                                        indicator={indicator}
+                                        variant="Primary"
+                                        label="Run"
+                                        title="Press Enter to run the query"
+                                        onClick={handleSubmit}
+                                        isLoading={isLoading}
+                                    />
+                                </div>
                                 <Editor
                                     className="w-full h-full"
                                     onMount={handleEditorDidMount}
@@ -644,7 +677,7 @@ export default function EditorComponent({ historyQuery, maximize, runQuery, grap
                                         lineNumbersMinChars: 3,
                                         minimap: { enabled: false },
                                         lineHeight: 30,
-                                        fontSize: 25
+                                        fontSize: 25,
                                     }}
                                     value={(blur ? historyQuery.query.replace(/\s+/g, ' ').trim() : historyQuery.query)}
                                     onChange={(val) => {
@@ -656,6 +689,7 @@ export default function EditorComponent({ historyQuery, maximize, runQuery, grap
                                         } else {
                                             setHistoryQuery(prev => ({
                                                 ...prev,
+                                                query: val || "",
                                                 currentQuery: val || ""
                                             }))
                                         }
@@ -667,6 +701,6 @@ export default function EditorComponent({ historyQuery, maximize, runQuery, grap
                     </div>
                 </Dialog>
             }
-        </div>
+        </div >
     )
 }

@@ -1,10 +1,10 @@
 'use client'
 
-import { useEffect, useRef, useState, Dispatch, SetStateAction } from "react";
+import { useEffect, useRef, useState, Dispatch, SetStateAction, useContext, useCallback } from "react";
 import { DialogTitle } from "@/components/ui/dialog";
 import { Editor } from "@monaco-editor/react";
 import { editor } from "monaco-editor";
-import { cn, defaultQuery, HistoryQuery, prepareArg, Query, securedFetch } from "@/lib/utils";
+import { cn, HistoryQuery, prepareArg, Query, securedFetch } from "@/lib/utils";
 import { Session } from "next-auth";
 import { PlusCircle, RefreshCcw } from "lucide-react";
 import { usePathname } from "next/navigation";
@@ -21,11 +21,12 @@ import CreateGraph from "../components/CreateGraph";
 import ExportGraph from "../components/ExportGraph";
 import MetadataView from "./MetadataView";
 import Input from "../components/ui/Input";
+import { IndicatorContext } from "../components/provider";
 
 interface Props {
     setGraphName: (selectedGraphName: string) => void
     graphName: string
-    runQuery?: (query: string) => Promise<Query | undefined>
+    runQuery?: (query: string, timeout?: number) => Promise<Query | undefined>
     historyQuery?: HistoryQuery
     setHistoryQuery?: Dispatch<SetStateAction<HistoryQuery>>
     edgesCount: number
@@ -51,7 +52,46 @@ export default function Selector({ setGraphName, graphName, runQuery, edgesCount
     const [isRotating, setIsRotating] = useState(false);
     const { toast } = useToast()
     const [filteredQueries, setFilteredQueries] = useState<Query[]>(historyQuery?.queries || [])
+    const { indicator, setIndicator } = useContext(IndicatorContext)
 
+    const handleOnChange = useCallback(async (name: string) => {
+        const formattedName = name === '""' ? "" : name
+        if (type === "Graph") {
+            const result = await securedFetch(`api/schema/${prepareArg(name)}?create=false`, {
+                method: "GET"
+            }, toast, setIndicator)
+
+            if (result.ok) {
+                const json = await result.json()
+                if (json.result) {
+                    setSchema(Graph.create(name, json.result, false, true))
+                }
+            }
+        }
+        setGraphName(formattedName)
+        setSelectedValue(name)
+    }, [setGraphName, setIndicator, toast, type])
+
+    const getOptions = useCallback(async () => {
+        if (indicator === "offline") return
+
+        const result = await securedFetch(`api/${type === "Graph" ? "graph" : "schema"}`, {
+            method: "GET"
+        }, toast, setIndicator)
+        if (!result.ok) return
+        const { opts } = (await result.json()) as { opts: string[] }
+        setOptions(opts)
+        if (opts.length === 1) handleOnChange(opts[0])
+        if (opts.length === 0) handleOnChange("")
+    }, [indicator, type, toast, setIndicator, setOptions, handleOnChange])
+
+    useEffect(() => {
+        getOptions()
+    }, [getOptions])
+
+    useEffect(() => {
+        if (indicator === "online") getOptions()
+    }, [indicator, getOptions])
 
     const focusEditorAtEnd = () => {
         if (editorRef.current) {
@@ -76,7 +116,6 @@ export default function Selector({ setGraphName, graphName, runQuery, edgesCount
             focusEditorAtEnd()
         }, 500)
 
-
         return () => {
             clearTimeout(timeout)
         }
@@ -86,46 +125,6 @@ export default function Selector({ setGraphName, graphName, runQuery, edgesCount
     useEffect(() => {
         setSelectedValue(graphName)
     }, [graphName])
-
-    const handleOnChange = async (name: string) => {
-        const formattedName = name === '""' ? "" : name
-        if (runQuery) {
-            const result = await securedFetch(`api/graph/${prepareArg(name)}_schema/?query=${prepareArg(defaultQuery())}&create=false`, {
-                method: "GET"
-            }, toast)
-
-            if (!result.ok) return
-
-            const json = await result.json()
-            if (json.result) {
-                setSchema(Graph.create(name, json.result, false, true))
-            }
-        }
-        setGraphName(formattedName)
-        setSelectedValue(name)
-    }
-
-    const getOptions = async () => {
-        const result = await securedFetch("api/graph", {
-            method: "GET"
-        }, toast)
-        if (!result.ok) return
-        const res = (await result.json()).result as string[]
-        const opts = !runQuery ?
-            res.filter(name => name.endsWith("_schema")).map(name => {
-                let split = name.split("_schema")[0]
-                if (split.startsWith("{") && split.endsWith("}")) {
-                    split = split.substring(1, split.length - 1)
-                }
-                return split
-            }) : res.filter(name => !name.endsWith("_schema"))
-        setOptions(opts)
-        if (opts.length === 1) handleOnChange(opts[0])
-    }
-
-    useEffect(() => {
-        getOptions()
-    }, [])
 
     const handleEditorDidMount = (e: editor.IStandaloneCodeEditor) => {
         editorRef.current = e
@@ -186,6 +185,7 @@ export default function Selector({ setGraphName, graphName, runQuery, edgesCount
                         </>
                     }
                     <Button
+                        indicator={indicator}
                         className={cn(
                             "transition-transform",
                             isRotating && "animate-spin duration-1000"
@@ -238,7 +238,7 @@ export default function Selector({ setGraphName, graphName, runQuery, edgesCount
             <div className={cn("bg-foreground flex gap-4 justify-between items-center p-4 rounded-xl min-h-14", !selectedValue && "justify-end")}>
                 {
                     selectedValue &&
-                    <div className="flex gap-6">
+                    <div className="flex gap-6" id="graphStats">
                         <span>{nodesCount}&ensp;Nodes</span>
                         <p className="text-secondary">|</p>
                         <span>{edgesCount}&ensp;Edges</span>
@@ -331,7 +331,7 @@ export default function Selector({ setGraphName, graphName, runQuery, edgesCount
                                         </ul>
                                     </div>
                                     <div className="w-1 grow">
-                                        {historyQuery && historyQuery.queries.length > 0 && historyQuery.counter && <MetadataView query={historyQuery.queries[historyQuery.counter - 1]} graphName={selectedValue} />}
+                                        {historyQuery && historyQuery.queries.length > 0 && historyQuery.counter ? <MetadataView query={historyQuery.queries[historyQuery.counter - 1]} graphName={selectedValue} /> : undefined}
                                     </div>
                                 </div>
                                 <div className="flex justify-end">
@@ -339,6 +339,7 @@ export default function Selector({ setGraphName, graphName, runQuery, edgesCount
                                         ref={submitQuery}
                                         className="text-white flex justify-center w-1/3"
                                         disabled={isLoading || !historyQuery?.counter}
+                                        indicator={indicator}
                                         onClick={async () => {
                                             try {
                                                 setIsLoading(true);

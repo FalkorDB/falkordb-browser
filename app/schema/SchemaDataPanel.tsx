@@ -4,32 +4,31 @@
 "use client";
 
 import { Check, ChevronRight, Pencil, PlusCircle, Trash2, X } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useContext, useEffect, useState } from "react";
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/components/ui/use-toast";
 import { useSession } from "next-auth/react";
+import { Switch } from "@/components/ui/switch";
+import { prepareArg, securedFetch } from "@/lib/utils";
 import Button from "../components/ui/Button";
 import { ATTRIBUTES, getDefaultAttribute, OPTIONS } from "./SchemaCreateElement";
 import Combobox from "../components/ui/combobox";
-import { Link, Node } from "../api/graph/model";
+import { Graph, Link, Node } from "../api/graph/model";
 import Input from "../components/ui/Input";
 import ToastButton from "../components/ToastButton";
 import DeleteElement from "../graph/DeleteElement";
 import DialogComponent from "../components/DialogComponent";
 import CloseDialog from "../components/CloseDialog";
+import { IndicatorContext } from "../components/provider";
 
 interface Props {
     obj: Node | Link
-    onExpand: () => void;
-    onSetAttributes: (attribute: [string, string[]]) => Promise<boolean>;
-    onRemoveAttribute: (key: string) => Promise<boolean>;
+    onExpand: (expand?: boolean) => void;
     onDeleteElement: () => Promise<void>;
-    onAddLabel: (label: string) => Promise<boolean>;
-    onRemoveLabel: (label: string) => Promise<boolean>;
+    schema: Graph
 }
 
-export default function SchemaDataPanel({ obj, onExpand, onSetAttributes, onRemoveAttribute, onDeleteElement, onAddLabel, onRemoveLabel }: Props) {
+export default function SchemaDataPanel({ obj, onExpand, onDeleteElement, schema }: Props) {
 
     const [attribute, setAttribute] = useState<[string, string[]]>(getDefaultAttribute())
     const [attributes, setAttributes] = useState<[string, string[]][]>([])
@@ -49,6 +48,7 @@ export default function SchemaDataPanel({ obj, onExpand, onSetAttributes, onRemo
     const type = !!obj.category
     const { toast } = useToast()
     const { data: session } = useSession()
+    const { indicator } = useContext(IndicatorContext)
 
     useEffect(() => {
         setAttributes(Object.entries(obj.data).filter(([key, val]) => !(key === "name" && Number(val) === obj.id)).map(([key, val]) => [key, Array.isArray(val) ? val : (val as string).split(',')]))
@@ -64,6 +64,15 @@ export default function SchemaDataPanel({ obj, onExpand, onSetAttributes, onRemo
         setEditable(key)
     }
 
+    const onSetAttribute = async (att: [string, string[]]) => {
+        const { ok } = await securedFetch(`api/schema/${prepareArg(schema.Id)}/${prepareArg(obj.id.toString())}/${prepareArg(att[0])}`, {
+            method: "PATCH",
+            body: JSON.stringify({ type, attribute: att[1] })
+        }, toast)
+
+        return ok
+    }
+
     const handleSetAttribute = async (isUndo: boolean, att?: [string, string[]]) => {
         const newAttribute = att || attribute
 
@@ -74,12 +83,30 @@ export default function SchemaDataPanel({ obj, onExpand, onSetAttributes, onRemo
             })
             return
         }
+
         try {
             setIsSetLoading(true)
-            const ok = await onSetAttributes(newAttribute)
+            const ok = await onSetAttribute(attribute)
             const oldAttribute = attributes.find(([key]) => key === newAttribute[0])
 
             if (ok) {
+                if (type) {
+                    // eslint-disable-next-line no-param-reassign
+                    schema.Elements = {
+                        ...schema.Elements,
+                        nodes: schema.Elements.nodes.map(element =>
+                            element.id === obj.id ? { ...element, data: { ...element.data, [newAttribute[0]]: newAttribute[1] } } : element
+                        )
+                    }
+                } else {
+                    // eslint-disable-next-line no-param-reassign
+                    schema.Elements = {
+                        ...schema.Elements,
+                        links: schema.Elements.links.map(element =>
+                            element.id === obj.id ? { ...element, data: { ...element.data, [newAttribute[0]]: newAttribute[1] } } : element
+                        )
+                    }
+                }
                 setAttributes(prev => prev.map((attr) => attr[0] === newAttribute[0] ? newAttribute : attr))
                 handleSetEditable()
                 toast({
@@ -88,6 +115,7 @@ export default function SchemaDataPanel({ obj, onExpand, onSetAttributes, onRemo
                     action: isUndo && oldAttribute ? <ToastButton onClick={() => handleSetAttribute(false, oldAttribute)} /> : undefined,
                 })
             }
+
         } finally {
             setIsSetLoading(false)
         }
@@ -96,10 +124,31 @@ export default function SchemaDataPanel({ obj, onExpand, onSetAttributes, onRemo
     const handleRemoveAttribute = async (key: string) => {
         try {
             setIsRemoveLoading(true)
-            const ok = await onRemoveAttribute(key)
+
+            const { ok } = await securedFetch(`api/schema/${prepareArg(schema.Id)}/${prepareArg(obj.id.toString())}/${prepareArg(key)}`, {
+                method: "DELETE",
+                body: JSON.stringify({ type })
+            }, toast)
 
             if (ok) {
                 const att = attributes.find(([k]) => k === key)
+                if (type) {
+                    // eslint-disable-next-line no-param-reassign
+                    schema.Elements = {
+                        ...schema.Elements,
+                        nodes: schema.Elements.nodes.map(element =>
+                            element.id === obj.id ? { ...element, data: { ...Object.fromEntries(Object.entries(element.data).filter(([k]) => k !== key)), [key]: [] } } : element
+                        )
+                    }
+                } else {
+                    // eslint-disable-next-line no-param-reassign
+                    schema.Elements = {
+                        ...schema.Elements,
+                        links: schema.Elements.links.map(element =>
+                            element.id === obj.id ? { ...element, data: { ...Object.fromEntries(Object.entries(element.data).filter(([k]) => k !== key)), [key]: [] } } : element
+                        )
+                    }
+                }
                 setAttributes(prev => prev.filter(([k]) => k !== key))
                 toast({
                     title: "Success",
@@ -108,9 +157,12 @@ export default function SchemaDataPanel({ obj, onExpand, onSetAttributes, onRemo
                 })
                 setAttribute(getDefaultAttribute())
             }
+
+            return ok
         } finally {
             setIsRemoveLoading(false)
         }
+
     }
 
     const handleAddAttribute = async (att?: [string, string[]]) => {
@@ -125,9 +177,21 @@ export default function SchemaDataPanel({ obj, onExpand, onSetAttributes, onRemo
         }
         try {
             setIsAddLoading(true)
-            const ok = await onSetAttributes(newAttribute)
-
+            const ok = await onSetAttribute(newAttribute)
             if (ok) {
+                if (type) {
+                    // eslint-disable-next-line no-param-reassign
+                    schema.Elements = {
+                        ...schema.Elements,
+                        nodes: [...schema.Elements.nodes, { ...obj as Node, data: { ...obj.data, [newAttribute[0]]: newAttribute[1] } }]
+                    }
+                } else {
+                    // eslint-disable-next-line no-param-reassign
+                    schema.Elements = {
+                        ...schema.Elements,
+                        links: [...schema.Elements.links, { ...obj as Link, data: { ...obj.data, [newAttribute[0]]: newAttribute[1] } }]
+                    }
+                }
                 setAttributes(prev => [...prev, newAttribute])
                 setAttribute(getDefaultAttribute())
                 setIsAddValue(false)
@@ -143,7 +207,7 @@ export default function SchemaDataPanel({ obj, onExpand, onSetAttributes, onRemo
             handleSetEditable()
         }
 
-        if (evt.code !== "Enter" || isSetLoading) return
+        if (evt.code !== "Enter" || isSetLoading || indicator === "offline") return
 
         evt.preventDefault()
         handleSetAttribute(true)
@@ -155,13 +219,15 @@ export default function SchemaDataPanel({ obj, onExpand, onSetAttributes, onRemo
             handleSetEditable()
         }
 
-        if (evt.code !== "Enter" || isAddLoading) return
+        if (evt.code !== "Enter" || isAddLoading || indicator === "offline") return
 
         evt.preventDefault()
         handleAddAttribute()
     }
 
     const handleAddLabel = async () => {
+        const node = obj as Node
+
         if (newLabel === "") {
             toast({
                 title: "Error",
@@ -170,10 +236,43 @@ export default function SchemaDataPanel({ obj, onExpand, onSetAttributes, onRemo
             })
             return
         }
+
+        if (label.includes(newLabel)) {
+            toast({
+                title: "Error",
+                description: "Label already exists",
+                variant: "destructive"
+            })
+            return
+        }
         try {
             setIsLabelLoading(true)
-            const ok = await onAddLabel(newLabel)
-            if (ok) {
+
+            const result = await securedFetch(`api/schema/${prepareArg(schema.Id)}/${prepareArg(obj.id.toString())}/label`, {
+                method: "POST",
+                body: JSON.stringify({ label: newLabel })
+            }, toast)
+
+            if (result.ok) {
+                node.displayName = ""
+                schema.createCategory([newLabel], node)
+                if (type) {
+                    // eslint-disable-next-line no-param-reassign
+                    schema.Elements = {
+                        ...schema.Elements,
+                        nodes: schema.Elements.nodes.map(element =>
+                            element.id === obj.id ? { ...element, category: [...element.category, newLabel] } : element
+                        )
+                    }
+                } else {
+                    // eslint-disable-next-line no-param-reassign
+                    schema.Elements = {
+                        ...schema.Elements,
+                        links: schema.Elements.links.map(element =>
+                            element.id === obj.id ? { ...element, category: [...element.category, newLabel] } : element
+                        )
+                    }
+                }
                 setLabel([...label, newLabel])
                 setNewLabel("")
                 setLabelsEditable(false)
@@ -184,10 +283,42 @@ export default function SchemaDataPanel({ obj, onExpand, onSetAttributes, onRemo
     }
 
     const handleRemoveLabel = async (removeLabel: string) => {
+        const node = obj as Node
+
         try {
             setIsRemoveLabelLoading(true)
-            const ok = await onRemoveLabel(removeLabel)
-            if (ok) {
+            const result = await securedFetch(`api/schema/${prepareArg(schema.Id)}/${prepareArg(obj.id.toString())}/label`, {
+                method: "DELETE",
+                body: JSON.stringify({ label: removeLabel })
+            }, toast)
+
+            if (result.ok) {
+                node.displayName = ""
+                const category = schema.CategoriesMap.get(removeLabel)
+
+                if (category) {
+                    category.elements = category.elements.filter((element) => element.id !== node.id)
+
+                    if (category.elements.length === 0) {
+                        schema.Categories.splice(schema.Categories.findIndex(c => c.name === category.name), 1)
+                        schema.CategoriesMap.delete(category.name)
+                    }
+                }
+
+                if (type) {
+                    // eslint-disable-next-line no-param-reassign
+                    schema.Elements = {
+                        ...schema.Elements,
+                        nodes: schema.Elements.nodes.filter(element => element.id !== node.id)
+                    }
+                } else {
+                    // eslint-disable-next-line no-param-reassign
+                    schema.Elements = {
+                        ...schema.Elements,
+                        links: schema.Elements.links.filter(element => element.id !== node.id)
+                    }
+                }
+
                 setLabel(prev => prev.filter(l => l !== removeLabel))
             }
         } finally {
@@ -197,7 +328,7 @@ export default function SchemaDataPanel({ obj, onExpand, onSetAttributes, onRemo
 
     return (
         <div className="DataPanel">
-            <div className="w-full flex justify-between items-center p-4">
+            <div className="w-full flex justify-between items-center p-4" id="headerDataPanel">
                 <div className="flex gap-4 items-center">
                     <Button
                         onClick={() => onExpand()}
@@ -215,6 +346,7 @@ export default function SchemaDataPanel({ obj, onExpand, onSetAttributes, onRemo
                                         {
                                             session?.user?.role !== "Read-Only" &&
                                             <Button
+                                                indicator={indicator}
                                                 title="Remove"
                                                 onClick={() => handleRemoveLabel(l)}
                                                 isLoading={isRemoveLabelLoading}
@@ -253,13 +385,14 @@ export default function SchemaDataPanel({ obj, onExpand, onSetAttributes, onRemo
                                                         setNewLabel("")
                                                     }
 
-                                                    if (e.key !== "Enter" || isLabelLoading) return
+                                                    if (e.key !== "Enter" || isLabelLoading || indicator === "offline") return
 
                                                     e.preventDefault()
                                                     handleAddLabel()
                                                 }}
                                             />
                                             <Button
+                                                indicator={indicator}
                                                 className="p-2 text-xs justify-center border border-foreground"
                                                 variant="Secondary"
                                                 label="Save"
@@ -357,8 +490,8 @@ export default function SchemaDataPanel({ obj, onExpand, onSetAttributes, onRemo
                                                 />
                                             </TableCell>
                                             <TableCell>
-                                                <Checkbox
-                                                    className="h-6 w-6 border-[#57577B] data-[state=checked]:bg-[#57577B]"
+                                                <Switch
+                                                    className="border-[#57577B]"
                                                     onCheckedChange={(checked) => setAttribute(prev => {
                                                         const p: [string, string[]] = [...prev]
                                                         p[1][2] = checked ? "true" : "false"
@@ -368,8 +501,8 @@ export default function SchemaDataPanel({ obj, onExpand, onSetAttributes, onRemo
                                                 />
                                             </TableCell>
                                             <TableCell>
-                                                <Checkbox
-                                                    className="h-6 w-6 border-[#57577B] data-[state=checked]:bg-[#57577B]"
+                                                <Switch
+                                                    className="border-[#57577B]"
                                                     onCheckedChange={(checked) => setAttribute(prev => {
                                                         const p: [string, string[]] = [...prev]
                                                         p[1][3] = checked ? "true" : "false"
@@ -424,8 +557,12 @@ export default function SchemaDataPanel({ obj, onExpand, onSetAttributes, onRemo
                                                         <DialogComponent
                                                             trigger={
                                                                 <Button
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation()
+                                                                    }}
                                                                     variant="button"
                                                                     title="Delete Attribute"
+                                                                    label="Delete"
                                                                 >
                                                                     <Trash2 size={20} />
                                                                 </Button>
@@ -438,7 +575,10 @@ export default function SchemaDataPanel({ obj, onExpand, onSetAttributes, onRemo
                                                                     variant="Primary"
                                                                     label="Delete"
                                                                     title="Confirm the deletion of the attribute"
-                                                                    onClick={() => handleRemoveAttribute(key)}
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation()
+                                                                        handleRemoveAttribute(key)
+                                                                    }}
                                                                     isLoading={isRemoveLoading}
                                                                 />
                                                                 {
@@ -451,6 +591,7 @@ export default function SchemaDataPanel({ obj, onExpand, onSetAttributes, onRemo
                                                             </div>
                                                         </DialogComponent>
                                                         <Button
+                                                            disabled={isAddValue}
                                                             className="p-2 justify-center border border-foreground"
                                                             variant="Secondary"
                                                             label="Edit"
@@ -511,8 +652,8 @@ export default function SchemaDataPanel({ obj, onExpand, onSetAttributes, onRemo
                                 />
                             </TableCell>
                             <TableCell>
-                                <Checkbox
-                                    className="h-6 w-6 border-[#57577B] data-[state=checked]:bg-[#57577B]"
+                                <Switch
+                                    className="border-[#57577B]"
                                     onCheckedChange={(checked) => setAttribute(prev => {
                                         const p: [string, string[]] = [...prev]
                                         p[1][2] = checked ? "true" : "false"
@@ -522,8 +663,8 @@ export default function SchemaDataPanel({ obj, onExpand, onSetAttributes, onRemo
                                 />
                             </TableCell>
                             <TableCell>
-                                <Checkbox
-                                    className="h-6 w-6 border-[#57577B] data-[state=checked]:bg-[#57577B]"
+                                <Switch
+                                    className="border-[#57577B]"
                                     onCheckedChange={(checked) => setAttribute(prev => {
                                         const p: [string, string[]] = [...prev]
                                         p[1][3] = checked ? "true" : "false"
@@ -535,6 +676,7 @@ export default function SchemaDataPanel({ obj, onExpand, onSetAttributes, onRemo
                             <TableCell>
                                 <div className="flex gap-2 w-44">
                                     <Button
+                                        indicator={indicator}
                                         className="p-2 justify-center border border-foreground"
                                         variant="Secondary"
                                         label="Save"
@@ -569,6 +711,7 @@ export default function SchemaDataPanel({ obj, onExpand, onSetAttributes, onRemo
                     {
                         session?.user?.role !== "Read-Only" &&
                         <Button
+                            disabled={attributes.some(att => att[0] === editable)}
                             variant="Primary"
                             label="Add Value"
                             title="Add a new attribute"

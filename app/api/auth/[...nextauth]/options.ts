@@ -5,11 +5,16 @@ import { NextResponse } from "next/server";
 import { FalkorDBOptions } from "falkordb/dist/src/falkordb";
 import { ErrorReply } from "redis";
 import { v4 as uuidv4 } from 'uuid'
+import { GraphReply } from "falkordb/dist/src/graph";
 
-const connections = new Map<string, FalkorDB>();
+export type CACHE = {
+    callback: (() => void) | undefined,
+    result: GraphReply<unknown> | Error | undefined
+}
 
-async function newClient(credentials: { host: string, port: string, password: string, username: string, tls: string, ca: string }, id: string): Promise<{ role: Role, client: FalkorDB }> {
+const connections = new Map<string, { client: FalkorDB, cache: Map<number, CACHE> }>();
 
+async function newClient(credentials: { host: string, port: string, password: string, username: string, tls: string, ca: string }, id: string): Promise<{ role: Role, client: FalkorDB, cache: Map<number, CACHE> }> {
     const connectionOptions: FalkorDBOptions = credentials.tls === "true" ?
         {
             socket: {
@@ -34,7 +39,7 @@ async function newClient(credentials: { host: string, port: string, password: st
     const client = await FalkorDB.connect(connectionOptions)
 
     // Save connection in connections map for later use
-    connections.set(id, client)
+    connections.set(id, { client, cache: new Map<number, CACHE>() })
 
     client.on('error', err => {
         // Close coonection on error and remove from connections map
@@ -42,7 +47,7 @@ async function newClient(credentials: { host: string, port: string, password: st
         const connection = connections.get(id)
         if (connection) {
             connections.delete(id)
-            connection.close()
+            connection.client.close()
                 .catch((e) => {
                     console.warn('FalkorDB Client Disconnect Error', e)
                 })
@@ -51,10 +56,11 @@ async function newClient(credentials: { host: string, port: string, password: st
 
     // Verify connection and Role
     const connection = await client.connection
+    const cache = new Map<number, CACHE>()
 
     try {
         await connection.aclGetUser(credentials.username || "default")
-        return { role: "Admin", client }
+        return { role: "Admin", client, cache }
     } catch (err) {
         if (err instanceof ErrorReply && (err as ErrorReply).message.startsWith("NOPERM")) {
             console.debug(err);
@@ -66,13 +72,13 @@ async function newClient(credentials: { host: string, port: string, password: st
     } catch (err) {
         if ((err as Error).message.includes("permissions")) {
             console.debug(err);
-            return { role: "Read-Only", client }
+            return { role: "Read-Only", client, cache }
         }
         console.debug(err);
-        return { role: "Read-Write", client }
+        return { role: "Read-Write", client, cache }
     }
 
-    return { role: "Admin", client }
+    return { role: "Admin", client, cache }
 }
 
 function generateTimeUUID() {
@@ -170,25 +176,27 @@ export async function getClient() {
     }
 
     const { user } = session;
-    let client = connections.get(user.id)
+    let connection = connections.get(user.id)
 
     // If client is not found, create a new one
-    if (!client) {
-        client = (await newClient({
+    if (!connection) {
+        connection = (await newClient({
             host: user.host,
             port: user.port.toString() ?? "6379",
             username: user.username,
             password: user.password,
             tls: String(user.tls),
             ca: user.ca
-        }, user.id)).client
+        }, user.id))
     }
+
+    const { client, cache } = connection
 
     if (!client) {
         return NextResponse.json({ message: "Not authenticated" }, { status: 401 })
     }
 
-    return { client, user }
+    return { client, user, cache }
 }
 
 export default authOptions

@@ -18,12 +18,17 @@ import { LogoutResponse } from "./responses/logoutResponse";
 import { AddSchemaResponse } from "./responses/addSchemaResponse";
 import { GetGraphsResponse } from "./responses/getGraphsResponse";
 import { getAdminToken } from "@/e2e/infra/utils";
+import { APIRequestContext } from "playwright";
+import { SchemaListResponse } from "./responses/getSchemaResponse";
+import { GraphCountResponse } from "./responses/graphCountResponse";
+import { GraphNodeResponse } from "./responses/graphNodeResponse";
+import { GraphAttributeResponse } from "./responses/graphAttributeResponse";
 
 export default class ApiCalls {
 
-    async login(): Promise<AuthCredentialsResponse> {
+    async login(request : APIRequestContext, username?: string, password?: string): Promise<AuthCredentialsResponse> {
         try {
-            const result = await getRequest(`${urls.api.LoginApiUrl}`);
+            const result = await getRequest(`${urls.api.LoginApiUrl}`,undefined, {username, password}, request);
             return await result.json();
         } catch (error) {
             throw new Error("Failed to login. Please try again.");
@@ -53,7 +58,7 @@ export default class ApiCalls {
     
     async getGraphs(): Promise<GetGraphsResponse> {
         try {
-            const result = await getRequest(`${urls.api.settingsUsers}`);
+            const result = await getRequest(`${urls.api.graphUrl}`);
             return await result.json();
         } catch (error) {
             throw new Error("Failed to retrieve graphs.");
@@ -100,10 +105,84 @@ export default class ApiCalls {
     async runQuery(graphName: string, query: string, role?: string): Promise<RunQueryResponse> {
         try {
             const headers = role === "admin" ? await getAdminToken() : undefined;
-            const result = await getRequest(urls.api.graphUrl + graphName + "?query=" + query, headers);
+    
+            let result = await getRequest(`${urls.api.graphUrl}${graphName}?query=${encodeURIComponent(query)}`, headers);
+            let rawText = await result.text();
+
+            let json = JSON.parse(rawText);
+    
+            // Poll if response contains a numeric result (job ID)
+            const MAX_POLLS = 10;
+            let polls = 0;
+            while (typeof json.result === "number") {
+                if (++polls > MAX_POLLS) {
+                    throw new Error(`Query polling exceeded ${MAX_POLLS} attempts`);
+                }
+                const jobId = json.result;
+                result = await getRequest(`${urls.api.graphUrl}${graphName}/query/?id=${jobId}`, headers);
+                rawText = await result.text();
+                json = JSON.parse(rawText);
+            }
+    
+            return json;
+    
+        } catch (error) {
+            console.error(error);
+            throw new Error("Failed to run query.");
+        }
+    }
+
+    async getGraphCount(graph: string): Promise<GraphCountResponse> {
+        try {
+            const result = await getRequest(`${urls.api.graphUrl}${graph}/count`);
             return await result.json();
         } catch (error) {
-            throw new Error("Failed to run query.");
+            throw new Error("Failed to get graph count.");
+        }
+    }
+
+    async addGraphNodeLabel(graph: string, node: string, data: Record<string, string>): Promise<GraphNodeResponse> {
+        try {
+            const result = await postRequest(`${urls.api.graphUrl}${graph}/${node}/label`, data);
+            return await result.json();
+        } catch (error) {
+            throw new Error("Failed to add graph node label.");
+        }
+    }
+
+    async deleteGraphNodeLabel(graph: string, node: string, data: Record<string, string>): Promise<GraphNodeResponse> {
+        try {
+            const result = await deleteRequest(`${urls.api.graphUrl}${graph}/${node}/label`,undefined ,data);
+            return await result.json();
+        } catch (error) {
+            throw new Error("Failed to delete graph node label.");
+        }
+    }
+
+    async deleteGraphNode(graph: string, node: string, data: Record<string, string>): Promise<GraphNodeResponse> {
+        try {
+            const result = await deleteRequest(`${urls.api.graphUrl}${graph}/${node}`,undefined ,data);
+            return await result.json();
+        } catch (error) {
+            throw new Error("Failed to delete graph node.");
+        }
+    }
+
+    async addGraphNodeAttribute(graph: string, node: string, attribute: string, data: Record<string, string | boolean>): Promise<GraphAttributeResponse> {
+        try {
+            const result = await postRequest(`${urls.api.graphUrl}${graph}/${node}/${attribute}`, data);
+            return await result.json();
+        } catch (error) {
+            throw new Error("Failed to add graph node attribute.");
+        }
+    }
+
+    async deleteGraphNodeAttribute(graph: string, node: string, attribute: string, data: Record<string, boolean>): Promise<GraphAttributeResponse> {
+        try {
+            const result = await deleteRequest(`${urls.api.graphUrl}${graph}/${node}/${attribute}`, undefined, data);
+            return await result.json();
+        } catch (error) {
+            throw new Error("Failed to delete graph node attribute.");
         }
     }
     
@@ -134,9 +213,9 @@ export default class ApiCalls {
         }
     }
     
-    async createUsers(data?: any): Promise<CreateUsersResponse> {
+    async createUsers(data?: any, request?: APIRequestContext): Promise<CreateUsersResponse> {
         try {
-            const result = await postRequest(urls.api.settingsUsers ,data);
+            const result = await postRequest(urls.api.settingsUsers ,data, request);
             return await result.json();
         } catch (error) {
             throw new Error("Failed to create users.");
@@ -154,7 +233,7 @@ export default class ApiCalls {
     
     async addSchema(schemaName: string): Promise<AddSchemaResponse> {
         try {
-            const result = await getRequest(`${urls.api.graphUrl + schemaName}?query=RETURN%201`);
+            const result = await getRequest(`${urls.api.graphUrl + schemaName}_schema?query=MATCH%20(n)%20RETURN%20n%20LIMIT%201`);
             return await result.json();
         } catch (error) {
             throw new Error("Failed to add schema.");
@@ -167,6 +246,41 @@ export default class ApiCalls {
             return await result.json();
         } catch (error) {
             throw new Error("Failed to remove schema.");
+        }
+    }
+
+    async runSchemaQuery(schemaName: string, schema: string): Promise<AddSchemaResponse> {
+        try {
+            let result = await getRequest(`${urls.api.graphUrl + schemaName}_schema?query=${encodeURIComponent(schema)}`);
+            let json = await result.json();
+    
+            const MAX_POLLS = 10;
+            let polls = 0;
+    
+            while (typeof json.result === "number") {
+                if (++polls > MAX_POLLS) {
+                    throw new Error(`Schema polling exceeded ${MAX_POLLS} attempts`);
+                }
+                const jobId = json.result;
+                await new Promise(r => setTimeout(r, 500)); // Wait before polling again
+                result = await getRequest(`${urls.api.graphUrl + schemaName}_schema/query/?id=${jobId}`);
+                json = await result.json();
+            }
+    
+            return json;
+    
+        } catch (error) {
+            console.error(error);
+            throw new Error("Failed to add schema.");
+        }
+    }
+    
+    async getSchemas(): Promise<SchemaListResponse> {
+        try {
+            const result = await getRequest(`${urls.api.schemaUrl}`);
+            return await result.json();
+        } catch (error) {
+            throw new Error("Failed to get schema.");
         }
     }
     

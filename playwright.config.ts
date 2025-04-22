@@ -44,6 +44,7 @@ export default defineConfig({
       },
       dependencies: ['setup'],
       grep: /@admin/,
+      testIgnore: /.*settingsConfig\.spec\.ts$/,
     },
     {
       name: '[Admin] Firefox',
@@ -53,6 +54,7 @@ export default defineConfig({
       },
       dependencies: ['setup'],
       grep: /@admin/,
+      testIgnore: /.*settingsConfig\.spec\.ts$/,
     },
 
     // Read-Write user projects
@@ -94,6 +96,26 @@ export default defineConfig({
       dependencies: ['setup'],
       grep: /@readonly/,
     },
+    {
+      name: '[Admin: Serial Config - Chromium]',
+      use: {
+        ...devices['Desktop Chrome'],
+        storageState: 'playwright/.auth/admin.json',
+      },
+      grep: /@admin/,
+      dependencies: ['setup'],
+      testMatch: /.*(settingsConfig|settingsUsers)\.spec\.ts$/,
+    },
+    {
+      name: '[Admin: Serial Config - Firefox]',
+      use: {
+        ...devices['Desktop Firefox'],
+        storageState: 'playwright/.auth/admin.json',
+      },
+      grep: /@admin/,
+      dependencies: ['setup'],
+      testMatch: /.*(settingsConfig|settingsUsers)\.spec\.ts$/,
+    },  
 
     // {
     //   name: 'webkit',

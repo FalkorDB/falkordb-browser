@@ -3,7 +3,7 @@
 'use client'
 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Dispatch, SetStateAction, useState } from "react";
+import { Dispatch, SetStateAction, useContext, useState } from "react";
 import { ArrowRight, ArrowRightLeft, Check, ChevronRight, Pencil, Plus, Trash2, X } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/components/ui/use-toast";
@@ -12,6 +12,7 @@ import Combobox from "../components/ui/combobox";
 import { Node } from "../api/graph/model";
 import Input from "../components/ui/Input";
 import ToastButton from "../components/ToastButton";
+import { IndicatorContext } from "../components/provider";
 
 interface Props {
   onCreate: (element: [string, string[]][], label?: string[]) => Promise<boolean>
@@ -38,8 +39,9 @@ export default function SchemaCreateElement({ onCreate, onExpand, selectedNodes,
   const [hover, setHover] = useState<string>("")
   const [isLoading, setIsLoading] = useState<boolean>(false)
   const [labelsHover, setLabelsHover] = useState<boolean>(false)
-  const [labelsEditable, setLabelsEditable] = useState<boolean>(false)
+  const [isAddLabel, setIsAddLabel] = useState<boolean>(false)
   const { toast } = useToast()
+  const { indicator } = useContext(IndicatorContext)
 
   const handleSetEditable = (att: [string, string[]] = getDefaultAttribute()) => {
     setAttribute(att)
@@ -115,22 +117,38 @@ export default function SchemaCreateElement({ onCreate, onExpand, selectedNodes,
   }
 
   const handleOnCreate = async () => {
-    if (!label && !type) {
-      toast({
-        title: "Error",
-        description: "You must type a label",
-        variant: "destructive"
-      })
-      return
+    if (!type) {
+      if (label.length === 0) {
+        toast({
+          title: "Error",
+          description: "You must type a label",
+          variant: "destructive"
+        })
+      
+        return
+      }
+
+      if (!selectedNodes[0] || !selectedNodes[1]) {
+        toast({
+          title: "Error",
+          description: "You must select two nodes to create a relation",
+          variant: "destructive"
+        })
+      
+        return
+      }
     }
+    
     try {
       setIsLoading(true)
       const ok = await onCreate(attributes, label)
+    
       if (!ok) return
+    
       setAttributes([])
       setAttribute(getDefaultAttribute())
       setLabel([])
-      setLabelsEditable(false)
+      setIsAddLabel(false)
     } finally {
       setIsLoading(false)
     }
@@ -141,17 +159,48 @@ export default function SchemaCreateElement({ onCreate, onExpand, selectedNodes,
   }
 
   const handleAddLabel = () => {
+    if (newLabel === "") {
+      toast({
+        title: "Error",
+        description: "Label cannot be empty",
+        variant: "destructive"
+      })
+      return
+    }
+
+    if (label.includes(newLabel)) {
+      toast({
+        title: "Error",
+        description: "Label already exists",
+        variant: "destructive"
+      })
+
+      return
+    }
+
     setLabel(prev => [...prev, newLabel])
     setNewLabel("")
-    setLabelsEditable(false)
+    setIsAddLabel(false)
+  }
+
+  const handleClose = () => {
+    setSelectedNodes([undefined, undefined])
+    setAttributes([])
+    setLabel([])
+    setNewLabel("")
+    setNewAttribute(getDefaultAttribute())
+    setAttribute(getDefaultAttribute())
+    setEditable("")
+    setIsAddLabel(false)
+    onExpand()
   }
 
   return (
     <div className="DataPanel">
-      <div className="w-full flex justify-between items-center p-4">
+      <div className="w-full flex justify-between items-center p-4" id="headerDataPanel">
         <div className="flex gap-4 items-center">
           <Button
-            onClick={() => onExpand()}
+            onClick={() => handleClose()}
           >
             <ChevronRight size={20} />
           </Button>
@@ -169,19 +218,19 @@ export default function SchemaCreateElement({ onCreate, onExpand, selectedNodes,
             ))}
             <li className="h-8 flex flex-wrap gap-2">
               {
-                (type ? (labelsHover || label.length === 0) && !labelsEditable : label.length < 1 && !labelsEditable) &&
+                (type ? (labelsHover || label.length === 0) && !isAddLabel : label.length < 1 && !isAddLabel) &&
                 <Button
                   className="p-2 text-xs justify-center border border-foreground"
                   variant="Secondary"
                   label="Add"
                   title="Add a new label"
-                  onClick={() => setLabelsEditable(true)}
+                  onClick={() => setIsAddLabel(true)}
                 >
                   <Pencil size={15} />
                 </Button>
               }
               {
-                labelsEditable &&
+                isAddLabel &&
                 <>
                   <Input
                     ref={ref => ref?.focus()}
@@ -192,7 +241,7 @@ export default function SchemaCreateElement({ onCreate, onExpand, selectedNodes,
 
                       if (e.key === "Escape") {
                         e.preventDefault()
-                        setLabelsEditable(false)
+                        setIsAddLabel(false)
                         setNewLabel("")
                       }
 
@@ -217,7 +266,7 @@ export default function SchemaCreateElement({ onCreate, onExpand, selectedNodes,
                     label="Cancel"
                     title="Discard new label"
                     onClick={() => {
-                      setLabelsEditable(false)
+                      setIsAddLabel(false)
                       setNewLabel("")
                     }}
                   >
@@ -568,6 +617,7 @@ export default function SchemaCreateElement({ onCreate, onExpand, selectedNodes,
             handleOnCreate();
           }}>
             <Button
+              indicator={indicator}
               label={`Create new ${type ? "node" : "edge"}`}
               title={`Add a new ${type ? "node" : "edge"} to the schema`}
               variant="Primary"

@@ -8,10 +8,11 @@ import Header from "../components/Header"
 import Users from "./users/Users"
 import Configurations from "./Configurations"
 import Button from "../components/ui/Button"
+import QuerySettings from "./QuerySettings"
 
 export default function Settings() {
 
-    const [current, setCurrent] = useState('DB')
+    const [current, setCurrent] = useState<'Query' | 'DB' | 'Users'>('Query')
     const router = useRouter()
     const { data: session } = useSession()
 
@@ -23,23 +24,31 @@ export default function Settings() {
         switch (current) {
             case 'Users':
                 return <Users />
-            default:
+            case 'DB':
                 return <Configurations />
+            default:
+                return <QuerySettings />
         }
     }
 
     return (
         <div className="Page">
             <Header />
-            <div className="grow flex flex-col gap-8 p-16">
+            <div className="grow flex flex-col items-center gap-8 p-32">
                 <h1 className="text-2xl font-medium px-6">Settings</h1>
                 <div className="w-fit bg-foreground flex gap-2 p-2 rounded-lg">
+                    <Button
+                        className={cn("p-2 rounded-lg", current === "Query" ? "bg-background" : "text-gray-500")}
+                        label="Query Settings"
+                        title="Manage query settings"
+                        onClick={() => setCurrent("Query")}
+                    />
                     <Button
                         className={cn("p-2 rounded-lg", current === "DB" ? "bg-background" : "text-gray-500")}
                         label="DB Configuration"
                         title="Configure database settings"
                         onClick={() => setCurrent("DB")}
-                        />
+                    />
                     <Button
                         className={cn("p-2 rounded-lg", current === "Users" ? "bg-background" : "text-gray-500")}
                         label="Users"
@@ -47,7 +56,7 @@ export default function Settings() {
                         onClick={() => setCurrent("Users")}
                     />
                 </div>
-                <div className="h-1 grow px-6">
+                <div className="w-full h-1 grow px-6">
                     {
                         getCurrentTab()
                     }

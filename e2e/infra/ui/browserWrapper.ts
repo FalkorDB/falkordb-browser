@@ -1,5 +1,6 @@
-import { chromium, Browser, BrowserContext, Page } from 'playwright';
+import { chromium, Browser, BrowserContext, Page, firefox } from 'playwright';
 import BasePage from './basePage';
+import { test } from '@playwright/test';
 
 export default class BrowserWrapper {
 
@@ -11,7 +12,8 @@ export default class BrowserWrapper {
 
     async createNewPage<T extends BasePage>(PageClass: new (page: Page) => T, url?: string) {
         if (!this.browser) {
-            this.browser = await chromium.launch();
+            const projectName = test.info().project.name;
+            this.browser = await this.launchBrowser(projectName);
         }
         if (!this.context) {
             this.context = await this.browser.newContext();
@@ -26,6 +28,14 @@ export default class BrowserWrapper {
         const pageInstance = new PageClass(this.page);
         return pageInstance;
     }
+
+    private async launchBrowser(projectName: string): Promise<Browser> {
+        if (projectName.toLowerCase().includes('firefox')) {
+            return await firefox.launch();
+        } else {
+            return await chromium.launch();
+        }
+    }    
 
     getContext(): BrowserContext | null {
         return this.context;

@@ -29,3 +29,33 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         return NextResponse.json({ message: (err as Error).message }, { status: 400 })
     }
 }
+
+export async function DELETE(request: NextRequest, { params }: { params: Promise<{ graph: string, node: string }> }) {
+    const session = await getClient()
+    if (session instanceof NextResponse) {
+        return session
+    }
+
+    const { client } = session
+
+    const { graph: graphId, node } = await params
+    const nodeId = Number(node)
+    const { type } = await request.json()
+
+    try {
+        if (type === undefined) throw new Error("Type is required")
+
+        const graph = client.selectGraph(graphId);
+        const query = type
+            ? `MATCH (n) WHERE ID(n) = $nodeId DELETE n`
+            : `MATCH ()-[e]-() WHERE ID(e) = $nodeId DELETE e`;
+        const result = await graph.query(query, { params: { nodeId } });
+
+        if (!result) throw new Error("Something went wrong")
+
+        return NextResponse.json({ message: "Node deleted successfully" }, { status: 200 })
+    } catch (err: unknown) {
+        console.error(err)
+        return NextResponse.json({ message: (err as Error).message }, { status: 400 })
+    }
+}

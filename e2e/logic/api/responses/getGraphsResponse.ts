@@ -1,3 +1,3 @@
 export interface GetGraphsResponse {
-    result: string[];
+    opts: string[];
 }

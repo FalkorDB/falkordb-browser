@@ -2,6 +2,8 @@
 /* eslint-disable no-await-in-loop */
 import { Locator, Page } from "playwright";
 import { readFileSync } from "fs";
+import crypto from "crypto";
+
 const adminAuthFile = 'playwright/.auth/admin.json'
 
 export function delay(ms: number) {
@@ -9,7 +11,7 @@ export function delay(ms: number) {
 }
 
 export const waitForElementToBeVisible = async (locator: Locator, time = 500, retry = 10): Promise<boolean> => {
-    for (let i = 0; i < retry; i++) {
+    for (let i = 0; i < retry; i += 1) {
         try {
             if (await locator.count() > 0 && await locator.isVisible()) {
                 return true;
@@ -17,13 +19,27 @@ export const waitForElementToBeVisible = async (locator: Locator, time = 500, re
         } catch (error) {
             console.error(`Error checking element visibility: ${error}`);
         }
-        await new Promise(resolve => setTimeout(resolve, time));
+        await delay(time);
+    }
+    return false;
+};
+
+export const waitForElementToBeEnabled = async (locator: Locator, time = 500, retry = 10): Promise<boolean> => {
+    for (let i = 0; i < retry; i += 1) {
+        try {
+            if (await locator.isEnabled()) {
+                return true;
+            }
+        } catch (error) {
+            console.error(`Error checking element visibility: ${error}`);
+        }
+        await delay(time);
     }
     return false;
 };
 
 export const waitForElementCount = async (locator: Locator, time = 500, retry = 10): Promise<number> => {
-    for (let i = 0; i < retry; i++) {
+    for (let i = 0; i < retry; i += 1) {
         try {
             const count = await locator.count();
             if (count > 0) {
@@ -32,7 +48,7 @@ export const waitForElementCount = async (locator: Locator, time = 500, retry = 
         } catch (error) {
             console.error(`Error checking element count: ${error}`);
         }
-        await new Promise(resolve => setTimeout(resolve, time));
+        await delay(time);
     }
     return 0;
 };
@@ -93,3 +109,14 @@ export async function getAdminToken(): Promise<Record<string, string> | undefine
     }
 }
 
+export function getRandomString(prefix = '', delimiter = '_'): string {
+    const uuid = crypto.randomUUID();
+    const timestamp = Date.now();
+    return `${prefix}${prefix ? delimiter : ''}${uuid}-${timestamp}`;
+}
+
+export async function interactWhenVisible<T>(element: Locator, action: (el: Locator) => Promise<T>, name: string): Promise<T> {
+    const isVisible = await waitForElementToBeVisible(element);
+    if (!isVisible) throw new Error(`${name} is not visible!`);
+    return action(element);
+}

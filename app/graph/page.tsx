@@ -1,16 +1,17 @@
 'use client'
 
-import { useCallback, useEffect, useState } from "react";
-import { HistoryQuery, prepareArg, securedFetch } from "@/lib/utils";
+import { useCallback, useContext, useEffect, useState } from "react";
+import { getQueryWithLimit, HistoryQuery, prepareArg, securedFetch } from "@/lib/utils";
 import { useSession } from "next-auth/react";
 import { useToast } from "@/components/ui/use-toast";
 import dynamic from "next/dynamic";
 import Header from "../components/Header";
 import { Graph, Link, Node } from "../api/graph/model";
-import GraphView from "./GraphView";
 import Tutorial from "./Tutorial";
+import { IndicatorContext, LimitContext, TimeoutContext } from "../components/provider";
 
 const Selector = dynamic(() => import("./Selector"), { ssr: false })
+const GraphView = dynamic(() => import("./GraphView"), { ssr: false })
 
 export default function Page() {
 
@@ -28,6 +29,9 @@ export default function Page() {
     })
     const { data: session } = useSession()
     const { toast } = useToast()
+    const { setIndicator } = useContext(IndicatorContext);
+    const { timeout } = useContext(TimeoutContext);
+    const { limit } = useContext(LimitContext);
 
     useEffect(() => {
         setHistoryQuery({
@@ -40,22 +44,16 @@ export default function Page() {
 
     const fetchCount = useCallback(async () => {
         if (!graphName) return
-        const q1 = "MATCH (n) RETURN COUNT(n) as nodes"
-        const q2 = "MATCH ()-[e]->() RETURN COUNT(e) as edges"
 
-        const nodes = await (await securedFetch(`api/graph/${prepareArg(graphName)}/?query=${prepareArg(q1)}`, {
+        const result = await securedFetch(`api/graph/${prepareArg(graphName)}/count`, {
             method: "GET"
-        }, toast)).json()
+        }, toast, setIndicator)
 
-        const edges = await (await securedFetch(`api/graph/${prepareArg(graphName)}/?query=${prepareArg(q2)}`, {
-            method: "GET"
-        }, toast)).json()
+        const json = await result.json()
 
-        if (!edges || !nodes) return
-
-        setEdgesCount(edges.result?.data[0].edges)
-        setNodesCount(nodes.result?.data[0].nodes)
-    }, [graphName, toast])
+        setEdgesCount(json.result.edges)
+        setNodesCount(json.result.nodes)
+    }, [graphName, toast, setIndicator])
 
     useEffect(() => {
         if (graphName !== graph.Id) {
@@ -75,13 +73,26 @@ export default function Page() {
             return null
         }
 
-        const result = await securedFetch(`api/graph/${prepareArg(graphName)}/?query=${prepareArg(q)}`, {
+        const result = await securedFetch(`api/graph/${prepareArg(graphName)}/?query=${prepareArg(getQueryWithLimit(q, limit))}&timeout=${timeout}`, {
             method: "GET"
-        }, toast)
+        }, toast, setIndicator)
 
         if (!result.ok) return null
 
-        const json = await result.json()
+        let json = await result.json()
+
+        while (typeof json.result === "number") {
+            // eslint-disable-next-line no-await-in-loop
+            const res = await securedFetch(`api/graph/${prepareArg(graphName)}/query/?id=${prepareArg(json.result.toString())}`, {
+                method: "GET"
+            }, toast, setIndicator)
+
+            if (!res.ok) return null
+
+            // eslint-disable-next-line no-await-in-loop
+            json = await res.json()
+        }
+
         fetchCount()
         setSelectedElement(undefined)
 
@@ -93,7 +104,7 @@ export default function Page() {
         if (!result) return undefined
         const explain = await securedFetch(`api/graph/${prepareArg(graphName)}/explain/?query=${prepareArg(q)}`, {
             method: "GET"
-        }, toast)
+        }, toast, setIndicator)
         if (!explain.ok) return undefined
         const explainJson = await explain.json()
         const newQuery = { text: q, metadata: result.metadata, explain: explainJson.result }
@@ -115,7 +126,10 @@ export default function Page() {
 
     return (
         <div className="Page">
-            <Header onSetGraphName={setGraphName} graphNames={graphNames} />
+            <Header onSetGraphName={(newGraphName) => {
+                setGraphName(newGraphName)
+                setGraphNames(prev => [...prev, newGraphName])
+            }} graphNames={graphNames} />
             <div className="h-1 grow p-8 px-10 flex flex-col gap-4">
                 <Selector
                     setGraphName={setGraphName}
