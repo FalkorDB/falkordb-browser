@@ -219,12 +219,9 @@ export default class SchemaPage extends GraphPage {
     }
       
     async hasAttributeRows(): Promise<boolean> {
-        return await interactWhenVisible(
-          this.attributeRows,
-          async el => (await el.count()) > 0,
-          "attribute rows in data panel"
-        );
-      }
+        const rows = await this.attributeRows.count();
+        return rows > 0;
+    }
       
     async getAttributeRowsCount(): Promise<number> {
         return await this.attributeRows.count();
