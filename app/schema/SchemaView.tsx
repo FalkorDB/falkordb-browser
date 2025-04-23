@@ -39,7 +39,7 @@ export default function SchemaView({ schema, fetchCount }: Props) {
     const [isAddEntity, setIsAddEntity] = useState(false)
     const [maximize, setMaximize] = useState<boolean>(false)
     const [cooldownTicks, setCooldownTicks] = useState<number | undefined>(0)
-    const [data, setData] = useState<GraphData>(schema.Elements)
+    const [data, setData] = useState<GraphData>({ ...schema.Elements })
     const { toast } = useToast()
     const { setIndicator } = useContext(IndicatorContext)
 

@@ -254,7 +254,6 @@ export default function SchemaDataPanel({ obj, onExpand, onDeleteElement, schema
             }, toast)
 
             if (result.ok) {
-                node.displayName = ""
                 schema.createCategory([newLabel], node)
                 if (type) {
                     // eslint-disable-next-line no-param-reassign
@@ -293,7 +292,6 @@ export default function SchemaDataPanel({ obj, onExpand, onDeleteElement, schema
             }, toast)
 
             if (result.ok) {
-                node.displayName = ""
                 const category = schema.CategoriesMap.get(removeLabel)
 
                 if (category) {

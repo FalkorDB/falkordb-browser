@@ -37,7 +37,7 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
     fetchCount: () => void
 }) {
 
-    const [data, setData] = useState<GraphData>(graph.Elements)
+    const [data, setData] = useState<GraphData>({ ...graph.Elements })
     const [selectedElements, setSelectedElements] = useState<(Node | Link)[]>([]);
     const [isCollapsed, setIsCollapsed] = useState<boolean>(true);
     const chartRef = useRef<ForceGraphMethods<Node, Link>>()
@@ -414,8 +414,7 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
                 {
                     selectedElement &&
                     <DataPanel
-                        obj={selectedElement}
-                        setObj={setSelectedElement}
+                        object={selectedElement}
                         onExpand={onExpand}
                         graph={graph}
                         onDeleteElement={handleDeleteElement}
