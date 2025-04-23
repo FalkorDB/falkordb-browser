@@ -264,4 +264,13 @@ test.describe('@config Settings config tests', () => {
         });
     })
 
+    test(`@admin Validate undo after modifying a config role`, async () => {
+        const settingsConfigPage = await browser.createNewPage(SettingsConfigPage, urls.settingsUrl)
+        await settingsConfigPage.navigateToDBConfigurationTab();
+        await settingsConfigPage.modifyRoleValue(roles.maxInfoQueries, "999")
+        await settingsConfigPage.clickOnUndoBtnInToastMsg();
+        const value = String((await apiCall.getSettingsRoleValue(roles.maxInfoQueries)).config[1]);
+        expect(value).toBe("1000");
+    });
+
 })

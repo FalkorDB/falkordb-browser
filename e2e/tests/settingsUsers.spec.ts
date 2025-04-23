@@ -8,9 +8,11 @@ import { getRandomString } from "../infra/utils";
 
 test.describe('@Config Settings users tests', () => {
     let browser: BrowserWrapper;
+    let apiCall: ApiCalls;
 
     test.beforeEach(async () => {
         browser = new BrowserWrapper();
+        apiCall = new ApiCalls();
     })
 
     test.afterEach(async () => {
@@ -94,7 +96,6 @@ test.describe('@Config Settings users tests', () => {
     })
 
     test("@admin API Test: Add user via API -> Validated user existing via UI -> Delete user via API.", async () => {
-        const apiCall = new ApiCalls();
         const username = getRandomString('user');
         await apiCall.createUsers({ username, password: user.password, role: user.ReadOnly });
         const settingsUsersPage = await browser.createNewPage(SettingsUsersPage, urls.settingsUrl);
@@ -105,7 +106,6 @@ test.describe('@Config Settings users tests', () => {
     })
 
     test(`@admin API Test: without passing a username, Attempt to add a user via api and validate the user was not added via ui`, async () => {
-        const apiCall = new ApiCalls();
         const username = '';
         await apiCall.createUsers({ username, password: user.password, role: user.ReadOnly });
         const settingsUsersPage = await browser.createNewPage(SettingsUsersPage, urls.settingsUrl);
@@ -115,7 +115,6 @@ test.describe('@Config Settings users tests', () => {
     });
 
     test(`@admin API Test: without passing a role, Attempt to add a user via api and validate the user was not added via ui`, async () => {
-        const apiCall = new ApiCalls();
         const username = getRandomString('user');
         await apiCall.createUsers({ username, password: user.password, role: '' });
         const settingsUsersPage = await browser.createNewPage(SettingsUsersPage, urls.settingsUrl);
@@ -125,7 +124,6 @@ test.describe('@Config Settings users tests', () => {
     });
     
     test(`@admin API Test: without passing a password, Attempt to add a user via api and validate the user was not added via ui`, async () => {
-        const apiCall = new ApiCalls();
         const username = getRandomString('user');
         await apiCall.createUsers({ username, password: '', role: user.ReadOnly });
         const settingsUsersPage = await browser.createNewPage(SettingsUsersPage, urls.settingsUrl);
@@ -135,7 +133,6 @@ test.describe('@Config Settings users tests', () => {
     });
 
     test(`@admin Validate user search filters table results`, async () => {
-        const apiCall = new ApiCalls()
         const username = getRandomString('user');
         await apiCall.createUsers({ username, password: user.password, role: user.ReadOnly })
         const settingsUsersPage = await browser.createNewPage(SettingsUsersPage, urls.settingsUrl)
@@ -145,4 +142,16 @@ test.describe('@Config Settings users tests', () => {
         await apiCall.deleteUsers({ users: [{ username }] })
     });
 
+    test("@admin Validate undo after modifying a user role", async () => {
+        const username = getRandomString('user');
+        await apiCall.createUsers({ username, password: user.password, role: user.ReadOnly });
+        const settingsUsersPage = await browser.createNewPage(SettingsUsersPage, urls.settingsUrl);
+        await settingsUsersPage.navigateToUserTab();
+        await settingsUsersPage.modifyUserRole(username, user.ReadWrite);
+        await settingsUsersPage.clickUndoBtnInNotification();
+        const users = await apiCall.getUsers();
+        const matchedUser = users.result.find(u => u.username === username)
+        expect(matchedUser?.role).toBe("Read-Only");
+        await apiCall.deleteUsers({ users: [{ username }] });
+    })
 })

@@ -1,6 +1,6 @@
 import { Locator } from "@playwright/test";
 import BasePage from "@/e2e/infra/ui/basePage";
-import { waitForElementToBeVisible } from "@/e2e/infra/utils";
+import { interactWhenVisible } from "@/e2e/infra/utils";
 
 export default class SettingsConfigPage extends BasePage {
 
@@ -53,40 +53,39 @@ export default class SettingsConfigPage extends BasePage {
     }
 
     async hoverOnRoleContentValue(role: string): Promise<void> {
-        const isVisible = await waitForElementToBeVisible(this.roleContentValue(role));
-        if (!isVisible) throw new Error("role content value is not visible!");
-        await this.roleContentValue(role).hover();
+        await interactWhenVisible(this.roleContentValue(role), el => el.hover(), "role content value");
     }
-
+    
     async clickEditRoleButton(role: string): Promise<void> {
-        const isVisible = await waitForElementToBeVisible(this.EditRoleButton(role));
-        if (!isVisible) throw new Error("edit role button is not visible!");
-        await this.EditRoleButton(role).click();
+        await interactWhenVisible(this.EditRoleButton(role), el => el.click(), "edit role button");
     }
-
+    
     async fillRoleValueInput(role: string, input: string): Promise<void> {
-        const isVisible = await waitForElementToBeVisible(this.roleValueInput(role));
-        if (!isVisible) throw new Error("role value input is not visible!");
-        await this.roleValueInput(role).fill(input);
+        await interactWhenVisible(this.roleValueInput(role), el => el.fill(input), "role value input");
     }
-
+    
     async clickConfirmValueInputBtn(role: string): Promise<void> {
-        const isVisible = await waitForElementToBeVisible(this.confirmValueInputBtn(role));
-        if (!isVisible) throw new Error("confirm value input button is not visible!");
-        await this.confirmValueInputBtn(role).click();
+        await interactWhenVisible(this.confirmValueInputBtn(role), el => el.click(), "confirm value input button");
     }
-
+    
     async getRoleContentValue(role: string): Promise<string | null> {
-        const isVisible = await waitForElementToBeVisible(this.roleContentValue(role));
-        if (!isVisible) throw new Error("role content value is not visible!");
-        const value = await this.roleContentValue(role).textContent();
-        return value
+        return await interactWhenVisible(this.roleContentValue(role), el => el.textContent(), "role content value");
+    }
+    
+    async clickOnUndoBtnInToastMsg(): Promise<void> {
+        await interactWhenVisible(this.undoBtnInToastMsg, el => el.click(), "undo button in toast");
     }
 
-    async clickOnUndoBtnInToastMsg(): Promise<void> {
-        const isVisible = await waitForElementToBeVisible(this.undoBtnInToastMsg);
-        if (!isVisible) throw new Error("undo button in toast is not visible!");
-        await this.undoBtnInToastMsg.click();
+    async clickSearchBtn(): Promise<void> {
+        await interactWhenVisible(this.searchBtn, el => el.click(), "search button");
+    }
+
+    async fillSearchInput(element: string): Promise<void> {
+        await interactWhenVisible(this.searchInput, el => el.fill(element), "search button");
+    }
+
+    async clickOnToastCloseBtn(): Promise<void> {
+        await interactWhenVisible(this.toastCloseBtn, el => el.click(), "toast close button");
     }
 
     async isUndoBtnInToastMsg(): Promise<void> {
@@ -94,17 +93,11 @@ export default class SettingsConfigPage extends BasePage {
         await this.undoBtnInToastMsg.isVisible();
     }
 
-    async modifyRoleValue(role: string, input: string): Promise<string | null> {
+    async modifyRoleValue(role: string, input: string): Promise<void> {
         await this.hoverOnRoleContentValue(role);
         await this.clickEditRoleButton(role);
-        await this.roleValueInput(role).fill(input);
+        await this.fillRoleValueInput(role, input);
         await this.clickConfirmValueInputBtn(role);
-        const value = await this.getRoleContentValue(role);
-        return value
-    }
-
-    async clickOnToastCloseBtn(): Promise<void> {
-        await this.toastCloseBtn.click();
     }
 
     async scrollToBottomInTable(): Promise<void> {
@@ -112,8 +105,8 @@ export default class SettingsConfigPage extends BasePage {
     }
 
     async searchForElement(element: string): Promise<void> {
-        await this.searchBtn.click();
-        await this.searchInput.fill(element);
+        await this.clickSearchBtn();
+        await this.fillSearchInput(element);
         await this.page.keyboard.press('Enter');
     }
 
@@ -127,5 +120,4 @@ export default class SettingsConfigPage extends BasePage {
         await this.page.reload({ waitUntil: 'networkidle' });
         await this.navigateToDBConfigurationTab();
     }
-
 }
