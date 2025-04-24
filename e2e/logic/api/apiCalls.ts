@@ -23,6 +23,9 @@ import { SchemaListResponse } from "./responses/getSchemaResponse";
 import { GraphCountResponse } from "./responses/graphCountResponse";
 import { GraphNodeResponse } from "./responses/graphNodeResponse";
 import { GraphAttributeResponse } from "./responses/graphAttributeResponse";
+import { AddSchemaNodeResponse } from "./responses/addSchemaNodeResponse";
+import { SchemaNodeResponse } from "./responses/schemaNodeResponse";
+import { SchemaLabelResponse } from "./responses/schemaLabelResponse";
 
 export default class ApiCalls {
 
@@ -281,6 +284,71 @@ export default class ApiCalls {
             return await result.json();
         } catch (error) {
             throw new Error("Failed to get schema.");
+        }
+    }
+
+    async getSchemaCount(schema: string): Promise<GraphCountResponse> {
+        try {
+            const result = await getRequest(`${urls.api.schemaUrl}${schema}/count`);
+            return await result.json();
+        } catch (error) {
+            throw new Error("Failed to get schema count.");
+        }
+    }
+
+    async addSchemaNode(schema: string, data: object): Promise<AddSchemaNodeResponse> {
+        try {
+            const result = await postRequest(`${urls.api.schemaUrl}/${schema}/-1`, data);
+            return await result.json();
+        } catch (error) {
+            throw new Error("Failed to add schema node.");
+        }
+    }
+
+    async deleteSchemaNode(schema: string, node: string, data: Record<string, string | string>): Promise<SchemaNodeResponse> {
+        try {
+            const result = await deleteRequest(`${urls.api.schemaUrl}/${schema}/${node}`,undefined ,data);
+            return await result.json();
+        } catch (error) {
+            throw new Error("Failed to delete schema node.");
+        }
+    }
+
+    async addSchemaNodeLabel(schema: string, node: string, data: Record<string, string | string>): Promise<SchemaLabelResponse> {
+        try {
+            console.log(`${urls.api.schemaUrl}/${schema}/${node}/label`);
+            
+            const result = await postRequest(`${urls.api.schemaUrl}/${schema}/${node}/label`, data);
+            return await result.json();
+        } catch (error) {
+            throw new Error("Failed to add schema label.");
+        }
+    }
+
+    async deleteSchemaNodeLabel(schema: string, node: string, data: Record<string, string | string>): Promise<SchemaLabelResponse> {
+        try {
+            const result = await deleteRequest(`${urls.api.schemaUrl}/${schema}/${node}/label`,undefined ,data);
+            return await result.json();
+        } catch (error) {
+            throw new Error("Failed to delete schema label.");
+        }
+    }
+
+    async addSchemaNodeAttribute(graph: string, node: string, attribute: string, data: Record<string, string | boolean | string[]>): Promise<GraphAttributeResponse> {
+        try {
+            const result = await patchRequest(`${urls.api.schemaUrl}${graph}/${node}/${attribute}`, data);
+            return await result.json();
+        } catch (error) {
+            throw new Error("Failed to add graph node attribute.");
+        }
+    }
+
+    async deleteSchemaNodeAttribute(graph: string, node: string, attribute: string, data: Record<string, boolean>): Promise<GraphAttributeResponse> {
+        try {
+            const result = await deleteRequest(`${urls.api.schemaUrl}${graph}/${node}/${attribute}`, undefined, data);
+            return await result.json();
+        } catch (error) {
+            throw new Error("Failed to delete graph node attribute.");
         }
     }
     
