@@ -11,16 +11,14 @@ import { Info, Maximize2, Minimize2 } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { HistoryQuery, prepareArg, securedFetch } from "@/lib/utils";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
-import { Graph } from "../api/graph/model";
 import Button from "./ui/Button";
 import CloseDialog from "./CloseDialog";
-import { IndicatorContext } from "./provider";
+import { IndicatorContext, GraphContext } from "./provider";
 
 interface Props {
     historyQuery: HistoryQuery
     maximize: boolean
     runQuery: (query: string, timeout?: number) => Promise<boolean>
-    graph: Graph
     setHistoryQuery: Dispatch<SetStateAction<HistoryQuery>>
 }
 
@@ -191,16 +189,17 @@ const LINE_HEIGHT = 38
 
 const PLACEHOLDER = "Type your query here to start"
 
-export default function EditorComponent({ historyQuery, maximize, runQuery, graph, setHistoryQuery }: Props) {
+export default function EditorComponent({ historyQuery, maximize, runQuery, setHistoryQuery }: Props) {
 
-    const { indicator, setIndicator } = useContext(IndicatorContext)
     const placeholderRef = useRef<HTMLDivElement>(null)
     const [lineNumber, setLineNumber] = useState(1)
-    const graphIdRef = useRef(graph.Id)
     const [blur, setBlur] = useState(false)
     const [sugDisposed, setSugDisposed] = useState<monaco.IDisposable>()
     const [isLoading, setIsLoading] = useState(false)
     const { toast } = useToast()
+    const { indicator, setIndicator } = useContext(IndicatorContext)
+    const { graph } = useContext(GraphContext)
+    const graphIdRef = useRef(graph.Id)
     const submitQuery = useRef<HTMLButtonElement>(null)
     const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null)
     const containerRef = useRef<HTMLDivElement>(null)

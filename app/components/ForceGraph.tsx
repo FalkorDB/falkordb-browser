@@ -9,7 +9,7 @@ import ForceGraph2D from "react-force-graph-2d"
 import { securedFetch, GraphRef, handleZoomToFit } from "@/lib/utils"
 import { useToast } from "@/components/ui/use-toast"
 import * as d3 from "d3"
-import { Graph, GraphData, Link, Node } from "../api/graph/model"
+import { GraphData, Link, Node, Graph } from "../api/graph/model"
 import { IndicatorContext } from "./provider"
 
 interface Props {

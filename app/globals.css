@@ -46,7 +46,7 @@
     }
 
     .Page {
-        @apply h-full w-full flex flex-col bg-background;
+        @apply h-1 grow flex flex-col bg-background;
     }
 
     .Gradient {

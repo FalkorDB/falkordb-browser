@@ -180,11 +180,9 @@ export default function Combobox({ isSelectGraph = false, disabled = false, inTa
             session?.user?.role !== "Read-Only" &&
             <DeleteGraph
               type={type}
-              options={options}
               rows={rows}
               handleSetRows={handleSetRows}
               setOpenMenage={setOpenMenage}
-              setOptions={setOptions!}
               selectedValue={selectedValue}
               setSelectedValue={setSelectedValue}
               trigger={<Button

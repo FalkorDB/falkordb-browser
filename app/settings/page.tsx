@@ -4,7 +4,6 @@ import { useEffect, useState } from "react"
 import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
-import Header from "../components/Header"
 import Users from "./users/Users"
 import Configurations from "./Configurations"
 import Button from "../components/ui/Button"
@@ -33,8 +32,7 @@ export default function Settings() {
 
     return (
         <div className="Page">
-            <Header />
-            <div className="grow flex flex-col items-center gap-8 p-32">
+            <div className="grow flex flex-col gap-8 p-16">
                 <h1 className="text-2xl font-medium px-6">Settings</h1>
                 <div className="w-fit bg-foreground flex gap-2 p-2 rounded-lg">
                     <Button

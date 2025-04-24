@@ -5,10 +5,9 @@ import { getQueryWithLimit, HistoryQuery, prepareArg, securedFetch } from "@/lib
 import { useSession } from "next-auth/react";
 import { useToast } from "@/components/ui/use-toast";
 import dynamic from "next/dynamic";
-import Header from "../components/Header";
 import { Graph, Link, Node } from "../api/graph/model";
 import Tutorial from "./Tutorial";
-import { IndicatorContext, LimitContext, TimeoutContext } from "../components/provider";
+import { GraphNameContext, GraphContext, IndicatorContext, LimitContext, TimeoutContext } from "../components/provider";
 
 const Selector = dynamic(() => import("./Selector"), { ssr: false })
 const GraphView = dynamic(() => import("./GraphView"), { ssr: false })
@@ -17,16 +16,15 @@ export default function Page() {
 
     const [edgesCount, setEdgesCount] = useState<number>(0)
     const [nodesCount, setNodesCount] = useState<number>(0)
-    const [graphName, setGraphName] = useState<string>("")
-    const [graph, setGraph] = useState<Graph>(Graph.empty())
     const [selectedElement, setSelectedElement] = useState<Node | Link>();
-    const [graphNames, setGraphNames] = useState<string[]>([])
     const [historyQuery, setHistoryQuery] = useState<HistoryQuery>({
         queries: [],
         query: "",
         currentQuery: "",
         counter: 0
     })
+    const { graph, setGraph } = useContext(GraphContext)
+    const { graphName } = useContext(GraphNameContext)
     const { data: session } = useSession()
     const { toast } = useToast()
     const { setIndicator } = useContext(IndicatorContext);
@@ -126,27 +124,16 @@ export default function Page() {
 
     return (
         <div className="Page">
-            <Header onSetGraphName={(newGraphName) => {
-                setGraphName(newGraphName)
-                setGraphNames(prev => [...prev, newGraphName])
-            }} graphNames={graphNames} />
             <div className="h-1 grow p-8 px-10 flex flex-col gap-4">
                 <Selector
-                    setGraphName={setGraphName}
-                    graphName={graphName}
-                    options={graphNames}
-                    setOptions={setGraphNames}
                     runQuery={runQuery}
                     edgesCount={edgesCount}
                     nodesCount={nodesCount}
-                    setGraph={setGraph}
-                    graph={graph}
                     data={session}
                     historyQuery={historyQuery}
                     setHistoryQuery={setHistoryQuery}
                 />
                 <GraphView
-                    graph={graph}
                     selectedElement={selectedElement}
                     setSelectedElement={setSelectedElement}
                     runQuery={runQuery}
@@ -154,7 +141,7 @@ export default function Page() {
                     historyQuery={historyQuery}
                     setHistoryQuery={setHistoryQuery}
                 />
-                <Tutorial onSetGraphName={setGraphName} graphNames={graphNames} />
+                <Tutorial />
             </div>
         </div >
     )

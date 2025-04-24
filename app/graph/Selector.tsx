@@ -21,28 +21,21 @@ import CreateGraph from "../components/CreateGraph";
 import ExportGraph from "../components/ExportGraph";
 import MetadataView from "./MetadataView";
 import Input from "../components/ui/Input";
-import { IndicatorContext } from "../components/provider";
+import { GraphNameContext, GraphNamesContext, IndicatorContext } from "../components/provider";
 
 interface Props {
-    setGraphName: (selectedGraphName: string) => void
-    graphName: string
     runQuery?: (query: string, timeout?: number) => Promise<Query | undefined>
     historyQuery?: HistoryQuery
     setHistoryQuery?: Dispatch<SetStateAction<HistoryQuery>>
     edgesCount: number
     nodesCount: number
-    setGraph: (graph: Graph) => void
-    graph: Graph
     data: Session | null
-    options: string[]
-    setOptions: Dispatch<SetStateAction<string[]>>
 }
 
-export default function Selector({ setGraphName, graphName, runQuery, edgesCount, nodesCount, setGraph, graph, data: session, historyQuery, setHistoryQuery, options, setOptions }: Props) {
+export default function Selector({ runQuery, edgesCount, nodesCount, data: session, historyQuery, setHistoryQuery }: Props) {
 
     const [schema, setSchema] = useState<Graph>(Graph.empty());
     const [search, setSearch] = useState<string>("")
-    const [selectedValue, setSelectedValue] = useState<string>("");
     const [duplicateOpen, setDuplicateOpen] = useState<boolean>(false);
     const [queriesOpen, setQueriesOpen] = useState<boolean>(false);
     const [isLoading, setIsLoading] = useState(false);
@@ -53,6 +46,8 @@ export default function Selector({ setGraphName, graphName, runQuery, edgesCount
     const { toast } = useToast()
     const [filteredQueries, setFilteredQueries] = useState<Query[]>(historyQuery?.queries || [])
     const { indicator, setIndicator } = useContext(IndicatorContext)
+    const { graphNames: options, setGraphNames: setOptions } = useContext(GraphNamesContext)
+    const { graphName, setGraphName } = useContext(GraphNameContext)
 
     const handleOnChange = useCallback(async (name: string) => {
         const formattedName = name === '""' ? "" : name
@@ -69,7 +64,6 @@ export default function Selector({ setGraphName, graphName, runQuery, edgesCount
             }
         }
         setGraphName(formattedName)
-        setSelectedValue(name)
     }, [setGraphName, setIndicator, toast, type])
 
     const getOptions = useCallback(async () => {
@@ -121,10 +115,6 @@ export default function Selector({ setGraphName, graphName, runQuery, edgesCount
         }
     }, [historyQuery?.queries, search, historyQuery?.counter, historyQuery])
     const submitQuery = useRef<HTMLButtonElement>(null)
-
-    useEffect(() => {
-        setSelectedValue(graphName)
-    }, [graphName])
 
     const handleEditorDidMount = (e: editor.IStandaloneCodeEditor) => {
         editorRef.current = e
@@ -201,7 +191,7 @@ export default function Selector({ setGraphName, graphName, runQuery, edgesCount
                         type={type}
                         options={options}
                         setOptions={setOptions}
-                        selectedValue={selectedValue}
+                        selectedValue={graphName}
                         setSelectedValue={handleOnChange}
                     />
                 </div>
@@ -210,34 +200,33 @@ export default function Selector({ setGraphName, graphName, runQuery, edgesCount
                         trigger={
                             <Button
                                 label="Export Data"
-                                disabled={!selectedValue}
+                                disabled={!graphName}
                                 title="Export your data to a file"
                             />
                         }
                         type={type}
-                        selectedValues={[selectedValue]}
+                        selectedValues={[graphName]}
                     />
                     {
                         session?.user?.role !== "Read-Only" &&
                         <Duplicate
-                            disabled={!selectedValue}
+                            disabled={!graphName}
                             open={duplicateOpen}
                             onOpenChange={setDuplicateOpen}
                             onDuplicate={(name) => {
                                 setOptions(prev => [...prev, name])
-                                setSelectedValue(name)
                                 handleOnChange(name)
                             }}
                             type={type}
-                            selectedValue={selectedValue}
+                            selectedValue={graphName}
                         />
                     }
-                    <View setGraph={setGraph} graph={graph} selectedValue={selectedValue} />
+                    <View selectedValue={graphName} />
                 </div >
             </div >
-            <div className={cn("bg-foreground flex gap-4 justify-between items-center p-4 rounded-xl min-h-14", !selectedValue && "justify-end")}>
+            <div className={cn("bg-foreground flex gap-4 justify-between items-center p-4 rounded-xl min-h-14", !graphName && "justify-end")}>
                 {
-                    selectedValue &&
+                    graphName &&
                     <div className="flex gap-6" id="graphStats">
                         <span>{nodesCount}&ensp;Nodes</span>
                         <p className="text-secondary">|</p>
@@ -331,7 +320,7 @@ export default function Selector({ setGraphName, graphName, runQuery, edgesCount
                                         </ul>
                                     </div>
                                     <div className="w-1 grow">
-                                        {historyQuery && historyQuery.queries.length > 0 && historyQuery.counter ? <MetadataView query={historyQuery.queries[historyQuery.counter - 1]} graphName={selectedValue} /> : undefined}
+                                        {historyQuery && historyQuery.queries.length > 0 && historyQuery.counter ? <MetadataView query={historyQuery.queries[historyQuery.counter - 1]} /> : undefined}
                                     </div>
                                 </div>
                                 <div className="flex justify-end">
@@ -360,7 +349,7 @@ export default function Selector({ setGraphName, graphName, runQuery, edgesCount
                                 </div>
                             </div >
                         </DialogComponent >
-                        <DialogComponent className="h-[90%] w-[90%]" title={`${selectedValue} Schema`} trigger={
+                        <DialogComponent className="h-[90%] w-[90%]" title={`${graphName} Schema`} trigger={
                             <Button
                                 disabled={!schema.Id}
                                 label="View Schema"

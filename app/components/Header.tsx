@@ -18,20 +18,20 @@ import CreateGraph from "./CreateGraph";
 import { IndicatorContext } from "./provider";
 
 interface Props {
-    onSetGraphName?: (newGraphName: string) => void
-    graphNames?: string[]
+    onSetGraphName: (newGraphName: string) => void
+    graphNames: string[]
 }
 
 export default function Header({ onSetGraphName, graphNames }: Props) {
     const router = useRouter()
     const pathname = usePathname()
     const type = pathname.includes("/schema") ? "Schema" : "Graph"
-    const inCreate = pathname.includes("/create")
     const { data: session } = useSession()
+    const showCreate = !pathname.includes("/create") && !pathname.includes("/settings") && session?.user?.role !== "Read-Only"
     const { indicator } = useContext(IndicatorContext)
 
     return (
-        <div className="flex flex-col">
+        <div className="flex flex-col bg-background">
             <div className="py-5 px-10 flex justify-between items-center Header">
                 <div className="flex gap-4 items-center">
                     <a
@@ -104,15 +104,15 @@ export default function Header({ onSetGraphName, graphNames }: Props) {
                                     </NavigationMenuContent>
                                 </NavigationMenuItem>
                                 {
-                                    !inCreate && session?.user?.role !== "Read-Only" &&
+                                    showCreate &&
                                     <CreateGraph
-                                        onSetGraphName={onSetGraphName!}
+                                        onSetGraphName={onSetGraphName}
                                         type={type}
-                                        graphNames={graphNames!}
+                                        graphNames={graphNames}
                                     />
                                 }
                                 {
-                                indicator === "offline" && 
+                                    indicator === "offline" &&
                                     <div className="flex gap-2 rounded-lg p-2 border border-red-500">
                                         <Tooltip>
                                             <TooltipTrigger asChild>

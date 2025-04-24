@@ -11,23 +11,22 @@ import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, Tabl
 import { useToast } from "@/components/ui/use-toast";
 import { useSession } from "next-auth/react";
 import Button from "../components/ui/Button";
-import { Graph, Link, Node } from "../api/graph/model";
+import { Link, Node } from "../api/graph/model";
 import Input from "../components/ui/Input";
 import DialogComponent from "../components/DialogComponent";
 import CloseDialog from "../components/CloseDialog";
 import DeleteElement from "./DeleteElement";
 import ToastButton from "../components/ToastButton";
-import { IndicatorContext } from "../components/provider";
+import { IndicatorContext, GraphContext } from "../components/provider";
 
 interface Props {
     obj: Node | Link;
     setObj: Dispatch<SetStateAction<Node | Link | undefined>>;
     onExpand: (expand?: boolean) => void;
-    graph: Graph;
     onDeleteElement: () => Promise<void>;
 }
 
-export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement, graph }: Props) {
+export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement }: Props) {
 
     const [attributes, setAttributes] = useState<string[]>([]);
     const [editable, setEditable] = useState<string>("");
@@ -48,6 +47,7 @@ export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement,
     const { toast } = useToast()
     const { data: session } = useSession()
     const { indicator, setIndicator } = useContext(IndicatorContext)
+    const { graph } = useContext(GraphContext)
     const lastObjId = useRef<number | undefined>(undefined)
 
     const handleSetEditable = (key: string, val: string) => {

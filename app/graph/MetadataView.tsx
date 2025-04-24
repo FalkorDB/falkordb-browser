@@ -4,15 +4,15 @@ import { useContext, useState } from "react";
 import { Info } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import Button from "../components/ui/Button";
-import { IndicatorContext } from "../components/provider";
+import { GraphNameContext, IndicatorContext } from "../components/provider";
 
-export default function MetadataView({ query, graphName, className = "" }: {
+export default function MetadataView({ query, className = "" }: {
     query: Query,
-    graphName: string,
     className?: string
 }) {
     const [profile, setProfile] = useState<string[]>([])
     const { indicator, setIndicator } = useContext(IndicatorContext)
+    const { graphName } = useContext(GraphNameContext)
     const { toast } = useToast()
 
     const handleProfile = async () => {

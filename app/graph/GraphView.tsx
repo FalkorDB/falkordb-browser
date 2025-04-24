@@ -14,8 +14,8 @@ import { useToast } from "@/components/ui/use-toast";
 import { Switch } from "@/components/ui/switch";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { ForceGraphMethods } from "react-force-graph-2d";
-import { IndicatorContext } from "@/app/components/provider";
-import { Category, Graph, GraphData, Link, Node } from "../api/graph/model";
+import { IndicatorContext, GraphContext } from "@/app/components/provider";
+import { Category, GraphData, Link, Node } from "../api/graph/model";
 import DataPanel from "./GraphDataPanel";
 import Labels from "./labels";
 import Toolbar from "./toolbar";
@@ -27,8 +27,7 @@ import Input from "../components/ui/Input";
 const ForceGraph = dynamic(() => import("../components/ForceGraph"), { ssr: false });
 const EditorComponent = dynamic(() => import("../components/EditorComponent"), { ssr: false })
 
-function GraphView({ graph, selectedElement, setSelectedElement, runQuery, historyQuery, fetchCount, setHistoryQuery }: {
-    graph: Graph
+function GraphView({ selectedElement, setSelectedElement, runQuery, historyQuery, fetchCount, setHistoryQuery }: {
     selectedElement: Node | Link | undefined
     setSelectedElement: Dispatch<SetStateAction<Node | Link | undefined>>
     runQuery: (query: string) => Promise<Query | undefined>
@@ -37,6 +36,7 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
     fetchCount: () => void
 }) {
 
+    const { graph } = useContext(GraphContext)
     const [data, setData] = useState<GraphData>(graph.Elements)
     const [selectedElements, setSelectedElements] = useState<(Node | Link)[]>([]);
     const [isCollapsed, setIsCollapsed] = useState<boolean>(true);
@@ -244,7 +244,6 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
                 defaultSize={selectedElement ? 75 : 100}
             >
                 <EditorComponent
-                    graph={graph}
                     maximize={maximize}
                     runQuery={handleRunQuery}
                     historyQuery={historyQuery}
@@ -380,22 +379,19 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
                                 {
                                     (graph.Categories.length > 0 || graph.Labels.length > 0) &&
                                     <>
-                                        <Labels categories={graph.Categories} onClick={onCategoryClick} label="Labels" graph={graph} />
-                                        <Labels categories={graph.Labels} onClick={onLabelClick} label="RelationshipTypes" graph={graph} />
+                                        <Labels categories={graph.Categories} onClick={onCategoryClick} label="Labels" />
+                                        <Labels categories={graph.Labels} onClick={onLabelClick} label="RelationshipTypes" />
                                     </>
                                 }
                             </div>
                         </div>
                     </TabsContent>
                     <TabsContent value="Table" className="mt-0 w-1 grow h-full">
-                        <TableView
-                            data={graph.Data}
-                        />
+                        <TableView />
                     </TabsContent>
                     <TabsContent value="Metadata" className="mt-0 w-1 grow h-full">
                         <MetadataView
                             query={currentQuery!}
-                            graphName={graph.Id}
                         />
                     </TabsContent>
                 </Tabs>
@@ -417,7 +413,6 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
                         obj={selectedElement}
                         setObj={setSelectedElement}
                         onExpand={onExpand}
-                        graph={graph}
                         onDeleteElement={handleDeleteElement}
                     />
                 }
