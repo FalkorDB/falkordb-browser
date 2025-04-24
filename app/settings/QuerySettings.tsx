@@ -29,7 +29,10 @@ export default function QuerySettings() {
                         <Button
                             id="increaseTimeoutBtn"
                             className="p-2"
-                            onClick={() => setTimeout(prev => prev + 1)}
+                            onClick={() => {
+                                setTimeout(prev => prev + 1)
+                                localStorage.setItem("timeout", (timeout + 1).toString())
+                            }}
                         >
                             <Plus />
                         </Button>
@@ -43,12 +46,16 @@ export default function QuerySettings() {
                                 if (value < 0 || Number.isNaN(value)) return
 
                                 setTimeout(value)
+                                localStorage.setItem("timeout", value.toString())
                             }}
                         />
                         <Button
                             id="decreaseTimeoutBtn"
                             className="p-2"
-                            onClick={() => setTimeout(prev => prev - 1)}
+                            onClick={() => {
+                                setTimeout(prev => prev - 1)
+                                localStorage.setItem("timeout", (timeout - 1).toString())
+                            }}
                         >
                             <Minus />
                         </Button>
@@ -70,7 +77,10 @@ export default function QuerySettings() {
                         <Button
                             id="increaseLimitBtn"
                             className="p-2"
-                            onClick={() => setLimit(prev => prev + 1)}
+                            onClick={() => {
+                                setLimit(prev => prev + 1)
+                                localStorage.setItem("limit", (limit + 1).toString())
+                            }}
                         >
                             <Plus />
                         </Button>
@@ -84,12 +94,16 @@ export default function QuerySettings() {
                                 if (value < 0 || Number.isNaN(value)) return
 
                                 setLimit(value)
+                                localStorage.setItem("limit", value.toString())
                             }}
                         />
                         <Button
                             id="decreaseLimitBtn"
                             className="p-2"
-                            onClick={() => setLimit(prev => prev - 1)}
+                            onClick={() => {
+                                setLimit(prev => prev - 1)
+                                localStorage.setItem("limit", (limit - 1).toString())
+                            }}
                         >
                             <Minus />
                         </Button>
