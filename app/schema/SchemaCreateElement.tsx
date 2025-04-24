@@ -581,7 +581,7 @@ export default function SchemaCreateElement({ onCreate, onExpand, selectedNodes,
         </Table>
         {
           !type &&
-          <div className="w-full flex flex-col gap-4">
+          <div className="w-full flex flex-col gap-4" id="relationship-controls">
             <div className="w-full flex justify-between p-8 items-center">
               <div style={{ backgroundColor: selectedNodes[0]?.color }} className="flex h-16 w-16 rounded-full border-2 border-foreground justify-center items-center">
                 <p>{selectedNodes[0]?.category}</p>

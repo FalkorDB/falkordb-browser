@@ -126,6 +126,38 @@ export default class SchemaPage extends GraphPage {
         return this.page.locator(`//ul[@id='TypeList']//div[@role="option"]`);
     }
 
+    private get LabelDataPanel(): Locator {
+        return this.page.locator("//div[contains(@class, 'DataPanel')]//li//button");
+    }
+
+    private get clearRelationBtnInDataPanel(): Locator {
+        return this.page.locator(`//button[contains(text(), 'Clear')]`);
+    }
+
+    private get swapRelationBtnInDataPanel(): Locator {
+        return this.page.locator(`//button[contains(text(), 'Swap')]`);
+    }
+
+    private get relationshipNodes(): (keyIndex: string) => Locator {
+        return (keyIndex: string) => this.page.locator(`//div[@id='relationship-controls']/div[1]/div[${keyIndex}]`);
+    }
+
+    private get lastSchemaAttributeValue(): Locator {
+        return this.page.locator('//div[contains(@id, "tableContent")]//tr[last()]//td[1]');
+    }
+
+    private get actionButtonInLastAttributeRow(): (action: string) => Locator {
+        return (action: string) => this.page.locator(`//div[contains(@id, "tableContent")]//tr[last()]/td[last()]//button[contains(text(), '${action}')]`);
+    }
+
+    private get saveAttributeBtnInSchemaDataPanel(): Locator {
+        return this.page.locator('//div[contains(@id, "tableContent")]//button[contains(text(), "Save")]');
+    }
+
+    private get attributesStatsInSchemaDataPanel(): Locator {
+        return this.page.locator('(//div[contains(@id, "headerDataPanel")]//p)[last()]');
+    }
+
     async clickAddNewSchemaBtn(): Promise<void> {
         await interactWhenVisible(this.addSchemaBtnInNavBar, el => el.click(), "add new schema button");
     }
@@ -174,7 +206,7 @@ export default class SchemaPage extends GraphPage {
         await interactWhenVisible(this.activeDescInputInDataPanel, el => el.fill(desc), "desc input in data panel");
     }
       
-    async getDescInDataPanelAttr(descIndex: string): Promise<string | null> {
+    async getFirstDescInDataPanelAttr(descIndex: string): Promise<string | null> {
         return await interactWhenVisible(this.descInDataPanel(descIndex), el => el.textContent(), "desc input in data panel");
     }
       
@@ -226,6 +258,7 @@ export default class SchemaPage extends GraphPage {
     }
       
     async getAttributeRowsCount(): Promise<number> {
+        await this.page.waitForTimeout(500);
         return await this.attributeRows.count();
     }      
       
@@ -252,9 +285,49 @@ export default class SchemaPage extends GraphPage {
     async clickSearchedType(): Promise<void> {
         await interactWhenVisible(this.selectSearchType, el => el.click(), "type search input");
     }
+
+    async hoverOnLabelDataPanel(): Promise<void> {
+        await interactWhenVisible(this.LabelDataPanel, async (el) => { await el.hover(); }, `Header data panel list`);
+    }
+
+    async clickOnDeleteLabel(): Promise<void> {
+        await interactWhenVisible(this.LabelDataPanel.first(), async (el) => { await el.click(); }, `Header data panel list`);
+    }
+
+    async clickClearRelationBtnInDataPanel(): Promise<void> {
+        await interactWhenVisible(this.clearRelationBtnInDataPanel, el => el.click(), "clear relation button in data panel");
+    }
+
+    async clickSwapRelationBtnInDataPanel(): Promise<void> {
+        await interactWhenVisible(this.swapRelationBtnInDataPanel, el => el.click(), "swap relation button in data panel");
+    }
+
+    async findRelationshipNodes(key: string): Promise<string | null> {
+        return await interactWhenVisible(this.relationshipNodes(key), el => el.textContent(), "swap relation button in data panel");
+    }
+
+    async hoverLastSchemaAttributeValue(): Promise<void> {
+        await interactWhenVisible(this.lastSchemaAttributeValue, async (el) => { await el.hover(); }, `last schema attribute value`);
+    }
+
+    async clickActionButtonInLastAttributeRow(action: string): Promise<void> {
+        await interactWhenVisible(this.actionButtonInLastAttributeRow(action), async (el) => { await el.click(); }, `action buttonn in last attribute row`);
+    }
+
+    async clickSaveAttributeBtnInSchemaDataPanel(): Promise<void> {
+        await interactWhenVisible(this.saveAttributeBtnInSchemaDataPanel, el => el.click(), "save attribute button in data panel");
+    }
+
+    async getAttributesStatsInSchemaDataPanel(): Promise<string | null> {
+        return await interactWhenVisible(this.attributesStatsInSchemaDataPanel, el => el.textContent(), "attr stats in data panel");
+    }
     
     async isCategoriesPanelBtnHidden(): Promise<boolean> {
         return await this.categoriesPanelBtn.isHidden();
+    }
+
+    async getCategoriesPanelCount(): Promise<number> {
+        return await this.categoriesPanelBtn.count();
     }
 
     async addSchema(schemaName: string): Promise<void> {
@@ -272,28 +345,53 @@ export default class SchemaPage extends GraphPage {
         await this.clickCreateNewNodeBtnInDataPanel();
     }
 
+    async modifyNodeLabel(x: number, y: number, title: string): Promise<void> {
+        await this.nodeClick(x, y);
+        await this.hoverOnLabelDataPanel();
+        await this.clickAddBtnInHeaderDataPanel();
+        await this.insertDataPanelHeader(title);
+        await this.clickSaveBtnInHeaderDataPanel();
+        await this.clickOnDeleteLabel();
+    }
+
     async deleteNode(x: number, y: number): Promise<void>{
         await this.nodeClick(x, y);
         await this.clickDeleteNodeInDataPanel();
         await this.clickConfirmDeleteNodeInDataPanel();      
     }
 
-    async addLabel(title: string): Promise<void>{
+    async addRelationLabel(title: string): Promise<void>{
         await this.clickAddRelation();
         await this.clickAddBtnInHeaderDataPanel();
         await this.insertDataPanelHeader(title);
         await this.clickSaveBtnInHeaderDataPanel();
     }
 
+    async clearNodeRelation(): Promise<void>{
+        await this.clickAddRelation();
+        await this.selectFirstTwoNodesForRelation();
+        await this.clickClearRelationBtnInDataPanel();
+    }
+
+    async swapNodesInRelation(): Promise<void> {
+        await this.clickAddRelation();
+        await this.selectFirstTwoNodesForRelation();
+        await this.clickSwapRelationBtnInDataPanel();
+    }
+
     async prepareRelation(title: string, key: string, type: string, desc: string, unique: boolean, required: boolean): Promise<void> {
-        await this.addLabel(title);
+        await this.addRelationLabel(title);
         await this.addAttribute(key, type, desc, unique, required);
     }
-    
-    async clickRelationBetweenNodes(): Promise<void> {
+
+    async selectFirstTwoNodesForRelation(): Promise<void> {
         const schema = await this.getNodeScreenPositions('schema');
         await this.nodeClick(schema[0].screenX, schema[0].screenY);
         await this.nodeClick(schema[1].screenX, schema[1].screenY);
+    }
+    
+    async clickRelationBetweenNodes(): Promise<void> {
+        await this.selectFirstTwoNodesForRelation();
         await this.clickCreateNewEdgeBtnInDataPanel();
     }    
 
@@ -320,6 +418,19 @@ export default class SchemaPage extends GraphPage {
             await this.clickRequiredActiveRadioBtn();
         }
         await this.clickAddActiveBtnInDataPanel();
+    }
+
+    async deleteAttriubute(): Promise<void> {
+        await this.hoverLastSchemaAttributeValue();
+        await this.clickActionButtonInLastAttributeRow('Delete');
+        await this.clickConfirmDeleteNodeInDataPanel();
+    }
+
+    async modifyAttriubuteDesc(desc: string): Promise<void> {
+        await this.hoverLastSchemaAttributeValue();
+        await this.clickActionButtonInLastAttributeRow('Edit');
+        await this.insertActiveDescInputInDataPanelAttr(desc);
+        await this.clickSaveAttributeBtnInSchemaDataPanel();
     }
     
 }

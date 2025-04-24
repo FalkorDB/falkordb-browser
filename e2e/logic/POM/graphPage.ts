@@ -42,6 +42,10 @@ export default class GraphPage extends BasePage {
         return this.page.locator("//button[contains(text(), 'Export Data')]");
     }
 
+    private get duplicateBtn(): Locator {
+        return this.page.locator("//button[contains(text(), 'Duplicate')]");
+    }
+
     private get exportDataConfirmBtn(): Locator {
         return this.page.getByRole("button", { name: "Download" });
     }
@@ -258,6 +262,18 @@ export default class GraphPage extends BasePage {
         return this.page.locator("//div[contains(@class, 'tree')]//div[contains(@class, 'contents')]");
     }
 
+    private get viewSchemaBtn(): Locator {
+        return this.page.locator("//button[contains(., 'View Schema')]");
+    }
+
+    private get duplicateGraphInput(): Locator {
+        return this.page.locator("//div[@id='dialog']//input");
+    }
+
+    private get duplicateConfirmInDialog(): Locator {
+        return this.page.locator("//div[@id='dialog']//button[contains(text(), 'Duplicate')]");
+    }
+
     async insertGraphInSearchInput(graph: string, label: string): Promise<void> {
         await interactWhenVisible(this.graphSelectSearchInput(label), el => el.fill(graph), "graph search input");
     }
@@ -314,6 +330,10 @@ export default class GraphPage extends BasePage {
 
     async clickExportDataButton(): Promise<void> {
         await interactWhenVisible(this.exportDataBtn, el => el.click(), "export data button");
+    }
+
+    async clickDuplicateButton(): Promise<void> {
+        await interactWhenVisible(this.duplicateBtn, el => el.click(), "duplicate data button");
     }
 
     async clickExportDataConfirmButton(): Promise<void> {
@@ -409,9 +429,7 @@ export default class GraphPage extends BasePage {
     }
 
     async hoverOnHeaderDataPanelList(): Promise<void> {
-        await interactWhenVisible(this.headerDataPanelList, async (el) => {
-            await el.hover();
-        }, `Header data panel list`);
+        await interactWhenVisible(this.headerDataPanelList, async (el) => { await el.hover(); }, `Header data panel list`);
     }
 
     async getLastLabelInCanvas(): Promise<string | null> {
@@ -531,6 +549,22 @@ export default class GraphPage extends BasePage {
     async getEdgesGraphStats(): Promise<string | null> {
         await this.page.waitForTimeout(500);
         return await interactWhenVisible(this.edgesGraphStats, el => el.textContent(), "edges graph stats button");
+    }
+
+    async clickViewSchema(): Promise<void> {
+        await interactWhenVisible(this.viewSchemaBtn, el => el.click(), "view schema button");
+    }
+
+    async getNodeCanvasToolTip(): Promise<string | null> {
+        return await interactWhenVisible(this.nodeCanvasToolTip, el => el.textContent(), "node canvas tool tip");
+    }
+
+    async fillDuplicateGraphInput(graph: string): Promise<void> {
+        await interactWhenVisible(this.duplicateGraphInput, el => el.fill(graph), "duplicate graph input");
+    }
+
+    async clickDuplicateConfirmInDialog(): Promise<void> {
+        return await interactWhenVisible(this.duplicateConfirmInDialog, el => el.click(), "duplicate graph confirm");
     }
 
     async getQuerySearchListText(): Promise<string[]> {
@@ -670,12 +704,6 @@ export default class GraphPage extends BasePage {
         await this.page.waitForTimeout(500);
         const isVisible = await this.nodeCanvasToolTip.isVisible();
         return isVisible;
-    }
-
-    async getNodeCanvasToolTip(): Promise<string | null> {
-        await this.page.waitForTimeout(1000);
-        const toolTipText = await this.nodeCanvasToolTip.textContent();
-        return toolTipText;
     }
 
     // eslint-disable-next-line class-methods-use-this
@@ -886,5 +914,11 @@ export default class GraphPage extends BasePage {
         await this.nodeClick(x, y);
         await this.clickDeleteRelationBtnInDataPanel();
         await this.clickConfirmDeleteNodeInDataPanel();
+    }
+
+    async duplicateGraph(newGraph: string): Promise<void> {
+        await this.clickDuplicateButton();
+        await this.fillDuplicateGraphInput(newGraph);
+        await this.clickDuplicateConfirmInDialog();
     }
 }

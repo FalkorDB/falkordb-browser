@@ -629,4 +629,30 @@ test.describe('Graph Tests', () => {
         expect(parseInt(await graph.getAttributesStatsInDataPanel() ?? "", 10)).toBe(1);
         await apiCall.removeGraph(graphName);
     });
+
+    test(`@admin Validate adding a schema for graph creation and ensure it's visible in the schema view`, async () => {
+        const graphName = getRandomString('graph');
+        apiCall.addGraph(graphName)
+        await apiCall.runSchemaQuery(graphName, 'CREATE (a:person1 {id: "Integer!*-1"}), (b:person2 {id: "Integer!*-2"}), (a)-[:knows]->(b) RETURN a, b');
+        const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+        await browser.setPageToFullScreen();
+        await graph.selectExistingGraph(graphName);
+        await graph.clickViewSchema();
+        expect(await graph.getRelationshipTypesPanelBtn()).toBe("knows");
+        await apiCall.removeSchema(graphName);
+    });
+
+    test(`@admin validate that duplicating a graph creates a new one with a unique name successfully`, async () => {
+        const graphName = getRandomString('graph');
+        await apiCall.runQuery(graphName, 'CREATE (a:person1 {id: "Integer!*-1"}), (b:person2 {id: "Integer!*-2"}), (a)-[:knows]->(b) RETURN a, b');
+        const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+        await browser.setPageToFullScreen();
+        await graph.selectExistingGraph(graphName);
+        const newGraphName = getRandomString('graph')
+        await graph.duplicateGraph(newGraphName);
+        expect((await graph.getNodesGraphStats() ?? "", 0)).toBe(2);
+        expect((await graph.getEdgesGraphStats() ?? "", 0)).toBe(1);
+        await apiCall.removeGraph(graphName);
+        await apiCall.removeGraph(newGraphName);
+    });
 })
