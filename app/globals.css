@@ -37,7 +37,7 @@
     }
 
     .tabs-trigger {
-        @apply !p-2 rounded-lg data-[state=active]:bg-foreground data-[state=active]:!text-white text-gray-500;
+        @apply !p-2 rounded-lg data-[state=active]:!text-primary text-white !bg-transparent;
     }
 
     .hide-scrollbar {
@@ -46,7 +46,7 @@
     }
 
     .Page {
-        @apply h-1 grow flex flex-col bg-background;
+        @apply w-1 grow bg-foreground relative overflow-hidden flex flex-col;
     }
 
     .Gradient {

@@ -16,7 +16,6 @@ interface Props {
     graph: Graph
     chartRef: GraphRef
     data: GraphData
-    onExpand: (expand?: boolean) => void
     setData: Dispatch<SetStateAction<GraphData>>
     selectedElement: Node | Link | undefined
     setSelectedElement: (element: Node | Link | undefined) => void
@@ -36,7 +35,6 @@ export default function ForceGraph({
     graph,
     chartRef,
     data,
-    onExpand,
     setData,
     selectedElement,
     setSelectedElement,
@@ -56,6 +54,8 @@ export default function ForceGraph({
     const lastClick = useRef<{ date: Date, name: string }>({ date: new Date(), name: "" })
     const { toast } = useToast()
     const { indicator, setIndicator } = useContext(IndicatorContext)
+
+    console.log(data)
 
     useEffect(() => {
         const handleResize = () => {
@@ -195,21 +195,19 @@ export default function ForceGraph({
             }
         }
         setSelectedElement(element)
-        onExpand(!!element)
     }
 
     const handleUnselected = (evt?: MouseEvent) => {
         if (evt?.ctrlKey || (!selectedElement && selectedElements.length === 0)) return
         setSelectedElement(undefined)
         setSelectedElements([])
-        onExpand(false)
     }
 
     return (
         <div ref={parentRef} className="w-full h-full relative">
             <ForceGraph2D
                 ref={chartRef}
-                backgroundColor="#191919"
+                backgroundColor="#242424"
                 width={parentWidth}
                 height={parentHeight}
                 nodeLabel={(node) => type === "graph" ? node.data.name || node.id.toString() : node.category[0]}
@@ -326,7 +324,7 @@ export default function ForceGraph({
                     ctx.rotate(angle);
 
                     // Draw background and text
-                    ctx.fillStyle = '#191919';
+                    ctx.fillStyle = '#242424';
                     const padding = 0.5;
                     ctx.fillRect(
                         textX - textWidth / 2 - padding,

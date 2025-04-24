@@ -88,13 +88,22 @@ export default function Combobox({ isSelectGraph = false, disabled = false, inTa
 
   return (
     <Dialog open={openMenage} onOpenChange={setOpenMenage}>
-      <Select disabled={disabled || options.length === 0 || (indicator === "offline" && label === type)} value={selectedValue} onValueChange={setSelectedValue} open={open} onOpenChange={(o) => {
-        setOpen(o)
-        if (onOpenChange) onOpenChange(o)
-      }}>
+      <Select
+        disabled={disabled || options.length === 0 || (indicator === "offline" && label === type)}
+        value={selectedValue}
+        onValueChange={setSelectedValue}
+        open={open}
+        onOpenChange={(o) => {
+          setOpen(o)
+          if (onOpenChange) onOpenChange(o)
+        }}
+      >
         <Tooltip>
           <TooltipTrigger asChild>
-            <SelectTrigger data-type="select" className={cn("w-fit gap-2 border-none p-2", inTable ? "text-sm font-light" : "text-xl font-medium")}>
+            <SelectTrigger
+              data-type="select"
+              className={cn("w-fit gap-2 items-center border p-2 disabled:text-gray-400 disabled:opacity-100 disabled:cursor-not-allowed", inTable ? "text-sm font-light" : "text-xl font-medium")}
+            >
               <SelectValue placeholder={`Select ${label}`} />
             </SelectTrigger>
           </TooltipTrigger>

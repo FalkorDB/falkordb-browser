@@ -4,51 +4,44 @@
 'use client'
 
 import { useRef, useState, useEffect, Dispatch, SetStateAction, useContext } from "react";
-import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { ImperativePanelHandle } from "react-resizable-panels";
-import { ChevronLeft, GitGraph, Info, Maximize2, Minimize2, Pause, Play, Search, Table } from "lucide-react"
-import { cn, handleZoomToFit, HistoryQuery, prepareArg, Query, securedFetch } from "@/lib/utils";
+import { GitGraph, Info, Pause, Play, Search, Table } from "lucide-react"
+import { handleZoomToFit, Query, prepareArg, securedFetch } from "@/lib/utils";
 import dynamic from "next/dynamic";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useToast } from "@/components/ui/use-toast";
 import { Switch } from "@/components/ui/switch";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { ForceGraphMethods } from "react-force-graph-2d";
-import { IndicatorContext, GraphContext } from "@/app/components/provider";
+import { GraphContext, IndicatorContext } from "@/app/components/provider";
+import { toast } from "@/components/ui/use-toast";
 import { Category, GraphData, Link, Node } from "../api/graph/model";
-import DataPanel from "./GraphDataPanel";
 import Labels from "./labels";
-import Toolbar from "./toolbar";
 import Button from "../components/ui/Button";
 import TableView from "./TableView";
 import MetadataView from "./MetadataView";
 import Input from "../components/ui/Input";
+import Toolbar from "./toolbar";
+import GraphDataPanel from "./GraphDataPanel";
 
 const ForceGraph = dynamic(() => import("../components/ForceGraph"), { ssr: false });
-const EditorComponent = dynamic(() => import("../components/EditorComponent"), { ssr: false })
 
-function GraphView({ selectedElement, setSelectedElement, runQuery, historyQuery, fetchCount, setHistoryQuery }: {
+function GraphView({ selectedElement, setSelectedElement, currentQuery, nodesCount, edgesCount, fetchCount }: {
     selectedElement: Node | Link | undefined
     setSelectedElement: Dispatch<SetStateAction<Node | Link | undefined>>
-    runQuery: (query: string) => Promise<Query | undefined>
-    historyQuery: HistoryQuery
-    setHistoryQuery: Dispatch<SetStateAction<HistoryQuery>>
+    currentQuery: Query | undefined
+    nodesCount: number
+    edgesCount: number
     fetchCount: () => void
 }) {
-
     const { graph } = useContext(GraphContext)
-    const [data, setData] = useState<GraphData>(graph.Elements)
+    const [data, setData] = useState<GraphData>({ ...graph.Elements })
     const [selectedElements, setSelectedElements] = useState<(Node | Link)[]>([]);
-    const [isCollapsed, setIsCollapsed] = useState<boolean>(true);
     const chartRef = useRef<ForceGraphMethods<Node, Link>>()
     const dataPanel = useRef<ImperativePanelHandle>(null)
-    const [maximize, setMaximize] = useState<boolean>(false)
     const [tabsValue, setTabsValue] = useState<string>("")
     const [cooldownTicks, setCooldownTicks] = useState<number | undefined>(0)
-    const [currentQuery, setCurrentQuery] = useState<Query>()
     const [searchElement, setSearchElement] = useState<string>("")
-    const { toast } = useToast()
-    const { setIndicator } = useContext(IndicatorContext);
+    const { setIndicator } = useContext(IndicatorContext)
 
     useEffect(() => {
         let timeout: NodeJS.Timeout
@@ -87,6 +80,7 @@ function GraphView({ selectedElement, setSelectedElement, runQuery, historyQuery
             canvas.setAttribute('data-engine-status', 'stop')
         } else {
             canvas.setAttribute('data-engine-status', 'running')
+
         }
     }
 
@@ -94,40 +88,6 @@ function GraphView({ selectedElement, setSelectedElement, runQuery, historyQuery
         setSelectedElement(undefined)
         setSelectedElements([])
     }, [graph.Id])
-
-    const onExpand = (expand?: boolean) => {
-        if (!dataPanel.current) return
-        const panel = dataPanel.current
-        if (expand !== undefined) {
-            if (expand && panel?.isCollapsed()) {
-                panel?.expand()
-            } else if (!expand && panel?.isExpanded()) {
-                panel?.collapse()
-            }
-            return
-        }
-        if (panel.isCollapsed()) {
-            panel.expand()
-        } else {
-            panel.collapse()
-        }
-    }
-
-    useEffect(() => {
-        dataPanel.current?.collapse()
-
-        const handleKeyDown = (e: KeyboardEvent) => {
-            if (e.key === "Escape") {
-                setMaximize(false)
-            }
-        }
-
-        window.addEventListener("keydown", handleKeyDown)
-
-        return () => {
-            window.removeEventListener("keydown", handleKeyDown)
-        }
-    }, [])
 
     const onCategoryClick = (category: Category) => {
         category.show = !category.show
@@ -157,6 +117,17 @@ function GraphView({ selectedElement, setSelectedElement, runQuery, historyQuery
         })
         setData({ ...graph.Elements })
     }
+
+    const handleSearchElement = () => {
+        if (searchElement) {
+            const element = graph.Elements.nodes.find(node => node.data.name ? node.data.name.toLowerCase().startsWith(searchElement.toLowerCase()) : node.id.toString().toLowerCase().includes(searchElement.toLowerCase()))
+            if (element) {
+                handleZoomToFit(chartRef, (node: Node) => node.id === element.id)
+                setSelectedElement(element)
+            }
+        }
+    }
+
     const handleDeleteElement = async () => {
         if (selectedElements.length === 0 && selectedElement) {
             selectedElements.push(selectedElement)
@@ -215,42 +186,24 @@ function GraphView({ selectedElement, setSelectedElement, runQuery, historyQuery
             description: `${selectedElements.length > 1 ? "Elements" : "Element"} deleted`,
         })
         handleCooldown()
-        onExpand(false)
-    }
-
-    const handleRunQuery = async (q: string) => {
-        const newQuery = await runQuery(q)
-        if (newQuery) {
-            setCurrentQuery(newQuery)
-            handleCooldown()
-        }
-        return !!newQuery
-    }
-
-    const handleSearchElement = () => {
-        if (searchElement) {
-            const element = graph.Elements.nodes.find(node => node.data.name ? node.data.name.toLowerCase().startsWith(searchElement.toLowerCase()) : node.id.toString().toLowerCase().includes(searchElement.toLowerCase()))
-            if (element) {
-                handleZoomToFit(chartRef, (node: Node) => node.id === element.id)
-                setSelectedElement(element)
-            }
-        }
+        setSelectedElement(undefined)
+        setSelectedElements([])
     }
 
     return (
-        <ResizablePanelGroup direction="horizontal" className={cn(maximize && "h-full p-10 bg-background fixed left-[50%] top-[50%] z-50 grid translate-x-[-50%] translate-y-[-50%]")}>
-            <ResizablePanel
-                className={cn("flex flex-col gap-4", !isCollapsed && "mr-8")}
-                defaultSize={selectedElement ? 75 : 100}
-            >
-                <EditorComponent
-                    maximize={maximize}
-                    runQuery={handleRunQuery}
-                    historyQuery={historyQuery}
-                    setHistoryQuery={setHistoryQuery}
-                />
-                <Tabs value={tabsValue} className="h-1 grow flex gap-2 items-center">
-                    <TabsList className="h-fit bg-foreground p-2 flex flex-col gap-2">
+        <Tabs value={tabsValue} className="h-full w-full relative border rounded-lg overflow-hidden">
+            <div className="w-full pointer-events-none z-10 absolute bottom-0 right-0 p-4 flex justify-between items-center">
+                <div className="w-1 grow flex gap-2">
+                    {
+                        graph.Id &&
+                        <>
+                            <p className="Gradient bg-clip-text text-transparent">Nodes: {nodesCount}</p>
+                            <p className="Gradient bg-clip-text text-transparent">Edges: {edgesCount}</p>
+                        </>
+                    }
+                </div>
+                <div className="w-1 grow flex justify-center">
+                    <TabsList className="bg-transparent flex gap-2 pointer-events-auto">
                         <TabsTrigger
                             asChild
                             value="Graph"
@@ -291,133 +244,97 @@ function GraphView({ selectedElement, setSelectedElement, runQuery, historyQuery
                             </Button>
                         </TabsTrigger>
                     </TabsList>
-                    <TabsContent value="Graph" className="w-1 grow h-full mt-0">
-                        <div className="h-full flex flex-col gap-4">
-                            <div className="flex items-center justify-between">
-                                <Toolbar
-                                    disabled={!graph.Id}
-                                    deleteDisabled={selectedElements.length === 0 && !selectedElement}
-                                    onDeleteElement={handleDeleteElement}
-                                    chartRef={chartRef}
-                                    displayAdd={false}
-                                    type="Graph"
-                                />
-                                {
-                                    isCollapsed && graph.Id &&
-                                    <Button
-                                        className="p-3 bg-[#7167F6] rounded-lg"
-                                        onClick={() => onExpand()}
-                                        disabled={!selectedElement}
-                                    >
-                                        <ChevronLeft />
-                                    </Button>
-                                }
-                            </div>
-                            <div className="relative h-1 grow rounded-lg overflow-hidden">
-                                <Button
-                                    className="z-10 absolute top-4 right-4"
-                                    title={!maximize ? "Maximize" : "Minimize"}
-                                    onClick={() => setMaximize(prev => !prev)}
-                                >
-                                    {!maximize ? <Maximize2 /> : <Minimize2 />}
-                                </Button>
-                                {
-                                    graph.getElements().length > 0 &&
-                                    <div className="z-10 absolute top-4 left-4 pointer-events-none flex gap-4" id="canvasPanel">
-                                        <Tooltip>
-                                            <TooltipTrigger asChild>
-                                                <div className="flex items-center gap-2">
-                                                    {cooldownTicks === undefined ? <Play size={20} /> : <Pause size={20} />}
-                                                    <Switch
-                                                        className="pointer-events-auto"
-                                                        checked={cooldownTicks === undefined}
-                                                        onCheckedChange={() => {
-                                                            handleCooldown(cooldownTicks === undefined ? 0 : undefined)
-                                                        }}
-                                                    />
-                                                </div>
-                                            </TooltipTrigger>
-                                            <TooltipContent>
-                                                <p>Animation Control</p>
-                                            </TooltipContent>
-                                        </Tooltip>
-                                        <div className="relative pointer-events-auto" id="elementCanvasSearch">
-                                            <Input
-                                                className="w-[20dvw]"
-                                                placeholder="Search for element in the graph"
-                                                value={searchElement}
-                                                onChange={(e) => setSearchElement(e.target.value)}
-                                                onKeyDown={(e) => {
-                                                    if (e.key === 'Enter') {
-                                                        handleSearchElement()
-                                                        setSearchElement("")
-                                                    }
-                                                }}
-                                            />
-                                            <Button
-                                                className="absolute right-2 top-2"
-                                                onClick={handleSearchElement}
-                                            >
-                                                <Search color="black" />
-                                            </Button>
-                                        </div>
-                                    </div>
-                                }
-                                <ForceGraph
-                                    graph={graph}
-                                    chartRef={chartRef}
-                                    data={data}
-                                    onExpand={onExpand}
-                                    setData={setData}
-                                    selectedElement={selectedElement}
-                                    setSelectedElement={setSelectedElement}
-                                    selectedElements={selectedElements}
-                                    setSelectedElements={setSelectedElements}
-                                    cooldownTicks={cooldownTicks}
-                                    handleCooldown={handleCooldown}
-                                />
-                                {
-                                    (graph.Categories.length > 0 || graph.Labels.length > 0) &&
-                                    <>
-                                        <Labels categories={graph.Categories} onClick={onCategoryClick} label="Labels" />
-                                        <Labels categories={graph.Labels} onClick={onLabelClick} label="RelationshipTypes" />
-                                    </>
-                                }
-                            </div>
-                        </div>
-                    </TabsContent>
-                    <TabsContent value="Table" className="mt-0 w-1 grow h-full">
-                        <TableView />
-                    </TabsContent>
-                    <TabsContent value="Metadata" className="mt-0 w-1 grow h-full">
-                        <MetadataView
-                            query={currentQuery!}
+                </div>
+                <div className="w-1 grow flex justify-end">
+                    {
+                        graph.getElements().length > 0 &&
+                        <Toolbar
+                            chartRef={chartRef}
+                            disabled={graph.getElements().length === 0}
                         />
-                    </TabsContent>
-                </Tabs>
-            </ResizablePanel>
-            <ResizableHandle disabled={!selectedElement} className={cn(!selectedElement ? "!cursor-default" : "w-3")} />
-            <ResizablePanel
-                className="rounded-lg"
-                collapsible
-                ref={dataPanel}
-                defaultSize={selectedElement ? 25 : 0}
-                minSize={25}
-                maxSize={50}
-                onCollapse={() => setIsCollapsed(true)}
-                onExpand={() => setIsCollapsed(false)}
-            >
+                    }
+                </div>
+            </div>
+            <TabsContent value="Graph" className="h-full w-full mt-0">
+                {
+                    graph.getElements().length > 0 &&
+                    <div className="z-10 absolute top-12 left-4 pointer-events-none flex gap-4" id="canvasPanel">
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <div className="flex items-center gap-2">
+                                    {cooldownTicks === undefined ? <Play size={20} /> : <Pause size={20} />}
+                                    <Switch
+                                        className="pointer-events-auto"
+                                        checked={cooldownTicks === undefined}
+                                        onCheckedChange={() => {
+                                            handleCooldown(cooldownTicks === undefined ? 0 : undefined)
+                                        }}
+                                    />
+                                </div>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                                <p>Animation Control</p>
+                            </TooltipContent>
+                        </Tooltip>
+                        <div className="relative pointer-events-auto" id="elementCanvasSearch">
+                            <Input
+                                className="w-[30dvw]"
+                                placeholder="Search for element in the graph"
+                                value={searchElement}
+                                onChange={(e) => setSearchElement(e.target.value)}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                        handleSearchElement()
+                                        setSearchElement("")
+                                    }
+                                }}
+                            />
+                            <Button
+                                className="absolute right-2 top-2"
+                                onClick={handleSearchElement}
+                            >
+                                <Search color="black" />
+                            </Button>
+                        </div>
+                    </div>
+                }
+                <ForceGraph
+                    graph={graph}
+                    chartRef={chartRef}
+                    data={data}
+                    setData={setData}
+                    selectedElement={selectedElement}
+                    setSelectedElement={setSelectedElement}
+                    selectedElements={selectedElements}
+                    setSelectedElements={setSelectedElements}
+                    cooldownTicks={cooldownTicks}
+                    handleCooldown={handleCooldown}
+                />
+                {
+                    (graph.Categories.length > 0 || graph.Labels.length > 0) &&
+                    <>
+                        <Labels categories={graph.Categories} onClick={onCategoryClick} label="Labels" />
+                        <Labels categories={graph.Labels} onClick={onLabelClick} label="RelationshipTypes" />
+                    </>
+                }
                 {
                     selectedElement &&
-                    <DataPanel
+                    <GraphDataPanel
                         obj={selectedElement}
                         setObj={setSelectedElement}
-                        onExpand={onExpand}
                         onDeleteElement={handleDeleteElement}
                     />
                 }
-            </ResizablePanel>
-        </ResizablePanelGroup >
+            </TabsContent>
+            <TabsContent value="Table" className="h-full w-full mt-0">
+                <TableView />
+            </TabsContent>
+            <TabsContent value="Metadata" className="h-full w-full mt-0">
+                <MetadataView
+                    query={currentQuery!}
+                />
+            </TabsContent>
+        </Tabs>
     )
 }
 

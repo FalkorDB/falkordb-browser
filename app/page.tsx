@@ -6,7 +6,7 @@ import pkg from '@/package.json';
 
 export default function Home() {
   return (
-    <div className="h-full bg-foreground flex flex-col gap-4">
+    <div className="h-full w-full bg-foreground flex flex-col gap-4">
       <main className="grow flex flex-col gap-10 items-center justify-center">
         <Image style={{ width: 'auto', height: '100px' }} priority src="/BrowserLogo.svg" alt="FalkorDB Logo" width={0} height={0} />
         <Spinning />

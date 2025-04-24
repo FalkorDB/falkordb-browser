@@ -1,8 +1,7 @@
 'use client'
 
 import { useCallback, useContext, useEffect, useState } from "react";
-import { getQueryWithLimit, HistoryQuery, prepareArg, securedFetch } from "@/lib/utils";
-import { useSession } from "next-auth/react";
+import { getQueryWithLimit, HistoryQuery, prepareArg, Query, securedFetch } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
 import dynamic from "next/dynamic";
 import { Graph, Link, Node } from "../api/graph/model";
@@ -14,8 +13,6 @@ const GraphView = dynamic(() => import("./GraphView"), { ssr: false })
 
 export default function Page() {
 
-    const [edgesCount, setEdgesCount] = useState<number>(0)
-    const [nodesCount, setNodesCount] = useState<number>(0)
     const [selectedElement, setSelectedElement] = useState<Node | Link>();
     const [historyQuery, setHistoryQuery] = useState<HistoryQuery>({
         queries: [],
@@ -23,22 +20,15 @@ export default function Page() {
         currentQuery: "",
         counter: 0
     })
+    const [currentQuery, setCurrentQuery] = useState<Query>()
     const { graph, setGraph } = useContext(GraphContext)
     const { graphName } = useContext(GraphNameContext)
-    const { data: session } = useSession()
     const { toast } = useToast()
     const { setIndicator } = useContext(IndicatorContext);
     const { timeout } = useContext(TimeoutContext);
     const { limit } = useContext(LimitContext);
-
-    useEffect(() => {
-        setHistoryQuery({
-            queries: JSON.parse(localStorage.getItem(`query history`) || "[]"),
-            query: "",
-            currentQuery: "",
-            counter: 0
-        })
-    }, [])
+    const [nodesCount, setNodesCount] = useState(0)
+    const [edgesCount, setEdgesCount] = useState(0)
 
     const fetchCount = useCallback(async () => {
         if (!graphName) return
@@ -53,13 +43,23 @@ export default function Page() {
         setNodesCount(json.result.nodes)
     }, [graphName, toast, setIndicator])
 
+
+    useEffect(() => {
+        setHistoryQuery({
+            queries: JSON.parse(localStorage.getItem(`query history`) || "[]"),
+            query: "",
+            currentQuery: "",
+            counter: 0
+        })
+    }, [])
+
     useEffect(() => {
         if (graphName !== graph.Id) {
             const colors = JSON.parse(localStorage.getItem(graphName) || "[]")
             setGraph(Graph.empty(graphName, colors))
         }
         fetchCount()
-    }, [fetchCount, graph.Id, graphName])
+    }, [graph.Id, graphName])
 
     const run = async (q: string) => {
         if (!graphName) {
@@ -91,7 +91,6 @@ export default function Page() {
             json = await res.json()
         }
 
-        fetchCount()
         setSelectedElement(undefined)
 
         return json.result
@@ -99,11 +98,11 @@ export default function Page() {
 
     const runQuery = async (q: string) => {
         const result = await run(q)
-        if (!result) return undefined
+        if (!result) return
         const explain = await securedFetch(`api/graph/${prepareArg(graphName)}/explain/?query=${prepareArg(q)}`, {
             method: "GET"
         }, toast, setIndicator)
-        if (!explain.ok) return undefined
+        if (!explain.ok) return
         const explainJson = await explain.json()
         const newQuery = { text: q, metadata: result.metadata, explain: explainJson.result }
         const queryArr = historyQuery.queries.some(qu => qu.text === q) ? historyQuery.queries : [...historyQuery.queries, newQuery]
@@ -119,30 +118,29 @@ export default function Page() {
         // eslint-disable-next-line @typescript-eslint/ban-ts-comment
         // @ts-ignore
         window.graph = g
-        return newQuery
+        setCurrentQuery(newQuery)
+        fetchCount()
     }
 
     return (
         <div className="Page">
-            <div className="h-1 grow p-8 px-10 flex flex-col gap-4">
-                <Selector
-                    runQuery={runQuery}
-                    edgesCount={edgesCount}
-                    nodesCount={nodesCount}
-                    data={session}
-                    historyQuery={historyQuery}
-                    setHistoryQuery={setHistoryQuery}
-                />
+            <Selector
+                runQuery={runQuery}
+                historyQuery={historyQuery}
+                setHistoryQuery={setHistoryQuery}
+            />
+            <div className="h-1 grow p-12">
                 <GraphView
+                    fetchCount={fetchCount}
                     selectedElement={selectedElement}
                     setSelectedElement={setSelectedElement}
-                    runQuery={runQuery}
-                    fetchCount={fetchCount}
-                    historyQuery={historyQuery}
-                    setHistoryQuery={setHistoryQuery}
+                    currentQuery={currentQuery}
+                    nodesCount={nodesCount}
+                    edgesCount={edgesCount}
                 />
-                <Tutorial />
             </div>
+            <Tutorial />
+            <div className="h-4 w-full Gradient" />
         </div >
     )
 }

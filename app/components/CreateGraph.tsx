@@ -15,7 +15,7 @@ import { IndicatorContext } from "./provider"
 
 interface Props {
     onSetGraphName: (name: string) => void
-    type: string
+    type: "Graph" | "Schema"
     graphNames: string[]
     trigger?: React.ReactNode
 }
@@ -27,10 +27,9 @@ export default function CreateGraph({
     trigger = (
         <Button
             variant="Primary"
-            label={`Create New ${type}`}
-            title={`Create a new ${type}`}
+            title={`Create New ${type}`}
         >
-            <PlusCircle />
+            <PlusCircle size={20} />
         </Button>
     ),
 }: Props) {

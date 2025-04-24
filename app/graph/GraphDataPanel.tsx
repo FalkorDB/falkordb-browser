@@ -6,7 +6,7 @@
 
 import { prepareArg, securedFetch } from "@/lib/utils";
 import { Dispatch, SetStateAction, useContext, useEffect, useRef, useState } from "react";
-import { Check, ChevronRight, Pencil, Plus, Trash2, X } from "lucide-react";
+import { Check, Pencil, Plus, Trash2, X } from "lucide-react";
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from "@/components/ui/use-toast";
 import { useSession } from "next-auth/react";
@@ -22,11 +22,10 @@ import { IndicatorContext, GraphContext } from "../components/provider";
 interface Props {
     obj: Node | Link;
     setObj: Dispatch<SetStateAction<Node | Link | undefined>>;
-    onExpand: (expand?: boolean) => void;
     onDeleteElement: () => Promise<void>;
 }
 
-export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement }: Props) {
+export default function GraphDataPanel({ obj, setObj, onDeleteElement }: Props) {
 
     const [attributes, setAttributes] = useState<string[]>([]);
     const [editable, setEditable] = useState<string>("");
@@ -260,21 +259,22 @@ export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement 
     }
 
     return (
-        <div className="h-full flex flex-col gap-4 border-foreground border-[3px] rounded-lg" id="graphDataPanel">
-            <div className="flex justify-between items-center p-4" id="dataPanelHeader">
+        <div className="absolute top-[50%] right-4 translate-y-[-50%] min-w-[30%] min-h-[60%] max-w-[50%] max-h-[90%] flex flex-col gap-4 bg-foreground border rounded-lg" id="graphDataPanel">
+            <div className="relative flex justify-between gap-4 items-center p-6" id="dataPanelHeader">
+                <Button
+                    className="absolute top-2 right-2"
+                    variant="button"
+                    title="Close"
+                    onClick={() => setObj(undefined)}
+                >
+                    <X size={15} />
+                </Button>
                 <div className="flex gap-4 items-center">
-                    <Button
-                        variant="button"
-                        title="Close"
-                        onClick={() => onExpand()}
-                    >
-                        <ChevronRight size={25} />
-                    </Button>
                     {
                         type ?
                             <ul className="flex flex-wrap gap-4 min-w-[10%]" onMouseEnter={() => setLabelsHover(true)} onMouseLeave={() => setLabelsHover(false)}>
                                 {label.map((l) => (
-                                    <li key={l} className="flex gap-2 px-2 py-1 bg-foreground rounded-full items-center">
+                                    <li key={l} className="flex gap-2 px-2 py-1 bg-background rounded-full items-center">
                                         <p>{l}</p>
                                         {
                                             session?.user?.role !== "Read-Only" &&
@@ -292,7 +292,7 @@ export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement 
                                     {
                                         labelsHover && !labelsEditable && session?.user?.role !== "Read-Only" &&
                                         <Button
-                                            className="p-2 text-xs justify-center border border-foreground"
+                                            className="p-2 text-xs justify-center border border-background"
                                             variant="Secondary"
                                             label="Add"
                                             title="Add a new label"
@@ -306,7 +306,7 @@ export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement 
                                         <>
                                             <Input
                                                 ref={ref => ref?.focus()}
-                                                className="max-w-[50%] h-full bg-foreground border-none text-white"
+                                                className="max-w-[50%] h-full bg-background border-none text-white"
                                                 value={newLabel}
                                                 onChange={(e) => setNewLabel(e.target.value)}
                                                 onKeyDown={(e) => {
@@ -324,7 +324,7 @@ export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement 
                                                 }}
                                             />
                                             <Button
-                                                className="p-2 text-xs justify-center border border-foreground"
+                                                className="p-2 text-xs justify-center border border-background"
                                                 variant="Secondary"
                                                 label="Save"
                                                 title="Save the new label"
@@ -337,7 +337,7 @@ export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement 
                                             {
                                                 !isLabelLoading &&
                                                 <Button
-                                                    className="p-2 text-xs justify-center border border-foreground"
+                                                    className="p-2 text-xs justify-center border border-background"
                                                     variant="Secondary"
                                                     label="Cancel"
                                                     title="Discard new label"

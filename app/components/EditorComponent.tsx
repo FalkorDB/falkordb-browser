@@ -3,11 +3,11 @@
 
 "use client";
 
-import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { Editor, Monaco } from "@monaco-editor/react"
 import { SetStateAction, Dispatch, useEffect, useRef, useState, useContext } from "react"
 import * as monaco from "monaco-editor";
-import { Info, Maximize2, Minimize2 } from "lucide-react";
+import { Minimize2 } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { HistoryQuery, prepareArg, securedFetch } from "@/lib/utils";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
@@ -18,7 +18,8 @@ import { IndicatorContext, GraphContext } from "./provider";
 interface Props {
     historyQuery: HistoryQuery
     maximize: boolean
-    runQuery: (query: string, timeout?: number) => Promise<boolean>
+    setMaximize: Dispatch<SetStateAction<boolean>>
+    runQuery: (query: string) => Promise<void>
     setHistoryQuery: Dispatch<SetStateAction<HistoryQuery>>
 }
 
@@ -48,6 +49,20 @@ const monacoOptions: monaco.editor.IStandaloneEditorConstructionOptions = {
     hideCursorInOverviewRuler: true,
     scrollBeyondLastColumn: 0,
     scrollBeyondLastLine: false,
+    suggest: {
+        showInlineDetails: false,
+        insertMode: 'insert',
+        snippetsPreventQuickSuggestions: false,
+        preview: false,
+        showStatusBar: false,
+        showDeprecated: false,
+        selectionMode: 'never',
+    },
+    overflowWidgetsDomNode: undefined,
+    scrollbar: {
+        vertical: 'hidden',
+        horizontal: 'hidden'
+    },
 };
 
 const KEYWORDS = [
@@ -189,7 +204,7 @@ const LINE_HEIGHT = 38
 
 const PLACEHOLDER = "Type your query here to start"
 
-export default function EditorComponent({ historyQuery, maximize, runQuery, setHistoryQuery }: Props) {
+export default function EditorComponent({ historyQuery, maximize, setMaximize, runQuery, setHistoryQuery }: Props) {
 
     const placeholderRef = useRef<HTMLDivElement>(null)
     const [lineNumber, setLineNumber] = useState(1)
@@ -576,65 +591,67 @@ export default function EditorComponent({ historyQuery, maximize, runQuery, setH
     }, [historyQuery.query])
 
     return (
-        <div>
-            {
-                !maximize &&
-                <Dialog>
-                    <div className="w-full flex items-center gap-8">
-                        <p>Query</p>
-                        <div className="w-1 grow flex rounded-lg overflow-hidden">
-                            <div ref={containerRef} className="relative grow w-1" id="editor-container">
-                                <Editor
-                                    // eslint-disable-next-line no-nested-ternary
-                                    height={blur ? LINE_HEIGHT : lineNumber * LINE_HEIGHT > document.body.clientHeight / 100 * MAX_HEIGHT ? document.body.clientHeight / 100 * MAX_HEIGHT : lineNumber * LINE_HEIGHT}
-                                    language="custom-language"
-                                    options={{
-                                        ...monacoOptions,
-                                        lineNumbers: lineNumber > 1 ? "on" : "off",
-                                    }}
-                                    value={blur ? historyQuery.query.replace(/\s+/g, ' ').trim() : historyQuery.query}
-                                    onChange={(val) => {
-                                        if (!historyQuery.counter) {
-                                            setHistoryQuery(prev => ({
-                                                ...prev,
-                                                currentQuery: val || "",
-                                                query: val || "",
-                                            }))
-                                        } else {
-                                            setHistoryQuery(prev => ({
-                                                ...prev,
-                                                query: val || "",
-                                            }))
-                                        }
-                                    }}
-                                    theme="custom-theme"
-                                    beforeMount={handleEditorWillMount}
-                                    onMount={handleEditorDidMount}
-                                />
-                                <div className="h-full absolute top-0 px-2 right-0 flex gap-2 items-center justify-center pointer-events-none">
-                                    <DialogTrigger className="pointer-events-auto" asChild>
-                                        <Button
-                                            title="Maximize"
-                                        >
-                                            <Maximize2 size={20} />
-                                        </Button>
-                                    </DialogTrigger>
-                                    <Button
-                                        className="pointer-events-auto"
-                                        title="Run (Enter) History (Arrow Up/Down) Insert new line (Shift + Enter)"
-                                    >
-                                        <Info />
-                        
-                                    </Button>
-                                </div>
-                                <div ref={placeholderRef} className="absolute top-2 left-2 pointer-events-none">
-                                    {PLACEHOLDER}
-                                </div>
-                            </div>
-                            <Button
-                                ref={submitQuery}
+        <div className="absolute w-full flex items-start gap-8 border rounded-lg overflow-hidden bg-foreground p-2">
+            <div className="w-1 grow flex rounded-lg overflow-hidden">
+                <div ref={containerRef} className="relative grow w-1" id="editor-container">
+                    <Editor
+                        // eslint-disable-next-line no-nested-ternary
+                        height={blur ? LINE_HEIGHT : lineNumber * LINE_HEIGHT > document.body.clientHeight / 100 * MAX_HEIGHT ? document.body.clientHeight / 100 * MAX_HEIGHT : lineNumber * LINE_HEIGHT}
+                        language="custom-language"
+                        options={{
+                            ...monacoOptions,
+                            lineNumbers: lineNumber > 1 ? "on" : "off",
+                        }}
+                        value={blur ? historyQuery.query.replace(/\s+/g, ' ').trim() : historyQuery.query}
+                        onChange={(val) => {
+                            if (!historyQuery.counter) {
+                                setHistoryQuery(prev => ({
+                                    ...prev,
+                                    currentQuery: val || "",
+                                    query: val || "",
+                                }))
+                            } else {
+                                setHistoryQuery(prev => ({
+                                    ...prev,
+                                    query: val || "",
+                                }))
+                            }
+                        }}
+                        theme="custom-theme"
+                        beforeMount={handleEditorWillMount}
+                        onMount={handleEditorDidMount}
+                    />
+                    <div ref={placeholderRef} className="absolute top-2 left-2 pointer-events-none">
+                        {PLACEHOLDER}
+                    </div>
+                </div>
+                <Button
+                    ref={submitQuery}
+                    indicator={indicator}
+                    className="h-[38px]"
+                    variant="Primary"
+                    label="RUN"
+                    title="Press Enter to run the query"
+                    onClick={handleSubmit}
+                    isLoading={isLoading}
+                />
+            </div>
+            <Dialog open={maximize} onOpenChange={setMaximize}>
+                <DialogContent disableClose className="w-full h-full">
+                    <div className="relative w-full h-full">
+                        <VisuallyHidden>
+                            <DialogTitle />
+                            <DialogDescription />
+                        </VisuallyHidden>
+                        <div className="z-10 absolute right-0 top-0 bottom-0 py-4 px-8 flex flex-col items-end justify-between pointer-events-none">
+                            <CloseDialog
+                                className="pointer-events-auto"
+                            >
+                                <Minimize2 size={20} />
+                            </CloseDialog>
+                            <CloseDialog
+                                className="pointer-events-auto py-2 px-8"
                                 indicator={indicator}
-                                className="rounded-none py-2 px-8"
                                 variant="Primary"
                                 label="Run"
                                 title="Press Enter to run the query"
@@ -642,64 +659,40 @@ export default function EditorComponent({ historyQuery, maximize, runQuery, setH
                                 isLoading={isLoading}
                             />
                         </div>
-                        <DialogContent disableClose className="w-full h-full">
-                            <div className="relative w-full h-full">
-                                <VisuallyHidden>
-                                    <DialogTitle />
-                                    <DialogDescription />
-                                </VisuallyHidden>
-                                <div className="z-10 absolute right-0 top-0 bottom-0 py-4 px-8 flex flex-col items-end justify-between pointer-events-none">
-                                    <CloseDialog
-                                        className="pointer-events-auto"
-                                    >
-                                        <Minimize2 size={20} />
-                                    </CloseDialog>
-                                    <CloseDialog
-                                        className="pointer-events-auto py-2 px-8"
-                                        indicator={indicator}
-                                        variant="Primary"
-                                        label="Run"
-                                        title="Press Enter to run the query"
-                                        onClick={handleSubmit}
-                                        isLoading={isLoading}
-                                    />
-                                </div>
-                                <Editor
-                                    className="w-full h-full"
-                                    onMount={handleEditorDidMount}
-                                    theme="custom-theme"
-                                    options={{
-                                        padding: {
-                                            bottom: 10,
-                                            top: 10,
-                                        },
-                                        lineNumbersMinChars: 3,
-                                        minimap: { enabled: false },
-                                        lineHeight: 30,
-                                        fontSize: 25,
-                                    }}
-                                    value={(blur ? historyQuery.query.replace(/\s+/g, ' ').trim() : historyQuery.query)}
-                                    onChange={(val) => {
-                                        if (historyQuery.counter) {
-                                            setHistoryQuery(prev => ({
-                                                ...prev,
-                                                query: val || ""
-                                            }))
-                                        } else {
-                                            setHistoryQuery(prev => ({
-                                                ...prev,
-                                                query: val || "",
-                                                currentQuery: val || ""
-                                            }))
-                                        }
-                                    }}
-                                    language="custom-language"
-                                />
-                            </div>
-                        </DialogContent>
+                        <Editor
+                            className="w-full h-full"
+                            onMount={handleEditorDidMount}
+                            theme="custom-theme"
+                            options={{
+                                padding: {
+                                    bottom: 10,
+                                    top: 10,
+                                },
+                                lineNumbersMinChars: 3,
+                                minimap: { enabled: false },
+                                lineHeight: 30,
+                                fontSize: 25,
+                            }}
+                            value={(blur ? historyQuery.query.replace(/\s+/g, ' ').trim() : historyQuery.query)}
+                            onChange={(val) => {
+                                if (historyQuery.counter) {
+                                    setHistoryQuery(prev => ({
+                                        ...prev,
+                                        query: val || ""
+                                    }))
+                                } else {
+                                    setHistoryQuery(prev => ({
+                                        ...prev,
+                                        query: val || "",
+                                        currentQuery: val || ""
+                                    }))
+                                }
+                            }}
+                            language="custom-language"
+                        />
                     </div>
-                </Dialog>
-            }
-        </div >
+                </DialogContent>
+            </Dialog>
+        </div>
     )
 }

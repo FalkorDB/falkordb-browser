@@ -25,7 +25,7 @@ export default function RootLayout({
   // caused by mismatched client/server content caused by next-themes
   return (
     <html className="w-screen h-screen" lang="en" suppressHydrationWarning>
-      <body className={`h-full bg-foreground flex flex-col ${inter.className}`}>
+      <body className={`w-full h-full bg-foreground flex flex-row ${inter.className}`}>
         <GTM />
         <TooltipProvider>
           <NextAuthProvider>

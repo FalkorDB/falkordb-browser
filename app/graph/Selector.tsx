@@ -1,68 +1,47 @@
 'use client'
 
-import { useEffect, useRef, useState, Dispatch, SetStateAction, useContext, useCallback } from "react";
-import { DialogTitle } from "@/components/ui/dialog";
-import { Editor } from "@monaco-editor/react";
-import { editor } from "monaco-editor";
-import { cn, HistoryQuery, prepareArg, Query, securedFetch } from "@/lib/utils";
-import { Session } from "next-auth";
-import { PlusCircle, RefreshCcw } from "lucide-react";
+import { useEffect, useState, useContext, useCallback, Dispatch, SetStateAction, useRef } from "react";
+import { cn, HistoryQuery, Query, securedFetch } from "@/lib/utils";
+import { useSession } from "next-auth/react";
+import { History, Info, Maximize2, RefreshCcw } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { useToast } from "@/components/ui/use-toast";
+import { DialogTitle } from "@/components/ui/dialog";
 import * as monaco from "monaco-editor";
+import { Editor } from "@monaco-editor/react";
 import Combobox from "../components/ui/combobox";
-import { Graph } from "../api/graph/model";
-import DialogComponent from "../components/DialogComponent";
 import Button from "../components/ui/Button";
-import Duplicate from "./Duplicate";
-import SchemaView from "../schema/SchemaView";
-import View from "./View";
 import CreateGraph from "../components/CreateGraph";
-import ExportGraph from "../components/ExportGraph";
-import MetadataView from "./MetadataView";
-import Input from "../components/ui/Input";
 import { GraphNameContext, GraphNamesContext, IndicatorContext } from "../components/provider";
+import EditorComponent from "../components/EditorComponent";
+import DialogComponent from "../components/DialogComponent";
+import Input from "../components/ui/Input";
+import MetadataView from "./MetadataView";
 
 interface Props {
-    runQuery?: (query: string, timeout?: number) => Promise<Query | undefined>
-    historyQuery?: HistoryQuery
-    setHistoryQuery?: Dispatch<SetStateAction<HistoryQuery>>
-    edgesCount: number
-    nodesCount: number
-    data: Session | null
+    runQuery?: (query: string) => Promise<void>
+    historyQuery: HistoryQuery
+    setHistoryQuery: Dispatch<SetStateAction<HistoryQuery>>
 }
 
-export default function Selector({ runQuery, edgesCount, nodesCount, data: session, historyQuery, setHistoryQuery }: Props) {
+export default function Selector({ runQuery, historyQuery, setHistoryQuery }: Props) {
 
-    const [schema, setSchema] = useState<Graph>(Graph.empty());
-    const [search, setSearch] = useState<string>("")
-    const [duplicateOpen, setDuplicateOpen] = useState<boolean>(false);
-    const [queriesOpen, setQueriesOpen] = useState<boolean>(false);
-    const [isLoading, setIsLoading] = useState(false);
-    const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null)
+    const [maximize, setMaximize] = useState(false)
     const pathname = usePathname()
     const type = pathname.includes("/schema") ? "Schema" : "Graph"
     const [isRotating, setIsRotating] = useState(false);
     const { toast } = useToast()
-    const [filteredQueries, setFilteredQueries] = useState<Query[]>(historyQuery?.queries || [])
     const { indicator, setIndicator } = useContext(IndicatorContext)
     const { graphNames: options, setGraphNames: setOptions } = useContext(GraphNamesContext)
     const { graphName, setGraphName } = useContext(GraphNameContext)
+    const [queriesOpen, setQueriesOpen] = useState(false)
+    const [search, setSearch] = useState("")
+    const { data: session } = useSession()
+    const [filteredQueries, setFilteredQueries] = useState<Query[]>([])
+    const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null)
 
     const handleOnChange = useCallback(async (name: string) => {
         const formattedName = name === '""' ? "" : name
-        if (type === "Graph") {
-            const result = await securedFetch(`api/schema/${prepareArg(name)}?create=false`, {
-                method: "GET"
-            }, toast, setIndicator)
-
-            if (result.ok) {
-                const json = await result.json()
-                if (json.result) {
-                    setSchema(Graph.create(name, json.result, false, true))
-                }
-            }
-        }
         setGraphName(formattedName)
     }, [setGraphName, setIndicator, toast, type])
 
@@ -86,6 +65,12 @@ export default function Selector({ runQuery, edgesCount, nodesCount, data: sessi
     useEffect(() => {
         if (indicator === "online") getOptions()
     }, [indicator, getOptions])
+
+    const handleReloadClick = () => {
+        setIsRotating(true);
+        getOptions();
+        setTimeout(() => setIsRotating(false), 1000);
+    };
 
     const focusEditorAtEnd = () => {
         if (editorRef.current) {
@@ -116,7 +101,7 @@ export default function Selector({ runQuery, edgesCount, nodesCount, data: sessi
     }, [historyQuery?.queries, search, historyQuery?.counter, historyQuery])
     const submitQuery = useRef<HTMLButtonElement>(null)
 
-    const handleEditorDidMount = (e: editor.IStandaloneCodeEditor) => {
+    const handleEditorDidMount = (e: monaco.editor.IStandaloneCodeEditor) => {
         editorRef.current = e
 
         // eslint-disable-next-line no-bitwise
@@ -142,97 +127,53 @@ export default function Selector({ runQuery, edgesCount, nodesCount, data: sessi
         });
     }
 
-    const handleReloadClick = () => {
-        setIsRotating(true);
-        getOptions();
-        setTimeout(() => setIsRotating(false), 1000);
-    };
-
     return (
-        <div className="flex flex-col gap-4">
-            <div className="flex justify-between items-center">
-                <div className="flex items-center gap-4" id="graphManager">
-                    {
-                        session?.user?.role !== "Read-Only" &&
-                        <>
-                            <CreateGraph
-                                type={type}
-                                graphNames={options}
-                                onSetGraphName={(name) => {
-                                    handleOnChange(name)
-                                    setOptions(prev => [...prev, name])
-                                }}
-                                trigger={
-                                    <Button
-                                        variant="Primary"
-                                        title={`Create New ${type}`}
-                                    >
-                                        <PlusCircle size={20} />
-                                    </Button>
-                                }
-                            />
-                            <p className="text-secondary">|</p>
-                        </>
-                    }
-                    <Button
-                        indicator={indicator}
-                        className={cn(
-                            "transition-transform",
-                            isRotating && "animate-spin duration-1000"
-                        )}
-                        onClick={handleReloadClick}
-                        title="Reload Graphs List"
-                    >
-                        <RefreshCcw size={20} />
-                    </Button>
-                    <p className="text-secondary">|</p>
-                    <Combobox
-                        isSelectGraph
-                        type={type}
-                        options={options}
-                        setOptions={setOptions}
-                        selectedValue={graphName}
-                        setSelectedValue={handleOnChange}
+        <div className="z-10 absolute w-[90%] top-5 left-[50%] translate-x-[-50%] flex flex-row gap-4 items-center">
+            {
+                session?.user?.role !== "Read-Only" &&
+                <CreateGraph
+                    type={type}
+                    graphNames={options}
+                    onSetGraphName={(name) => {
+                        handleOnChange(name)
+                        setOptions(prev => [...prev, name])
+                    }}
+                />
+            }
+            <div className="p-2 border rounded-lg overflow-hidden bg-foreground">
+                <Button
+                    indicator={indicator}
+                    className={cn(
+                        "transition-transform w-full h-full",
+                        isRotating && "animate-spin duration-1000"
+                    )}
+                    onClick={handleReloadClick}
+                    title="Reload Graphs List"
+                >
+                    <RefreshCcw />
+                </Button>
+            </div>
+            <Combobox
+                isSelectGraph
+                type={type}
+                options={options}
+                setOptions={setOptions}
+                selectedValue={graphName}
+                setSelectedValue={handleOnChange}
+            />
+            {
+                runQuery &&
+                <div className="h-[56px] w-full relative overflow-visible">
+                    <EditorComponent
+                        maximize={maximize}
+                        setMaximize={setMaximize}
+                        runQuery={runQuery}
+                        historyQuery={historyQuery}
+                        setHistoryQuery={setHistoryQuery}
                     />
                 </div>
-                <div className="flex gap-16 text-[#e5e7eb]">
-                    <ExportGraph
-                        trigger={
-                            <Button
-                                label="Export Data"
-                                disabled={!graphName}
-                                title="Export your data to a file"
-                            />
-                        }
-                        type={type}
-                        selectedValues={[graphName]}
-                    />
-                    {
-                        session?.user?.role !== "Read-Only" &&
-                        <Duplicate
-                            disabled={!graphName}
-                            open={duplicateOpen}
-                            onOpenChange={setDuplicateOpen}
-                            onDuplicate={(name) => {
-                                setOptions(prev => [...prev, name])
-                                handleOnChange(name)
-                            }}
-                            type={type}
-                            selectedValue={graphName}
-                        />
-                    }
-                    <View selectedValue={graphName} />
-                </div >
-            </div >
-            <div className={cn("bg-foreground flex gap-4 justify-between items-center p-4 rounded-xl min-h-14", !graphName && "justify-end")}>
-                {
-                    graphName &&
-                    <div className="flex gap-6" id="graphStats">
-                        <span>{nodesCount}&ensp;Nodes</span>
-                        <p className="text-secondary">|</p>
-                        <span>{edgesCount}&ensp;Edges</span>
-                    </div>
-                }
+            }
+            <div className="flex gap-2 p-2 border rounded-lg bg-foreground">
                 {
                     runQuery &&
                     <div className="flex gap-4 items-center">
@@ -251,8 +192,9 @@ export default function Selector({ runQuery, edgesCount, nodesCount, data: sessi
                                 <Button
                                     disabled={!historyQuery || historyQuery.queries.length === 0}
                                     title={!historyQuery || historyQuery.queries.length === 0 ? "No queries" : "View past queries"}
-                                    label="Query History"
-                                />
+                                >
+                                    <History />
+                                </Button>
                             }
                             title="Query History"
                         >
@@ -270,7 +212,7 @@ export default function Selector({ runQuery, edgesCount, nodesCount, data: sessi
                                         </div>
                                         <ul className="flex flex-col-reverse">
                                             {
-                                                setHistoryQuery && historyQuery && filteredQueries.length > 0 && filteredQueries.map((query, index) => {
+                                                setHistoryQuery && historyQuery && filteredQueries.length > 0 && filteredQueries.map((query: Query, index) => {
                                                     const currentIndex = historyQuery.queries.findIndex(q => q.text === query.text)
                                                     return (
                                                         // eslint-disable-next-line react/no-array-index-key
@@ -323,55 +265,29 @@ export default function Selector({ runQuery, edgesCount, nodesCount, data: sessi
                                         {historyQuery && historyQuery.queries.length > 0 && historyQuery.counter ? <MetadataView query={historyQuery.queries[historyQuery.counter - 1]} /> : undefined}
                                     </div>
                                 </div>
-                                <div className="flex justify-end">
-                                    <Button
-                                        ref={submitQuery}
-                                        className="text-white flex justify-center w-1/3"
-                                        disabled={isLoading || !historyQuery?.counter}
-                                        indicator={indicator}
-                                        onClick={async () => {
-                                            try {
-                                                setIsLoading(true);
-                                                const q = await runQuery(historyQuery?.query || "")
-                                                if (q) {
-                                                    setQueriesOpen(false)
-                                                }
-                                            } finally {
-                                                setQueriesOpen(false)
-                                                setIsLoading(false)
-                                            }
-                                        }}
-                                        variant="Primary"
-                                        label={isLoading ? undefined : "Run"}
-                                        title={isLoading ? "Please wait..." : "Execute this query again"}
-                                        isLoading={isLoading}
-                                    />
-                                </div>
-                            </div >
-                        </DialogComponent >
-                        <DialogComponent className="h-[90%] w-[90%]" title={`${graphName} Schema`} trigger={
-                            <Button
-                                disabled={!schema.Id}
-                                label="View Schema"
-                                title="Display the schema structure"
-                            />
-                        }>
-                            <SchemaView schema={schema} />
+                            </div>
                         </DialogComponent>
-                    </div >
+                    </div>
                 }
-            </div >
+                <div className="w-[1px] bg-white" />
+                <Button
+                    title="Maximize"
+                    onClick={() => setMaximize(true)}
+                >
+                    <Maximize2 size={20} />
+                </Button>
+                <div className="w-[1px] bg-white" />
+                <Button
+                    className="pointer-events-auto"
+                    title="Run (Enter) History (Arrow Up/Down) Insert new line (Shift + Enter)"
+                >
+                    <Info />
+                </Button>
+            </div>
         </div >
     )
 }
 
 Selector.defaultProps = {
-    runQuery: undefined,
-    historyQuery: {
-        queries: [],
-        counter: 0,
-        query: "",
-        currentQuery: ""
-    },
-    setHistoryQuery: () => { }
+    runQuery: undefined
 }
