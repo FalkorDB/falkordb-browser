@@ -49,13 +49,15 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         return session
     }
 
-    const { client } = session
+    const { client, user } = session
 
     const { graph: graphId } = await params
 
     try {
         const graph = client.selectGraph(graphId)
-        const result = await graph.query("RETURN 1")
+        const result = user.role === "Read-Only"
+            ? await graph.roQuery("RETURN 1")
+            : await graph.query("RETURN 1")
 
         if (!result) throw new Error("Something went wrong")
 
