@@ -8,8 +8,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         return session
     }
 
-    const { client } = session
-
+    const { client, user } = session
     const { schema } = await params
     const schemaName = `${schema}_schema`
     const create = request.nextUrl.searchParams.get("create")
@@ -20,7 +19,9 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         if (create === "false" && !schemas.includes(schemaName)) return NextResponse.json({ message: "Schema not found" }, { status: 200 })
 
         const graph = client.selectGraph(schemaName)
-        const result = await graph.query("MATCH (n) OPTIONAL MATCH (n)-[e]-(m) RETURN * LIMIT 100")
+        const result = user.role === "Read-Only"
+            ? await graph.roQuery("MATCH (n) OPTIONAL MATCH (n)-[e]-(m) RETURN * LIMIT 100")
+            : await graph.query("MATCH (n) OPTIONAL MATCH (n)-[e]-(m) RETURN * LIMIT 100")
 
         return NextResponse.json({ result }, { status: 200 })
     } catch (error) {
@@ -36,14 +37,15 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         return session
     }
 
-    const { client } = session
-
+    const { client, user } = session
     const { schema } = await params
     const schemaName = `${schema}_schema`
 
     try {
         const graph = client.selectGraph(schemaName)
-        const result = await graph.query("RETURN 1")
+        const result = user.role === "Read-Only"
+            ? await graph.roQuery("RETURN 1")
+            : await graph.query("RETURN 1")
 
         if (!result) throw new Error("Something went wrong")
 
