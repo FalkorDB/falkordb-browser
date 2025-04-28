@@ -9,8 +9,7 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
         return session
     }
 
-    const { client } = session
-
+    const { client, user } = session
     const { graph: graphId, node } = await params
     const nodeId = Number(node)
     const { label } = await request.json()
@@ -20,7 +19,9 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
 
         const query = `MATCH (n) WHERE ID(n) = $nodeId REMOVE n:${label}`
         const graph = client.selectGraph(graphId);
-        const result = await graph.query(query, { params: { nodeId } })
+        const result = user.role === "Read-Only"
+            ? await graph.roQuery(query, { params: { nodeId } })
+            : await graph.query(query, { params: { nodeId } })
 
         if (!result) throw new Error("Something went wrong")
 
@@ -39,8 +40,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         return session
     }
 
-    const { client } = session
-
+    const { client, user } = session
     const { graph: graphId, node } = await params
     const nodeId = Number(node)
     const { label } = await request.json()
@@ -50,7 +50,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
         const query = `MATCH (n) WHERE ID(n) = $nodeId SET n:${label}`
         const graph = client.selectGraph(graphId);
-        const result = await graph.query(query, { params: { nodeId } })
+        const result = user.role === "Read-Only"
+            ? await graph.roQuery(query, { params: { nodeId } })
+            : await graph.query(query, { params: { nodeId } })
 
         if (!result) throw new Error("Something went wrong")
 
