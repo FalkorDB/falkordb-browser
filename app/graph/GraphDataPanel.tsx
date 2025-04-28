@@ -5,13 +5,13 @@
 'use client'
 
 import { prepareArg, securedFetch } from "@/lib/utils";
-import { useContext, useEffect, useRef, useState } from "react";
+import { Dispatch, SetStateAction, useContext, useEffect, useRef, useState } from "react";
 import { Check, ChevronRight, Pencil, Plus, Trash2, X } from "lucide-react";
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from "@/components/ui/use-toast";
 import { useSession } from "next-auth/react";
 import Button from "../components/ui/Button";
-import { Graph, Link, Node } from "../api/graph/model";
+import { Category, Graph, Link, Node } from "../api/graph/model";
 import Input from "../components/ui/Input";
 import DialogComponent from "../components/DialogComponent";
 import CloseDialog from "../components/CloseDialog";
@@ -24,9 +24,10 @@ interface Props {
     onExpand: (expand?: boolean) => void;
     graph: Graph;
     onDeleteElement: () => Promise<void>;
+    setCategories: Dispatch<SetStateAction<Category[]>>;
 }
 
-export default function GraphDataPanel({ object, onExpand, onDeleteElement, graph }: Props) {
+export default function GraphDataPanel({ object, onExpand, onDeleteElement, graph, setCategories }: Props) {
 
     const [attributes, setAttributes] = useState<string[]>([]);
     const [editable, setEditable] = useState<string>("");
@@ -220,6 +221,7 @@ export default function GraphDataPanel({ object, onExpand, onDeleteElement, grap
                 graph.addLabel(newLabel, node)
                 node.category.push(newLabel)
                 setLabel([...node.category])
+                setCategories([...graph.Categories])
                 setNewLabel("")
                 setLabelsEditable(false)
             }
@@ -241,6 +243,7 @@ export default function GraphDataPanel({ object, onExpand, onDeleteElement, grap
             graph.removeLabel(removeLabel, node)
             node.category = node.category.filter((c) => c !== removeLabel)
             setLabel([...node.category])
+            setCategories([...graph.Categories])
         }
     }
 

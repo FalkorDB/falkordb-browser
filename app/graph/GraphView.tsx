@@ -47,8 +47,15 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
     const [cooldownTicks, setCooldownTicks] = useState<number | undefined>(0)
     const [currentQuery, setCurrentQuery] = useState<Query>()
     const [searchElement, setSearchElement] = useState<string>("")
+    const [categories, setCategories] = useState<Category[]>([...graph.Categories])
+    const [labels, setLabels] = useState<Category[]>([...graph.Labels])
     const { toast } = useToast()
     const { setIndicator } = useContext(IndicatorContext);
+
+    useEffect(() => {
+        setCategories([...graph.Categories])
+        setLabels([...graph.Labels])
+    }, [graph, graph.Categories, graph.Labels])
 
     useEffect(() => {
         let timeout: NodeJS.Timeout
@@ -380,8 +387,8 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
                                 {
                                     (graph.Categories.length > 0 || graph.Labels.length > 0) &&
                                     <>
-                                        <Labels categories={graph.Categories} onClick={onCategoryClick} label="Labels" graph={graph} />
-                                        <Labels categories={graph.Labels} onClick={onLabelClick} label="RelationshipTypes" graph={graph} />
+                                        <Labels categories={categories} onClick={onCategoryClick} label="Labels" graph={graph} />
+                                        <Labels categories={labels} onClick={onLabelClick} label="RelationshipTypes" graph={graph} />
                                     </>
                                 }
                             </div>
@@ -418,6 +425,7 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
                         onExpand={onExpand}
                         graph={graph}
                         onDeleteElement={handleDeleteElement}
+                        setCategories={setCategories}
                     />
                 }
             </ResizablePanel>
