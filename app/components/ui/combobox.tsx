@@ -57,12 +57,11 @@ export default function Combobox({ isSelectGraph = false, disabled = false, inTa
   }, [options, search])
 
   const handleSetOption = async (option: string, optionName: string) => {
-    const result = await securedFetch(`api/graph/${prepareArg(option)}/?sourceName=${prepareArg(optionName)}`, {
+    const result = await securedFetch(`api/${type === "Graph" ? "graph" : "schema"}/${prepareArg(option)}/?sourceName=${prepareArg(optionName)}`, {
       method: "PATCH",
       headers: {
         "Content-Type": "application/json"
       },
-      body: JSON.stringify({ name: optionName })
     }, toast, setIndicator)
 
     if (result.ok) {

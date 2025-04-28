@@ -9,20 +9,22 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         return session
     }
 
-    const { client } = session
-
+    const { client, user } = session
     const { graph: graphId, node } = await params
     const nodeId = Number(node)
 
-    const graph = client.selectGraph(graphId);
-
-    // Get node's neighbors    
-    const query = `MATCH (src)-[e]-(n)
-                      WHERE ID(src) = $nodeId
-                      RETURN e, n`;
-
     try {
-        const result = await graph.query(query, { params: { nodeId } });
+        const graph = client.selectGraph(graphId);
+
+        // Get node's neighbors    
+        const query = `MATCH (src)-[e]-(n)
+                          WHERE ID(src) = $nodeId
+                          RETURN e, n`;
+
+        const result = user.role === "Read-Only"
+            ? await graph.roQuery(query, { params: { nodeId } })
+            : await graph.query(query, { params: { nodeId } })
+
         return NextResponse.json({ result }, { status: 200 })
     } catch (err: unknown) {
         console.error(err)
@@ -36,8 +38,7 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
         return session
     }
 
-    const { client } = session
-
+    const { client, user } = session
     const { graph: graphId, node } = await params
     const nodeId = Number(node)
     const { type } = await request.json()
@@ -49,7 +50,9 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
         const query = type
             ? `MATCH (n) WHERE ID(n) = $nodeId DELETE n`
             : `MATCH ()-[e]-() WHERE ID(e) = $nodeId DELETE e`;
-        const result = await graph.query(query, { params: { nodeId } });
+        const result = user.role === "Read-Only"
+            ? await graph.roQuery(query, { params: { nodeId } })
+            : await graph.query(query, { params: { nodeId } })
 
         if (!result) throw new Error("Something went wrong")
 

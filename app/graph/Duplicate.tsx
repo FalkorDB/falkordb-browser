@@ -25,11 +25,8 @@ export default function Duplicate({ open, onOpenChange, selectedValue, onDuplica
         try {
 
             setIsLoading(true)
-            const graphName = type === "Schema" ? `${duplicateName}_schema` : duplicateName
-            const sourceName = type === "Schema" ? `${selectedValue}_schema` : selectedValue
-
-            const result = await securedFetch(`api/graph/${prepareArg(graphName)}/?sourceName=${prepareArg(sourceName)}`, {
-                method: "POST"
+            const result = await securedFetch(`api/${type === "Graph" ? "graph" : "schema"}/${prepareArg(duplicateName)}/duplicate/?sourceName=${prepareArg(selectedValue)}`, {
+                method: "PATCH"
             }, toast, setIndicator)
 
             if (!result.ok) return

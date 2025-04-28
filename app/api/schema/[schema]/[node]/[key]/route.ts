@@ -9,8 +9,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
         return session
     }
 
-    const { client } = session
-
+    const { client, user } = session
     const { schema, node, key } = await params
     const schemaName = `${schema}_schema`
     const { type, attribute } = await request.json()
@@ -24,7 +23,9 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
         const q = type
             ? `MATCH (n) WHERE ID(n) = ${node} SET n.${formattedKey} = "${formattedValue}"`
             : `MATCH (n)-[e]-(m) WHERE ID(e) = ${node} SET e.${formattedKey} = "${formattedValue}"`
-        const result = await graph.query(q)
+        const result = user.role === "Read-Only"
+            ? await graph.roQuery(q)
+            : await graph.query(q)
 
         if (!result) throw new Error("Something went wrong")
 
@@ -42,8 +43,7 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
         return session
     }
 
-    const { client } = session
-
+    const { client, user } = session
     const { schema, node, key } = await params
     const schemaName = `${schema}_schema`
     const { type } = await request.json()
@@ -55,7 +55,9 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
         const q = type
             ? `MATCH (n) WHERE ID(n) = ${node} SET n.${key} = NULL`
             : `MATCH (n)-[e]-(m) WHERE ID(e) = ${node} SET e.${key} = NULL`
-        const result = await graph.query(q)
+        const result = user.role === "Read-Only"
+            ? await graph.roQuery(q)
+            : await graph.query(q)
 
         if (!result) throw new Error("Something went wrong")
 
