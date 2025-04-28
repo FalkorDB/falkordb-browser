@@ -185,7 +185,7 @@ test.describe('Data panel Tests', () => {
         await graph.insertQuery(FETCH_FIRST_TEN_NODES);
         await graph.clickRunQuery();
         const nodes = await graph.getNodesGraphStats();
-        expect(parseInt(nodes ?? "")).toBe(1);
+        expect(parseInt(nodes ?? "", 10)).toBe(1);
         await apicalls.removeGraph(graphName);
     });
 })

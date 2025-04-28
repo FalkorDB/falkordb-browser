@@ -629,4 +629,14 @@ test.describe('Graph Tests', () => {
         expect(parseInt(await graph.getAttributesStatsInDataPanel() ?? "", 10)).toBe(1);
         await apiCall.removeGraph(graphName);
     });
+
+    test(`@readonly Validate that RO user can select graph`, async () => {
+        const graphName = getRandomString('graph');
+        await apiCall.addGraph(graphName, "admin");
+        const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+        await graph.selectExistingGraph(graphName, "readonly");
+        expect(await graph.getErrorNotification()).toBeFalsy();
+        await apiCall.removeGraph(graphName, "admin");
+    });
+    
 })
