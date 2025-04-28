@@ -39,7 +39,7 @@ export default function Tutorial({ onSetGraphName, graphNames }: Props) {
                         <DrawerTitle />
                     </DrawerHeader>
                 </VisuallyHidden>
-                <div className="flex justify-center items-center p-8">
+                <div className="flex justify-center items-center p-8" id="graphTutorial">
                     <Carousel className="w-1/2 h-1/2">
                         <CarouselContent className="text-2xl">
                             <CarouselItem className="border text-center p-40">
