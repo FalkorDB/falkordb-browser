@@ -9,15 +9,16 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         return session
     }
 
-    const { client } = session
-
+    const { client, user } = session
     const { schema } = await params
     const schemaName = `${schema}_schema`
 
     try {
         const graph = client.selectGraph(schemaName)
         const query = "MATCH (n) OPTIONAL MATCH (n)-[e]->() WITH count(n) as nodes, count(e) as edges RETURN nodes, edges"
-        const { data } = await graph.query(query)
+        const { data } = user.role === "Read-Only"
+            ? await graph.roQuery(query)
+            : await graph.query(query)
 
         if (!data) throw new Error("Something went wrong")
 

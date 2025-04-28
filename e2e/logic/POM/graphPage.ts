@@ -10,6 +10,14 @@ import { interactWhenVisible, waitForElementToBeVisible, waitForTimeOut } from "
 
 export default class GraphPage extends BasePage {
 
+    private get graphsButton(): Locator {
+        return this.page.locator("//button[contains(text(), 'Graphs')]");
+    }
+
+    private get settingsButton(): Locator {
+        return this.page.locator("//button[contains(text(), 'Settings')]");
+    }
+
     private get graphsMenu(): Locator {
         return this.page.getByRole("combobox");
     }
@@ -256,6 +264,14 @@ export default class GraphPage extends BasePage {
 
     private get querySearchListItems(): Locator {
         return this.page.locator("//div[contains(@class, 'tree')]//div[contains(@class, 'contents')]");
+    }
+
+    async clickOnGraph(): Promise<void> {
+        await interactWhenVisible(this.graphsButton, el => el.click(), "graph button");
+    }
+
+    async clickOnSettings(): Promise<void> {
+        await interactWhenVisible(this.settingsButton, el => el.click(), "settings button");
     }
 
     async insertGraphInSearchInput(graph: string, label: string): Promise<void> {
