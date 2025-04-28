@@ -39,11 +39,11 @@ export default function DeleteGraph({ type, trigger, options, rows, handleSetRow
 
       setOptions(newNames)
 
-      if (opts.includes(selectedValue) && setSelectedValue) setSelectedValue(newNames.length > 0 ? newNames[newNames.length - 1] : "")
+      if (!newNames.includes(selectedValue) && setSelectedValue) setSelectedValue(newNames.length > 0 ? newNames[newNames.length - 1] : "")
 
       setOpen(false)
       setOpenMenage(false)
-      handleSetRows(options.filter(opt => !opts.includes(opt)))
+      handleSetRows(options.filter(opt => newNames.includes(opt)))
       toast({
         title: "Graph(s) deleted successfully",
         description: `The graph(s) ${opts.join(", ")} have been deleted successfully`,

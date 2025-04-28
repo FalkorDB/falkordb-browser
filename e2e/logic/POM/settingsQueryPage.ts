@@ -20,12 +20,12 @@ export default class SettingsQueryPage extends GraphPage {
         return this.page.locator("#increaseTimeoutBtn");
     }
 
-    private get graphsButton(): Locator {
-        return this.page.locator("//button[contains(text(), 'Graphs')]");
+    private get decreaseLimitBtn(): Locator {
+        return this.page.locator("#decreaseLimitBtn");
     }
 
-    async clickOnGraph(): Promise<void> {
-        await interactWhenVisible(this.graphsButton, el => el.click(), "graph button");
+    private get decreaseTimeoutBtn(): Locator {
+        return this.page.locator("#decreaseTimeoutBtn");
     }
 
     async clickIncreaseLimit(): Promise<void> {
@@ -36,6 +36,14 @@ export default class SettingsQueryPage extends GraphPage {
         await interactWhenVisible(this.increaseTimeoutBtn, el => el.click(), "increase timeout button");
     }
 
+    async clickDecreaseLimit(): Promise<void> {
+        await interactWhenVisible(this.decreaseLimitBtn, el => el.click(), "decrease limit button");
+    }
+
+    async clickDecreaseTimeout(): Promise<void> {
+        await interactWhenVisible(this.decreaseTimeoutBtn, el => el.click(), "decrease timeout button");
+    }
+
     async fillTimeoutInput(input: string): Promise<void> {
         await interactWhenVisible(this.timeoutInput, el => el.fill(input), "time out input");
     }
@@ -44,19 +52,40 @@ export default class SettingsQueryPage extends GraphPage {
         await interactWhenVisible(this.limitInput, el => el.fill(input), "limit input");
     }
 
-    async addLimit(limit?: number): Promise<void> {
-        if (limit) {
+    async fillLimit(limit: number): Promise<void> {
             await this.fillLimitInput(limit.toString())
-        } else {
-            await this.clickIncreaseLimit();
-        }
     }
 
-    async addTimeout(timeout?: number): Promise<void> {
-        if (timeout) {
-            await this.fillTimeoutInput(timeout.toString())
-        } else {
-            await this.clickIncreaseTimeout();
-        }
+    async fillTimeout(timeout: number): Promise<void> {
+        await this.fillTimeoutInput(timeout.toString())
     }
+    
+    async increaseLimit(): Promise<void> {
+        await this.clickIncreaseLimit();
+    }
+
+    async increaseTimeout(): Promise<void> {
+        await this.clickIncreaseTimeout();
+    }
+
+    async decreaseLimit(): Promise<void> {
+        await this.clickDecreaseLimit();
+    }
+
+    async decreaseTimeout(): Promise<void> {
+        await this.clickDecreaseTimeout();
+    }
+
+    async getLimit(): Promise<string> {
+        const limit = await this.limitInput.inputValue();
+        return limit;
+    }
+
+    async getTimeout(): Promise<string> {
+        const timeout = await this.timeoutInput.inputValue();
+        return timeout;
+    }
+
+
+
 }
