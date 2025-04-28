@@ -49,7 +49,7 @@ test.describe('Table View Tests', () => {
         expect(isTableViewSelected).toBe(true);
     })
 
-    test.only('@admin Validate that the data displayed in the table view is the same as the data returned by the query', async () => {
+    test('@admin Validate that the data displayed in the table view is the same as the data returned by the query', async () => {
         const graphName = getRandomString('table');
         await apiCalls.addGraph(graphName);
         const tableView = await browser.createNewPage(TableView, urls.graphUrl);
