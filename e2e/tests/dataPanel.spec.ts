@@ -189,7 +189,7 @@ test.describe('Data panel Tests', () => {
         await apicalls.removeGraph(graphName);
     });
 
-    test.only(`@readwrite Validate adding attribute for node via ui and validation via ui`, async () => {
+    test(`@readwrite Validate adding attribute for node via ui and validation via ui`, async () => {
         const graphName = getRandomString('datapanel');
         await apicalls.addGraph(graphName);
         await apicalls.runQuery(graphName, "UNWIND range(1, 10) as x CREATE (p:Person {name: 'Person ' + toString(x)})");
