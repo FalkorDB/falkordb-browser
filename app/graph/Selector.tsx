@@ -20,11 +20,12 @@ import MetadataView from "./MetadataView";
 
 interface Props {
     runQuery?: (query: string) => Promise<void>
-    historyQuery: HistoryQuery
-    setHistoryQuery: Dispatch<SetStateAction<HistoryQuery>>
+    historyQuery?: HistoryQuery
+    setHistoryQuery?: Dispatch<SetStateAction<HistoryQuery>>
+    fetchCount: () => void
 }
 
-export default function Selector({ runQuery, historyQuery, setHistoryQuery }: Props) {
+export default function Selector({ runQuery, historyQuery, setHistoryQuery, fetchCount }: Props) {
 
     const [maximize, setMaximize] = useState(false)
     const pathname = usePathname()
@@ -128,7 +129,7 @@ export default function Selector({ runQuery, historyQuery, setHistoryQuery }: Pr
     }
 
     return (
-        <div className="z-10 absolute w-[90%] top-5 left-[50%] translate-x-[-50%] flex flex-row gap-4 items-center">
+        <div className="z-10 absolute w-[90%] h-[56px] top-5 left-[50%] translate-x-[-50%] flex flex-row gap-4 items-center">
             {
                 session?.user?.role !== "Read-Only" &&
                 <CreateGraph
@@ -162,132 +163,133 @@ export default function Selector({ runQuery, historyQuery, setHistoryQuery }: Pr
                 setSelectedValue={handleOnChange}
             />
             {
-                runQuery &&
-                <div className="h-[56px] w-full relative overflow-visible">
-                    <EditorComponent
-                        maximize={maximize}
-                        setMaximize={setMaximize}
-                        runQuery={runQuery}
-                        historyQuery={historyQuery}
-                        setHistoryQuery={setHistoryQuery}
-                    />
-                </div>
-            }
-            <div className="flex gap-2 p-2 border rounded-lg bg-foreground">
-                {
-                    runQuery &&
-                    <div className="flex gap-4 items-center">
-                        <DialogComponent
-                            className="h-[90dvh] w-[90dvw]"
-                            open={queriesOpen}
-                            onOpenChange={(open) => {
-                                setQueriesOpen(open)
-                                if (open) {
-                                    setTimeout(() => {
-                                        focusEditorAtEnd()
-                                    }, 100)
-                                }
-                            }}
-                            trigger={
-                                <Button
-                                    disabled={!historyQuery || historyQuery.queries.length === 0}
-                                    title={!historyQuery || historyQuery.queries.length === 0 ? "No queries" : "View past queries"}
-                                >
-                                    <History />
-                                </Button>
-                            }
-                            title="Query History"
+                runQuery && historyQuery && setHistoryQuery &&
+                <>
+                    <div className="h-[56px] w-full relative overflow-visible">
+                        <EditorComponent
+                            maximize={maximize}
+                            setMaximize={setMaximize}
+                            runQuery={runQuery}
+                            historyQuery={historyQuery}
+                            setHistoryQuery={setHistoryQuery}
+                        />
+                    </div>
+                    <div className="flex gap-2 p-2 border rounded-lg bg-foreground">
+                        <Button
+                            className="pointer-events-auto"
+                            title="Run (Enter) History (Arrow Up/Down) Insert new line (Shift + Enter)"
                         >
-                            <div className="grow flex flex-col p-8 gap-8" id="queryHistory">
-                                <DialogTitle>Queries</DialogTitle>
-                                <div className="h-1 grow flex border">
-                                    <div className="w-1 grow border-r overflow-auto">
-                                        <div className="p-8 border-b">
-                                            <Input
-                                                className="w-full"
-                                                value={search}
-                                                placeholder="Search for a query"
-                                                onChange={(e) => setSearch(e.target.value)}
-                                            />
-                                        </div>
-                                        <ul className="flex flex-col-reverse">
-                                            {
-                                                setHistoryQuery && historyQuery && filteredQueries.length > 0 && filteredQueries.map((query: Query, index) => {
-                                                    const currentIndex = historyQuery.queries.findIndex(q => q.text === query.text)
-                                                    return (
-                                                        // eslint-disable-next-line react/no-array-index-key
-                                                        <li key={index} className="flex flex-col gap-2 w-full border-b py-3 px-12">
-                                                            <Button
-                                                                className="w-full truncate text-sm"
-                                                                label={query.text}
-                                                                onClick={() => {
-                                                                    setHistoryQuery(prev => ({
-                                                                        ...prev,
-                                                                        counter: currentIndex + 1
-                                                                    }))
-                                                                }}
-                                                            />
-                                                            {
-                                                                historyQuery.counter - 1 === currentIndex &&
-                                                                <div className="h-[20dvh] border" id="queryHistoryEditor">
-                                                                    <Editor
-                                                                        width="100%"
-                                                                        height="100%"
-                                                                        language="cypher"
-                                                                        theme="custom-theme"
-                                                                        options={{
-                                                                            lineHeight: 30,
-                                                                            fontSize: 25,
-                                                                            lineNumbersMinChars: 3,
-                                                                            scrollbar: {
-                                                                                horizontal: "hidden"
-                                                                            },
-                                                                            wordWrap: "on",
-                                                                            scrollBeyondLastLine: false,
-                                                                            renderWhitespace: "none"
-                                                                        }}
-                                                                        value={historyQuery.query}
-                                                                        onChange={(value) => setHistoryQuery(prev => ({
+                            <Info />
+                        </Button>
+                        <div className="w-[1px] bg-white" />
+                        <div className="flex gap-4 items-center">
+                            <DialogComponent
+                                className="h-[90dvh] w-[90dvw]"
+                                open={queriesOpen}
+                                onOpenChange={(open) => {
+                                    setQueriesOpen(open)
+                                    if (open) {
+                                        setTimeout(() => {
+                                            focusEditorAtEnd()
+                                        }, 100)
+                                    }
+                                }}
+                                trigger={
+                                    <Button
+                                        disabled={historyQuery.queries.length === 0}
+                                        title={historyQuery.queries.length === 0 ? "No queries" : "View past queries"}
+                                    >
+                                        <History />
+                                    </Button>
+                                }
+                                title="Query History"
+                            >
+                                <div className="grow flex flex-col p-8 gap-8" id="queryHistory">
+                                    <DialogTitle>Queries</DialogTitle>
+                                    <div className="h-1 grow flex border">
+                                        <div className="w-1 grow border-r overflow-auto">
+                                            <div className="p-8 border-b">
+                                                <Input
+                                                    className="w-full"
+                                                    value={search}
+                                                    placeholder="Search for a query"
+                                                    onChange={(e) => setSearch(e.target.value)}
+                                                />
+                                            </div>
+                                            <ul className="flex flex-col-reverse">
+                                                {
+                                                    setHistoryQuery && historyQuery && filteredQueries.length > 0 && filteredQueries.map((query: Query, index) => {
+                                                        const currentIndex = historyQuery.queries.findIndex(q => q.text === query.text)
+                                                        return (
+                                                            // eslint-disable-next-line react/no-array-index-key
+                                                            <li key={index} className="flex flex-col gap-2 w-full border-b py-3 px-12">
+                                                                <Button
+                                                                    className="w-full truncate text-sm"
+                                                                    label={query.text}
+                                                                    onClick={() => {
+                                                                        setHistoryQuery(prev => ({
                                                                             ...prev,
-                                                                            query: value || ""
-                                                                        }))}
-                                                                        onMount={handleEditorDidMount}
-                                                                    />
-                                                                </div>
-                                                            }
-                                                        </li>
-                                                    )
-                                                })
-                                            }
-                                        </ul>
-                                    </div>
-                                    <div className="w-1 grow">
-                                        {historyQuery && historyQuery.queries.length > 0 && historyQuery.counter ? <MetadataView query={historyQuery.queries[historyQuery.counter - 1]} /> : undefined}
+                                                                            counter: currentIndex + 1
+                                                                        }))
+                                                                    }}
+                                                                />
+                                                                {
+                                                                    historyQuery.counter - 1 === currentIndex &&
+                                                                    <div className="h-[20dvh] border" id="queryHistoryEditor">
+                                                                        <Editor
+                                                                            width="100%"
+                                                                            height="100%"
+                                                                            language="cypher"
+                                                                            theme="custom-theme"
+                                                                            options={{
+                                                                                lineHeight: 30,
+                                                                                fontSize: 25,
+                                                                                lineNumbersMinChars: 3,
+                                                                                scrollbar: {
+                                                                                    horizontal: "hidden"
+                                                                                },
+                                                                                wordWrap: "on",
+                                                                                scrollBeyondLastLine: false,
+                                                                                renderWhitespace: "none"
+                                                                            }}
+                                                                            value={historyQuery.query}
+                                                                            onChange={(value) => setHistoryQuery(prev => ({
+                                                                                ...prev,
+                                                                                query: value || ""
+                                                                            }))}
+                                                                            onMount={handleEditorDidMount}
+                                                                        />
+                                                                    </div>
+                                                                }
+                                                            </li>
+                                                        )
+                                                    })
+                                                }
+                                            </ul>
+                                        </div>
+                                        <div className="w-1 grow">
+                                            {historyQuery && historyQuery.queries.length > 0 && historyQuery.counter ? <MetadataView query={historyQuery.queries[historyQuery.counter - 1]} fetchCount={fetchCount} /> : undefined}
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
-                        </DialogComponent>
+                            </DialogComponent>
+                        </div>
+                        <div className="w-[1px] bg-white" />
+                        <Button
+                            title="Maximize"
+                            onClick={() => setMaximize(true)}
+                        >
+                            <Maximize2 size={20} />
+                        </Button>
                     </div>
-                }
-                <div className="w-[1px] bg-white" />
-                <Button
-                    title="Maximize"
-                    onClick={() => setMaximize(true)}
-                >
-                    <Maximize2 size={20} />
-                </Button>
-                <div className="w-[1px] bg-white" />
-                <Button
-                    className="pointer-events-auto"
-                    title="Run (Enter) History (Arrow Up/Down) Insert new line (Shift + Enter)"
-                >
-                    <Info />
-                </Button>
-            </div>
+                </>
+            }
         </div >
     )
 }
 
 Selector.defaultProps = {
-    runQuery: undefined
+    runQuery: undefined,
+    historyQuery: undefined,
+    setHistoryQuery: undefined
 }

@@ -27,7 +27,7 @@ export default function Header({ onSetGraphName, graphNames }: Props) {
     const pathname = usePathname()
     const type = pathname.includes("/schema") ? "Schema" : "Graph"
     const { data: session } = useSession()
-    const showCreate = !pathname.includes("/create") && !pathname.includes("/settings") && session?.user?.role !== "Read-Only"
+    const showCreate = !pathname.includes("/create") && session?.user?.role !== "Read-Only"
     const { indicator } = useContext(IndicatorContext)
 
     return (
@@ -61,7 +61,7 @@ export default function Header({ onSetGraphName, graphNames }: Props) {
             <div className="flex flex-col gap-6 items-center">
                 {
                     session?.user?.role === "Admin" &&
-                    <div className="bg-foreground w-fit">
+                    <>
                         <Button
                             indicator={indicator}
                             title="Adjust application settings"
@@ -69,9 +69,9 @@ export default function Header({ onSetGraphName, graphNames }: Props) {
                         >
                             <Settings size={35} />
                         </Button>
-                    </div>
+                        <div className="h-[1px] w-[80%] bg-white" />
+                    </>
                 }
-                <div className="h-[1px] w-[80%] bg-white" />
                 <Drawer direction="right">
                     <DropdownMenu>
                         <DropdownMenuTrigger onClick={(e) => e.preventDefault()} className="flex gap-2">
@@ -123,14 +123,16 @@ export default function Header({ onSetGraphName, graphNames }: Props) {
                         </div>
                     </DrawerContent>
                 </Drawer>
-                <div className="h-[1px] w-[80%] bg-white" />
                 {
                     showCreate &&
-                    <CreateGraph
-                        onSetGraphName={onSetGraphName}
-                        type={type}
-                        graphNames={graphNames}
-                    />
+                    <>
+                        <div className="h-[1px] w-[80%] bg-white" />
+                        <CreateGraph
+                            onSetGraphName={onSetGraphName}
+                            type={type}
+                            graphNames={graphNames}
+                        />
+                    </>
                 }
                 {
                     indicator === "offline" &&

@@ -242,7 +242,7 @@ export class Graph {
         const categories = this.createCategory(cell.labels.length === 0 ? [""] : cell.labels)
         // check if node already exists in nodes or fake node was created
         const currentNode = this.nodesMap.get(cell.id)
-
+        
         if (!currentNode) {
             const node: Node = {
                 id: cell.id,
@@ -333,7 +333,7 @@ export class Graph {
                 let target = this.nodesMap.get(cell.destinationId)
 
                 if (!source || !target) {
-                    [category] = this.createCategory([""])
+                    [category] = this.createCategory([""], )
                 }
 
                 if (!source) {
@@ -369,6 +369,9 @@ export class Graph {
                     category?.elements.push(target)
                     this.nodesMap.set(cell.destinationId, target)
                     this.elements.nodes.push(target)
+                    target.category.forEach(c => {
+                        this.categoriesMap.get(c)!.elements.push(target!)
+                    })
                 }
 
                 link = {

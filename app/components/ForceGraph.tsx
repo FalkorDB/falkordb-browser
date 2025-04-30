@@ -55,8 +55,6 @@ export default function ForceGraph({
     const { toast } = useToast()
     const { indicator, setIndicator } = useContext(IndicatorContext)
 
-    console.log(data)
-
     useEffect(() => {
         const handleResize = () => {
             if (!parentRef.current) return

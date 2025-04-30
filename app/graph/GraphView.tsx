@@ -4,7 +4,6 @@
 'use client'
 
 import { useRef, useState, useEffect, Dispatch, SetStateAction, useContext } from "react";
-import { ImperativePanelHandle } from "react-resizable-panels";
 import { GitGraph, Info, Pause, Play, Search, Table } from "lucide-react"
 import { handleZoomToFit, Query, prepareArg, securedFetch } from "@/lib/utils";
 import dynamic from "next/dynamic";
@@ -25,37 +24,23 @@ import GraphDataPanel from "./GraphDataPanel";
 
 const ForceGraph = dynamic(() => import("../components/ForceGraph"), { ssr: false });
 
-function GraphView({ selectedElement, setSelectedElement, currentQuery, nodesCount, edgesCount, fetchCount }: {
+function GraphView({ selectedElement, setSelectedElement, currentQuery, nodesCount, edgesCount, fetchCount, handleCooldown, cooldownTicks }: {
     selectedElement: Node | Link | undefined
     setSelectedElement: Dispatch<SetStateAction<Node | Link | undefined>>
     currentQuery: Query | undefined
     nodesCount: number
     edgesCount: number
     fetchCount: () => void
+    handleCooldown: (ticks?: number) => void
+    cooldownTicks: number | undefined
 }) {
     const { graph } = useContext(GraphContext)
     const [data, setData] = useState<GraphData>({ ...graph.Elements })
     const [selectedElements, setSelectedElements] = useState<(Node | Link)[]>([]);
     const chartRef = useRef<ForceGraphMethods<Node, Link>>()
-    const dataPanel = useRef<ImperativePanelHandle>(null)
     const [tabsValue, setTabsValue] = useState<string>("")
-    const [cooldownTicks, setCooldownTicks] = useState<number | undefined>(0)
     const [searchElement, setSearchElement] = useState<string>("")
     const { setIndicator } = useContext(IndicatorContext)
-
-    useEffect(() => {
-        let timeout: NodeJS.Timeout
-        if (tabsValue === "Graph" && selectedElement) {
-            timeout = setTimeout(() => {
-                dataPanel.current?.expand()
-            }, 0)
-        }
-        dataPanel.current?.collapse()
-
-        return () => {
-            clearInterval(timeout)
-        }
-    }, [tabsValue])
 
     useEffect(() => {
         let defaultChecked = "Graph"
@@ -66,23 +51,16 @@ function GraphView({ selectedElement, setSelectedElement, currentQuery, nodesCou
         } else if (currentQuery && currentQuery.metadata.length > 0 && graph.Metadata.length > 0 && currentQuery.explain.length > 0) {
             defaultChecked = "Metadata";
         }
-
+        
         setTabsValue(defaultChecked);
         setData({ ...graph.Elements })
     }, [graph, graph.Id, graph.getElements().length, graph.Data.length])
 
-    const handleCooldown = (ticks?: number) => {
-        setCooldownTicks(ticks)
-
-        const canvas = document.querySelector('.force-graph-container canvas');
-        if (!canvas) return
-        if (ticks === 0) {
-            canvas.setAttribute('data-engine-status', 'stop')
-        } else {
-            canvas.setAttribute('data-engine-status', 'running')
-
+    useEffect(() => {
+        if (tabsValue === "Graph") {
+            handleCooldown()
         }
-    }
+    }, [tabsValue])
 
     useEffect(() => {
         setSelectedElement(undefined)
@@ -192,7 +170,7 @@ function GraphView({ selectedElement, setSelectedElement, currentQuery, nodesCou
 
     return (
         <Tabs value={tabsValue} className="h-full w-full relative border rounded-lg overflow-hidden">
-            <div className="w-full pointer-events-none z-10 absolute bottom-0 right-0 p-4 flex justify-between items-center">
+            <div className="absolute bottom-0 right-0 left-0 pointer-events-none z-10 p-4 flex justify-between items-center">
                 <div className="w-1 grow flex gap-2">
                     {
                         graph.Id &&
@@ -332,6 +310,7 @@ function GraphView({ selectedElement, setSelectedElement, currentQuery, nodesCou
             <TabsContent value="Metadata" className="h-full w-full mt-0">
                 <MetadataView
                     query={currentQuery!}
+                    fetchCount={fetchCount}
                 />
             </TabsContent>
         </Tabs>

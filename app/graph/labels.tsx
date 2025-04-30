@@ -51,7 +51,7 @@ export default function Labels({ categories, onClick, label, className = "" }: P
                         categories.map((category) => (
                             <li key={category.name}>
                                 <Button
-                                    className={cn(category.name && "w-full pointer-events-auto")}
+                                    className="w-full pointer-events-auto"
                                     label={category.name}
                                     onClick={() => {
                                         onClick(category)

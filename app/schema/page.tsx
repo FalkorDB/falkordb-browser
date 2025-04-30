@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useContext, useState } from "react";
 import { prepareArg, securedFetch } from "@/lib/utils";
-import { useSession } from "next-auth/react";
 import { useToast } from "@/components/ui/use-toast";
 import dynamic from "next/dynamic";
 import SchemaView from "./SchemaView";
@@ -16,7 +15,6 @@ export default function Page() {
     const [schema, setSchema] = useState<Graph>(Graph.empty())
     const [edgesCount, setEdgesCount] = useState<number>(0)
     const [nodesCount, setNodesCount] = useState<number>(0)
-    const { data: session } = useSession()
     const { toast } = useToast()
     const { indicator, setIndicator } = useContext(IndicatorContext);
     const { graphName: schemaName } = useContext(GraphNameContext)
@@ -56,14 +54,18 @@ export default function Page() {
 
     return (
         <div className="Page">
-            <div className="h-1 grow p-8 px-10 flex flex-col gap-8">
-                <Selector
+            <Selector
+                fetchCount={fetchCount}
+            />
+            <div className="h-1 grow p-12">
+                <SchemaView
+                    schema={schema}
+                    fetchCount={fetchCount}
                     edgesCount={edgesCount}
                     nodesCount={nodesCount}
-                    data={session}
                 />
-                <SchemaView schema={schema} fetchCount={fetchCount} />
             </div>
+            <div className="h-4 w-full Gradient" />
         </div>
     )
 }

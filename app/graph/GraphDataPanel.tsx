@@ -259,7 +259,7 @@ export default function GraphDataPanel({ obj, setObj, onDeleteElement }: Props) 
     }
 
     return (
-        <div className="absolute top-[50%] right-4 translate-y-[-50%] min-w-[30%] min-h-[60%] max-w-[50%] max-h-[90%] flex flex-col gap-4 bg-foreground border rounded-lg" id="graphDataPanel">
+        <div className="DataPanel" id="graphDataPanel">
             <div className="relative flex justify-between gap-4 items-center p-6" id="dataPanelHeader">
                 <Button
                     className="absolute top-2 right-2"

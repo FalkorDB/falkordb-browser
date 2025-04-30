@@ -3,8 +3,8 @@
 
 "use client";
 
-import { Check, ChevronRight, Pencil, PlusCircle, Trash2, X } from "lucide-react";
-import { useContext, useEffect, useState } from "react";
+import { Check, Pencil, PlusCircle, Trash2, X } from "lucide-react";
+import { SetStateAction, Dispatch, useContext, useEffect, useState } from "react";
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from "@/components/ui/use-toast";
 import { useSession } from "next-auth/react";
@@ -23,12 +23,12 @@ import { IndicatorContext } from "../components/provider";
 
 interface Props {
     obj: Node | Link
-    onExpand: (expand?: boolean) => void;
+    setObj: Dispatch<SetStateAction<Node | Link | undefined>>
     onDeleteElement: () => Promise<void>;
     schema: Graph
 }
 
-export default function SchemaDataPanel({ obj, onExpand, onDeleteElement, schema }: Props) {
+export default function SchemaDataPanel({ obj, setObj, onDeleteElement, schema }: Props) {
 
     const [attribute, setAttribute] = useState<[string, string[]]>(getDefaultAttribute())
     const [attributes, setAttributes] = useState<[string, string[]][]>([])
@@ -331,9 +331,9 @@ export default function SchemaDataPanel({ obj, onExpand, onDeleteElement, schema
             <div className="w-full flex justify-between items-center p-4" id="headerDataPanel">
                 <div className="flex gap-4 items-center">
                     <Button
-                        onClick={() => onExpand()}
+                        onClick={() => setObj(undefined)}
                     >
-                        <ChevronRight size={20} />
+                        <X size={20} />
                     </Button>
                     {
                         "source" in obj ?

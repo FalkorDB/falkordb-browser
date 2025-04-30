@@ -49,15 +49,6 @@ const monacoOptions: monaco.editor.IStandaloneEditorConstructionOptions = {
     hideCursorInOverviewRuler: true,
     scrollBeyondLastColumn: 0,
     scrollBeyondLastLine: false,
-    suggest: {
-        showInlineDetails: false,
-        insertMode: 'insert',
-        snippetsPreventQuickSuggestions: false,
-        preview: false,
-        showStatusBar: false,
-        showDeprecated: false,
-        selectionMode: 'never',
-    },
     overflowWidgetsDomNode: undefined,
     scrollbar: {
         vertical: 'hidden',
@@ -541,10 +532,6 @@ export default function EditorComponent({ historyQuery, maximize, setMaximize, r
                     let counter;
                     if (prev.counter !== 1) {
                         counter = prev.counter ? prev.counter - 1 : prev.queries.length;
-                        // Run provideCompletion when counter changes from 0 to queries.length
-                        if (!prev.counter && counter === prev.queries.length) {
-                            e.trigger('keyboard', 'editor.action.triggerSuggest', {});
-                        }
                     } else {
                         counter = 1;
                     }
@@ -566,12 +553,15 @@ export default function EditorComponent({ historyQuery, maximize, setMaximize, r
             run: async () => {
                 setHistoryQuery(prev => {
                     if (prev.queries.length === 0) return prev
+                    
                     let counter
+                    
                     if (prev.counter) {
                         counter = prev.counter + 1 > prev.queries.length ? 0 : prev.counter + 1
                     } else {
                         counter = 0
                     }
+                    
                     return {
                         ...prev,
                         counter

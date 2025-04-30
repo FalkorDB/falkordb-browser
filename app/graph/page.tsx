@@ -21,6 +21,7 @@ export default function Page() {
         counter: 0
     })
     const [currentQuery, setCurrentQuery] = useState<Query>()
+    const [cooldownTicks, setCooldownTicks] = useState<number | undefined>(0)
     const { graph, setGraph } = useContext(GraphContext)
     const { graphName } = useContext(GraphNameContext)
     const { toast } = useToast()
@@ -96,6 +97,19 @@ export default function Page() {
         return json.result
     }
 
+    const handleCooldown = (ticks?: number) => {
+        setCooldownTicks(ticks)
+
+        const canvas = document.querySelector('.force-graph-container canvas');
+        if (!canvas) return
+        if (ticks === 0) {
+            canvas.setAttribute('data-engine-status', 'stop')
+        } else {
+            canvas.setAttribute('data-engine-status', 'running')
+
+        }
+    }
+
     const runQuery = async (q: string) => {
         const result = await run(q)
         if (!result) return
@@ -120,6 +134,7 @@ export default function Page() {
         window.graph = g
         setCurrentQuery(newQuery)
         fetchCount()
+        handleCooldown()
     }
 
     return (
@@ -128,6 +143,7 @@ export default function Page() {
                 runQuery={runQuery}
                 historyQuery={historyQuery}
                 setHistoryQuery={setHistoryQuery}
+                fetchCount={fetchCount}
             />
             <div className="h-1 grow p-12">
                 <GraphView
@@ -137,6 +153,8 @@ export default function Page() {
                     currentQuery={currentQuery}
                     nodesCount={nodesCount}
                     edgesCount={edgesCount}
+                    handleCooldown={handleCooldown}
+                    cooldownTicks={cooldownTicks}
                 />
             </div>
             <Tutorial />

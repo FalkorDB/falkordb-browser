@@ -4,7 +4,7 @@
 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dispatch, SetStateAction, useContext, useState } from "react";
-import { ArrowRight, ArrowRightLeft, Check, ChevronRight, Pencil, Plus, Trash2, X } from "lucide-react";
+import { ArrowRight, ArrowRightLeft, Check, Pencil, Plus, Trash2, X } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/components/ui/use-toast";
 import Button from "../components/ui/Button";
@@ -16,7 +16,7 @@ import { IndicatorContext } from "../components/provider";
 
 interface Props {
   onCreate: (element: [string, string[]][], label?: string[]) => Promise<boolean>
-  onExpand: () => void
+  setIsAdd: Dispatch<SetStateAction<boolean>>
   selectedNodes: [Node | undefined, Node | undefined]
   setSelectedNodes: Dispatch<SetStateAction<[Node | undefined, Node | undefined]>>
   type: boolean
@@ -28,7 +28,7 @@ export const OPTIONS = ["String", "Integer", "Float", "Geospatial", "Boolean"]
 
 export const getDefaultAttribute = (): [string, string[]] => ["", ["", "", "false", "false"]]
 
-export default function SchemaCreateElement({ onCreate, onExpand, selectedNodes, setSelectedNodes, type }: Props) {
+export default function SchemaCreateElement({ onCreate, setIsAdd, selectedNodes, setSelectedNodes, type }: Props) {
 
   const [attributes, setAttributes] = useState<[string, string[]][]>([])
   const [newAttribute, setNewAttribute] = useState<[string, string[]]>(getDefaultAttribute())
@@ -192,7 +192,7 @@ export default function SchemaCreateElement({ onCreate, onExpand, selectedNodes,
     setAttribute(getDefaultAttribute())
     setEditable("")
     setIsAddLabel(false)
-    onExpand()
+    setIsAdd(false)
   }
 
   return (
@@ -202,7 +202,7 @@ export default function SchemaCreateElement({ onCreate, onExpand, selectedNodes,
           <Button
             onClick={() => handleClose()}
           >
-            <ChevronRight size={20} />
+            <X size={20} />
           </Button>
           <ul className="flex flex-wrap gap-4 min-w-[10%]" onMouseEnter={() => setLabelsHover(true)} onMouseLeave={() => setLabelsHover(false)}>
             {label.map((l) => (

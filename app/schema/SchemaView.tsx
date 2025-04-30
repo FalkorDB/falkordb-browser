@@ -26,9 +26,11 @@ const ForceGraph = dynamic(() => import("../components/ForceGraph"), { ssr: fals
 interface Props {
     schema: Graph
     fetchCount?: () => void
+    edgesCount: number
+    nodesCount: number
 }
 
-export default function SchemaView({ schema, fetchCount }: Props) {
+export default function SchemaView({ schema, fetchCount, edgesCount, nodesCount }: Props) {
     const [selectedElement, setSelectedElement] = useState<Node | Link | undefined>();
     const [selectedElements, setSelectedElements] = useState<(Node | Link)[]>([]);
     const [selectedNodes, setSelectedNodes] = useState<[Node | undefined, Node | undefined]>([undefined, undefined]);
@@ -205,130 +207,96 @@ export default function SchemaView({ schema, fetchCount }: Props) {
     }
 
     return (
-        <ResizablePanelGroup direction="horizontal" className={cn(maximize && "h-full p-10 bg-background fixed left-[50%] top-[50%] z-50 grid translate-x-[-50%] translate-y-[-50%]")}>
-            <ResizablePanel
-                defaultSize={50}
-                className={cn("flex flex-col gap-10", !isCollapsed && "mr-8")}
-            >
-                <div className="flex items-center justify-between">
-                    <Toolbar
-                        disabled={!schema.Id}
-                        deleteDisabled={Object.values(selectedElements).length === 0 && !selectedElement}
-                        onAddEntity={() => {
-                            setIsAddEntity(true)
-                            setIsAddRelation(false)
-                            setSelectedElement(undefined)
-                            if (dataPanel.current?.isExpanded()) return
-                            onExpand()
-                        }}
-                        onAddRelation={() => {
-                            setIsAddRelation(true)
-                            setIsAddEntity(false)
-                            setSelectedElement(undefined)
-                            if (dataPanel.current?.isExpanded()) return
-                            onExpand()
-                        }}
-                        onDeleteElement={handleDeleteElement}
-                        chartRef={chartRef}
-                        displayAdd
-                        type="Schema"
-                    />
+        <div className="relative w-full h-full border rounded-lg overflow-hidden">
+            <div className="pointer-events-none absolute bottom-0 left-0 right-0 flex items-center justify-between p-4">
+                <div className="w-1 grow flex gap-2">
                     {
-                        isCollapsed &&
-                        <Button
-                            className="p-3 bg-[#7167F6] rounded-lg"
-                            onClick={() => onExpand()}
-                            disabled={!selectedElement}
-                        >
-                            <ChevronLeft size={20} />
-                        </Button>
-                    }
-                </div>
-                <div className="relative h-1 grow rounded-lg overflow-hidden">
-                    <Button
-                        className="z-10 absolute top-4 right-4"
-                        title={maximize ? "Minimize" : "Maximize"}
-                        onClick={() => setMaximize(prev => !prev)}
-                    >
-                        {
-                            maximize ?
-                                <Minimize2 size={20} />
-                                : <Maximize2 size={20} />
-                        }
-                    </Button>
-                    <div className="z-10 absolute top-4 left-4 pointer-events-none">
-                        <Tooltip>
-                            <TooltipTrigger asChild>
-                                <div className="flex items-center gap-2">
-                                    {cooldownTicks === undefined ? <Play size={20} /> : <Pause size={20} />}
-                                    <Switch
-                                        className="pointer-events-auto"
-                                        checked={cooldownTicks === undefined}
-                                        onCheckedChange={() => {
-                                            handleCooldown(cooldownTicks === undefined ? 0 : undefined)
-                                        }}
-                                    />
-                                </div>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                                <p>Animation Control</p>
-                            </TooltipContent>
-                        </Tooltip>
-                    </div>
-                    <ForceGraph
-                        chartRef={chartRef}
-                        data={data}
-                        setData={setData}
-                        graph={schema}
-                        onExpand={onExpand}
-                        selectedElement={selectedElement}
-                        setSelectedElement={handleSetSelectedElement}
-                        selectedElements={selectedElements}
-                        setSelectedElements={setSelectedElements}
-                        type="schema"
-                        isAddElement={isAddRelation}
-                        setSelectedNodes={setSelectedNodes}
-                        cooldownTicks={cooldownTicks}
-                        handleCooldown={handleCooldown}
-                    />
-                    {
-                        (schema.Categories.length > 0 || schema.Labels.length > 0) &&
+                        schema.Id &&
                         <>
-                            <Labels className="left-2" label="Categories" categories={schema.Categories} onClick={onCategoryClick} graph={schema} />
-                            <Labels className="right-2 text-end" label="RelationshipTypes" categories={schema.Labels} onClick={onLabelClick} graph={schema} />
+                            <p className="Gradient bg-clip-text text-transparent">Nodes: {nodesCount}</p>
+                            <p className="Gradient bg-clip-text text-transparent">Edges: {edgesCount}</p>
                         </>
                     }
                 </div>
-            </ResizablePanel>
-            <ResizableHandle disabled={!selectedElement} className={cn(!selectedElement && "!cursor-default")} />
-            <ResizablePanel
-                className={cn("rounded-lg", !isCollapsed && "border-[3px] border-foreground")}
-                collapsible
-                ref={dataPanel}
-                defaultSize={50}
-                minSize={25}
-                maxSize={50}
-                onCollapse={() => setIsCollapsed(true)}
-                onExpand={() => setIsCollapsed(false)}
-            >
+                {
+                    schema.getElements().length > 0 &&
+                    <Toolbar
+                        disabled={!schema.Id}
+                        chartRef={chartRef}
+                    />
+                }
+            </div>
+            <div className="relative h-1 grow rounded-lg overflow-hidden">
+                <Button
+                    className="z-10 absolute top-4 right-4"
+                    title={maximize ? "Minimize" : "Maximize"}
+                    onClick={() => setMaximize(prev => !prev)}
+                >
+                    {
+                        maximize ?
+                            <Minimize2 size={20} />
+                            : <Maximize2 size={20} />
+                    }
+                </Button>
+                <div className="z-10 absolute top-4 left-4 pointer-events-none">
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <div className="flex items-center gap-2">
+                                {cooldownTicks === undefined ? <Play size={20} /> : <Pause size={20} />}
+                                <Switch
+                                    className="pointer-events-auto"
+                                    checked={cooldownTicks === undefined}
+                                    onCheckedChange={() => {
+                                        handleCooldown(cooldownTicks === undefined ? 0 : undefined)
+                                    }}
+                                />
+                            </div>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                            <p>Animation Control</p>
+                        </TooltipContent>
+                    </Tooltip>
+                </div>
+                <ForceGraph
+                    chartRef={chartRef}
+                    data={data}
+                    setData={setData}
+                    graph={schema}
+                    selectedElement={selectedElement}
+                    setSelectedElement={handleSetSelectedElement}
+                    selectedElements={selectedElements}
+                    setSelectedElements={setSelectedElements}
+                    type="schema"
+                    isAddElement={isAddRelation}
+                    setSelectedNodes={setSelectedNodes}
+                    cooldownTicks={cooldownTicks}
+                    handleCooldown={handleCooldown}
+                />
+                {
+                    (schema.Categories.length > 0 || schema.Labels.length > 0) &&
+                    <>
+                        <Labels className="left-2" label="Categories" categories={schema.Categories} onClick={onCategoryClick} />
+                        <Labels className="right-2 text-end" label="RelationshipTypes" categories={schema.Labels} onClick={onLabelClick} />
+                    </>
+                }
                 {
                     selectedElement ?
                         <SchemaDataPanel
                             obj={selectedElement}
-                            onExpand={onExpand}
+                            setObj={setSelectedElement}
                             onDeleteElement={handleDeleteElement}
                             schema={schema}
                         />
-                        : (isAddEntity || isAddRelation) &&
+                        : isAddRelation || isAddEntity &&
                         <CreateElement
                             onCreate={onCreateElement}
-                            onExpand={onExpand}
+                            setIsAdd={isAddRelation ? setIsAddRelation : setIsAddEntity}
                             selectedNodes={selectedNodes}
                             setSelectedNodes={setSelectedNodes}
                             type={isAddEntity}
                         />
                 }
-            </ResizablePanel>
-        </ResizablePanelGroup>
+            </div>
+        </div>
     )
 }

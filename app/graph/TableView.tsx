@@ -11,7 +11,7 @@ export default function TableView() {
 
     return (
         <TableComponent
-            className="py-8"
+            className="p-8"
             headers={Object.keys(graph.Data[0])}
             rows={graph.Data.map(row => ({
                 cells: Object.values(row).map((value) => ({

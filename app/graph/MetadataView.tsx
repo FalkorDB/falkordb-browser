@@ -6,8 +6,9 @@ import { useToast } from "@/components/ui/use-toast";
 import Button from "../components/ui/Button";
 import { GraphNameContext, IndicatorContext } from "../components/provider";
 
-export default function MetadataView({ query, className = "" }: {
+export default function MetadataView({ query, fetchCount, className = "" }: {
     query: Query,
+    fetchCount: () => void,
     className?: string
 }) {
     const [profile, setProfile] = useState<string[]>([])
@@ -24,6 +25,7 @@ export default function MetadataView({ query, className = "" }: {
 
         const json = await result.json()
         setProfile(json.result)
+        fetchCount()
     }
 
     return (
