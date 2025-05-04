@@ -124,7 +124,7 @@ export default function SchemaCreateElement({ onCreate, setIsAdd, selectedNodes,
           description: "You must type a label",
           variant: "destructive"
         })
-      
+
         return
       }
 
@@ -134,17 +134,17 @@ export default function SchemaCreateElement({ onCreate, setIsAdd, selectedNodes,
           description: "You must select two nodes to create a relation",
           variant: "destructive"
         })
-      
+
         return
       }
     }
-    
+
     try {
       setIsLoading(true)
       const ok = await onCreate(attributes, label)
-    
+
       if (!ok) return
-    
+
       setAttributes([])
       setAttribute(getDefaultAttribute())
       setLabel([])
@@ -197,86 +197,85 @@ export default function SchemaCreateElement({ onCreate, setIsAdd, selectedNodes,
 
   return (
     <div className="DataPanel">
-      <div className="w-full flex justify-between items-center p-4" id="headerDataPanel">
-        <div className="flex gap-4 items-center">
-          <Button
-            onClick={() => handleClose()}
-          >
-            <X size={20} />
-          </Button>
-          <ul className="flex flex-wrap gap-4 min-w-[10%]" onMouseEnter={() => setLabelsHover(true)} onMouseLeave={() => setLabelsHover(false)}>
-            {label.map((l) => (
-              <li key={l} className="flex gap-2 px-2 py-1 bg-foreground rounded-full items-center">
-                <p>{l}</p>
+      <div className="relative w-full flex justify-between items-center p-6" id="headerDataPanel">
+        <Button
+          className="absolute top-2 right-2"
+          onClick={() => handleClose()}
+        >
+          <X size={15} />
+        </Button>
+        <ul className="flex flex-wrap gap-4 min-w-[10%]" onMouseEnter={() => setLabelsHover(true)} onMouseLeave={() => setLabelsHover(false)}>
+          {label.map((l) => (
+            <li key={l} className="flex gap-2 px-2 py-1 bg-background rounded-full items-center">
+              <p>{l}</p>
+              <Button
+                title="Remove"
+                onClick={() => handleRemoveLabel(l)}
+              >
+                <X size={15} />
+              </Button>
+            </li>
+          ))}
+          <li className="h-8 flex flex-wrap gap-2">
+            {
+              (type ? (labelsHover || label.length === 0) && !isAddLabel : label.length < 1 && !isAddLabel) &&
+              <Button
+                className="p-2 text-xs justify-center border border-background"
+                variant="Secondary"
+                label="Add"
+                title="Add a new label"
+                onClick={() => setIsAddLabel(true)}
+              >
+                <Pencil size={15} />
+              </Button>
+            }
+            {
+              isAddLabel &&
+              <>
+                <Input
+                  ref={ref => ref?.focus()}
+                  className="max-w-[20dvw] h-full bg-background border-none text-white"
+                  value={newLabel}
+                  onChange={(e) => setNewLabel(e.target.value)}
+                  onKeyDown={(e) => {
+
+                    if (e.key === "Escape") {
+                      e.preventDefault()
+                      setIsAddLabel(false)
+                      setNewLabel("")
+                    }
+
+                    if (e.key !== "Enter") return
+
+                    e.preventDefault()
+                    handleAddLabel()
+                  }}
+                />
                 <Button
-                  title="Remove"
-                  onClick={() => handleRemoveLabel(l)}
+                  className="p-2 text-xs justify-center border border-background"
+                  variant="Secondary"
+                  label="Save"
+                  title="Save the new label"
+                  onClick={() => handleAddLabel()}
+                >
+                  <Check size={15} />
+                </Button>
+                <Button
+                  className="p-2 text-xs justify-center border border-background"
+                  variant="Secondary"
+                  label="Cancel"
+                  title="Discard new label"
+                  onClick={() => {
+                    setIsAddLabel(false)
+                    setNewLabel("")
+                  }}
                 >
                   <X size={15} />
                 </Button>
-              </li>
-            ))}
-            <li className="h-8 flex flex-wrap gap-2">
-              {
-                (type ? (labelsHover || label.length === 0) && !isAddLabel : label.length < 1 && !isAddLabel) &&
-                <Button
-                  className="p-2 text-xs justify-center border border-foreground"
-                  variant="Secondary"
-                  label="Add"
-                  title="Add a new label"
-                  onClick={() => setIsAddLabel(true)}
-                >
-                  <Pencil size={15} />
-                </Button>
-              }
-              {
-                isAddLabel &&
-                <>
-                  <Input
-                    ref={ref => ref?.focus()}
-                    className="max-w-[20dvw] h-full bg-foreground border-none text-white"
-                    value={newLabel}
-                    onChange={(e) => setNewLabel(e.target.value)}
-                    onKeyDown={(e) => {
-
-                      if (e.key === "Escape") {
-                        e.preventDefault()
-                        setIsAddLabel(false)
-                        setNewLabel("")
-                      }
-
-                      if (e.key !== "Enter") return
-
-                      e.preventDefault()
-                      handleAddLabel()
-                    }}
-                  />
-                  <Button
-                    className="p-2 text-xs justify-center border border-foreground"
-                    variant="Secondary"
-                    label="Save"
-                    title="Save the new label"
-                    onClick={() => handleAddLabel()}
-                  >
-                    <Check size={15} />
-                  </Button>
-                  <Button
-                    className="p-2 text-xs justify-center border border-foreground"
-                    variant="Secondary"
-                    label="Cancel"
-                    title="Discard new label"
-                    onClick={() => {
-                      setIsAddLabel(false)
-                      setNewLabel("")
-                    }}
-                  >
-                    <X size={15} />
-                  </Button>
-                </>
-              }
-            </li>
-          </ul>
-        </div>
+              </>
+            }
+          </li>
+        </ul>
         <p className="font-medium text-xl">{attributes.length}&ensp;Attributes</p>
       </div>
       <div className="w-full h-1 grow flex flex-col justify-between items-start font-medium">
@@ -581,19 +580,19 @@ export default function SchemaCreateElement({ onCreate, setIsAdd, selectedNodes,
         </Table>
         {
           !type &&
-          <div className="w-full flex flex-col gap-4">
-            <div className="w-full flex justify-between p-8 items-center">
-              <div style={{ backgroundColor: selectedNodes[0]?.color }} className="flex h-16 w-16 rounded-full border-2 border-foreground justify-center items-center">
+          <div className="w-full flex flex-col gap-2">
+            <div className="w-full flex justify-between p-4 items-center">
+              <div style={{ backgroundColor: selectedNodes[0]?.color }} className="flex h-16 w-16 rounded-full border-2 border-background justify-center items-center">
                 <p>{selectedNodes[0]?.category}</p>
               </div>
               <ArrowRight strokeWidth={1} size={40} />
-              <div style={{ backgroundColor: selectedNodes[1]?.color }} className="flex h-16 w-16 rounded-full border-2 border-foreground justify-center items-center">
+              <div style={{ backgroundColor: selectedNodes[1]?.color }} className="flex h-16 w-16 rounded-full border-2 border-background justify-center items-center">
                 <p>{selectedNodes[1]?.category}</p>
               </div>
             </div>
             <div className="w-full flex justify-center gap-8">
               <Button
-                className="flex-col-reverse border border-[#232341]"
+                className="flex-col-reverse"
                 label="Clear"
                 title="Clear selected nodes for relation"
                 onClick={() => setSelectedNodes([undefined, undefined])}
@@ -601,7 +600,7 @@ export default function SchemaCreateElement({ onCreate, setIsAdd, selectedNodes,
                 <Trash2 size={40} />
               </Button>
               <Button
-                className="flex-col-reverse border border-[#232341]"
+                className="flex-col-reverse"
                 label="Swap"
                 title="Swap the order of selected nodes"
                 onClick={() => setSelectedNodes(prev => [prev[1], prev[0]])}

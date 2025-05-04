@@ -17,7 +17,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const { type, label, attributes, selectedNodes } = await request.json()
 
     try {
-        if (!label) throw new Error("Label is required")
+        if (type ? !label : !label[0]) throw new Error("Label is required")
+        if (!type && (!selectedNodes || selectedNodes.length !== 2)) throw new Error("Selected nodes are required")
         if (!attributes) throw new Error("Attributes are required")
         if (type === undefined) {
             throw new Error("Type is required")
@@ -27,8 +28,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         const formateAttributes = formatAttributes(attributes)
         const graph = client.selectGraph(schemaName)
         const query = type
-            ? `CREATE (n${label ? `:${label.join(":")}` : ""}${formateAttributes?.length > 0 ? ` {${formateAttributes.map(([k, v]) => `${k}: "${v}"`).join(",")}}` : ""}) RETURN n`
-            : `MATCH (a), (b) WHERE ID(a) = ${selectedNodes[0].id} AND ID(b) = ${selectedNodes[1].id} CREATE (a)-[e${label[0] ? `:${label[0]}` : ""}${formateAttributes?.length > 0 ? ` {${formateAttributes.map(([k, v]) => `${k}: "${v}"`).join(",")}}` : ""}]->(b) RETURN e`
+            ? `CREATE (n${label.length > 0 ? `:${label.join(":")}` : ""}${formateAttributes?.length > 0 ? ` {${formateAttributes.map(([k, v]) => `${k}: "${v}"`).join(",")}}` : ""}) RETURN n`
+            : `MATCH (a), (b) WHERE ID(a) = ${selectedNodes[0].id} AND ID(b) = ${selectedNodes[1].id} CREATE (a)-[e${label[0]}${formateAttributes?.length > 0 ? ` {${formateAttributes.map(([k, v]) => `${k}: "${v}"`).join(",")}}` : ""}]->(b) RETURN e`
         const result = await graph.query(query)
 
         if (!result) throw new Error("Something went wrong")

@@ -26,6 +26,8 @@ interface Props {
     type?: "schema" | "graph"
     isAddElement?: boolean
     setSelectedNodes?: Dispatch<SetStateAction<[Node | undefined, Node | undefined]>>
+    setIsAddEntity?: Dispatch<SetStateAction<boolean>>
+    setIsAddRelation?: Dispatch<SetStateAction<boolean>>
 }
 
 const NODE_SIZE = 6
@@ -45,6 +47,8 @@ export default function ForceGraph({
     type = "graph",
     isAddElement = false,
     setSelectedNodes,
+    setIsAddEntity = () => {},
+    setIsAddRelation = () => {},
 }: Props) {
 
     const [parentWidth, setParentWidth] = useState<number>(0)
@@ -193,6 +197,8 @@ export default function ForceGraph({
             }
         }
         setSelectedElement(element)
+        setIsAddEntity(false)
+        setIsAddRelation(false)
     }
 
     const handleUnselected = (evt?: MouseEvent) => {
@@ -362,4 +368,9 @@ export default function ForceGraph({
             />
         </div>
     )
+}
+
+ForceGraph.defaultProps = {
+    setIsAddEntity: () => {},
+    setIsAddRelation: () => {},
 }

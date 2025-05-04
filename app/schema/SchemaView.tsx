@@ -2,23 +2,19 @@
 
 'use client'
 
-import { ResizablePanel, ResizablePanelGroup, ResizableHandle } from "@/components/ui/resizable"
-import { ChevronLeft, Maximize2, Minimize2, Pause, Play } from "lucide-react"
 import { ImperativePanelHandle } from "react-resizable-panels"
 import { useEffect, useRef, useState, useContext } from "react"
-import { cn, prepareArg, securedFetch } from "@/lib/utils"
+import { prepareArg, securedFetch } from "@/lib/utils"
 import dynamic from "next/dynamic"
 import { useToast } from "@/components/ui/use-toast"
-import { Switch } from "@/components/ui/switch"
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { ForceGraphMethods } from "react-force-graph-2d"
-import Toolbar from "../graph/toolbar"
 import SchemaDataPanel from "./SchemaDataPanel"
 import Labels from "../graph/labels"
 import { Category, Graph, Link, Node, GraphData } from "../api/graph/model"
-import Button from "../components/ui/Button"
 import CreateElement from "./SchemaCreateElement"
 import { IndicatorContext } from "../components/provider"
+import Controls from "../graph/controls"
+import Toolbar from "../graph/toolbar"
 
 const ForceGraph = dynamic(() => import("../components/ForceGraph"), { ssr: false })
 
@@ -34,12 +30,10 @@ export default function SchemaView({ schema, fetchCount, edgesCount, nodesCount 
     const [selectedElement, setSelectedElement] = useState<Node | Link | undefined>();
     const [selectedElements, setSelectedElements] = useState<(Node | Link)[]>([]);
     const [selectedNodes, setSelectedNodes] = useState<[Node | undefined, Node | undefined]>([undefined, undefined]);
-    const [isCollapsed, setIsCollapsed] = useState<boolean>(false);
     const chartRef = useRef<ForceGraphMethods<Node, Link>>();
     const dataPanel = useRef<ImperativePanelHandle>(null);
     const [isAddRelation, setIsAddRelation] = useState(false)
     const [isAddEntity, setIsAddEntity] = useState(false)
-    const [maximize, setMaximize] = useState<boolean>(false)
     const [cooldownTicks, setCooldownTicks] = useState<number | undefined>(0)
     const [data, setData] = useState<GraphData>(schema.Elements)
     const { toast } = useToast()
@@ -86,14 +80,6 @@ export default function SchemaView({ schema, fetchCount, edgesCount, nodesCount 
         })
 
         setData({ ...schema.Elements })
-    }
-
-    const handleSetSelectedElement = (element?: Node | Link | undefined) => {
-        setSelectedElement(element)
-        if (isAddRelation || isAddEntity) return
-        if (element) {
-            dataPanel.current?.expand()
-        } else dataPanel.current?.collapse()
     }
 
     const onExpand = (expand?: boolean) => {
@@ -208,8 +194,8 @@ export default function SchemaView({ schema, fetchCount, edgesCount, nodesCount 
 
     return (
         <div className="relative w-full h-full border rounded-lg overflow-hidden">
-            <div className="pointer-events-none absolute bottom-0 left-0 right-0 flex items-center justify-between p-4">
-                <div className="w-1 grow flex gap-2">
+            <div className="pointer-events-none absolute bottom-4 inset-x-12 z-10 flex items-center justify-between">
+                <div className="flex gap-2">
                     {
                         schema.Id &&
                         <>
@@ -220,50 +206,32 @@ export default function SchemaView({ schema, fetchCount, edgesCount, nodesCount 
                 </div>
                 {
                     schema.getElements().length > 0 &&
-                    <Toolbar
+                    <Controls
                         disabled={!schema.Id}
                         chartRef={chartRef}
                     />
                 }
             </div>
-            <div className="relative h-1 grow rounded-lg overflow-hidden">
-                <Button
-                    className="z-10 absolute top-4 right-4"
-                    title={maximize ? "Minimize" : "Maximize"}
-                    onClick={() => setMaximize(prev => !prev)}
-                >
-                    {
-                        maximize ?
-                            <Minimize2 size={20} />
-                            : <Maximize2 size={20} />
-                    }
-                </Button>
-                <div className="z-10 absolute top-4 left-4 pointer-events-none">
-                    <Tooltip>
-                        <TooltipTrigger asChild>
-                            <div className="flex items-center gap-2">
-                                {cooldownTicks === undefined ? <Play size={20} /> : <Pause size={20} />}
-                                <Switch
-                                    className="pointer-events-auto"
-                                    checked={cooldownTicks === undefined}
-                                    onCheckedChange={() => {
-                                        handleCooldown(cooldownTicks === undefined ? 0 : undefined)
-                                    }}
-                                />
-                            </div>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                            <p>Animation Control</p>
-                        </TooltipContent>
-                    </Tooltip>
-                </div>
+            <div className="relative h-full w-full rounded-lg overflow-hidden">
+                <Toolbar
+                    graph={schema}
+                    selectedElement={selectedElement}
+                    setSelectedElement={setSelectedElement}
+                    selectedElements={selectedElements}
+                    handleDeleteElement={handleDeleteElement}
+                    cooldownTicks={cooldownTicks}
+                    handleCooldown={handleCooldown}
+                    setIsAddEntity={setIsAddEntity}
+                    setIsAddRelation={setIsAddRelation}
+                    chartRef={chartRef}
+                />
                 <ForceGraph
                     chartRef={chartRef}
                     data={data}
                     setData={setData}
                     graph={schema}
                     selectedElement={selectedElement}
-                    setSelectedElement={handleSetSelectedElement}
+                    setSelectedElement={setSelectedElement}
                     selectedElements={selectedElements}
                     setSelectedElements={setSelectedElements}
                     type="schema"
@@ -287,7 +255,7 @@ export default function SchemaView({ schema, fetchCount, edgesCount, nodesCount 
                             onDeleteElement={handleDeleteElement}
                             schema={schema}
                         />
-                        : isAddRelation || isAddEntity &&
+                        : (isAddRelation || isAddEntity) &&
                         <CreateElement
                             onCreate={onCreateElement}
                             setIsAdd={isAddRelation ? setIsAddRelation : setIsAddEntity}

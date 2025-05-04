@@ -4,12 +4,10 @@
 'use client'
 
 import { useRef, useState, useEffect, Dispatch, SetStateAction, useContext } from "react";
-import { GitGraph, Info, Pause, Play, Search, Table } from "lucide-react"
-import { handleZoomToFit, Query, prepareArg, securedFetch } from "@/lib/utils";
+import { GitGraph, Info, Table } from "lucide-react"
+import { Query, prepareArg, securedFetch } from "@/lib/utils";
 import dynamic from "next/dynamic";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Switch } from "@/components/ui/switch";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { ForceGraphMethods } from "react-force-graph-2d";
 import { GraphContext, IndicatorContext } from "@/app/components/provider";
 import { toast } from "@/components/ui/use-toast";
@@ -18,8 +16,8 @@ import Labels from "./labels";
 import Button from "../components/ui/Button";
 import TableView from "./TableView";
 import MetadataView from "./MetadataView";
-import Input from "../components/ui/Input";
 import Toolbar from "./toolbar";
+import Controls from "./controls";
 import GraphDataPanel from "./GraphDataPanel";
 
 const ForceGraph = dynamic(() => import("../components/ForceGraph"), { ssr: false });
@@ -39,7 +37,6 @@ function GraphView({ selectedElement, setSelectedElement, currentQuery, nodesCou
     const [selectedElements, setSelectedElements] = useState<(Node | Link)[]>([]);
     const chartRef = useRef<ForceGraphMethods<Node, Link>>()
     const [tabsValue, setTabsValue] = useState<string>("")
-    const [searchElement, setSearchElement] = useState<string>("")
     const { setIndicator } = useContext(IndicatorContext)
 
     useEffect(() => {
@@ -51,7 +48,7 @@ function GraphView({ selectedElement, setSelectedElement, currentQuery, nodesCou
         } else if (currentQuery && currentQuery.metadata.length > 0 && graph.Metadata.length > 0 && currentQuery.explain.length > 0) {
             defaultChecked = "Metadata";
         }
-        
+
         setTabsValue(defaultChecked);
         setData({ ...graph.Elements })
     }, [graph, graph.Id, graph.getElements().length, graph.Data.length])
@@ -94,16 +91,6 @@ function GraphView({ selectedElement, setSelectedElement, currentQuery, nodesCou
             }
         })
         setData({ ...graph.Elements })
-    }
-
-    const handleSearchElement = () => {
-        if (searchElement) {
-            const element = graph.Elements.nodes.find(node => node.data.name ? node.data.name.toLowerCase().startsWith(searchElement.toLowerCase()) : node.id.toString().toLowerCase().includes(searchElement.toLowerCase()))
-            if (element) {
-                handleZoomToFit(chartRef, (node: Node) => node.id === element.id)
-                setSelectedElement(element)
-            }
-        }
     }
 
     const handleDeleteElement = async () => {
@@ -170,10 +157,10 @@ function GraphView({ selectedElement, setSelectedElement, currentQuery, nodesCou
 
     return (
         <Tabs value={tabsValue} className="h-full w-full relative border rounded-lg overflow-hidden">
-            <div className="absolute bottom-0 right-0 left-0 pointer-events-none z-10 p-4 flex justify-between items-center">
+            <div className="absolute bottom-4 inset-x-12 pointer-events-none z-10 flex justify-between items-center">
                 <div className="w-1 grow flex gap-2">
                     {
-                        graph.Id &&
+                        graph.Id && tabsValue === "Graph" &&
                         <>
                             <p className="Gradient bg-clip-text text-transparent">Nodes: {nodesCount}</p>
                             <p className="Gradient bg-clip-text text-transparent">Edges: {edgesCount}</p>
@@ -225,57 +212,25 @@ function GraphView({ selectedElement, setSelectedElement, currentQuery, nodesCou
                 </div>
                 <div className="w-1 grow flex justify-end">
                     {
-                        graph.getElements().length > 0 &&
-                        <Toolbar
+                        graph.getElements().length > 0 && tabsValue === "Graph" &&
+                        <Controls
                             chartRef={chartRef}
                             disabled={graph.getElements().length === 0}
                         />
                     }
                 </div>
             </div>
-            <TabsContent value="Graph" className="h-full w-full mt-0">
-                {
-                    graph.getElements().length > 0 &&
-                    <div className="z-10 absolute top-12 left-4 pointer-events-none flex gap-4" id="canvasPanel">
-                        <Tooltip>
-                            <TooltipTrigger asChild>
-                                <div className="flex items-center gap-2">
-                                    {cooldownTicks === undefined ? <Play size={20} /> : <Pause size={20} />}
-                                    <Switch
-                                        className="pointer-events-auto"
-                                        checked={cooldownTicks === undefined}
-                                        onCheckedChange={() => {
-                                            handleCooldown(cooldownTicks === undefined ? 0 : undefined)
-                                        }}
-                                    />
-                                </div>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                                <p>Animation Control</p>
-                            </TooltipContent>
-                        </Tooltip>
-                        <div className="relative pointer-events-auto" id="elementCanvasSearch">
-                            <Input
-                                className="w-[30dvw]"
-                                placeholder="Search for element in the graph"
-                                value={searchElement}
-                                onChange={(e) => setSearchElement(e.target.value)}
-                                onKeyDown={(e) => {
-                                    if (e.key === 'Enter') {
-                                        handleSearchElement()
-                                        setSearchElement("")
-                                    }
-                                }}
-                            />
-                            <Button
-                                className="absolute right-2 top-2"
-                                onClick={handleSearchElement}
-                            >
-                                <Search color="black" />
-                            </Button>
-                        </div>
-                    </div>
-                }
+            <TabsContent value="Graph" className="h-full w-full mt-0 overflow-hidden">
+                <Toolbar
+                    graph={graph}
+                    selectedElement={selectedElement}
+                    setSelectedElement={setSelectedElement}
+                    selectedElements={selectedElements}
+                    cooldownTicks={cooldownTicks}
+                    handleCooldown={handleCooldown}
+                    handleDeleteElement={handleDeleteElement}
+                    chartRef={chartRef}
+                />
                 <ForceGraph
                     graph={graph}
                     chartRef={chartRef}
@@ -304,10 +259,10 @@ function GraphView({ selectedElement, setSelectedElement, currentQuery, nodesCou
                     />
                 }
             </TabsContent>
-            <TabsContent value="Table" className="h-full w-full mt-0">
+            <TabsContent value="Table" className="h-full w-full mt-0 overflow-hidden">
                 <TableView />
             </TabsContent>
-            <TabsContent value="Metadata" className="h-full w-full mt-0">
+            <TabsContent value="Metadata" className="h-full w-full mt-0 overflow-hidden">
                 <MetadataView
                     query={currentQuery!}
                     fetchCount={fetchCount}

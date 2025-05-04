@@ -129,7 +129,7 @@ export default function Selector({ runQuery, historyQuery, setHistoryQuery, fetc
     }
 
     return (
-        <div className="z-10 absolute w-[90%] h-[56px] top-5 left-[50%] translate-x-[-50%] flex flex-row gap-4 items-center">
+        <div className="z-20 absolute top-5 inset-x-24 h-[56px] flex flex-row gap-4 items-center">
             {
                 session?.user?.role !== "Read-Only" &&
                 <CreateGraph
@@ -151,7 +151,7 @@ export default function Selector({ runQuery, historyQuery, setHistoryQuery, fetc
                     onClick={handleReloadClick}
                     title="Reload Graphs List"
                 >
-                    <RefreshCcw />
+                    <RefreshCcw size={20} />
                 </Button>
             </div>
             <Combobox

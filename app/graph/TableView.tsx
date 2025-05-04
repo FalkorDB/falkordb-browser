@@ -11,7 +11,7 @@ export default function TableView() {
 
     return (
         <TableComponent
-            className="p-8"
+            className="p-12"
             headers={Object.keys(graph.Data[0])}
             rows={graph.Data.map(row => ({
                 cells: Object.values(row).map((value) => ({

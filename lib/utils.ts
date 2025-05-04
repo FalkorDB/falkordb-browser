@@ -9,6 +9,14 @@ import { MutableRefObject } from "react"
 import { ForceGraphMethods } from "react-force-graph-2d"
 import { Node, Link, DataCell } from "@/app/api/graph/model"
 
+export const screenSize = {
+  sm: 640,
+  md: 768,
+  lg: 1024,
+  xl: 1280,
+  '2xl': 1536
+}
+
 export type GraphRef = MutableRefObject<ForceGraphMethods<Node, Link> | undefined>
 
 export interface HistoryQuery {
