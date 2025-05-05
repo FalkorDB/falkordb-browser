@@ -124,7 +124,7 @@ export default function SchemaCreateElement({ onCreate, onExpand, selectedNodes,
           description: "You must type a label",
           variant: "destructive"
         })
-      
+
         return
       }
 
@@ -134,17 +134,17 @@ export default function SchemaCreateElement({ onCreate, onExpand, selectedNodes,
           description: "You must select two nodes to create a relation",
           variant: "destructive"
         })
-      
+
         return
       }
     }
-    
+
     try {
       setIsLoading(true)
       const ok = await onCreate(attributes, label)
-    
+
       if (!ok) return
-    
+
       setAttributes([])
       setAttribute(getDefaultAttribute())
       setLabel([])
@@ -205,17 +205,19 @@ export default function SchemaCreateElement({ onCreate, onExpand, selectedNodes,
             <ChevronRight size={20} />
           </Button>
           <ul className="flex flex-wrap gap-4 min-w-[10%]" onMouseEnter={() => setLabelsHover(true)} onMouseLeave={() => setLabelsHover(false)}>
-            {label.map((l) => (
-              <li key={l} className="flex gap-2 px-2 py-1 bg-foreground rounded-full items-center">
-                <p>{l}</p>
-                <Button
-                  title="Remove"
-                  onClick={() => handleRemoveLabel(l)}
-                >
-                  <X size={15} />
-                </Button>
-              </li>
-            ))}
+            {
+              label.map((l) => (
+                <li key={l} className="flex gap-2 px-2 py-1 bg-foreground rounded-full items-center">
+                  <p>{l}</p>
+                  <Button
+                    title="Remove"
+                    onClick={() => handleRemoveLabel(l)}
+                  >
+                    <X size={15} />
+                  </Button>
+                </li>
+              ))
+            }
             <li className="h-8 flex flex-wrap gap-2">
               {
                 (type ? (labelsHover || label.length === 0) && !isAddLabel : label.length < 1 && !isAddLabel) &&

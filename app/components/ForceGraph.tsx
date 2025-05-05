@@ -223,12 +223,10 @@ export default function ForceGraph({
                     || hoverElement && ("source" in hoverElement) && hoverElement.id === link.id)
                     || (selectedElements.length > 0 && selectedElements.some(el => el.id === link.id && !("source" in el))) ? 2 : 1}
                 nodeCanvasObject={(node, ctx) => {
-                    if (graph.Elements.nodes.length === 1) {
+                    if (!node.x || !node.y) {
                         node.x = 0
                         node.y = 0
                     }
-
-                    if (node.x === undefined || node.y === undefined) return
 
                     ctx.lineWidth = ((selectedElement && !("source" in selectedElement) && selectedElement.id === node.id)
                         || (hoverElement && !("source" in hoverElement) && hoverElement.id === node.id)
@@ -272,7 +270,13 @@ export default function ForceGraph({
                     const start = link.source;
                     const end = link.target;
 
-                    if (!start.x || !start.y || !end.x || !end.y) return
+                    if (!start.x || !start.y || !end.x || !end.y) {
+                        start.x = 0
+                        start.y = 0
+                        end.x = 0
+                        end.y = 0
+                    }
+
 
                     let textX;
                     let textY;

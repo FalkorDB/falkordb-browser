@@ -246,6 +246,7 @@ export default function SchemaDataPanel({ obj, onExpand, onDeleteElement, schema
             })
             return
         }
+
         try {
             setIsLabelLoading(true)
 
@@ -298,93 +299,88 @@ export default function SchemaDataPanel({ obj, onExpand, onDeleteElement, schema
                     >
                         <ChevronRight size={20} />
                     </Button>
-                    {
-                        "source" in obj ?
-                            <p className="px-2 py-1 bg-foreground rounded-full">{label[0]}</p>
-                            :
-                            <ul className="flex flex-wrap gap-4 min-w-[10%]" onMouseEnter={() => setLabelsHover(true)} onMouseLeave={() => setLabelsHover(false)}>
-                                {label.map((l) => (
-                                    <li key={l} className="flex gap-2 px-2 py-1 bg-foreground rounded-full items-center">
-                                        <p>{l}</p>
-                                        {
-                                            session?.user?.role !== "Read-Only" &&
-                                            <Button
-                                                indicator={indicator}
-                                                title="Remove"
-                                                onClick={() => handleRemoveLabel(l)}
-                                                isLoading={isRemoveLabelLoading}
-                                            >
-                                                <X size={15} />
-                                            </Button>
-                                        }
-                                    </li>
-                                ))}
-                                <li className="h-8 flex flex-wrap gap-2">
+                    <ul className="flex flex-wrap gap-4 min-w-[10%]" onMouseEnter={() => setLabelsHover(true)} onMouseLeave={() => setLabelsHover(false)}>
+                        {label.map((l) => (
+                            <li key={l} className="flex gap-2 px-2 py-1 bg-foreground rounded-full items-center">
+                                <p>{l}</p>
+                                {
+                                    session?.user?.role !== "Read-Only" &&
+                                    <Button
+                                        indicator={indicator}
+                                        title="Remove"
+                                        onClick={() => handleRemoveLabel(l)}
+                                        isLoading={isRemoveLabelLoading}
+                                    >
+                                        <X size={15} />
+                                    </Button>
+                                }
+                            </li>
+                        ))}
+                        <li className="h-8 flex flex-wrap gap-2">
+                            {
+                                type && labelsHover && !labelsEditable && session?.user?.role !== "Read-Only" &&
+                                <Button
+                                    className="p-2 text-xs justify-center border border-foreground"
+                                    variant="Secondary"
+                                    label="Add"
+                                    title="Add a new label"
+                                    onClick={() => setLabelsEditable(true)}
+                                >
+                                    <Pencil size={15} />
+                                </Button>
+                            }
+                            {
+                                labelsEditable &&
+                                <>
+                                    <Input
+                                        ref={ref => ref?.focus()}
+                                        className="max-w-[20dvw] h-full bg-foreground border-none text-white"
+                                        value={newLabel}
+                                        onChange={(e) => setNewLabel(e.target.value)}
+                                        onKeyDown={(e) => {
+
+                                            if (e.key === "Escape") {
+                                                e.preventDefault()
+                                                setLabelsEditable(false)
+                                                setNewLabel("")
+                                            }
+
+                                            if (e.key !== "Enter" || isLabelLoading || indicator === "offline") return
+
+                                            e.preventDefault()
+                                            handleAddLabel()
+                                        }}
+                                    />
+                                    <Button
+                                        indicator={indicator}
+                                        className="p-2 text-xs justify-center border border-foreground"
+                                        variant="Secondary"
+                                        label="Save"
+                                        title="Save the new label"
+                                        onClick={() => handleAddLabel()}
+                                        isLoading={isLabelLoading}
+                                    >
+                                        <Check size={15} />
+                                    </Button>
                                     {
-                                        labelsHover && !labelsEditable && session?.user?.role !== "Read-Only" &&
+                                        !isLabelLoading &&
                                         <Button
                                             className="p-2 text-xs justify-center border border-foreground"
                                             variant="Secondary"
-                                            label="Add"
-                                            title="Add a new label"
-                                            onClick={() => setLabelsEditable(true)}
+                                            label="Cancel"
+                                            title="Discard the new label"
+                                            onClick={() => {
+                                                setLabelsEditable(false)
+                                                setNewLabel("")
+                                            }}
                                         >
-                                            <Pencil size={15} />
+                                            <X size={15} />
                                         </Button>
                                     }
-                                    {
-                                        labelsEditable &&
-                                        <>
-                                            <Input
-                                                ref={ref => ref?.focus()}
-                                                className="max-w-[20dvw] h-full bg-foreground border-none text-white"
-                                                value={newLabel}
-                                                onChange={(e) => setNewLabel(e.target.value)}
-                                                onKeyDown={(e) => {
-
-                                                    if (e.key === "Escape") {
-                                                        e.preventDefault()
-                                                        setLabelsEditable(false)
-                                                        setNewLabel("")
-                                                    }
-
-                                                    if (e.key !== "Enter" || isLabelLoading || indicator === "offline") return
-
-                                                    e.preventDefault()
-                                                    handleAddLabel()
-                                                }}
-                                            />
-                                            <Button
-                                                indicator={indicator}
-                                                className="p-2 text-xs justify-center border border-foreground"
-                                                variant="Secondary"
-                                                label="Save"
-                                                title="Save the new label"
-                                                onClick={() => handleAddLabel()}
-                                                isLoading={isLabelLoading}
-                                            >
-                                                <Check size={15} />
-                                            </Button>
-                                            {
-                                                !isLabelLoading &&
-                                                <Button
-                                                    className="p-2 text-xs justify-center border border-foreground"
-                                                    variant="Secondary"
-                                                    label="Cancel"
-                                                    title="Discard the new label"
-                                                    onClick={() => {
-                                                        setLabelsEditable(false)
-                                                        setNewLabel("")
-                                                    }}
-                                                >
-                                                    <X size={15} />
-                                                </Button>
-                                            }
-                                        </>
-                                    }
-                                </li>
-                            </ul>
-                    }
+                                </>
+                            }
+                        </li>
+                    </ul>
                 </div>
                 <p className="font-medium text-xl">{attributes.length}&ensp;Attributes</p>
             </div>
