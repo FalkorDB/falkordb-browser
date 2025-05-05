@@ -4,6 +4,7 @@
 
 import { EdgeDataDefinition, NodeDataDefinition } from 'cytoscape';
 import { LinkObject, NodeObject } from 'react-force-graph-2d';
+import { Dispatch, SetStateAction } from 'react';
 
 const getSchemaValue = (value: string): string[] => {
     let unique, required, type, description
@@ -35,7 +36,6 @@ export type Node = NodeObject<{
     visible: boolean,
     expand: boolean,
     collapsed: boolean,
-    displayName: string,
     data: {
         [key: string]: any
     }
@@ -251,7 +251,6 @@ export class Graph {
                 visible: true,
                 expand: false,
                 collapsed,
-                displayName: "",
                 data: {}
             }
             Object.entries(cell.properties).forEach(([key, value]) => {
@@ -307,7 +306,6 @@ export class Graph {
                         expand: false,
                         collapsed,
                         visible: true,
-                        displayName: "",
                         data: {},
                     }
 
@@ -344,7 +342,6 @@ export class Graph {
                         expand: false,
                         collapsed,
                         visible: true,
-                        displayName: "",
                         data: {},
                     }
 
@@ -362,7 +359,6 @@ export class Graph {
                         expand: false,
                         collapsed,
                         visible: true,
-                        displayName: "",
                         data: {},
                     }
 
@@ -513,19 +509,13 @@ export class Graph {
         })
     }
 
-    public removeLinks(ids: number[] = []) {
+    public removeLinks(setter: Dispatch<SetStateAction<Category[]>>, ids: number[] = []) {
         const elements = this.elements.links.filter(link => ids.includes(link.source.id) || ids.includes(link.target.id))
 
         this.elements = {
             nodes: this.elements.nodes,
             links: this.elements.links.map(link => {
-                if (ids.length !== 0 && elements.includes(link)) {
-                    this.linksMap.delete(link.id)
-
-                    return undefined
-                }
-
-                if (this.elements.nodes.map(n => n.id).includes(link.source.id) && this.elements.nodes.map(n => n.id).includes(link.target.id)) {
+                if (ids.length !== 0 && !elements.includes(link) || this.elements.nodes.map(n => n.id).includes(link.source.id) && this.elements.nodes.map(n => n.id).includes(link.target.id)) {
                     return link
                 }
 
@@ -533,10 +523,11 @@ export class Graph {
 
                 if (category) {
                     category.elements = category.elements.filter(e => e.id !== link.id)
-                 
+
                     if (category.elements.length === 0) {
                         this.labels.splice(this.labels.findIndex(c => c.name === category.name), 1)
                         this.labelsMap.delete(category.name)
+                        setter(this.labels)
                     }
                 }
 
@@ -584,6 +575,11 @@ export class Graph {
             }
         })
 
+        this.elements = {
+            nodes: this.elements.nodes.filter(node => !elements.filter(e => !e.source).some(element => element.id === node.id)),
+            links: this.elements.links.filter(link => !elements.filter(e => e.source).some(element => element.id === link.id))
+        }
+
         this.data = this.data.map(row => {
             const newRow = Object.entries(row).map(([key, cell]) => {
                 if (cell && typeof cell === "object" && elements.some(element => element.id === cell.id)) {
@@ -609,9 +605,21 @@ export class Graph {
             }
             return [key, cell]
         })))
+
+        const category = this.CategoriesMap.get(label)
+
+        if (category) {
+            category.elements = category.elements.filter((element) => element.id !== selectedElement.id)
+            if (category.elements.length === 0) {
+                this.Categories.splice(this.Categories.findIndex(c => c.name === category.name), 1)
+                this.CategoriesMap.delete(category.name)
+            }
+        }
     }
 
     public addLabel(label: string, selectedElement: Node) {
+        this.createCategory([label], selectedElement)
+
         this.Data = this.Data.map(row => Object.fromEntries(Object.entries(row).map(([key, cell]) => {
             if (cell && typeof cell === "object" && cell.id === selectedElement.id && "labels" in cell) {
                 const newCell = { ...cell }
@@ -622,10 +630,10 @@ export class Graph {
         })))
     }
 
-    public removeProperty(key: string, id: number) {
+    public removeProperty(key: string, id: number, type: boolean) {
         this.Data = this.Data.map(row => {
             const newRow = Object.entries(row).map(([k, cell]) => {
-                if (cell && typeof cell === "object" && cell.id === id) {
+                if (cell && typeof cell === "object" && cell.id === id && (type ? !("sourceId" in cell) : "sourceId" in cell)) {
                     delete cell.properties[key]
                     return [k, cell]
                 }
@@ -635,9 +643,9 @@ export class Graph {
         })
     }
 
-    public setProperty(key: string, val: string, id: number) {
+    public setProperty(key: string, val: string, id: number, type: boolean) {
         this.Data = this.Data.map(row => Object.fromEntries(Object.entries(row).map(([k, cell]) => {
-            if (cell && typeof cell === "object" && cell.id === id) {
+            if (cell && typeof cell === "object" && cell.id === id && (type ? !("sourceId" in cell) : "sourceId" in cell)) {
                 return [k, { ...cell, properties: { ...cell.properties, [key]: val } }]
             }
             return [k, cell]

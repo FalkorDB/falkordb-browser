@@ -13,7 +13,7 @@ import { prepareArg, securedFetch } from "@/lib/utils";
 import Button from "../components/ui/Button";
 import { ATTRIBUTES, getDefaultAttribute, OPTIONS } from "./SchemaCreateElement";
 import Combobox from "../components/ui/combobox";
-import { Graph, Link, Node } from "../api/graph/model";
+import { Category, Graph, Link, Node } from "../api/graph/model";
 import Input from "../components/ui/Input";
 import ToastButton from "../components/ToastButton";
 import DeleteElement from "../graph/DeleteElement";
@@ -26,9 +26,10 @@ interface Props {
     onExpand: (expand?: boolean) => void;
     onDeleteElement: () => Promise<void>;
     schema: Graph
+    setCategories: (categories: Category[]) => void
 }
 
-export default function SchemaDataPanel({ obj, onExpand, onDeleteElement, schema }: Props) {
+export default function SchemaDataPanel({ obj, onExpand, onDeleteElement, schema, setCategories }: Props) {
 
     const [attribute, setAttribute] = useState<[string, string[]]>(getDefaultAttribute())
     const [attributes, setAttributes] = useState<[string, string[]][]>([])
@@ -254,25 +255,9 @@ export default function SchemaDataPanel({ obj, onExpand, onDeleteElement, schema
             }, toast)
 
             if (result.ok) {
-                node.displayName = ""
                 schema.createCategory([newLabel], node)
-                if (type) {
-                    // eslint-disable-next-line no-param-reassign
-                    schema.Elements = {
-                        ...schema.Elements,
-                        nodes: schema.Elements.nodes.map(element =>
-                            element.id === obj.id ? { ...element, category: [...element.category, newLabel] } : element
-                        )
-                    }
-                } else {
-                    // eslint-disable-next-line no-param-reassign
-                    schema.Elements = {
-                        ...schema.Elements,
-                        links: schema.Elements.links.map(element =>
-                            element.id === obj.id ? { ...element, category: [...element.category, newLabel] } : element
-                        )
-                    }
-                }
+                node.category.push(newLabel)
+                setCategories([...schema.Categories])
                 setLabel([...label, newLabel])
                 setNewLabel("")
                 setLabelsEditable(false)
@@ -293,32 +278,10 @@ export default function SchemaDataPanel({ obj, onExpand, onDeleteElement, schema
             }, toast)
 
             if (result.ok) {
-                node.displayName = ""
-                const category = schema.CategoriesMap.get(removeLabel)
-
-                if (category) {
-                    category.elements = category.elements.filter((element) => element.id !== node.id)
-
-                    if (category.elements.length === 0) {
-                        schema.Categories.splice(schema.Categories.findIndex(c => c.name === category.name), 1)
-                        schema.CategoriesMap.delete(category.name)
-                    }
-                }
-
-                if (type) {
-                    // eslint-disable-next-line no-param-reassign
-                    schema.Elements = {
-                        ...schema.Elements,
-                        nodes: schema.Elements.nodes.filter(element => element.id !== node.id)
-                    }
-                } else {
-                    // eslint-disable-next-line no-param-reassign
-                    schema.Elements = {
-                        ...schema.Elements,
-                        links: schema.Elements.links.filter(element => element.id !== node.id)
-                    }
-                }
-
+                schema.Categories.splice(schema.Categories.findIndex(c => c.name === removeLabel), 1)
+                schema.CategoriesMap.delete(removeLabel)
+                node.category.splice(node.category.findIndex(l => l === removeLabel), 1)
+                setCategories([...schema.Categories])
                 setLabel(prev => prev.filter(l => l !== removeLabel))
             }
         } finally {

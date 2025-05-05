@@ -9,7 +9,7 @@ import ForceGraph2D from "react-force-graph-2d"
 import { securedFetch, GraphRef, handleZoomToFit } from "@/lib/utils"
 import { useToast } from "@/components/ui/use-toast"
 import * as d3 from "d3"
-import { Graph, GraphData, Link, Node } from "../api/graph/model"
+import { Graph, GraphData, Link, Node, Category } from "../api/graph/model"
 import { IndicatorContext } from "./provider"
 
 interface Props {
@@ -27,6 +27,7 @@ interface Props {
     type?: "schema" | "graph"
     isAddElement?: boolean
     setSelectedNodes?: Dispatch<SetStateAction<[Node | undefined, Node | undefined]>>
+    setLabels: Dispatch<SetStateAction<Category[]>>
 }
 
 const NODE_SIZE = 6
@@ -47,6 +48,7 @@ export default function ForceGraph({
     type = "graph",
     isAddElement = false,
     setSelectedNodes,
+    setLabels
 }: Props) {
 
     const [parentWidth, setParentWidth] = useState<number>(0)
@@ -146,7 +148,7 @@ export default function ForceGraph({
 
         deleteNeighbors(expandedNodes)
 
-        graph.removeLinks()
+        graph.removeLinks(setLabels, nodes.map(n => n.id))
     }
 
     const handleNodeClick = async (node: Node) => {
