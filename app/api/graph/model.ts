@@ -4,6 +4,7 @@
 
 import { EdgeDataDefinition, NodeDataDefinition } from 'cytoscape';
 import { LinkObject, NodeObject } from 'react-force-graph-2d';
+import { Dispatch, SetStateAction } from 'react';
 
 const getSchemaValue = (value: string): string[] => {
     let unique, required, type, description
@@ -508,19 +509,13 @@ export class Graph {
         })
     }
 
-    public removeLinks(ids: number[] = []) {
+    public removeLinks(setter: Dispatch<SetStateAction<Category[]>>, ids: number[] = []) {
         const elements = this.elements.links.filter(link => ids.includes(link.source.id) || ids.includes(link.target.id))
 
         this.elements = {
             nodes: this.elements.nodes,
             links: this.elements.links.map(link => {
-                if (ids.length !== 0 && elements.includes(link)) {
-                    this.linksMap.delete(link.id)
-
-                    return undefined
-                }
-
-                if (this.elements.nodes.map(n => n.id).includes(link.source.id) && this.elements.nodes.map(n => n.id).includes(link.target.id)) {
+                if (ids.length !== 0 && !elements.includes(link) || this.elements.nodes.map(n => n.id).includes(link.source.id) && this.elements.nodes.map(n => n.id).includes(link.target.id)) {
                     return link
                 }
 
@@ -532,6 +527,7 @@ export class Graph {
                     if (category.elements.length === 0) {
                         this.labels.splice(this.labels.findIndex(c => c.name === category.name), 1)
                         this.labelsMap.delete(category.name)
+                        setter(this.labels)
                     }
                 }
 

@@ -189,6 +189,7 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
                             if (index !== -1) {
                                 graph.Categories.splice(index, 1)
                                 graph.CategoriesMap.delete(cat.name)
+                                setCategories([...graph.Categories])
                             }
                         }
                     }
@@ -202,6 +203,7 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
                         if (index !== -1) {
                             graph.Labels.splice(index, 1)
                             graph.LabelsMap.delete(category.name)
+                            setLabels([...graph.Labels])
                         }
                     }
                 }
@@ -214,7 +216,7 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
         setSelectedElements([])
         setSelectedElement(undefined)
 
-        graph.removeLinks(selectedElements.map((element) => element.id))
+        graph.removeLinks(setLabels, selectedElements.map((element) => element.id))
 
         setData({ ...graph.Elements })
         toast({
@@ -383,6 +385,7 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
                                     setSelectedElements={setSelectedElements}
                                     cooldownTicks={cooldownTicks}
                                     handleCooldown={handleCooldown}
+                                    setLabels={setLabels}
                                 />
                                 {
                                     (graph.Categories.length > 0 || graph.Labels.length > 0) &&
