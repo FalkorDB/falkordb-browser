@@ -730,7 +730,6 @@ export default function SchemaDataPanel({ obj, setObj, onDeleteElement, schema }
                         open={deleteOpen}
                         setOpen={setDeleteOpen}
                         onDeleteElement={onDeleteElement}
-                        trigger={<Button label={`Delete ${type ? "Node" : "Relation"}`} variant="Secondary" title="Remove the selected element" />}
                     />
                 }
             </div>

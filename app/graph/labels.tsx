@@ -29,7 +29,7 @@ export default function Labels({ categories, onClick, label, className = "" }: P
     }
 
     return (
-        <div className={cn(className, "absolute top-28 flex flex-col gap-2 max-w-[200px] h-[85%] pointer-events-none", label === "RelationshipTypes" ? "right-12" : "left-12")} id={`${label}Panel`}>
+        <div className={cn(className, "flex flex-col gap-2 max-w-[200px] h-[85%] pointer-events-none")} id={`${label}Panel`}>
             {
                 label &&
                 <h1>{label}</h1>

@@ -3,6 +3,8 @@
 "use client"
 
 import React, { useState, useContext } from "react";
+import { Trash2 } from "lucide-react";
+import { cn } from "@/lib/utils";
 import CloseDialog from "../components/CloseDialog";
 import DialogComponent from "../components/DialogComponent";
 import Button from "../components/ui/Button";
@@ -10,18 +12,26 @@ import { IndicatorContext } from "../components/provider";
 
 interface Props {
     onDeleteElement: () => Promise<void>
-    trigger: React.ReactNode
     open: boolean
     setOpen: (open: boolean) => void
     description: string
+    backgroundColor?: string
+    trigger?: React.ReactNode
 }
 
 export default function DeleteElement({
     onDeleteElement,
-    trigger,
     open,
     setOpen,
     description,
+    backgroundColor,
+    trigger = <Button
+        className={cn("pointer-events-auto", backgroundColor)}
+        variant="Delete"
+        title="Delete Element(s)"
+    >
+        <Trash2 size={20} />
+    </Button>,
 }: Props) {
 
     const { indicator } = useContext(IndicatorContext)
@@ -48,7 +58,7 @@ export default function DeleteElement({
                 <Button
                     indicator={indicator}
                     className="text-nowrap"
-                    variant="Primary"
+                    variant="Delete"
                     label="Delete"
                     title="Remove the selected element(s)"
                     onClick={handleDelete}

@@ -2,23 +2,30 @@
 
 /* eslint-disable react/require-default-props */
 
-import { Shrink, ZoomIn, ZoomOut } from "lucide-react";
+import { Pause, Play, Shrink, ZoomIn, ZoomOut } from "lucide-react";
 import { useContext } from "react";
 import { handleZoomToFit, GraphRef } from "@/lib/utils";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Switch } from "@/components/ui/switch";
 import Button from "../components/ui/Button";
-import { IndicatorContext } from "../components/provider";
+import { GraphContext, IndicatorContext } from "../components/provider";
 
 interface Props {
     disabled: boolean,
     chartRef: GraphRef,
+    handleCooldown: (ticks?: number) => void
+    cooldownTicks: number | undefined
 }
 
 export default function Controls({
     disabled,
     chartRef,
+    handleCooldown,
+    cooldownTicks,
 }: Props) {
 
     const { indicator } = useContext(IndicatorContext)
+    const { graph } = useContext(GraphContext)
 
     const handleZoomClick = (changeFactor: number) => {
         const chart = chartRef.current
@@ -35,6 +42,26 @@ export default function Controls({
     return (
         <div className="bg-transparent flex items-center gap-6 p-1 pointer-events-auto">
             <div className="flex items-center gap-4">
+                <Tooltip>
+                    <TooltipTrigger asChild>
+                        {
+                            graph.getElements().length > 0 &&
+                            <div className="flex items-center gap-2">
+                                {cooldownTicks === undefined ? <Play size={20} /> : <Pause size={20} />}
+                                <Switch
+                                    className="pointer-events-auto"
+                                    checked={cooldownTicks === undefined}
+                                    onCheckedChange={() => {
+                                        handleCooldown(cooldownTicks === undefined ? 0 : undefined)
+                                    }}
+                                />
+                            </div>
+                        }
+                    </TooltipTrigger>
+                    <TooltipContent>
+                        <p>Animation Control</p>
+                    </TooltipContent>
+                </Tooltip>
                 <Button
                     className="text-nowrap"
                     disabled={disabled}

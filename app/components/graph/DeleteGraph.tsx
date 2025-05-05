@@ -6,15 +6,30 @@ import Button from "../ui/Button";
 import CloseDialog from "../CloseDialog";
 import { GraphNamesContext, IndicatorContext } from "../provider";
 
-export default function DeleteGraph({ type, trigger, rows, handleSetRows, setOpenMenage, selectedValue, setSelectedValue }: {
+interface Props {
   type: "Schema" | "Graph"
-  trigger: ReactNode
   rows: Row[]
   handleSetRows: (rows: string[]) => void
   setOpenMenage: (openMenage: boolean) => void
   selectedValue: string
   setSelectedValue: (selectedValue: string) => void
-}) {
+  trigger?: ReactNode
+}
+
+export default function DeleteGraph({
+  type,
+  rows,
+  handleSetRows,
+  setOpenMenage,
+  selectedValue,
+  setSelectedValue,
+  trigger = <Button
+    variant="Delete"
+    disabled={rows.filter(opt => opt.checked).length === 0}
+    label="Delete"
+    title="Confirm the deletion of the selected graph(s)"
+  />,
+}: Props) {
 
   const [open, setOpen] = useState(false)
   const { toast } = useToast()
@@ -66,7 +81,7 @@ export default function DeleteGraph({ type, trigger, rows, handleSetRows, setOpe
       <div className="flex justify-end gap-2">
         <Button
           indicator={indicator}
-          variant="Primary"
+          variant="Delete"
           label="Delete Graph"
           onClick={() => handleDelete(rows.filter(opt => opt.checked).map(opt => opt.cells[0].value as string))}
           isLoading={isLoading}
@@ -75,4 +90,8 @@ export default function DeleteGraph({ type, trigger, rows, handleSetRows, setOpe
       </div>
     </DialogComponent>
   );
+}
+
+DeleteGraph.defaultProps = {
+  trigger: undefined,
 }

@@ -194,12 +194,6 @@ export default function Combobox({ isSelectGraph = false, disabled = false, inTa
               setOpenMenage={setOpenMenage}
               selectedValue={selectedValue}
               setSelectedValue={setSelectedValue}
-              trigger={<Button
-                variant="Primary"
-                disabled={rows.filter(opt => opt.checked).length === 0}
-                label="Delete"
-                title="Confirm the deletion of the selected graph(s)"
-              />}
             />
           }
           <ExportGraph

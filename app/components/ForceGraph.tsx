@@ -9,11 +9,10 @@ import ForceGraph2D from "react-force-graph-2d"
 import { securedFetch, GraphRef, handleZoomToFit } from "@/lib/utils"
 import { useToast } from "@/components/ui/use-toast"
 import * as d3 from "d3"
-import { GraphData, Link, Node, Graph } from "../api/graph/model"
-import { IndicatorContext } from "./provider"
+import { GraphData, Link, Node } from "../api/graph/model"
+import { IndicatorContext, GraphContext } from "./provider"
 
 interface Props {
-    graph: Graph
     chartRef: GraphRef
     data: GraphData
     setData: Dispatch<SetStateAction<GraphData>>
@@ -34,7 +33,6 @@ const NODE_SIZE = 6
 const PADDING = 2;
 
 export default function ForceGraph({
-    graph,
     chartRef,
     data,
     setData,
@@ -58,6 +56,7 @@ export default function ForceGraph({
     const lastClick = useRef<{ date: Date, name: string }>({ date: new Date(), name: "" })
     const { toast } = useToast()
     const { indicator, setIndicator } = useContext(IndicatorContext)
+    const { graph } = useContext(GraphContext)
 
     useEffect(() => {
         const handleResize = () => {

@@ -2,50 +2,68 @@
 
 'use client'
 
-import { ImperativePanelHandle } from "react-resizable-panels"
-import { useEffect, useRef, useState, useContext } from "react"
-import { prepareArg, securedFetch } from "@/lib/utils"
+import { useEffect, useState, useContext, Dispatch, SetStateAction } from "react"
+import { GraphRef, prepareArg, securedFetch } from "@/lib/utils"
 import dynamic from "next/dynamic"
 import { useToast } from "@/components/ui/use-toast"
-import { ForceGraphMethods } from "react-force-graph-2d"
 import SchemaDataPanel from "./SchemaDataPanel"
 import Labels from "../graph/labels"
-import { Category, Graph, Link, Node, GraphData } from "../api/graph/model"
+import { Category, Link, Node, GraphData } from "../api/graph/model"
 import CreateElement from "./SchemaCreateElement"
-import { IndicatorContext } from "../components/provider"
+import { IndicatorContext, GraphContext } from "../components/provider"
 import Controls from "../graph/controls"
-import Toolbar from "../graph/toolbar"
 
 const ForceGraph = dynamic(() => import("../components/ForceGraph"), { ssr: false })
 
 /* eslint-disable react/require-default-props */
 interface Props {
-    schema: Graph
     fetchCount?: () => void
     edgesCount: number
     nodesCount: number
+    selectedElement: Node | Link | undefined
+    setSelectedElement: Dispatch<SetStateAction<Node | Link | undefined>>
+    selectedElements: (Node | Link)[]
+    setSelectedElements: Dispatch<SetStateAction<(Node | Link)[]>>
+    isAddRelation: boolean
+    setIsAddRelation: Dispatch<SetStateAction<boolean>>
+    isAddEntity: boolean
+    setIsAddEntity: Dispatch<SetStateAction<boolean>>
+    chartRef: GraphRef
+    cooldownTicks: number | undefined
+    setCooldownTicks: Dispatch<SetStateAction<number | undefined>>
+    data: GraphData
+    setData: Dispatch<SetStateAction<GraphData>>
+    handleDeleteElement: () => Promise<void>
 }
 
-export default function SchemaView({ schema, fetchCount, edgesCount, nodesCount }: Props) {
-    const [selectedElement, setSelectedElement] = useState<Node | Link | undefined>();
-    const [selectedElements, setSelectedElements] = useState<(Node | Link)[]>([]);
+export default function SchemaView({
+    fetchCount,
+    edgesCount,
+    nodesCount,
+    selectedElement,
+    setSelectedElement,
+    selectedElements,
+    setSelectedElements,
+    isAddRelation,
+    setIsAddRelation,
+    isAddEntity,
+    setIsAddEntity,
+    chartRef,
+    cooldownTicks,
+    setCooldownTicks,
+    data,
+    setData,
+    handleDeleteElement
+}: Props) {
     const [selectedNodes, setSelectedNodes] = useState<[Node | undefined, Node | undefined]>([undefined, undefined]);
-    const chartRef = useRef<ForceGraphMethods<Node, Link>>();
-    const dataPanel = useRef<ImperativePanelHandle>(null);
-    const [isAddRelation, setIsAddRelation] = useState(false)
-    const [isAddEntity, setIsAddEntity] = useState(false)
-    const [cooldownTicks, setCooldownTicks] = useState<number | undefined>(0)
-    const [data, setData] = useState<GraphData>(schema.Elements)
+
     const { toast } = useToast()
     const { setIndicator } = useContext(IndicatorContext)
+    const { graph: schema } = useContext(GraphContext)
 
     useEffect(() => {
         setData({ ...schema.Elements })
     }, [schema.Elements, schema.Id])
-
-    useEffect(() => {
-        dataPanel.current?.collapse()
-    }, [])
 
     useEffect(() => {
         setSelectedElement(undefined)
@@ -82,87 +100,6 @@ export default function SchemaView({ schema, fetchCount, edgesCount, nodesCount 
         setData({ ...schema.Elements })
     }
 
-    const onExpand = (expand?: boolean) => {
-        if (!dataPanel.current) return
-        const panel = dataPanel.current
-        if (expand !== undefined) {
-            if (expand && panel?.isCollapsed()) {
-                panel?.expand()
-            } else if (!expand && panel?.isExpanded()) {
-                panel?.collapse()
-            }
-            return
-        }
-        if (panel.isCollapsed()) {
-            panel.expand()
-        } else {
-            panel.collapse()
-        }
-    }
-
-    const handleDeleteElement = async () => {
-        const stateSelectedElements = Object.values(selectedElements)
-
-        if (stateSelectedElements.length === 0 && selectedElement) {
-            stateSelectedElements.push(selectedElement)
-            setSelectedElement(undefined)
-        }
-
-        await Promise.all(stateSelectedElements.map(async (element) => {
-            const { id } = element
-            const type = !("source" in element)
-            const result = await securedFetch(`api/schema/${prepareArg(schema.Id)}/${prepareArg(id.toString())}`, {
-                method: "DELETE",
-                body: JSON.stringify({ type }),
-            }, toast, setIndicator)
-
-            if (!result.ok) return
-
-            if (type) {
-                schema.Elements.nodes.splice(schema.Elements.nodes.findIndex(node => node.id === element.id), 1)
-                schema.NodesMap.delete(id)
-            } else {
-                schema.Elements.links.splice(schema.Elements.links.findIndex(link => link.id === element.id), 1)
-                schema.EdgesMap.delete(id)
-            }
-
-            if (type) {
-                element.category.forEach((category) => {
-                    const cat = schema.CategoriesMap.get(category)
-
-                    if (cat) {
-                        cat.elements = cat.elements.filter(n => n.id !== id)
-
-                        if (cat.elements.length === 0) {
-                            schema.Categories.splice(schema.Categories.findIndex(c => c.name === cat.name), 1)
-                            schema.CategoriesMap.delete(cat.name)
-                        }
-                    }
-                })
-            } else {
-                const cat = schema.LabelsMap.get(element.label)
-
-                if (cat) {
-                    cat.elements = cat.elements.filter(n => n.id !== id)
-
-                    if (cat.elements.length === 0) {
-                        schema.Labels.splice(schema.Labels.findIndex(c => c.name === cat.name), 1)
-                        schema.LabelsMap.delete(cat.name)
-                    }
-                }
-            }
-        }))
-
-        schema.removeLinks()
-
-        if (fetchCount) fetchCount()
-
-        setSelectedElement(undefined)
-        setSelectedElements([])
-        setData({ ...schema.Elements })
-        onExpand(false)
-    }
-
     const onCreateElement = async (attributes: [string, string[]][], label?: string[]) => {
         const fakeId = "-1"
         const result = await securedFetch(`api/schema/${prepareArg(schema.Id)}/${prepareArg(fakeId)}`, {
@@ -183,8 +120,7 @@ export default function SchemaView({ schema, fetchCount, edgesCount, nodesCount 
 
             if (fetchCount) fetchCount()
 
-            onExpand()
-
+            setSelectedElement(undefined)
         }
 
         setData({ ...schema.Elements })
@@ -209,27 +145,16 @@ export default function SchemaView({ schema, fetchCount, edgesCount, nodesCount 
                     <Controls
                         disabled={!schema.Id}
                         chartRef={chartRef}
+                        handleCooldown={handleCooldown}
+                        cooldownTicks={cooldownTicks}
                     />
                 }
             </div>
             <div className="relative h-full w-full rounded-lg overflow-hidden">
-                <Toolbar
-                    graph={schema}
-                    selectedElement={selectedElement}
-                    setSelectedElement={setSelectedElement}
-                    selectedElements={selectedElements}
-                    handleDeleteElement={handleDeleteElement}
-                    cooldownTicks={cooldownTicks}
-                    handleCooldown={handleCooldown}
-                    setIsAddEntity={setIsAddEntity}
-                    setIsAddRelation={setIsAddRelation}
-                    chartRef={chartRef}
-                />
                 <ForceGraph
                     chartRef={chartRef}
                     data={data}
                     setData={setData}
-                    graph={schema}
                     selectedElement={selectedElement}
                     setSelectedElement={setSelectedElement}
                     selectedElements={selectedElements}

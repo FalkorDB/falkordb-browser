@@ -3,14 +3,12 @@
 
 'use client'
 
-import { useRef, useState, useEffect, Dispatch, SetStateAction, useContext } from "react";
+import { useState, useEffect, Dispatch, SetStateAction, useContext } from "react";
 import { GitGraph, Info, Table } from "lucide-react"
-import { Query, prepareArg, securedFetch } from "@/lib/utils";
+import { GraphRef, Query } from "@/lib/utils";
 import dynamic from "next/dynamic";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ForceGraphMethods } from "react-force-graph-2d";
-import { GraphContext, IndicatorContext } from "@/app/components/provider";
-import { toast } from "@/components/ui/use-toast";
+import { GraphContext } from "@/app/components/provider";
 import { Category, GraphData, Link, Node } from "../api/graph/model";
 import Labels from "./labels";
 import Button from "../components/ui/Button";
@@ -22,22 +20,42 @@ import GraphDataPanel from "./GraphDataPanel";
 
 const ForceGraph = dynamic(() => import("../components/ForceGraph"), { ssr: false });
 
-function GraphView({ selectedElement, setSelectedElement, currentQuery, nodesCount, edgesCount, fetchCount, handleCooldown, cooldownTicks }: {
+interface Props {
+    data: GraphData
+    setData: Dispatch<SetStateAction<GraphData>>
     selectedElement: Node | Link | undefined
     setSelectedElement: Dispatch<SetStateAction<Node | Link | undefined>>
+    selectedElements: (Node | Link)[]
+    setSelectedElements: Dispatch<SetStateAction<(Node | Link)[]>>
     currentQuery: Query | undefined
     nodesCount: number
     edgesCount: number
     fetchCount: () => void
     handleCooldown: (ticks?: number) => void
     cooldownTicks: number | undefined
-}) {
-    const { graph } = useContext(GraphContext)
-    const [data, setData] = useState<GraphData>({ ...graph.Elements })
-    const [selectedElements, setSelectedElements] = useState<(Node | Link)[]>([]);
-    const chartRef = useRef<ForceGraphMethods<Node, Link>>()
+    chartRef: GraphRef
+    handleDeleteElement: () => Promise<void>
+}
+
+function GraphView({
+    data,
+    setData,
+    selectedElement,
+    setSelectedElement,
+    selectedElements,
+    setSelectedElements,
+    currentQuery,
+    nodesCount,
+    edgesCount,
+    fetchCount,
+    handleCooldown,
+    cooldownTicks,
+    chartRef,
+    handleDeleteElement
+}: Props) {
+
     const [tabsValue, setTabsValue] = useState<string>("")
-    const { setIndicator } = useContext(IndicatorContext)
+    const { graph } = useContext(GraphContext)
 
     useEffect(() => {
         let defaultChecked = "Graph"
@@ -91,68 +109,6 @@ function GraphView({ selectedElement, setSelectedElement, currentQuery, nodesCou
             }
         })
         setData({ ...graph.Elements })
-    }
-
-    const handleDeleteElement = async () => {
-        if (selectedElements.length === 0 && selectedElement) {
-            selectedElements.push(selectedElement)
-            setSelectedElement(undefined)
-        }
-
-        await Promise.all(selectedElements.map(async (element) => {
-            const type = !element.source
-            const result = await securedFetch(`api/graph/${prepareArg(graph.Id)}/${prepareArg(element.id.toString())}`, {
-                method: "DELETE",
-                body: JSON.stringify({ type })
-            }, toast, setIndicator)
-
-            if (!result.ok) return
-
-            if (type) {
-                (element as Node).category.forEach((category) => {
-                    const cat = graph.CategoriesMap.get(category)
-                    if (cat) {
-                        cat.elements = cat.elements.filter((e) => e.id !== element.id)
-                        if (cat.elements.length === 0) {
-                            const index = graph.Categories.findIndex(c => c.name === cat.name)
-                            if (index !== -1) {
-                                graph.Categories.splice(index, 1)
-                                graph.CategoriesMap.delete(cat.name)
-                            }
-                        }
-                    }
-                })
-            } else {
-                const category = graph.LabelsMap.get((element as Link).label)
-                if (category) {
-                    category.elements = category.elements.filter((e) => e.id !== element.id)
-                    if (category.elements.length === 0) {
-                        const index = graph.Labels.findIndex(l => l.name === category.name)
-                        if (index !== -1) {
-                            graph.Labels.splice(index, 1)
-                            graph.LabelsMap.delete(category.name)
-                        }
-                    }
-                }
-            }
-        }))
-
-        graph.removeElements(selectedElements)
-
-        fetchCount()
-        setSelectedElements([])
-        setSelectedElement(undefined)
-
-        graph.removeLinks(selectedElements.map((element) => element.id))
-
-        setData({ ...graph.Elements })
-        toast({
-            title: "Success",
-            description: `${selectedElements.length > 1 ? "Elements" : "Element"} deleted`,
-        })
-        handleCooldown()
-        setSelectedElement(undefined)
-        setSelectedElements([])
     }
 
     return (
@@ -216,23 +172,14 @@ function GraphView({ selectedElement, setSelectedElement, currentQuery, nodesCou
                         <Controls
                             chartRef={chartRef}
                             disabled={graph.getElements().length === 0}
+                            handleCooldown={handleCooldown}
+                            cooldownTicks={cooldownTicks}
                         />
                     }
                 </div>
             </div>
             <TabsContent value="Graph" className="h-full w-full mt-0 overflow-hidden">
-                <Toolbar
-                    graph={graph}
-                    selectedElement={selectedElement}
-                    setSelectedElement={setSelectedElement}
-                    selectedElements={selectedElements}
-                    cooldownTicks={cooldownTicks}
-                    handleCooldown={handleCooldown}
-                    handleDeleteElement={handleDeleteElement}
-                    chartRef={chartRef}
-                />
                 <ForceGraph
-                    graph={graph}
                     chartRef={chartRef}
                     data={data}
                     setData={setData}
@@ -243,13 +190,25 @@ function GraphView({ selectedElement, setSelectedElement, currentQuery, nodesCou
                     cooldownTicks={cooldownTicks}
                     handleCooldown={handleCooldown}
                 />
-                {
-                    (graph.Categories.length > 0 || graph.Labels.length > 0) &&
-                    <>
+                <div className="h-full z-10 absolute top-12 inset-x-12 pointer-events-none flex gap-8">
+                    {
+                        (graph.Labels.length > 0 || graph.Categories.length > 0) &&
                         <Labels categories={graph.Categories} onClick={onCategoryClick} label="Labels" />
+                    }
+                    <div className="w-1 grow h-fit">
+                        <Toolbar
+                            setSelectedElement={setSelectedElement}
+                            selectedElements={selectedElements}
+                            handleDeleteElement={handleDeleteElement}
+                            chartRef={chartRef}
+                            backgroundColor="bg-transparent"
+                        />
+                    </div>
+                    {
+                        (graph.Labels.length > 0 || graph.Categories.length > 0) &&
                         <Labels categories={graph.Labels} onClick={onLabelClick} label="RelationshipTypes" />
-                    </>
-                }
+                    }
+                </div>
                 {
                     selectedElement &&
                     <GraphDataPanel

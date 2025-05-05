@@ -528,15 +528,6 @@ export default function GraphDataPanel({ obj, setObj, onDeleteElement }: Props) 
                         open={deleteOpen}
                         setOpen={setDeleteOpen}
                         onDeleteElement={handleDeleteElement}
-                        trigger={
-                            <Button
-                                variant="Primary"
-                                label={`Delete ${type ? "Node" : "Relation"}`}
-                                title={`Delete the selected ${type ? "Node" : "Relation"}`}
-                            >
-                                <Trash2 size={20} />
-                            </Button>
-                        }
                     />
                 }
             </div>

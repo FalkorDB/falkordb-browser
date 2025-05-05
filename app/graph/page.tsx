@@ -1,10 +1,11 @@
 'use client'
 
-import { useCallback, useContext, useEffect, useState } from "react";
+import { useCallback, useContext, useEffect, useRef, useState } from "react";
 import { getQueryWithLimit, HistoryQuery, prepareArg, Query, securedFetch } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
 import dynamic from "next/dynamic";
-import { Graph, Link, Node } from "../api/graph/model";
+import { ForceGraphMethods } from "react-force-graph-2d";
+import { Graph, GraphData, Link, Node } from "../api/graph/model";
 import Tutorial from "./Tutorial";
 import { GraphNameContext, GraphContext, IndicatorContext, LimitContext, TimeoutContext } from "../components/provider";
 
@@ -12,8 +13,9 @@ const Selector = dynamic(() => import("./Selector"), { ssr: false })
 const GraphView = dynamic(() => import("./GraphView"), { ssr: false })
 
 export default function Page() {
-
-    const [selectedElement, setSelectedElement] = useState<Node | Link>();
+    const [selectedElement, setSelectedElement] = useState<Node | Link | undefined>()
+    const [selectedElements, setSelectedElements] = useState<(Node | Link)[]>([])
+    const [cooldownTicks, setCooldownTicks] = useState<number | undefined>(0)
     const [historyQuery, setHistoryQuery] = useState<HistoryQuery>({
         queries: [],
         query: "",
@@ -21,15 +23,18 @@ export default function Page() {
         counter: 0
     })
     const [currentQuery, setCurrentQuery] = useState<Query>()
-    const [cooldownTicks, setCooldownTicks] = useState<number | undefined>(0)
-    const { graph, setGraph } = useContext(GraphContext)
-    const { graphName } = useContext(GraphNameContext)
-    const { toast } = useToast()
-    const { setIndicator } = useContext(IndicatorContext);
-    const { timeout } = useContext(TimeoutContext);
-    const { limit } = useContext(LimitContext);
     const [nodesCount, setNodesCount] = useState(0)
     const [edgesCount, setEdgesCount] = useState(0)
+
+    const chartRef = useRef<ForceGraphMethods<Node, Link>>()
+
+    const { toast } = useToast()
+    const { setIndicator } = useContext(IndicatorContext);
+    const { graph, setGraph } = useContext(GraphContext)
+    const [data, setData] = useState<GraphData>({ ...graph.Elements })
+    const { graphName } = useContext(GraphNameContext)
+    const { timeout } = useContext(TimeoutContext);
+    const { limit } = useContext(LimitContext);
 
     const fetchCount = useCallback(async () => {
         if (!graphName) return
@@ -137,6 +142,68 @@ export default function Page() {
         handleCooldown()
     }
 
+    const handleDeleteElement = async () => {
+        if (selectedElements.length === 0 && selectedElement) {
+            selectedElements.push(selectedElement)
+            setSelectedElement(undefined)
+        }
+
+        await Promise.all(selectedElements.map(async (element) => {
+            const type = !element.source
+            const result = await securedFetch(`api/graph/${prepareArg(graph.Id)}/${prepareArg(element.id.toString())}`, {
+                method: "DELETE",
+                body: JSON.stringify({ type })
+            }, toast, setIndicator)
+
+            if (!result.ok) return
+
+            if (type) {
+                (element as Node).category.forEach((category) => {
+                    const cat = graph.CategoriesMap.get(category)
+                    if (cat) {
+                        cat.elements = cat.elements.filter((e) => e.id !== element.id)
+                        if (cat.elements.length === 0) {
+                            const index = graph.Categories.findIndex(c => c.name === cat.name)
+                            if (index !== -1) {
+                                graph.Categories.splice(index, 1)
+                                graph.CategoriesMap.delete(cat.name)
+                            }
+                        }
+                    }
+                })
+            } else {
+                const category = graph.LabelsMap.get((element as Link).label)
+                if (category) {
+                    category.elements = category.elements.filter((e) => e.id !== element.id)
+                    if (category.elements.length === 0) {
+                        const index = graph.Labels.findIndex(l => l.name === category.name)
+                        if (index !== -1) {
+                            graph.Labels.splice(index, 1)
+                            graph.LabelsMap.delete(category.name)
+                        }
+                    }
+                }
+            }
+        }))
+
+        graph.removeElements(selectedElements)
+
+        fetchCount()
+        setSelectedElements([])
+        setSelectedElement(undefined)
+
+        graph.removeLinks(selectedElements.map((element) => element.id))
+
+        setData({ ...graph.Elements })
+        toast({
+            title: "Success",
+            description: `${selectedElements.length > 1 ? "Elements" : "Element"} deleted`,
+        })
+        handleCooldown()
+        setSelectedElement(undefined)
+        setSelectedElements([])
+    }
+
     return (
         <div className="Page">
             <Selector
@@ -144,17 +211,27 @@ export default function Page() {
                 historyQuery={historyQuery}
                 setHistoryQuery={setHistoryQuery}
                 fetchCount={fetchCount}
+                selectedElements={selectedElements}
+                setSelectedElement={setSelectedElement}
+                handleDeleteElement={handleDeleteElement}
+                chartRef={chartRef}
             />
             <div className="h-1 grow p-12">
                 <GraphView
                     fetchCount={fetchCount}
                     selectedElement={selectedElement}
                     setSelectedElement={setSelectedElement}
+                    selectedElements={selectedElements}
+                    setSelectedElements={setSelectedElements}
                     currentQuery={currentQuery}
                     nodesCount={nodesCount}
                     edgesCount={edgesCount}
                     handleCooldown={handleCooldown}
                     cooldownTicks={cooldownTicks}
+                    chartRef={chartRef}
+                    data={data}
+                    setData={setData}
+                    handleDeleteElement={handleDeleteElement}
                 />
             </div>
             <Tutorial />
