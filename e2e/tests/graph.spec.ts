@@ -662,4 +662,13 @@ test.describe('Graph Tests', () => {
         await apiCall.removeGraph(graphName);
         await apiCall.removeGraph(newGraphName);
     });
+
+    test(`@readonly Validate that RO user can select graph`, async () => {
+        const graphName = getRandomString('graph');
+        await apiCall.addGraph(graphName, "admin");
+        const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+        await graph.selectExistingGraph(graphName, "readonly");
+        expect(await graph.getErrorNotification()).toBeFalsy();
+        await apiCall.removeGraph(graphName, "admin");
+    });
 })

@@ -11,7 +11,7 @@ import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, Tabl
 import { useToast } from "@/components/ui/use-toast";
 import { useSession } from "next-auth/react";
 import Button from "../components/ui/Button";
-import { Graph, Link, Node } from "../api/graph/model";
+import { Category, Graph, Link, Node } from "../api/graph/model";
 import Input from "../components/ui/Input";
 import DialogComponent from "../components/DialogComponent";
 import CloseDialog from "../components/CloseDialog";
@@ -20,14 +20,14 @@ import ToastButton from "../components/ToastButton";
 import { IndicatorContext } from "../components/provider";
 
 interface Props {
-    obj: Node | Link;
-    setObj: Dispatch<SetStateAction<Node | Link | undefined>>;
+    object: Node | Link;
     onExpand: (expand?: boolean) => void;
     graph: Graph;
     onDeleteElement: () => Promise<void>;
+    setCategories: Dispatch<SetStateAction<Category[]>>;
 }
 
-export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement, graph }: Props) {
+export default function GraphDataPanel({ object, onExpand, onDeleteElement, graph, setCategories }: Props) {
 
     const [attributes, setAttributes] = useState<string[]>([]);
     const [editable, setEditable] = useState<string>("");
@@ -40,7 +40,7 @@ export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement,
     const [labelsHover, setLabelsHover] = useState(false)
     const [labelsEditable, setLabelsEditable] = useState(false)
     const [newLabel, setNewLabel] = useState("")
-    const type = !("source" in obj)
+    const type = !("source" in object)
     const [isLabelLoading, setIsLabelLoading] = useState(false)
     const [isAddLoading, setIsAddLoading] = useState(false)
     const [isSetLoading, setIsSetLoading] = useState(false)
@@ -60,7 +60,7 @@ export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement,
     }
 
     useEffect(() => {
-        if (lastObjId.current !== obj.id) {
+        if (lastObjId.current !== object.id) {
             setEditable("")
             setNewVal("")
             setNewKey("")
@@ -68,13 +68,13 @@ export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement,
             setLabelsHover(false)
             setIsAddValue(false)
         }
-        setAttributes(Object.keys(obj.data).filter((key) => (key !== "name" || obj.data.name !== obj.id)));
-        setLabel(type ? [...obj.category.filter((c) => c !== "")] : [obj.label]);
-        lastObjId.current = obj.id
-    }, [obj, type]);
+        setAttributes(Object.keys(object.data));
+        setLabel(type ? [...object.category.filter((c) => c !== "")] : [object.label]);
+        lastObjId.current = object.id
+    }, [object, type]);
 
     const setProperty = async (key: string, val: string, isUndo: boolean, actionType: ("added" | "set") = "set") => {
-        const { id } = obj
+        const { id } = object
         if (!val || val === "") {
             toast({
                 title: "Error",
@@ -94,11 +94,11 @@ export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement,
             }, toast, setIndicator)
 
             if (result.ok) {
+                const value = object.data[key]
 
-                graph.setProperty(key, val, id)
-
-                const value = obj.data[key]
-                setObj({ ...obj, data: { ...obj.data, [key]: val } })
+                graph.setProperty(key, val, id, type)
+                object.data[key] = val
+                setAttributes(Object.keys(object.data))
 
                 handleSetEditable("", "")
                 toast({
@@ -139,18 +139,18 @@ export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement,
     const removeProperty = async (key: string) => {
         try {
             setIsRemoveLoading(true)
-            const { id } = obj
+            const { id } = object
             const success = (await securedFetch(`api/graph/${prepareArg(graph.Id)}/${id}/${key}`, {
                 method: "DELETE",
                 body: JSON.stringify({ type }),
             }, toast, setIndicator)).ok
 
             if (success) {
-                const value = obj.data[key]
+                const value = object.data[key]
 
-                graph.removeProperty(key, id)
-                delete obj.data[key]
-                setObj({ ...obj })
+                graph.removeProperty(key, id, type)
+                delete object.data[key]
+                setAttributes(Object.keys(object.data))
 
                 toast({
                     title: "Success",
@@ -191,7 +191,7 @@ export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement,
     }
 
     const handleAddLabel = async () => {
-        const node = obj as Node
+        const node = object as Node
         if (newLabel === "") {
             toast({
                 title: "Error",
@@ -218,9 +218,10 @@ export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement,
             }, toast, setIndicator)
 
             if (result.ok) {
-                graph.createCategory([newLabel], node)
                 graph.addLabel(newLabel, node)
-                setObj({ ...node, category: [...node.category, newLabel] })
+                node.category.push(newLabel)
+                setLabel([...node.category])
+                setCategories([...graph.Categories])
                 setNewLabel("")
                 setLabelsEditable(false)
             }
@@ -230,7 +231,7 @@ export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement,
     }
 
     const handleRemoveLabel = async (removeLabel: string) => {
-        const node = obj as Node
+        const node = object as Node
         const result = await securedFetch(`api/graph/${prepareArg(graph.Id)}/${node.id}/label`, {
             method: "DELETE",
             body: JSON.stringify({
@@ -239,24 +240,17 @@ export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement,
         }, toast, setIndicator)
 
         if (result.ok) {
-            const category = graph.CategoriesMap.get(removeLabel)
-
-            if (category) {
-                category.elements = category.elements.filter((element) => element.id !== node.id)
-                if (category.elements.length === 0) {
-                    graph.Categories.splice(graph.Categories.findIndex(c => c.name === category.name), 1)
-                    graph.CategoriesMap.delete(category.name)
-                }
-            }
-
             graph.removeLabel(removeLabel, node)
-            setObj({ ...node, category: node.category.filter((c) => c !== removeLabel) })
+            node.category = node.category.filter((c) => c !== removeLabel)
+            setLabel([...node.category])
+            setCategories([...graph.Categories])
         }
     }
 
     const handleDeleteElement = async () => {
         await onDeleteElement()
         setDeleteOpen(false)
+        onExpand(false)
     }
 
     return (
@@ -371,7 +365,7 @@ export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement,
                     <TableRow>
                         <TableCell />
                         <TableCell>id:</TableCell>
-                        <TableCell>{obj.id}</TableCell>
+                        <TableCell>{object.id}</TableCell>
                     </TableRow>
                     {
                         attributes.map((key) => (
@@ -411,7 +405,7 @@ export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement,
                                                     <>
                                                         <Button
                                                             variant="button"
-                                                            onClick={() => handleSetEditable(key, obj.data[key])}
+                                                            onClick={() => handleSetEditable(key, object.data[key])}
                                                             disabled={isAddValue}
                                                         >
                                                             <Pencil size={20} />
@@ -457,10 +451,10 @@ export default function GraphDataPanel({ obj, setObj, onExpand, onDeleteElement,
                                                 onKeyDown={handleSetKeyDown}
                                             />
                                             : <Button
-                                                label={obj.data[key]}
+                                                label={object.data[key]}
                                                 title="Click to edit the attribute value"
                                                 variant="button"
-                                                onClick={() => handleSetEditable(key, obj.data[key])}
+                                                onClick={() => handleSetEditable(key, object.data[key])}
                                             />
                                     }
                                 </TableCell>

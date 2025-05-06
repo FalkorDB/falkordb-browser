@@ -161,47 +161,48 @@ export default class SchemaPage extends GraphPage {
     async clickAddNewSchemaBtn(): Promise<void> {
         await interactWhenVisible(this.addSchemaBtnInNavBar, el => el.click(), "add new schema button");
     }
-      
+
     async fillSchemaNameInput(schemaName: string): Promise<void> {
         await interactWhenVisible(this.schemaNameInput, el => el.fill(schemaName), "schema name input");
     }
-      
+
     async clickCreateSchemaBtn(): Promise<void> {
         await interactWhenVisible(this.createSchemaBtn, el => el.click(), "create schema button");
     }
-      
+
     async clickAddNode(): Promise<void> {
         await interactWhenVisible(this.addNodeBtn, el => el.click(), "add node button");
     }
-      
+
     async clickAddRelation(): Promise<void> {
         await interactWhenVisible(this.addRelationBtn, el => el.click(), "add relation button");
     }
-      
+
     async clickCloseBtnInHeaderDataPanel(): Promise<void> {
         await interactWhenVisible(this.closeBtnInHeaderDataPanel, el => el.click(), "close button in header data panel");
     }
-      
+
     async clickAddBtnInHeaderDataPanel(): Promise<void> {
         await interactWhenVisible(this.addBtnInHeaderDataPanel, el => el.click(), "add button in header data panel");
     }
-      
+
     async insertDataPanelHeader(title: string): Promise<void> {
         await interactWhenVisible(this.dataPanelHeaderInput, el => el.fill(title), "data panel header input");
     }
-      
+
     async clickSaveBtnInHeaderDataPanel(): Promise<void> {
         await interactWhenVisible(this.saveBtnInHeaderDataPanel, el => el.click(), "save button in header data panel");
     }
-      
+
     async insertActiveKeyInputInDataPanelAttr(key: string): Promise<void> {
         await interactWhenVisible(this.activekeyInputInDataPanel, el => el.fill(key), "active key input in data panel");
     }
-      
+
     async getKeyInDataPanelAttr(keyIndex: string): Promise<string | null> {
-        return await interactWhenVisible(this.keyInDataPanel(keyIndex), el => el.textContent(), "key input in data panel");
+        const text = await interactWhenVisible(this.keyInDataPanel(keyIndex), el => el.textContent(), "key input in data panel");
+        return text;
     }
-      
+
     async insertActiveDescInputInDataPanelAttr(desc: string): Promise<void> {
         await interactWhenVisible(this.activeDescInputInDataPanel, el => el.fill(desc), "desc input in data panel");
     }
@@ -209,59 +210,60 @@ export default class SchemaPage extends GraphPage {
     async getFirstDescInDataPanelAttr(descIndex: string): Promise<string | null> {
         return await interactWhenVisible(this.descInDataPanel(descIndex), el => el.textContent(), "desc input in data panel");
     }
-      
+
     async clickTypeActiveBtnInDataPanel(): Promise<void> {
         await interactWhenVisible(this.typeActiveBtnInDataPanel, el => el.click(), "type active button in data panel");
     }
-      
+
     async clickUniqueActiveRadioBtn(): Promise<void> {
         await interactWhenVisible(this.uniqueActiveRadioBtn, el => el.click(), "unique active button in data panel");
     }
-      
+
     async clickRequiredActiveRadioBtn(): Promise<void> {
         await interactWhenVisible(this.requiredActiveRadioBtn, el => el.click(), "required active button in data panel");
     }
-      
+
     async clickAddActiveBtnInDataPanel(): Promise<void> {
         await interactWhenVisible(this.addActiveBtnInDataPanel, el => el.click(), "add active button in data panel");
     }
-      
+
     async clickCancelActiveBtnInDataPanel(): Promise<void> {
         await interactWhenVisible(this.cancelActiveBtnInDataPanel, el => el.click(), "cancel active button in data panel");
     }
-      
+
     async clickCreateNewNodeBtnInDataPanel(): Promise<void> {
         await interactWhenVisible(this.createNewNodeBtnInDataPanel, el => el.click(), "create new node button in data panel");
     }
-      
+
     async clickCreateNewEdgeBtnInDataPanel(): Promise<void> {
         await interactWhenVisible(this.createNewEdgeBtnInDataPanel, el => el.click(), "create new edge button in data panel");
     }
-      
+
     async clickAddValueBtnInDataPanel(): Promise<void> {
         await interactWhenVisible(this.addValueBtnInDataPanel, el => el.click(), "add value button in data panel");
     }
-      
+
     async clickDeleteValueBtnInDataPanel(): Promise<void> {
         await interactWhenVisible(this.deleteValueBtnInDataPanel, el => el.click(), "delete value button in data panel");
     }
-      
+
     async clickEditValueBtnInDataPanel(): Promise<void> {
         await interactWhenVisible(this.editValueBtnInDataPanel, el => el.click(), "edit value button in data panel");
     }
-      
+
     async hasAttributeRows(): Promise<boolean> {
         const isVisible = await waitForElementToBeVisible(this.attributeRows);
         if (!isVisible) return false;
         const rows = await this.attributeRows.count();
         return rows > 0;
     }
-      
+
     async getAttributeRowsCount(): Promise<number> {
         await this.page.waitForTimeout(500);
-        return await this.attributeRows.count();
-    }      
-      
+        const rows = await this.attributeRows.count();
+        return rows;
+    }
+    
     async clickDeleteNodeInDataPanel(): Promise<void> {
         await interactWhenVisible(this.deleteNodeInDataPanel, el => el.click(), "delete node in data panel");
     }
@@ -269,13 +271,14 @@ export default class SchemaPage extends GraphPage {
     async clickDeleteRelationInDataPanel(): Promise<void> {
         await interactWhenVisible(this.deleteRelationInDataPanel, el => el.click(), "delete relation in data panel");
     }
-      
+
     async clickCategoriesPanelBtn(): Promise<void> {
         await interactWhenVisible(this.categoriesPanelBtn, el => el.click(), "categories panel button");
     }
-      
+
     async getCategoriesPanelBtn(): Promise<string | null> {
-        return await interactWhenVisible(this.categoriesPanelBtn, el => el.textContent(), "categories panel button");
+        const text = await interactWhenVisible(this.categoriesPanelBtn, el => el.textContent(), "categories panel button");
+        return text;
     }
 
     async fillTypeSelectSearchInput(type: string): Promise<void> {
@@ -323,7 +326,8 @@ export default class SchemaPage extends GraphPage {
     }
     
     async isCategoriesPanelBtnHidden(): Promise<boolean> {
-        return await this.categoriesPanelBtn.isHidden();
+        const isHidden = await this.categoriesPanelBtn.isHidden();
+        return isHidden;
     }
 
     async getCategoriesPanelCount(): Promise<number> {
@@ -354,13 +358,13 @@ export default class SchemaPage extends GraphPage {
         await this.clickOnDeleteLabel();
     }
 
-    async deleteNode(x: number, y: number): Promise<void>{
+    async deleteNode(x: number, y: number): Promise<void> {
         await this.nodeClick(x, y);
         await this.clickDeleteNodeInDataPanel();
-        await this.clickConfirmDeleteNodeInDataPanel();      
+        await this.clickConfirmDeleteNodeInDataPanel();
     }
 
-    async addRelationLabel(title: string): Promise<void>{
+    async addRelationLabel(title: string): Promise<void> {
         await this.clickAddRelation();
         await this.clickAddBtnInHeaderDataPanel();
         await this.insertDataPanelHeader(title);
@@ -384,6 +388,7 @@ export default class SchemaPage extends GraphPage {
         await this.addAttribute(key, type, desc, unique, required);
     }
 
+
     async selectFirstTwoNodesForRelation(): Promise<void> {
         const schema = await this.getNodeScreenPositions('schema');
         await this.nodeClick(schema[0].screenX, schema[0].screenY);
@@ -393,7 +398,7 @@ export default class SchemaPage extends GraphPage {
     async clickRelationBetweenNodes(): Promise<void> {
         await this.selectFirstTwoNodesForRelation();
         await this.clickCreateNewEdgeBtnInDataPanel();
-    }    
+    }
 
     async deleteRelation(x: number, y: number): Promise<void> {
         await this.nodeClick(x, y);
@@ -406,15 +411,15 @@ export default class SchemaPage extends GraphPage {
         await this.clickSearchedType();
     }
 
-    async addAttribute(key: string, type: string, desc: string, unique: boolean, required: boolean): Promise<void>{
+    async addAttribute(key: string, type: string, desc: string, unique: boolean, required: boolean): Promise<void> {
         await this.insertActiveKeyInputInDataPanelAttr(key);
         await this.clickTypeActiveBtnInDataPanel();
         await this.selectTypeFromList(type);
         await this.insertActiveDescInputInDataPanelAttr(desc);
-        if(unique){
+        if (unique) {
             await this.clickUniqueActiveRadioBtn();
         }
-        if(required){
+        if (required) {
             await this.clickRequiredActiveRadioBtn();
         }
         await this.clickAddActiveBtnInDataPanel();
@@ -432,5 +437,4 @@ export default class SchemaPage extends GraphPage {
         await this.insertActiveDescInputInDataPanelAttr(desc);
         await this.clickSaveAttributeBtnInSchemaDataPanel();
     }
-    
 }

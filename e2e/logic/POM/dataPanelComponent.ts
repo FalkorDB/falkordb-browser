@@ -96,7 +96,8 @@ export default class DataPanel extends GraphPage {
     
     async getAttributeValueInGraphDataPanel(): Promise<string | null> {
         await interactWhenVisible(this.saveAttributeButtonInGraphDataPanel, async () => {}, "save attribute button in graph data panel");
-        return await this.saveAttributeButtonInGraphDataPanel.textContent();
+        const text = await this.saveAttributeButtonInGraphDataPanel.textContent();
+        return text
     }    
 
     async clickModifyAttributeButtonInLastRowOfGraphDataPanel(): Promise<void> {
@@ -120,12 +121,14 @@ export default class DataPanel extends GraphPage {
     }    
 
     async isLastAttributeNameCellInGraphDataPanel(attribute: string): Promise<boolean>{
-        return await this.lastAttributeNameCellInGraphDataPanel(attribute).isVisible();
+        const isVisible = await this.lastAttributeNameCellInGraphDataPanel(attribute).isVisible();
+        return isVisible;
     }
 
     async getLastAttributeNameCellInGraphDataPanel(attribute: string): Promise<string | null> {
         await interactWhenVisible(this.lastAttributeNameCellInGraphDataPanel(attribute), async () => {}, `last attribute name cell for "${attribute}"`);
-        return await this.lastAttributeNameCellInGraphDataPanel(attribute).textContent();
+        const text = await this.lastAttributeNameCellInGraphDataPanel(attribute).textContent();
+        return text;
     }
     
     async fillAttributeValueInputInGraphDataPanel(input: string): Promise<void> {
@@ -154,7 +157,8 @@ export default class DataPanel extends GraphPage {
     
     async getAttributeHeaderLabelInDataPanelHeader(): Promise<string | null> {
         await interactWhenVisible(this.attributeHeaderLabelInDataPanelHeader, async () => {}, "attribute header label in data panel header");
-        return await this.attributeHeaderLabelInDataPanelHeader.textContent();
+        const text = await this.attributeHeaderLabelInDataPanelHeader.textContent();
+        return text;
     }
 
     async modifyNodeHeaderAttribute(attribute: string): Promise<void> {

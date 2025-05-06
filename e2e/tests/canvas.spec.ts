@@ -21,9 +21,9 @@ test.describe('Canvas Tests', () => {
     test.afterEach(async () => {
         await browser.closeBrowser();
     })
-    
+
     const testNodes = [1, 5, 10];
-    for (const node of testNodes) {
+    testNodes.forEach(async (node) => {
         test(`@admin Validate search for Person ${node} in the canvas and ensure focus`, async () => {
             const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
             await browser.setPageToFullScreen();
@@ -37,7 +37,7 @@ test.describe('Canvas Tests', () => {
             expect(await graph.getNodeCanvasToolTip()).toBe(searchQuery);
             await apicalls.removeGraph(graphName);
         });
-    }
+    });
 
     test(`@admin Validate zoom-in functionality upon clicking the zoom in button`, async () => {
         const graph = await browser.createNewPage(GraphPage, urls.graphUrl);

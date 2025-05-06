@@ -37,7 +37,7 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
     fetchCount: () => void
 }) {
 
-    const [data, setData] = useState<GraphData>(graph.Elements)
+    const [data, setData] = useState<GraphData>({ ...graph.Elements })
     const [selectedElements, setSelectedElements] = useState<(Node | Link)[]>([]);
     const [isCollapsed, setIsCollapsed] = useState<boolean>(true);
     const chartRef = useRef<ForceGraphMethods<Node, Link>>()
@@ -47,8 +47,15 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
     const [cooldownTicks, setCooldownTicks] = useState<number | undefined>(0)
     const [currentQuery, setCurrentQuery] = useState<Query>()
     const [searchElement, setSearchElement] = useState<string>("")
+    const [categories, setCategories] = useState<Category[]>([...graph.Categories])
+    const [labels, setLabels] = useState<Category[]>([...graph.Labels])
     const { toast } = useToast()
     const { setIndicator } = useContext(IndicatorContext);
+
+    useEffect(() => {
+        setCategories([...graph.Categories])
+        setLabels([...graph.Labels])
+    }, [graph, graph.Categories, graph.Labels])
 
     useEffect(() => {
         let timeout: NodeJS.Timeout
@@ -182,6 +189,7 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
                             if (index !== -1) {
                                 graph.Categories.splice(index, 1)
                                 graph.CategoriesMap.delete(cat.name)
+                                setCategories([...graph.Categories])
                             }
                         }
                     }
@@ -195,6 +203,7 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
                         if (index !== -1) {
                             graph.Labels.splice(index, 1)
                             graph.LabelsMap.delete(category.name)
+                            setLabels([...graph.Labels])
                         }
                     }
                 }
@@ -207,7 +216,7 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
         setSelectedElements([])
         setSelectedElement(undefined)
 
-        graph.removeLinks(selectedElements.map((element) => element.id))
+        graph.removeLinks(setLabels, selectedElements.map((element) => element.id))
 
         setData({ ...graph.Elements })
         toast({
@@ -376,12 +385,13 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
                                     setSelectedElements={setSelectedElements}
                                     cooldownTicks={cooldownTicks}
                                     handleCooldown={handleCooldown}
+                                    setLabels={setLabels}
                                 />
                                 {
                                     (graph.Categories.length > 0 || graph.Labels.length > 0) &&
                                     <>
-                                        <Labels categories={graph.Categories} onClick={onCategoryClick} label="Labels" graph={graph} />
-                                        <Labels categories={graph.Labels} onClick={onLabelClick} label="RelationshipTypes" graph={graph} />
+                                        <Labels categories={categories} onClick={onCategoryClick} label="Labels" graph={graph} />
+                                        <Labels categories={labels} onClick={onLabelClick} label="RelationshipTypes" graph={graph} />
                                     </>
                                 }
                             </div>
@@ -414,11 +424,11 @@ function GraphView({ graph, selectedElement, setSelectedElement, runQuery, histo
                 {
                     selectedElement &&
                     <DataPanel
-                        obj={selectedElement}
-                        setObj={setSelectedElement}
+                        object={selectedElement}
                         onExpand={onExpand}
                         graph={graph}
                         onDeleteElement={handleDeleteElement}
+                        setCategories={setCategories}
                     />
                 }
             </ResizablePanel>

@@ -39,13 +39,20 @@ export default function SchemaView({ schema, fetchCount }: Props) {
     const [isAddEntity, setIsAddEntity] = useState(false)
     const [maximize, setMaximize] = useState<boolean>(false)
     const [cooldownTicks, setCooldownTicks] = useState<number | undefined>(0)
-    const [data, setData] = useState<GraphData>(schema.Elements)
+    const [categories, setCategories] = useState<Category[]>([...schema.Categories])
+    const [labels, setLabels] = useState<Category[]>([...schema.Labels])
+    const [data, setData] = useState<GraphData>({ ...schema.Elements })
     const { toast } = useToast()
     const { setIndicator } = useContext(IndicatorContext)
 
     useEffect(() => {
         setData({ ...schema.Elements })
     }, [schema.Elements, schema.Id])
+
+    useEffect(() => {
+        setCategories([...schema.Categories])
+        setLabels([...schema.Labels])
+    }, [schema.Id, schema.Categories, schema.Labels])
 
     useEffect(() => {
         dataPanel.current?.collapse()
@@ -74,6 +81,7 @@ export default function SchemaView({ schema, fetchCount }: Props) {
         schema.visibleLinks(category.show)
 
         setData({ ...schema.Elements })
+        setCategories([...schema.Categories])
     }
 
     const onLabelClick = (label: Category) => {
@@ -84,6 +92,7 @@ export default function SchemaView({ schema, fetchCount }: Props) {
         })
 
         setData({ ...schema.Elements })
+        setLabels([...schema.Labels])
     }
 
     const handleSetSelectedElement = (element?: Node | Link | undefined) => {
@@ -148,6 +157,7 @@ export default function SchemaView({ schema, fetchCount }: Props) {
                         if (cat.elements.length === 0) {
                             schema.Categories.splice(schema.Categories.findIndex(c => c.name === cat.name), 1)
                             schema.CategoriesMap.delete(cat.name)
+                            setCategories([...schema.Categories])
                         }
                     }
                 })
@@ -160,12 +170,13 @@ export default function SchemaView({ schema, fetchCount }: Props) {
                     if (cat.elements.length === 0) {
                         schema.Labels.splice(schema.Labels.findIndex(c => c.name === cat.name), 1)
                         schema.LabelsMap.delete(cat.name)
+                        setLabels([...schema.Labels])
                     }
                 }
             }
         }))
 
-        schema.removeLinks()
+        schema.removeLinks(setLabels, stateSelectedElements.map(e => e.id))
 
         if (fetchCount) fetchCount()
 
@@ -175,21 +186,23 @@ export default function SchemaView({ schema, fetchCount }: Props) {
         onExpand(false)
     }
 
-    const onCreateElement = async (attributes: [string, string[]][], label?: string[]) => {
+    const onCreateElement = async (attributes: [string, string[]][], elementLabel?: string[]) => {
         const fakeId = "-1"
         const result = await securedFetch(`api/schema/${prepareArg(schema.Id)}/${prepareArg(fakeId)}`, {
             method: "POST",
-            body: JSON.stringify({ type: isAddEntity, label, attributes, selectedNodes })
+            body: JSON.stringify({ type: isAddEntity, label: elementLabel, attributes, selectedNodes })
         }, toast, setIndicator)
 
         if (result.ok) {
             const json = await result.json()
 
             if (isAddEntity) {
-                schema.extendNode(json.result.data[0].n, false, true)
+                const { category } = schema.extendNode(json.result.data[0].n, false, true)!
+                setCategories(prev => [...prev, ...category.map(c => schema.CategoriesMap.get(c)!)])
                 setIsAddEntity(false)
             } else {
-                schema.extendEdge(json.result.data[0].e, false, true)
+                const { label } = schema.extendEdge(json.result.data[0].e, false, true)!
+                setLabels(prev => [...prev, schema.LabelsMap.get(label)!])
                 setIsAddRelation(false)
             }
 
@@ -290,12 +303,13 @@ export default function SchemaView({ schema, fetchCount }: Props) {
                         setSelectedNodes={setSelectedNodes}
                         cooldownTicks={cooldownTicks}
                         handleCooldown={handleCooldown}
+                        setLabels={setLabels}
                     />
                     {
                         (schema.Categories.length > 0 || schema.Labels.length > 0) &&
                         <>
-                            <Labels className="left-2" label="Categories" categories={schema.Categories} onClick={onCategoryClick} graph={schema} />
-                            <Labels className="right-2 text-end" label="RelationshipTypes" categories={schema.Labels} onClick={onLabelClick} graph={schema} />
+                            <Labels className="left-2" label="Categories" categories={categories} onClick={onCategoryClick} graph={schema} />
+                            <Labels className="right-2 text-end" label="RelationshipTypes" categories={labels} onClick={onLabelClick} graph={schema} />
                         </>
                     }
                 </div>
@@ -318,6 +332,7 @@ export default function SchemaView({ schema, fetchCount }: Props) {
                             onExpand={onExpand}
                             onDeleteElement={handleDeleteElement}
                             schema={schema}
+                            setCategories={setCategories}
                         />
                         : (isAddEntity || isAddRelation) &&
                         <CreateElement

@@ -6,7 +6,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { Locator, Download } from "@playwright/test";
 import BasePage from "@/e2e/infra/ui/basePage";
-import { interactWhenVisible, waitForElementToBeVisible, waitForTimeOut } from "@/e2e/infra/utils";
+import { inferLabelFromGraph, interactWhenVisible, waitForElementToBeVisible, waitForTimeOut } from "@/e2e/infra/utils";
 
 export default class GraphPage extends BasePage {
 
@@ -516,7 +516,8 @@ export default class GraphPage extends BasePage {
     }
 
     async getAttributesStatsInDataPanel(): Promise<string | null> {
-        return await interactWhenVisible(this.attributesStatsInDataPanel, el => el.innerText(), "attributes stats in data panel");
+        const text = await interactWhenVisible(this.attributesStatsInDataPanel, el => el.innerText(), "attributes stats in data panel");
+        return text;
     }
 
     async clickDeleteRelationBtnInDataPanel(): Promise<void> {
@@ -542,7 +543,8 @@ export default class GraphPage extends BasePage {
     }
 
     async getAnimationControlPanelState(): Promise<string | null> {
-        return await this.animationControlBtn.getAttribute('data-state');
+        const state = await this.animationControlBtn.getAttribute('data-state');
+        return state;
     }
 
     async clickLabelsPanelBtn(): Promise<void> {
@@ -550,21 +552,25 @@ export default class GraphPage extends BasePage {
     }
 
     async getLabelsPanelBtn(): Promise<string | null> {
-        return await interactWhenVisible(this.labelsPanelBtn, el => el.textContent(), "Labels panel button");
+        const text = await interactWhenVisible(this.labelsPanelBtn, el => el.textContent(), "Labels panel button");
+        return text;
     }
 
     async getDataCellByAttrInDataPanel(attribute: string): Promise<string | null> {
-        return await interactWhenVisible(this.valueCellByAttributeInDataPanel(attribute), el => el.textContent(), "value cell by attribute button");
+        const text = await interactWhenVisible(this.valueCellByAttributeInDataPanel(attribute), el => el.textContent(), "value cell by attribute button");
+        return text;
     }
 
     async getNodesGraphStats(): Promise<string | null> {
         await this.page.waitForTimeout(500);
-        return await interactWhenVisible(this.nodesGraphStats, el => el.textContent(), "node graph stats button");
+        const text = await interactWhenVisible(this.nodesGraphStats, el => el.textContent(), "node graph stats button");
+        return text;
     }
 
     async getEdgesGraphStats(): Promise<string | null> {
         await this.page.waitForTimeout(500);
-        return await interactWhenVisible(this.edgesGraphStats, el => el.textContent(), "edges graph stats button");
+        const text = await interactWhenVisible(this.edgesGraphStats, el => el.textContent(), "edges graph stats button");
+        return text;
     }
 
     async clickViewSchema(): Promise<void> {
@@ -699,13 +705,8 @@ export default class GraphPage extends BasePage {
         await this.clickGraphFromList(graph, label);
     }
 
-    private inferLabelFromGraph(graph: string): string {
-        if (graph.toLowerCase().includes('schema')) return 'Schema';
-        return 'Graph';
-    }
-
     async selectExistingGraph(graph: string, role?: string): Promise<void>{
-        const resolvedLabel = this.inferLabelFromGraph(graph);
+        const resolvedLabel = inferLabelFromGraph(graph);
         await this.clickSelectBtnFromGraphManager(role);
         await this.selectGraphFromList(graph, resolvedLabel);
     }
