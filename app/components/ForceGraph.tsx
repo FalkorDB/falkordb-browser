@@ -9,7 +9,7 @@ import ForceGraph2D from "react-force-graph-2d"
 import { securedFetch, GraphRef, handleZoomToFit } from "@/lib/utils"
 import { useToast } from "@/components/ui/use-toast"
 import * as d3 from "d3"
-import { GraphData, Link, Node } from "../api/graph/model"
+import { GraphData, Link, Node, Category } from "../api/graph/model"
 import { IndicatorContext, GraphContext } from "./provider"
 
 interface Props {
@@ -27,6 +27,7 @@ interface Props {
     setSelectedNodes?: Dispatch<SetStateAction<[Node | undefined, Node | undefined]>>
     setIsAddEntity?: Dispatch<SetStateAction<boolean>>
     setIsAddRelation?: Dispatch<SetStateAction<boolean>>
+    setLabels: Dispatch<SetStateAction<Category[]>>
 }
 
 const NODE_SIZE = 6
@@ -45,8 +46,9 @@ export default function ForceGraph({
     type = "graph",
     isAddElement = false,
     setSelectedNodes,
-    setIsAddEntity = () => {},
-    setIsAddRelation = () => {},
+    setIsAddEntity = () => { },
+    setIsAddRelation = () => { },
+    setLabels
 }: Props) {
 
     const [parentWidth, setParentWidth] = useState<number>(0)
@@ -147,7 +149,7 @@ export default function ForceGraph({
 
         deleteNeighbors(expandedNodes)
 
-        graph.removeLinks()
+        graph.removeLinks(setLabels, nodes.map(n => n.id))
     }
 
     const handleNodeClick = async (node: Node) => {
@@ -222,12 +224,11 @@ export default function ForceGraph({
                     || hoverElement && ("source" in hoverElement) && hoverElement.id === link.id)
                     || (selectedElements.length > 0 && selectedElements.some(el => el.id === link.id && !("source" in el))) ? 2 : 1}
                 nodeCanvasObject={(node, ctx) => {
-                    if (graph.Elements.nodes.length === 1) {
+
+                    if (!node.x || !node.y) {
                         node.x = 0
                         node.y = 0
                     }
-
-                    if (node.x === undefined || node.y === undefined) return
 
                     ctx.lineWidth = ((selectedElement && !("source" in selectedElement) && selectedElement.id === node.id)
                         || (hoverElement && !("source" in hoverElement) && hoverElement.id === node.id)
@@ -271,7 +272,12 @@ export default function ForceGraph({
                     const start = link.source;
                     const end = link.target;
 
-                    if (!start.x || !start.y || !end.x || !end.y) return
+                    if (!start.x || !start.y || !end.x || !end.y) {
+                        start.x = 0
+                        start.y = 0
+                        end.x = 0
+                        end.y = 0
+                    }
 
                     let textX;
                     let textY;
@@ -352,6 +358,7 @@ export default function ForceGraph({
                 onBackgroundClick={handleUnselected}
                 onBackgroundRightClick={handleUnselected}
                 onEngineStop={() => {
+                    if (cooldownTicks === 0) return
                     handleCooldown(0)
                     handleZoomToFit(chartRef)
                 }}
@@ -370,6 +377,6 @@ export default function ForceGraph({
 }
 
 ForceGraph.defaultProps = {
-    setIsAddEntity: () => {},
-    setIsAddRelation: () => {},
+    setIsAddEntity: () => { },
+    setIsAddRelation: () => { },
 }

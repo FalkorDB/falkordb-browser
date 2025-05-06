@@ -41,25 +41,24 @@ export default function DeleteGraph({
     setIsLoading(true)
     try {
       const newNames = await Promise.all(deleteGraphNames
-        .map(names => type === "Schema" ? `${names}_schema` : names)
         .map(async (name) => {
-          const result = await securedFetch(`api/graph/${prepareArg(name)}`, {
+          const result = await securedFetch(`api/${type === "Schema" ? "schema" : "graph"}/${prepareArg(name)}`, {
             method: "DELETE"
           }, toast, setIndicator)
 
-          if (result.ok) return name
+          if (result.ok) return ""
 
-          return ""
+          return name
 
-        })).then(newGraphNames => graphNames.filter(names => !newGraphNames.filter(name => name !== "").includes(names)))
+        })).then(newGraphNames => graphNames.filter(name => !newGraphNames.filter(n => n !== "").includes(name)))
 
       setGraphNames(newNames)
 
-      if (deleteGraphNames.includes(selectedValue) && setSelectedValue) setSelectedValue(newNames.length > 0 ? newNames[newNames.length - 1] : "")
+      if (!newNames.includes(selectedValue) && setSelectedValue) setSelectedValue(newNames.length > 0 ? newNames[newNames.length - 1] : "")
 
       setOpen(false)
       setOpenMenage(false)
-      handleSetRows(graphNames.filter(name => !deleteGraphNames.includes(name)))
+      handleSetRows(newNames)
       toast({
         title: "Graph(s) deleted successfully",
         description: `The graph(s) ${deleteGraphNames.join(", ")} have been deleted successfully`,

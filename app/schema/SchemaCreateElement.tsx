@@ -218,7 +218,7 @@ export default function SchemaCreateElement({ onCreate, setIsAdd, selectedNodes,
           ))}
           <li className="h-8 flex flex-wrap gap-2">
             {
-              (type ? (labelsHover || label.length === 0) && !isAddLabel : label.length < 1 && !isAddLabel) &&
+              (type ? (labelsHover || label.length === 0) : label.length === 0) && !isAddLabel &&
               <Button
                 className="p-2 text-xs justify-center border border-background"
                 variant="Secondary"

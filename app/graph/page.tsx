@@ -5,7 +5,7 @@ import { getQueryWithLimit, HistoryQuery, prepareArg, Query, securedFetch } from
 import { useToast } from "@/components/ui/use-toast";
 import dynamic from "next/dynamic";
 import { ForceGraphMethods } from "react-force-graph-2d";
-import { Graph, GraphData, Link, Node } from "../api/graph/model";
+import { Category, Graph, GraphData, Link, Node } from "../api/graph/model";
 import Tutorial from "./Tutorial";
 import { GraphNameContext, GraphContext, IndicatorContext, LimitContext, TimeoutContext } from "../components/provider";
 
@@ -25,6 +25,8 @@ export default function Page() {
     const [currentQuery, setCurrentQuery] = useState<Query>()
     const [nodesCount, setNodesCount] = useState(0)
     const [edgesCount, setEdgesCount] = useState(0)
+    const [labels, setLabels] = useState<Category[]>([])
+    const [categories, setCategories] = useState<Category[]>([])
 
     const chartRef = useRef<ForceGraphMethods<Node, Link>>()
 
@@ -35,6 +37,11 @@ export default function Page() {
     const { graphName } = useContext(GraphNameContext)
     const { timeout } = useContext(TimeoutContext);
     const { limit } = useContext(LimitContext);
+
+    useEffect(() => {
+        setLabels([...graph.Labels])
+        setCategories([...graph.Categories])
+    }, [graph, graph.Labels.length, graph.Categories.length, graph.Labels, graph.Categories])
 
     const fetchCount = useCallback(async () => {
         if (!graphName) return
@@ -192,7 +199,7 @@ export default function Page() {
         setSelectedElements([])
         setSelectedElement(undefined)
 
-        graph.removeLinks(selectedElements.map((element) => element.id))
+        graph.removeLinks(setLabels, selectedElements.map((element) => element.id))
 
         setData({ ...graph.Elements })
         toast({
@@ -232,6 +239,10 @@ export default function Page() {
                     data={data}
                     setData={setData}
                     handleDeleteElement={handleDeleteElement}
+                    setLabels={setLabels}
+                    setCategories={setCategories}
+                    labels={labels}
+                    categories={categories}
                 />
             </div>
             <Tutorial />

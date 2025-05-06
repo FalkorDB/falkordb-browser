@@ -23,7 +23,7 @@ test.describe('Data panel Tests', () => {
     })
 
     test(`@readwrite Validate modifying node attributes header via UI and validate via API`, async () => {
-        const graphName = getRandomString('datapanel');        
+        const graphName = getRandomString('datapanel');
         await apicalls.addGraph(graphName);
         await apicalls.runQuery(graphName, 'CREATE (:Person {name: "Alice"}), (:Person {name: "Bob"})');
         const graph = await browser.createNewPage(DataPanel, urls.graphUrl);
@@ -41,7 +41,7 @@ test.describe('Data panel Tests', () => {
     });
 
     test(`@readwrite Validate modifying node attributes header via API and validate via UI`, async () => {
-        const graphName = getRandomString('datapanel');        
+        const graphName = getRandomString('datapanel');
         await apicalls.addGraph(graphName);
         await apicalls.runQuery(graphName, 'CREATE (:Person {name: "Alice"}), (:Person {name: "Bob"})');
         await apicalls.runQuery(graphName, 'MATCH (n {name: "Alice"}) SET n:TestHeader REMOVE n:Person');
@@ -57,7 +57,7 @@ test.describe('Data panel Tests', () => {
     });
 
     test(`@readwrite Validate adding new attribute for node via ui and validation via API`, async () => {
-        const graphName = getRandomString('datapanel');        
+        const graphName = getRandomString('datapanel');
         await apicalls.addGraph(graphName);
         await apicalls.runQuery(graphName, 'CREATE (:Person {name: "Alice"}), (:Person {name: "Bob"})');
         const graph = await browser.createNewPage(DataPanel, urls.graphUrl);
@@ -75,7 +75,7 @@ test.describe('Data panel Tests', () => {
     });
 
     test(`@readwrite Validate adding new attribute for node via API and validation via UI`, async () => {
-        const graphName = getRandomString('datapanel');        
+        const graphName = getRandomString('datapanel');
         await apicalls.addGraph(graphName);
         await apicalls.runQuery(graphName, 'CREATE (a:Person {name: "Alice", age: 30}), (b:Person {name: "Bob"})');
         const graph = await browser.createNewPage(DataPanel, urls.graphUrl);
@@ -90,7 +90,7 @@ test.describe('Data panel Tests', () => {
     });
 
     test(`@readwrite Validate remove attribute for node via ui and validation via API`, async () => {
-        const graphName = getRandomString('datapanel');        
+        const graphName = getRandomString('datapanel');
         await apicalls.addGraph(graphName);
         await apicalls.runQuery(graphName, 'CREATE (a:Person {name: "Alice", age: 30}), (b:Person {name: "Bob"})');
         const graph = await browser.createNewPage(DataPanel, urls.graphUrl);
@@ -108,7 +108,7 @@ test.describe('Data panel Tests', () => {
     });
 
     test(`@readwrite Validate remove attribute for node via API and validation via UI`, async () => {
-        const graphName = getRandomString('datapanel');        
+        const graphName = getRandomString('datapanel');
         await apicalls.addGraph(graphName);
         await apicalls.runQuery(graphName, 'CREATE (a:Person {name: "Alice", age: 30}), (b:Person {name: "Bob"})');
         await apicalls.runQuery(graphName, 'MATCH (a:Person {name: "Alice"}) REMOVE a.age');
@@ -118,13 +118,13 @@ test.describe('Data panel Tests', () => {
         await graph.insertQuery(FETCH_FIRST_TEN_NODES);
         await graph.clickRunQuery();
         await graph.searchForElementInCanvas("alice");
-        await graph.rightClickAtCanvasCenter(); 
+        await graph.rightClickAtCanvasCenter();
         expect(await graph.isLastAttributeNameCellInGraphDataPanel("age")).toBe(false)
         await apicalls.removeGraph(graphName);
     });
 
     test(`@readwrite Validate modify attribute for node via ui and validation via API`, async () => {
-        const graphName = getRandomString('datapanel');        
+        const graphName = getRandomString('datapanel');
         await apicalls.addGraph(graphName);
         await apicalls.runQuery(graphName, 'CREATE (a:Person {name: "Alice", age: 30}), (b:Person {name: "Bob"})');
         const graph = await browser.createNewPage(DataPanel, urls.graphUrl);
@@ -142,7 +142,7 @@ test.describe('Data panel Tests', () => {
     });
 
     test(`@readwrite Validate modify attribute for node via API and validation via UI`, async () => {
-        const graphName = getRandomString('datapanel');        
+        const graphName = getRandomString('datapanel');
         await apicalls.addGraph(graphName);
         await apicalls.runQuery(graphName, 'CREATE (a:Person {name: "Alice", age: 30}), (b:Person {name: "Bob"})');
         await apicalls.runQuery(graphName, 'MATCH (a:Person {name: "Alice"}) SET a.age = 35');
@@ -158,7 +158,7 @@ test.describe('Data panel Tests', () => {
     });
 
     test(`@readwrite Validate delete node via ui and validation via API`, async () => {
-        const graphName = getRandomString('datapanel');        
+        const graphName = getRandomString('datapanel');
         await apicalls.addGraph(graphName);
         await apicalls.runQuery(graphName, 'CREATE (a:Person {name: "Alice", age: 30}), (b:Person {name: "Bob"})');
         const graph = await browser.createNewPage(DataPanel, urls.graphUrl);
@@ -175,7 +175,7 @@ test.describe('Data panel Tests', () => {
     });
 
     test(`@readwrite Validate delete node via API and validation via UI`, async () => {
-        const graphName = getRandomString('datapanel');        
+        const graphName = getRandomString('datapanel');
         await apicalls.addGraph(graphName);
         await apicalls.runQuery(graphName, 'CREATE (a:Person {name: "Alice", age: 30}), (b:Person {name: "Bob"})');
         await apicalls.runQuery(graphName, 'MATCH (b:Person {name: "Alice"}) DELETE b');
@@ -185,7 +185,27 @@ test.describe('Data panel Tests', () => {
         await graph.insertQuery(FETCH_FIRST_TEN_NODES);
         await graph.clickRunQuery();
         const nodes = await graph.getNodesGraphStats();
-        expect(parseInt(nodes ?? "")).toBe(1);
+        expect(parseInt(nodes ?? "", 10)).toBe(1);
         await apicalls.removeGraph(graphName);
     });
+
+    test(`@readwrite Validate adding attribute for node via ui and validation via ui`, async () => {
+        const graphName = getRandomString('datapanel');
+        await apicalls.addGraph(graphName);
+        await apicalls.runQuery(graphName, "UNWIND range(1, 10) as x CREATE (p:Person {name: 'Person ' + toString(x)})");
+        const graph = await browser.createNewPage(DataPanel, urls.graphUrl);
+        await browser.setPageToFullScreen();
+        await graph.selectExistingGraph(graphName);
+        await graph.insertQuery(FETCH_FIRST_TEN_NODES);
+        await graph.clickRunQuery();
+        await graph.searchForElementInCanvas("Person 1");
+        await graph.rightClickAtCanvasCenter();
+        await graph.addAttribute("age", "30");
+        await graph.searchForElementInCanvas("Person 2");
+        await graph.rightClickAtCanvasCenter();
+        await graph.searchForElementInCanvas("Person 1");
+        await graph.rightClickAtCanvasCenter();
+        expect(await graph.isLastAttributeNameCellInGraphDataPanel("age")).toBe(true);
+        await apicalls.removeGraph(graphName);
+    })
 })

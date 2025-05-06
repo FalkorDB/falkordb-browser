@@ -120,3 +120,8 @@ export async function interactWhenVisible<T>(element: Locator, action: (el: Loca
     if (!isVisible) throw new Error(`${name} is not visible!`);
     return action(element);
 }
+
+export function inferLabelFromGraph(graph: string): string {
+    if (graph.toLowerCase().includes('schema')) return 'Schema';
+    return 'Graph';
+}

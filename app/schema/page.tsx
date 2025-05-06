@@ -6,7 +6,7 @@ import { useToast } from "@/components/ui/use-toast";
 import dynamic from "next/dynamic";
 import { ForceGraphMethods } from "react-force-graph-2d";
 import SchemaView from "./SchemaView";
-import { Graph, GraphData, Link, Node } from "../api/graph/model";
+import { Category, Graph, GraphData, Link, Node } from "../api/graph/model";
 import { GraphContext, GraphNameContext, IndicatorContext } from "../components/provider";
 
 const Selector = dynamic(() => import("../graph/Selector"), { ssr: false })
@@ -21,6 +21,8 @@ export default function Page() {
     const [isAddEntity, setIsAddEntity] = useState(false)
     const [edgesCount, setEdgesCount] = useState<number>(0)
     const [nodesCount, setNodesCount] = useState<number>(0)
+    const [labels, setLabels] = useState<Category[]>([])
+    const [categories, setCategories] = useState<Category[]>([])
 
     const { graph: schema, setGraph: setSchema } = useContext(GraphContext)
     const { indicator, setIndicator } = useContext(IndicatorContext)
@@ -116,7 +118,7 @@ export default function Page() {
             }
         }))
 
-        schema.removeLinks()
+        schema.removeLinks(setLabels, selectedElements.map((element) => element.id))
 
         if (fetchCount) fetchCount()
 
@@ -155,6 +157,10 @@ export default function Page() {
                     data={data}
                     setData={setData}
                     handleDeleteElement={handleDeleteElement}
+                    setLabels={setLabels}
+                    setCategories={setCategories}
+                    labels={labels}
+                    categories={categories}
                 />
             </div>
             <div className="h-4 w-full Gradient" />

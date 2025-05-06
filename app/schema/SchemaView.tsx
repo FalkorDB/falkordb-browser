@@ -34,6 +34,10 @@ interface Props {
     data: GraphData
     setData: Dispatch<SetStateAction<GraphData>>
     handleDeleteElement: () => Promise<void>
+    setLabels: Dispatch<SetStateAction<Category[]>>
+    setCategories: Dispatch<SetStateAction<Category[]>>
+    labels: Category[]
+    categories: Category[]
 }
 
 export default function SchemaView({
@@ -53,17 +57,25 @@ export default function SchemaView({
     setCooldownTicks,
     data,
     setData,
-    handleDeleteElement
+    handleDeleteElement,
+    setLabels,
+    setCategories,
+    labels,
+    categories
 }: Props) {
     const [selectedNodes, setSelectedNodes] = useState<[Node | undefined, Node | undefined]>([undefined, undefined]);
-
+    const { graph: schema } = useContext(GraphContext)
     const { toast } = useToast()
     const { setIndicator } = useContext(IndicatorContext)
-    const { graph: schema } = useContext(GraphContext)
 
     useEffect(() => {
         setData({ ...schema.Elements })
     }, [schema.Elements, schema.Id])
+
+    useEffect(() => {
+        setCategories([...schema.Categories])
+        setLabels([...schema.Labels])
+    }, [schema.Id, schema.Categories.length, schema.Labels.length])
 
     useEffect(() => {
         setSelectedElement(undefined)
@@ -88,6 +100,7 @@ export default function SchemaView({
         schema.visibleLinks(category.show)
 
         setData({ ...schema.Elements })
+        setCategories([...schema.Categories])
     }
 
     const onLabelClick = (label: Category) => {
@@ -98,23 +111,26 @@ export default function SchemaView({
         })
 
         setData({ ...schema.Elements })
+        setLabels([...schema.Labels])
     }
 
-    const onCreateElement = async (attributes: [string, string[]][], label?: string[]) => {
+    const onCreateElement = async (attributes: [string, string[]][], elementLabel?: string[]) => {
         const fakeId = "-1"
         const result = await securedFetch(`api/schema/${prepareArg(schema.Id)}/${prepareArg(fakeId)}`, {
             method: "POST",
-            body: JSON.stringify({ type: isAddEntity, label, attributes, selectedNodes })
+            body: JSON.stringify({ type: isAddEntity, label: elementLabel, attributes, selectedNodes })
         }, toast, setIndicator)
 
         if (result.ok) {
             const json = await result.json()
 
             if (isAddEntity) {
-                schema.extendNode(json.result.data[0].n, false, true)
+                const { category } = schema.extendNode(json.result.data[0].n, false, true)!
+                setCategories(prev => [...prev, ...category.map(c => schema.CategoriesMap.get(c)!)])
                 setIsAddEntity(false)
             } else {
-                schema.extendEdge(json.result.data[0].e, false, true)
+                const { label } = schema.extendEdge(json.result.data[0].e, false, true)!
+                setLabels(prev => [...prev, schema.LabelsMap.get(label)!])
                 setIsAddRelation(false)
             }
 
@@ -164,21 +180,23 @@ export default function SchemaView({
                     setSelectedNodes={setSelectedNodes}
                     cooldownTicks={cooldownTicks}
                     handleCooldown={handleCooldown}
+                    setLabels={setLabels}
                 />
                 {
-                    (schema.Categories.length > 0 || schema.Labels.length > 0) &&
+                    (categories.length > 0 || labels.length > 0) &&
                     <>
-                        <Labels className="left-2" label="Categories" categories={schema.Categories} onClick={onCategoryClick} />
-                        <Labels className="right-2 text-end" label="RelationshipTypes" categories={schema.Labels} onClick={onLabelClick} />
+                        <Labels className="left-2" label="Categories" categories={categories} onClick={onCategoryClick} />
+                        <Labels className="right-2 text-end" label="RelationshipTypes" categories={labels} onClick={onLabelClick} />
                     </>
                 }
                 {
                     selectedElement ?
                         <SchemaDataPanel
-                            obj={selectedElement}
-                            setObj={setSelectedElement}
+                            object={selectedElement}
+                            setObject={setSelectedElement}
                             onDeleteElement={handleDeleteElement}
                             schema={schema}
+                            setCategories={setCategories}
                         />
                         : (isAddRelation || isAddEntity) &&
                         <CreateElement

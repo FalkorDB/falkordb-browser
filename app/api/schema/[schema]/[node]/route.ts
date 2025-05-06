@@ -10,8 +10,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         return session
     }
 
-    const { client } = session
-
+    const { client, user } = session
     const { schema } = await params
     const schemaName = `${schema}_schema`
     const { type, label, attributes, selectedNodes } = await request.json()
@@ -25,15 +24,17 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         } else if (!type && !selectedNodes) {
             throw new Error("Selected nodes are required")
         }
+
         const formateAttributes = formatAttributes(attributes)
         const graph = client.selectGraph(schemaName)
         const query = type
             ? `CREATE (n${label.length > 0 ? `:${label.join(":")}` : ""}${formateAttributes?.length > 0 ? ` {${formateAttributes.map(([k, v]) => `${k}: "${v}"`).join(",")}}` : ""}) RETURN n`
             : `MATCH (a), (b) WHERE ID(a) = ${selectedNodes[0].id} AND ID(b) = ${selectedNodes[1].id} CREATE (a)-[e${label[0]}${formateAttributes?.length > 0 ? ` {${formateAttributes.map(([k, v]) => `${k}: "${v}"`).join(",")}}` : ""}]->(b) RETURN e`
-        const result = await graph.query(query)
+        const result = user.role === "Read-Only"
+            ? await graph.roQuery(query)
+            : await graph.query(query)
 
         if (!result) throw new Error("Something went wrong")
-
 
         return NextResponse.json({ result }, { status: 200 })
     } catch (error) {
@@ -49,8 +50,7 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
         return session
     }
 
-    const { client } = session
-
+    const { client, user } = session
     const { schema, node } = await params
     const schemaName = `${schema}_schema`
     const nodeId = Number(node)
@@ -63,7 +63,9 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
         const query = type
             ? `MATCH (n) WHERE ID(n) = $nodeId DELETE n`
             : `MATCH ()-[e]-() WHERE ID(e) = $nodeId DELETE e`
-        const result = await graph.query(query, { params: { nodeId } })
+        const result = user.role === "Read-Only"
+            ? await graph.roQuery(query, { params: { nodeId } })
+            : await graph.query(query, { params: { nodeId } })
 
         if (!result) throw new Error("Something went wrong")
 

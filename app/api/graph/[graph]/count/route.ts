@@ -9,17 +9,18 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         return session
     }
 
-    const { client } = session
-
+    const { client, user } = session
     const { graph: graphId } = await params
 
     try {
         const graph = client.selectGraph(graphId)
         const query = "MATCH (n) OPTIONAL MATCH (n)-[e]->() WITH count(n) as nodes, count(e) as edges RETURN nodes, edges"
-        const { data } = await graph.query(query)
+        const { data } = user.role === "Read-Only"
+            ? await graph.roQuery(query)
+            : await graph.query(query)
 
         if (!data) throw new Error("Something went wrong")
-        
+
         const result = data.length === 0 ? { nodes: 0, edges: 0 } : data[0]
 
         return NextResponse.json({ result }, { status: 200 })

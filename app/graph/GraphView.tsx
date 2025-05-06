@@ -35,6 +35,10 @@ interface Props {
     cooldownTicks: number | undefined
     chartRef: GraphRef
     handleDeleteElement: () => Promise<void>
+    setLabels: Dispatch<SetStateAction<Category[]>>
+    setCategories: Dispatch<SetStateAction<Category[]>>
+    labels: Category[]
+    categories: Category[]
 }
 
 function GraphView({
@@ -51,11 +55,20 @@ function GraphView({
     handleCooldown,
     cooldownTicks,
     chartRef,
-    handleDeleteElement
+    handleDeleteElement,
+    setLabels,
+    setCategories,
+    labels,
+    categories
 }: Props) {
 
     const [tabsValue, setTabsValue] = useState<string>("")
     const { graph } = useContext(GraphContext)
+
+    useEffect(() => {
+        setCategories([...graph.Categories])
+        setLabels([...graph.Labels])
+    }, [graph, graph.Categories, graph.Labels])
 
     useEffect(() => {
         let defaultChecked = "Graph"
@@ -189,11 +202,12 @@ function GraphView({
                     setSelectedElements={setSelectedElements}
                     cooldownTicks={cooldownTicks}
                     handleCooldown={handleCooldown}
+                    setLabels={setLabels}
                 />
                 <div className="h-full z-10 absolute top-12 inset-x-12 pointer-events-none flex gap-8">
                     {
-                        (graph.Labels.length > 0 || graph.Categories.length > 0) &&
-                        <Labels categories={graph.Categories} onClick={onCategoryClick} label="Labels" />
+                        (labels.length > 0 || categories.length > 0) &&
+                        <Labels categories={categories} onClick={onCategoryClick} label="Labels" />
                     }
                     <div className="w-1 grow h-fit">
                         <Toolbar
@@ -205,16 +219,17 @@ function GraphView({
                         />
                     </div>
                     {
-                        (graph.Labels.length > 0 || graph.Categories.length > 0) &&
-                        <Labels categories={graph.Labels} onClick={onLabelClick} label="RelationshipTypes" />
+                        (labels.length > 0 || categories.length > 0) &&
+                        <Labels categories={labels} onClick={onLabelClick} label="RelationshipTypes" />
                     }
                 </div>
                 {
                     selectedElement &&
                     <GraphDataPanel
-                        obj={selectedElement}
-                        setObj={setSelectedElement}
+                        object={selectedElement}
+                        setObject={setSelectedElement}
                         onDeleteElement={handleDeleteElement}
+                        setCategories={setCategories}
                     />
                 }
             </TabsContent>
