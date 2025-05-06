@@ -336,7 +336,6 @@ test.describe('Schema Tests', () => {
         await apiCall.removeSchema(schemaName);
     });
 
-    // ✅ Test is valid — failure indicates a real bug in the app
     test(`@admin validate that duplicating a schema creates a new schema with same node and edges count`, async () => {
         const schemaName = getRandomString('schema');
         await apiCall.runSchemaQuery(schemaName, 'CREATE (a:person1 {id: "Integer!*-1"}), (b:person2 {id: "Integer!*-2"}), (a)-[:knows]->(b) RETURN a, b');
@@ -345,8 +344,10 @@ test.describe('Schema Tests', () => {
         await schema.selectExistingGraph(schemaName);
         const newSchmaName = getRandomString('schema')
         await schema.duplicateGraph(newSchmaName);
-        expect((await schema.getNodesGraphStats() ?? "", 0)).toBe(2);
-        expect((await schema.getEdgesGraphStats() ?? "", 0)).toBe(1);
+        expect(parseInt(await schema.getNodesGraphStats() ?? "", 10)).toBe(2);
+        expect(parseInt(await schema.getEdgesGraphStats() ?? "", 10)).toBe(1);
+        expect(await schema.getRelationshipTypesPanelBtn()).toBe("knows");
+        expect(await schema.getCategoriesPanelCount()).toBe(2);
         await apiCall.removeSchema(schemaName);
         await apiCall.removeSchema(newSchmaName);
     });

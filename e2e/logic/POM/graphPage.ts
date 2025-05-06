@@ -937,5 +937,6 @@ export default class GraphPage extends BasePage {
         await this.clickDuplicateButton();
         await this.fillDuplicateGraphInput(newGraph);
         await this.clickDuplicateConfirmInDialog();
+        await this.waitForPageIdle();
     }
 }

@@ -648,17 +648,20 @@ test.describe('Graph Tests', () => {
         await apiCall.removeSchema(graphName);
     });
 
-    // ✅ Test is valid — failure indicates a real bug in the app
     test(`@admin validate that duplicating a graph creates a new graph with same node and edges count`, async () => {
         const graphName = getRandomString('graph');
-        await apiCall.runQuery(graphName, 'CREATE (a:person1 {id: "Integer!*-1"}), (b:person2 {id: "Integer!*-2"}), (a)-[:knows]->(b) RETURN a, b');
+        await apiCall.runQuery(graphName, 'CREATE (a:person1 {id: "Integer!*-1"}), (b:person2 {id: "Integer!*-2"}), (a)-[c:knows]->(b) RETURN a, b, c');
         const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
         await browser.setPageToFullScreen();
         await graph.selectExistingGraph(graphName);
         const newGraphName = getRandomString('graph')
         await graph.duplicateGraph(newGraphName);
-        expect((await graph.getNodesGraphStats() ?? "", 0)).toBe(2);
-        expect((await graph.getEdgesGraphStats() ?? "", 0)).toBe(1);
+        await graph.insertQuery("MATCH (n)-[r]->(m) RETURN n, r, m");
+        await graph.clickRunQuery();
+        expect(parseInt(await graph.getNodesGraphStats() ?? "", 0)).toBe(2);
+        expect(parseInt(await graph.getEdgesGraphStats() ?? "", 0)).toBe(1);
+        expect(await graph.getRelationshipTypesPanelBtn()).toBe("knows");
+        expect(await graph.getLabesCountlInCanvas()).toBe(2);
         await apiCall.removeGraph(graphName);
         await apiCall.removeGraph(newGraphName);
     });
