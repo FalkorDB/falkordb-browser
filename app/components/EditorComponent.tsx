@@ -583,7 +583,7 @@ export default function EditorComponent({ historyQuery, maximize, setMaximize, r
     return (
         <div className="absolute w-full flex items-start gap-8 border rounded-lg overflow-hidden bg-foreground p-2">
             <div className="w-1 grow flex rounded-lg overflow-hidden">
-                <div ref={containerRef} className="relative grow w-1" id="editor-container">
+                <div ref={containerRef} className="relative grow w-1" data-testid="editorContainer">
                     <Editor
                         // eslint-disable-next-line no-nested-ternary
                         height={blur ? LINE_HEIGHT : lineNumber * LINE_HEIGHT > document.body.clientHeight / 100 * MAX_HEIGHT ? document.body.clientHeight / 100 * MAX_HEIGHT : lineNumber * LINE_HEIGHT}
@@ -616,6 +616,7 @@ export default function EditorComponent({ historyQuery, maximize, setMaximize, r
                     </div>
                 </div>
                 <Button
+                    data-testid="editorRunButton"
                     ref={submitQuery}
                     indicator={indicator}
                     className="h-[38px]"
@@ -640,6 +641,7 @@ export default function EditorComponent({ historyQuery, maximize, setMaximize, r
                                 <Minimize2 size={20} />
                             </CloseDialog>
                             <CloseDialog
+                                data-testid="editorRunButton"
                                 className="pointer-events-auto py-2 px-8"
                                 indicator={indicator}
                                 variant="Primary"

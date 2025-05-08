@@ -13,6 +13,7 @@ import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import { Drawer, DrawerContent, DrawerDescription, DrawerTitle, DrawerTrigger } from "@/components/ui/drawer";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import Link from "next/link";
 import Button from "./ui/Button";
 import CreateGraph from "./CreateGraph";
 import { IndicatorContext } from "./provider";
@@ -33,15 +34,14 @@ export default function Header({ onSetGraphName, graphNames }: Props) {
     return (
         <div className="bg-background py-5 px-2 flex flex-col justify-between items-center">
             <div className="flex flex-col gap-4 items-center">
-                <a
-                    className="rounded-full text-2xl font-bold bg-white p-2 text-black h-12 w-12 flex items-center justify-center"
+                <Link
+                    className="rounded-full h-12 w-12 overflow-hidden"
                     aria-label="FalkorDB"
                     href="https://www.falkordb.com"
                     target="_blank" rel="noreferrer"
                 >
-                    {/* <Image style={{ width: 'auto', height: 'auto' }} priority width={0} height={0} src="/Logo.svg" alt="" /> */}
-                    F
-                </a>
+                    <Image style={{ width: 'auto', height: 'auto' }} priority src="/Logo.svg" alt="FalkorDB Logo" width={0} height={0} />
+                </Link>
                 <div className="flex flex-col gap-2 items-center">
                     <Button
                         label="GRAPHS"
@@ -128,6 +128,7 @@ export default function Header({ onSetGraphName, graphNames }: Props) {
                     <>
                         <div className="h-[1px] w-[80%] bg-white" />
                         <CreateGraph
+                            label="Header"
                             onSetGraphName={onSetGraphName}
                             type={type}
                             graphNames={graphNames}

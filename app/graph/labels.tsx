@@ -9,11 +9,12 @@ import { GraphContext } from "../components/provider";
 interface Props {
     categories: Category[],
     onClick: (category: Category) => void,
-    label?: string,
-    className?: string
+    label: "RelationshipTypes" | "Labels",
+    type: "Schema" | "Graph",
+    className?: string,
 }
 
-export default function Labels({ categories, onClick, label, className = "" }: Props) {
+export default function Labels({ categories, onClick, label, type, className = "" }: Props) {
 
     // fake state to force reload
     const [, setReload] = useState(false)
@@ -29,7 +30,7 @@ export default function Labels({ categories, onClick, label, className = "" }: P
     }
 
     return (
-        <div className={cn(className, "flex flex-col gap-2 max-w-[200px] h-[85%] pointer-events-none")} id={`${label}Panel`}>
+        <div className={cn(className, "flex flex-col gap-2 max-w-[200px] h-[85%] pointer-events-none")}>
             {
                 label &&
                 <h1>{label}</h1>
@@ -51,6 +52,7 @@ export default function Labels({ categories, onClick, label, className = "" }: P
                         categories.map((category) => (
                             <li key={category.name}>
                                 <Button
+                                    data-testid={`${type}${label}Button${category.name}`}
                                     className="w-full pointer-events-auto"
                                     label={category.name}
                                     onClick={() => {

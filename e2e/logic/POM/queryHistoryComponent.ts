@@ -4,38 +4,16 @@ import GraphPage from "./graphPage";
 
 export default class QueryHistory extends GraphPage {
 
-    private get queryHistoryDialog(): Locator {
-        return this.page.locator("//div[contains(@id, 'queryHistory')]");
+    private get queryHistoryList(): Locator {
+        return this.page.getByTestId("queryHistoryList");
     }
 
-    private get queryHistory(): Locator {
-        return this.page.locator("//button[contains(text(), 'Query History')]");
-    }
-
-    private get queryInHistory(): (query: string) => Locator {
-        return (query: string) => this.page.locator(`//div[contains(@id, 'queryHistory')]//ul//li[${query}]`);
-    }
-
-    private get selectQueryInHistoryBtn(): (query: string) => Locator {
-        return (query: string) => this.page.locator(`//div[contains(@id, 'queryHistory')]//ul//li[${query}]/button`);
-    }
-
-    private get runBtnInQueryHistory(): Locator {
-        return this.page.locator("//div[contains(@id, 'queryHistory')]//button[contains(text(), 'Run')]");
-    }
-
-    private get queryHistoryTextarea(): Locator {
-        return this.page.locator("#queryHistoryEditor textarea");
-    }
-
-    private get queryHistoryPanel(): Locator {
-        return this.page.locator("//div[@id='queryHistoryPanel']//ul");
-    }
+    
 
     async clickOnQueryHistory(): Promise<void> {
-        const isVisible = await waitForElementToBeVisible(this.queryHistory);
+        const isVisible = await waitForElementToBeVisible(this.queryHistoryList);
         if (!isVisible) throw new Error("query history button is not visible!");
-        await this.queryHistory.click();
+        await this.queryHistoryList.click();
     }
 
     async selectQueryInHistory(query: string): Promise<void> {

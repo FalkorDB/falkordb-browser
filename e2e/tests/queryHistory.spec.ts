@@ -25,7 +25,7 @@ test.describe('Query history Tests', () => {
         await apicalls.addGraph(graphName);
         const graph = await browser.createNewPage(QueryHistory, urls.graphUrl);
         await browser.setPageToFullScreen();
-        await graph.selectExistingGraph(graphName);
+        await graph.selectGraph(graphName);
         await graph.insertQuery("CREATE (n:Person { name: 'Alice' }) RETURN n");
         await graph.clickRunQuery();
         await graph.clickOnQueryHistory();
@@ -38,14 +38,14 @@ test.describe('Query history Tests', () => {
         await apicalls.addGraph(graphName);
         const graph = await browser.createNewPage(QueryHistory, urls.graphUrl);
         await browser.setPageToFullScreen();
-        await graph.selectExistingGraph(graphName);
+        await graph.selectGraph(graphName);
         await graph.insertQuery("CREATE (n:Person { name: 'Alice' }) RETURN n");
         await graph.clickRunQuery();
         await graph.refreshPage();
-        await graph.selectExistingGraph(graphName)
+        await graph.selectGraph(graphName)
         await graph.runAQueryFromHistory("1")
         const searchQuery = `Alice`;
-        await graph.searchForElementInCanvas(searchQuery);
+        await graph.searchElementInCanvas(searchQuery);
         await graph.hoverAtCanvasCenter();
         expect(await graph.getNodeCanvasToolTip()).toBe(searchQuery);
         await apicalls.removeGraph(graphName);        

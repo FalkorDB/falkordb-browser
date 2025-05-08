@@ -36,7 +36,7 @@ export type Cell = {
   value: DataCell,
   onChange?: (value: string) => Promise<boolean>,
   type?: string
-  comboboxType?: string
+  comboboxType?: "Role"
 }
 export interface Row {
   cells: Cell[]

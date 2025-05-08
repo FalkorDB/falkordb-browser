@@ -131,14 +131,25 @@ function GraphView({
                     {
                         graph.Id && tabsValue === "Graph" &&
                         <>
-                            <p className="Gradient bg-clip-text text-transparent">Nodes: {nodesCount}</p>
-                            <p className="Gradient bg-clip-text text-transparent">Edges: {edgesCount}</p>
+                            <p
+                                data-testid="nodesCount"
+                                className="Gradient bg-clip-text text-transparent"
+                            >
+                                Nodes: {nodesCount}
+                            </p>
+                            <p
+                                data-testid="edgesCount"
+                                className="Gradient bg-clip-text text-transparent"
+                            >
+                                Edges: {edgesCount}
+                            </p>
                         </>
                     }
                 </div>
                 <div className="w-1 grow flex justify-center">
                     <TabsList className="bg-transparent flex gap-2 pointer-events-auto">
                         <TabsTrigger
+                            data-testid="graphTab"
                             asChild
                             value="Graph"
                         >
@@ -152,6 +163,7 @@ function GraphView({
                             </Button>
                         </TabsTrigger>
                         <TabsTrigger
+                            data-testid="tableTab"
                             asChild
                             value="Table"
                         >
@@ -165,6 +177,7 @@ function GraphView({
                             </Button>
                         </TabsTrigger>
                         <TabsTrigger
+                            data-testid="metadataTab"
                             asChild
                             value="Metadata"
                         >
@@ -207,10 +220,11 @@ function GraphView({
                 <div className="h-full z-10 absolute top-12 inset-x-12 pointer-events-none flex gap-8">
                     {
                         (labels.length > 0 || categories.length > 0) &&
-                        <Labels categories={categories} onClick={onCategoryClick} label="Labels" />
+                        <Labels categories={categories} onClick={onCategoryClick} label="Labels" type="Graph" />
                     }
                     <div className="w-1 grow h-fit">
                         <Toolbar
+                            label="Graph"
                             setSelectedElement={setSelectedElement}
                             selectedElements={selectedElements}
                             handleDeleteElement={handleDeleteElement}
@@ -220,7 +234,7 @@ function GraphView({
                     </div>
                     {
                         (labels.length > 0 || categories.length > 0) &&
-                        <Labels categories={labels} onClick={onLabelClick} label="RelationshipTypes" />
+                        <Labels categories={labels} onClick={onLabelClick} label="RelationshipTypes" type="Graph" />
                     }
                 </div>
                 {

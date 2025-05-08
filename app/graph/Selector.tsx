@@ -152,6 +152,7 @@ export default function Selector({ runQuery, historyQuery, setHistoryQuery, fetc
             }
             <div className="p-2 border rounded-lg overflow-hidden bg-foreground">
                 <Button
+                    data-testid={`reload${type}sListButton`}
                     indicator={indicator}
                     className={cn(
                         "transition-transform w-full h-full",
@@ -205,6 +206,7 @@ export default function Selector({ runQuery, historyQuery, setHistoryQuery, fetc
                                     }}
                                     trigger={
                                         <Button
+                                            data-testid="queryHistoryButton"
                                             disabled={historyQuery.queries.length === 0}
                                             title={historyQuery.queries.length === 0 ? "No queries" : "View past queries"}
                                         >
@@ -219,13 +221,17 @@ export default function Selector({ runQuery, historyQuery, setHistoryQuery, fetc
                                             <div className="w-1 grow border-r overflow-auto">
                                                 <div className="p-8 border-b">
                                                     <Input
+                                                        data-testid="queryHistorySearchInput"
                                                         className="w-full"
                                                         value={search}
                                                         placeholder="Search for a query"
                                                         onChange={(e) => setSearch(e.target.value)}
                                                     />
                                                 </div>
-                                                <ul className="flex flex-col-reverse">
+                                                <ul
+                                                    data-testid="queryHistoryList"
+                                                    className="flex flex-col-reverse"
+                                                >
                                                     {
                                                         setHistoryQuery && historyQuery && filteredQueries.length > 0 && filteredQueries.map((query: Query, index) => {
                                                             const currentIndex = historyQuery.queries.findIndex(q => q.text === query.text)
@@ -244,8 +250,9 @@ export default function Selector({ runQuery, historyQuery, setHistoryQuery, fetc
                                                                     />
                                                                     {
                                                                         historyQuery.counter - 1 === currentIndex &&
-                                                                        <div className="h-[20dvh] border" id="queryHistoryEditor">
+                                                                        <div className="h-[20dvh] border">
                                                                             <Editor
+                                                                                data-testid="queryHistoryEditor"
                                                                                 width="100%"
                                                                                 height="100%"
                                                                                 language="cypher"
@@ -285,6 +292,7 @@ export default function Selector({ runQuery, historyQuery, setHistoryQuery, fetc
                             </div>
                             <div className="w-[1px] bg-white" />
                             <Button
+                                data-testid="editorMaximizeButton"
                                 title="Maximize"
                                 onClick={() => setMaximize(true)}
                             >
@@ -294,6 +302,7 @@ export default function Selector({ runQuery, historyQuery, setHistoryQuery, fetc
                     </>
                     : <div className="w-full h-[56px]">
                         <Toolbar
+                            label={type}
                             selectedElements={selectedElements}
                             setSelectedElement={setSelectedElement}
                             handleDeleteElement={handleDeleteElement}

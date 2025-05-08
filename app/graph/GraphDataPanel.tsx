@@ -515,6 +515,7 @@ export default function GraphDataPanel({ object, setObject, onDeleteElement, set
                 {
                     session?.user?.role !== "Read-Only" &&
                     <DeleteElement
+                        label="Graph"
                         description={`Are you sure you want to delete this ${type ? "Node" : "Relation"}?`}
                         open={deleteOpen}
                         setOpen={setDeleteOpen}

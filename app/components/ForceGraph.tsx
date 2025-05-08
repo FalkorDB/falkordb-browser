@@ -84,21 +84,30 @@ export default function ForceGraph({
     useEffect(() => {
         if (!chartRef.current) return;
 
-        // Adjust force parameters for better graph layout
+        // Adjust link force and length
         const linkForce = chartRef.current.d3Force('link');
+
         if (linkForce) {
             linkForce
                 .distance(() => 50)
-                .strength(0.1);
+                .strength(0.5);
         }
 
         // Add collision force to prevent node overlap
-        chartRef.current.d3Force('collision', d3.forceCollide(NODE_SIZE).strength(-1));
+        chartRef.current.d3Force('collision', d3.forceCollide(NODE_SIZE * 2).strength(0.1));
 
         // Center force to keep graph centered
         const centerForce = chartRef.current.d3Force('center');
+
         if (centerForce) {
             centerForce.strength(0.05);
+        }
+
+        // Add charge force to repel nodes
+        const chargeForce = chartRef.current.d3Force('charge');
+
+        if (chargeForce) {
+            chargeForce.strength(-1)
         }
     }, [chartRef, graph.Elements.nodes])
 

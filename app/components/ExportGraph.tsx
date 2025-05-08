@@ -1,4 +1,4 @@
-import React, { ReactNode, useContext, useState } from "react"
+import React, { useContext, useState } from "react"
 import { prepareArg, securedFetch } from "@/lib/utils"
 import { useToast } from "@/components/ui/use-toast"
 import DialogComponent from "./DialogComponent"
@@ -9,10 +9,9 @@ import { IndicatorContext } from "./provider"
 interface Props {
     selectedValues: string[]
     type: "Graph" | "Schema"
-    trigger: ReactNode
 }
 
-export default function ExportGraph({ selectedValues, type, trigger }: Props) {
+export default function ExportGraph({ selectedValues, type }: Props) {
 
     const [open, setOpen] = useState(false)
     const [isLoading, setIsLoading] = useState(false)
@@ -59,12 +58,21 @@ export default function ExportGraph({ selectedValues, type, trigger }: Props) {
         <DialogComponent
             open={open}
             onOpenChange={setOpen}
-            trigger={trigger}
+            trigger={
+                <Button
+                    data-testid="exportGraphButton"
+                    variant="Primary"
+                    label="Export Data"
+                    title="Export graph data to a .dump file"
+                    disabled={selectedValues.length === 0}
+                />
+            }
             title="Export your graph"
             description="Export a .dump file of your data"
         >
             <div className="flex gap-4 justify-end">
                 <Button
+                    data-testid="exportGraphConfirmButton"
                     className="flex-1"
                     indicator={indicator}
                     variant="Primary"
@@ -73,6 +81,7 @@ export default function ExportGraph({ selectedValues, type, trigger }: Props) {
                     isLoading={isLoading}
                 />
                 <CloseDialog
+                    data-testid="exportGraphCancelButton"
                     className="flex-1"
                     variant="Cancel"
                     label="Cancel"

@@ -24,6 +24,20 @@ export const waitForElementToBeVisible = async (locator: Locator, time = 500, re
     return false;
 };
 
+export const waitForElementToNotBeVisible = async (locator: Locator, time = 500, retry = 10): Promise<boolean> => {
+    for (let i = 0; i < retry; i += 1) {
+        try {
+            if (await locator.count() > 0 && !await locator.isVisible()) {
+                return true;
+            }
+        } catch (error) {
+            console.error(`Error checking element visibility: ${error}`);
+        }
+        await delay(time);
+    }
+    return false;
+};
+
 export const waitForElementToBeEnabled = async (locator: Locator, time = 500, retry = 10): Promise<boolean> => {
     for (let i = 0; i < retry; i += 1) {
         try {

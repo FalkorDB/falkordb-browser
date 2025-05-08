@@ -49,6 +49,7 @@ export default function Controls({
                             <div className="flex items-center gap-2">
                                 {cooldownTicks === undefined ? <Play size={20} /> : <Pause size={20} />}
                                 <Switch
+                                    data-testid="animationControl"
                                     className="pointer-events-auto"
                                     checked={cooldownTicks === undefined}
                                     onCheckedChange={() => {
@@ -63,6 +64,7 @@ export default function Controls({
                     </TooltipContent>
                 </Tooltip>
                 <Button
+                    data-testid="zoomInControl"
                     className="text-nowrap"
                     disabled={disabled}
                     indicator={indicator}
@@ -72,6 +74,7 @@ export default function Controls({
                     <ZoomIn size={20} />
                 </Button>
                 <Button
+                    data-testid="zoomOutControl"
                     className="text-nowrap"
                     disabled={disabled}
                     indicator={indicator}
@@ -81,6 +84,7 @@ export default function Controls({
                     <ZoomOut size={20} />
                 </Button>
                 <Button
+                    data-testid="centerControl"
                     className="text-nowrap"
                     disabled={disabled}
                     indicator={indicator}

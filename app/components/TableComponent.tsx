@@ -21,13 +21,14 @@ import { IndicatorContext } from "./provider";
 interface Props {
     headers: string[],
     rows: Row[],
+    label: "Graphs" | "Schemas" | "Configs",
     children?: React.ReactNode,
     setRows?: (rows: Row[]) => void,
     options?: string[]
     className?: string
 }
 
-export default function TableComponent({ headers, rows, children, setRows, options, className }: Props) {
+export default function TableComponent({ headers, rows, label, children, setRows, options, className }: Props) {
 
     const [search, setSearch] = useState<string>("")
     const [isSearchable, setIsSearchable] = useState<boolean>(false)
@@ -35,6 +36,7 @@ export default function TableComponent({ headers, rows, children, setRows, optio
     const [hover, setHover] = useState<string>("")
     const [newValue, setNewValue] = useState<string>("")
     const [filteredRows, setFilteredRows] = useState<Row[]>(rows)
+    const [isLoading, setIsLoading] = useState<boolean>(false)
     const { indicator } = useContext(IndicatorContext)
 
     const handleSearchFilter = useCallback((cell: Cell): boolean => {
@@ -75,11 +77,12 @@ export default function TableComponent({ headers, rows, children, setRows, optio
 
     return (
         <div className={cn("h-full w-full flex flex-col gap-4", className)}>
-            <div className="flex gap-4" id="tableComponent">
+            <div className="flex gap-4">
                 {children}
                 {
                     isSearchable ?
                         <Input
+                            data-testid={`searchInput${label}`}
                             ref={ref => ref?.focus()}
                             variant="primary"
                             className="grow"
@@ -101,6 +104,7 @@ export default function TableComponent({ headers, rows, children, setRows, optio
                             onChange={(e) => setSearch(e.target.value)}
                         />
                         : <Button
+                            data-testid={`searchButton${label}`}
                             variant="Secondary"
                             label="Search"
                             title="Search within the table"
@@ -115,6 +119,7 @@ export default function TableComponent({ headers, rows, children, setRows, optio
                             setRows ?
                                 <TableHead className="w-5 !pr-2" key={headers[0]}>
                                     <Checkbox
+                                        data-testid={`tableCheckbox${label}`}
                                         checked={rows.length > 0 && rows.every(row => row.checked)}
                                         onCheckedChange={() => {
                                             const checked = !rows.every(row => row.checked)
@@ -137,6 +142,7 @@ export default function TableComponent({ headers, rows, children, setRows, optio
                     {
                         filteredRows.map((row, i) => (
                             <TableRow
+                                data-testid={`tableRow${label}${row.cells[0].value}`}
                                 onMouseEnter={() => setHover(`${i}`)}
                                 onMouseLeave={() => setHover("")}
                                 data-id={typeof row.cells[0].value === "string" ? row.cells[0].value : undefined}
@@ -146,6 +152,7 @@ export default function TableComponent({ headers, rows, children, setRows, optio
                                     setRows ?
                                         <TableCell className="w-5 !pr-2">
                                             <Checkbox
+                                                data-testid={`tableCheckbox${label}${row.cells[0].value}`}
                                                 checked={row.checked}
                                                 onCheckedChange={() => {
                                                     setRows(rows.map((r, k) => k === i ? ({ ...r, checked: !r.checked }) : r))
@@ -199,6 +206,7 @@ export default function TableComponent({ headers, rows, children, setRows, optio
                                                                         selectedValue={cell.value.toString()}
                                                                     />
                                                                     : <Input
+                                                                        data-testid={`input${label}`}
                                                                         ref={ref => ref?.focus()}
                                                                         variant="primary"
                                                                         className="grow"
@@ -224,23 +232,34 @@ export default function TableComponent({ headers, rows, children, setRows, optio
                                                                 {
                                                                     cell.type !== "combobox" &&
                                                                     <Button
+                                                                        data-testid={`saveButton${label}`}
                                                                         title="Save"
-                                                                        onClick={() => {
-                                                                            cell.onChange!(newValue)
-                                                                            handleSetEditable("", "")
+                                                                        onClick={async () => {
+                                                                            try {
+                                                                                setIsLoading(true)
+                                                                                await cell.onChange!(newValue)
+                                                                                handleSetEditable("", "")
+                                                                            } finally {
+                                                                                setIsLoading(false)
+                                                                            }
                                                                         }}
+                                                                        isLoading={isLoading}
                                                                     >
                                                                         <CheckCircle className="w-4 h-4" />
                                                                     </Button>
                                                                 }
-                                                                <Button
-                                                                    title="Cancel"
-                                                                    onClick={() => {
-                                                                        handleSetEditable("", "")
-                                                                    }}
-                                                                >
-                                                                    <XCircle className="w-4 h-4" />
-                                                                </Button>
+                                                                {
+                                                                    !isLoading &&
+                                                                    <Button
+                                                                        data-testid={`cancelButton${label}`}
+                                                                        title="Cancel"
+                                                                        onClick={() => {
+                                                                            handleSetEditable("", "")
+                                                                        }}
+                                                                    >
+                                                                        <XCircle className="w-4 h-4" />
+                                                                    </Button>
+                                                                }
                                                             </div>
                                                         </div>
                                                         : <div className="flex items-center gap-2">
@@ -256,6 +275,7 @@ export default function TableComponent({ headers, rows, children, setRows, optio
                                                                 {
                                                                     cell.onChange && hover === `${i}` &&
                                                                     <Button
+                                                                        data-testid={`editButton${label}`}
                                                                         className="disabled:cursor-text disabled:opacity-100"
                                                                         disabled={!cell.onChange}
                                                                         indicator={indicator}

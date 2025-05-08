@@ -28,7 +28,7 @@ interface ComboboxProps {
   isSelectGraph?: boolean,
   disabled?: boolean,
   inTable?: boolean,
-  label?: string,
+  label?: "Graph" | "Schema" | "Role" | "Type",
   setOptions?: (value: string[]) => void,
   defaultOpen?: boolean,
   onOpenChange?: (open: boolean) => void
@@ -78,7 +78,7 @@ export default function Combobox({ isSelectGraph = false, disabled = false, inTa
   }
 
   const handleSetRows = (opts: string[]) => {
-    setRows(opts.map(opt => ({ checked: false, name: opt, cells: [{ value: opt, onChange: (value: string) => handleSetOption(value, opt) }] })))
+    setRows(opts.map(opt => ({ checked: false, name: opt, cells: [{ value: opt, onChange: session?.user?.role === "Admin" ? (value: string) => handleSetOption(value, opt) : undefined }] })))
   }
 
   useEffect(() => {
@@ -100,8 +100,9 @@ export default function Combobox({ isSelectGraph = false, disabled = false, inTa
         <Tooltip>
           <TooltipTrigger asChild>
             <SelectTrigger
+              data-testid={`Select${label}`}
               data-type="select"
-              className={cn("w-fit gap-2 items-center border p-2 disabled:text-gray-400 disabled:opacity-100 disabled:cursor-not-allowed", inTable ? "text-sm font-light" : "text-xl font-medium")}
+              className={cn("w-fit gap-2 items-center border p-2 disabled:text-gray-400 disabled:opacity-100 disabled:cursor-not-allowed max-w-[10%]", inTable ? "text-sm font-light" : "text-xl font-medium")}
             >
               <SelectValue placeholder={`Select ${label}`} />
             </SelectTrigger>
@@ -112,14 +113,21 @@ export default function Combobox({ isSelectGraph = false, disabled = false, inTa
           </TooltipContent>
         </Tooltip>
         <SelectContent className="min-w-52 max-h-[40lvh] bg-foreground">
-          <div className="p-4" id={`${label}Search`}>
-            <Input ref={ref => ref?.focus()} className="w-full" placeholder={`Search for a ${label}`} onChange={(e) => {
-              setSearch(e.target.value)
-              setMaxOptions(5)
-            }} value={search} />
+          <div className="p-4">
+            <Input
+              data-testid={`Search${label}`}
+              ref={ref => ref?.focus()}
+              className="w-full"
+              placeholder={`Search for a ${label}`}
+              onChange={(e) => {
+                setSearch(e.target.value)
+                setMaxOptions(5)
+              }}
+              value={search}
+            />
           </div>
           <SelectGroup>
-            <ul className="shrink grow overflow-auto" id={`${label}List`}>
+            <ul className="shrink grow overflow-auto">
               {selectedValue && (
                 <SelectItem value={selectedValue}>
                   {selectedValue}
@@ -128,6 +136,7 @@ export default function Combobox({ isSelectGraph = false, disabled = false, inTa
               {
                 filteredOptions.slice(0, maxOptions).filter((option) => selectedValue !== option).map((option) => (
                   <SelectItem
+                    data-testid={`SelectItem${label}${option}`}
                     value={!option ? '""' : option}
                     key={`key-${option}`}
                   >
@@ -160,6 +169,7 @@ export default function Combobox({ isSelectGraph = false, disabled = false, inTa
               <SelectSeparator className="bg-secondary" />
               <DialogTrigger asChild>
                 <Button
+                  data-testid={`manage${label}sButton`}
                   onClick={() => setOpen(false)}
                   className="w-full p-2 justify-center"
                   label="Manage Graphs"
@@ -180,33 +190,28 @@ export default function Combobox({ isSelectGraph = false, disabled = false, inTa
         </VisuallyHidden>
         <TableComponent
           className="grow overflow-hidden"
+          label={`${type}s`}
           headers={["Name"]}
           rows={rows}
           setRows={setRows}
         >
           {
             session?.user?.role !== "Read-Only" &&
-            <DeleteGraph
-              type={type}
-              rows={rows}
-              handleSetRows={handleSetRows}
-              setOpenMenage={setOpenMenage}
-              selectedValue={selectedValue}
-              setSelectedValue={setSelectedValue}
-            />
-          }
-          <ExportGraph
-            trigger={
-              <Button
-                variant="Primary"
-                label="Export Data"
-                title="Export graph data to a .dump file"
-                disabled={rows.filter(opt => opt.checked).length === 0}
+            <>
+              <DeleteGraph
+                type={type}
+                rows={rows}
+                handleSetRows={handleSetRows}
+                setOpenMenage={setOpenMenage}
+                selectedValue={selectedValue}
+                setSelectedValue={setSelectedValue}
               />
-            }
-            selectedValues={rows.filter(opt => opt.checked).map(opt => opt.cells[0].value as string)}
-            type={type}
-          />
+              <ExportGraph
+                selectedValues={rows.filter(opt => opt.checked).map(opt => opt.cells[0].value as string)}
+                type={type}
+              />
+            </>
+          }
         </TableComponent>
       </DialogContent>
     </Dialog >

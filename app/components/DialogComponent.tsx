@@ -4,6 +4,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { cn } from "@/lib/utils";
 import { ReactNode } from "react";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import CloseDialog from "./CloseDialog";
 
 /* eslint-disable react/require-default-props */
@@ -38,9 +39,16 @@ export default function DialogComponent({
                 </DialogHeader>
                 {
                     description ?
-                        <DialogDescription className="p-4 truncate">
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <DialogDescription className="p-4 truncate">
+                                {description}
+                            </DialogDescription>
+                        </TooltipTrigger>
+                        <TooltipContent>
                             {description}
-                        </DialogDescription>
+                        </TooltipContent>
+                    </Tooltip>
                         : <VisuallyHidden>
                             <DialogDescription />
                         </VisuallyHidden>

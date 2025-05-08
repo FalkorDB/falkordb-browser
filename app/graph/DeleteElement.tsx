@@ -15,8 +15,8 @@ interface Props {
     open: boolean
     setOpen: (open: boolean) => void
     description: string
+    label: string
     backgroundColor?: string
-    trigger?: React.ReactNode
 }
 
 export default function DeleteElement({
@@ -25,13 +25,7 @@ export default function DeleteElement({
     setOpen,
     description,
     backgroundColor,
-    trigger = <Button
-        className={cn("pointer-events-auto", backgroundColor)}
-        variant="Delete"
-        title="Delete Element(s)"
-    >
-        <Trash2 size={20} />
-    </Button>,
+    label
 }: Props) {
 
     const { indicator } = useContext(IndicatorContext)
@@ -52,10 +46,20 @@ export default function DeleteElement({
             open={open}
             title="Delete Elements"
             description={description}
-            trigger={trigger}
+            trigger={
+                <Button
+                    data-testid={`deleteElementButton${label}`}
+                    className={cn("pointer-events-auto", backgroundColor)}
+                    variant="Delete"
+                    title="Delete Element(s)"
+                >
+                    <Trash2 size={20} />
+                </Button>
+            }
         >
             <div className="flex justify-end gap-4">
                 <Button
+                    data-testid={`deleteElementConfirmButton${label}`}
                     indicator={indicator}
                     className="text-nowrap"
                     variant="Delete"
@@ -65,6 +69,7 @@ export default function DeleteElement({
                     isLoading={isLoading}
                 />
                 <CloseDialog
+                    data-testid={`deleteElementCancelButton${label}`}
                     className="text-nowrap"
                     variant="Cancel"
                     label="Cancel"

@@ -55,6 +55,7 @@ export default function Tutorial() {
                                 {
                                     session?.user?.role !== "Read-Only" &&
                                     <CreateGraph
+                                        label="Tutorial"
                                         graphNames={graphNames}
                                         onSetGraphName={handleSetGraphName}
                                         type="Graph"

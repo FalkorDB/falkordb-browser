@@ -1,6 +1,6 @@
 import { useToast } from "@/components/ui/use-toast";
 import { prepareArg, securedFetch, Row } from "@/lib/utils";
-import React, { ReactNode, useContext, useState } from "react";
+import React, { useContext, useState } from "react";
 import DialogComponent from "../DialogComponent";
 import Button from "../ui/Button";
 import CloseDialog from "../CloseDialog";
@@ -13,7 +13,6 @@ interface Props {
   setOpenMenage: (openMenage: boolean) => void
   selectedValue: string
   setSelectedValue: (selectedValue: string) => void
-  trigger?: ReactNode
 }
 
 export default function DeleteGraph({
@@ -22,13 +21,7 @@ export default function DeleteGraph({
   handleSetRows,
   setOpenMenage,
   selectedValue,
-  setSelectedValue,
-  trigger = <Button
-    variant="Delete"
-    disabled={rows.filter(opt => opt.checked).length === 0}
-    label="Delete"
-    title="Confirm the deletion of the selected graph(s)"
-  />,
+  setSelectedValue
 }: Props) {
 
   const [open, setOpen] = useState(false)
@@ -50,18 +43,21 @@ export default function DeleteGraph({
 
           return name
 
-        })).then(newGraphNames => graphNames.filter(name => !newGraphNames.filter(n => n !== "").includes(name)))
+        })).then(newGraphNames => newGraphNames.filter(n => n !== ""))
+
+      const successDeletedGraphs = graphNames.filter(name => !newNames.includes(name))
+      const failedDeletedGraphs = newNames.filter(name => !graphNames.includes(name))
 
       setGraphNames(newNames)
 
-      if (!newNames.includes(selectedValue) && setSelectedValue) setSelectedValue(newNames.length > 0 ? newNames[newNames.length - 1] : "")
+      if (!successDeletedGraphs.includes(selectedValue) && setSelectedValue) setSelectedValue(successDeletedGraphs.length > 0 ? newNames[successDeletedGraphs.length - 1] : "")
 
       setOpen(false)
       setOpenMenage(false)
-      handleSetRows(newNames)
+      handleSetRows(successDeletedGraphs)
       toast({
         title: "Graph(s) deleted successfully",
-        description: `The graph(s) ${deleteGraphNames.join(", ")} have been deleted successfully`,
+        description: successDeletedGraphs.length > 0 && `The graph(s) ${successDeletedGraphs.join(", ")} have been deleted successfully${failedDeletedGraphs.length > 0 && `The graph(s) ${failedDeletedGraphs.join(", ")} have not been deleted`}`,
       })
     } finally {
       setIsLoading(false)
@@ -70,27 +66,35 @@ export default function DeleteGraph({
 
   return (
     <DialogComponent
-      className="max-w-[90dvw]"
+      className="max-w-[70dvw]"
       open={open}
       onOpenChange={setOpen}
       title="Delete Graph"
-      trigger={trigger}
+      trigger={
+        <Button
+          data-testid="deleteGraphButton"
+          variant="Delete"
+          disabled={rows.filter(opt => opt.checked).length === 0}
+          label="Delete"
+          title="Confirm the deletion of the selected graph(s)"
+        />
+      }
       description={`Are you sure you want to delete the selected graph(s)? (${rows.filter(opt => opt.checked).map(opt => opt.cells[0].value as string).join(", ")})`}
     >
       <div className="flex justify-end gap-2">
         <Button
+          data-testid="deleteGraphConfirmButton"
           indicator={indicator}
           variant="Delete"
           label="Delete Graph"
           onClick={() => handleDelete(rows.filter(opt => opt.checked).map(opt => opt.cells[0].value as string))}
           isLoading={isLoading}
         />
-        <CloseDialog label="Cancel" />
+        <CloseDialog
+          data-testid="deleteGraphCancelButton"
+          label="Cancel"
+        />
       </div>
     </DialogComponent>
   );
-}
-
-DeleteGraph.defaultProps = {
-  trigger: undefined,
 }

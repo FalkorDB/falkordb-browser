@@ -278,7 +278,7 @@ export default class SchemaPage extends GraphPage {
     }
 
     async deleteNode(x: number, y: number): Promise<void> {
-        await this.nodeClick(x, y);
+        await this.elementClick(x, y);
         await this.clickDeleteNodeInDataPanel();
         await this.clickConfirmDeleteNodeInDataPanel();
     }
@@ -297,13 +297,13 @@ export default class SchemaPage extends GraphPage {
 
     async clickRelationBetweenNodes(): Promise<void> {
         const schema = await this.getNodeScreenPositions('schema');
-        await this.nodeClick(schema[0].screenX, schema[0].screenY);
-        await this.nodeClick(schema[1].screenX, schema[1].screenY);
+        await this.elementClick(schema[0].screenX, schema[0].screenY);
+        await this.elementClick(schema[1].screenX, schema[1].screenY);
         await this.clickCreateNewEdgeBtnInDataPanel();
     }
 
     async deleteRelation(x: number, y: number): Promise<void> {
-        await this.nodeClick(x, y);
+        await this.elementClick(x, y);
         await this.clickDeleteRelationInDataPanel();
         await this.clickConfirmDeleteNodeInDataPanel();
     }
