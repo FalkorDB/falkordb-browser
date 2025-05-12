@@ -252,22 +252,33 @@ export default function GraphDataPanel({ object, setObject, onDeleteElement, set
     }
 
     return (
-        <div className="DataPanel" id="graphDataPanel">
-            <div className="relative flex justify-between items-center p-6" id="dataPanelHeader">
+        <div data-testid="DataPanel" className="DataPanel">
+            <div className="relative flex justify-between items-center p-6">
                 <Button
+                    data-testid="DataPanelClose"
                     className="absolute top-2 right-2"
                     title="Close"
                     onClick={() => setObject(undefined)}
                 >
                     <X size={15} />
                 </Button>
-                <ul className="flex flex-wrap gap-4 min-w-[10%]" onMouseEnter={() => setLabelsHover(true)} onMouseLeave={() => setLabelsHover(false)}>
+                <ul
+                    data-testid="DataPanelLabel"
+                    className="flex flex-wrap gap-4 min-w-[10%]"
+                    onMouseEnter={() => setLabelsHover(true)}
+                    onMouseLeave={() => setLabelsHover(false)}
+                >
                     {label.map((l) => (
-                        <li key={l} className="flex gap-2 px-2 py-1 bg-background rounded-full items-center">
+                        <li
+                            data-testid={`DataPanelLabel${l}`}
+                            key={l}
+                            className="flex gap-2 px-2 py-1 bg-background rounded-full items-center"
+                        >
                             <p>{l}</p>
                             {
                                 session?.user?.role !== "Read-Only" &&
                                 <Button
+                                    data-testid={`DataPanelRemoveLabel${l}`}
                                     title="Remove"
                                     onClick={() => handleRemoveLabel(l)}
                                     indicator={indicator}
@@ -279,8 +290,9 @@ export default function GraphDataPanel({ object, setObject, onDeleteElement, set
                     ))}
                     <li className="h-8 flex flex-wrap gap-2">
                         {
-                            type && labelsHover && !labelsEditable && session?.user?.role !== "Read-Only" &&
+                            type && (labelsHover || label.length === 0) && !labelsEditable && session?.user?.role !== "Read-Only" &&
                             <Button
+                                data-testid="DataPanelAddLabel"
                                 className="p-2 text-xs justify-center border border-background"
                                 variant="Secondary"
                                 label="Add"
@@ -294,6 +306,7 @@ export default function GraphDataPanel({ object, setObject, onDeleteElement, set
                             labelsEditable &&
                             <>
                                 <Input
+                                    data-testid="DataPanelAddLabelInput"
                                     ref={ref => ref?.focus()}
                                     className="max-w-[50%] h-full bg-background border-none text-white"
                                     value={newLabel}
@@ -313,6 +326,7 @@ export default function GraphDataPanel({ object, setObject, onDeleteElement, set
                                     }}
                                 />
                                 <Button
+                                    data-testid="DataPanelAddLabelConfirm"
                                     className="p-2 text-xs justify-center border border-background"
                                     variant="Secondary"
                                     label="Save"
@@ -326,6 +340,7 @@ export default function GraphDataPanel({ object, setObject, onDeleteElement, set
                                 {
                                     !isLabelLoading &&
                                     <Button
+                                        data-testid="DataPanelAddLabelCancel"
                                         className="p-2 text-xs justify-center border border-background"
                                         variant="Secondary"
                                         label="Cancel"
@@ -342,7 +357,7 @@ export default function GraphDataPanel({ object, setObject, onDeleteElement, set
                         }
                     </li>
                 </ul>
-                <p className="font-medium text-xl text-nowrap">{attributes.length}&ensp;Attributes</p>
+                <p data-testid="DataPanelAttributesCount" className="font-medium text-xl text-nowrap">{attributes.length}&ensp;Attributes</p>
             </div>
             <Table parentClassName="grow">
                 <TableHeader>
@@ -361,6 +376,7 @@ export default function GraphDataPanel({ object, setObject, onDeleteElement, set
                     {
                         attributes.map((key) => (
                             <TableRow
+                                data-testid={`DataPanelAttribute${key}`}
                                 onMouseEnter={() => setHover(key)}
                                 onMouseLeave={() => setHover("")}
                                 key={key}
@@ -372,6 +388,7 @@ export default function GraphDataPanel({ object, setObject, onDeleteElement, set
                                                 editable === key ?
                                                     <>
                                                         <Button
+                                                            data-testid="DataPanelSetAttributeConfirm"
                                                             indicator={indicator}
                                                             variant="button"
                                                             onClick={(e) => {
@@ -384,10 +401,14 @@ export default function GraphDataPanel({ object, setObject, onDeleteElement, set
                                                         </Button>
                                                         {
                                                             !isSetLoading &&
-                                                            <Button variant="button" onClick={(e) => {
-                                                                e.stopPropagation()
-                                                                handleSetEditable("", "")
-                                                            }}>
+                                                            <Button
+                                                                data-testid="DataPanelSetAttributeCancel"
+                                                                variant="button"
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation()
+                                                                    handleSetEditable("", "")
+                                                                }}
+                                                            >
                                                                 <X size={20} />
                                                             </Button>
                                                         }
@@ -395,6 +416,7 @@ export default function GraphDataPanel({ object, setObject, onDeleteElement, set
                                                     : hover === key &&
                                                     <>
                                                         <Button
+                                                            data-testid="DataPanelSetAttribute"
                                                             variant="button"
                                                             onClick={() => handleSetEditable(key, object.data[key])}
                                                             disabled={isAddValue}
@@ -404,6 +426,7 @@ export default function GraphDataPanel({ object, setObject, onDeleteElement, set
                                                         <DialogComponent
                                                             trigger={
                                                                 <Button
+                                                                    data-testid="DataPanelDeleteAttribute"
                                                                     variant="button"
                                                                     title="Delete Attribute"
                                                                 >
@@ -415,12 +438,14 @@ export default function GraphDataPanel({ object, setObject, onDeleteElement, set
                                                         >
                                                             <div className="flex justify-end gap-4">
                                                                 <Button
+                                                                    data-testid="DataPanelDeleteAttributeConfirm"
                                                                     variant="Primary"
                                                                     label="Delete"
                                                                     onClick={() => removeProperty(key)}
                                                                     isLoading={isRemoveLoading}
                                                                 />
                                                                 <CloseDialog
+                                                                    data-testid="DataPanelDeleteAttributeCancel"
                                                                     label="Cancel"
                                                                     variant="Cancel"
                                                                 />
@@ -436,12 +461,14 @@ export default function GraphDataPanel({ object, setObject, onDeleteElement, set
                                     {
                                         editable === key ?
                                             <Input
+                                                data-testid="DataPanelSetAttributeInput"
                                                 className="w-full"
                                                 value={newVal}
                                                 onChange={(e) => setNewVal(e.target.value)}
                                                 onKeyDown={handleSetKeyDown}
                                             />
                                             : <Button
+                                                data-testid="DataPanelValueSetAttribute"
                                                 label={object.data[key]}
                                                 title="Click to edit the attribute value"
                                                 variant="button"
@@ -457,6 +484,7 @@ export default function GraphDataPanel({ object, setObject, onDeleteElement, set
                         <TableRow>
                             <TableCell className="flex flex-col items-center gap-2">
                                 <Button
+                                    data-testid="DataPanelAddAttributeConfirm"
                                     variant="button"
                                     title="Save"
                                     onClick={() => handleAddValue(newKey, newVal)}
@@ -468,6 +496,7 @@ export default function GraphDataPanel({ object, setObject, onDeleteElement, set
                                 {
                                     !isAddLoading &&
                                     <Button
+                                        data-testid="DataPanelAddAttributeCancel"
                                         variant="button"
                                         onClick={() => setIsAddValue(false)}
                                         title="Cancel"
@@ -478,6 +507,7 @@ export default function GraphDataPanel({ object, setObject, onDeleteElement, set
                             </TableCell >
                             <TableCell>
                                 <Input
+                                    data-testid="DataPanelAddAttributeKey"
                                     ref={ref => !newKey ? ref?.focus() : undefined}
                                     className="w-full"
                                     value={newKey}
@@ -487,6 +517,7 @@ export default function GraphDataPanel({ object, setObject, onDeleteElement, set
                             </TableCell>
                             <TableCell>
                                 <Input
+                                    data-testid="DataPanelAddAttributeValue"
                                     className="w-full"
                                     value={newVal}
                                     onChange={(e) => setNewVal(e.target.value)}
@@ -502,6 +533,7 @@ export default function GraphDataPanel({ object, setObject, onDeleteElement, set
                         <Button
                             disabled={attributes.some((key) => key === editable)}
                             variant="Primary"
+                            data-testid="DataPanelAddAttribute"
                             label="Add Attribute"
                             title="Add a new attribute"
                             onClick={() => setIsAddValue(true)}

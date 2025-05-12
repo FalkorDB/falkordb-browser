@@ -50,7 +50,7 @@ export default function DeleteGraph({
 
       setGraphNames(newNames)
 
-      if (!successDeletedGraphs.includes(selectedValue) && setSelectedValue) setSelectedValue(successDeletedGraphs.length > 0 ? newNames[successDeletedGraphs.length - 1] : "")
+      if (successDeletedGraphs.includes(selectedValue) && setSelectedValue) setSelectedValue(successDeletedGraphs.length > 0 ? newNames[successDeletedGraphs.length - 1] : "")
 
       setOpen(false)
       setOpenMenage(false)
@@ -72,7 +72,7 @@ export default function DeleteGraph({
       title="Delete Graph"
       trigger={
         <Button
-          data-testid="deleteGraphButton"
+          data-testid="deleteGraph"
           variant="Delete"
           disabled={rows.filter(opt => opt.checked).length === 0}
           label="Delete"
@@ -83,7 +83,7 @@ export default function DeleteGraph({
     >
       <div className="flex justify-end gap-2">
         <Button
-          data-testid="deleteGraphConfirmButton"
+          data-testid="deleteGraphConfirm"
           indicator={indicator}
           variant="Delete"
           label="Delete Graph"
@@ -91,7 +91,7 @@ export default function DeleteGraph({
           isLoading={isLoading}
         />
         <CloseDialog
-          data-testid="deleteGraphCancelButton"
+          data-testid="deleteGraphCancel"
           label="Cancel"
         />
       </div>

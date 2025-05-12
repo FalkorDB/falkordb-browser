@@ -60,7 +60,7 @@ export default function ExportGraph({ selectedValues, type }: Props) {
             onOpenChange={setOpen}
             trigger={
                 <Button
-                    data-testid="exportGraphButton"
+                    data-testid="exportGraph"
                     variant="Primary"
                     label="Export Data"
                     title="Export graph data to a .dump file"
@@ -72,7 +72,7 @@ export default function ExportGraph({ selectedValues, type }: Props) {
         >
             <div className="flex gap-4 justify-end">
                 <Button
-                    data-testid="exportGraphConfirmButton"
+                    data-testid="exportGraphConfirm"
                     className="flex-1"
                     indicator={indicator}
                     variant="Primary"
@@ -81,7 +81,7 @@ export default function ExportGraph({ selectedValues, type }: Props) {
                     isLoading={isLoading}
                 />
                 <CloseDialog
-                    data-testid="exportGraphCancelButton"
+                    data-testid="exportGraphCancel"
                     className="flex-1"
                     variant="Cancel"
                     label="Cancel"

@@ -199,7 +199,7 @@ export default function Toolbar({
                             <DropdownMenu open={addOpen} onOpenChange={setAddOpen}>
                                 <DropdownMenuTrigger asChild>
                                     <Button
-                                        data-testid={`elementCanvasAddButton${label}`}
+                                        data-testid={`elementCanvasAdd${label}`}
                                         className={cn("pointer-events-auto", backgroundColor)}
                                         variant="Secondary"
                                         label="Add Element"
@@ -209,7 +209,7 @@ export default function Toolbar({
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent>
                                     <Button
-                                        data-testid={`elementCanvasAddNodeButton${label}`}
+                                        data-testid={`elementCanvasAddNode${label}`}
                                         className={cn("pointer-events-auto", backgroundColor)}
                                         variant="Secondary"
                                         label="Add Node"
@@ -223,7 +223,7 @@ export default function Toolbar({
                                         <PlusCircle size={20} />
                                     </Button>
                                     <Button
-                                        data-testid={`elementCanvasAddEdgeButton${label}`}
+                                        data-testid={`elementCanvasAddEdge${label}`}
                                         className={cn("pointer-events-auto", backgroundColor)}
                                         variant="Secondary"
                                         label="Add Edge"

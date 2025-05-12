@@ -48,7 +48,7 @@ export default function DeleteElement({
             description={description}
             trigger={
                 <Button
-                    data-testid={`deleteElementButton${label}`}
+                    data-testid={`deleteElement${label}`}
                     className={cn("pointer-events-auto", backgroundColor)}
                     variant="Delete"
                     title="Delete Element(s)"
@@ -59,7 +59,7 @@ export default function DeleteElement({
         >
             <div className="flex justify-end gap-4">
                 <Button
-                    data-testid={`deleteElementConfirmButton${label}`}
+                    data-testid={`deleteElementConfirm${label}`}
                     indicator={indicator}
                     className="text-nowrap"
                     variant="Delete"
@@ -69,7 +69,7 @@ export default function DeleteElement({
                     isLoading={isLoading}
                 />
                 <CloseDialog
-                    data-testid={`deleteElementCancelButton${label}`}
+                    data-testid={`deleteElementCancel${label}`}
                     className="text-nowrap"
                     variant="Cancel"
                     label="Cancel"

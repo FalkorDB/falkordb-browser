@@ -169,7 +169,7 @@ export default function Combobox({ isSelectGraph = false, disabled = false, inTa
               <SelectSeparator className="bg-secondary" />
               <DialogTrigger asChild>
                 <Button
-                  data-testid={`manage${label}sButton`}
+                  data-testid={`manage${label}s`}
                   onClick={() => setOpen(false)}
                   className="w-full p-2 justify-center"
                   label="Manage Graphs"

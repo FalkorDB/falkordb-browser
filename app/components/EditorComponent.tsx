@@ -616,7 +616,7 @@ export default function EditorComponent({ historyQuery, maximize, setMaximize, r
                     </div>
                 </div>
                 <Button
-                    data-testid="editorRunButton"
+                    data-testid="editorRun"
                     ref={submitQuery}
                     indicator={indicator}
                     className="h-[38px]"
@@ -641,7 +641,7 @@ export default function EditorComponent({ historyQuery, maximize, setMaximize, r
                                 <Minimize2 size={20} />
                             </CloseDialog>
                             <CloseDialog
-                                data-testid="editorRunButton"
+                                data-testid="editorRun"
                                 className="pointer-events-auto py-2 px-8"
                                 indicator={indicator}
                                 variant="Primary"

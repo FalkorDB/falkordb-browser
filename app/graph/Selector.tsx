@@ -152,7 +152,7 @@ export default function Selector({ runQuery, historyQuery, setHistoryQuery, fetc
             }
             <div className="p-2 border rounded-lg overflow-hidden bg-foreground">
                 <Button
-                    data-testid={`reload${type}sListButton`}
+                    data-testid={`reload${type}sList`}
                     indicator={indicator}
                     className={cn(
                         "transition-transform w-full h-full",
@@ -206,7 +206,7 @@ export default function Selector({ runQuery, historyQuery, setHistoryQuery, fetc
                                     }}
                                     trigger={
                                         <Button
-                                            data-testid="queryHistoryButton"
+                                            data-testid="queryHistory"
                                             disabled={historyQuery.queries.length === 0}
                                             title={historyQuery.queries.length === 0 ? "No queries" : "View past queries"}
                                         >
@@ -215,13 +215,13 @@ export default function Selector({ runQuery, historyQuery, setHistoryQuery, fetc
                                     }
                                     title="Query History"
                                 >
-                                    <div className="grow flex flex-col p-8 gap-8" id="queryHistory">
+                                    <div className="grow flex flex-col p-8 gap-8">
                                         <DialogTitle>Queries</DialogTitle>
                                         <div className="h-1 grow flex border">
                                             <div className="w-1 grow border-r overflow-auto">
                                                 <div className="p-8 border-b">
                                                     <Input
-                                                        data-testid="queryHistorySearchInput"
+                                                        data-testid="queryHistorySearch"
                                                         className="w-full"
                                                         value={search}
                                                         placeholder="Search for a query"
@@ -292,7 +292,7 @@ export default function Selector({ runQuery, historyQuery, setHistoryQuery, fetc
                             </div>
                             <div className="w-[1px] bg-white" />
                             <Button
-                                data-testid="editorMaximizeButton"
+                                data-testid="editorMaximize"
                                 title="Maximize"
                                 onClick={() => setMaximize(true)}
                             >

@@ -4,10 +4,9 @@
 import { expect, test } from "@playwright/test";
 import BrowserWrapper from "../infra/ui/browserWrapper";
 import ApiCalls from "../logic/api/apiCalls";
-import urls from '../config/urls.json'
-import { FETCH_FIRST_TEN_NODES } from "../config/constants";
 import DataPanel from "../logic/POM/dataPanelComponent";
-import { getRandomString } from "../infra/utils";
+import urls from "../config/urls.json";
+import { CREATE_NODE_QUERY, getRandomString } from "../infra/utils";
 
 test.describe('Data panel Tests', () => {
     let browser: BrowserWrapper;
@@ -22,190 +21,143 @@ test.describe('Data panel Tests', () => {
         await browser.closeBrowser();
     })
 
-    test(`@readwrite Validate modifying node attributes header via UI and validate via API`, async () => {
-        const graphName = getRandomString('datapanel');
-        await apicalls.addGraph(graphName);
-        await apicalls.runQuery(graphName, 'CREATE (:Person {name: "Alice"}), (:Person {name: "Bob"})');
-        const graph = await browser.createNewPage(DataPanel, urls.graphUrl);
-        await browser.setPageToFullScreen();
-        await graph.selectGraph(graphName);
-        await graph.insertQuery(FETCH_FIRST_TEN_NODES);
-        await graph.clickRunQuery();
-        await graph.searchElementInCanvas("bob");
-        await graph.rightClickAtCanvasCenter();
-        await graph.modifyNodeHeaderAttribute("attributetest");
-        const response = await apicalls.runQuery(graphName, FETCH_FIRST_TEN_NODES ?? "");
-        const labels = response.result.data.map(item => item.n.labels);
-        expect(labels.flat()).toContain('attributetest');
-        await apicalls.removeGraph(graphName);
-    });
+    test("@admin validate selecting node opens data panel", async () => {
+        const graphName = getRandomString("DataPanel")
+        await apicalls.addGraph(graphName, "admin");
+        const dataPanel = await browser.createNewPage(DataPanel, urls.graphUrl);
+        await dataPanel.selectGraphByName(graphName);
+        await dataPanel.insertQuery(CREATE_NODE_QUERY);
+        await dataPanel.clickRunQuery();
+        await dataPanel.searchElementInCanvas("a");
+        expect(await dataPanel.isVisibleDataPanel()).toBe(true);
+    })
 
-    test(`@readwrite Validate modifying node attributes header via API and validate via UI`, async () => {
-        const graphName = getRandomString('datapanel');
-        await apicalls.addGraph(graphName);
-        await apicalls.runQuery(graphName, 'CREATE (:Person {name: "Alice"}), (:Person {name: "Bob"})');
-        await apicalls.runQuery(graphName, 'MATCH (n {name: "Alice"}) SET n:TestHeader REMOVE n:Person');
-        const graph = await browser.createNewPage(DataPanel, urls.graphUrl);
-        await browser.setPageToFullScreen();
-        await graph.selectGraph(graphName);
-        await graph.insertQuery(FETCH_FIRST_TEN_NODES);
-        await graph.clickRunQuery();
-        await graph.searchElementInCanvas("alice");
-        await graph.rightClickAtCanvasCenter();
-        expect(await graph.getAttributeHeaderLabelInDataPanelHeader()).toBe("TestHeader");
-        await apicalls.removeGraph(graphName);
-    });
+    test("@admin validate pressing x closes data panel", async () => {
+        const graphName = getRandomString("DataPanel")
+        await apicalls.addGraph(graphName, "admin");
+        const dataPanel = await browser.createNewPage(DataPanel, urls.graphUrl);
+        await dataPanel.selectGraphByName(graphName);
+        await dataPanel.insertQuery(CREATE_NODE_QUERY);
+        await dataPanel.clickRunQuery();
+        await dataPanel.searchElementInCanvas("a");
+        await dataPanel.closeDataPanel();
+        expect(await dataPanel.isVisibleDataPanel()).toBe(false);
+    })
+    
+    test("@admin validate adding label to node via the canvas panel", async () => {
+        const graphName = getRandomString("DataPanel")
+        await apicalls.addGraph(graphName, "admin");
+        const dataPanel = await browser.createNewPage(DataPanel, urls.graphUrl);
+        await dataPanel.selectGraphByName(graphName);
+        await dataPanel.insertQuery(CREATE_NODE_QUERY);
+        await dataPanel.clickRunQuery();
+        await dataPanel.searchElementInCanvas("a");
+        await dataPanel.addLabel("test", true);
+        await dataPanel.closeDataPanel();
+        expect(await dataPanel.isVisibleLabelsButtonByName("Labels", "test")).toBe(true);
+    })
 
-    test(`@readwrite Validate adding new attribute for node via ui and validation via API`, async () => {
-        const graphName = getRandomString('datapanel');
-        await apicalls.addGraph(graphName);
-        await apicalls.runQuery(graphName, 'CREATE (:Person {name: "Alice"}), (:Person {name: "Bob"})');
-        const graph = await browser.createNewPage(DataPanel, urls.graphUrl);
-        await browser.setPageToFullScreen();
-        await graph.selectGraph(graphName);
-        await graph.insertQuery(FETCH_FIRST_TEN_NODES);
-        await graph.clickRunQuery();
-        await graph.searchElementInCanvas("alice");
-        await graph.rightClickAtCanvasCenter();
-        await graph.addAttribute("age", "30");
-        const response = await apicalls.runQuery(graphName, FETCH_FIRST_TEN_NODES ?? "");
-        const person = response.result.data.find(item => 'age' in item.n.properties);
-        expect(person?.n.properties.age).toBe("30");
-        await apicalls.removeGraph(graphName);
-    });
+    test("@admin validate adding label to node via the data panel", async () => {
+        const graphName = getRandomString("DataPanel")
+        await apicalls.addGraph(graphName, "admin");
+        const dataPanel = await browser.createNewPage(DataPanel, urls.graphUrl);
+        await dataPanel.selectGraphByName(graphName);
+        await dataPanel.insertQuery(CREATE_NODE_QUERY);
+        await dataPanel.clickRunQuery();
+        await dataPanel.searchElementInCanvas("a");
+        await dataPanel.addLabel("test", true);
+        expect(await dataPanel.isVisibleLabel("test")).toBe(true);
+    })
 
-    test(`@readwrite Validate adding new attribute for node via API and validation via UI`, async () => {
-        const graphName = getRandomString('datapanel');
-        await apicalls.addGraph(graphName);
-        await apicalls.runQuery(graphName, 'CREATE (a:Person {name: "Alice", age: 30}), (b:Person {name: "Bob"})');
-        const graph = await browser.createNewPage(DataPanel, urls.graphUrl);
-        await browser.setPageToFullScreen();
-        await graph.selectGraph(graphName);
-        await graph.insertQuery(FETCH_FIRST_TEN_NODES);
-        await graph.clickRunQuery();
-        await graph.searchElementInCanvas("alice");
-        await graph.rightClickAtCanvasCenter();
-        expect(await graph.getAttributeValueInGraphDataPanel()).toBe("30");
-        await apicalls.removeGraph(graphName);
-    });
-
-    test(`@readwrite Validate remove attribute for node via ui and validation via API`, async () => {
-        const graphName = getRandomString('datapanel');
-        await apicalls.addGraph(graphName);
-        await apicalls.runQuery(graphName, 'CREATE (a:Person {name: "Alice", age: 30}), (b:Person {name: "Bob"})');
-        const graph = await browser.createNewPage(DataPanel, urls.graphUrl);
-        await browser.setPageToFullScreen();
-        await graph.selectGraph(graphName);
-        await graph.insertQuery(FETCH_FIRST_TEN_NODES);
-        await graph.clickRunQuery();
-        await graph.searchElementInCanvas("alice");
-        await graph.rightClickAtCanvasCenter();
-        await graph.removeAttribute();
-        const response = await apicalls.runQuery(graphName, FETCH_FIRST_TEN_NODES ?? "");
-        const person = response.result.data.find(item => 'age' in item.n.properties);
-        expect(person?.n.properties.age).toBeUndefined();
-        await apicalls.removeGraph(graphName);
-    });
-
-    test(`@readwrite Validate remove attribute for node via API and validation via UI`, async () => {
-        const graphName = getRandomString('datapanel');
-        await apicalls.addGraph(graphName);
-        await apicalls.runQuery(graphName, 'CREATE (a:Person {name: "Alice", age: 30}), (b:Person {name: "Bob"})');
-        await apicalls.runQuery(graphName, 'MATCH (a:Person {name: "Alice"}) REMOVE a.age');
-        const graph = await browser.createNewPage(DataPanel, urls.graphUrl);
-        await browser.setPageToFullScreen();
-        await graph.selectGraph(graphName);
-        await graph.insertQuery(FETCH_FIRST_TEN_NODES);
-        await graph.clickRunQuery();
-        await graph.searchElementInCanvas("alice");
-        await graph.rightClickAtCanvasCenter();
-        expect(await graph.isLastAttributeNameCellInGraphDataPanel("age")).toBe(false)
-        await apicalls.removeGraph(graphName);
-    });
-
-    test(`@readwrite Validate modify attribute for node via ui and validation via API`, async () => {
-        const graphName = getRandomString('datapanel');
-        await apicalls.addGraph(graphName);
-        await apicalls.runQuery(graphName, 'CREATE (a:Person {name: "Alice", age: 30}), (b:Person {name: "Bob"})');
-        const graph = await browser.createNewPage(DataPanel, urls.graphUrl);
-        await browser.setPageToFullScreen();
-        await graph.selectGraph(graphName);
-        await graph.insertQuery(FETCH_FIRST_TEN_NODES);
-        await graph.clickRunQuery();
-        await graph.searchElementInCanvas("alice");
-        await graph.rightClickAtCanvasCenter();
-        await graph.modifyAttribute("70");
-        const response = await apicalls.runQuery(graphName, FETCH_FIRST_TEN_NODES ?? "");
-        const person = response.result.data.find(item => 'age' in item.n.properties);
-        expect(person?.n.properties.age).toBe("70");
-        await apicalls.removeGraph(graphName);
-    });
-
-    test(`@readwrite Validate modify attribute for node via API and validation via UI`, async () => {
-        const graphName = getRandomString('datapanel');
-        await apicalls.addGraph(graphName);
-        await apicalls.runQuery(graphName, 'CREATE (a:Person {name: "Alice", age: 30}), (b:Person {name: "Bob"})');
-        await apicalls.runQuery(graphName, 'MATCH (a:Person {name: "Alice"}) SET a.age = 35');
-        const graph = await browser.createNewPage(DataPanel, urls.graphUrl);
-        await browser.setPageToFullScreen();
-        await graph.selectGraph(graphName);
-        await graph.insertQuery(FETCH_FIRST_TEN_NODES);
-        await graph.clickRunQuery();
-        await graph.searchElementInCanvas("alice");
-        await graph.rightClickAtCanvasCenter();
-        expect(await graph.getAttributeValueInGraphDataPanel()).toBe("35")
-        await apicalls.removeGraph(graphName);
-    });
-
-    test(`@readwrite Validate delete node via ui and validation via API`, async () => {
-        const graphName = getRandomString('datapanel');
-        await apicalls.addGraph(graphName);
-        await apicalls.runQuery(graphName, 'CREATE (a:Person {name: "Alice", age: 30}), (b:Person {name: "Bob"})');
-        const graph = await browser.createNewPage(DataPanel, urls.graphUrl);
-        await browser.setPageToFullScreen();
-        await graph.selectGraph(graphName);
-        await graph.insertQuery(FETCH_FIRST_TEN_NODES);
-        await graph.clickRunQuery();
-        await graph.searchElementInCanvas("alice");
-        await graph.rightClickAtCanvasCenter();
-        await graph.deleteNodeViaDataPanel();
-        const response = await apicalls.runQuery(graphName, FETCH_FIRST_TEN_NODES ?? "");
-        expect(response.result.data.length).toBe(1);
-        await apicalls.removeGraph(graphName);
-    });
-
-    test(`@readwrite Validate delete node via API and validation via UI`, async () => {
-        const graphName = getRandomString('datapanel');
-        await apicalls.addGraph(graphName);
-        await apicalls.runQuery(graphName, 'CREATE (a:Person {name: "Alice", age: 30}), (b:Person {name: "Bob"})');
-        await apicalls.runQuery(graphName, 'MATCH (b:Person {name: "Alice"}) DELETE b');
-        const graph = await browser.createNewPage(DataPanel, urls.graphUrl);
-        await browser.setPageToFullScreen();
-        await graph.selectGraph(graphName);
-        await graph.insertQuery(FETCH_FIRST_TEN_NODES);
-        await graph.clickRunQuery();
-        const nodes = await graph.getNodesCount();
-        expect(parseInt(nodes ?? "", 10)).toBe(1);
-        await apicalls.removeGraph(graphName);
-    });
-
-    test(`@readwrite Validate adding attribute for node via ui and validation via ui`, async () => {
-        const graphName = getRandomString('datapanel');
-        await apicalls.addGraph(graphName);
-        await apicalls.runQuery(graphName, "UNWIND range(1, 10) as x CREATE (p:Person {name: 'Person ' + toString(x)})");
-        const graph = await browser.createNewPage(DataPanel, urls.graphUrl);
-        await browser.setPageToFullScreen();
-        await graph.selectGraph(graphName);
-        await graph.insertQuery(FETCH_FIRST_TEN_NODES);
-        await graph.clickRunQuery();
-        await graph.searchElementInCanvas("Person 1");
-        await graph.rightClickAtCanvasCenter();
-        await graph.addAttribute("age", "30");
-        await graph.searchElementInCanvas("Person 2");
-        await graph.rightClickAtCanvasCenter();
-        await graph.searchElementInCanvas("Person 1");
-        await graph.rightClickAtCanvasCenter();
-        expect(await graph.isLastAttributeNameCellInGraphDataPanel("age")).toBe(true);
-        await apicalls.removeGraph(graphName);
+    test("@admin validate removing label to node via the canvas panel", async () => {
+        const graphName = getRandomString("DataPanel")
+        await apicalls.addGraph(graphName, "admin");
+        const dataPanel = await browser.createNewPage(DataPanel, urls.graphUrl);
+        await dataPanel.selectGraphByName(graphName);
+        await dataPanel.insertQuery(CREATE_NODE_QUERY);
+        await dataPanel.clickRunQuery();
+        await dataPanel.searchElementInCanvas("a");
+        await dataPanel.addLabel("test", true);
+        await dataPanel.removeLabel("test");
+        expect(await dataPanel.isVisibleLabelsButtonByName("Labels", "test")).toBe(false);
+    })
+    
+    test("@admin validate removing label to node via the data panel", async () => {
+        const graphName = getRandomString("DataPanel")
+        await apicalls.addGraph(graphName, "admin");
+        const dataPanel = await browser.createNewPage(DataPanel, urls.graphUrl);
+        await dataPanel.selectGraphByName(graphName);
+        await dataPanel.insertQuery(CREATE_NODE_QUERY);
+        await dataPanel.clickRunQuery();
+        await dataPanel.searchElementInCanvas("a");
+        await dataPanel.addLabel("test");
+        await dataPanel.removeLabel("test");
+        expect(await dataPanel.isVisibleLabel("test")).toBe(false);
+    })
+    
+    test("@admin validate adding attribute to node via the data panel", async () => {
+        const graphName = getRandomString("DataPanel")
+        await apicalls.addGraph(graphName, "admin");
+        const dataPanel = await browser.createNewPage(DataPanel, urls.graphUrl);
+        await dataPanel.selectGraphByName(graphName);
+        await dataPanel.insertQuery(CREATE_NODE_QUERY);
+        await dataPanel.clickRunQuery();
+        await dataPanel.searchElementInCanvas("a");
+        await dataPanel.addAttribute("test", "test");
+        expect(await dataPanel.isVisibleAttribute("test")).toBe(true);
+    })
+    
+    test("@admin validate adding attribute to node via attribute count", async () => {
+        const graphName = getRandomString("DataPanel")
+        await apicalls.addGraph(graphName, "admin");
+        const dataPanel = await browser.createNewPage(DataPanel, urls.graphUrl);
+        await dataPanel.selectGraphByName(graphName);
+        await dataPanel.insertQuery(CREATE_NODE_QUERY);
+        await dataPanel.clickRunQuery();
+        await dataPanel.searchElementInCanvas("a");
+        const initialCount = await dataPanel.getContentDataPanelAttributesCount();
+        await dataPanel.addAttribute("test", "test");
+        const newCount = await dataPanel.getContentDataPanelAttributesCount();
+        expect(newCount).toBe(initialCount + 1);
+    })
+    
+    test("@admin validate removing attribute to node via the data panel", async () => {
+        const graphName = getRandomString("DataPanel")
+        await apicalls.addGraph(graphName, "admin");
+        const dataPanel = await browser.createNewPage(DataPanel, urls.graphUrl);
+        await dataPanel.selectGraphByName(graphName);
+        await dataPanel.insertQuery(CREATE_NODE_QUERY);
+        await dataPanel.clickRunQuery();
+        await dataPanel.searchElementInCanvas("a");
+        await dataPanel.addAttribute("test", "test");
+        await dataPanel.removeAttribute("test");
+        expect(await dataPanel.isVisibleAttribute("test")).toBe(false);
+    })
+    
+    test("@admin validate removing attribute to node via attribute count", async () => {
+        const graphName = getRandomString("DataPanel")
+        await apicalls.addGraph(graphName, "admin");
+        const dataPanel = await browser.createNewPage(DataPanel, urls.graphUrl);
+        await dataPanel.selectGraphByName(graphName);
+        await dataPanel.insertQuery(CREATE_NODE_QUERY);
+        await dataPanel.clickRunQuery();
+        await dataPanel.searchElementInCanvas("a");
+        await dataPanel.addAttribute("test", "test");
+        const initialCount = await dataPanel.getContentDataPanelAttributesCount();
+        await dataPanel.removeAttribute("test");
+        const newCount = await dataPanel.getContentDataPanelAttributesCount();
+        expect(newCount).toBe(initialCount - 1);
+    })
+    
+    test("@admin validate deleting node closes data panel", async () => {
+        const graphName = getRandomString("DataPanel")
+        await apicalls.addGraph(graphName, "admin");
+        const dataPanel = await browser.createNewPage(DataPanel, urls.graphUrl);
+        await dataPanel.selectGraphByName(graphName);
+        await dataPanel.insertQuery(CREATE_NODE_QUERY);
+        await dataPanel.clickRunQuery();
+        await dataPanel.searchElementInCanvas("a");
+        await dataPanel.deleteElementByName("a");
+        expect(await dataPanel.isVisibleDataPanel()).toBe(false);
     })
 })

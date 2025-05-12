@@ -3,17 +3,12 @@
 /* eslint-disable no-await-in-loop */
 import { expect, test } from "@playwright/test";
 import fs from 'fs';
+import { getRandomString, DEFAULT_CREATE_QUERY, CREATE_QUERY, CREATE_TWO_NODES_QUERY, CREATE_NODE_QUERY } from "../infra/utils";
 import BrowserWrapper from "../infra/ui/browserWrapper";
 import ApiCalls from "../logic/api/apiCalls";
 import GraphPage from "../logic/POM/graphPage";
 import urls from '../config/urls.json'
 import queryData from '../config/queries.json'
-import { getRandomString } from "../infra/utils";
-
-const DEFAULT_CREATE_QUERY = "UNWIND range(1, 10) as x CREATE (n:n)-[e:e]->(m:m) RETURN *"
-const CREATE_TWO_NODES_QUERY = 'CREATE (a:person1 {name: "a"}), (b:person2 {name: "b"}) RETURN *'
-const CREATE_NODE_QUERY = 'CREATE (a:person1 {name: "a"}) RETURN *'
-const CREATE_QUERY = 'CREATE (a:person1 {name: "a"})-[c:KNOWS {name: "knows"}]->(b:person2) RETURN *'
 
 test.describe('Graph Tests', () => {
     let browser: BrowserWrapper;
@@ -50,7 +45,7 @@ test.describe('Graph Tests', () => {
         const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
         const graphName = getRandomString('graph');
         await graph.addGraph(graphName);
-        const download = await graph.exportGraph(graphName);
+        const download = await graph.exportGraphByName(graphName);
         const downloadPath = await download.path();
         expect(fs.existsSync(downloadPath)).toBe(true);
         await apiCall.removeGraph(graphName);
@@ -158,7 +153,7 @@ test.describe('Graph Tests', () => {
         await graph.insertQuery(CREATE_QUERY);
         await graph.clickRunQuery();
         const initCount = parseInt(await graph.getNodesCount() ?? "", 10);
-        await graph.deleteElement("knows");
+        await graph.deleteElementByName("knows");
         expect(parseInt(await graph.getNodesCount() ?? "", 10)).toBe(initCount);
         await apiCall.removeGraph(graphName);
     });
@@ -172,7 +167,7 @@ test.describe('Graph Tests', () => {
         await graph.insertQuery(CREATE_QUERY);
         await graph.clickRunQuery();
         const initCount = parseInt(await graph.getEdgesCount(), 10);
-        await graph.deleteElement("a");
+        await graph.deleteElementByName("a");
         expect(parseInt(await graph.getEdgesCount(), 10)).toBe(initCount - 1);
         await apiCall.removeGraph(graphName);
     });
@@ -186,7 +181,7 @@ test.describe('Graph Tests', () => {
         await graph.insertQuery(CREATE_QUERY);
         await graph.clickRunQuery();
         const initCount = parseInt(await graph.getEdgesCount(), 10);
-        await graph.deleteElement("knows");
+        await graph.deleteElementByName("knows");
         expect(parseInt(await graph.getEdgesCount(), 10)).toBe(initCount - 1);
         await apiCall.removeGraph(graphName);
     });
@@ -200,7 +195,7 @@ test.describe('Graph Tests', () => {
         await graph.insertQuery(CREATE_QUERY);
         await graph.clickRunQuery();
         const initCount = parseInt(await graph.getNodesCount(), 10);
-        await graph.deleteElement("a");
+        await graph.deleteElementByName("a");
         expect(parseInt(await graph.getNodesCount(), 10)).toBe(initCount - 1);
         await apiCall.removeGraph(graphName);
     });
@@ -214,7 +209,7 @@ test.describe('Graph Tests', () => {
         await graph.insertQuery(CREATE_QUERY);
         await graph.clickRunQuery();
         const initCount = parseInt(await graph.getNodesCount(), 10);
-        await graph.deleteElement("a");
+        await graph.deleteElementByName("a");
         expect(parseInt(await graph.getNodesCount(), 10)).toBe(initCount - 1);
         await apiCall.removeGraph(graphName);
     });
@@ -330,7 +325,7 @@ test.describe('Graph Tests', () => {
         await graph.insertQuery(CREATE_QUERY);
         await graph.clickRunQuery();
         const initCount = parseInt(await graph.getEdgesCount(), 10);
-        await graph.deleteElement("knows");
+        await graph.deleteElementByName("knows");
         expect(parseInt(await graph.getEdgesCount(), 10)).toBe(initCount - 1);
         await apiCall.removeGraph(graphName);
     });
@@ -397,20 +392,21 @@ test.describe('Graph Tests', () => {
         await graph.insertQuery(CREATE_TWO_NODES_QUERY);
         await graph.clickRunQuery(true);
         expect(await graph.getAnimationControl()).toBe(false);
-        const initNodes = await graph.getNodeScreenPositions('graph');
+        await graph.clickCenterControl();
+        const initNodes = await graph.getNodesScreenPositions('graph');
         const fromX = initNodes[0].screenX;
         const fromY = initNodes[0].screenY;
         const toX = initNodes[1].screenX;;
         const toY = initNodes[1].screenY;
         await graph.changeNodePosition(fromX, fromY, toX, toY);
         await graph.waitForCanvasAnimationToEnd();
-        const nodes = await graph.getNodeScreenPositions('graph');
+        const nodes = await graph.getNodesScreenPositions('graph');
         expect(nodes[1].screenX - nodes[0].screenX).toBeLessThanOrEqual(2);
         expect(nodes[1].screenY - nodes[0].screenY).toBeLessThanOrEqual(2);
         await apiCall.removeGraph(graphName);
     });
 
-    test.only(`@readwrite moving a node to another node's position while animation is on should push them apart`, async () => {
+    test(`@readwrite moving a node to another node's position while animation is on should push them apart`, async () => {
         const graphName = getRandomString('graph');
         await apiCall.addGraph(graphName);
         const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
@@ -418,7 +414,7 @@ test.describe('Graph Tests', () => {
         await graph.selectGraphByName(graphName);
         await graph.insertQuery(CREATE_TWO_NODES_QUERY);
         await graph.clickRunQuery(true);
-        const initNodes = await graph.getNodeScreenPositions('graph');
+        const initNodes = await graph.getNodesScreenPositions('graph');
         await graph.clickAnimationControl();
         expect(await graph.getAnimationControl()).toBe(true);
         const fromX = initNodes[0].screenX;
@@ -427,7 +423,7 @@ test.describe('Graph Tests', () => {
         const toY = initNodes[1].screenY;
         await graph.changeNodePosition(fromX, fromY, toX, toY);
         await graph.waitForCanvasAnimationToEnd();
-        const nodes = await graph.getNodeScreenPositions('graph');
+        const nodes = await graph.getNodesScreenPositions('graph');
         expect(Math.abs(nodes[1].screenX - nodes[0].screenX)).toBeGreaterThan(2);
         expect(Math.abs(nodes[1].screenY - nodes[0].screenY)).toBeGreaterThan(2);
         await apiCall.removeGraph(graphName);
@@ -442,10 +438,10 @@ test.describe('Graph Tests', () => {
         await graph.insertQuery(CREATE_NODE_QUERY);
         await graph.clickRunQuery();
         await graph.clickLabelsButtonByLabel("Labels", "person1");
-        const nodes1 = await graph.getNodeScreenPositions('graph');
+        const nodes1 = await graph.getNodesScreenPositions('graph');
         expect(nodes1[0].visible).toBeFalsy();
         await graph.clickLabelsButtonByLabel("Labels", "person1");
-        const nodes2 = await graph.getNodeScreenPositions('graph');
+        const nodes2 = await graph.getNodesScreenPositions('graph');
         expect(nodes2[0].visible).toBeTruthy();
         await apiCall.removeGraph(graphName);
     });
@@ -458,10 +454,10 @@ test.describe('Graph Tests', () => {
         await graph.selectGraphByName(graphName);
         await graph.insertQuery(CREATE_QUERY);
         await graph.clickRunQuery();
-        await graph.clickLabelsButtonByLabel("RelationshipTypes", "knows");
+        await graph.clickLabelsButtonByLabel("RelationshipTypes", "KNOWS");
         const links1 = await graph.getLinksScreenPositions('graph');
         expect(links1[0].visible).toBeFalsy();
-        await graph.clickLabelsButtonByLabel("RelationshipTypes", "knows");
+        await graph.clickLabelsButtonByLabel("RelationshipTypes", "KNOWS");
         const links2 = await graph.getLinksScreenPositions('graph');
         expect(links2[0].visible).toBeTruthy();
         await apiCall.removeGraph(graphName);
@@ -585,36 +581,6 @@ test.describe('Graph Tests', () => {
         expect(parseInt(await graph.getNodesCount(), 10)).toBe(1);
         await apiCall.removeGraph(graphName);
     });
-
-    // test(`@readwrite add node attribute via API and validate attribute count via UI`, async () => {
-    //     const graphName = getRandomString('graph');
-    //     await apiCall.addGraph(graphName);
-    //     await apiCall.runQuery(graphName, 'CREATE (a:person1 {id: "1"}) RETURN a');
-    //     await apiCall.addGraphNodeAttribute(graphName, "0", "age", { "value": "31", "type": true })
-    //     const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
-    //     await browser.setPageToFullScreen();
-    //     await graph.selectGraph(graphName);
-    //     await graph.insertQuery('match(n) return n');
-    //     await graph.clickRunQuery();
-    //     await graph.searchElementInCanvas("0");
-    //     expect(parseInt(await graph.getAttributesStatsInDataPanel(), 10)).toBe(2);
-    //     await apiCall.removeGraph(graphName);
-    // });
-
-    // test(`@readwrite delete node attribute via API and validate attribute count via UI`, async () => {
-    //     const graphName = getRandomString('graph');
-    //     await apiCall.addGraph(graphName);
-    //     await apiCall.runQuery(graphName, 'CREATE (a:person1 {id: "1", age: "30"}) RETURN a');
-    //     await apiCall.deleteGraphNodeAttribute(graphName, "0", "age", { "type": true })
-    //     const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
-    //     await browser.setPageToFullScreen();
-    //     await graph.selectGraph(graphName);
-    //     await graph.insertQuery('match(n) return n');
-    //     await graph.clickRunQuery();
-    //     await graph.searchElementInCanvas("0");
-    //     expect(parseInt(await graph.getAttributesStatsInDataPanel(), 10)).toBe(1);
-    //     await apiCall.removeGraph(graphName);
-    // });
 
     test(`@readonly Validate that RO user can select graph`, async () => {
         const graphName = getRandomString('graph');

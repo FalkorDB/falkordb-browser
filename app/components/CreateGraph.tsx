@@ -110,7 +110,7 @@ export default function CreateGraph({
                 </div>
                 <div className="flex gap-4 justify-end">
                     <Button
-                        data-testid={`create${type}${label}ConfirmButton`}
+                        data-testid={`create${type}${label}Confirm`}
                         indicator={indicator}
                         variant="Primary"
                         label={`Create your ${type}`}
@@ -119,7 +119,7 @@ export default function CreateGraph({
                         isLoading={isLoading}
                     />
                     <CloseDialog
-                        data-testid={`create${type}${label}CancelButton`}
+                        data-testid={`create${type}${label}Cancel`}
                         variant="Cancel"
                         label="Cancel"
                         type="button"

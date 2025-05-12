@@ -17,43 +17,43 @@ export default class GraphPage extends BasePage {
         return this.page.getByTestId("createGraphInput");
     }
 
-    private get createGraphConfirmButton(): Locator {
-        return this.page.getByTestId("createGraphConfirmButton");
+    private get createGraphConfirm(): Locator {
+        return this.page.getByTestId("createGraphConfirm");
     }
 
-    private get createGraphCancelButton(): Locator {
-        return this.page.getByTestId("createGraphCancelButton");
+    private get createGraphCancel(): Locator {
+        return this.page.getByTestId("createGraphCancel");
     }
 
     // DELETE
-    private get deleteGraphButton(): Locator {
-        return this.page.getByTestId("deleteGraphButton");
+    private get deleteGraph(): Locator {
+        return this.page.getByTestId("deleteGraph");
     }
 
-    private get deleteGraphConfirmButton(): Locator {
-        return this.page.getByTestId("deleteGraphConfirmButton");
+    private get deleteGraphConfirm(): Locator {
+        return this.page.getByTestId("deleteGraphConfirm");
     }
 
-    private get deleteGraphCancelButton(): Locator {
-        return this.page.getByTestId("deleteGraphCancelButton");
+    private get deleteGraphCancel(): Locator {
+        return this.page.getByTestId("deleteGraphCancel");
     }
 
     // EXPORT
-    private get exportGraphButton(): Locator {
-        return this.page.getByTestId("exportGraphButton");
+    private get exportGraph(): Locator {
+        return this.page.getByTestId("exportGraph");
     }
 
-    private get exportGraphConfirmButton(): Locator {
-        return this.page.getByTestId("exportGraphConfirmButton");
+    private get exportGraphConfirm(): Locator {
+        return this.page.getByTestId("exportGraphConfirm");
     }
 
-    private get exportGraphCancelButton(): Locator {
-        return this.page.getByTestId("exportGraphCancelButton");
+    private get exportGraphCancel(): Locator {
+        return this.page.getByTestId("exportGraphCancel");
     }
 
     // RELOAD
-    private get reloadGraphsListButton(): Locator {
-        return this.page.getByTestId("reloadGraphsListButton");
+    private get reloadGraphsList(): Locator {
+        return this.page.getByTestId("reloadGraphsList");
     }
 
     // SELECT
@@ -72,8 +72,8 @@ export default class GraphPage extends BasePage {
     }
 
     // MANAGE
-    private get manageGraphsButton(): Locator {
-        return this.page.getByTestId("manageGraphsButton");
+    private get manageGraphs(): Locator {
+        return this.page.getByTestId("manageGraphs");
     }
 
     // TABLE
@@ -110,21 +110,21 @@ export default class GraphPage extends BasePage {
         return this.page.getByTestId("editorContainer");
     }
 
-    private get editorRunButton(): Locator {
-        return this.page.getByTestId("editorRunButton");
+    private get editorRun(): Locator {
+        return this.page.getByTestId("editorRun");
     }
 
-    private get editorMaximizeButton(): Locator {
-        return this.page.getByTestId("editorMaximizeButton");
+    private get editorMaximize(): Locator {
+        return this.page.getByTestId("editorMaximize");
     }
 
     // QUERY HISTORY
-    private get queryHistoryButton(): Locator {
-        return this.page.getByTestId("queryHistoryButton");
+    private get queryHistory(): Locator {
+        return this.page.getByTestId("queryHistory");
     }
 
-    private get queryHistorySearchInput(): Locator {
-        return this.page.getByTestId("queryHistorySearchInput");
+    private get queryHistorySearch(): Locator {
+        return this.page.getByTestId("queryHistorySearch");
     }
 
     private get queryHistoryButtonByIndex(): (index: number) => Locator {
@@ -151,29 +151,29 @@ export default class GraphPage extends BasePage {
     }
 
     // ADD
-    private get elementCanvasAddButton(): Locator {
-        return this.page.getByTestId("elementCanvasAddButtonGraph");
+    private get elementCanvasAdd(): Locator {
+        return this.page.getByTestId("elementCanvasAddGraph");
     }
 
-    private get elementCanvasAddNodeButton(): Locator {
-        return this.page.getByTestId("elementCanvasAddNodeButtonGraph");
+    private get elementCanvasAddNode(): Locator {
+        return this.page.getByTestId("elementCanvasAddNodeGraph");
     }
 
-    private get elementCanvasAddEdgeButton(): Locator {
-        return this.page.getByTestId("elementCanvasAddEdgeButtonGraph");
+    private get elementCanvasAddEdge(): Locator {
+        return this.page.getByTestId("elementCanvasAddEdgeGraph");
     }
 
     // DELETE
-    private get deleteElementButton(): Locator {
-        return this.page.getByTestId("deleteElementButtonGraph");
+    private get deleteElement(): Locator {
+        return this.page.getByTestId("deleteElementGraph");
     }
 
-    private get deleteElementConfirmButton(): Locator {
-        return this.page.getByTestId("deleteElementConfirmButtonGraph");
+    private get deleteElementConfirm(): Locator {
+        return this.page.getByTestId("deleteElementConfirmGraph");
     }
 
-    private get deleteElementCancelButton(): Locator {
-        return this.page.getByTestId("deleteElementCancelButtonGraph");
+    private get deleteElementCancel(): Locator {
+        return this.page.getByTestId("deleteElementCancelGraph");
     }
 
     // LABELS
@@ -186,7 +186,7 @@ export default class GraphPage extends BasePage {
         return this.page.getByTestId("toast");
     }
 
-    // CONTROLS
+    // CANVAS CONTROLS
     private get animationControl(): Locator {
         return this.page.getByTestId("animationControl");
     }
@@ -223,11 +223,6 @@ export default class GraphPage extends BasePage {
 
     private get edgesCount(): Locator {
         return this.page.getByTestId("edgesCount");
-    }
-
-    // DATA PANEL
-    private get dataPanelElementDeleteButton(): Locator {
-        return this.page.getByTestId("deleteElementButtonGraph");
     }
 
     // CANVAS TOOLTIP
@@ -269,8 +264,8 @@ export default class GraphPage extends BasePage {
         await interactWhenVisible(this.inputGraphs, (el) => el.fill(text), "Input Graphs");
     }
 
-    async fillQueryHistorySearchInput(text: string): Promise<void> {
-        await interactWhenVisible(this.queryHistorySearchInput, (el) => el.fill(text), "Query History Search Input");
+    async fillQueryHistorySearch(text: string): Promise<void> {
+        await interactWhenVisible(this.queryHistorySearch, (el) => el.fill(text), "Query History Search");
     }
 
     async fillElementCanvasSearch(text: string): Promise<void> {
@@ -290,35 +285,35 @@ export default class GraphPage extends BasePage {
     }
 
     async clickCreateGraphConfirm(): Promise<void> {
-        await interactWhenVisible(this.createGraphConfirmButton, (el) => el.click(), "Create Graph Confirm");
+        await interactWhenVisible(this.createGraphConfirm, (el) => el.click(), "Create Graph Confirm");
     }
 
     async clickCreateGraphCancel(): Promise<void> {
-        await interactWhenVisible(this.createGraphCancelButton, (el) => el.click(), "Create Graph Cancel");
+        await interactWhenVisible(this.createGraphCancel, (el) => el.click(), "Create Graph Cancel");
     }
 
     async clickDeleteGraph(): Promise<void> {
-        await interactWhenVisible(this.deleteGraphButton, (el) => el.click(), "Delete Graph");
+        await interactWhenVisible(this.deleteGraph, (el) => el.click(), "Delete Graph");
     }
 
     async clickDeleteGraphConfirm(): Promise<void> {
-        await interactWhenVisible(this.deleteGraphConfirmButton, (el) => el.click(), "Confirm Delete Graph");
+        await interactWhenVisible(this.deleteGraphConfirm, (el) => el.click(), "Confirm Delete Graph");
     }
 
     async clickDeleteGraphCancel(): Promise<void> {
-        await interactWhenVisible(this.deleteGraphCancelButton, (el) => el.click(), "Cancel Delete Graph");
+        await interactWhenVisible(this.deleteGraphCancel, (el) => el.click(), "Cancel Delete Graph");
     }
 
     async clickExportGraph(): Promise<void> {
-        await interactWhenVisible(this.exportGraphButton, (el) => el.click(), "Export Graph");
+        await interactWhenVisible(this.exportGraph, (el) => el.click(), "Export Graph");
     }
 
     async clickExportGraphConfirm(): Promise<void> {
-        await interactWhenVisible(this.exportGraphConfirmButton, (el) => el.click(), "Confirm Export Graph");
+        await interactWhenVisible(this.exportGraphConfirm, (el) => el.click(), "Confirm Export Graph");
     }
 
     async clickExportGraphCancel(): Promise<void> {
-        await interactWhenVisible(this.exportGraphCancelButton, (el) => el.click(), "Cancel Export Graph");
+        await interactWhenVisible(this.exportGraphCancel, (el) => el.click(), "Cancel Export Graph");
     }
 
     async clickSelectGraph(): Promise<void> {
@@ -333,28 +328,28 @@ export default class GraphPage extends BasePage {
         await interactWhenVisible(this.searchGraph, (el) => el.click(), "Search Graph");
     }
 
-    async clickElementCanvasAddButton(): Promise<void> {
-        await interactWhenVisible(this.elementCanvasAddButton, (el) => el.click(), "Add Element Button");
+    async clickElementCanvasAdd(): Promise<void> {
+        await interactWhenVisible(this.elementCanvasAdd, (el) => el.click(), "Add Element");
     }
 
-    async clickElementCanvasAddNodeButton(): Promise<void> {
-        await interactWhenVisible(this.elementCanvasAddNodeButton, (el) => el.click(), "Add Node Button");
+    async clickElementCanvasAddNode(): Promise<void> {
+        await interactWhenVisible(this.elementCanvasAddNode, (el) => el.click(), "Add Node");
     }
 
-    async clickElementCanvasAddEdgeButton(): Promise<void> {
-        await interactWhenVisible(this.elementCanvasAddEdgeButton, (el) => el.click(), "Add Edge Button");
+    async clickElementCanvasAddEdge(): Promise<void> {
+        await interactWhenVisible(this.elementCanvasAddEdge, (el) => el.click(), "Add Edge");
     }
 
-    async clickDeleteElementButton(): Promise<void> {
-        await interactWhenVisible(this.deleteElementButton, (el) => el.click(), "Delete Element Button");
+    async clickDeleteElement(): Promise<void> {
+        await interactWhenVisible(this.deleteElement, (el) => el.click(), "Delete Element");
     }
 
     async clickDeleteElementConfirm(): Promise<void> {
-        await interactWhenVisible(this.deleteElementConfirmButton, (el) => el.click(), "Confirm Delete Element");
+        await interactWhenVisible(this.deleteElementConfirm, (el) => el.click(), "Confirm Delete Element");
     }
 
     async clickDeleteElementCancel(): Promise<void> {
-        await interactWhenVisible(this.deleteElementCancelButton, (el) => el.click(), "Cancel Delete Element");
+        await interactWhenVisible(this.deleteElementCancel, (el) => el.click(), "Cancel Delete Element");
     }
 
     async clickAnimationControl(): Promise<void> {
@@ -393,24 +388,20 @@ export default class GraphPage extends BasePage {
         await interactWhenVisible(this.labelsButtonByName(label, name), (el) => el.click(), `Labels Panel Button ${label} ${name}`);
     }
 
-    async clickEditorRunButton(): Promise<void> {
-        await interactWhenVisible(this.editorRunButton, (el) => el.click(), "Editor Run Button");
+    async clickEditorRun(): Promise<void> {
+        await interactWhenVisible(this.editorRun, (el) => el.click(), "Editor Run");
     }
 
-    async clickManageGraphsButton(): Promise<void> {
-        await interactWhenVisible(this.manageGraphsButton, (el) => el.click(), "Manage Graphs Button");
+    async clickManageGraphs(): Promise<void> {
+        await interactWhenVisible(this.manageGraphs, (el) => el.click(), "Manage Graphs Button");
     }
 
     async clickTableGraphsCheckboxByName(name: string): Promise<void> {
         await interactWhenVisible(this.tableGraphsCheckboxByName(name), (el) => el.click(), `Table Graphs Checkbox ${name}`);
     }
 
-    async clickExportGraphButton(): Promise<void> {
-        await interactWhenVisible(this.exportGraphButton, (el) => el.click(), "Export Graph Button");
-    }
-
-    async clickReloadGraphsListButton(): Promise<void> {
-        await interactWhenVisible(this.reloadGraphsListButton, (el) => el.click(), "Reload Graphs List Button");
+    async clickReloadGraphsList(): Promise<void> {
+        await interactWhenVisible(this.reloadGraphsList, (el) => el.click(), "Reload Graphs List");
     }
 
     async clickEditButtonGraphs(): Promise<void> {
@@ -496,19 +487,18 @@ export default class GraphPage extends BasePage {
     }
 
     async clickRunQuery(waitForAnimation = false): Promise<void> {
-        await this.clickEditorRunButton();
+        await this.clickEditorRun();
+        await waitForElementToBeEnabled(this.editorRun);
         if (waitForAnimation) {
             await this.waitForCanvasAnimationToEnd();
-        } else {
-            await waitForElementToBeEnabled(this.editorRunButton);
         }
     }
 
-    async exportGraph(graphName: string): Promise<Download> {
+    async exportGraphByName(graphName: string): Promise<Download> {
         await this.clickSelectGraph();
-        await this.clickManageGraphsButton();
+        await this.clickManageGraphs();
         await this.clickTableGraphsCheckboxByName(graphName);
-        await this.clickExportGraphButton();
+        await this.clickExportGraph();
         const [download] = await Promise.all([
             this.page.waitForEvent("download"),
             this.clickExportGraphConfirm(),
@@ -517,13 +507,13 @@ export default class GraphPage extends BasePage {
     }
 
     async reloadGraphList(): Promise<void> {
-        await this.clickReloadGraphsListButton();
-        await waitForElementToBeEnabled(this.reloadGraphsListButton);
+        await this.clickReloadGraphsList();
+        await waitForElementToBeEnabled(this.reloadGraphsList);
     }
 
     async isModifyGraphNameButtonVisible(graphName: string): Promise<boolean> {
         await this.clickSelectGraph();
-        await this.clickManageGraphsButton();
+        await this.clickManageGraphs();
         await this.hoverTableGraphsRowByName(graphName);
         const isVisible = await this.isVisibleEditButtonGraphs();
         return isVisible;
@@ -531,7 +521,7 @@ export default class GraphPage extends BasePage {
 
     async modifyGraphName(oldName: string, newName: string): Promise<void> {
         await this.clickSelectGraph();
-        await this.clickManageGraphsButton();
+        await this.clickManageGraphs();
         await this.hoverTableGraphsRowByName(oldName);
         await this.clickEditButtonGraphs();
         await this.fillInputGraphs(newName);
@@ -555,20 +545,20 @@ export default class GraphPage extends BasePage {
         return count;
     }
 
-    async deleteElements(positions: { x: number, y: number }[]): Promise<void> {
+    async deleteElementsByPosition(positions: { x: number, y: number }[]): Promise<void> {
         positions.forEach(async (position) => {
             await this.elementClick(position.x, position.y);
         });
-        await this.clickDeleteElementButton();
+        await this.clickDeleteElement();
         await this.clickDeleteElementConfirm();
-        await waitForElementToNotBeVisible(this.dataPanelElementDeleteButton);
+        await waitForElementToNotBeVisible(this.deleteElement);
     }
 
-    async deleteElement(name: string): Promise<void> {
+    async deleteElementByName(name: string): Promise<void> {
         await this.searchElementInCanvas(name);
-        await this.clickDeleteElementButton();
+        await this.clickDeleteElement();
         await this.clickDeleteElementConfirm();
-        await waitForElementToNotBeVisible(this.dataPanelElementDeleteButton);
+        await waitForElementToNotBeVisible(this.deleteElement);
     }
 
     async getErrorNotification(): Promise<boolean> {
@@ -582,8 +572,10 @@ export default class GraphPage extends BasePage {
         return status === "running"
     }
 
-    async waitForCanvasAnimationToEnd(timeout = 7000): Promise<void> {
-        await this.page.waitForTimeout(1500); // fit to size animation 
+    // 6000 is the timeout for the animation to end
+    // 1500 is the timeout for the fit to size animation
+    // 2000 is extra timeout to ensure the animation is over
+    async waitForCanvasAnimationToEnd(timeout = 9500): Promise<void> {
         await this.page.waitForFunction(
             (selector: string) => {
                 const canvas = document.querySelector(selector) as HTMLCanvasElement;
@@ -627,40 +619,78 @@ export default class GraphPage extends BasePage {
         throw new Error("Canvas transform data not available!");
     }
 
-    async getNodeScreenPositions(windowKey: 'graph' | 'schema'): Promise<any[]> {
+    async getNodesScreenPositions(windowKey: 'graph' | 'schema'): Promise<any[]> {
+        // Get canvas element and its properties
+        const canvas = await this.page.evaluate((selector) => {
+            const canvasElement = document.querySelector(selector);
+            if (!canvasElement) return null;
+            const rect = canvasElement.getBoundingClientRect();
+            return {
+                width: rect.width,
+                height: rect.height,
+                left: rect.left,
+                top: rect.top,
+                scale: window.devicePixelRatio || 1
+            };
+        }, ".force-graph-container canvas");
+
+        if (!canvas) return [];
+
+        // Get graph data
         const graphData = await this.page.evaluate((key) => (window as any)[key], windowKey);
 
+        // Get canvas transform
         const transformData = await this.getCanvasTransform(this.canvasElement);
         const { a, e, d, f } = transformData.transform;
-        const { left, top } = transformData;
 
-        const offsets = {
-            graph: { x: -105, y: -380 },
-            schema: { x: -40, y: -370 }
-        };
+        return graphData.elements.nodes.map((node: any) => {
+            // Calculate node position relative to canvas
+            const screenX = canvas.left + (node.x * a + e) * canvas.scale;
+            const screenY = canvas.top + (node.y * d + f) * canvas.scale;
 
-        const { x: offsetX, y: offsetY } = offsets[windowKey];
+            // Check if node is visible in viewport
+            const isVisible = (
+                screenX >= canvas.left &&
+                screenX <= canvas.left + canvas.width &&
+                screenY >= canvas.top &&
+                screenY <= canvas.top + canvas.height
+            );
 
-        return graphData.elements.nodes.map((node: any) => ({
-            ...node,
-            screenX: left + node.x * a + e + offsetX,
-            screenY: top + node.y * d + f + offsetY,
-        }));
+            return {
+                id: node.id,
+                screenX,
+                screenY,
+                isVisible,
+                canvasWidth: canvas.width,
+                canvasHeight: canvas.height,
+                ...node
+            };
+        });
     }
 
     async getLinksScreenPositions(windowKey: 'graph' | 'schema'): Promise<any[]> {
+        // Get canvas element and its properties
+        const canvas = await this.page.evaluate((selector) => {
+            const canvasElement = document.querySelector(selector);
+            if (!canvasElement) return null;
+            const rect = canvasElement.getBoundingClientRect();
+            return {
+                width: rect.width,
+                height: rect.height,
+                left: rect.left,
+                top: rect.top,
+                scale: window.devicePixelRatio || 1
+            };
+        }, ".force-graph-container canvas");
+
+        if (!canvas) return [];
+
+        // Get graph data
         const graphData = await this.page.evaluate((key) => (window as any)[key], windowKey);
 
+        // Get canvas transform
         const transformData = await this.getCanvasTransform(this.canvasElement);
         const { a, e, d, f } = transformData.transform;
-        const { left, top } = transformData;
-
-        const offsets = {
-            graph: { x: -105, y: -380 },
-            schema: { x: -40, y: -370 }
-        };
-
-        const { x: offsetX, y: offsetY } = offsets[windowKey];
 
         return graphData.elements.links.map((link: any) => {
             const sourceId = typeof link.source === 'object' ? link.source.id : link.source;
@@ -669,10 +699,26 @@ export default class GraphPage extends BasePage {
             const source = graphData.elements.nodes.find((n: any) => n.id === sourceId);
             const target = graphData.elements.nodes.find((n: any) => n.id === targetId);
 
-            const sourceScreenX = left + source.x * a + e + offsetX;
-            const sourceScreenY = top + source.y * d + f + offsetY;
-            const targetScreenX = left + target.x * a + e + offsetX;
-            const targetScreenY = top + target.y * d + f + offsetY;
+            // Calculate node positions relative to canvas
+            const sourceScreenX = canvas.left + (source.x * a + e) * canvas.scale;
+            const sourceScreenY = canvas.top + (source.y * d + f) * canvas.scale;
+            const targetScreenX = canvas.left + (target.x * a + e) * canvas.scale;
+            const targetScreenY = canvas.top + (target.y * d + f) * canvas.scale;
+
+            // Calculate midpoint
+            const midX = (sourceScreenX + targetScreenX) / 2;
+            const midY = (sourceScreenY + targetScreenY) / 2;
+
+            // Check if link is visible in viewport
+            const isVisible = (
+                (sourceScreenX >= canvas.left && sourceScreenX <= canvas.left + canvas.width) ||
+                (targetScreenX >= canvas.left && targetScreenX <= canvas.left + canvas.width) ||
+                (midX >= canvas.left && midX <= canvas.left + canvas.width)
+            ) && (
+                    (sourceScreenY >= canvas.top && sourceScreenY <= canvas.top + canvas.height) ||
+                    (targetScreenY >= canvas.top && targetScreenY <= canvas.top + canvas.height) ||
+                    (midY >= canvas.top && midY <= canvas.top + canvas.height)
+                );
 
             return {
                 id: link.id,
@@ -682,23 +728,20 @@ export default class GraphPage extends BasePage {
                 sourceScreenY,
                 targetScreenX,
                 targetScreenY,
-                midX: (sourceScreenX + targetScreenX) / 2,
-                midY: (sourceScreenY + targetScreenY) / 2,
+                midX,
+                midY,
+                isVisible,
+                canvasWidth: canvas.width,
+                canvasHeight: canvas.height,
                 ...link
             };
         });
     }
 
     async changeNodePosition(fromX: number, fromY: number, toX: number, toY: number): Promise<void> {
-        const box = (await this.getBoundingBoxCanvasElement())!;
-        const absStartX = box.x + fromX;
-        const absStartY = box.y + fromY;
-        const absEndX = box.x + toX;
-        const absEndY = box.y + toY;
-
-        await this.page.mouse.move(absStartX, absStartY);
+        await this.page.mouse.move(fromX, fromY);
         await this.page.mouse.down();
-        await this.page.mouse.move(absEndX, absEndY);
+        await this.page.mouse.move(toX, toY);
         await this.page.mouse.up();
     }
 
