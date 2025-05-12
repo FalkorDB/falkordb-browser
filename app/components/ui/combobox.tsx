@@ -99,7 +99,7 @@ export default function Combobox({ disabled = false, inTable, type = "Graph", la
         <Tooltip>
           <TooltipTrigger asChild>
             <SelectTrigger
-              data-testid={`Select${label}`}
+              data-testid={`select${label}`}
               data-type="select"
               className={cn("w-fit gap-2 items-center border p-2 disabled:text-gray-400 disabled:opacity-100 disabled:cursor-not-allowed max-w-[10%]", inTable ? "text-sm font-light" : "text-xl font-medium")}
             >
@@ -114,7 +114,7 @@ export default function Combobox({ disabled = false, inTable, type = "Graph", la
         <SelectContent className="min-w-52 max-h-[40lvh] bg-foreground">
           <div className="p-4">
             <Input
-              data-testid={`Search${label}`}
+              data-testid={`search${label}`}
               ref={ref => ref?.focus()}
               className="w-full"
               placeholder={`Search for a ${label}`}
@@ -135,7 +135,7 @@ export default function Combobox({ disabled = false, inTable, type = "Graph", la
               {
                 filteredOptions.slice(0, maxOptions).filter((option) => selectedValue !== option).map((option) => (
                   <SelectItem
-                    data-testid={`SelectItem${label}${option}`}
+                    data-testid={`select${label}Item${option}`}
                     value={!option ? '""' : option}
                     key={`key-${option}`}
                   >
