@@ -185,8 +185,8 @@ export default function SchemaView({
                 {
                     (categories.length > 0 || labels.length > 0) &&
                     <>
-                        <Labels className="left-2" label="Categories" categories={categories} onClick={onCategoryClick} />
-                        <Labels className="right-2 text-end" label="RelationshipTypes" categories={labels} onClick={onLabelClick} />
+                        <Labels type="Schema" className="left-2" label="Labels" categories={categories} onClick={onCategoryClick} />
+                        <Labels type="Schema" className="right-2 text-end" label="RelationshipTypes" categories={labels} onClick={onLabelClick} />
                     </>
                 }
                 {

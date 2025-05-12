@@ -21,14 +21,13 @@ import { IndicatorContext } from "./provider";
 interface Props {
     headers: string[],
     rows: Row[],
-    label: "Graphs" | "Schemas" | "Configs",
+    label: "Graphs" | "Schemas" | "Configs" | "Users" | "TableView",
     children?: React.ReactNode,
     setRows?: (rows: Row[]) => void,
-    options?: string[]
     className?: string
 }
 
-export default function TableComponent({ headers, rows, label, children, setRows, options, className }: Props) {
+export default function TableComponent({ headers, rows, label, children, setRows, className }: Props) {
 
     const [search, setSearch] = useState<string>("")
     const [isSearchable, setIsSearchable] = useState<boolean>(false)
@@ -44,7 +43,7 @@ export default function TableComponent({ headers, rows, label, children, setRows
 
         const searchLower = search.toLowerCase();
 
-        if (typeof cell.value === "object") {
+        if (cell.type === "object") {
             return Object.values(cell.value).some(value => {
                 if (typeof value === "object") {
                     return Object.values(value).some(val =>
@@ -163,9 +162,9 @@ export default function TableComponent({ headers, rows, label, children, setRows
                                 }
                                 {
                                     row.cells.map((cell, j) => (
-                                        <TableCell className={cn(j === 0 ? setRows && "border-l" : "border-l", row.cells[0]?.value === editable && cell.onChange && "p-2")} key={j}>
+                                        <TableCell className={cn(j === 0 ? setRows && "border-l" : "border-l", row.cells[0]?.value === editable && (cell.type !== "readonly" && cell.type !== "object") && "p-2")} key={j}>
                                             {
-                                                typeof cell.value === "object" ?
+                                                cell.type === "object" ?
                                                     <JSONTree
                                                         key={search}
                                                         shouldExpandNodeInitially={() =>
@@ -195,17 +194,20 @@ export default function TableComponent({ headers, rows, label, children, setRows
                                                     : editable === `${i}-${j}` ?
                                                         <div className="w-full flex gap-2 items-center">
                                                             {
-                                                                cell.type === "combobox" ?
+                                                                cell.type === "select" ?
                                                                     <Combobox
-                                                                        options={options!}
-                                                                        setSelectedValue={(value) => {
-                                                                            cell.onChange!(value)
-                                                                            handleSetEditable("", "")
+                                                                        options={cell.options}
+                                                                        setSelectedValue={async (value) => {
+                                                                            const result = await cell.onChange(value)
+                                                                            if (result) {
+                                                                                handleSetEditable("", "")
+                                                                            }
                                                                         }}
-                                                                        label={cell.comboboxType}
+                                                                        label={cell.selectType}
                                                                         selectedValue={cell.value.toString()}
                                                                     />
-                                                                    : <Input
+                                                                    : cell.type === "text" &&
+                                                                    <Input
                                                                         data-testid={`input${label}`}
                                                                         ref={ref => ref?.focus()}
                                                                         variant="primary"
@@ -221,7 +223,7 @@ export default function TableComponent({ headers, rows, label, children, setRows
                                                                             if (e.key !== "Enter") return
 
                                                                             e.preventDefault()
-                                                                            const result = await cell.onChange!(newValue)
+                                                                            const result = await cell.onChange(newValue)
                                                                             if (result) {
                                                                                 handleSetEditable("", "")
                                                                             }
@@ -230,15 +232,17 @@ export default function TableComponent({ headers, rows, label, children, setRows
                                                             }
                                                             <div className="flex flex-col gap-1">
                                                                 {
-                                                                    cell.type !== "combobox" &&
+                                                                    cell.type !== "select" && cell.type !== "readonly" &&
                                                                     <Button
                                                                         data-testid={`saveButton${label}`}
                                                                         title="Save"
                                                                         onClick={async () => {
                                                                             try {
                                                                                 setIsLoading(true)
-                                                                                await cell.onChange!(newValue)
-                                                                                handleSetEditable("", "")
+                                                                                const result = await cell.onChange(newValue)
+                                                                                if (result) {
+                                                                                    handleSetEditable("", "")
+                                                                                }
                                                                             } finally {
                                                                                 setIsLoading(false)
                                                                             }
@@ -273,11 +277,10 @@ export default function TableComponent({ headers, rows, label, children, setRows
                                                             </Tooltip>
                                                             <div className="w-4">
                                                                 {
-                                                                    cell.onChange && hover === `${i}` &&
+                                                                    cell.type !== "readonly" && hover === `${i}` &&
                                                                     <Button
                                                                         data-testid={`editButton${label}`}
                                                                         className="disabled:cursor-text disabled:opacity-100"
-                                                                        disabled={!cell.onChange}
                                                                         indicator={indicator}
                                                                         title="Edit"
                                                                         onClick={() => handleSetEditable(`${i}-${j}`, cell.value!.toString())}

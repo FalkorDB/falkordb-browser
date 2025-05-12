@@ -15,7 +15,7 @@ interface Props {
     open: boolean
     setOpen: (open: boolean) => void
     description: string
-    label: string
+    label?: "Graph" | "Schema"
     backgroundColor?: string
 }
 
@@ -25,7 +25,7 @@ export default function DeleteElement({
     setOpen,
     description,
     backgroundColor,
-    label
+    label = "Graph"
 }: Props) {
 
     const { indicator } = useContext(IndicatorContext)

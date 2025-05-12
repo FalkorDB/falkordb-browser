@@ -11,12 +11,13 @@ export default function TableView() {
 
     return (
         <TableComponent
+            label="TableView"
             className="p-12"
             headers={Object.keys(graph.Data[0])}
             rows={graph.Data.map(row => ({
                 cells: Object.values(row).map((value) => ({
                     value,
-
+                    type: "object"
                 }))
             }))}
         />

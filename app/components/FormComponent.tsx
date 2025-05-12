@@ -16,20 +16,35 @@ export type Error = {
     condition: (value: string, password?: string) => boolean
 }
 
-export type Field = {
-    label: string
+export type DefaultField = {
     value: string
-    onChange?: (e: React.ChangeEvent<HTMLInputElement>) => void
-    type: string
-    info?: string
-    options?: string[]
-    onSelectedValue?: (value: string) => void
-    placeholder?: string
+    label: string
     required: boolean
+    placeholder?: string
     show?: boolean
     description?: string
     errors?: Error[]
+    info?: string
 }
+
+export type SelectField = DefaultField & {
+    type: "select"
+    options: string[]
+    selectType: "Role"
+    onChange: (value: string) => void
+}
+
+export type PasswordField = DefaultField & {
+    onChange: (e: React.ChangeEvent<HTMLInputElement>) => void
+    type: "password"
+}
+
+export type TextField = DefaultField & {
+    onChange: (e: React.ChangeEvent<HTMLInputElement>) => void
+    type: "text"
+}
+
+export type Field = SelectField | PasswordField | TextField
 
 interface Props {
     handleSubmit: (e: React.FormEvent<HTMLFormElement>) => Promise<void>
@@ -115,10 +130,10 @@ export default function FormComponent({ handleSubmit, fields, error = undefined,
                                     field.type === "select" ?
                                         <Combobox
                                             inTable
-                                            options={field.options!}
-                                            label={field.label}
+                                            options={field.options}
+                                            label={field.selectType}
                                             selectedValue={field.value}
-                                            setSelectedValue={field.onSelectedValue!}
+                                            setSelectedValue={field.onChange}
                                         />
                                         : <Input
                                             id={field.label}
@@ -126,7 +141,7 @@ export default function FormComponent({ handleSubmit, fields, error = undefined,
                                             placeholder={field.placeholder}
                                             value={field.value}
                                             onChange={(e) => {
-                                                field.onChange!(e)
+                                                field.onChange(e)
                                                 if (field.type === "password") {
                                                     const confirmPasswordField = fields.find(f => f.label === "Confirm Password")
                                                     if (confirmPasswordField && confirmPasswordField.errors) {

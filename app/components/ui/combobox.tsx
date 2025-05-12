@@ -25,7 +25,6 @@ interface ComboboxProps {
   selectedValue: string,
   setSelectedValue: (value: string) => void,
   type?: "Graph" | "Schema",
-  isSelectGraph?: boolean,
   disabled?: boolean,
   inTable?: boolean,
   label?: "Graph" | "Schema" | "Role" | "Type",
@@ -36,7 +35,7 @@ interface ComboboxProps {
 
 const STEP = 4
 
-export default function Combobox({ isSelectGraph = false, disabled = false, inTable, type = "Graph", label = type, options, setOptions, selectedValue, setSelectedValue, defaultOpen = false, onOpenChange }: ComboboxProps) {
+export default function Combobox({ disabled = false, inTable, type = "Graph", label = type, options, setOptions, selectedValue, setSelectedValue, defaultOpen = false, onOpenChange }: ComboboxProps) {
 
   const [openMenage, setOpenMenage] = useState<boolean>(false)
   const [open, setOpen] = useState<boolean>(defaultOpen)
@@ -78,7 +77,7 @@ export default function Combobox({ isSelectGraph = false, disabled = false, inTa
   }
 
   const handleSetRows = (opts: string[]) => {
-    setRows(opts.map(opt => ({ checked: false, name: opt, cells: [{ value: opt, onChange: session?.user?.role === "Admin" ? (value: string) => handleSetOption(value, opt) : undefined }] })))
+    setRows(opts.map(opt => session?.user?.role === "Admin" ? ({ checked: false, name: opt, cells: [{ value: opt, onChange: (value: string) => handleSetOption(value, opt), type: "text" }] }) : ({ checked: false, name: opt, cells: [{ value: opt, type: "readonly" }] })))
   }
 
   useEffect(() => {
@@ -164,7 +163,7 @@ export default function Combobox({ isSelectGraph = false, disabled = false, inTa
             </ul>
           </SelectGroup>
           {
-            isSelectGraph &&
+            type === "Graph" &&
             <>
               <SelectSeparator className="bg-secondary" />
               <DialogTrigger asChild>

@@ -268,14 +268,14 @@ export default function SchemaDataPanel({ object, setObject, onDeleteElement, sc
 
     const handleRemoveLabel = async (removeLabel: string) => {
         const node = object as Node
-        
+
         try {
             setIsRemoveLabelLoading(true)
             const result = await securedFetch(`api/schema/${prepareArg(schema.Id)}/${prepareArg(object.id.toString())}/label`, {
                 method: "DELETE",
                 body: JSON.stringify({ label: removeLabel })
             }, toast)
-            
+
             if (result.ok) {
                 schema.removeCategory(removeLabel, node, false)
                 setCategories([...schema.Categories])
@@ -681,6 +681,7 @@ export default function SchemaDataPanel({ object, setObject, onDeleteElement, sc
                 {
                     session?.user.role !== "Read-Only" &&
                     <DeleteElement
+                        label="Schema"
                         description={`Are you sure you want to delete this ${type ? "Node" : "Relation"}?`}
                         open={deleteOpen}
                         setOpen={setDeleteOpen}

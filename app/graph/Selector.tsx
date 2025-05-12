@@ -165,7 +165,6 @@ export default function Selector({ runQuery, historyQuery, setHistoryQuery, fetc
                 </Button>
             </div>
             <Combobox
-                isSelectGraph
                 type={type}
                 options={options}
                 setOptions={setOptions}
