@@ -15,6 +15,31 @@ import Button from "./ui/Button";
 import CloseDialog from "./CloseDialog";
 import { IndicatorContext, GraphContext } from "./provider";
 
+export const setTheme = (monacoI: Monaco, background = '#191919') => {
+    monacoI.editor.defineTheme('custom-theme', {
+        base: 'vs-dark',
+        inherit: true,
+        rules: [
+            { token: 'keyword', foreground: '#99E4E5' },
+            { token: 'function', foreground: '#DCDCAA' },
+            { token: 'type', foreground: '#89D86D' },
+            { token: 'string', foreground: '#CE9178' },
+            { token: 'number', foreground: '#b5cea8' },
+        ],
+        colors: {
+            'editor.background': background,
+            'editor.foreground': '#ffffff',
+            'editorSuggestWidget.background': '#272745',
+            'editorSuggestWidget.foreground': '#FFFFFF',
+            'editorSuggestWidget.selectedBackground': '#57577B',
+            'editorSuggestWidget.hoverBackground': '#28283F',
+            'focusBorder': '#00000000',
+        },
+    });
+
+    monacoI.editor.setTheme('custom-theme')
+}
+
 interface Props {
     historyQuery: HistoryQuery
     maximize: boolean
@@ -170,7 +195,7 @@ const FUNCTIONS = [
     "vecf32",
     "vec.euclideanDistance",
     "vec.cosineDistance",
-]
+]    
 
 const SUGGESTIONS: monaco.languages.CompletionItem[] = [
     ...KEYWORDS.map(key => ({
@@ -257,30 +282,6 @@ export default function EditorComponent({ historyQuery, maximize, setMaximize, r
         }
     }, [containerRef.current])
 
-    const setTheme = (monacoI: Monaco) => {
-        monacoI.editor.defineTheme('custom-theme', {
-            base: 'vs-dark',
-            inherit: true,
-            rules: [
-                { token: 'keyword', foreground: '#99E4E5' },
-                { token: 'function', foreground: '#DCDCAA' },
-                { token: 'type', foreground: '#89D86D' },
-                { token: 'string', foreground: '#CE9178' },
-                { token: 'number', foreground: '#b5cea8' },
-            ],
-            colors: {
-                'editor.background': '#191919',
-                'editor.foreground': '#ffffff',
-                'editorSuggestWidget.background': '#272745',
-                'editorSuggestWidget.foreground': '#FFFFFF',
-                'editorSuggestWidget.selectedBackground': '#57577B',
-                'editorSuggestWidget.hoverBackground': '#28283F',
-                'focusBorder': '#00000000',
-            },
-        });
-
-        monacoI.editor.setTheme('custom-theme')
-    }
 
     const fetchSuggestions = async (detail: string): Promise<monaco.languages.CompletionItem[]> => {
         if (indicator === "offline") return []

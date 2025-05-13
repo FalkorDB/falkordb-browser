@@ -222,6 +222,7 @@ export default function Page() {
                 setSelectedElement={setSelectedElement}
                 handleDeleteElement={handleDeleteElement}
                 chartRef={chartRef}
+                currentQuery={currentQuery}
             />
             <div className="h-1 grow p-12">
                 <GraphView

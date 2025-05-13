@@ -67,7 +67,12 @@ const Button = forwardRef<HTMLButtonElement, Props>(({ label, variant = "button"
                             <Loader2 className="animate-spin" />
                             : <>
                                 {children}
-                                {label}
+                                {
+                                    label &&
+                                    <p className="truncate">
+                                        {label}
+                                    </p>
+                                }
                             </>
                     }
                 </button>
