@@ -51,7 +51,7 @@ const getClassName = (variant: Variant, disable: boolean | undefined, open: bool
 }
 
 const Button = forwardRef<HTMLButtonElement, Props>(({ label, variant = "button", open, className, title, type = "button", disabled, children, isLoading = false, indicator, ...props }, ref) =>
-    (title || label || indicator === "offline") ? (
+    (title || label || indicator === "offline") && variant !== "Cancel" ? (
         <Tooltip>
             <TooltipTrigger asChild>
                 <button
@@ -72,7 +72,7 @@ const Button = forwardRef<HTMLButtonElement, Props>(({ label, variant = "button"
                     }
                 </button>
             </TooltipTrigger>
-            <TooltipContent className={cn(variant === "Delete" && "bg-red-500")}>
+            <TooltipContent className={cn(variant === "Delete" && "bg-red-500 border-white text-white")}>
                 {
                     indicator === "offline" && "The FalkorDB server is offline"
                 }
