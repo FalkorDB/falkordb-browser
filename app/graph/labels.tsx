@@ -1,20 +1,20 @@
 import { useContext, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import { ChevronDown, ChevronUp } from "lucide-react";
-import { Category } from "../api/graph/model";
+import { Category, Link, Node } from "../api/graph/model";
 import Button from "../components/ui/Button";
 import { GraphContext } from "../components/provider";
 
 /* eslint-disable react/require-default-props */
-interface Props {
-    categories: Category[],
-    onClick: (category: Category) => void,
+interface Props<T extends Category<Node> | Category<Link>> {
+    categories: T[],
+    onClick: (category: T) => void,
     label: "RelationshipTypes" | "Labels",
     type: "Schema" | "Graph",
     className?: string,
 }
 
-export default function Labels({ categories, onClick, label, type, className = "" }: Props) {
+export default function Labels<T extends Category<Node> | Category<Link>>({ categories, onClick, label, type, className = "" }: Props<T>) {
 
     // fake state to force reload
     const [, setReload] = useState(false)
@@ -53,7 +53,7 @@ export default function Labels({ categories, onClick, label, type, className = "
                             <li key={category.name}>
                                 <Button
                                     data-testid={`${type}${label}Button${category.name}`}
-                                    className="w-full pointer-events-auto"
+                                    className={cn("w-full pointer-events-auto", category.show ? "opacity-100" : "opacity-50")}
                                     label={category.name}
                                     onClick={() => {
                                         onClick(category)

@@ -35,10 +35,10 @@ interface Props {
     cooldownTicks: number | undefined
     chartRef: GraphRef
     handleDeleteElement: () => Promise<void>
-    setLabels: Dispatch<SetStateAction<Category[]>>
-    setCategories: Dispatch<SetStateAction<Category[]>>
-    labels: Category[]
-    categories: Category[]
+    setLabels: Dispatch<SetStateAction<Category<Link>[]>>
+    setCategories: Dispatch<SetStateAction<Category<Node>[]>>
+    labels: Category<Link>[]
+    categories: Category<Node>[]
 }
 
 function GraphView({
@@ -95,32 +95,36 @@ function GraphView({
         setSelectedElements([])
     }, [graph.Id])
 
-    const onCategoryClick = (category: Category) => {
+    const onCategoryClick = (category: Category<Node>) => {
         category.show = !category.show
 
-        category.elements.forEach((element) => {
-            if (element.category[0] !== category.name) return
+        category.elements.forEach((node) => {
+            if (node.category[0] !== category.name) return
             if (category.show) {
-                element.visible = true
+                node.visible = true
             } else {
-                element.visible = false
+                node.visible = false
             }
         })
 
         graph.visibleLinks(category.show)
 
+        graph.CategoriesMap.set(category.name, category)
         setData({ ...graph.Elements })
     }
 
-    const onLabelClick = (label: Category) => {
+    const onLabelClick = (label: Category<Link>) => {
         label.show = !label.show
-        label.elements.forEach((element) => {
+
+        label.elements.filter((link) => link.source.visible && link.target.visible).forEach((link) => {
             if (label.show) {
-                element.visible = true
+                link.visible = true
             } else {
-                element.visible = false
+                link.visible = false
             }
         })
+
+        graph.LabelsMap.set(label.name, label)
         setData({ ...graph.Elements })
     }
 
