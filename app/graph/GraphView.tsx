@@ -17,6 +17,7 @@ import MetadataView from "./MetadataView";
 import Toolbar from "./toolbar";
 import Controls from "./controls";
 import GraphDataPanel from "./GraphDataPanel";
+import GraphDetails from "./GraphDetails";
 
 const ForceGraph = dynamic(() => import("../components/ForceGraph"), { ssr: false });
 
@@ -127,31 +128,11 @@ function GraphView({
     return (
         <Tabs value={tabsValue} className="h-full w-full relative border rounded-lg overflow-hidden">
             <div className="absolute bottom-4 inset-x-12 pointer-events-none z-10 flex justify-between items-center">
-                <div className="w-1 grow flex gap-4">
-                    {
-                        graph.Id && tabsValue === "Graph" &&
-                        <>
-                            <p
-                                data-testid="graphName"
-                                className="Gradient bg-clip-text text-transparent"
-                            >
-                                GraphName:&nbsp;{graph.Id}
-                            </p>
-                            <p
-                                data-testid="nodesCount"
-                                className="Gradient bg-clip-text text-transparent"
-                            >
-                                Nodes:&nbsp;{nodesCount}
-                            </p>
-                            <p
-                                data-testid="edgesCount"
-                                className="Gradient bg-clip-text text-transparent"
-                            >
-                                Edges:&nbsp;{edgesCount}
-                            </p>
-                        </>
-                    }
-                </div>
+                <GraphDetails
+                    tabsValue={tabsValue}
+                    nodesCount={nodesCount}
+                    edgesCount={edgesCount}
+                />
                 <div className="w-1 grow flex justify-center">
                     <TabsList className="bg-transparent flex gap-2 pointer-events-auto">
                         <TabsTrigger
