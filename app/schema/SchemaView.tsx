@@ -34,10 +34,10 @@ interface Props {
     data: GraphData
     setData: Dispatch<SetStateAction<GraphData>>
     handleDeleteElement: () => Promise<void>
-    setLabels: Dispatch<SetStateAction<Category[]>>
-    setCategories: Dispatch<SetStateAction<Category[]>>
-    labels: Category[]
-    categories: Category[]
+    setLabels: Dispatch<SetStateAction<Category<Link>[]>>
+    setCategories: Dispatch<SetStateAction<Category<Node>[]>>
+    labels: Category<Link>[]
+    categories: Category<Node>[]
 }
 
 export default function SchemaView({
@@ -90,28 +90,29 @@ export default function SchemaView({
         setCooldownTicks(ticks)
     }
 
-    const onCategoryClick = (category: Category) => {
+    const onCategoryClick = (category: Category<Node>) => {
         category.show = !category.show
+
         schema.Elements.nodes.forEach((node) => {
             if (node.category[0] !== category.name) return
             node.visible = category.show
         })
 
         schema.visibleLinks(category.show)
-
+        schema.CategoriesMap.set(category.name, category)
         setData({ ...schema.Elements })
-        setCategories([...schema.Categories])
     }
 
-    const onLabelClick = (label: Category) => {
+    const onLabelClick = (label: Category<Link>) => {
         label.show = !label.show
+
         schema.Elements.links.forEach((link) => {
             if (link.label !== label.name) return
             link.visible = label.show
         })
 
+        schema.LabelsMap.set(label.name, label)
         setData({ ...schema.Elements })
-        setLabels([...schema.Labels])
     }
 
     const onCreateElement = async (attributes: [string, string[]][], elementLabel?: string[]) => {

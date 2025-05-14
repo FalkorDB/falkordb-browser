@@ -21,8 +21,8 @@ export default function Page() {
     const [isAddEntity, setIsAddEntity] = useState(false)
     const [edgesCount, setEdgesCount] = useState<number>(0)
     const [nodesCount, setNodesCount] = useState<number>(0)
-    const [labels, setLabels] = useState<Category[]>([])
-    const [categories, setCategories] = useState<Category[]>([])
+    const [labels, setLabels] = useState<Category<Link>[]>([])
+    const [categories, setCategories] = useState<Category<Node>[]>([])
 
     const { graph: schema, setGraph: setSchema } = useContext(GraphContext)
     const { indicator, setIndicator } = useContext(IndicatorContext)
