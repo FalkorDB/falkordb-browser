@@ -127,21 +127,27 @@ function GraphView({
     return (
         <Tabs value={tabsValue} className="h-full w-full relative border rounded-lg overflow-hidden">
             <div className="absolute bottom-4 inset-x-12 pointer-events-none z-10 flex justify-between items-center">
-                <div className="w-1 grow flex gap-2">
+                <div className="w-1 grow flex gap-4">
                     {
                         graph.Id && tabsValue === "Graph" &&
                         <>
                             <p
+                                data-testid="graphName"
+                                className="Gradient bg-clip-text text-transparent"
+                            >
+                                GraphName:&nbsp;{graph.Id}
+                            </p>
+                            <p
                                 data-testid="nodesCount"
                                 className="Gradient bg-clip-text text-transparent"
                             >
-                                Nodes: {nodesCount}
+                                Nodes:&nbsp;{nodesCount}
                             </p>
                             <p
                                 data-testid="edgesCount"
                                 className="Gradient bg-clip-text text-transparent"
                             >
-                                Edges: {edgesCount}
+                                Edges:&nbsp;{edgesCount}
                             </p>
                         </>
                     }
