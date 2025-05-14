@@ -1,704 +1,417 @@
-/* eslint-disable prefer-destructuring */
-/* eslint-disable @typescript-eslint/no-shadow */
-/* eslint-disable no-plusplus */
-/* eslint-disable no-await-in-loop */
-/* eslint-disable arrow-body-style */
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { Locator, Download } from "@playwright/test";
-import BasePage from "@/e2e/infra/ui/basePage";
-import { inferLabelFromGraph, interactWhenVisible, waitForElementToBeVisible, waitForTimeOut } from "@/e2e/infra/utils";
+/* eslint-disable no-await-in-loop */
+import { Download, Locator } from "@playwright/test";
+import { waitForElementToBeVisible, waitForElementToBeEnabled, waitForElementToNotBeVisible, interactWhenVisible } from "@/e2e/infra/utils";
+import Page from "./page";
 
-export default class GraphPage extends BasePage {
+export default class GraphPage extends Page {
 
-    private get graphsButton(): Locator {
-        return this.page.locator("//button[contains(text(), 'Graphs')]");
+    // TABS
+    private get graphTab(): Locator {
+        return this.page.getByTestId("graphTab");
     }
 
-    private get settingsButton(): Locator {
-        return this.page.locator("//button[contains(text(), 'Settings')]");
+    private get tableTab(): Locator {
+        return this.page.getByTestId("tableTab");
     }
 
-    private get graphsMenu(): Locator {
-        return this.page.getByRole("combobox");
+    private get metadataTab(): Locator {
+        return this.page.getByTestId("metadataTab");
     }
 
-    private get manageGraphBtn(): Locator {
-        return this.page.locator("//button[contains(text(), 'Manage Graphs')]")
+    // EDITOR
+    public get editorInput(): Locator {
+        return this.page.getByTestId(`editorInput`);
     }
 
-    private get deleteGraphBtn(): Locator {
-        return this.page.locator("//div[contains(@id, 'tableComponent')]//button[contains(text(), 'Delete')]")
+    public get editorRun(): Locator {
+        return this.page.getByTestId(`editorRun`);
     }
 
-    private get addGraphBtnInNavBar(): Locator {
-        return this.page.locator("//*[contains(@class, 'Header')]//button[contains(text(), 'Create New Graph')]");
+    public get editorMaximize(): Locator {
+        return this.page.getByTestId(`editorMaximize`);
     }
 
-    private get addGraphBtnInGraphManager(): Locator {
-        return this.page.locator("//div[contains(@id, 'graphManager')]//button[contains(@aria-label, 'Create New Graph')]");
+    // QUERY HISTORY
+    public get queryHistory(): Locator {
+        return this.page.getByTestId(`queryHistory`);
     }
 
-    private get graphNameInput(): Locator {
-        return this.page.getByRole("textbox");
+    public get queryHistorySearch(): Locator {
+        return this.page.getByTestId(`queryHistorySearch`);
     }
 
-    private get createGraphBtn(): Locator {
-        return this.page.locator("//div[@id='dialog']//button[contains(text(), 'Create your Graph')]");
+    public get queryHistoryButtonByIndex(): Locator {
+        return this.page.getByTestId(`queryHistoryButtonByIndex`);
     }
 
-    private get exportDataBtn(): Locator {
-        return this.page.locator("//button[contains(text(), 'Export Data')]");
+    public get queryHistoryEditorInput(): Locator {
+        return this.page.getByTestId(`queryHistoryEditorInput`);
     }
 
-    private get exportDataConfirmBtn(): Locator {
-        return this.page.getByRole("button", { name: "Download" });
+    async getBoundingBoxCanvasElement(): Promise<null | {
+        x: number;
+        y: number;
+        width: number;
+        height: number;
+    }> {
+        const boundingBox = await interactWhenVisible(this.canvasElement, (el) => el.boundingBox(), "Canvas Element");
+        return boundingBox;
     }
 
-    private get findGraphInMenu(): (graph: string) => Locator {
-        return (graph: string) => this.page.getByRole('row', { name: graph, exact: true });
+    async getAttributeCanvasElement(attribute: string): Promise<string> {
+        const attributeValue = await interactWhenVisible(this.canvasElement, (el) => el.getAttribute(attribute), "Canvas Element");
+        return attributeValue ?? "";
     }
 
-    private get checkGraphInMenu(): (graph: string) => Locator {
-        return (graph: string) => this.findGraphInMenu(graph).getByRole('checkbox');
+    async fillCreateInput(text: string): Promise<void> {
+        await interactWhenVisible(this.createInput("Graph"), (el) => el.fill(text), "Create Graph Input");
     }
 
-    private get deleteAllGraphInMenu(): Locator {
-        return this.page.getByRole('row', { name: 'Name', exact: true }).getByRole('checkbox');
+    async fillSearch(text: string): Promise<void> {
+        await interactWhenVisible(this.search("Graph"), (el) => el.fill(text), "Search Graph");
     }
 
-    private get graphMenuElements(): Locator {
-        return this.page.getByRole('row');
+    async fillInput(text: string): Promise<void> {
+        await interactWhenVisible(this.input("Graph"), (el) => el.fill(text), "Input Graphs");
     }
 
-    private get deleteGraphConfirmBtn(): Locator {
-        return this.page.locator("//button[contains(text(), 'Delete Graph')]")
+    async fillQueryHistorySearch(text: string): Promise<void> {
+        await interactWhenVisible(this.queryHistorySearch, (el) => el.fill(text), "Query History Search");
     }
 
-    private get errorNotification(): Locator {
-        return this.page.locator("//ol//li//div[text()='Error']")
+    async fillElementCanvasSearch(text: string): Promise<void> {
+        await interactWhenVisible(this.elementCanvasSearch("Graph"), (el) => el.fill(text), "Element Canvas Search");
     }
 
-    private get queryInput(): Locator {
-        return this.page.locator("#editor-container")
+    async clickCanvasElement(x: number, y: number): Promise<void> {
+        await interactWhenVisible(this.canvasElement, (el) => el.click({ position: { x, y }, button: "right" }), "Canvas Element");
     }
 
-    private get queryRunBtn(): Locator {
-        return this.page.locator("//button[text()='Run']");
+    async clickEditorInput(): Promise<void> {
+        await interactWhenVisible(this.editorInput, (el) => el.click(), "Editor Input");
     }
 
-    protected get canvasElement(): Locator {
-        return this.page.locator("//div[contains(@class, 'force-graph-container')]//canvas");
+    async clickCreate(): Promise<void> {
+        await interactWhenVisible(this.create("Graph"), (el) => el.click(), "Create Graph");
     }
 
-    private get selectBtnFromGraphManager(): (buttonNumber: string) => Locator {
-        return (buttonNumber: string) => this.page.locator(`//div[@id='graphManager']//button[${buttonNumber}]`);
+    async clickCreateConfirm(): Promise<void> {
+        await interactWhenVisible(this.createConfirm("Graph"), (el) => el.click(), "Create Graph Confirm");
     }
 
-    private get selectGraphList(): (graph: string, label: string) => Locator {
-        return (graph: string, label: string) => this.page.locator(`//ul[@id='${label}List']/div[descendant::text()[contains(., '${graph}')]]`);
+    async clickCreateCancel(): Promise<void> {
+        await interactWhenVisible(this.createCancel("Graph"), (el) => el.click(), "Create Graph Cancel");
     }
 
-    private get graphSelectSearchInput(): (label: string) => Locator {
-        return (label: string) => this.page.locator(`//div[@id='${label}Search']//input`);
+    async clickDelete(): Promise<void> {
+        await interactWhenVisible(this.delete("Graph"), (el) => el.click(), "Delete Graph");
     }
 
-    private get canvasElementSearchInput(): Locator {
-        return this.page.locator("//div[@id='elementCanvasSearch']//input");
+    async clickDeleteConfirm(): Promise<void> {
+        await interactWhenVisible(this.deleteConfirm("Graph"), (el) => el.click(), "Confirm Delete Graph");
     }
 
-    private get canvasElementSearchBtn(): Locator {
-        return this.page.locator("//div[@id='elementCanvasSearch']//button");
+    async clickDeleteCancel(): Promise<void> {
+        await interactWhenVisible(this.deleteCancel("Graph"), (el) => el.click(), "Cancel Delete Graph");
     }
 
-    private get nodeCanvasToolTip(): Locator {
-        return this.page.locator("//div[contains(@class, 'float-tooltip-kap')]");
+    async clickExport(): Promise<void> {
+        await interactWhenVisible(this.export("Graph"), (el) => el.click(), "Export Graph");
     }
 
-    private get reloadGraphListBtn(): (index: string) => Locator {
-        return (index: string) => this.page.locator(`//div[@id='graphManager']//button[${index}]`);
+    async clickExportConfirm(): Promise<void> {
+        await interactWhenVisible(this.exportConfirm("Graph"), (el) => el.click(), "Confirm Export Graph");
     }
 
-    private get zoomInBtn(): Locator {
-        return this.page.locator("//button[contains(., 'Zoom In')]");
+    async clickExportCancel(): Promise<void> {
+        await interactWhenVisible(this.exportCancel("Graph"), (el) => el.click(), "Cancel Export Graph");
     }
 
-    private get zoomOutBtn(): Locator {
-        return this.page.locator("//button[contains(., 'Zoom Out')]");
+    async clickSelect(): Promise<void> {
+        await interactWhenVisible(this.select("Graph"), (el) => el.click(), "Select Graph");
     }
 
-    private get fitToSizeBtn(): Locator {
-        return this.page.locator("//button[contains(., 'Fit To Size')]");
+    async clickSelectItem(graphName: string): Promise<void> {
+    await interactWhenVisible(this.selectItem("Graph", graphName), (el) => el.click(), `Select Graph Item ${graphName}`);
     }
 
-    private get editBtnInGraphListMenu(): (graph: string) => Locator {
-        return (graph: string) => this.page.locator(`//table//tbody/tr[@data-id='${graph}']//td[2]//button`);
+    async clickSearch(): Promise<void> {
+        await interactWhenVisible(this.search("Graph"), (el) => el.click(), "Search Graph");
     }
 
-    private get editInputInGraphListMenu(): (graph: string) => Locator {
-        return (graph: string) => this.page.locator(`//table//tbody/tr[@data-id='${graph}']//td[2]//input`);
+    async clickElementCanvasAdd(): Promise<void> {
+        await interactWhenVisible(this.elementCanvasAdd("Graph"), (el) => el.click(), "Add Element");
     }
 
-    private get editSaveBtnInGraphListMenu(): (graph: string) => Locator {
-        return (graph: string) => this.page.locator(`//table//tbody/tr[@data-id='${graph}']//td[2]//button[1]`);
+    async clickElementCanvasAddNode(): Promise<void> {
+        await interactWhenVisible(this.elementCanvasAddNode("Graph"), (el) => el.click(), "Add Node");
     }
 
-    private get valueCellByAttributeInDataPanel(): (attribute: string) => Locator {
-        return (attribute: string) => this.page.locator(`//div[contains(@id, 'graphDataPanel')]//tbody//tr[td[contains(text(), '${attribute}')]]/td[last()]/button`);
+    async clickElementCanvasAddEdge(): Promise<void> {
+        await interactWhenVisible(this.elementCanvasAddEdge("Graph"), (el) => el.click(), "Add Edge");
     }
 
-    private get nodesGraphStats(): Locator {
-        return this.page.locator("//div[@id='graphStats']//span[1]");
+    async clickDeleteElement(): Promise<void> {
+        await interactWhenVisible(this.deleteElement("Graph"), (el) => el.click(), "Delete Element");
     }
 
-    private get edgesGraphStats(): Locator {
-        return this.page.locator("//div[@id='graphStats']//span[2]");
+    async clickDeleteElementConfirm(): Promise<void> {
+        await interactWhenVisible(this.deleteElementConfirm("Graph"), (el) => el.click(), "Confirm Delete Element");
     }
 
-    private get deleteNodeInGraphDataPanel(): Locator {
-        return this.page.locator('//div[contains(@id, "graphDataPanel")]//button[contains(text(), "Delete Node")]');
+    async clickDeleteElementCancel(): Promise<void> {
+        await interactWhenVisible(this.deleteElementCancel("Graph"), (el) => el.click(), "Cancel Delete Element");
     }
 
-    private get confirmDeleteNodeInDataPanel(): Locator {
-        return this.page.locator('//div[@role="dialog"]//button[contains(text(), "Delete")]');
+    async clickAnimationControl(): Promise<void> {
+        await interactWhenVisible(this.animationControl("Graph"), (el) => el.click(), "Animation Control");
     }
 
-    private get deleteRelationInGraphDataPanel(): Locator {
-        return this.page.locator('//div[contains(@id, "graphDataPanel")]//button[contains(text(), "Delete Relation")]');
+    async clickZoomInControl(): Promise<void> {
+        await interactWhenVisible(this.zoomInControl("Graph"), (el) => el.click(), "Zoom In Control");
     }
 
-    private get deleteNodeInCanvasPanel(): Locator {
-        return this.page.locator('//button[normalize-space(text()) = "Delete"]');
+    async clickZoomOutControl(): Promise<void> {
+        await interactWhenVisible(this.zoomOutControl("Graph"), (el) => el.click(), "Zoom Out Control");
     }
 
-    private get addBtnInHeaderGraphDataPanel(): Locator {
-        return this.page.locator('//div[contains(@id, "graphDataPanel")]//button[normalize-space(text()) = "Add"]');
+    async clickCenterControl(): Promise<void> {
+        await interactWhenVisible(this.centerControl("Graph"), (el) => el.click(), "Center Control");
     }
 
-    private get graphDataPanelHeaderInput(): Locator {
-        return this.page.locator('//div[contains(@id, "graphDataPanel")]//input');
+    async clickGraphTab(): Promise<void> {
+        await interactWhenVisible(this.graphTab, (el) => el.click(), "Graph Tab");
     }
 
-    private get saveBtnInGraphHeaderDataPanel(): Locator {
-        return this.page.locator('//div[contains(@id, "graphDataPanel")]//button[contains(text(), "Save")]');
+    async clickTableTab(): Promise<void> {
+        await interactWhenVisible(this.tableTab, (el) => el.click(), "Table Tab");
     }
 
-    private get headerDataPanelList(): Locator {
-        return this.page.locator('//div[contains(@id, "graphDataPanel")]//ul');
+    async clickMetadataTab(): Promise<void> {
+        await interactWhenVisible(this.metadataTab, (el) => el.click(), "Metadata Tab");
     }
 
-    private get labelsInCanvas(): Locator {
-        return this.page.locator('//div[contains(@id, "LabelsPanel")]//ul/li');
+    async clickElementCanvasSuggestionByName(name: string): Promise<void> {
+        await interactWhenVisible(this.elementCanvasSuggestionByName("Graph", name), (el) => el.click(), `Element Canvas Suggestion ${name}`);
     }
 
-    private get labelsInDataPanel(): Locator {
-        return this.page.locator('//div[contains(@id, "graphDataPanel")]//ul//li');
+    async clickLabelsButtonByLabel(label: "RelationshipTypes" | "Labels", name: string): Promise<void> {
+        await interactWhenVisible(this.labelsButtonByName("Graph", label, name), (el) => el.click(), `Labels Panel Button ${label} ${name}`);
     }
 
-    private get deleteFirstLabelDataPanelBtn(): Locator {
-        return this.page.locator('//div[contains(@id, "graphDataPanel")]//ul//li[1]//button');
+    async clickEditorRun(): Promise<void> {
+        await interactWhenVisible(this.editorRun, (el) => el.click(), "Editor Run");
     }
 
-    private get keyInputInDataPanel(): Locator {
-        return this.page.locator('(//div[contains(@id, "graphDataPanel")]//tr//input)[1]');
+    async clickManage(): Promise<void> {
+        await interactWhenVisible(this.manage("Graph"), (el) => el.click(), "Manage Graphs Button");
     }
 
-    private get valueInputInDataPanel(): Locator {
-        return this.page.locator('(//div[contains(@id, "graphDataPanel")]//tr//input)[2]');
+    async clickTableCheckboxByName(name: string): Promise<void> {
+        await interactWhenVisible(this.tableCheckboxByName("Graph", name), (el) => el.click(), `Table Graphs Checkbox ${name}`);
     }
 
-    private get addAttributeBtnInDataPanel(): Locator {
-        return this.page.locator('//div[contains(@id, "graphDataPanel")]//button[contains(text(), "Add Attribute")]');
+    async clickReloadList(): Promise<void> {
+        await interactWhenVisible(this.reloadList("Graph"), (el) => el.click(), "Reload Graphs List");
     }
 
-    private get saveAttributeBtnInDataPanel(): Locator {
-        return this.page.locator('//div[contains(@id, "graphDataPanel")]//tr[last()]//button[1]');
+    async clickEditButton(): Promise<void> {
+        await interactWhenVisible(this.editButton("Graph"), (el) => el.click(), "Edit Button Graphs");
     }
 
-    private get deleteLastAttributeInDataPanel(): Locator {
-        return this.page.locator('//div[contains(@id, "graphDataPanel")]//tr[last()]//td[1]//button[2]');
+    async clickSaveButton(): Promise<void> {
+        await interactWhenVisible(this.saveButton("Graph"), (el) => el.click(), "Save Button Graphs");
     }
 
-    private get modifyLastAttributeInDataPanel(): Locator {
-        return this.page.locator('//div[contains(@id, "graphDataPanel")]//tr[last()]//td[1]//button[1]');
+    async hoverCanvasElement(x: number, y: number): Promise<void> {
+        await interactWhenVisible(this.canvasElement, (el) => el.hover({ position: { x, y } }), "Canvas Element");
     }
 
-    private get valueInputLastAttributeInDataPanel(): Locator {
-        return this.page.locator('//div[contains(@id, "graphDataPanel")]//tr[last()]//td//input');
+    async hoverTableRowByName(name: string): Promise<void> {
+        await interactWhenVisible(this.tableRowByName("Graph", name), (el) => el.hover(), `Table Graphs Row ${name}`);
     }
 
-    private get undoBtnInNotification(): Locator {
-        return this.page.locator('//ol//li//button[contains(text(), "Undo")]');
+    async isVisibleSelectItem(name: string): Promise<boolean> {
+        const isVisible = await waitForElementToBeVisible(this.selectItem("Graph", name));
+        return isVisible;
     }
 
-    private get lastAttributeValueBtn(): Locator {
-        return this.page.locator('//div[contains(@id, "graphDataPanel")]//tr[last()]//td[3]//button');
+    async isVisibleLabelsButtonByName(label: "RelationshipTypes" | "Labels", name: string): Promise<boolean> {
+        const isVisible = await waitForElementToBeVisible(this.labelsButtonByName("Graph", label, name));
+        return isVisible;
     }
 
-    private get lastAttributeValue(): Locator {
-        return this.page.locator('//div[contains(@id, "graphDataPanel")]//tr[last()]//td[1]');
+    async isVisibleEditButton(): Promise<boolean> {
+        const isVisible = await waitForElementToBeVisible(this.editButton("Graph"));
+        return isVisible;
     }
 
-    private get attributesStatsInDataPanel(): Locator {
-        return this.page.locator('(//div[contains(@id, "graphDataPanel")]//p)[2]');
+    async isVisibleToast(): Promise<boolean> {
+        const isVisible = await waitForElementToBeVisible(this.toast);
+        return isVisible;
     }
 
-    private get deleteRelationBtnInDataPanel(): Locator {
-        return this.page.locator('//div[contains(@id, "graphDataPanel")]//button[contains(text(), "Delete Relation")]');
+    async isVisibleNodeCanvasToolTip(): Promise<boolean> {
+        const isVisible = await waitForElementToBeVisible(this.nodeCanvasToolTip);
+        return isVisible;
     }
 
-    private get relationshipTypesPanelBtn(): Locator {
-        return this.page.locator('//div[contains(@id, "RelationshipTypesPanel")]//button');
+    async getNodeCanvasToolTipContent(): Promise<string | null> {
+        const content = await interactWhenVisible(this.nodeCanvasToolTip, (el) => el.textContent(), "Node Canvas Tooltip");
+        return content;
     }
 
-    private get animationControlBtn(): Locator {
-        return this.page.locator('//div[contains(@id, "canvasPanel")]//button[@role="switch"]');
+    async getNodeCountContent(): Promise<string> {
+        const count = await interactWhenVisible(this.nodesCount("Graph"), (el) => el.textContent(), "Nodes Count");
+        return count?.split(" ")[1] ?? "0";
     }
 
-    private get labelsPanelBtn(): Locator {
-        return this.page.locator('//div[contains(@id, "LabelsPanel")]//button');
+    async getEdgesCountContent(): Promise<string> {
+        const count = await interactWhenVisible(this.edgesCount("Graph"), (el) => el.textContent(), "Edges Count");
+        return count?.split(" ")[1] ?? "0";
     }
 
-    private get querySearchList(): Locator {
-        return this.page.locator("//div[contains(@class, 'tree')]");
+    async searchElementInCanvas(name: string): Promise<void> {
+        await this.fillElementCanvasSearch(name);
+        await this.clickElementCanvasSuggestionByName(name);
     }
 
-    private get querySearchListItems(): Locator {
-        return this.page.locator("//div[contains(@class, 'tree')]//div[contains(@class, 'contents')]");
+    async verifyGraphExists(graphName: string): Promise<boolean> {
+        await this.clickSelect();
+        await this.fillSearch(graphName);
+        const isVisible = await this.isVisibleSelectItem(graphName);
+        return isVisible;
     }
 
-    async clickOnGraph(): Promise<void> {
-        await interactWhenVisible(this.graphsButton, el => el.click(), "graph button");
+    async addGraph(graphName: string): Promise<void> {
+        await this.clickCreate();
+        await this.fillCreateInput(graphName);
+        await this.clickCreateConfirm();
+        await waitForElementToNotBeVisible(this.create("Graph"));
     }
 
-    async clickOnSettings(): Promise<void> {
-        await interactWhenVisible(this.settingsButton, el => el.click(), "settings button");
+    async insertQuery(query: string): Promise<void> {
+        await this.clickEditorInput();
+        await this.page.keyboard.type(query);
     }
 
-    async insertGraphInSearchInput(graph: string, label: string): Promise<void> {
-        await interactWhenVisible(this.graphSelectSearchInput(label), el => el.fill(graph), "graph search input");
-    }
-
-    async insertElementInCanvasSearch(node: string): Promise<void> {
-        await interactWhenVisible(this.canvasElementSearchInput, el => el.fill(node), "canvas element search input");
-    }
-
-    async clickOnElementSearchInCanvas(): Promise<void> {
-        await interactWhenVisible(this.canvasElementSearchBtn, el => el.click(), "canvas element search button");
-    }
-
-    async reloadGraphList(role: string = "admin"): Promise<void> {
-        const index = role === 'readonly' ? "1" : "2";
-        await interactWhenVisible(this.reloadGraphListBtn(index), el => el.click(), "reload graph button");
-    }
-
-    async clickOnZoomIn(): Promise<void> {
-        await interactWhenVisible(this.zoomInBtn, el => el.click(), "zoom in button");
-    }
-
-    async clickOnZoomOut(): Promise<void> {
-        await interactWhenVisible(this.zoomOutBtn, el => el.click(), "zoom out button");
-    }
-
-    async clickOnFitToSize(): Promise<void> {
-        await interactWhenVisible(this.fitToSizeBtn, el => el.click(), "fit to size button");
-        await this.waitForCanvasAnimationToEnd();
-    }
-
-    async clickAddGraphBtnInNavBar(): Promise<void> {
-        await interactWhenVisible(this.addGraphBtnInNavBar, el => el.click(), "add graph in nav bar button");
-    }
-
-    async openGraphsMenu(): Promise<void> {
-        await interactWhenVisible(this.graphsMenu, el => el.click(), "graphs menu combobox");
-    }
-
-    async clickManageGraphButton(): Promise<void> {
-        await interactWhenVisible(this.manageGraphBtn, el => el.click(), "manage graphs button");
-    }
-
-    async clickDeleteGraphButton(): Promise<void> {
-        await interactWhenVisible(this.deleteGraphBtn, el => el.click(), "delete graph button");
-    }
-
-    async insertGraphName(name: string): Promise<void> {
-        await interactWhenVisible(this.graphNameInput, el => el.fill(name), "graph name input");
-    }
-
-    async clickCreateGraphButton(): Promise<void> {
-        await interactWhenVisible(this.createGraphBtn, el => el.click(), "create graph button");
-    }
-
-    async clickExportDataButton(): Promise<void> {
-        await interactWhenVisible(this.exportDataBtn, el => el.click(), "export data button");
-    }
-
-    async clickExportDataConfirmButton(): Promise<void> {
-        await interactWhenVisible(this.exportDataConfirmBtn, el => el.click(), "confirm export data button");
-    }
-
-    async confirmGraphDeletion(): Promise<void> {
-        await interactWhenVisible(this.deleteGraphConfirmBtn, el => el.click(), "confirm delete graph button");
-    }
-
-    async clickRunQuery(waitForAnimation = true): Promise<void> {
-        await interactWhenVisible(this.queryRunBtn, el => el.click(), "run query button");
+    async clickRunQuery(waitForAnimation = false): Promise<void> {
+        await this.clickEditorRun();
+        await waitForElementToBeEnabled(this.editorRun);
         if (waitForAnimation) {
             await this.waitForCanvasAnimationToEnd();
         }
     }
 
-    async clickOnQueryInput(): Promise<void> {
-        await interactWhenVisible(this.queryInput, el => el.click(), "query input");
-    }
-
-    async clickGraphCheckbox(graph: string): Promise<void> {
-        const checkbox = this.checkGraphInMenu(graph);
-        await interactWhenVisible(checkbox, el => el.click(), `checkbox for graph "${graph}"`);
-    }
-
-    async clickSelectBtnFromGraphManager(role: string = "admin"): Promise<void> {
-        const index = role === 'readonly' ? "2" : "3";
-        const button = this.selectBtnFromGraphManager(index);
-        await interactWhenVisible(button, el => el.click(), `graph manager select button #${index}`);
-    }
-
-    async clickDeleteAllGraphsCheckbox(): Promise<void> {
-        await interactWhenVisible(this.deleteAllGraphInMenu, el => el.click(), "delete all graphs checkbox");
-    }
-
-    async hoverOverGraphInMenu(graph: string): Promise<void> {
-        const row = this.findGraphInMenu(graph);
-        await interactWhenVisible(row, el => el.hover(), `graph row for "${graph}"`);
-    }
-
-    async clickEditBtnInGraphListMenu(graph: string): Promise<void> {
-        const editBtn = this.editBtnInGraphListMenu(graph);
-        await interactWhenVisible(editBtn, el => el.click(), `edit button for graph "${graph}"`);
-    }
-
-    async fillEditInputInGraphListMenu(graph: string, newName: string): Promise<void> {
-        const input = this.editInputInGraphListMenu(graph);
-        await interactWhenVisible(input, el => el.fill(newName), `edit input for graph "${graph}"`);
-    }
-
-    async clickEditSaveBtnInGraphListMenu(graph: string): Promise<void> {
-        const saveBtn = this.editSaveBtnInGraphListMenu(graph);
-        await interactWhenVisible(saveBtn, el => el.click(), `save button for graph "${graph}"`);
-    }
-    
-    async clickGraphFromList(graph: string, label: string): Promise<void> {
-        const graphItem = this.selectGraphList(graph, label);
-
-        await interactWhenVisible(graphItem, el => el.click(), `graph item "${graph}" in graph list`);
-    }
-
-    async clickAddGraphBtnInGraphManager(): Promise<void> {
-        await interactWhenVisible(this.addGraphBtnInGraphManager, el => el.click(), "add graph button in graph manager");
-    }
-
-    async clickDeleteNodeInGraphDataPanel(): Promise<void> {
-        await interactWhenVisible(this.deleteNodeInGraphDataPanel, el => el.click(), "delete node in data panel");
-    }
-
-    async clickConfirmDeleteNodeInDataPanel(): Promise<void> {
-        await interactWhenVisible(this.confirmDeleteNodeInDataPanel, el => el.click(), "confirm delete in data panel");
-    }
-
-    async clickDeleteRelationInGraphDataPanel(): Promise<void> {
-        await interactWhenVisible(this.deleteRelationInGraphDataPanel, el => el.click(), "delete relation in data panel");
-    }
-
-    async clickDeleteNodeInCanvasPanel(): Promise<void> {
-        await interactWhenVisible(this.deleteNodeInCanvasPanel, el => el.click(), "delete node in canvas panel");
-    }
-
-    async clickAddBtnInHeaderGraphDataPanel(): Promise<void> {
-        await interactWhenVisible(this.addBtnInHeaderGraphDataPanel, el => el.click(), "add button node in graph data panel");
-    }
-
-    async fillGraphDataPanelHeaderInput(label: string): Promise<void> {
-        await interactWhenVisible(this.graphDataPanelHeaderInput, el => el.fill(label), "graph data panel header input");
-    }
-
-    async clickSaveBtnInGraphHeaderDataPanel(): Promise<void> {
-        await interactWhenVisible(this.saveBtnInGraphHeaderDataPanel, el => el.click(), "save label button in graph data panel");
-    }
-
-    async hoverOnHeaderDataPanelList(): Promise<void> {
-        await interactWhenVisible(this.headerDataPanelList, async (el) => {
-            await el.hover();
-        }, `Header data panel list`);
-    }
-
-    async getLastLabelInCanvas(): Promise<string | null> {
-        const text = await interactWhenVisible(this.labelsInCanvas.last(), el => el.textContent(), "last label in canvas");
-        return text;
-    }
-
-    async getFirstLabelInCanvas(): Promise<string | null> {
-        const text = await interactWhenVisible(this.labelsInCanvas.first(), el => el.textContent(), "first label in canvas");
-        return text;
-    }
-
-    async fillkeyInputInDataPanel(key: string): Promise<void> {
-        await interactWhenVisible(this.keyInputInDataPanel.first(), el => el.fill(key), "key input in data panel");
-    }
-
-    async fillValueInputInDataPanel(key: string): Promise<void> {
-        await interactWhenVisible(this.valueInputInDataPanel.first(), el => el.fill(key), "value input in data panel");
-    }
-
-    async getLabesCountlInDataPanel(): Promise<number> {
-        await this.page.waitForTimeout(500);
-        const count = await this.labelsInDataPanel.count();
-        return count;
-    }
-
-    async getLabesCountlInCanvas(): Promise<number> {
-        await this.page.waitForTimeout(500);
-        const count = await this.labelsInCanvas.count();
-        return count;
-    }
-
-    async clickDeleteBtnInFirstLabelDataPanel(): Promise<void> {
-        await interactWhenVisible(this.deleteFirstLabelDataPanelBtn, el => el.click(), "delete button for first label in data panel");
-    }
-
-    async clickAddAttributeBtnInDataPanel(): Promise<void> {
-        await interactWhenVisible(this.addAttributeBtnInDataPanel, el => el.click(), "add attribute button in data panel");
-    }
-
-    async clickSaveAttributeBtnInDataPanel(): Promise<void> {
-        await interactWhenVisible(this.saveAttributeBtnInDataPanel, el => el.click(), "save attribute button in data panel");
-    }
-
-    async clickDeleteLastAttributeInDataPanel(): Promise<void> {
-        await interactWhenVisible(this.deleteLastAttributeInDataPanel, el => el.click(), "delete last attribute button in data panel");
-    }
-
-    async clickModifyLastAttributeInDataPanel(): Promise<void> {
-        await interactWhenVisible(this.modifyLastAttributeInDataPanel, el => el.click(), "modify last attribute button in data panel");
-    }
-
-    async fillValueInputLastAttributeInDataPanel(value: string): Promise<void> {
-        await interactWhenVisible(this.valueInputLastAttributeInDataPanel, el => el.fill(value), "value input last attribute in data panel");
-    }
-
-    async clickUndoBtnInNotification(): Promise<void> {
-        await interactWhenVisible(this.undoBtnInNotification, el => el.click(), "undo button in notification");
-    }
-
-    async getLastAttributeValue(): Promise<string | null> {
-        const text = await interactWhenVisible(this.lastAttributeValueBtn, el => el.innerText(), "last attribute value in data panel");
-        return text;
-    }
-
-    async hoverOnLastAttributeInDataPanel(): Promise<void> {
-        await interactWhenVisible(this.lastAttributeValue, el => el.hover(), "hover on last attribute in data panel");
-    }
-
-    async getAttributesStatsInDataPanel(): Promise<string | null> {
-        const text = await interactWhenVisible(this.attributesStatsInDataPanel, el => el.innerText(), "attributes stats in data panel");
-        return text;
-    }
-
-    async clickDeleteRelationBtnInDataPanel(): Promise<void> {
-        await interactWhenVisible(this.deleteRelationBtnInDataPanel, el => el.click(), "delete relation button in data panel");
-    }
-
-    async clickRelationshipTypesPanelBtn(): Promise<void> {
-        await interactWhenVisible(this.relationshipTypesPanelBtn, el => el.click(), "relationship types panel button");
-    }
-
-    async getRelationshipTypesPanelBtn(): Promise<string | null> {
-        const text = await interactWhenVisible(this.relationshipTypesPanelBtn, el => el.textContent(), "relationship types panel button");
-        return text;
-    }
-
-    async isRelationshipTypesPanelBtnHidden(): Promise<boolean> {
-        const isHidden = await this.relationshipTypesPanelBtn.isHidden();
-        return isHidden;
-    }
-
-    async clickAnimationControlPanelbtn(): Promise<void> {
-        await interactWhenVisible(this.animationControlBtn, el => el.click(), "animation control button");
-    }
-
-    async getAnimationControlPanelState(): Promise<string | null> {
-        const state = await this.animationControlBtn.getAttribute('data-state');
-        return state;
-    }
-
-    async clickLabelsPanelBtn(): Promise<void> {
-        await interactWhenVisible(this.labelsPanelBtn, el => el.click(), "Labels panel button");
-    }
-
-    async getLabelsPanelBtn(): Promise<string | null> {
-        const text = await interactWhenVisible(this.labelsPanelBtn, el => el.textContent(), "Labels panel button");
-        return text;
-    }
-
-    async getDataCellByAttrInDataPanel(attribute: string): Promise<string | null> {
-        const text = await interactWhenVisible(this.valueCellByAttributeInDataPanel(attribute), el => el.textContent(), "value cell by attribute button");
-        return text;
-    }
-
-    async getNodesGraphStats(): Promise<string | null> {
-        await this.page.waitForTimeout(500);
-        const text = await interactWhenVisible(this.nodesGraphStats, el => el.textContent(), "node graph stats button");
-        return text;
-    }
-
-    async getEdgesGraphStats(): Promise<string | null> {
-        await this.page.waitForTimeout(500);
-        const text = await interactWhenVisible(this.edgesGraphStats, el => el.textContent(), "edges graph stats button");
-        return text;
-    }
-
-    async getQuerySearchListText(): Promise<string[]> {
-        await waitForElementToBeVisible(this.querySearchList);
-        const elements = this.querySearchListItems;
-        const count = await elements.count();
-        const texts: string[] = [];
-    
-        for (let i = 0; i < count; i++) {
-            const item = elements.nth(i);
-            const text = await interactWhenVisible(item, el => el.textContent(), `Query search list item #${i}`);
-            if (text) texts.push(text.trim());
-        }
-    
-        return texts;
-    }
-    
-    async countGraphsInMenu(): Promise<number> {
-        await waitForTimeOut(this.page, 1000);
-
-        if (await this.graphsMenu.isEnabled()) {
-            await this.openGraphsMenu();
-            await this.clickManageGraphButton();
-            const count = await this.graphMenuElements.count();
-            await this.refreshPage();
-            return count;
-        }
-        return 0;
-    }
-
-    async removeAllGraphs(): Promise<void> {
-        await waitForTimeOut(this.page, 1000);
-        if (await this.graphsMenu.isEnabled()) {
-            await this.openGraphsMenu();
-            await this.clickManageGraphButton();
-            await this.clickDeleteAllGraphsCheckbox()
-            await this.clickDeleteGraphButton()
-            await this.confirmGraphDeletion();
-        }
-    }
-
-    async addGraph(graphName: string): Promise<void> {
-        await this.clickAddGraphBtnInNavBar();
-        await this.insertGraphName(graphName);
-        await this.clickCreateGraphButton();
-    }
-
-    async exportGraph(): Promise<Download> {
-        await this.waitForPageIdle();
+    async exportGraphByName(graphName: string): Promise<Download> {
+        await this.clickSelect();
+        await this.clickManage();
+        await this.clickTableCheckboxByName(graphName);
+        await this.clickExport();
         const [download] = await Promise.all([
-            this.page.waitForEvent('download'),
-            this.clickExportDataButton(),
-            this.clickExportDataConfirmButton()
+            this.page.waitForEvent("download"),
+            this.clickExportConfirm(),
         ]);
-
         return download;
     }
 
-    async verifyGraphExists(graph: string): Promise<boolean> {
-        await this.page.waitForTimeout(500);
-        if (await this.graphsMenu.isDisabled()) return false;
+    async reloadGraphList(): Promise<void> {
+        await this.clickReloadList();
+        await waitForElementToBeEnabled(this.reloadList("Graph"));
+    }
 
-        await this.openGraphsMenu();
-        await this.clickManageGraphButton();
-        const isVisible = await this.findGraphInMenu(graph).isVisible();
+    async isModifyGraphNameButtonVisible(graphName: string): Promise<boolean> {
+        await this.clickSelect();
+        await this.clickManage();
+        await this.hoverTableRowByName(graphName);
+        const isVisible = await this.isVisibleEditButton();
         return isVisible;
     }
 
-    async modifyGraphName(graph: string, newGraphName: string): Promise<void> {
-        await this.openGraphsMenu();
-        await this.clickManageGraphButton();
-        await this.hoverOverGraphInMenu(graph);
-        await this.clickEditBtnInGraphListMenu(graph);
-        await this.fillEditInputInGraphListMenu(graph, newGraphName);
-        await this.clickEditSaveBtnInGraphListMenu(graph);
+    async modifyGraphName(oldName: string, newName: string): Promise<void> {
+        await this.clickSelect();
+        await this.clickManage();
+        await this.hoverTableRowByName(oldName);
+        await this.clickEditButton();
+        await this.fillInput(newName);
+        await this.clickSaveButton();
+        await waitForElementToNotBeVisible(this.saveButton("Graph"));
     }
 
-    async deleteGraph(graph: string): Promise<void> {
-        await this.openGraphsMenu();
-        await this.clickManageGraphButton();
-        await this.clickGraphCheckbox(graph);
-        await this.clickDeleteGraphButton();
-        await this.confirmGraphDeletion();
+    async selectGraphByName(graphName: string): Promise<void> {
+        await this.clickSelect();
+        await this.fillSearch(graphName);
+        await this.clickSelectItem(graphName);
+    }
+
+    async getNodesCount(): Promise<string> {
+        const count = await this.getNodeCountContent();
+        return count;
+    }
+
+    async getEdgesCount(): Promise<string> {
+        const count = await this.getEdgesCountContent();
+        return count;
+    }
+
+    async deleteElementsByPosition(positions: { x: number, y: number }[]): Promise<void> {
+        positions.forEach(async (position) => {
+            await this.elementClick(position.x, position.y);
+        });
+        await this.clickDeleteElement();
+        await this.clickDeleteElementConfirm();
+        await waitForElementToNotBeVisible(this.deleteElement("Graph"));
+    }
+
+    async deleteElementByName(name: string): Promise<void> {
+        await this.searchElementInCanvas(name);
+        await this.clickDeleteElement();
+        await this.clickDeleteElementConfirm();
+        await waitForElementToNotBeVisible(this.deleteElement("Graph"));
     }
 
     async getErrorNotification(): Promise<boolean> {
         await this.page.waitForTimeout(1000);
-        const isVisible = await this.errorNotification.isVisible();
+        const isVisible = await this.isVisibleToast();
         return isVisible;
     }
 
-    async insertQuery(query: string): Promise<void> {
-        await this.clickOnQueryInput();
-        await this.page.keyboard.type(query);
+    async getAnimationControl(): Promise<boolean> {
+        const status = await this.getAttributeCanvasElement("data-engine-status");
+        return status === "running"
     }
 
-    async waitForRunQueryToBeEnabled(): Promise<void> {
-        const maxRetries = 5;
-        let retries = 0;
-        while (await this.queryRunBtn.isDisabled()) {
-            if (retries++ >= maxRetries) {
-                throw new Error("Timed out waiting for Run Query button to be enabled.");
-            }
-            await this.page.waitForTimeout(1000);
-        }
+    // 6000 is the timeout for the animation to end
+    // 1500 is the timeout for the fit to size animation
+    // 2000 is extra timeout to ensure the animation is over
+    async waitForCanvasAnimationToEnd(timeout = 9500): Promise<void> {
+        await this.page.waitForFunction(
+            (selector: string) => {
+                const canvas = document.querySelector(selector) as HTMLCanvasElement;
+                return canvas.getAttribute("data-engine-status") === "stop";
+            },
+            '.force-graph-container canvas',
+            { timeout }
+        );
     }
 
-    async nodeClick(x: number, y: number): Promise<void> {
-        await this.canvasElement.hover({ position: { x, y } });
+    async isNodeCanvasToolTipVisible(): Promise<boolean> {
         await this.page.waitForTimeout(500);
-        await this.canvasElement.click({ position: { x, y }, button: 'right' });
-    }
-
-    async selectGraphFromList(graph: string, label: string): Promise<void> {
-        await this.insertGraphInSearchInput(graph, label);
-        await this.clickGraphFromList(graph, label);
-    }
-
-    async selectExistingGraph(graph: string, role?: string): Promise<void>{
-        const resolvedLabel = inferLabelFromGraph(graph);
-        await this.clickSelectBtnFromGraphManager(role);
-        await this.selectGraphFromList(graph, resolvedLabel);
-    }
-
-    async searchForElementInCanvas(node: string): Promise<void> {
-        await this.insertElementInCanvasSearch(node);
-        await this.clickOnElementSearchInCanvas();
-        await this.waitForCanvasAnimationToEnd();
-    }
-
-    async isNodeCanvasToolTip(): Promise<boolean> {
-        await this.page.waitForTimeout(500);
-        const isVisible = await this.nodeCanvasToolTip.isVisible();
+        const isVisible = await this.isVisibleNodeCanvasToolTip();
         return isVisible;
     }
 
     async getNodeCanvasToolTip(): Promise<string | null> {
         await this.page.waitForTimeout(1000);
-        const toolTipText = await this.nodeCanvasToolTip.textContent();
+        const toolTipText = await this.getNodeCanvasToolTipContent();
         return toolTipText;
     }
 
     // eslint-disable-next-line class-methods-use-this
     async getCanvasTransform(canvasElement: Locator): Promise<any> {
         let transformData = null;
-        for (let attempt = 0; attempt < 3; attempt++) {
+        for (let attempt = 0; attempt < 3; attempt += 1) {
             transformData = await canvasElement.evaluate((canvas: HTMLCanvasElement) => {
                 const rect = canvas.getBoundingClientRect();
                 const ctx = canvas.getContext('2d');
@@ -716,48 +429,78 @@ export default class GraphPage extends BasePage {
         throw new Error("Canvas transform data not available!");
     }
 
-    async getNodeScreenPositions(windowKey: 'graph' | 'schema'): Promise<any[]> {
-        await this.page.waitForTimeout(2000);
+    async getNodesScreenPositions(windowKey: 'graph' | 'schema'): Promise<any[]> {
+        // Get canvas element and its properties
+        const canvas = await this.page.evaluate((selector) => {
+            const canvasElement = document.querySelector(selector);
+            if (!canvasElement) return null;
+            const rect = canvasElement.getBoundingClientRect();
+            return {
+                width: rect.width,
+                height: rect.height,
+                left: rect.left,
+                top: rect.top,
+                scale: window.devicePixelRatio || 1
+            };
+        }, ".force-graph-container canvas");
 
-        const graphData = await this.page.evaluate((key) => {
-            return (window as any)[key];
-        }, windowKey);
+        if (!canvas) return [];
 
+        // Get graph data
+        const graphData = await this.page.evaluate((key) => (window as any)[key], windowKey);
+
+        // Get canvas transform
         const transformData = await this.getCanvasTransform(this.canvasElement);
         const { a, e, d, f } = transformData.transform;
-        const { left, top } = transformData;
 
-        const offsets = {
-            graph: { x: -105, y: -380 },
-            schema: { x: -40, y: -370 }
-        };
+        return graphData.elements.nodes.map((node: any) => {
+            // Calculate node position relative to canvas
+            const screenX = canvas.left + (node.x * a + e) * canvas.scale;
+            const screenY = canvas.top + (node.y * d + f) * canvas.scale;
 
-        const { x: offsetX, y: offsetY } = offsets[windowKey];
+            // Check if node is visible in viewport
+            const isVisible = (
+                screenX >= canvas.left &&
+                screenX <= canvas.left + canvas.width &&
+                screenY >= canvas.top &&
+                screenY <= canvas.top + canvas.height
+            );
 
-        return graphData.elements.nodes.map((node: any) => ({
-            ...node,
-            screenX: left + node.x * a + e + offsetX,
-            screenY: top + node.y * d + f + offsetY,
-        }));
+            return {
+                id: node.id,
+                screenX,
+                screenY,
+                isVisible,
+                canvasWidth: canvas.width,
+                canvasHeight: canvas.height,
+                ...node
+            };
+        });
     }
 
     async getLinksScreenPositions(windowKey: 'graph' | 'schema'): Promise<any[]> {
-        await this.page.waitForTimeout(2000);
+        // Get canvas element and its properties
+        const canvas = await this.page.evaluate((selector) => {
+            const canvasElement = document.querySelector(selector);
+            if (!canvasElement) return null;
+            const rect = canvasElement.getBoundingClientRect();
+            return {
+                width: rect.width,
+                height: rect.height,
+                left: rect.left,
+                top: rect.top,
+                scale: window.devicePixelRatio || 1
+            };
+        }, ".force-graph-container canvas");
 
-        const graphData = await this.page.evaluate((key) => {
-            return (window as any)[key];
-        }, windowKey);
+        if (!canvas) return [];
 
+        // Get graph data
+        const graphData = await this.page.evaluate((key) => (window as any)[key], windowKey);
+
+        // Get canvas transform
         const transformData = await this.getCanvasTransform(this.canvasElement);
         const { a, e, d, f } = transformData.transform;
-        const { left, top } = transformData;
-
-        const offsets = {
-            graph: { x: -105, y: -380 },
-            schema: { x: -40, y: -370 }
-        };
-
-        const { x: offsetX, y: offsetY } = offsets[windowKey];
 
         return graphData.elements.links.map((link: any) => {
             const sourceId = typeof link.source === 'object' ? link.source.id : link.source;
@@ -766,10 +509,26 @@ export default class GraphPage extends BasePage {
             const source = graphData.elements.nodes.find((n: any) => n.id === sourceId);
             const target = graphData.elements.nodes.find((n: any) => n.id === targetId);
 
-            const sourceScreenX = left + source.x * a + e + offsetX;
-            const sourceScreenY = top + source.y * d + f + offsetY;
-            const targetScreenX = left + target.x * a + e + offsetX;
-            const targetScreenY = top + target.y * d + f + offsetY;
+            // Calculate node positions relative to canvas
+            const sourceScreenX = canvas.left + (source.x * a + e) * canvas.scale;
+            const sourceScreenY = canvas.top + (source.y * d + f) * canvas.scale;
+            const targetScreenX = canvas.left + (target.x * a + e) * canvas.scale;
+            const targetScreenY = canvas.top + (target.y * d + f) * canvas.scale;
+
+            // Calculate midpoint
+            const midX = (sourceScreenX + targetScreenX) / 2;
+            const midY = (sourceScreenY + targetScreenY) / 2;
+
+            // Check if link is visible in viewport
+            const isVisible = (
+                (sourceScreenX >= canvas.left && sourceScreenX <= canvas.left + canvas.width) ||
+                (targetScreenX >= canvas.left && targetScreenX <= canvas.left + canvas.width) ||
+                (midX >= canvas.left && midX <= canvas.left + canvas.width)
+            ) && (
+                    (sourceScreenY >= canvas.top && sourceScreenY <= canvas.top + canvas.height) ||
+                    (targetScreenY >= canvas.top && targetScreenY <= canvas.top + canvas.height) ||
+                    (midY >= canvas.top && midY <= canvas.top + canvas.height)
+                );
 
             return {
                 id: link.id,
@@ -779,28 +538,25 @@ export default class GraphPage extends BasePage {
                 sourceScreenY,
                 targetScreenX,
                 targetScreenY,
-                midX: (sourceScreenX + targetScreenX) / 2,
-                midY: (sourceScreenY + targetScreenY) / 2,
+                midX,
+                midY,
+                isVisible,
+                canvasWidth: canvas.width,
+                canvasHeight: canvas.height,
                 ...link
             };
         });
     }
 
     async changeNodePosition(fromX: number, fromY: number, toX: number, toY: number): Promise<void> {
-        const box = (await this.canvasElement.boundingBox())!;
-        const absStartX = box.x + fromX;
-        const absStartY = box.y + fromY;
-        const absEndX = box.x + toX;
-        const absEndY = box.y + toY;
-    
-        await this.page.mouse.move(absStartX, absStartY);
+        await this.page.mouse.move(fromX, fromY);
         await this.page.mouse.down();
-        await this.page.mouse.move(absEndX, absEndY);
+        await this.page.mouse.move(toX, toY);
         await this.page.mouse.up();
-    }    
+    }
 
     async rightClickAtCanvasCenter(): Promise<void> {
-        const boundingBox = await this.canvasElement.boundingBox();
+        const boundingBox = await this.getBoundingBoxCanvasElement();
         if (!boundingBox) throw new Error('Canvas bounding box not found');
         const centerX = boundingBox.x + boundingBox.width / 2;
         const centerY = boundingBox.y + boundingBox.height / 2;
@@ -808,100 +564,16 @@ export default class GraphPage extends BasePage {
     }
 
     async hoverAtCanvasCenter(): Promise<void> {
-        const boundingBox = await this.canvasElement.boundingBox();
+        const boundingBox = await this.getBoundingBoxCanvasElement();
         if (!boundingBox) throw new Error('Canvas bounding box not found');
         const centerX = boundingBox.x + boundingBox.width / 2;
         const centerY = boundingBox.y + boundingBox.height / 2;
         await this.page.mouse.move(centerX, centerY);
     }
 
-    async waitForCanvasAnimationToEnd(timeout = 7000): Promise<void> {
-        await this.page.waitForTimeout(1500); // fit to size animation 
-
-        await this.page.waitForFunction(
-            (selector) => {
-                const canvas = document.querySelector(selector);
-                return canvas?.getAttribute("data-engine-status") === "stop";
-            },
-            '.force-graph-container canvas',
-            { timeout }
-        );
-    }
-
-    async getCanvasScaling(): Promise<{ scaleX: number; scaleY: number }> {
-        const { scaleX, scaleY } = await this.canvasElement.evaluate((canvas: HTMLCanvasElement) => {
-            const ctx = canvas.getContext('2d');
-            const transform = ctx?.getTransform();
-            return {
-                scaleX: transform?.a || 1,
-                scaleY: transform?.d || 1,
-            };
-        });
-        return { scaleX, scaleY };
-    }
-
-    async deleteNodeViaCanvasPanel(x: number, y: number): Promise<void> {
-        await this.nodeClick(x, y);
-        await this.clickDeleteNodeInCanvasPanel();
-        await this.clickConfirmDeleteNodeInDataPanel();
-    }
-
-    async deleteNode(x: number, y: number): Promise<void> {
-        await this.nodeClick(x, y);
-        await this.clickDeleteNodeInGraphDataPanel();
-        await this.clickConfirmDeleteNodeInDataPanel();
-    }
-
-    async openDataPanelForElementInCanvas(node: string): Promise<void> {
-        await this.searchForElementInCanvas(node);
-        await this.rightClickAtCanvasCenter();
-    }
-
-    async modifyLabel(node: string, label: string): Promise<void> {
-        await this.openDataPanelForElementInCanvas(node);
-        await this.hoverOnHeaderDataPanelList();
-        await this.clickAddBtnInHeaderGraphDataPanel();
-        await this.fillGraphDataPanelHeaderInput(label);
-        await this.clickSaveBtnInGraphHeaderDataPanel();
-        await this.waitForPageIdle();
-    }
-
-    async deleteRelation(x: number, y: number): Promise<void> {
-        await this.nodeClick(x, y);
-        await this.clickDeleteRelationInGraphDataPanel();
-        await this.clickConfirmDeleteNodeInDataPanel();
-    }
-
-    async deleteLabel(node: string): Promise<void> {
-        await this.openDataPanelForElementInCanvas(node);
-        await this.clickDeleteBtnInFirstLabelDataPanel();
-    }
-
-    async addGraphAttribute(node: string, key: string, value: string): Promise<void> {
-        await this.openDataPanelForElementInCanvas(node);
-        await this.clickAddAttributeBtnInDataPanel();
-        await this.fillkeyInputInDataPanel(key);
-        await this.fillValueInputInDataPanel(value);
-        await this.clickSaveAttributeBtnInDataPanel();
-    }
-
-    async modifyAttribute(value: string): Promise<void> {
-        await this.hoverOnLastAttributeInDataPanel();
-        await this.clickModifyLastAttributeInDataPanel();
-        await this.fillValueInputLastAttributeInDataPanel(value);
-        await this.clickSaveAttributeBtnInDataPanel();
-        await this.waitForPageIdle();
-    }
-
-    async deleteGraphAttribute(): Promise<void> {
-        await this.hoverOnLastAttributeInDataPanel();
-        await this.clickDeleteLastAttributeInDataPanel();
-        await this.clickConfirmDeleteNodeInDataPanel();
-    }
-
-    async deleteGraphRelation(x: number, y: number): Promise<void> {
-        await this.nodeClick(x, y);
-        await this.clickDeleteRelationBtnInDataPanel();
-        await this.clickConfirmDeleteNodeInDataPanel();
+    async elementClick(x: number, y: number): Promise<void> {
+        await this.hoverCanvasElement(x, y);
+        await this.page.waitForTimeout(500);
+        await this.clickCanvasElement(x, y);
     }
 }

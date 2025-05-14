@@ -331,7 +331,7 @@ export class Graph {
                 let target = this.nodesMap.get(cell.destinationId)
 
                 if (!source || !target) {
-                    [category] = this.createCategory([""])
+                    [category] = this.createCategory([""],)
                 }
 
                 if (!source) {
@@ -365,6 +365,9 @@ export class Graph {
                     category?.elements.push(target)
                     this.nodesMap.set(cell.destinationId, target)
                     this.elements.nodes.push(target)
+                    target.category.forEach(c => {
+                        this.categoriesMap.get(c)!.elements.push(target!)
+                    })
                 }
 
                 link = {
@@ -596,15 +599,17 @@ export class Graph {
         }).filter((row) => row !== undefined)
     }
 
-    public removeLabel(label: string, selectedElement: Node) {
-        this.Data = this.Data.map(row => Object.fromEntries(Object.entries(row).map(([key, cell]) => {
-            if (cell && typeof cell === "object" && cell.id === selectedElement.id && "labels" in cell) {
-                const newCell = { ...cell }
-                newCell.labels = newCell.labels.filter((l) => l !== label)
-                return [key, newCell]
-            }
-            return [key, cell]
-        })))
+    public removeCategory(label: string, selectedElement: Node, updateData = true) {
+        if (updateData) {
+            this.Data = this.Data.map(row => Object.fromEntries(Object.entries(row).map(([key, cell]) => {
+                if (cell && typeof cell === "object" && cell.id === selectedElement.id && "labels" in cell) {
+                    const newCell = { ...cell }
+                    newCell.labels = newCell.labels.filter((l) => l !== label)
+                    return [key, newCell]
+                }
+                return [key, cell]
+            })))
+        }
 
         const category = this.CategoriesMap.get(label)
 
@@ -615,19 +620,39 @@ export class Graph {
                 this.CategoriesMap.delete(category.name)
             }
         }
+
+        selectedElement.category.splice(selectedElement.category.findIndex(l => l === label), 1)
+        
+        if (selectedElement.category.length === 0) {
+            const [emptyCategory] = this.createCategory([""], selectedElement)
+            selectedElement.category.push(emptyCategory.name)
+            selectedElement.color = this.getCategoryColorValue(emptyCategory.index)
+        }
     }
 
-    public addLabel(label: string, selectedElement: Node) {
-        this.createCategory([label], selectedElement)
+    public addCategory(label: string, selectedElement: Node, updateData = true) {
+        const [category] = this.createCategory([label], selectedElement)
 
-        this.Data = this.Data.map(row => Object.fromEntries(Object.entries(row).map(([key, cell]) => {
-            if (cell && typeof cell === "object" && cell.id === selectedElement.id && "labels" in cell) {
-                const newCell = { ...cell }
-                newCell.labels.push(label)
-                return [key, newCell]
-            }
-            return [key, cell]
-        })))
+        if (updateData) {
+            this.Data = this.Data.map(row => Object.fromEntries(Object.entries(row).map(([key, cell]) => {
+                if (cell && typeof cell === "object" && cell.id === selectedElement.id && "labels" in cell) {
+                    const newCell = { ...cell }
+                    newCell.labels.push(label)
+                    return [key, newCell]
+                }
+                return [key, cell]
+            })))
+        }
+
+        const emptyCategoryIndex = selectedElement.category.findIndex(c => c === "")
+
+        if (emptyCategoryIndex !== -1) {
+            this.removeCategory(selectedElement.category[emptyCategoryIndex], selectedElement)
+            selectedElement.category.splice(emptyCategoryIndex, 1)
+            selectedElement.color = this.getCategoryColorValue(category.index)
+        }
+
+        selectedElement.category.push(label)
     }
 
     public removeProperty(key: string, id: number, type: boolean) {

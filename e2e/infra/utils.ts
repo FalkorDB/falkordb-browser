@@ -6,6 +6,12 @@ import crypto from "crypto";
 
 const adminAuthFile = 'playwright/.auth/admin.json'
 
+export const DEFAULT_CREATE_QUERY = "UNWIND range(1, 10) as x CREATE (n:n)-[e:e]->(m:m) RETURN *"
+export const CREATE_TWO_NODES_QUERY = 'CREATE (a:person1 {name: "a"}), (b:person2 {name: "b"}) RETURN *'
+export const CREATE_NODE_QUERY = 'CREATE (a:person1 {name: "a"}) RETURN *'
+export const CREATE_QUERY = 'CREATE (a:person1 {name: "a"})-[c:KNOWS {name: "knows"}]->(b:person2) RETURN *'
+
+
 export function delay(ms: number) {
     return new Promise(resolve => { setTimeout(resolve, ms) });
 }
@@ -14,6 +20,20 @@ export const waitForElementToBeVisible = async (locator: Locator, time = 500, re
     for (let i = 0; i < retry; i += 1) {
         try {
             if (await locator.count() > 0 && await locator.isVisible()) {
+                return true;
+            }
+        } catch (error) {
+            console.error(`Error checking element visibility: ${error}`);
+        }
+        await delay(time);
+    }
+    return false;
+};
+
+export const waitForElementToNotBeVisible = async (locator: Locator, time = 500, retry = 10): Promise<boolean> => {
+    for (let i = 0; i < retry; i += 1) {
+        try {
+            if (await locator.count() > 0 && !await locator.isVisible()) {
                 return true;
             }
         } catch (error) {

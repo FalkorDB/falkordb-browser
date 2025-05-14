@@ -9,6 +9,14 @@ import { MutableRefObject } from "react"
 import { ForceGraphMethods } from "react-force-graph-2d"
 import { Node, Link, DataCell } from "@/app/api/graph/model"
 
+export const screenSize = {
+  sm: 640,
+  md: 768,
+  lg: 1024,
+  xl: 1280,
+  '2xl': 1536
+}
+
 export type GraphRef = MutableRefObject<ForceGraphMethods<Node, Link> | undefined>
 
 export interface HistoryQuery {
@@ -24,12 +32,31 @@ export interface Query {
   explain: string[]
 }
 
-export type Cell = {
-  value: DataCell,
-  onChange?: (value: string) => Promise<boolean>,
-  type?: string
-  comboboxType?: string
+export type SelectCell = {
+  value: string,
+  type: "select",
+  options: string[],
+  selectType: "Role"
+  onChange: (value: string) => Promise<boolean>,
 }
+
+export type ObjectCell = {
+  value: DataCell,
+  type: "object",
+}
+
+export type TextCell = {
+  value: string,
+  type: "text",
+  onChange: (value: string) => Promise<boolean>,
+}
+
+export type ReadOnlyCell = {
+  value: string,
+  type: "readonly",
+}
+
+export type Cell = SelectCell | TextCell | ObjectCell | ReadOnlyCell
 export interface Row {
   cells: Cell[]
   checked?: boolean

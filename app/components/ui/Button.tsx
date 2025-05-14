@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils"
 import { Loader2 } from "lucide-react"
 import { forwardRef } from "react"
 
-export type Variant = "Large" | "Primary" | "Secondary" | "Cancel" | "button"
+export type Variant = "Large" | "Primary" | "Secondary" | "Cancel" | "Delete" | "button"
 
 /* eslint-disable react/require-default-props */
 export interface Props extends React.DetailedHTMLProps<React.ButtonHTMLAttributes<HTMLButtonElement>, HTMLButtonElement> {
@@ -42,6 +42,9 @@ const getClassName = (variant: Variant, disable: boolean | undefined, open: bool
         case "Cancel":
             className = cn("px-12 py-1 bg-transparent border-2 border-secondary", className)
             break
+        case "Delete":
+            className = cn("px-12 py-1 bg-transparent border-2 border-red-500", className)
+            break
         default:
     }
     return className
@@ -69,7 +72,7 @@ const Button = forwardRef<HTMLButtonElement, Props>(({ label, variant = "button"
                     }
                 </button>
             </TooltipTrigger>
-            <TooltipContent>
+            <TooltipContent className={cn(variant === "Delete" && "bg-red-500")}>
                 {
                     indicator === "offline" && "The FalkorDB server is offline"
                 }

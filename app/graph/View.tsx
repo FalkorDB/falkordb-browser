@@ -1,12 +1,13 @@
 /* eslint-disable no-param-reassign */
 
 import { Check, ChevronDown, ChevronUp, FileCheck2, Pencil, PlusCircle, RotateCcw, Trash2, X } from "lucide-react"
-import { useEffect, useState } from "react"
+import { useContext, useEffect, useState } from "react"
 import { cn, rgbToHSL } from "@/lib/utils"
 import { useToast } from "@/components/ui/use-toast"
 import { DEFAULT_COLORS, Graph } from "../api/graph/model"
 import Button from "../components/ui/Button"
 import DialogComponent from "../components/DialogComponent"
+import { GraphContext } from "../components/provider"
 
 
 function hslToHex(hsl: string): string {
@@ -51,11 +52,11 @@ function hslToHex(hsl: string): string {
     return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
 }
 
-export default function View({ graph, setGraph, selectedValue }: {
-    graph: Graph,
-    setGraph: (graph: Graph) => void,
+export default function View({ selectedValue }: {
     selectedValue: string
 }) {
+    
+    const { graph, setGraph } = useContext(GraphContext)
     const [colorsArr, setColorsArr] = useState<string[]>(graph.Colors)
     const [newColor, setNewColor] = useState<string>("")
     const [hover, setHover] = useState<string>("")

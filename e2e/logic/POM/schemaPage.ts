@@ -1,330 +1,174 @@
-/* eslint-disable prefer-destructuring */
-/* eslint-disable @typescript-eslint/no-shadow */
-/* eslint-disable no-plusplus */
-/* eslint-disable no-await-in-loop */
-/* eslint-disable arrow-body-style */
-/* eslint-disable @typescript-eslint/no-explicit-any */
-import { Locator } from "@playwright/test";
 import { interactWhenVisible, waitForElementToBeVisible } from "@/e2e/infra/utils";
-import GraphPage from "./graphPage";
+import Page from "./page";
 
-export default class SchemaPage extends GraphPage {
+export default class SchemaPage extends Page {
 
-    private get addSchemaBtnInNavBar(): Locator {
-        return this.page.getByText("Create New Schema");
+    async clickCreate(): Promise<void> {
+        await interactWhenVisible(this.create("Schema"), (el) => el.click(), "Click Create");
     }
 
-    private get schemaNameInput(): Locator {
-        return this.page.getByRole("textbox");
+    async clickCreateInput(): Promise<void> {
+        await interactWhenVisible(this.createInput("Schema"), (el) => el.click(), "Click Create Input");
     }
 
-    private get createSchemaBtn(): Locator {
-        return this.page.locator("//div[@id='dialog']//button[contains(text(), 'Create your Schema')]");
+    async clickCreateConfirm(): Promise<void> {
+        await interactWhenVisible(this.createConfirm("Schema"), (el) => el.click(), "Click Create Confirm");
     }
 
-    private get addNodeBtn(): Locator {
-        return this.page.locator('button').filter({ hasText: 'Add Node' });
+    async clickCreateCancel(): Promise<void> {
+        await interactWhenVisible(this.createCancel("Schema"), (el) => el.click(), "Click Create Cancel");
     }
 
-    private get addRelationBtn(): Locator {
-        return this.page.locator('button').filter({ hasText: 'Add Relation' });
+    async clickDelete(): Promise<void> {
+        await interactWhenVisible(this.delete("Schema"), (el) => el.click(), "Click Delete");
     }
 
-    private get closeBtnInHeaderDataPanel(): Locator {
-        return this.page.locator('(//div[contains(@id, "headerDataPanel")]//button)[1]');
+    async clickDeleteConfirm(): Promise<void> {
+        await interactWhenVisible(this.deleteConfirm("Schema"), (el) => el.click(), "Click Delete Confirm");
     }
 
-    private get addBtnInHeaderDataPanel(): Locator {
-        return this.page.locator('//div[contains(@id, "headerDataPanel")]//button[contains(text(), "Add")]');
+    async clickDeleteCancel(): Promise<void> {
+        await interactWhenVisible(this.deleteCancel("Schema"), (el) => el.click(), "Click Delete Cancel");
     }
 
-    private get saveBtnInHeaderDataPanel(): Locator {
-        return this.page.locator('//div[contains(@id, "headerDataPanel")]//button[contains(text(), "Save")]');
+    async clickExport(): Promise<void> {
+        await interactWhenVisible(this.export("Schema"), (el) => el.click(), "Click Export");
     }
 
-    private get dataPanelHeaderInput(): Locator {
-        return this.page.locator('//div[contains(@id, "headerDataPanel")]//input');
+    async clickExportConfirm(): Promise<void> {
+        await interactWhenVisible(this.exportConfirm("Schema"), (el) => el.click(), "Click Export Confirm");
     }
 
-    private get keyInDataPanel(): (keyIndex: string) => Locator {
-        return (keyIndex: string) => this.page.locator(`//div[contains(@class, "DataPanel")]//tr[${keyIndex}]//td[1]`);
+    async clickExportCancel(): Promise<void> {
+        await interactWhenVisible(this.exportCancel("Schema"), (el) => el.click(), "Click Export Cancel");
     }
 
-    private get activekeyInputInDataPanel(): Locator {
-        return this.page.locator('//div[contains(@class, "DataPanel")]//tr//td[1]//input[not(@disabled)]');
+    async clickReloadList(): Promise<void> {
+        await interactWhenVisible(this.reloadList("Schema"), (el) => el.click(), "Click Reload List");
     }
 
-    private get activeDescInputInDataPanel(): Locator {
-        return this.page.locator('//div[contains(@class, "DataPanel")]//tr//td[3]//input[not(@disabled)]');
+    async clickSelect(): Promise<void> {
+        await interactWhenVisible(this.select("Schema"), (el) => el.click(), "Click Select");
     }
 
-    private get descInDataPanel(): (descIndex: string) => Locator {
-        return (descIndex: string) => this.page.locator(`//div[contains(@class, "DataPanel")]//tr[${descIndex}]//td[3]`);
+    async clickSelectItem(name: string): Promise<void> {
+        await interactWhenVisible(this.selectItem("Schema", name), (el) => el.click(), "Click Select Item");
     }
 
-    private get typeActiveBtnInDataPanel(): Locator {
-        return this.page.locator('//div[contains(@class, "DataPanel")]//td[2]//button[not(@disabled)]');
+    async clickSearch(): Promise<void> {
+        await interactWhenVisible(this.search("Schema"), (el) => el.click(), "Click Search");
     }
 
-    private get uniqueActiveRadioBtn(): Locator {
-        return this.page.locator('//div[contains(@class, "DataPanel")]//tr//td[4]//button[not(@disabled)]');
+    async clickManage(): Promise<void> {
+        await interactWhenVisible(this.manage("Schema"), (el) => el.click(), "Click Manage");
     }
 
-    private get requiredActiveRadioBtn(): Locator {
-        return this.page.locator('//div[contains(@class, "DataPanel")]//tr//td[5]//button[not(@disabled)]');
+    async clickTableCheckbox(): Promise<void> {
+        await interactWhenVisible(this.tableCheckbox("Schema"), (el) => el.click(), "Click Table Checkbox");
     }
 
-    private get addActiveBtnInDataPanel(): Locator {
-        return this.page.locator('//div[contains(@class, "DataPanel")]//tr//td[6]//button[not(@disabled) and contains(text(), "Add")]');
+    async clickTableCheckboxByName(name: string): Promise<void> {
+        await interactWhenVisible(this.tableCheckboxByName("Schema", name), (el) => el.click(), "Click Table Checkbox By Name");
     }
 
-    private get cancelActiveBtnInDataPanel(): Locator {
-        return this.page.locator('//div[contains(@class, "DataPanel")]//tr//td[6]//button[not(@disabled) and contains(text(), "Cancel")]');
+    async clickEditButton(): Promise<void> {
+        await interactWhenVisible(this.editButton("Schema"), (el) => el.click(), "Click Edit Button");
     }
 
-    private get createNewNodeBtnInDataPanel(): Locator {
-        return this.page.locator('//div[contains(@class, "DataPanel")]//button[contains(text(), "Create new node")]');
+    async clickInput(): Promise<void> {
+        await interactWhenVisible(this.input("Schema"), (el) => el.click(), "Click Input");
     }
 
-    private get createNewEdgeBtnInDataPanel(): Locator {
-        return this.page.locator('//div[contains(@class, "DataPanel")]//button[contains(text(), "Create new edge")]');
+    async clickSaveButton(): Promise<void> {
+        await interactWhenVisible(this.saveButton("Schema"), (el) => el.click(), "Click Save Button");
     }
 
-    private get addValueBtnInDataPanel(): Locator {
-        return this.page.locator('//div[contains(@class, "DataPanel")]//button[contains(text(), "Add Value")]');
+    async clickCancelButton(): Promise<void> {
+        await interactWhenVisible(this.cancelButton("Schema"), (el) => el.click(), "Click Cancel Button");
     }
 
-    private get deleteValueBtnInDataPanel(): Locator {
-        return this.page.locator('(//div[contains(@class, "DataPanel")]//tr//td//button)[1]');
+    async clickCanvasElement(x: number, y: number): Promise<void> {
+        await interactWhenVisible(this.canvasElement, (el) => el.click({ position: { x, y }, button: "right" }), "Canvas Element");
     }
 
-    private get editValueBtnInDataPanel(): Locator {
-        return this.page.locator('(//div[contains(@class, "DataPanel")]//tr//td//button)[2]');
+    async hoverCanvasElement(x: number, y: number): Promise<void> {
+        await interactWhenVisible(this.canvasElement, (el) => el.hover({ position: { x, y } }), "Canvas Element");
     }
 
-    private get attributeRows(): Locator {
-        return this.page.locator('//div[contains(@class, "DataPanel")]//tbody//tr');
+    async clickElementCanvasAdd(): Promise<void> {
+        await interactWhenVisible(this.elementCanvasAdd("Schema"), (el) => el.click(), "Add Element");
     }
 
-    private get deleteNodeInDataPanel(): Locator {
-        return this.page.locator('//div[contains(@class, "DataPanel")]//button[contains(text(), "Delete Node")]');
+    async clickElementCanvasAddNode(): Promise<void> {
+        await interactWhenVisible(this.elementCanvasAddNode("Schema"), (el) => el.click(), "Add Node");
     }
 
-    private get deleteRelationInDataPanel(): Locator {
-        return this.page.locator('//div[contains(@class, "DataPanel")]//button[contains(text(), "Delete Relation")]');
+    async clickElementCanvasAddEdge(): Promise<void> {
+        await interactWhenVisible(this.elementCanvasAddEdge("Schema"), (el) => el.click(), "Add Edge");
     }
 
-    private get categoriesPanelBtn(): Locator {
-        return this.page.locator('//div[contains(@id, "CategoriesPanel")]//button');
+    async clickDeleteElement(): Promise<void> {
+        await interactWhenVisible(this.deleteElement("Schema"), (el) => el.click(), "Delete Element");
     }
 
-    private get typeSelectSearchInput(): Locator {
-        return this.page.locator(`//div[@id='TypeSearch']//input`);
+    async clickDeleteElementConfirm(): Promise<void> {
+        await interactWhenVisible(this.deleteElementConfirm("Schema"), (el) => el.click(), "Confirm Delete Element");
     }
 
-    private get selectSearchType(): Locator {
-        return this.page.locator(`//ul[@id='TypeList']//div[@role="option"]`);
+    async clickDeleteElementCancel(): Promise<void> {
+        await interactWhenVisible(this.deleteElementCancel("Schema"), (el) => el.click(), "Cancel Delete Element");
     }
 
-    async clickAddNewSchemaBtn(): Promise<void> {
-        await interactWhenVisible(this.addSchemaBtnInNavBar, el => el.click(), "add new schema button");
+    async clickAnimationControl(): Promise<void> {
+        await interactWhenVisible(this.animationControl("Schema"), (el) => el.click(), "Animation Control");
     }
 
-    async fillSchemaNameInput(schemaName: string): Promise<void> {
-        await interactWhenVisible(this.schemaNameInput, el => el.fill(schemaName), "schema name input");
+    async clickZoomInControl(): Promise<void> {
+        await interactWhenVisible(this.zoomInControl("Schema"), (el) => el.click(), "Zoom In Control");
     }
 
-    async clickCreateSchemaBtn(): Promise<void> {
-        await interactWhenVisible(this.createSchemaBtn, el => el.click(), "create schema button");
+    async clickZoomOutControl(): Promise<void> {
+        await interactWhenVisible(this.zoomOutControl("Schema"), (el) => el.click(), "Zoom Out Control");
     }
 
-    async clickAddNode(): Promise<void> {
-        await interactWhenVisible(this.addNodeBtn, el => el.click(), "add node button");
+    async clickCenterControl(): Promise<void> {
+        await interactWhenVisible(this.centerControl("Schema"), (el) => el.click(), "Center Control");
     }
 
-    async clickAddRelation(): Promise<void> {
-        await interactWhenVisible(this.addRelationBtn, el => el.click(), "add relation button");
+    async fillElementCanvasSearch(text: string): Promise<void> {
+        await interactWhenVisible(this.elementCanvasSearch("Schema"), (el) => el.fill(text), "Element Canvas Search");
     }
 
-    async clickCloseBtnInHeaderDataPanel(): Promise<void> {
-        await interactWhenVisible(this.closeBtnInHeaderDataPanel, el => el.click(), "close button in header data panel");
+    async clickElementCanvasSuggestionByName(name: string): Promise<void> {
+        await interactWhenVisible(this.elementCanvasSuggestionByName("Schema", name), (el) => el.click(), `Element Canvas Suggestion ${name}`);
     }
 
-    async clickAddBtnInHeaderDataPanel(): Promise<void> {
-        await interactWhenVisible(this.addBtnInHeaderDataPanel, el => el.click(), "add button in header data panel");
+    async clickLabelsButtonByLabel(label: "RelationshipTypes" | "Labels", name: string): Promise<void> {
+        await interactWhenVisible(this.labelsButtonByName("Schema", label, name), (el) => el.click(), `Labels Panel Button ${label} ${name}`);
     }
 
-    async insertDataPanelHeader(title: string): Promise<void> {
-        await interactWhenVisible(this.dataPanelHeaderInput, el => el.fill(title), "data panel header input");
+    async getNodesCount(): Promise<string> {
+        const count = await interactWhenVisible(this.nodesCount("Schema"), (el) => el.textContent(), "Nodes Count");
+        return count?.split(" ")[1] ?? "0";
     }
 
-    async clickSaveBtnInHeaderDataPanel(): Promise<void> {
-        await interactWhenVisible(this.saveBtnInHeaderDataPanel, el => el.click(), "save button in header data panel");
+    async getEdgesCount(): Promise<string> {
+        const count = await interactWhenVisible(this.edgesCount("Schema"), (el) => el.textContent(), "Edges Count");
+        return count?.split(" ")[1] ?? "0";
     }
 
-    async insertActiveKeyInputInDataPanelAttr(key: string): Promise<void> {
-        await interactWhenVisible(this.activekeyInputInDataPanel, el => el.fill(key), "active key input in data panel");
+    async isVisibleLabelsButtonByName(label: "RelationshipTypes" | "Labels", name: string): Promise<boolean> {
+        const isVisible = await waitForElementToBeVisible(this.labelsButtonByName("Schema", label, name));
+        return isVisible;
     }
 
-    async getKeyInDataPanelAttr(keyIndex: string): Promise<string | null> {
-        const text = await interactWhenVisible(this.keyInDataPanel(keyIndex), el => el.textContent(), "key input in data panel");
-        return text;
+    async isVisibleNodeCanvasToolTip(): Promise<boolean> {
+        const isVisible = await waitForElementToBeVisible(this.nodeCanvasToolTip);
+        return isVisible;
     }
 
-    async insertActiveDescInputInDataPanelAttr(desc: string): Promise<void> {
-        await interactWhenVisible(this.activeDescInputInDataPanel, el => el.fill(desc), "desc input in data panel");
+    async getNodeCanvasToolTipContent(): Promise<string | null> {
+        const content = await interactWhenVisible(this.nodeCanvasToolTip, (el) => el.textContent(), "Node Canvas Tooltip");
+        return content;
     }
-
-    async getDescInDataPanelAttr(descIndex: string): Promise<string | null> {
-        const text = await interactWhenVisible(this.descInDataPanel(descIndex), el => el.textContent(), "desc input in data panel");
-        return text;
-    }
-
-    async clickTypeActiveBtnInDataPanel(): Promise<void> {
-        await interactWhenVisible(this.typeActiveBtnInDataPanel, el => el.click(), "type active button in data panel");
-    }
-
-    async clickUniqueActiveRadioBtn(): Promise<void> {
-        await interactWhenVisible(this.uniqueActiveRadioBtn, el => el.click(), "unique active button in data panel");
-    }
-
-    async clickRequiredActiveRadioBtn(): Promise<void> {
-        await interactWhenVisible(this.requiredActiveRadioBtn, el => el.click(), "required active button in data panel");
-    }
-
-    async clickAddActiveBtnInDataPanel(): Promise<void> {
-        await interactWhenVisible(this.addActiveBtnInDataPanel, el => el.click(), "add active button in data panel");
-    }
-
-    async clickCancelActiveBtnInDataPanel(): Promise<void> {
-        await interactWhenVisible(this.cancelActiveBtnInDataPanel, el => el.click(), "cancel active button in data panel");
-    }
-
-    async clickCreateNewNodeBtnInDataPanel(): Promise<void> {
-        await interactWhenVisible(this.createNewNodeBtnInDataPanel, el => el.click(), "create new node button in data panel");
-    }
-
-    async clickCreateNewEdgeBtnInDataPanel(): Promise<void> {
-        await interactWhenVisible(this.createNewEdgeBtnInDataPanel, el => el.click(), "create new edge button in data panel");
-    }
-
-    async clickAddValueBtnInDataPanel(): Promise<void> {
-        await interactWhenVisible(this.addValueBtnInDataPanel, el => el.click(), "add value button in data panel");
-    }
-
-    async clickDeleteValueBtnInDataPanel(): Promise<void> {
-        await interactWhenVisible(this.deleteValueBtnInDataPanel, el => el.click(), "delete value button in data panel");
-    }
-
-    async clickEditValueBtnInDataPanel(): Promise<void> {
-        await interactWhenVisible(this.editValueBtnInDataPanel, el => el.click(), "edit value button in data panel");
-    }
-
-    async hasAttributeRows(): Promise<boolean> {
-        const isVisible = await waitForElementToBeVisible(this.attributeRows);
-        if (!isVisible) return false;
-        const rows = await this.attributeRows.count();
-        return rows > 0;
-    }
-
-    async getAttributeRowsCount(): Promise<number> {
-        const rows = await this.attributeRows.count();
-        return rows;
-    }
-
-    async clickDeleteNodeInDataPanel(): Promise<void> {
-        await interactWhenVisible(this.deleteNodeInDataPanel, el => el.click(), "delete node in data panel");
-    }
-
-    async clickDeleteRelationInDataPanel(): Promise<void> {
-        await interactWhenVisible(this.deleteRelationInDataPanel, el => el.click(), "delete relation in data panel");
-    }
-
-    async clickCategoriesPanelBtn(): Promise<void> {
-        await interactWhenVisible(this.categoriesPanelBtn, el => el.click(), "categories panel button");
-    }
-
-    async getCategoriesPanelBtn(): Promise<string | null> {
-        const text = await interactWhenVisible(this.categoriesPanelBtn, el => el.textContent(), "categories panel button");
-        return text;
-    }
-
-    async fillTypeSelectSearchInput(type: string): Promise<void> {
-        await interactWhenVisible(this.typeSelectSearchInput, el => el.fill(type), "type search input");
-    }
-
-    async clickSearchedType(): Promise<void> {
-        await interactWhenVisible(this.selectSearchType, el => el.click(), "type search input");
-    }
-
-    async isCategoriesPanelBtnHidden(): Promise<boolean> {
-        const isHidden = await this.categoriesPanelBtn.isHidden();
-        return isHidden;
-    }
-
-    async addSchema(schemaName: string): Promise<void> {
-        await this.clickAddNewSchemaBtn();
-        await this.fillSchemaNameInput(schemaName);
-        await this.clickCreateSchemaBtn();
-    }
-
-    async addNode(title: string, key: string, type: string, desc: string, unique: boolean, required: boolean): Promise<void> {
-        await this.clickAddNode();
-        await this.clickAddBtnInHeaderDataPanel();
-        await this.insertDataPanelHeader(title);
-        await this.clickSaveBtnInHeaderDataPanel();
-        await this.addAttribute(key, type, desc, unique, required);
-        await this.clickCreateNewNodeBtnInDataPanel();
-    }
-
-    async deleteNode(x: number, y: number): Promise<void> {
-        await this.nodeClick(x, y);
-        await this.clickDeleteNodeInDataPanel();
-        await this.clickConfirmDeleteNodeInDataPanel();
-    }
-
-    async addLabel(title: string): Promise<void> {
-        await this.clickAddRelation();
-        await this.clickAddBtnInHeaderDataPanel();
-        await this.insertDataPanelHeader(title);
-        await this.clickSaveBtnInHeaderDataPanel();
-    }
-
-    async prepareRelation(title: string, key: string, type: string, desc: string, unique: boolean, required: boolean): Promise<void> {
-        await this.addLabel(title);
-        await this.addAttribute(key, type, desc, unique, required);
-    }
-
-    async clickRelationBetweenNodes(): Promise<void> {
-        const schema = await this.getNodeScreenPositions('schema');
-        await this.nodeClick(schema[0].screenX, schema[0].screenY);
-        await this.nodeClick(schema[1].screenX, schema[1].screenY);
-        await this.clickCreateNewEdgeBtnInDataPanel();
-    }
-
-    async deleteRelation(x: number, y: number): Promise<void> {
-        await this.nodeClick(x, y);
-        await this.clickDeleteRelationInDataPanel();
-        await this.clickConfirmDeleteNodeInDataPanel();
-    }
-
-    async selectTypeFromList(type: string): Promise<void> {
-        await this.fillTypeSelectSearchInput(type);
-        await this.clickSearchedType();
-    }
-
-    async addAttribute(key: string, type: string, desc: string, unique: boolean, required: boolean): Promise<void> {
-        await this.insertActiveKeyInputInDataPanelAttr(key);
-        await this.clickTypeActiveBtnInDataPanel();
-        await this.selectTypeFromList(type);
-        await this.insertActiveDescInputInDataPanelAttr(desc);
-        if (unique) {
-            await this.clickUniqueActiveRadioBtn();
-        }
-        if (required) {
-            await this.clickRequiredActiveRadioBtn();
-        }
-        await this.clickAddActiveBtnInDataPanel();
-    }
-
 }

@@ -4,15 +4,16 @@ import { useContext, useState } from "react";
 import { Info } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import Button from "../components/ui/Button";
-import { IndicatorContext } from "../components/provider";
+import { GraphNameContext, IndicatorContext } from "../components/provider";
 
-export default function MetadataView({ query, graphName, className = "" }: {
+export default function MetadataView({ query, fetchCount, className = "" }: {
     query: Query,
-    graphName: string,
+    fetchCount: () => void,
     className?: string
 }) {
     const [profile, setProfile] = useState<string[]>([])
     const { indicator, setIndicator } = useContext(IndicatorContext)
+    const { graphName } = useContext(GraphNameContext)
     const { toast } = useToast()
 
     const handleProfile = async () => {
@@ -24,12 +25,13 @@ export default function MetadataView({ query, graphName, className = "" }: {
 
         const json = await result.json()
         setProfile(json.result)
+        fetchCount()
     }
 
     return (
         <div className={cn("h-full flex overflow-hidden border", className)}>
-            <div className="w-1 grow flex flex-col gap-4 border-r p-8 overflow-auto">
-                <h1 className="text-2xl font-bold p-2">Profile</h1>
+            <div className="w-1 grow flex flex-col gap-4 border-r p-12 overflow-auto">
+                <h1 className="text-2xl font-bold">Profile</h1>
                 <div className="flex gap-4">
                     <Button
                         indicator={indicator}
@@ -75,17 +77,17 @@ export default function MetadataView({ query, graphName, className = "" }: {
 
             </div>
             <div className="w-1 grow flex flex-col">
-                <div className="h-1 grow p-8 overflow-auto overflow-x-hidden border-b">
-                    <h1 className="text-2xl font-bold p-2">Metadata</h1>
-                    <ul>
+                <div className="h-1 grow p-12 overflow-auto overflow-x-hidden border-b">
+                    <h1 className="text-2xl font-bold">Metadata</h1>
+                    <ul className="flex flex-col gap-2 p-2">
                         {query.metadata.map((m, i) => (
                             // eslint-disable-next-line react/no-array-index-key
                             <li key={i}>{m}</li>
                         ))}
                     </ul>
                 </div>
-                <div className="h-1 grow p-8 overflow-auto overflow-x-hidden">
-                    <h1 className="text-2xl font-bold p-2">Explain</h1>
+                <div className="h-1 grow p-12 overflow-auto overflow-x-hidden">
+                    <h1 className="text-2xl font-bold">Explain</h1>
                     <JSONTree
                         data={createNestedObject(query.explain)}
                         shouldExpandNodeInitially={() => true}

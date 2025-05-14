@@ -6,6 +6,7 @@ const INITIAL = Number(process.env.INITIAL) || 0
 // eslint-disable-next-line import/prefer-default-export
 export async function GET(request: NextRequest) {
     const session = await getClient()
+    
     if (session instanceof NextResponse) {
         return session
     }

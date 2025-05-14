@@ -38,7 +38,7 @@ test.describe('Schema Tests', () => {
         await schema.addSchema(schemaName);
         await schema.addNode("person", 'id', "Integer", "100", true, true);
         const graph = await schema.getNodeScreenPositions('schema');
-        await schema.nodeClick(graph[0].screenX, graph[0].screenY);
+        await schema.elementClick(graph[0].screenX, graph[0].screenY);
         expect(await schema.hasAttributeRows()).toBe(true);
         expect(await schema.getCategoriesPanelBtn()).toBe("person")
         await apicalls.removeSchema(schemaName);
@@ -53,7 +53,7 @@ test.describe('Schema Tests', () => {
         await schema.prepareRelation("knows", 'id', "Integer", "100", true, true);
         await schema.clickRelationBetweenNodes();
         const links = await schema.getLinksScreenPositions('schema');
-        await schema.nodeClick(links[0].midX, links[0].midY);
+        await schema.elementClick(links[0].midX, links[0].midY);
         expect(await schema.hasAttributeRows()).toBe(true);
         expect(await schema.isRelationshipTypesPanelBtnHidden()).toBeFalsy();
         await apicalls.removeSchema(schemaName);

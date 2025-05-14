@@ -1,20 +1,18 @@
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from "@/components/ui/carousel";
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from "@/components/ui/drawer";
-import { Dispatch, SetStateAction, useEffect, useState } from "react";
+import { useContext, useEffect, useState } from "react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import { useSession } from "next-auth/react";
 import CreateGraph from "../components/CreateGraph";
+import { GraphNameContext, GraphNamesContext } from "../components/provider";
 
-interface Props {
-    onSetGraphName: Dispatch<SetStateAction<string>>
-    graphNames: string[]
-}
-
-export default function Tutorial({ onSetGraphName, graphNames }: Props) {
+export default function Tutorial() {
 
     const [open, setOpen] = useState<boolean>(false)
     const [showAgain, setShowAgain] = useState<boolean>(false)
+    const { setGraphName: onSetGraphName } = useContext(GraphNameContext)
+    const { graphNames } = useContext(GraphNamesContext)
     const { data: session } = useSession()
 
     useEffect(() => {
@@ -57,6 +55,7 @@ export default function Tutorial({ onSetGraphName, graphNames }: Props) {
                                 {
                                     session?.user?.role !== "Read-Only" &&
                                     <CreateGraph
+                                        label="Tutorial"
                                         graphNames={graphNames}
                                         onSetGraphName={handleSetGraphName}
                                         type="Graph"

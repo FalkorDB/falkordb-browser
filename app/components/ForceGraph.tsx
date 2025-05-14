@@ -9,14 +9,12 @@ import ForceGraph2D from "react-force-graph-2d"
 import { securedFetch, GraphRef, handleZoomToFit } from "@/lib/utils"
 import { useToast } from "@/components/ui/use-toast"
 import * as d3 from "d3"
-import { Graph, GraphData, Link, Node, Category } from "../api/graph/model"
-import { IndicatorContext } from "./provider"
+import { GraphData, Link, Node, Category } from "../api/graph/model"
+import { IndicatorContext, GraphContext } from "./provider"
 
 interface Props {
-    graph: Graph
     chartRef: GraphRef
     data: GraphData
-    onExpand: (expand?: boolean) => void
     setData: Dispatch<SetStateAction<GraphData>>
     selectedElement: Node | Link | undefined
     setSelectedElement: (element: Node | Link | undefined) => void
@@ -27,6 +25,8 @@ interface Props {
     type?: "schema" | "graph"
     isAddElement?: boolean
     setSelectedNodes?: Dispatch<SetStateAction<[Node | undefined, Node | undefined]>>
+    setIsAddEntity?: Dispatch<SetStateAction<boolean>>
+    setIsAddRelation?: Dispatch<SetStateAction<boolean>>
     setLabels: Dispatch<SetStateAction<Category[]>>
 }
 
@@ -34,10 +34,8 @@ const NODE_SIZE = 6
 const PADDING = 2;
 
 export default function ForceGraph({
-    graph,
     chartRef,
     data,
-    onExpand,
     setData,
     selectedElement,
     setSelectedElement,
@@ -48,6 +46,8 @@ export default function ForceGraph({
     type = "graph",
     isAddElement = false,
     setSelectedNodes,
+    setIsAddEntity = () => { },
+    setIsAddRelation = () => { },
     setLabels
 }: Props) {
 
@@ -58,6 +58,7 @@ export default function ForceGraph({
     const lastClick = useRef<{ date: Date, name: string }>({ date: new Date(), name: "" })
     const { toast } = useToast()
     const { indicator, setIndicator } = useContext(IndicatorContext)
+    const { graph } = useContext(GraphContext)
 
     useEffect(() => {
         const handleResize = () => {
@@ -83,21 +84,30 @@ export default function ForceGraph({
     useEffect(() => {
         if (!chartRef.current) return;
 
-        // Adjust force parameters for better graph layout
+        // Adjust link force and length
         const linkForce = chartRef.current.d3Force('link');
+
         if (linkForce) {
             linkForce
                 .distance(() => 50)
-                .strength(0.1);
+                .strength(0.5);
         }
 
         // Add collision force to prevent node overlap
-        chartRef.current.d3Force('collision', d3.forceCollide(NODE_SIZE).strength(-1));
+        chartRef.current.d3Force('collision', d3.forceCollide(NODE_SIZE * 2).strength(0.1));
 
         // Center force to keep graph centered
         const centerForce = chartRef.current.d3Force('center');
+
         if (centerForce) {
             centerForce.strength(0.05);
+        }
+
+        // Add charge force to repel nodes
+        const chargeForce = chartRef.current.d3Force('charge');
+
+        if (chargeForce) {
+            chargeForce.strength(-1)
         }
     }, [chartRef, graph.Elements.nodes])
 
@@ -197,21 +207,21 @@ export default function ForceGraph({
             }
         }
         setSelectedElement(element)
-        onExpand(!!element)
+        setIsAddEntity(false)
+        setIsAddRelation(false)
     }
 
     const handleUnselected = (evt?: MouseEvent) => {
         if (evt?.ctrlKey || (!selectedElement && selectedElements.length === 0)) return
         setSelectedElement(undefined)
         setSelectedElements([])
-        onExpand(false)
     }
 
     return (
         <div ref={parentRef} className="w-full h-full relative">
             <ForceGraph2D
                 ref={chartRef}
-                backgroundColor="#191919"
+                backgroundColor="#242424"
                 width={parentWidth}
                 height={parentHeight}
                 nodeLabel={(node) => type === "graph" ? node.data.name || node.id.toString() : node.category[0]}
@@ -223,12 +233,11 @@ export default function ForceGraph({
                     || hoverElement && ("source" in hoverElement) && hoverElement.id === link.id)
                     || (selectedElements.length > 0 && selectedElements.some(el => el.id === link.id && !("source" in el))) ? 2 : 1}
                 nodeCanvasObject={(node, ctx) => {
-                    if (graph.Elements.nodes.length === 1) {
+
+                    if (!node.x || !node.y) {
                         node.x = 0
                         node.y = 0
                     }
-
-                    if (node.x === undefined || node.y === undefined) return
 
                     ctx.lineWidth = ((selectedElement && !("source" in selectedElement) && selectedElement.id === node.id)
                         || (hoverElement && !("source" in hoverElement) && hoverElement.id === node.id)
@@ -272,7 +281,12 @@ export default function ForceGraph({
                     const start = link.source;
                     const end = link.target;
 
-                    if (!start.x || !start.y || !end.x || !end.y) return
+                    if (!start.x || !start.y || !end.x || !end.y) {
+                        start.x = 0
+                        start.y = 0
+                        end.x = 0
+                        end.y = 0
+                    }
 
                     let textX;
                     let textY;
@@ -328,7 +342,7 @@ export default function ForceGraph({
                     ctx.rotate(angle);
 
                     // Draw background and text
-                    ctx.fillStyle = '#191919';
+                    ctx.fillStyle = '#242424';
                     const padding = 0.5;
                     ctx.fillRect(
                         textX - textWidth / 2 - padding,
@@ -353,6 +367,7 @@ export default function ForceGraph({
                 onBackgroundClick={handleUnselected}
                 onBackgroundRightClick={handleUnselected}
                 onEngineStop={() => {
+                    if (cooldownTicks === 0) return
                     handleCooldown(0)
                     handleZoomToFit(chartRef)
                 }}
@@ -368,4 +383,9 @@ export default function ForceGraph({
             />
         </div>
     )
+}
+
+ForceGraph.defaultProps = {
+    setIsAddEntity: () => { },
+    setIsAddRelation: () => { },
 }

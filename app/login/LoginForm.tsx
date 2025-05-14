@@ -6,7 +6,7 @@ import { useSearchParams, useRouter } from "next/navigation";
 import Image from "next/image";
 import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
-import FormComponent from "../components/FormComponent";
+import FormComponent, { Field } from "../components/FormComponent";
 import Dropzone from "../components/ui/Dropzone";
 
 const DEFAULT_HOST = "localhost";
@@ -29,15 +29,16 @@ export default function LoginForm() {
   });
 
   const searchParams = useSearchParams();
-  const fields = [
+  const fields: Field[] = [
     {
       value: host,
-      onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
+      onChange: async (e: React.ChangeEvent<HTMLInputElement>) => {
         setHost(e.target.value)
         setError(prev => ({
           ...prev,
           show: false
         }))
+        return true
       },
       label: "Host",
       type: "text",
@@ -46,12 +47,13 @@ export default function LoginForm() {
     },
     {
       value: port,
-      onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
+      onChange: async (e: React.ChangeEvent<HTMLInputElement>) => {
         setPort(e.target.value)
         setError(prev => ({
           ...prev,
           show: false
         }))
+        return true
       },
       label: "Port",
       type: "text",
@@ -60,12 +62,13 @@ export default function LoginForm() {
     },
     {
       value: username,
-      onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
+      onChange: async (e: React.ChangeEvent<HTMLInputElement>) => {
         setUsername(e.target.value)
         setError(prev => ({
           ...prev,
           show: false
         }))
+        return true
       },
       label: "Username",
       placeholder: "Default",
@@ -75,12 +78,13 @@ export default function LoginForm() {
     },
     {
       value: password,
-      onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
+      onChange: async (e: React.ChangeEvent<HTMLInputElement>) => {
         setPassword(e.target.value)
         setError(prev => ({
           ...prev,
           show: false
         }))
+        return true
       },
       label: "Password",
       placeholder: "Default",

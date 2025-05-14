@@ -15,8 +15,9 @@ import { IndicatorContext } from "./provider"
 
 interface Props {
     onSetGraphName: (name: string) => void
-    type: string
+    type: "Graph" | "Schema"
     graphNames: string[]
+    label?: string
     trigger?: React.ReactNode
 }
 
@@ -24,13 +25,14 @@ export default function CreateGraph({
     onSetGraphName,
     type,
     graphNames,
+    label = "",
     trigger = (
         <Button
+            data-testid={`create${type}${label}`}
             variant="Primary"
-            label={`Create New ${type}`}
-            title={`Create a new ${type}`}
+            title={`Create New ${type}`}
         >
-            <PlusCircle />
+            <PlusCircle size={20} />
         </Button>
     ),
 }: Props) {
@@ -99,6 +101,7 @@ export default function CreateGraph({
                     </Tooltip>
                     <p className="font-normal text-2xl">Name your {type}:</p>
                     <Input
+                        data-testid={`create${type}${label}Input`}
                         variant="primary"
                         ref={ref => ref?.focus()}
                         value={graphName}
@@ -107,6 +110,7 @@ export default function CreateGraph({
                 </div>
                 <div className="flex gap-4 justify-end">
                     <Button
+                        data-testid={`create${type}${label}Confirm`}
                         indicator={indicator}
                         variant="Primary"
                         label={`Create your ${type}`}
@@ -115,6 +119,7 @@ export default function CreateGraph({
                         isLoading={isLoading}
                     />
                     <CloseDialog
+                        data-testid={`create${type}${label}Cancel`}
                         variant="Cancel"
                         label="Cancel"
                         type="button"

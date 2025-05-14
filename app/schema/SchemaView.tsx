@@ -2,46 +2,69 @@
 
 'use client'
 
-import { ResizablePanel, ResizablePanelGroup, ResizableHandle } from "@/components/ui/resizable"
-import { ChevronLeft, Maximize2, Minimize2, Pause, Play } from "lucide-react"
-import { ImperativePanelHandle } from "react-resizable-panels"
-import { useEffect, useRef, useState, useContext } from "react"
-import { cn, prepareArg, securedFetch } from "@/lib/utils"
+import { useEffect, useState, useContext, Dispatch, SetStateAction } from "react"
+import { GraphRef, prepareArg, securedFetch } from "@/lib/utils"
 import dynamic from "next/dynamic"
 import { useToast } from "@/components/ui/use-toast"
-import { Switch } from "@/components/ui/switch"
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
-import { ForceGraphMethods } from "react-force-graph-2d"
-import Toolbar from "../graph/toolbar"
 import SchemaDataPanel from "./SchemaDataPanel"
 import Labels from "../graph/labels"
-import { Category, Graph, Link, Node, GraphData } from "../api/graph/model"
-import Button from "../components/ui/Button"
+import { Category, Link, Node, GraphData } from "../api/graph/model"
 import CreateElement from "./SchemaCreateElement"
-import { IndicatorContext } from "../components/provider"
+import { IndicatorContext, GraphContext } from "../components/provider"
+import Controls from "../graph/controls"
 
 const ForceGraph = dynamic(() => import("../components/ForceGraph"), { ssr: false })
 
 /* eslint-disable react/require-default-props */
 interface Props {
-    schema: Graph
     fetchCount?: () => void
+    edgesCount: number
+    nodesCount: number
+    selectedElement: Node | Link | undefined
+    setSelectedElement: Dispatch<SetStateAction<Node | Link | undefined>>
+    selectedElements: (Node | Link)[]
+    setSelectedElements: Dispatch<SetStateAction<(Node | Link)[]>>
+    isAddRelation: boolean
+    setIsAddRelation: Dispatch<SetStateAction<boolean>>
+    isAddEntity: boolean
+    setIsAddEntity: Dispatch<SetStateAction<boolean>>
+    chartRef: GraphRef
+    cooldownTicks: number | undefined
+    setCooldownTicks: Dispatch<SetStateAction<number | undefined>>
+    data: GraphData
+    setData: Dispatch<SetStateAction<GraphData>>
+    handleDeleteElement: () => Promise<void>
+    setLabels: Dispatch<SetStateAction<Category[]>>
+    setCategories: Dispatch<SetStateAction<Category[]>>
+    labels: Category[]
+    categories: Category[]
 }
 
-export default function SchemaView({ schema, fetchCount }: Props) {
-    const [selectedElement, setSelectedElement] = useState<Node | Link | undefined>();
-    const [selectedElements, setSelectedElements] = useState<(Node | Link)[]>([]);
+export default function SchemaView({
+    fetchCount,
+    edgesCount,
+    nodesCount,
+    selectedElement,
+    setSelectedElement,
+    selectedElements,
+    setSelectedElements,
+    isAddRelation,
+    setIsAddRelation,
+    isAddEntity,
+    setIsAddEntity,
+    chartRef,
+    cooldownTicks,
+    setCooldownTicks,
+    data,
+    setData,
+    handleDeleteElement,
+    setLabels,
+    setCategories,
+    labels,
+    categories
+}: Props) {
     const [selectedNodes, setSelectedNodes] = useState<[Node | undefined, Node | undefined]>([undefined, undefined]);
-    const [isCollapsed, setIsCollapsed] = useState<boolean>(false);
-    const chartRef = useRef<ForceGraphMethods<Node, Link>>();
-    const dataPanel = useRef<ImperativePanelHandle>(null);
-    const [isAddRelation, setIsAddRelation] = useState(false)
-    const [isAddEntity, setIsAddEntity] = useState(false)
-    const [maximize, setMaximize] = useState<boolean>(false)
-    const [cooldownTicks, setCooldownTicks] = useState<number | undefined>(0)
-    const [categories, setCategories] = useState<Category[]>([...schema.Categories])
-    const [labels, setLabels] = useState<Category[]>([...schema.Labels])
-    const [data, setData] = useState<GraphData>({ ...schema.Elements })
+    const { graph: schema } = useContext(GraphContext)
     const { toast } = useToast()
     const { setIndicator } = useContext(IndicatorContext)
 
@@ -52,11 +75,7 @@ export default function SchemaView({ schema, fetchCount }: Props) {
     useEffect(() => {
         setCategories([...schema.Categories])
         setLabels([...schema.Labels])
-    }, [schema.Id, schema.Categories, schema.Labels])
-
-    useEffect(() => {
-        dataPanel.current?.collapse()
-    }, [])
+    }, [schema.Id, schema.Categories.length, schema.Labels.length])
 
     useEffect(() => {
         setSelectedElement(undefined)
@@ -95,97 +114,6 @@ export default function SchemaView({ schema, fetchCount }: Props) {
         setLabels([...schema.Labels])
     }
 
-    const handleSetSelectedElement = (element?: Node | Link | undefined) => {
-        setSelectedElement(element)
-        if (isAddRelation || isAddEntity) return
-        if (element) {
-            dataPanel.current?.expand()
-        } else dataPanel.current?.collapse()
-    }
-
-    const onExpand = (expand?: boolean) => {
-        if (!dataPanel.current) return
-        const panel = dataPanel.current
-        if (expand !== undefined) {
-            if (expand && panel?.isCollapsed()) {
-                panel?.expand()
-            } else if (!expand && panel?.isExpanded()) {
-                panel?.collapse()
-            }
-            return
-        }
-        if (panel.isCollapsed()) {
-            panel.expand()
-        } else {
-            panel.collapse()
-        }
-    }
-
-    const handleDeleteElement = async () => {
-        const stateSelectedElements = Object.values(selectedElements)
-
-        if (stateSelectedElements.length === 0 && selectedElement) {
-            stateSelectedElements.push(selectedElement)
-            setSelectedElement(undefined)
-        }
-
-        await Promise.all(stateSelectedElements.map(async (element) => {
-            const { id } = element
-            const type = !("source" in element)
-            const result = await securedFetch(`api/schema/${prepareArg(schema.Id)}/${prepareArg(id.toString())}`, {
-                method: "DELETE",
-                body: JSON.stringify({ type }),
-            }, toast, setIndicator)
-
-            if (!result.ok) return
-
-            if (type) {
-                schema.Elements.nodes.splice(schema.Elements.nodes.findIndex(node => node.id === element.id), 1)
-                schema.NodesMap.delete(id)
-            } else {
-                schema.Elements.links.splice(schema.Elements.links.findIndex(link => link.id === element.id), 1)
-                schema.EdgesMap.delete(id)
-            }
-
-            if (type) {
-                element.category.forEach((category) => {
-                    const cat = schema.CategoriesMap.get(category)
-
-                    if (cat) {
-                        cat.elements = cat.elements.filter(n => n.id !== id)
-
-                        if (cat.elements.length === 0) {
-                            schema.Categories.splice(schema.Categories.findIndex(c => c.name === cat.name), 1)
-                            schema.CategoriesMap.delete(cat.name)
-                            setCategories([...schema.Categories])
-                        }
-                    }
-                })
-            } else {
-                const cat = schema.LabelsMap.get(element.label)
-
-                if (cat) {
-                    cat.elements = cat.elements.filter(n => n.id !== id)
-
-                    if (cat.elements.length === 0) {
-                        schema.Labels.splice(schema.Labels.findIndex(c => c.name === cat.name), 1)
-                        schema.LabelsMap.delete(cat.name)
-                        setLabels([...schema.Labels])
-                    }
-                }
-            }
-        }))
-
-        schema.removeLinks(setLabels, stateSelectedElements.map(e => e.id))
-
-        if (fetchCount) fetchCount()
-
-        setSelectedElement(undefined)
-        setSelectedElements([])
-        setData({ ...schema.Elements })
-        onExpand(false)
-    }
-
     const onCreateElement = async (attributes: [string, string[]][], elementLabel?: string[]) => {
         const fakeId = "-1"
         const result = await securedFetch(`api/schema/${prepareArg(schema.Id)}/${prepareArg(fakeId)}`, {
@@ -208,8 +136,7 @@ export default function SchemaView({ schema, fetchCount }: Props) {
 
             if (fetchCount) fetchCount()
 
-            onExpand()
-
+            setSelectedElement(undefined)
         }
 
         setData({ ...schema.Elements })
@@ -218,132 +145,69 @@ export default function SchemaView({ schema, fetchCount }: Props) {
     }
 
     return (
-        <ResizablePanelGroup direction="horizontal" className={cn(maximize && "h-full p-10 bg-background fixed left-[50%] top-[50%] z-50 grid translate-x-[-50%] translate-y-[-50%]")}>
-            <ResizablePanel
-                defaultSize={50}
-                className={cn("flex flex-col gap-10", !isCollapsed && "mr-8")}
-            >
-                <div className="flex items-center justify-between">
-                    <Toolbar
-                        disabled={!schema.Id}
-                        deleteDisabled={Object.values(selectedElements).length === 0 && !selectedElement}
-                        onAddEntity={() => {
-                            setIsAddEntity(true)
-                            setIsAddRelation(false)
-                            setSelectedElement(undefined)
-                            if (dataPanel.current?.isExpanded()) return
-                            onExpand()
-                        }}
-                        onAddRelation={() => {
-                            setIsAddRelation(true)
-                            setIsAddEntity(false)
-                            setSelectedElement(undefined)
-                            if (dataPanel.current?.isExpanded()) return
-                            onExpand()
-                        }}
-                        onDeleteElement={handleDeleteElement}
-                        chartRef={chartRef}
-                        displayAdd
-                        type="Schema"
-                    />
+        <div className="relative w-full h-full border rounded-lg overflow-hidden">
+            <div className="pointer-events-none absolute bottom-4 inset-x-12 z-10 flex items-center justify-between">
+                <div className="flex gap-2">
                     {
-                        isCollapsed &&
-                        <Button
-                            className="p-3 bg-[#7167F6] rounded-lg"
-                            onClick={() => onExpand()}
-                            disabled={!selectedElement}
-                        >
-                            <ChevronLeft size={20} />
-                        </Button>
-                    }
-                </div>
-                <div className="relative h-1 grow rounded-lg overflow-hidden">
-                    <Button
-                        className="z-10 absolute top-4 right-4"
-                        title={maximize ? "Minimize" : "Maximize"}
-                        onClick={() => setMaximize(prev => !prev)}
-                    >
-                        {
-                            maximize ?
-                                <Minimize2 size={20} />
-                                : <Maximize2 size={20} />
-                        }
-                    </Button>
-                    <div className="z-10 absolute top-4 left-4 pointer-events-none">
-                        <Tooltip>
-                            <TooltipTrigger asChild>
-                                <div className="flex items-center gap-2">
-                                    {cooldownTicks === undefined ? <Play size={20} /> : <Pause size={20} />}
-                                    <Switch
-                                        className="pointer-events-auto"
-                                        checked={cooldownTicks === undefined}
-                                        onCheckedChange={() => {
-                                            handleCooldown(cooldownTicks === undefined ? 0 : undefined)
-                                        }}
-                                    />
-                                </div>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                                <p>Animation Control</p>
-                            </TooltipContent>
-                        </Tooltip>
-                    </div>
-                    <ForceGraph
-                        chartRef={chartRef}
-                        data={data}
-                        setData={setData}
-                        graph={schema}
-                        onExpand={onExpand}
-                        selectedElement={selectedElement}
-                        setSelectedElement={handleSetSelectedElement}
-                        selectedElements={selectedElements}
-                        setSelectedElements={setSelectedElements}
-                        type="schema"
-                        isAddElement={isAddRelation}
-                        setSelectedNodes={setSelectedNodes}
-                        cooldownTicks={cooldownTicks}
-                        handleCooldown={handleCooldown}
-                        setLabels={setLabels}
-                    />
-                    {
-                        (schema.Categories.length > 0 || schema.Labels.length > 0) &&
+                        schema.Id &&
                         <>
-                            <Labels className="left-2" label="Categories" categories={categories} onClick={onCategoryClick} graph={schema} />
-                            <Labels className="right-2 text-end" label="RelationshipTypes" categories={labels} onClick={onLabelClick} graph={schema} />
+                            <p className="Gradient bg-clip-text text-transparent">Nodes: {nodesCount}</p>
+                            <p className="Gradient bg-clip-text text-transparent">Edges: {edgesCount}</p>
                         </>
                     }
                 </div>
-            </ResizablePanel>
-            <ResizableHandle disabled={!selectedElement} className={cn(!selectedElement && "!cursor-default")} />
-            <ResizablePanel
-                className={cn("rounded-lg", !isCollapsed && "border-[3px] border-foreground")}
-                collapsible
-                ref={dataPanel}
-                defaultSize={50}
-                minSize={25}
-                maxSize={50}
-                onCollapse={() => setIsCollapsed(true)}
-                onExpand={() => setIsCollapsed(false)}
-            >
+                {
+                    schema.getElements().length > 0 &&
+                    <Controls
+                        disabled={!schema.Id}
+                        chartRef={chartRef}
+                        handleCooldown={handleCooldown}
+                        cooldownTicks={cooldownTicks}
+                    />
+                }
+            </div>
+            <div className="relative h-full w-full rounded-lg overflow-hidden">
+                <ForceGraph
+                    chartRef={chartRef}
+                    data={data}
+                    setData={setData}
+                    selectedElement={selectedElement}
+                    setSelectedElement={setSelectedElement}
+                    selectedElements={selectedElements}
+                    setSelectedElements={setSelectedElements}
+                    type="schema"
+                    isAddElement={isAddRelation}
+                    setSelectedNodes={setSelectedNodes}
+                    cooldownTicks={cooldownTicks}
+                    handleCooldown={handleCooldown}
+                    setLabels={setLabels}
+                />
+                {
+                    (categories.length > 0 || labels.length > 0) &&
+                    <>
+                        <Labels type="Schema" className="left-2" label="Labels" categories={categories} onClick={onCategoryClick} />
+                        <Labels type="Schema" className="right-2 text-end" label="RelationshipTypes" categories={labels} onClick={onLabelClick} />
+                    </>
+                }
                 {
                     selectedElement ?
                         <SchemaDataPanel
-                            obj={selectedElement}
-                            onExpand={onExpand}
+                            object={selectedElement}
+                            setObject={setSelectedElement}
                             onDeleteElement={handleDeleteElement}
                             schema={schema}
                             setCategories={setCategories}
                         />
-                        : (isAddEntity || isAddRelation) &&
+                        : (isAddRelation || isAddEntity) &&
                         <CreateElement
                             onCreate={onCreateElement}
-                            onExpand={onExpand}
+                            setIsAdd={isAddRelation ? setIsAddRelation : setIsAddEntity}
                             selectedNodes={selectedNodes}
                             setSelectedNodes={setSelectedNodes}
                             type={isAddEntity}
                         />
                 }
-            </ResizablePanel>
-        </ResizablePanelGroup>
+            </div>
+        </div>
     )
 }

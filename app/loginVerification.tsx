@@ -54,6 +54,21 @@ export default function LoginVerification({ children }: { children: React.ReactN
         return () => clearInterval(interval)
     }, [status])
 
+
+
+    useEffect(() => {
+        if (data?.user || data === undefined) return
+        localStorage.removeItem("query history")
+    }, [data])
+
+    useEffect(() => {
+        if ((url === "/login" || url === "/") && status === "authenticated") {
+            router.push("/graph")
+        } else if (status === "unauthenticated" && url !== "/login") {
+            signOut({ callbackUrl: "/login" })
+        }
+    }, [status, url, router])
+
     const indicatorContext = useMemo(() => ({ indicator, setIndicator }), [indicator, setIndicator])
     const timeoutContext = useMemo(() => ({ timeout, setTimeout }), [timeout, setTimeout])
     const limitContext = useMemo(() => ({ limit, setLimit }), [limit, setLimit])

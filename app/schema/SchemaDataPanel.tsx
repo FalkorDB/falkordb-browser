@@ -3,8 +3,8 @@
 
 "use client";
 
-import { Check, ChevronRight, Pencil, PlusCircle, Trash2, X } from "lucide-react";
-import { useContext, useEffect, useState } from "react";
+import { Check, Pencil, PlusCircle, Trash2, X } from "lucide-react";
+import { SetStateAction, Dispatch, useContext, useEffect, useState } from "react";
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from "@/components/ui/use-toast";
 import { useSession } from "next-auth/react";
@@ -22,14 +22,14 @@ import CloseDialog from "../components/CloseDialog";
 import { IndicatorContext } from "../components/provider";
 
 interface Props {
-    obj: Node | Link
-    onExpand: (expand?: boolean) => void;
+    object: Node | Link
+    setObject: Dispatch<SetStateAction<Node | Link | undefined>>
     onDeleteElement: () => Promise<void>;
     schema: Graph
     setCategories: (categories: Category[]) => void
 }
 
-export default function SchemaDataPanel({ obj, onExpand, onDeleteElement, schema, setCategories }: Props) {
+export default function SchemaDataPanel({ object, setObject, onDeleteElement, schema, setCategories }: Props) {
 
     const [attribute, setAttribute] = useState<[string, string[]]>(getDefaultAttribute())
     const [attributes, setAttributes] = useState<[string, string[]][]>([])
@@ -46,15 +46,15 @@ export default function SchemaDataPanel({ obj, onExpand, onDeleteElement, schema
     const [isLabelLoading, setIsLabelLoading] = useState<boolean>(false)
     const [isRemoveLabelLoading, setIsRemoveLabelLoading] = useState<boolean>(false)
     const [deleteOpen, setDeleteOpen] = useState<boolean>(false)
-    const type = !!obj.category
+    const type = !!object.category
     const { toast } = useToast()
     const { data: session } = useSession()
     const { indicator } = useContext(IndicatorContext)
 
     useEffect(() => {
-        setAttributes(Object.entries(obj.data).filter(([key, val]) => !(key === "name" && Number(val) === obj.id)).map(([key, val]) => [key, Array.isArray(val) ? val : (val as string).split(',')]))
-        setLabel("source" in obj ? [obj.label] : [...obj.category])
-    }, [obj])
+        setAttributes(Object.entries(object.data).filter(([key, val]) => !(key === "name" && Number(val) === object.id)).map(([key, val]) => [key, Array.isArray(val) ? val : (val as string).split(',')]))
+        setLabel("source" in object ? [object.label] : [...object.category])
+    }, [object])
 
     const handleSetEditable = ([key, val]: [string, string[]] = getDefaultAttribute()) => {
         if (key !== "") {
@@ -66,7 +66,7 @@ export default function SchemaDataPanel({ obj, onExpand, onDeleteElement, schema
     }
 
     const onSetAttribute = async (att: [string, string[]]) => {
-        const { ok } = await securedFetch(`api/schema/${prepareArg(schema.Id)}/${prepareArg(obj.id.toString())}/${prepareArg(att[0])}`, {
+        const { ok } = await securedFetch(`api/schema/${prepareArg(schema.Id)}/${prepareArg(object.id.toString())}/${prepareArg(att[0])}`, {
             method: "PATCH",
             body: JSON.stringify({ type, attribute: att[1] })
         }, toast)
@@ -96,7 +96,7 @@ export default function SchemaDataPanel({ obj, onExpand, onDeleteElement, schema
                     schema.Elements = {
                         ...schema.Elements,
                         nodes: schema.Elements.nodes.map(element =>
-                            element.id === obj.id ? { ...element, data: { ...element.data, [newAttribute[0]]: newAttribute[1] } } : element
+                            element.id === object.id ? { ...element, data: { ...element.data, [newAttribute[0]]: newAttribute[1] } } : element
                         )
                     }
                 } else {
@@ -104,7 +104,7 @@ export default function SchemaDataPanel({ obj, onExpand, onDeleteElement, schema
                     schema.Elements = {
                         ...schema.Elements,
                         links: schema.Elements.links.map(element =>
-                            element.id === obj.id ? { ...element, data: { ...element.data, [newAttribute[0]]: newAttribute[1] } } : element
+                            element.id === object.id ? { ...element, data: { ...element.data, [newAttribute[0]]: newAttribute[1] } } : element
                         )
                     }
                 }
@@ -126,7 +126,7 @@ export default function SchemaDataPanel({ obj, onExpand, onDeleteElement, schema
         try {
             setIsRemoveLoading(true)
 
-            const { ok } = await securedFetch(`api/schema/${prepareArg(schema.Id)}/${prepareArg(obj.id.toString())}/${prepareArg(key)}`, {
+            const { ok } = await securedFetch(`api/schema/${prepareArg(schema.Id)}/${prepareArg(object.id.toString())}/${prepareArg(key)}`, {
                 method: "DELETE",
                 body: JSON.stringify({ type })
             }, toast)
@@ -138,7 +138,7 @@ export default function SchemaDataPanel({ obj, onExpand, onDeleteElement, schema
                     schema.Elements = {
                         ...schema.Elements,
                         nodes: schema.Elements.nodes.map(element =>
-                            element.id === obj.id ? { ...element, data: { ...Object.fromEntries(Object.entries(element.data).filter(([k]) => k !== key)), [key]: [] } } : element
+                            element.id === object.id ? { ...element, data: { ...Object.fromEntries(Object.entries(element.data).filter(([k]) => k !== key)), [key]: [] } } : element
                         )
                     }
                 } else {
@@ -146,7 +146,7 @@ export default function SchemaDataPanel({ obj, onExpand, onDeleteElement, schema
                     schema.Elements = {
                         ...schema.Elements,
                         links: schema.Elements.links.map(element =>
-                            element.id === obj.id ? { ...element, data: { ...Object.fromEntries(Object.entries(element.data).filter(([k]) => k !== key)), [key]: [] } } : element
+                            element.id === object.id ? { ...element, data: { ...Object.fromEntries(Object.entries(element.data).filter(([k]) => k !== key)), [key]: [] } } : element
                         )
                     }
                 }
@@ -184,13 +184,13 @@ export default function SchemaDataPanel({ obj, onExpand, onDeleteElement, schema
                     // eslint-disable-next-line no-param-reassign
                     schema.Elements = {
                         ...schema.Elements,
-                        nodes: [...schema.Elements.nodes, { ...obj as Node, data: { ...obj.data, [newAttribute[0]]: newAttribute[1] } }]
+                        nodes: [...schema.Elements.nodes, { ...object as Node, data: { ...object.data, [newAttribute[0]]: newAttribute[1] } }]
                     }
                 } else {
                     // eslint-disable-next-line no-param-reassign
                     schema.Elements = {
                         ...schema.Elements,
-                        links: [...schema.Elements.links, { ...obj as Link, data: { ...obj.data, [newAttribute[0]]: newAttribute[1] } }]
+                        links: [...schema.Elements.links, { ...object as Link, data: { ...object.data, [newAttribute[0]]: newAttribute[1] } }]
                     }
                 }
                 setAttributes(prev => [...prev, newAttribute])
@@ -227,7 +227,7 @@ export default function SchemaDataPanel({ obj, onExpand, onDeleteElement, schema
     }
 
     const handleAddLabel = async () => {
-        const node = obj as Node
+        const node = object as Node
 
         if (newLabel === "") {
             toast({
@@ -249,16 +249,15 @@ export default function SchemaDataPanel({ obj, onExpand, onDeleteElement, schema
         try {
             setIsLabelLoading(true)
 
-            const result = await securedFetch(`api/schema/${prepareArg(schema.Id)}/${prepareArg(obj.id.toString())}/label`, {
+            const result = await securedFetch(`api/schema/${prepareArg(schema.Id)}/${prepareArg(object.id.toString())}/label`, {
                 method: "POST",
                 body: JSON.stringify({ label: newLabel })
             }, toast)
 
             if (result.ok) {
-                schema.createCategory([newLabel], node)
-                node.category.push(newLabel)
+                schema.addCategory(newLabel, node, false)
                 setCategories([...schema.Categories])
-                setLabel([...label, newLabel])
+                setLabel([...node.category])
                 setNewLabel("")
                 setLabelsEditable(false)
             }
@@ -268,21 +267,19 @@ export default function SchemaDataPanel({ obj, onExpand, onDeleteElement, schema
     }
 
     const handleRemoveLabel = async (removeLabel: string) => {
-        const node = obj as Node
+        const node = object as Node
 
         try {
             setIsRemoveLabelLoading(true)
-            const result = await securedFetch(`api/schema/${prepareArg(schema.Id)}/${prepareArg(obj.id.toString())}/label`, {
+            const result = await securedFetch(`api/schema/${prepareArg(schema.Id)}/${prepareArg(object.id.toString())}/label`, {
                 method: "DELETE",
                 body: JSON.stringify({ label: removeLabel })
             }, toast)
 
             if (result.ok) {
-                schema.Categories.splice(schema.Categories.findIndex(c => c.name === removeLabel), 1)
-                schema.CategoriesMap.delete(removeLabel)
-                node.category.splice(node.category.findIndex(l => l === removeLabel), 1)
+                schema.removeCategory(removeLabel, node, false)
                 setCategories([...schema.Categories])
-                setLabel(prev => prev.filter(l => l !== removeLabel))
+                setLabel([...node.category])
             }
         } finally {
             setIsRemoveLabelLoading(false)
@@ -291,101 +288,96 @@ export default function SchemaDataPanel({ obj, onExpand, onDeleteElement, schema
 
     return (
         <div className="DataPanel">
-            <div className="w-full flex justify-between items-center p-4" id="headerDataPanel">
-                <div className="flex gap-4 items-center">
-                    <Button
-                        onClick={() => onExpand()}
-                    >
-                        <ChevronRight size={20} />
-                    </Button>
-                    {
-                        "source" in obj ?
-                            <p className="px-2 py-1 bg-foreground rounded-full">{label[0]}</p>
-                            :
-                            <ul className="flex flex-wrap gap-4 min-w-[10%]" onMouseEnter={() => setLabelsHover(true)} onMouseLeave={() => setLabelsHover(false)}>
-                                {label.map((l) => (
-                                    <li key={l} className="flex gap-2 px-2 py-1 bg-foreground rounded-full items-center">
-                                        <p>{l}</p>
-                                        {
-                                            session?.user?.role !== "Read-Only" &&
-                                            <Button
-                                                indicator={indicator}
-                                                title="Remove"
-                                                onClick={() => handleRemoveLabel(l)}
-                                                isLoading={isRemoveLabelLoading}
-                                            >
-                                                <X size={15} />
-                                            </Button>
+            <div className="relative w-full flex justify-between items-center p-6" id="headerDataPanel">
+                <Button
+                    className="absolute top-2 right-2"
+                    title="Close"
+                    onClick={() => setObject(undefined)}
+                >
+                    <X size={15} />
+                </Button>
+                <ul className="flex flex-wrap gap-4 min-w-[10%]" onMouseEnter={() => setLabelsHover(true)} onMouseLeave={() => setLabelsHover(false)}>
+                    {label.map((l) => (
+                        <li key={l} className="flex gap-2 px-2 py-1 bg-background rounded-full items-center">
+                            <p>{l}</p>
+                            {
+                                session?.user?.role !== "Read-Only" &&
+                                <Button
+                                    indicator={indicator}
+                                    title="Remove"
+                                    onClick={() => handleRemoveLabel(l)}
+                                    isLoading={isRemoveLabelLoading}
+                                >
+                                    <X size={15} />
+                                </Button>
+                            }
+                        </li>
+                    ))}
+                    <li className="h-8 flex flex-wrap gap-2">
+                        {
+                            type && labelsHover && !labelsEditable && session?.user?.role !== "Read-Only" &&
+                            <Button
+                                className="p-2 text-xs justify-center border border-background"
+                                variant="Secondary"
+                                label="Add"
+                                title="Add a new label"
+                                onClick={() => setLabelsEditable(true)}
+                            >
+                                <Pencil size={15} />
+                            </Button>
+                        }
+                        {
+                            labelsEditable &&
+                            <>
+                                <Input
+                                    ref={ref => ref?.focus()}
+                                    className="max-w-[20dvw] h-full bg-background border-none text-white"
+                                    value={newLabel}
+                                    onChange={(e) => setNewLabel(e.target.value)}
+                                    onKeyDown={(e) => {
+
+                                        if (e.key === "Escape") {
+                                            e.preventDefault()
+                                            setLabelsEditable(false)
+                                            setNewLabel("")
                                         }
-                                    </li>
-                                ))}
-                                <li className="h-8 flex flex-wrap gap-2">
-                                    {
-                                        labelsHover && !labelsEditable && session?.user?.role !== "Read-Only" &&
-                                        <Button
-                                            className="p-2 text-xs justify-center border border-foreground"
-                                            variant="Secondary"
-                                            label="Add"
-                                            title="Add a new label"
-                                            onClick={() => setLabelsEditable(true)}
-                                        >
-                                            <Pencil size={15} />
-                                        </Button>
-                                    }
-                                    {
-                                        labelsEditable &&
-                                        <>
-                                            <Input
-                                                ref={ref => ref?.focus()}
-                                                className="max-w-[20dvw] h-full bg-foreground border-none text-white"
-                                                value={newLabel}
-                                                onChange={(e) => setNewLabel(e.target.value)}
-                                                onKeyDown={(e) => {
 
-                                                    if (e.key === "Escape") {
-                                                        e.preventDefault()
-                                                        setLabelsEditable(false)
-                                                        setNewLabel("")
-                                                    }
+                                        if (e.key !== "Enter" || isLabelLoading || indicator === "offline") return
 
-                                                    if (e.key !== "Enter" || isLabelLoading || indicator === "offline") return
-
-                                                    e.preventDefault()
-                                                    handleAddLabel()
-                                                }}
-                                            />
-                                            <Button
-                                                indicator={indicator}
-                                                className="p-2 text-xs justify-center border border-foreground"
-                                                variant="Secondary"
-                                                label="Save"
-                                                title="Save the new label"
-                                                onClick={() => handleAddLabel()}
-                                                isLoading={isLabelLoading}
-                                            >
-                                                <Check size={15} />
-                                            </Button>
-                                            {
-                                                !isLabelLoading &&
-                                                <Button
-                                                    className="p-2 text-xs justify-center border border-foreground"
-                                                    variant="Secondary"
-                                                    label="Cancel"
-                                                    title="Discard the new label"
-                                                    onClick={() => {
-                                                        setLabelsEditable(false)
-                                                        setNewLabel("")
-                                                    }}
-                                                >
-                                                    <X size={15} />
-                                                </Button>
-                                            }
-                                        </>
-                                    }
-                                </li>
-                            </ul>
-                    }
-                </div>
+                                        e.preventDefault()
+                                        handleAddLabel()
+                                    }}
+                                />
+                                <Button
+                                    indicator={indicator}
+                                    className="p-2 text-xs justify-center border border-background"
+                                    variant="Secondary"
+                                    label="Save"
+                                    title="Save the new label"
+                                    onClick={() => handleAddLabel()}
+                                    isLoading={isLabelLoading}
+                                >
+                                    <Check size={15} />
+                                </Button>
+                                {
+                                    !isLabelLoading &&
+                                    <Button
+                                        className="p-2 text-xs justify-center border border-background"
+                                        variant="Secondary"
+                                        label="Cancel"
+                                        title="Discard the new label"
+                                        onClick={() => {
+                                            setLabelsEditable(false)
+                                            setNewLabel("")
+                                        }}
+                                    >
+                                        <X size={15} />
+                                    </Button>
+                                }
+                            </>
+                        }
+                    </li>
+                </ul>
                 <p className="font-medium text-xl">{attributes.length}&ensp;Attributes</p>
             </div>
             <Table parentClassName="grow">
@@ -689,11 +681,11 @@ export default function SchemaDataPanel({ obj, onExpand, onDeleteElement, schema
                 {
                     session?.user.role !== "Read-Only" &&
                     <DeleteElement
+                        label="Schema"
                         description={`Are you sure you want to delete this ${type ? "Node" : "Relation"}?`}
                         open={deleteOpen}
                         setOpen={setDeleteOpen}
                         onDeleteElement={onDeleteElement}
-                        trigger={<Button label={`Delete ${type ? "Node" : "Relation"}`} variant="Secondary" title="Remove the selected element" />}
                     />
                 }
             </div>
