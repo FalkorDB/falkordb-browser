@@ -2,7 +2,6 @@
 
 import { useEffect, useState, useContext, useCallback, Dispatch, SetStateAction, useRef } from "react";
 import { cn, HistoryQuery, Query, securedFetch, GraphRef } from "@/lib/utils";
-import { useSession } from "next-auth/react";
 import { History, Info, Maximize2, RefreshCcw } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { DialogTitle } from "@/components/ui/dialog";
@@ -10,7 +9,6 @@ import * as monaco from "monaco-editor";
 import { Editor } from "@monaco-editor/react";
 import Combobox from "../components/ui/combobox";
 import Button from "../components/ui/Button";
-import CreateGraph from "../components/CreateGraph";
 import { GraphNameContext, GraphNamesContext, IndicatorContext } from "../components/provider";
 import EditorComponent from "../components/EditorComponent";
 import DialogComponent from "../components/DialogComponent";
