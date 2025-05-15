@@ -37,7 +37,7 @@ export default function NextAuthProvider({ children }: { children: React.ReactNo
                 <GraphContext.Provider value={graphContext}>
                   <GraphNameContext.Provider value={graphNameContext}>
                     <GraphNamesContext.Provider value={graphNamesContext}>
-                      {pathname !== "/" && pathname !== "/login" && <Header graphNames={graphNames} onSetGraphName={setGraphName} />}
+                      {pathname !== "/" && pathname !== "/login" && <Header graphNames={pathname.includes("/schema") ? schemaNames : graphNames} onSetGraphName={pathname.includes("/schema") ? setSchemaName : setGraphName} />}
                       {children}
                     </GraphNamesContext.Provider>
                   </GraphNameContext.Provider>
