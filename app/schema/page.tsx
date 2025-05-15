@@ -7,12 +7,19 @@ import dynamic from "next/dynamic";
 import { ForceGraphMethods } from "react-force-graph-2d";
 import SchemaView from "./SchemaView";
 import { Category, Graph, GraphData, Link, Node } from "../api/graph/model";
-import { GraphContext, GraphNameContext, IndicatorContext } from "../components/provider";
+import { IndicatorContext, SchemaContext, SchemaNameContext, SchemaNamesContext } from "../components/provider";
 
 const Selector = dynamic(() => import("../graph/Selector"), { ssr: false })
 
 export default function Page() {
 
+    const { schemaNames, setSchemaNames } = useContext(SchemaNamesContext)
+    const { schemaName, setSchemaName } = useContext(SchemaNameContext)
+    const { schema, setSchema } = useContext(SchemaContext)
+    const { indicator, setIndicator } = useContext(IndicatorContext)
+    
+    const { toast } = useToast()
+    
     const [selectedElement, setSelectedElement] = useState<Node | Link | undefined>()
     const [selectedElements, setSelectedElements] = useState<(Node | Link)[]>([])
     const [cooldownTicks, setCooldownTicks] = useState<number | undefined>(0)
@@ -23,12 +30,7 @@ export default function Page() {
     const [nodesCount, setNodesCount] = useState<number>(0)
     const [labels, setLabels] = useState<Category[]>([])
     const [categories, setCategories] = useState<Category[]>([])
-
-    const { graph: schema, setGraph: setSchema } = useContext(GraphContext)
-    const { indicator, setIndicator } = useContext(IndicatorContext)
-    const { graphName: schemaName } = useContext(GraphNameContext)
     const [data, setData] = useState<GraphData>(schema.Elements)
-    const { toast } = useToast()
     
     const fetchCount = useCallback(async () => {
         const result = await securedFetch(`api/schema/${prepareArg(schemaName)}/count`, {
@@ -42,6 +44,10 @@ export default function Page() {
         setEdgesCount(json.result.edges)
         setNodesCount(json.result.nodes)
     }, [schemaName, toast, setIndicator])
+
+    const handleCooldown = (ticks?: number) => {
+        setCooldownTicks(ticks)
+    }
 
     useEffect(() => {
         if (!schemaName || indicator === "offline") return
@@ -60,6 +66,7 @@ export default function Page() {
 
             fetchCount()
 
+            handleCooldown()
         }
         run()
     }, [fetchCount, schemaName, toast, setIndicator, indicator])
@@ -122,6 +129,7 @@ export default function Page() {
 
         if (fetchCount) fetchCount()
 
+        handleCooldown()
         setSelectedElement(undefined)
         setSelectedElements([])
         setData({ ...schema.Elements })
@@ -130,6 +138,11 @@ export default function Page() {
     return (
         <div className="Page">
             <Selector
+                graph={schema}
+                options={schemaNames}
+                setOptions={setSchemaNames}
+                graphName={schemaName}
+                setGraphName={setSchemaName}
                 fetchCount={fetchCount}
                 selectedElements={selectedElements}
                 setSelectedElement={setSelectedElement}
@@ -153,7 +166,7 @@ export default function Page() {
                     setIsAddEntity={setIsAddEntity}
                     chartRef={chartRef}
                     cooldownTicks={cooldownTicks}
-                    setCooldownTicks={setCooldownTicks}
+                    handleCooldown={handleCooldown}
                     data={data}
                     setData={setData}
                     handleDeleteElement={handleDeleteElement}

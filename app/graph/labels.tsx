@@ -1,12 +1,12 @@
-import { useContext, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import { ChevronDown, ChevronUp } from "lucide-react";
-import { Category } from "../api/graph/model";
+import { Category, Graph } from "../api/graph/model";
 import Button from "../components/ui/Button";
-import { GraphContext } from "../components/provider";
 
 /* eslint-disable react/require-default-props */
 interface Props {
+    graph: Graph,
     categories: Category[],
     onClick: (category: Category) => void,
     label: "RelationshipTypes" | "Labels",
@@ -14,13 +14,13 @@ interface Props {
     className?: string,
 }
 
-export default function Labels({ categories, onClick, label, type, className = "" }: Props) {
+export default function Labels({ graph, categories, onClick, label, type, className = "" }: Props) {
+
+    const listRef = useRef<HTMLUListElement>(null)
 
     // fake state to force reload
     const [, setReload] = useState(false)
-    const listRef = useRef<HTMLUListElement>(null)
     const isScrollable = listRef.current && listRef.current.scrollHeight > listRef.current.clientHeight
-    const { graph } = useContext(GraphContext)
 
     const handleScroll = (scrollTo: number) => {
         listRef.current?.scrollBy({

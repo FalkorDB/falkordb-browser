@@ -29,19 +29,21 @@ export const OPTIONS = ["String", "Integer", "Float", "Geospatial", "Boolean"]
 export const getDefaultAttribute = (): [string, string[]] => ["", ["", "", "false", "false"]]
 
 export default function SchemaCreateElement({ onCreate, setIsAdd, selectedNodes, setSelectedNodes, type }: Props) {
-
-  const [attributes, setAttributes] = useState<[string, string[]][]>([])
+  
+  const { indicator } = useContext(IndicatorContext)
+  
+  const { toast } = useToast()
+  
   const [newAttribute, setNewAttribute] = useState<[string, string[]]>(getDefaultAttribute())
   const [attribute, setAttribute] = useState<[string, string[]]>(getDefaultAttribute())
-  const [label, setLabel] = useState<string[]>([])
-  const [newLabel, setNewLabel] = useState<string>("")
-  const [editable, setEditable] = useState<string>("")
-  const [hover, setHover] = useState<string>("")
-  const [isLoading, setIsLoading] = useState<boolean>(false)
+  const [attributes, setAttributes] = useState<[string, string[]][]>([])
   const [labelsHover, setLabelsHover] = useState<boolean>(false)
   const [isAddLabel, setIsAddLabel] = useState<boolean>(false)
-  const { toast } = useToast()
-  const { indicator } = useContext(IndicatorContext)
+  const [isLoading, setIsLoading] = useState<boolean>(false)
+  const [newLabel, setNewLabel] = useState<string>("")
+  const [editable, setEditable] = useState<string>("")
+  const [label, setLabel] = useState<string[]>([])
+  const [hover, setHover] = useState<string>("")
 
   const handleSetEditable = (att: [string, string[]] = getDefaultAttribute()) => {
     setAttribute(att)

@@ -1,20 +1,23 @@
-import { cn, createNestedObject, prepareArg, Query, securedFetch } from "@/lib/utils";
+import { cn, createNestedObject, prepareArg, securedFetch } from "@/lib/utils";
 import { JSONTree } from "react-json-tree";
 import { useContext, useState } from "react";
 import { Info } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import Button from "../components/ui/Button";
-import { GraphNameContext, IndicatorContext } from "../components/provider";
+import { IndicatorContext } from "../components/provider";
+import { Query } from "../api/graph/model";
 
-export default function MetadataView({ query, fetchCount, className = "" }: {
+export default function MetadataView({ graphName, query, fetchCount, className = "" }: {
+    graphName: string,
     query: Query,
     fetchCount: () => void,
     className?: string
 }) {
-    const [profile, setProfile] = useState<string[]>([])
     const { indicator, setIndicator } = useContext(IndicatorContext)
-    const { graphName } = useContext(GraphNameContext)
+
     const { toast } = useToast()
+
+    const [profile, setProfile] = useState<string[]>([])
 
     const handleProfile = async () => {
         const result = await securedFetch(`/api/graph/${graphName}/profile?query=${prepareArg(query.text)}`, {

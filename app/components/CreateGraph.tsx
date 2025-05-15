@@ -38,10 +38,12 @@ export default function CreateGraph({
 }: Props) {
 
     const { indicator, setIndicator } = useContext(IndicatorContext)
+    
+    const { toast } = useToast()
+    
+    const [isLoading, setIsLoading] = useState(false)
     const [graphName, setGraphName] = useState("")
     const [open, setOpen] = useState(false)
-    const [isLoading, setIsLoading] = useState(false)
-    const { toast } = useToast()
 
     const handleCreateGraph = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault()

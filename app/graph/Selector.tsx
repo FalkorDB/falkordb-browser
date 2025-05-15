@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState, useContext, useCallback, Dispatch, SetStateAction, useRef } from "react";
-import { cn, HistoryQuery, Query, securedFetch, GraphRef } from "@/lib/utils";
+import { cn, securedFetch, GraphRef } from "@/lib/utils";
 import { useSession } from "next-auth/react";
 import { History, Info, Maximize2, RefreshCcw } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
@@ -11,15 +11,20 @@ import { Editor } from "@monaco-editor/react";
 import Combobox from "../components/ui/combobox";
 import Button from "../components/ui/Button";
 import CreateGraph from "../components/CreateGraph";
-import { GraphNameContext, GraphNamesContext, IndicatorContext } from "../components/provider";
+import { IndicatorContext } from "../components/provider";
 import EditorComponent from "../components/EditorComponent";
 import DialogComponent from "../components/DialogComponent";
 import Input from "../components/ui/Input";
 import MetadataView from "./MetadataView";
 import Toolbar from "./toolbar";
-import { Node, Link } from "../api/graph/model";
+import { Node, Link, Graph, Query, HistoryQuery } from "../api/graph/model";
 
 interface Props {
+    graph: Graph
+    options: string[]
+    setOptions: Dispatch<SetStateAction<string[]>>
+    graphName: string
+    setGraphName: Dispatch<SetStateAction<string>>
     runQuery?: (query: string) => Promise<void>
     historyQuery?: HistoryQuery
     setHistoryQuery?: Dispatch<SetStateAction<HistoryQuery>>
@@ -32,28 +37,29 @@ interface Props {
     setIsAddRelation?: Dispatch<SetStateAction<boolean>>
 }
 
-export default function Selector({ runQuery, historyQuery, setHistoryQuery, fetchCount, selectedElements, setSelectedElement, handleDeleteElement, chartRef, setIsAddEntity, setIsAddRelation }: Props) {
+export default function Selector({ graph, options, setOptions, graphName, setGraphName, runQuery, historyQuery, setHistoryQuery, fetchCount, selectedElements, setSelectedElement, handleDeleteElement, chartRef, setIsAddEntity, setIsAddRelation }: Props) {
 
-    const [search, setSearch] = useState("")
-    const [maximize, setMaximize] = useState(false)
-    const [isRotating, setIsRotating] = useState(false);
-    const [queriesOpen, setQueriesOpen] = useState(false)
-    const [filteredQueries, setFilteredQueries] = useState<Query[]>([])
-
-    const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null)
-
-    const { toast } = useToast()
-    const { data: session } = useSession()
     const { indicator, setIndicator } = useContext(IndicatorContext)
-    const { graphName, setGraphName } = useContext(GraphNameContext)
-    const { graphNames: options, setGraphNames: setOptions } = useContext(GraphNamesContext)
+    const { data: session } = useSession()
+    
+    const { toast } = useToast()
+    
+    const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null)
+    
+    const [filteredQueries, setFilteredQueries] = useState<Query[]>([])
+    const [queriesOpen, setQueriesOpen] = useState(false)
+    const [isRotating, setIsRotating] = useState(false);
+    const [maximize, setMaximize] = useState(false)
+    const [search, setSearch] = useState("")
+
+
 
     const type = runQuery && historyQuery && setHistoryQuery ? "Graph" : "Schema"
 
     const handleOnChange = useCallback(async (name: string) => {
         const formattedName = name === '""' ? "" : name
         setGraphName(formattedName)
-    }, [setGraphName, setIndicator, toast, type])
+    }, [setGraphName])
 
     const getOptions = useCallback(async () => {
         if (indicator === "offline") return
@@ -176,6 +182,7 @@ export default function Selector({ runQuery, historyQuery, setHistoryQuery, fetc
                     <>
                         <div className="h-[56px] w-full relative overflow-visible">
                             <EditorComponent
+                                graph={graph}
                                 maximize={maximize}
                                 setMaximize={setMaximize}
                                 runQuery={runQuery}
@@ -283,7 +290,7 @@ export default function Selector({ runQuery, historyQuery, setHistoryQuery, fetc
                                                 </ul>
                                             </div>
                                             <div className="w-1 grow">
-                                                {historyQuery && historyQuery.queries.length > 0 && historyQuery.counter ? <MetadataView query={historyQuery.queries[historyQuery.counter - 1]} fetchCount={fetchCount} /> : undefined}
+                                                {historyQuery && historyQuery.queries.length > 0 && historyQuery.counter ? <MetadataView graphName={graphName} query={historyQuery.queries[historyQuery.counter - 1]} fetchCount={fetchCount} /> : undefined}
                                             </div>
                                         </div>
                                     </div>
@@ -301,6 +308,7 @@ export default function Selector({ runQuery, historyQuery, setHistoryQuery, fetc
                     </>
                     : <div className="w-full h-[56px]">
                         <Toolbar
+                            graph={graph}
                             label={type}
                             selectedElements={selectedElements}
                             setSelectedElement={setSelectedElement}

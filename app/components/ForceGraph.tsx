@@ -9,10 +9,11 @@ import ForceGraph2D from "react-force-graph-2d"
 import { securedFetch, GraphRef, handleZoomToFit } from "@/lib/utils"
 import { useToast } from "@/components/ui/use-toast"
 import * as d3 from "d3"
-import { GraphData, Link, Node, Category } from "../api/graph/model"
-import { IndicatorContext, GraphContext } from "./provider"
+import { GraphData, Link, Node, Category, Graph } from "../api/graph/model"
+import { IndicatorContext } from "./provider"
 
 interface Props {
+    graph: Graph
     chartRef: GraphRef
     data: GraphData
     setData: Dispatch<SetStateAction<GraphData>>
@@ -34,6 +35,7 @@ const NODE_SIZE = 6
 const PADDING = 2;
 
 export default function ForceGraph({
+    graph,
     chartRef,
     data,
     setData,
@@ -51,14 +53,16 @@ export default function ForceGraph({
     setLabels
 }: Props) {
 
-    const [parentWidth, setParentWidth] = useState<number>(0)
-    const [parentHeight, setParentHeight] = useState<number>(0)
-    const [hoverElement, setHoverElement] = useState<Node | Link | undefined>()
-    const parentRef = useRef<HTMLDivElement>(null)
-    const lastClick = useRef<{ date: Date, name: string }>({ date: new Date(), name: "" })
-    const { toast } = useToast()
     const { indicator, setIndicator } = useContext(IndicatorContext)
-    const { graph } = useContext(GraphContext)
+
+    const { toast } = useToast()
+
+    const lastClick = useRef<{ date: Date, name: string }>({ date: new Date(), name: "" })
+    const parentRef = useRef<HTMLDivElement>(null)
+
+    const [hoverElement, setHoverElement] = useState<Node | Link | undefined>()
+    const [parentHeight, setParentHeight] = useState<number>(0)
+    const [parentWidth, setParentWidth] = useState<number>(0)
 
     useEffect(() => {
         const handleResize = () => {
@@ -369,7 +373,7 @@ export default function ForceGraph({
                 onEngineStop={() => {
                     if (cooldownTicks === 0) return
                     handleCooldown(0)
-                    handleZoomToFit(chartRef)
+                    handleZoomToFit(chartRef, undefined, data.nodes.length < 2 ? 4 : undefined)
                 }}
                 linkCurvature="curve"
                 nodeVisibility="visible"

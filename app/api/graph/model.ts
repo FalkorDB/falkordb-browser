@@ -6,6 +6,19 @@ import { EdgeDataDefinition, NodeDataDefinition } from 'cytoscape';
 import { LinkObject, NodeObject } from 'react-force-graph-2d';
 import { Dispatch, SetStateAction } from 'react';
 
+export type HistoryQuery = {
+    queries: Query[]
+    query: string
+    currentQuery: string
+    counter: number
+}
+
+export type Query = {
+    text: string
+    metadata: string[]
+    explain: string[]
+  }
+
 const getSchemaValue = (value: string): string[] => {
     let unique, required, type, description
     if (value.includes("!")) {
@@ -120,6 +133,8 @@ export class Graph {
 
     private metadata: any[];
 
+    private currentQuery: Query;
+
     private categories: Category[];
 
     private labels: Category[];
@@ -139,11 +154,12 @@ export class Graph {
     private COLORS_ORDER_VALUE: string[] = []
 
     private constructor(id: string, categories: Category[], labels: Category[], elements: GraphData,
-        categoriesMap: Map<string, Category>, labelsMap: Map<string, Category>, nodesMap: Map<number, Node>, edgesMap: Map<number, Link>, colors?: string[]) {
+        categoriesMap: Map<string, Category>, labelsMap: Map<string, Category>, nodesMap: Map<number, Node>, edgesMap: Map<number, Link>, currentQuery?: Query, colors: string[] = []) {
         this.id = id;
         this.columns = [];
         this.data = [];
         this.metadata = [];
+        this.currentQuery = currentQuery || { text: "", metadata: [], explain: [] };
         this.categories = categories;
         this.labels = labels;
         this.elements = elements;
@@ -156,6 +172,10 @@ export class Graph {
 
     get Id(): string {
         return this.id;
+    }
+
+    get CurrentQuery(): Query {
+        return this.currentQuery;
     }
 
     get Categories(): Category[] {
@@ -226,12 +246,12 @@ export class Graph {
         return [...this.elements.nodes, ...this.elements.links]
     }
 
-    public static empty(graphName?: string, colors?: string[]): Graph {
-        return new Graph(graphName || "", [], [], { nodes: [], links: [] }, new Map<string, Category>(), new Map<string, Category>(), new Map<number, Node>(), new Map<number, Link>(), colors)
+    public static empty(graphName?: string, colors?: string[], currentQuery?: Query): Graph {
+        return new Graph(graphName || "", [], [], { nodes: [], links: [] }, new Map<string, Category>(), new Map<string, Category>(), new Map<number, Node>(), new Map<number, Link>(), currentQuery, colors)
     }
 
-    public static create(id: string, results: { data: Data, metadata: any[] }, isCollapsed: boolean, isSchema: boolean, colors?: string[],): Graph {
-        const graph = Graph.empty(undefined, colors)
+    public static create(id: string, results: { data: Data, metadata: any[] }, isCollapsed: boolean, isSchema: boolean, colors?: string[], currentQuery?: Query): Graph {
+        const graph = Graph.empty(undefined, colors, currentQuery)
         graph.extend(results, isCollapsed, isSchema)
         graph.id = id
         return graph
@@ -622,7 +642,7 @@ export class Graph {
         }
 
         selectedElement.category.splice(selectedElement.category.findIndex(l => l === label), 1)
-        
+
         if (selectedElement.category.length === 0) {
             const [emptyCategory] = this.createCategory([""], selectedElement)
             selectedElement.category.push(emptyCategory.name)

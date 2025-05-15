@@ -9,13 +9,15 @@ import { SetStateAction, Dispatch, useEffect, useRef, useState, useContext } fro
 import * as monaco from "monaco-editor";
 import { Minimize2 } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
-import { HistoryQuery, prepareArg, securedFetch } from "@/lib/utils";
+import { prepareArg, securedFetch } from "@/lib/utils";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import Button from "./ui/Button";
 import CloseDialog from "./CloseDialog";
-import { IndicatorContext, GraphContext } from "./provider";
+import { IndicatorContext } from "./provider";
+import { Graph, HistoryQuery } from "../api/graph/model";
 
 interface Props {
+    graph: Graph
     historyQuery: HistoryQuery
     maximize: boolean
     setMaximize: Dispatch<SetStateAction<boolean>>
@@ -195,21 +197,23 @@ const LINE_HEIGHT = 38
 
 const PLACEHOLDER = "Type your query here to start"
 
-export default function EditorComponent({ historyQuery, maximize, setMaximize, runQuery, setHistoryQuery }: Props) {
+export default function EditorComponent({ graph, historyQuery, maximize, setMaximize, runQuery, setHistoryQuery }: Props) {
 
-    const placeholderRef = useRef<HTMLDivElement>(null)
-    const [lineNumber, setLineNumber] = useState(1)
-    const [blur, setBlur] = useState(false)
-    const [sugDisposed, setSugDisposed] = useState<monaco.IDisposable>()
-    const [isLoading, setIsLoading] = useState(false)
-    const { toast } = useToast()
     const { indicator, setIndicator } = useContext(IndicatorContext)
-    const { graph } = useContext(GraphContext)
-    const graphIdRef = useRef(graph.Id)
-    const submitQuery = useRef<HTMLButtonElement>(null)
+    
+    const { toast } = useToast()
+
     const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null)
+    const placeholderRef = useRef<HTMLDivElement>(null)
+    const submitQuery = useRef<HTMLButtonElement>(null)
     const containerRef = useRef<HTMLDivElement>(null)
     const indicatorRef = useRef(indicator)
+    const graphIdRef = useRef(graph.Id)
+    
+    const [sugDisposed, setSugDisposed] = useState<monaco.IDisposable>()
+    const [isLoading, setIsLoading] = useState(false)
+    const [lineNumber, setLineNumber] = useState(1)
+    const [blur, setBlur] = useState(false)
 
     useEffect(() => {
         indicatorRef.current = indicator
