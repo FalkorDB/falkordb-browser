@@ -43,7 +43,6 @@ export default function Selector({ runQuery, historyQuery, setHistoryQuery, fetc
     const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null)
 
     const { toast } = useToast()
-    const { data: session } = useSession()
     const { indicator, setIndicator } = useContext(IndicatorContext)
     const { graphName, setGraphName } = useContext(GraphNameContext)
     const { graphNames: options, setGraphNames: setOptions } = useContext(GraphNamesContext)
@@ -139,17 +138,6 @@ export default function Selector({ runQuery, historyQuery, setHistoryQuery, fetc
 
     return (
         <div className="z-20 absolute top-5 inset-x-24 h-[56px] flex flex-row gap-4 items-center">
-            {
-                session?.user?.role !== "Read-Only" &&
-                <CreateGraph
-                    type={type}
-                    graphNames={options}
-                    onSetGraphName={(name) => {
-                        handleOnChange(name)
-                        setOptions(prev => [...prev, name])
-                    }}
-                />
-            }
             <div className="p-2 border rounded-lg overflow-hidden bg-foreground">
                 <Button
                     data-testid={`reload${type}sList`}
