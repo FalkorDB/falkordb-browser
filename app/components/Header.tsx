@@ -101,7 +101,7 @@ export default function Header({ onSetGraphName, graphNames }: Props) {
                             </ul>
                         </DropdownMenuContent>
                     </DropdownMenu>
-                    <DrawerContent side="right" className="bg-popover gap-4 items-center text-foreground" id="about">
+                    <DrawerContent side="right" className="bg-popover-foreground gap-4 items-center text-foreground" id="about">
                         <VisuallyHidden>
                             <DrawerTitle />
                             <DrawerDescription />
