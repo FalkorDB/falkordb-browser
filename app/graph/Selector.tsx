@@ -11,12 +11,12 @@ import { Editor } from "@monaco-editor/react";
 import Combobox from "../components/ui/combobox";
 import Button from "../components/ui/Button";
 import { IndicatorContext } from "../components/provider";
-import EditorComponent from "../components/EditorComponent";
+import EditorComponent, { setTheme } from "../components/EditorComponent";
 import DialogComponent from "../components/DialogComponent";
-import Input from "../components/ui/Input";
 import Toolbar from "./toolbar";
 import { Node, Link, Graph, Query, HistoryQuery } from "../api/graph/model";
 import { Explain, Metadata, Profile } from "./MetadataView";
+import PaginationList from "../components/PaginationList";
 
 interface Props {
     graph: Graph
@@ -48,20 +48,13 @@ export default function Selector({ graph, options, setOptions, graphName, setGra
 
     const { toast } = useToast()
 
-    const [filteredQueries, setFilteredQueries] = useState<Query[]>([])
     const [queriesOpen, setQueriesOpen] = useState(false)
     const [isRotating, setIsRotating] = useState(false);
     const [isLoading, setIsLoading] = useState(false)
-    const [stepCounter, setStepCounter] = useState(0)
     const [maximize, setMaximize] = useState(false)
-    const [search, setSearch] = useState("")
     const [tab, setTab] = useState("")
 
     const type = runQuery && historyQuery && setHistoryQuery ? "Graph" : "Schema"
-    const pageCount = Math.ceil(filteredQueries.length / STEP)
-    const startIndex = stepCounter ? stepCounter * STEP : 0
-    const endIndex = startIndex + STEP
-    const items = filteredQueries.slice(startIndex, Math.min(endIndex, filteredQueries.length))
 
     useEffect(() => {
         if (!currentQuery) {
@@ -70,10 +63,6 @@ export default function Selector({ graph, options, setOptions, graphName, setGra
             setTab("profile")
         }
     }, [currentQuery])
-
-    useEffect(() => {
-        setStepCounter(0)
-    }, [historyQuery?.queries])
 
     const handleOnChange = useCallback(async (name: string) => {
         const formattedName = name === '""' ? "" : name
@@ -122,27 +111,6 @@ export default function Selector({ graph, options, setOptions, graphName, setGra
             }
         }
     };
-
-    useEffect(() => {
-        const timeout = setTimeout(() => {
-            if (!historyQuery || !setHistoryQuery) return
-            const newFilteredQueries = historyQuery.queries?.filter((query) => !search || query.text.toLowerCase().includes(search.toLowerCase())).reverse() || []
-            setFilteredQueries(newFilteredQueries)
-            if (newFilteredQueries.every(q => q.text !== historyQuery.query)) {
-                setHistoryQuery(prev => ({
-                    ...prev,
-                    counter: 0
-                }))
-            }
-            focusEditorAtEnd()
-            setStepCounter(0)
-        }, 500)
-
-        return () => {
-            clearTimeout(timeout)
-        }
-    }, [historyQuery?.queries, search])
-
 
     const handleEditorDidMount = (e: monaco.editor.IStandaloneCodeEditor) => {
         editorRef.current = e
@@ -250,60 +218,30 @@ export default function Selector({ graph, options, setOptions, graphName, setGra
                                     title="Query History"
                                 >
                                     <div className="h-1 grow flex gap-8 p-8">
-                                        <div className="w-[40%] flex flex-col gap-8">
-                                            <Input
-                                                data-testid="queryHistorySearch"
-                                                className="w-full bg-foreground text-white"
-                                                value={search}
-                                                placeholder="Search for a query"
-                                                onChange={(e) => setSearch(e.target.value)}
-                                            />
-                                            <div className="h-1 grow flex flex-col justify-between bg-background rounded-lg">
-                                                <ul
-                                                    data-testid="queryHistoryList"
-                                                    className="flex flex-col p-8"
-                                                >
-                                                    {
-                                                        historyQuery && filteredQueries.length > 0 && items.map((query: Query, index) => (
-                                                            // eslint-disable-next-line react/no-array-index-key
-                                                            <li key={index} className="border-b py-4">
-                                                                <Button
-                                                                    ref={submitQuery}
-                                                                    data-testid={`queryHistoryButton${index}`}
-                                                                    className={cn("w-full text-xl", historyQuery.queries.findIndex(q => q.text === query.text) + 1 === historyQuery.counter ? "text-white" : "text-gray-500")}
-                                                                    label={query.text}
-                                                                    onClick={() => {
-                                                                        setHistoryQuery(prev => ({
-                                                                            ...prev,
-                                                                            counter: historyQuery.queries.findIndex(q => q.text === query.text) + 1
-                                                                        }))
-                                                                        setTab("query")
-                                                                    }}
-                                                                />
-                                                            </li>
-                                                        ))
-                                                    }
-                                                </ul>
-                                                <ul className="flex gap-6 p-4 items-center justify-center">
-                                                    <li className="flex gap-4">
-                                                        <Button disabled={stepCounter < 4} label="<<" title="Previous 5 pages" onClick={() => setStepCounter(prev => prev > 4 ? prev - 5 : prev)} />
-                                                        <Button disabled={stepCounter === 0} label="<" title="Previous page" onClick={() => setStepCounter(prev => prev > 0 ? prev - 1 : prev)} />
-                                                    </li>
-                                                    {
-                                                        Array(pageCount).fill(0).map((_, index) => index).slice(stepCounter ? stepCounter - 1 : 0, Math.min(stepCounter + STEP, pageCount)).map((index) => (
-                                                            // eslint-disable-next-line react/no-array-index-key
-                                                            <li key={index}>
-                                                                <Button className={cn(index === stepCounter ? "text-white" : "text-gray-500")} label={`[${index + 1}]`} title={`Page ${index + 1}`} onClick={() => setStepCounter(index)} />
-                                                            </li>
-                                                        ))
-                                                    }
-                                                    <li className="flex gap-4">
-                                                        <Button disabled={stepCounter > pageCount - 2} label=">" title="Next page" onClick={() => setStepCounter(prev => prev < pageCount - 1 ? prev + 1 : prev)} />
-                                                        <Button disabled={stepCounter > pageCount - 6} label=">>" title="Next 5 pages" onClick={() => setStepCounter(prev => prev < pageCount - 5 ? prev + 5 : prev)} />
-                                                    </li>
-                                                </ul>
-                                            </div>
-                                        </div>
+                                        <PaginationList
+                                            className="w-[40%] bg-background rounded-lg"
+                                            isSelected={(item) => historyQuery.queries.findIndex(q => q.text === item.text) + 1 === historyQuery.counter}
+                                            afterSearchCallback={(newFilteredList) => {
+                                                if (newFilteredList.every(q => q.text !== historyQuery.query)) {
+                                                    setHistoryQuery(prev => ({
+                                                        ...prev,
+                                                        counter: 0
+                                                    }))
+                                                }
+                                                focusEditorAtEnd()
+                                            }}
+                                            dataTestId="queryHistory"
+                                            list={historyQuery.queries.reverse()}
+                                            step={STEP}
+                                            onClick={(counter) => {
+                                                setHistoryQuery(prev => ({
+                                                    ...prev,
+                                                    counter: historyQuery.queries.findIndex(q => q.text === counter) + 1
+                                                }))
+                                                
+                                                setTab("query")
+                                            }}
+                                        />
                                         <Tabs value={tab} onValueChange={setTab} className="w-[60%] flex flex-col gap-8 items-center">
                                             <TabsList className="bg-black h-fit w-fit p-2">
                                                 <TabsTrigger className={cn("!text-gray-500 data-[state=active]:!bg-background data-[state=active]:!text-white")} disabled={!historyQuery.query} value="query">Edit Query</TabsTrigger>
@@ -328,7 +266,7 @@ export default function Selector({ graph, options, setOptions, graphName, setGra
                                                     width="100%"
                                                     height="100%"
                                                     language="cypher"
-                                                    theme="custom-theme"
+                                                    theme="selector-theme"
                                                     options={{
                                                         lineHeight: 30,
                                                         fontSize: 25,
@@ -346,6 +284,9 @@ export default function Selector({ graph, options, setOptions, graphName, setGra
                                                         query: value || ""
                                                     }))}
                                                     onMount={handleEditorDidMount}
+                                                    beforeMount={(m) => {
+                                                        setTheme(m, "selector-theme", "#242424")
+                                                    }}
                                                 />
                                             </TabsContent>
                                             <TabsContent className="w-full h-1 grow bg-background rounded-lg p-8" value="profile">

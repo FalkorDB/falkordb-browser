@@ -16,6 +16,31 @@ import CloseDialog from "./CloseDialog";
 import { IndicatorContext } from "./provider";
 import { Graph, HistoryQuery } from "../api/graph/model";
 
+export const setTheme = (monacoI: Monaco, themeName: string, backgroundColor: string) => {
+    monacoI.editor.defineTheme(themeName, {
+        base: 'vs-dark',
+        inherit: true,
+        rules: [
+            { token: 'keyword', foreground: '#99E4E5' },
+            { token: 'function', foreground: '#DCDCAA' },
+            { token: 'type', foreground: '#89D86D' },
+            { token: 'string', foreground: '#CE9178' },
+            { token: 'number', foreground: '#b5cea8' },
+        ],
+        colors: {
+            'editor.background': backgroundColor,
+            'editor.foreground': '#ffffff',
+            'editorSuggestWidget.background': '#272745',
+            'editorSuggestWidget.foreground': '#FFFFFF',
+            'editorSuggestWidget.selectedBackground': '#57577B',
+            'editorSuggestWidget.hoverBackground': '#28283F',
+            'focusBorder': '#00000000',
+        },
+    });
+
+    monacoI.editor.setTheme(themeName)
+}
+
 interface Props {
     graph: Graph
     historyQuery: HistoryQuery
@@ -373,31 +398,6 @@ export default function EditorComponent({ graph, historyQuery, maximize, setMaxi
         }
     }, [monacoEditor, graphIdRef.current])
 
-    const setTheme = (monacoI: Monaco) => {
-        monacoI.editor.defineTheme('custom-theme', {
-            base: 'vs-dark',
-            inherit: true,
-            rules: [
-                { token: 'keyword', foreground: '#99E4E5' },
-                { token: 'function', foreground: '#DCDCAA' },
-                { token: 'type', foreground: '#89D86D' },
-                { token: 'string', foreground: '#CE9178' },
-                { token: 'number', foreground: '#b5cea8' },
-            ],
-            colors: {
-                'editor.background': '#191919',
-                'editor.foreground': '#ffffff',
-                'editorSuggestWidget.background': '#272745',
-                'editorSuggestWidget.foreground': '#FFFFFF',
-                'editorSuggestWidget.selectedBackground': '#57577B',
-                'editorSuggestWidget.hoverBackground': '#28283F',
-                'focusBorder': '#00000000',
-            },
-        });
-
-        monacoI.editor.setTheme('custom-theme')
-    }
-
     const handleSubmit = async () => {
         try {
             setIsLoading(true)
@@ -437,7 +437,7 @@ export default function EditorComponent({ graph, historyQuery, maximize, setMaxi
             ignoreCase: true,
         })
 
-        setTheme(monacoI)
+        setTheme(monacoI, "editor-theme", "#191919")
 
         monacoI.languages.setLanguageConfiguration('custom-language', {
             brackets: [
@@ -621,7 +621,7 @@ export default function EditorComponent({ graph, historyQuery, maximize, setMaxi
                                 }))
                             }
                         }}
-                        theme="custom-theme"
+                        theme="editor-theme"
                         beforeMount={handleEditorWillMount}
                         onMount={handleEditorDidMount}
                     />
