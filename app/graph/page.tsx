@@ -25,8 +25,8 @@ export default function Page() {
     const [currentQuery, setCurrentQuery] = useState<Query>()
     const [nodesCount, setNodesCount] = useState(0)
     const [edgesCount, setEdgesCount] = useState(0)
-    const [labels, setLabels] = useState<Category[]>([])
-    const [categories, setCategories] = useState<Category[]>([])
+    const [labels, setLabels] = useState<Category<Link>[]>([])
+    const [categories, setCategories] = useState<Category<Node>[]>([])
 
     const chartRef = useRef<ForceGraphMethods<Node, Link>>()
 

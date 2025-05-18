@@ -23,7 +23,7 @@ interface Props {
     object: Node | Link;
     setObject: Dispatch<SetStateAction<Node | Link | undefined>>;
     onDeleteElement: () => Promise<void>;
-    setCategories: Dispatch<SetStateAction<Category[]>>;
+    setCategories: Dispatch<SetStateAction<Category<Node>[]>>;
 }
 
 export default function GraphDataPanel({ object, setObject, onDeleteElement, setCategories }: Props) {
