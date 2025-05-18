@@ -17,6 +17,7 @@ import MetadataView from "./MetadataView";
 import Toolbar from "./toolbar";
 import Controls from "./controls";
 import GraphDataPanel from "./GraphDataPanel";
+import GraphDetails from "./GraphDetails";
 
 const ForceGraph = dynamic(() => import("../components/ForceGraph"), { ssr: false });
 
@@ -126,83 +127,64 @@ function GraphView({
 
     return (
         <Tabs value={tabsValue} className="h-full w-full relative border rounded-lg overflow-hidden">
-            <div className="absolute bottom-4 inset-x-12 pointer-events-none z-10 flex justify-between items-center">
-                <div className="w-1 grow flex gap-2">
-                    {
-                        graph.Id && tabsValue === "Graph" &&
-                        <>
-                            <p
-                                data-testid="nodesCount"
-                                className="Gradient bg-clip-text text-transparent"
-                            >
-                                Nodes: {nodesCount}
-                            </p>
-                            <p
-                                data-testid="edgesCount"
-                                className="Gradient bg-clip-text text-transparent"
-                            >
-                                Edges: {edgesCount}
-                            </p>
-                        </>
-                    }
-                </div>
-                <div className="w-1 grow flex justify-center">
-                    <TabsList className="bg-transparent flex gap-2 pointer-events-auto">
-                        <TabsTrigger
-                            data-testid="graphTab"
-                            asChild
-                            value="Graph"
-                        >
-                            <Button
-                                disabled={graph.getElements().length === 0}
-                                className="tabs-trigger"
-                                onClick={() => setTabsValue("Graph")}
-                                title="Graph"
-                            >
-                                <GitGraph />
-                            </Button>
-                        </TabsTrigger>
-                        <TabsTrigger
-                            data-testid="tableTab"
-                            asChild
-                            value="Table"
-                        >
-                            <Button
-                                disabled={graph.Data.length === 0}
-                                className="tabs-trigger"
-                                onClick={() => setTabsValue("Table")}
-                                title="Table"
-                            >
-                                <Table />
-                            </Button>
-                        </TabsTrigger>
-                        <TabsTrigger
-                            data-testid="metadataTab"
-                            asChild
-                            value="Metadata"
-                        >
-                            <Button
-                                disabled={!currentQuery || currentQuery.metadata.length === 0 || currentQuery.explain.length === 0 || graph.Metadata.length === 0}
-                                className="tabs-trigger"
-                                onClick={() => setTabsValue("Metadata")}
-                                title="Metadata"
-                            >
-                                <Info />
-                            </Button>
-                        </TabsTrigger>
-                    </TabsList>
-                </div>
-                <div className="w-1 grow flex justify-end">
-                    {
-                        graph.getElements().length > 0 && tabsValue === "Graph" &&
-                        <Controls
-                            chartRef={chartRef}
+            <div className="absolute bottom-4 inset-x-12 pointer-events-none z-10 flex gap-4 justify-between items-center">
+                <GraphDetails
+                    graph={graph}
+                    tabsValue={tabsValue}
+                    nodesCount={nodesCount}
+                    edgesCount={edgesCount}
+                />
+                <TabsList className="bg-transparent flex gap-2 pointer-events-auto">
+                    <TabsTrigger
+                        data-testid="graphTab"
+                        asChild
+                        value="Graph"
+                    >
+                        <Button
                             disabled={graph.getElements().length === 0}
-                            handleCooldown={handleCooldown}
-                            cooldownTicks={cooldownTicks}
-                        />
-                    }
-                </div>
+                            className="tabs-trigger"
+                            onClick={() => setTabsValue("Graph")}
+                            title="Graph"
+                        >
+                            <GitGraph />
+                        </Button>
+                    </TabsTrigger>
+                    <TabsTrigger
+                        data-testid="tableTab"
+                        asChild
+                        value="Table"
+                    >
+                        <Button
+                            disabled={graph.Data.length === 0}
+                            className="tabs-trigger"
+                            onClick={() => setTabsValue("Table")}
+                            title="Table"
+                        >
+                            <Table />
+                        </Button>
+                    </TabsTrigger>
+                    <TabsTrigger
+                        data-testid="metadataTab"
+                        asChild
+                        value="Metadata"
+                    >
+                        <Button
+                            disabled={!currentQuery || currentQuery.metadata.length === 0 || currentQuery.explain.length === 0 || graph.Metadata.length === 0}
+                            className="tabs-trigger"
+                            onClick={() => setTabsValue("Metadata")}
+                            title="Metadata"
+                        >
+                            <Info />
+                        </Button>
+                    </TabsTrigger>
+                </TabsList>
+                <Controls
+                    tabsValue={tabsValue}
+                    chartRef={chartRef}
+                    disabled={graph.getElements().length === 0}
+                    handleCooldown={handleCooldown}
+                    cooldownTicks={cooldownTicks}
+                />
             </div>
             <TabsContent value="Graph" className="h-full w-full mt-0 overflow-hidden">
                 <ForceGraph

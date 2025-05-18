@@ -12,6 +12,7 @@ import { Category, Link, Node, GraphData } from "../api/graph/model"
 import CreateElement from "./SchemaCreateElement"
 import { IndicatorContext, GraphContext } from "../components/provider"
 import Controls from "../graph/controls"
+import GraphDetails from "../graph/GraphDetails"
 
 const ForceGraph = dynamic(() => import("../components/ForceGraph"), { ssr: false })
 
@@ -147,15 +148,11 @@ export default function SchemaView({
     return (
         <div className="relative w-full h-full border rounded-lg overflow-hidden">
             <div className="pointer-events-none absolute bottom-4 inset-x-12 z-10 flex items-center justify-between">
-                <div className="flex gap-2">
-                    {
-                        schema.Id &&
-                        <>
-                            <p className="Gradient bg-clip-text text-transparent">Nodes: {nodesCount}</p>
-                            <p className="Gradient bg-clip-text text-transparent">Edges: {edgesCount}</p>
-                        </>
-                    }
-                </div>
+                <GraphDetails
+                    graph={schema}
+                    nodesCount={nodesCount}
+                    edgesCount={edgesCount}
+                />
                 {
                     schema.getElements().length > 0 &&
                     <Controls
