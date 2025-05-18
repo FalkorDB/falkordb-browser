@@ -44,9 +44,9 @@ export default function Tutorial() {
                                 <p>Our Browser allows you to visualize, manipulate and explore your data.</p>
                             </CarouselItem>
                             <CarouselItem className="border text-center p-32">
-                                <p>Interact with your data with a force-directed layout,
+                                <p>Interact with your data on a force-directed layout,
                                     with features including zoom, pan,
-                                    node-drag and interactive node/link hover and click events</p>
+                                    node-drag and interactive node/link hover and click events.</p>
                             </CarouselItem>
                             <CarouselItem className="border text-center p-40">
                                 <p>Configure or export your graph with ease from the control center</p>

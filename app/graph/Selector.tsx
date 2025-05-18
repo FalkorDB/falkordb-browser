@@ -2,7 +2,6 @@
 
 import { useEffect, useState, useContext, useCallback, Dispatch, SetStateAction, useRef } from "react";
 import { cn, securedFetch, GraphRef } from "@/lib/utils";
-import { useSession } from "next-auth/react";
 import { History, Info, Maximize2, RefreshCcw } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { DialogTitle } from "@/components/ui/dialog";
@@ -10,7 +9,6 @@ import * as monaco from "monaco-editor";
 import { Editor } from "@monaco-editor/react";
 import Combobox from "../components/ui/combobox";
 import Button from "../components/ui/Button";
-import CreateGraph from "../components/CreateGraph";
 import { IndicatorContext } from "../components/provider";
 import EditorComponent from "../components/EditorComponent";
 import DialogComponent from "../components/DialogComponent";
@@ -40,7 +38,6 @@ interface Props {
 export default function Selector({ graph, options, setOptions, graphName, setGraphName, runQuery, historyQuery, setHistoryQuery, fetchCount, selectedElements, setSelectedElement, handleDeleteElement, chartRef, setIsAddEntity, setIsAddRelation }: Props) {
 
     const { indicator, setIndicator } = useContext(IndicatorContext)
-    const { data: session } = useSession()
     
     const { toast } = useToast()
     
@@ -145,17 +142,6 @@ export default function Selector({ graph, options, setOptions, graphName, setGra
 
     return (
         <div className="z-20 absolute top-5 inset-x-24 h-[56px] flex flex-row gap-4 items-center">
-            {
-                session?.user?.role !== "Read-Only" &&
-                <CreateGraph
-                    type={type}
-                    graphNames={options}
-                    onSetGraphName={(name) => {
-                        handleOnChange(name)
-                        setOptions(prev => [...prev, name])
-                    }}
-                />
-            }
             <div className="p-2 border rounded-lg overflow-hidden bg-foreground">
                 <Button
                     data-testid={`reload${type}sList`}
