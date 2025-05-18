@@ -10,7 +10,7 @@
         --secondary: 39 33% 96%;
         --destructive: 0 84% 60%;
         --accent: var(--background);
-        --popover: var(--primary);
+        --popover: var(--foreground);
         --popover-foreground: 0 0% 100%;
         --radius: 0.5rem;
         --input: var(--popover-foreground);
