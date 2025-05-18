@@ -1,20 +1,19 @@
 import { useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import { ChevronDown, ChevronUp } from "lucide-react";
-import { Category, Graph } from "../api/graph/model";
+import { Category, Graph, Link, Node } from "../api/graph/model";
 import Button from "../components/ui/Button";
 
-/* eslint-disable react/require-default-props */
-interface Props {
+interface Props<T extends Category<Node> | Category<Link>> {
     graph: Graph,
-    categories: Category[],
-    onClick: (category: Category) => void,
+    categories: T[],
+    onClick: (category: T) => void,
     label: "RelationshipTypes" | "Labels",
     type: "Schema" | "Graph",
     className?: string,
 }
 
-export default function Labels({ graph, categories, onClick, label, type, className = "" }: Props) {
+export default function Labels<T extends Category<Node> | Category<Link>>({ graph, categories, onClick, label, type, className = "" }: Props<T>) {
 
     const listRef = useRef<HTMLUListElement>(null)
 
@@ -53,7 +52,7 @@ export default function Labels({ graph, categories, onClick, label, type, classN
                             <li key={category.name}>
                                 <Button
                                     data-testid={`${type}${label}Button${category.name}`}
-                                    className="w-full pointer-events-auto"
+                                    className={cn("w-full pointer-events-auto", category.show ? "opacity-100" : "opacity-50")}
                                     label={category.name}
                                     onClick={() => {
                                         onClick(category)
@@ -79,4 +78,8 @@ export default function Labels({ graph, categories, onClick, label, type, classN
             </div>
         </div>
     )
+}
+
+Labels.defaultProps = {
+    className: "",
 }

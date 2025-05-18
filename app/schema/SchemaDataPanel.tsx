@@ -26,7 +26,7 @@ interface Props {
     setObject: Dispatch<SetStateAction<Node | Link | undefined>>
     onDeleteElement: () => Promise<void>;
     schema: Graph
-    setCategories: (categories: Category[]) => void
+    setCategories: (categories: Category<Node>[]) => void
 }
 
 export default function SchemaDataPanel({ object, setObject, onDeleteElement, schema, setCategories }: Props) {

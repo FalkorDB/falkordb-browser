@@ -15,22 +15,22 @@ export default function Page() {
 
     const { schemaNames, setSchemaNames } = useContext(SchemaNamesContext)
     const { schemaName, setSchemaName } = useContext(SchemaNameContext)
-    const { schema, setSchema } = useContext(SchemaContext)
     const { indicator, setIndicator } = useContext(IndicatorContext)
+    const { schema, setSchema } = useContext(SchemaContext)
     
     const { toast } = useToast()
     
     const [selectedElement, setSelectedElement] = useState<Node | Link | undefined>()
     const [selectedElements, setSelectedElements] = useState<(Node | Link)[]>([])
     const [cooldownTicks, setCooldownTicks] = useState<number | undefined>(0)
+    const [categories, setCategories] = useState<Category<Node>[]>([])
+    const [data, setData] = useState<GraphData>(schema.Elements)
+    const [labels, setLabels] = useState<Category<Link>[]>([])
     const [isAddRelation, setIsAddRelation] = useState(false)
     const chartRef = useRef<ForceGraphMethods<Node, Link>>()
-    const [isAddEntity, setIsAddEntity] = useState(false)
     const [edgesCount, setEdgesCount] = useState<number>(0)
     const [nodesCount, setNodesCount] = useState<number>(0)
-    const [labels, setLabels] = useState<Category[]>([])
-    const [categories, setCategories] = useState<Category[]>([])
-    const [data, setData] = useState<GraphData>(schema.Elements)
+    const [isAddEntity, setIsAddEntity] = useState(false)
     
     const fetchCount = useCallback(async () => {
         const result = await securedFetch(`api/schema/${prepareArg(schemaName)}/count`, {

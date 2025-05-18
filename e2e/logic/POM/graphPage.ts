@@ -49,6 +49,10 @@ export default class GraphPage extends Page {
         return this.page.getByTestId(`queryHistoryEditorInput`);
     }
 
+    public get queryHistoryEditorRun(): Locator {
+        return this.page.getByTestId(`queryHistoryEditorRun`);
+    }
+
     async getBoundingBoxCanvasElement(): Promise<null | {
         x: number;
         y: number;

@@ -12,6 +12,7 @@ import { Category, Link, Node, GraphData } from "../api/graph/model"
 import CreateElement from "./SchemaCreateElement"
 import { IndicatorContext, SchemaContext } from "../components/provider"
 import Controls from "../graph/controls"
+import GraphDetails from "../graph/GraphDetails"
 
 const ForceGraph = dynamic(() => import("../components/ForceGraph"), { ssr: false })
 
@@ -34,10 +35,10 @@ interface Props {
     data: GraphData
     setData: Dispatch<SetStateAction<GraphData>>
     handleDeleteElement: () => Promise<void>
-    setLabels: Dispatch<SetStateAction<Category[]>>
-    setCategories: Dispatch<SetStateAction<Category[]>>
-    labels: Category[]
-    categories: Category[]
+    setLabels: Dispatch<SetStateAction<Category<Link>[]>>
+    setCategories: Dispatch<SetStateAction<Category<Node>[]>>
+    labels: Category<Link>[]
+    categories: Category<Node>[]
 }
 
 export default function SchemaView({
@@ -88,28 +89,29 @@ export default function SchemaView({
         setSelectedNodes([undefined, undefined])
     }, [isAddRelation])
 
-    const onCategoryClick = (category: Category) => {
+    const onCategoryClick = (category: Category<Node>) => {
         category.show = !category.show
+
         schema.Elements.nodes.forEach((node) => {
             if (node.category[0] !== category.name) return
             node.visible = category.show
         })
 
         schema.visibleLinks(category.show)
-
+        schema.CategoriesMap.set(category.name, category)
         setData({ ...schema.Elements })
-        setCategories([...schema.Categories])
     }
 
-    const onLabelClick = (label: Category) => {
+    const onLabelClick = (label: Category<Link>) => {
         label.show = !label.show
+
         schema.Elements.links.forEach((link) => {
             if (link.label !== label.name) return
             link.visible = label.show
         })
 
+        schema.LabelsMap.set(label.name, label)
         setData({ ...schema.Elements })
-        setLabels([...schema.Labels])
     }
 
     const onCreateElement = async (attributes: [string, string[]][], elementLabel?: string[]) => {
@@ -145,15 +147,11 @@ export default function SchemaView({
     return (
         <div className="relative w-full h-full border rounded-lg overflow-hidden">
             <div className="pointer-events-none absolute bottom-4 inset-x-12 z-10 flex items-center justify-between">
-                <div className="flex gap-2">
-                    {
-                        schema.Id &&
-                        <>
-                            <p className="Gradient bg-clip-text text-transparent">Nodes: {nodesCount}</p>
-                            <p className="Gradient bg-clip-text text-transparent">Edges: {edgesCount}</p>
-                        </>
-                    }
-                </div>
+                <GraphDetails
+                    graph={schema}
+                    nodesCount={nodesCount}
+                    edgesCount={edgesCount}
+                />
                 {
                     schema.getElements().length > 0 &&
                     <Controls

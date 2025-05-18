@@ -107,19 +107,20 @@ export const DEFAULT_COLORS = [
     "hsl(180, 66%, 70%)"
 ]
 
-export interface Category {
+export interface Category<T extends Node | Link> {
     index: number,
     name: string,
     show: boolean,
     textWidth?: number,
-    elements: (Node | Link)[]
+    elements: T[],
     textHeight?: number,
 }
 
 export interface ExtractedData {
     data: any[][],
     columns: string[],
-    categories: Map<string, Category>,
+    categories: Map<string, Category<Node>>,
+    labels: Map<string, Category<Link>>,
     nodes: Map<number, NodeDataDefinition>,
     edges: Map<number, EdgeDataDefinition>,
 }
@@ -135,17 +136,17 @@ export class Graph {
 
     private currentQuery: Query;
 
-    private categories: Category[];
+    private categories: Category<Node>[];
 
-    private labels: Category[];
+    private labels: Category<Link>[];
 
     private elements: GraphData;
 
     private colorIndex: number = 0;
 
-    private categoriesMap: Map<string, Category>;
+    private categoriesMap: Map<string, Category<Node>>;
 
-    private labelsMap: Map<string, Category>;
+    private labelsMap: Map<string, Category<Link>>;
 
     private nodesMap: Map<number, Node>;
 
@@ -153,8 +154,8 @@ export class Graph {
 
     private COLORS_ORDER_VALUE: string[] = []
 
-    private constructor(id: string, categories: Category[], labels: Category[], elements: GraphData,
-        categoriesMap: Map<string, Category>, labelsMap: Map<string, Category>, nodesMap: Map<number, Node>, edgesMap: Map<number, Link>, currentQuery?: Query, colors: string[] = []) {
+    private constructor(id: string, categories: Category<Node>[], labels: Category<Link>[], elements: GraphData,
+        categoriesMap: Map<string, Category<Node>>, labelsMap: Map<string, Category<Link>>, nodesMap: Map<number, Node>, edgesMap: Map<number, Link>, currentQuery?: Query, colors?: string[]) {
         this.id = id;
         this.columns = [];
         this.data = [];
@@ -178,27 +179,27 @@ export class Graph {
         return this.currentQuery;
     }
 
-    get Categories(): Category[] {
+    get Categories(): Category<Node>[] {
         return this.categories;
     }
 
-    set Categories(categories: Category[]) {
+    set Categories(categories: Category<Node>[]) {
         this.categories = categories;
     }
 
-    get CategoriesMap(): Map<string, Category> {
+    get CategoriesMap(): Map<string, Category<Node>> {
         return this.categoriesMap;
     }
 
-    get Labels(): Category[] {
+    get Labels(): Category<Link>[] {
         return this.labels;
     }
 
-    set Labels(labels: Category[]) {
+    set Labels(labels: Category<Link>[]) {
         this.labels = labels;
     }
 
-    get LabelsMap(): Map<string, Category> {
+    get LabelsMap(): Map<string, Category<Link>> {
         return this.labelsMap;
     }
 
@@ -247,7 +248,7 @@ export class Graph {
     }
 
     public static empty(graphName?: string, colors?: string[], currentQuery?: Query): Graph {
-        return new Graph(graphName || "", [], [], { nodes: [], links: [] }, new Map<string, Category>(), new Map<string, Category>(), new Map<number, Node>(), new Map<number, Link>(), currentQuery, colors)
+        return new Graph(graphName || "", [], [], { nodes: [], links: [] }, new Map<string, Category<Node>>(), new Map<string, Category<Link>>(), new Map<number, Node>(), new Map<number, Link>(), currentQuery, colors)
     }
 
     public static create(id: string, results: { data: Data, metadata: any[] }, isCollapsed: boolean, isSchema: boolean, colors?: string[], currentQuery?: Query): Graph {
@@ -486,7 +487,7 @@ export class Graph {
         return newElements
     }
 
-    public createCategory(categories: string[], node?: Node): Category[] {
+    public createCategory(categories: string[], node?: Node): Category<Node>[] {
         return categories.map(category => {
             let c = this.categoriesMap.get(category)
 
@@ -505,7 +506,7 @@ export class Graph {
         })
     }
 
-    public createLabel(category: string): Category {
+    public createLabel(category: string): Category<Link> {
         let l = this.labelsMap.get(category)
 
         if (!l) {
@@ -520,7 +521,8 @@ export class Graph {
 
     public visibleLinks(visible: boolean) {
         this.elements.links.forEach(link => {
-            if (visible && (this.elements.nodes.map(n => n.id).includes(link.source.id) && link.source.visible) && (this.elements.nodes.map(n => n.id).includes(link.target.id) && link.target.visible)) {
+            
+            if (this.LabelsMap.get(link.label)!.show && visible && (this.elements.nodes.map(n => n.id).includes(link.source.id) && link.source.visible) && (this.elements.nodes.map(n => n.id).includes(link.target.id) && link.target.visible)) {
                 // eslint-disable-next-line no-param-reassign
                 link.visible = true
             }
@@ -532,7 +534,7 @@ export class Graph {
         })
     }
 
-    public removeLinks(setter: Dispatch<SetStateAction<Category[]>>, ids: number[] = []) {
+    public removeLinks(setter: Dispatch<SetStateAction<Category<Link>[]>>, ids: number[] = []) {
         const elements = this.elements.links.filter(link => ids.includes(link.source.id) || ids.includes(link.target.id))
 
         this.elements = {
@@ -583,17 +585,25 @@ export class Graph {
 
             if (type) {
                 this.elements.nodes.splice(this.elements.nodes.findIndex(n => n.id === id), 1)
+                const category = this.categoriesMap.get(element.category[0])
+
+                if (category) {
+                    category.elements = category.elements.filter((e) => e.id !== id)
+                    if (category.elements.length === 0) {
+                        this.categories.splice(this.categories.findIndex(c => c.name === category.name), 1)
+                        this.categoriesMap.delete(category.name)
+                    }
+                }
             } else {
                 this.elements.links.splice(this.elements.links.findIndex(l => l.id === id), 1)
-            }
+                const category = this.labelsMap.get(element.label)
 
-            const category = type ? this.categoriesMap.get(element.category[0]) : this.labelsMap.get(element.label)
-
-            if (category) {
-                category.elements = category.elements.filter((e) => e.id !== id)
-                if (category.elements.length === 0) {
-                    this.categories.splice(this.categories.findIndex(c => c.name === category.name), 1)
-                    this.categoriesMap.delete(category.name)
+                if (category) {
+                    category.elements = category.elements.filter((e) => e.id !== id)
+                    if (category.elements.length === 0) {
+                        this.labels.splice(this.labels.findIndex(c => c.name === category.name), 1)
+                        this.labelsMap.delete(category.name)
+                    }
                 }
             }
         })

@@ -10,13 +10,14 @@ import dynamic from "next/dynamic";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { GraphContext } from "@/app/components/provider";
 import { Category, GraphData, Link, Node } from "../api/graph/model";
-import Labels from "./labels";
 import Button from "../components/ui/Button";
 import TableView from "./TableView";
-import MetadataView from "./MetadataView";
 import Toolbar from "./toolbar";
 import Controls from "./controls";
 import GraphDataPanel from "./GraphDataPanel";
+import GraphDetails from "./GraphDetails";
+import Labels from "./labels";
+import MetadataView from "./MetadataView";
 
 const ForceGraph = dynamic(() => import("../components/ForceGraph"), { ssr: false });
 
@@ -34,10 +35,10 @@ interface Props {
     cooldownTicks: number | undefined
     chartRef: GraphRef
     handleDeleteElement: () => Promise<void>
-    setLabels: Dispatch<SetStateAction<Category[]>>
-    setCategories: Dispatch<SetStateAction<Category[]>>
-    labels: Category[]
-    categories: Category[]
+    setLabels: Dispatch<SetStateAction<Category<Link>[]>>
+    setCategories: Dispatch<SetStateAction<Category<Node>[]>>
+    labels: Category<Link>[]
+    categories: Category<Node>[]
 }
 
 function GraphView({
@@ -93,115 +94,100 @@ function GraphView({
         setSelectedElements([])
     }, [graph.Id])
 
-    const onCategoryClick = (category: Category) => {
+    const onCategoryClick = (category: Category<Node>) => {
         category.show = !category.show
 
-        category.elements.forEach((element) => {
-            if (element.category[0] !== category.name) return
+        category.elements.forEach((node) => {
+            if (node.category[0] !== category.name) return
             if (category.show) {
-                element.visible = true
+                node.visible = true
             } else {
-                element.visible = false
+                node.visible = false
             }
         })
 
         graph.visibleLinks(category.show)
 
+        graph.CategoriesMap.set(category.name, category)
         setData({ ...graph.Elements })
     }
 
-    const onLabelClick = (label: Category) => {
+    const onLabelClick = (label: Category<Link>) => {
         label.show = !label.show
-        label.elements.forEach((element) => {
+
+        label.elements.filter((link) => link.source.visible && link.target.visible).forEach((link) => {
             if (label.show) {
-                element.visible = true
+                link.visible = true
             } else {
-                element.visible = false
+                link.visible = false
             }
         })
+
+        graph.LabelsMap.set(label.name, label)
         setData({ ...graph.Elements })
     }
 
     return (
         <Tabs value={tabsValue} className="h-full w-full relative border rounded-lg overflow-hidden">
-            <div className="absolute bottom-4 inset-x-12 pointer-events-none z-10 flex justify-between items-center">
-                <div className="w-1 grow flex gap-2">
-                    {
-                        graph.Id && tabsValue === "Graph" &&
-                        <>
-                            <p
-                                data-testid="nodesCount"
-                                className="Gradient bg-clip-text text-transparent"
-                            >
-                                Nodes: {nodesCount}
-                            </p>
-                            <p
-                                data-testid="edgesCount"
-                                className="Gradient bg-clip-text text-transparent"
-                            >
-                                Edges: {edgesCount}
-                            </p>
-                        </>
-                    }
-                </div>
-                <div className="w-1 grow flex justify-center">
-                    <TabsList className="bg-transparent flex gap-2 pointer-events-auto">
-                        <TabsTrigger
-                            data-testid="graphTab"
-                            asChild
-                            value="Graph"
-                        >
-                            <Button
-                                disabled={graph.getElements().length === 0}
-                                className="tabs-trigger"
-                                onClick={() => setTabsValue("Graph")}
-                                title="Graph"
-                            >
-                                <GitGraph />
-                            </Button>
-                        </TabsTrigger>
-                        <TabsTrigger
-                            data-testid="tableTab"
-                            asChild
-                            value="Table"
-                        >
-                            <Button
-                                disabled={graph.Data.length === 0}
-                                className="tabs-trigger"
-                                onClick={() => setTabsValue("Table")}
-                                title="Table"
-                            >
-                                <Table />
-                            </Button>
-                        </TabsTrigger>
-                        <TabsTrigger
-                            data-testid="metadataTab"
-                            asChild
-                            value="Metadata"
-                        >
-                            <Button
-                                disabled={!graph.CurrentQuery || graph.CurrentQuery.metadata.length === 0 || graph.CurrentQuery.explain.length === 0 || graph.Metadata.length === 0}
-                                className="tabs-trigger"
-                                onClick={() => setTabsValue("Metadata")}
-                                title="Metadata"
-                            >
-                                <Info />
-                            </Button>
-                        </TabsTrigger>
-                    </TabsList>
-                </div>
-                <div className="w-1 grow flex justify-end">
-                    {
-                        graph.getElements().length > 0 && tabsValue === "Graph" &&
-                        <Controls
-                            graph={graph}
-                            chartRef={chartRef}
+            <div className="absolute bottom-4 inset-x-12 pointer-events-none z-10 flex gap-4 justify-between items-center">
+                <GraphDetails
+                    graph={graph}
+                    tabsValue={tabsValue}
+                    nodesCount={nodesCount}
+                    edgesCount={edgesCount}
+                />
+                <TabsList className="bg-transparent flex gap-2 pointer-events-auto">
+                    <TabsTrigger
+                        data-testid="graphTab"
+                        asChild
+                        value="Graph"
+                    >
+                        <Button
                             disabled={graph.getElements().length === 0}
-                            handleCooldown={handleCooldown}
-                            cooldownTicks={cooldownTicks}
-                        />
-                    }
-                </div>
+                            className="tabs-trigger"
+                            onClick={() => setTabsValue("Graph")}
+                            title="Graph"
+                        >
+                            <GitGraph />
+                        </Button>
+                    </TabsTrigger>
+                    <TabsTrigger
+                        data-testid="tableTab"
+                        asChild
+                        value="Table"
+                    >
+                        <Button
+                            disabled={graph.Data.length === 0}
+                            className="tabs-trigger"
+                            onClick={() => setTabsValue("Table")}
+                            title="Table"
+                        >
+                            <Table />
+                        </Button>
+                    </TabsTrigger>
+                    <TabsTrigger
+                        data-testid="metadataTab"
+                        asChild
+                        value="Metadata"
+                    >
+                        <Button
+                            disabled={!graph.CurrentQuery || graph.CurrentQuery.metadata.length === 0 || graph.CurrentQuery.explain.length === 0 || graph.Metadata.length === 0}
+                            className="tabs-trigger"
+                            onClick={() => setTabsValue("Metadata")}
+                            title="Metadata"
+                        >
+                            <Info />
+                        </Button>
+                    </TabsTrigger>
+                </TabsList>
+                <Controls
+                    graph={graph}
+                    tabsValue={tabsValue}
+                    chartRef={chartRef}
+                    disabled={graph.getElements().length === 0}
+                    handleCooldown={handleCooldown}
+                    cooldownTicks={cooldownTicks}
+                />
             </div>
             <TabsContent value="Graph" className="h-full w-full mt-0 overflow-hidden">
                 <ForceGraph

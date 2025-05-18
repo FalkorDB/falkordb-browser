@@ -28,7 +28,7 @@ interface Props {
     setSelectedNodes?: Dispatch<SetStateAction<[Node | undefined, Node | undefined]>>
     setIsAddEntity?: Dispatch<SetStateAction<boolean>>
     setIsAddRelation?: Dispatch<SetStateAction<boolean>>
-    setLabels: Dispatch<SetStateAction<Category[]>>
+    setLabels: Dispatch<SetStateAction<Category<Link>[]>>
 }
 
 const NODE_SIZE = 6

@@ -200,7 +200,7 @@ const PLACEHOLDER = "Type your query here to start"
 export default function EditorComponent({ graph, historyQuery, maximize, setMaximize, runQuery, setHistoryQuery }: Props) {
 
     const { indicator, setIndicator } = useContext(IndicatorContext)
-    
+
     const { toast } = useToast()
 
     const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null)
@@ -209,7 +209,8 @@ export default function EditorComponent({ graph, historyQuery, maximize, setMaxi
     const containerRef = useRef<HTMLDivElement>(null)
     const indicatorRef = useRef(indicator)
     const graphIdRef = useRef(graph.Id)
-    
+
+    const [monacoEditor, setMonacoEditor] = useState<Monaco | null>(null)
     const [sugDisposed, setSugDisposed] = useState<monaco.IDisposable>()
     const [isLoading, setIsLoading] = useState(false)
     const [lineNumber, setLineNumber] = useState(1)
@@ -260,31 +261,6 @@ export default function EditorComponent({ graph, historyQuery, maximize, setMaxi
             observer.disconnect()
         }
     }, [containerRef.current])
-
-    const setTheme = (monacoI: Monaco) => {
-        monacoI.editor.defineTheme('custom-theme', {
-            base: 'vs-dark',
-            inherit: true,
-            rules: [
-                { token: 'keyword', foreground: '#99E4E5' },
-                { token: 'function', foreground: '#DCDCAA' },
-                { token: 'type', foreground: '#89D86D' },
-                { token: 'string', foreground: '#CE9178' },
-                { token: 'number', foreground: '#b5cea8' },
-            ],
-            colors: {
-                'editor.background': '#191919',
-                'editor.foreground': '#ffffff',
-                'editorSuggestWidget.background': '#272745',
-                'editorSuggestWidget.foreground': '#FFFFFF',
-                'editorSuggestWidget.selectedBackground': '#57577B',
-                'editorSuggestWidget.hoverBackground': '#28283F',
-                'focusBorder': '#00000000',
-            },
-        });
-
-        monacoI.editor.setTheme('custom-theme')
-    }
 
     const fetchSuggestions = async (detail: string): Promise<monaco.languages.CompletionItem[]> => {
         if (indicator === "offline") return []
@@ -391,16 +367,48 @@ export default function EditorComponent({ graph, historyQuery, maximize, setMaxi
         return sug
     }
 
+    useEffect(() => {
+        if (monacoEditor) {
+            addSuggestions(monacoEditor)
+        }
+    }, [monacoEditor, graphIdRef.current])
+
+    const setTheme = (monacoI: Monaco) => {
+        monacoI.editor.defineTheme('custom-theme', {
+            base: 'vs-dark',
+            inherit: true,
+            rules: [
+                { token: 'keyword', foreground: '#99E4E5' },
+                { token: 'function', foreground: '#DCDCAA' },
+                { token: 'type', foreground: '#89D86D' },
+                { token: 'string', foreground: '#CE9178' },
+                { token: 'number', foreground: '#b5cea8' },
+            ],
+            colors: {
+                'editor.background': '#191919',
+                'editor.foreground': '#ffffff',
+                'editorSuggestWidget.background': '#272745',
+                'editorSuggestWidget.foreground': '#FFFFFF',
+                'editorSuggestWidget.selectedBackground': '#57577B',
+                'editorSuggestWidget.hoverBackground': '#28283F',
+                'focusBorder': '#00000000',
+            },
+        });
+
+        monacoI.editor.setTheme('custom-theme')
+    }
+
     const handleSubmit = async () => {
         try {
             setIsLoading(true)
-            await runQuery(historyQuery.query)
+            await runQuery(historyQuery.query.trim())
         } finally {
             setIsLoading(false)
         }
     }
 
     const handleEditorWillMount = async (monacoI: Monaco) => {
+        setMonacoEditor(monacoI)
 
         monacoI.languages.register({ id: "custom-language" })
 
@@ -452,6 +460,8 @@ export default function EditorComponent({ graph, historyQuery, maximize, setMaxi
                 { open: "'", close: "'" }
             ]
         });
+
+        addSuggestions(monacoI)
 
         const provider = monacoI.languages.registerCompletionItemProvider("custom-language", {
             provideCompletionItems: async (model, position) => {
@@ -557,15 +567,15 @@ export default function EditorComponent({ graph, historyQuery, maximize, setMaxi
             run: async () => {
                 setHistoryQuery(prev => {
                     if (prev.queries.length === 0) return prev
-                    
+
                     let counter
-                    
+
                     if (prev.counter) {
                         counter = prev.counter + 1 > prev.queries.length ? 0 : prev.counter + 1
                     } else {
                         counter = 0
                     }
-                    
+
                     return {
                         ...prev,
                         counter

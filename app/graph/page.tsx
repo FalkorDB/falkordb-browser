@@ -27,6 +27,7 @@ export default function Page() {
     const [selectedElement, setSelectedElement] = useState<Node | Link | undefined>()
     const [selectedElements, setSelectedElements] = useState<(Node | Link)[]>([])
     const [cooldownTicks, setCooldownTicks] = useState<number | undefined>(0)
+    const [categories, setCategories] = useState<Category<Node>[]>([])
     const [data, setData] = useState<GraphData>({ ...graph.Elements })
     const [historyQuery, setHistoryQuery] = useState<HistoryQuery>({
         queries: [],
@@ -34,8 +35,7 @@ export default function Page() {
         currentQuery: "",
         counter: 0
     })
-    const [categories, setCategories] = useState<Category[]>([])
-    const [labels, setLabels] = useState<Category[]>([])
+    const [labels, setLabels] = useState<Category<Link>[]>([])
     const [nodesCount, setNodesCount] = useState(0)
     const [edgesCount, setEdgesCount] = useState(0)
 
@@ -227,6 +227,7 @@ export default function Page() {
                 setSelectedElement={setSelectedElement}
                 handleDeleteElement={handleDeleteElement}
                 chartRef={chartRef}
+                currentQuery={graph.CurrentQuery}
             />
             <div className="h-1 grow p-12">
                 <GraphView
