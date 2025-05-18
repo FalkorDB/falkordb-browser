@@ -29,7 +29,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         const graph = client.selectGraph(schemaName)
         const query = type
             ? `CREATE (n${label.length > 0 ? `:${label.join(":")}` : ""}${formateAttributes?.length > 0 ? ` {${formateAttributes.map(([k, v]) => `${k}: "${v}"`).join(",")}}` : ""}) RETURN n`
-            : `MATCH (a), (b) WHERE ID(a) = ${selectedNodes[0].id} AND ID(b) = ${selectedNodes[1].id} CREATE (a)-[e${label[0]}${formateAttributes?.length > 0 ? ` {${formateAttributes.map(([k, v]) => `${k}: "${v}"`).join(",")}}` : ""}]->(b) RETURN e`
+            : `MATCH (a), (b) WHERE ID(a) = ${selectedNodes[0].id} AND ID(b) = ${selectedNodes[1].id} CREATE (a)-[e:${label[0]}${formateAttributes?.length > 0 ? ` {${formateAttributes.map(([k, v]) => `${k}: "${v}"`).join(",")}}` : ""}]->(b) RETURN e`
         const result = user.role === "Read-Only"
             ? await graph.roQuery(query)
             : await graph.query(query)
