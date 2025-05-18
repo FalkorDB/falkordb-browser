@@ -1,17 +1,18 @@
-import { cn, createNestedObject, prepareArg, Query, securedFetch } from "@/lib/utils";
+import { cn, createNestedObject, prepareArg, securedFetch } from "@/lib/utils";
 import { JSONTree } from "react-json-tree";
 import { useContext, useState } from "react";
 import { Info } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import Button from "../components/ui/Button";
-import { GraphNameContext, IndicatorContext } from "../components/provider";
+import { IndicatorContext } from "../components/provider";
+import { Query } from "../api/graph/model";
 
-export function Profile({ query, fetchCount }: {
+export function Profile({ graphName, query, fetchCount }: {
+    graphName: string,
     query: Query,
     fetchCount: () => void
 }) {
     const { indicator, setIndicator } = useContext(IndicatorContext)
-    const { graphName } = useContext(GraphNameContext)
     const { toast } = useToast()
 
     const [profile, setProfile] = useState<string[]>([])
@@ -128,7 +129,8 @@ export function Explain({ query }: {
 }
 
 
-export default function MetadataView({ query, fetchCount }: {
+export default function MetadataView({ graphName, query, fetchCount }: {
+    graphName: string,
     query: Query,
     fetchCount: () => void,
 }) {
@@ -136,7 +138,7 @@ export default function MetadataView({ query, fetchCount }: {
     return (
         <div className={cn("h-full flex overflow-hidden border")}>
             <div className="w-1 grow flex flex-col gap-4 border-r p-12 overflow-auto">
-                <Profile query={query} fetchCount={fetchCount} />
+                <Profile graphName={graphName} query={query} fetchCount={fetchCount} />
             </div>
             <div className="w-1 grow flex flex-col">
                 <div className="h-1 grow p-12 overflow-auto overflow-x-hidden border-b">

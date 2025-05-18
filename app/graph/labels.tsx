@@ -1,12 +1,11 @@
-import { useContext, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import { ChevronDown, ChevronUp } from "lucide-react";
-import { Category, Link, Node } from "../api/graph/model";
+import { Category, Graph, Link, Node } from "../api/graph/model";
 import Button from "../components/ui/Button";
-import { GraphContext } from "../components/provider";
 
-/* eslint-disable react/require-default-props */
 interface Props<T extends Category<Node> | Category<Link>> {
+    graph: Graph,
     categories: T[],
     onClick: (category: T) => void,
     label: "RelationshipTypes" | "Labels",
@@ -14,13 +13,13 @@ interface Props<T extends Category<Node> | Category<Link>> {
     className?: string,
 }
 
-export default function Labels<T extends Category<Node> | Category<Link>>({ categories, onClick, label, type, className = "" }: Props<T>) {
+export default function Labels<T extends Category<Node> | Category<Link>>({ graph, categories, onClick, label, type, className = "" }: Props<T>) {
+
+    const listRef = useRef<HTMLUListElement>(null)
 
     // fake state to force reload
     const [, setReload] = useState(false)
-    const listRef = useRef<HTMLUListElement>(null)
     const isScrollable = listRef.current && listRef.current.scrollHeight > listRef.current.clientHeight
-    const { graph } = useContext(GraphContext)
 
     const handleScroll = (scrollTo: number) => {
         listRef.current?.scrollBy({
@@ -79,4 +78,8 @@ export default function Labels<T extends Category<Node> | Category<Link>>({ cate
             </div>
         </div>
     )
+}
+
+Labels.defaultProps = {
+    className: "",
 }

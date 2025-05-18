@@ -5,19 +5,19 @@
 
 import { useState, useEffect, Dispatch, SetStateAction, useContext } from "react";
 import { GitGraph, Info, Table } from "lucide-react"
-import { GraphRef, Query } from "@/lib/utils";
+import { GraphRef } from "@/lib/utils";
 import dynamic from "next/dynamic";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { GraphContext } from "@/app/components/provider";
 import { Category, GraphData, Link, Node } from "../api/graph/model";
-import Labels from "./labels";
 import Button from "../components/ui/Button";
 import TableView from "./TableView";
-import MetadataView from "./MetadataView";
 import Toolbar from "./toolbar";
 import Controls from "./controls";
 import GraphDataPanel from "./GraphDataPanel";
 import GraphDetails from "./GraphDetails";
+import Labels from "./labels";
+import MetadataView from "./MetadataView";
 
 const ForceGraph = dynamic(() => import("../components/ForceGraph"), { ssr: false });
 
@@ -28,7 +28,6 @@ interface Props {
     setSelectedElement: Dispatch<SetStateAction<Node | Link | undefined>>
     selectedElements: (Node | Link)[]
     setSelectedElements: Dispatch<SetStateAction<(Node | Link)[]>>
-    currentQuery: Query | undefined
     nodesCount: number
     edgesCount: number
     fetchCount: () => void
@@ -49,7 +48,6 @@ function GraphView({
     setSelectedElement,
     selectedElements,
     setSelectedElements,
-    currentQuery,
     nodesCount,
     edgesCount,
     fetchCount,
@@ -77,7 +75,7 @@ function GraphView({
             defaultChecked = "Graph"
         } else if (graph.Data.length !== 0) {
             defaultChecked = "Table";
-        } else if (currentQuery && currentQuery.metadata.length > 0 && graph.Metadata.length > 0 && currentQuery.explain.length > 0) {
+        } else if (graph.CurrentQuery && graph.CurrentQuery.metadata.length > 0 && graph.Metadata.length > 0 && graph.CurrentQuery.explain.length > 0) {
             defaultChecked = "Metadata";
         }
 
@@ -173,7 +171,7 @@ function GraphView({
                         value="Metadata"
                     >
                         <Button
-                            disabled={!currentQuery || currentQuery.metadata.length === 0 || currentQuery.explain.length === 0 || graph.Metadata.length === 0}
+                            disabled={!graph.CurrentQuery || graph.CurrentQuery.metadata.length === 0 || graph.CurrentQuery.explain.length === 0 || graph.Metadata.length === 0}
                             className="tabs-trigger"
                             onClick={() => setTabsValue("Metadata")}
                             title="Metadata"
@@ -183,6 +181,7 @@ function GraphView({
                     </TabsTrigger>
                 </TabsList>
                 <Controls
+                    graph={graph}
                     tabsValue={tabsValue}
                     chartRef={chartRef}
                     disabled={graph.getElements().length === 0}
@@ -192,6 +191,7 @@ function GraphView({
             </div>
             <TabsContent value="Graph" className="h-full w-full mt-0 overflow-hidden">
                 <ForceGraph
+                    graph={graph}
                     chartRef={chartRef}
                     data={data}
                     setData={setData}
@@ -206,10 +206,11 @@ function GraphView({
                 <div className="h-full z-10 absolute top-12 inset-x-12 pointer-events-none flex gap-8">
                     {
                         (labels.length > 0 || categories.length > 0) &&
-                        <Labels categories={categories} onClick={onCategoryClick} label="Labels" type="Graph" />
+                        <Labels graph={graph} categories={categories} onClick={onCategoryClick} label="Labels" type="Graph" />
                     }
                     <div className="w-1 grow h-fit">
                         <Toolbar
+                            graph={graph}
                             label="Graph"
                             setSelectedElement={setSelectedElement}
                             selectedElements={selectedElements}
@@ -220,7 +221,7 @@ function GraphView({
                     </div>
                     {
                         (labels.length > 0 || categories.length > 0) &&
-                        <Labels categories={labels} onClick={onLabelClick} label="RelationshipTypes" type="Graph" />
+                        <Labels graph={graph} categories={labels} onClick={onLabelClick} label="RelationshipTypes" type="Graph" />
                     }
                 </div>
                 {
@@ -238,7 +239,8 @@ function GraphView({
             </TabsContent>
             <TabsContent value="Metadata" className="h-full w-full mt-0 overflow-hidden">
                 <MetadataView
-                    query={currentQuery!}
+                    graphName={graph.Id}
+                    query={graph.CurrentQuery}
                     fetchCount={fetchCount}
                 />
             </TabsContent>

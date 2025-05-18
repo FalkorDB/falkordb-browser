@@ -8,9 +8,11 @@ import { handleZoomToFit, GraphRef } from "@/lib/utils";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Switch } from "@/components/ui/switch";
 import Button from "../components/ui/Button";
-import { GraphContext, IndicatorContext } from "../components/provider";
+import { IndicatorContext } from "../components/provider";
+import { Graph } from "../api/graph/model";
 
 interface Props {
+    graph: Graph,
     disabled: boolean,
     chartRef: GraphRef,
     handleCooldown: (ticks?: number) => void
@@ -19,6 +21,7 @@ interface Props {
 }
 
 export default function Controls({
+    graph,
     disabled,
     chartRef,
     handleCooldown,
@@ -27,7 +30,6 @@ export default function Controls({
 }: Props) {
 
     const { indicator } = useContext(IndicatorContext)
-    const { graph } = useContext(GraphContext)
 
     const handleZoomClick = (changeFactor: number) => {
         const chart = chartRef.current

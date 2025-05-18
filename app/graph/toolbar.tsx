@@ -1,14 +1,14 @@
 import { PlusCircle } from "lucide-react"
-import { Dispatch, SetStateAction, useContext, useEffect, useRef, useState } from "react"
+import { Dispatch, SetStateAction, useEffect, useRef, useState } from "react"
 import { cn, GraphRef, handleZoomToFit } from "@/lib/utils"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { Link, Node } from "../api/graph/model"
+import { Graph, Link, Node } from "../api/graph/model"
 import Input from "../components/ui/Input"
 import Button from "../components/ui/Button"
 import DeleteElement from "./DeleteElement"
-import { GraphContext } from "../components/provider"
 
 interface Props {
+    graph: Graph
     selectedElements: (Node | Link)[]
     setSelectedElement: Dispatch<SetStateAction<Node | Link | undefined>>
     handleDeleteElement: () => Promise<void>
@@ -20,6 +20,7 @@ interface Props {
 }
 
 export default function Toolbar({
+    graph,
     selectedElements,
     setSelectedElement,
     handleDeleteElement,
@@ -30,15 +31,13 @@ export default function Toolbar({
     label
 }: Props) {
 
+    const suggestionRef = useRef<HTMLUListElement>(null)
+
     const [suggestions, setSuggestions] = useState<(Node | Link)[]>([])
     const [suggestionIndex, setSuggestionIndex] = useState(0)
     const [searchElement, setSearchElement] = useState("")
     const [deleteOpen, setDeleteOpen] = useState(false)
     const [addOpen, setAddOpen] = useState(false)
-
-    const suggestionRef = useRef<HTMLUListElement>(null)
-
-    const { graph } = useContext(GraphContext)
 
     const scrollToSuggestion = (index: number) => {
         const suggestionElement = suggestionRef.current?.querySelector(`li:nth-child(${index + 1})`)

@@ -37,15 +37,17 @@ const STEP = 4
 
 export default function Combobox({ disabled = false, inTable, type = "Graph", label = type, options, setOptions, selectedValue, setSelectedValue, defaultOpen = false, onOpenChange }: ComboboxProps) {
 
-  const [openMenage, setOpenMenage] = useState<boolean>(false)
-  const [open, setOpen] = useState<boolean>(defaultOpen)
-  const [rows, setRows] = useState<Row[]>([])
-  const [search, setSearch] = useState<string>("")
-  const [filteredOptions, setFilteredOptions] = useState<string[]>([])
-  const [maxOptions, setMaxOptions] = useState<number>(STEP)
-  const { toast } = useToast()
-  const { data: session } = useSession()
   const { indicator, setIndicator } = useContext(IndicatorContext)
+  
+  const { data: session } = useSession()
+  const { toast } = useToast()
+  
+  const [filteredOptions, setFilteredOptions] = useState<string[]>([])
+  const [openMenage, setOpenMenage] = useState<boolean>(false)
+  const [maxOptions, setMaxOptions] = useState<number>(STEP)
+  const [open, setOpen] = useState<boolean>(defaultOpen)
+  const [search, setSearch] = useState<string>("")
+  const [rows, setRows] = useState<Row[]>([])
 
   useEffect(() => {
     const timeout = setTimeout(() => {

@@ -1,42 +1,43 @@
 'use client'
 
 import { useCallback, useContext, useEffect, useRef, useState } from "react";
-import { getQueryWithLimit, HistoryQuery, prepareArg, Query, securedFetch } from "@/lib/utils";
+import { getQueryWithLimit, prepareArg, securedFetch } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
 import dynamic from "next/dynamic";
 import { ForceGraphMethods } from "react-force-graph-2d";
-import { Category, Graph, GraphData, Link, Node } from "../api/graph/model";
+import { Category, Graph, GraphData, HistoryQuery, Link, Node } from "../api/graph/model";
 import Tutorial from "./Tutorial";
-import { GraphNameContext, GraphContext, IndicatorContext, LimitContext, TimeoutContext } from "../components/provider";
+import { GraphNameContext, GraphContext, IndicatorContext, LimitContext, TimeoutContext, GraphNamesContext } from "../components/provider";
 
 const Selector = dynamic(() => import("./Selector"), { ssr: false })
 const GraphView = dynamic(() => import("./GraphView"), { ssr: false })
 
 export default function Page() {
+    const { graphNames, setGraphNames } = useContext(GraphNamesContext)
+    const { setIndicator } = useContext(IndicatorContext);
+    const { graph, setGraph } = useContext(GraphContext)
+    const { graphName, setGraphName } = useContext(GraphNameContext)
+    const { timeout } = useContext(TimeoutContext);
+    const { limit } = useContext(LimitContext);
+
+    const { toast } = useToast()
+
+    const chartRef = useRef<ForceGraphMethods<Node, Link>>()
+
     const [selectedElement, setSelectedElement] = useState<Node | Link | undefined>()
     const [selectedElements, setSelectedElements] = useState<(Node | Link)[]>([])
     const [cooldownTicks, setCooldownTicks] = useState<number | undefined>(0)
+    const [categories, setCategories] = useState<Category<Node>[]>([])
+    const [data, setData] = useState<GraphData>({ ...graph.Elements })
     const [historyQuery, setHistoryQuery] = useState<HistoryQuery>({
         queries: [],
         query: "",
         currentQuery: "",
         counter: 0
     })
-    const [currentQuery, setCurrentQuery] = useState<Query>()
+    const [labels, setLabels] = useState<Category<Link>[]>([])
     const [nodesCount, setNodesCount] = useState(0)
     const [edgesCount, setEdgesCount] = useState(0)
-    const [labels, setLabels] = useState<Category<Link>[]>([])
-    const [categories, setCategories] = useState<Category<Node>[]>([])
-
-    const chartRef = useRef<ForceGraphMethods<Node, Link>>()
-
-    const { toast } = useToast()
-    const { setIndicator } = useContext(IndicatorContext);
-    const { graph, setGraph } = useContext(GraphContext)
-    const [data, setData] = useState<GraphData>({ ...graph.Elements })
-    const { graphName } = useContext(GraphNameContext)
-    const { timeout } = useContext(TimeoutContext);
-    const { limit } = useContext(LimitContext);
 
     useEffect(() => {
         setLabels([...graph.Labels])
@@ -139,12 +140,11 @@ export default function Page() {
             counter: 0
         }))
         localStorage.setItem("query history", JSON.stringify(queryArr))
-        const g = Graph.create(graphName, result, false, false, graph.Colors)
+        const g = Graph.create(graphName, result, false, false, graph.Colors, newQuery)
         setGraph(g)
         // eslint-disable-next-line @typescript-eslint/ban-ts-comment
         // @ts-ignore
         window.graph = g
-        setCurrentQuery(newQuery)
         fetchCount()
         handleCooldown()
     }
@@ -214,6 +214,11 @@ export default function Page() {
     return (
         <div className="Page">
             <Selector
+                graph={graph}
+                options={graphNames}
+                setOptions={setGraphNames}
+                graphName={graphName}
+                setGraphName={setGraphName}
                 runQuery={runQuery}
                 historyQuery={historyQuery}
                 setHistoryQuery={setHistoryQuery}
@@ -222,7 +227,7 @@ export default function Page() {
                 setSelectedElement={setSelectedElement}
                 handleDeleteElement={handleDeleteElement}
                 chartRef={chartRef}
-                currentQuery={currentQuery}
+                currentQuery={graph.CurrentQuery}
             />
             <div className="h-1 grow p-12">
                 <GraphView
@@ -231,7 +236,6 @@ export default function Page() {
                     setSelectedElement={setSelectedElement}
                     selectedElements={selectedElements}
                     setSelectedElements={setSelectedElements}
-                    currentQuery={currentQuery}
                     nodesCount={nodesCount}
                     edgesCount={edgesCount}
                     handleCooldown={handleCooldown}

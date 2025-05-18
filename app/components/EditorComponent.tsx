@@ -9,38 +9,15 @@ import { SetStateAction, Dispatch, useEffect, useRef, useState, useContext } fro
 import * as monaco from "monaco-editor";
 import { Minimize2 } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
-import { HistoryQuery, prepareArg, securedFetch } from "@/lib/utils";
+import { prepareArg, securedFetch } from "@/lib/utils";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import Button from "./ui/Button";
 import CloseDialog from "./CloseDialog";
-import { IndicatorContext, GraphContext } from "./provider";
-
-export const setTheme = (monacoI: Monaco, background = '#191919') => {
-    monacoI.editor.defineTheme('custom-theme', {
-        base: 'vs-dark',
-        inherit: true,
-        rules: [
-            { token: 'keyword', foreground: '#99E4E5' },
-            { token: 'function', foreground: '#DCDCAA' },
-            { token: 'type', foreground: '#89D86D' },
-            { token: 'string', foreground: '#CE9178' },
-            { token: 'number', foreground: '#b5cea8' },
-        ],
-        colors: {
-            'editor.background': background,
-            'editor.foreground': '#ffffff',
-            'editorSuggestWidget.background': '#272745',
-            'editorSuggestWidget.foreground': '#FFFFFF',
-            'editorSuggestWidget.selectedBackground': '#57577B',
-            'editorSuggestWidget.hoverBackground': '#28283F',
-            'focusBorder': '#00000000',
-        },
-    });
-
-    monacoI.editor.setTheme('custom-theme')
-}
+import { IndicatorContext } from "./provider";
+import { Graph, HistoryQuery } from "../api/graph/model";
 
 interface Props {
+    graph: Graph
     historyQuery: HistoryQuery
     maximize: boolean
     setMaximize: Dispatch<SetStateAction<boolean>>
@@ -195,7 +172,7 @@ const FUNCTIONS = [
     "vecf32",
     "vec.euclideanDistance",
     "vec.cosineDistance",
-]    
+]
 
 const SUGGESTIONS: monaco.languages.CompletionItem[] = [
     ...KEYWORDS.map(key => ({
@@ -220,21 +197,24 @@ const LINE_HEIGHT = 38
 
 const PLACEHOLDER = "Type your query here to start"
 
-export default function EditorComponent({ historyQuery, maximize, setMaximize, runQuery, setHistoryQuery }: Props) {
+export default function EditorComponent({ graph, historyQuery, maximize, setMaximize, runQuery, setHistoryQuery }: Props) {
 
-    const placeholderRef = useRef<HTMLDivElement>(null)
-    const [lineNumber, setLineNumber] = useState(1)
-    const [blur, setBlur] = useState(false)
-    const [sugDisposed, setSugDisposed] = useState<monaco.IDisposable>()
-    const [isLoading, setIsLoading] = useState(false)
-    const { toast } = useToast()
     const { indicator, setIndicator } = useContext(IndicatorContext)
-    const { graph } = useContext(GraphContext)
-    const graphIdRef = useRef(graph.Id)
-    const submitQuery = useRef<HTMLButtonElement>(null)
+
+    const { toast } = useToast()
+
     const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null)
+    const placeholderRef = useRef<HTMLDivElement>(null)
+    const submitQuery = useRef<HTMLButtonElement>(null)
     const containerRef = useRef<HTMLDivElement>(null)
     const indicatorRef = useRef(indicator)
+    const graphIdRef = useRef(graph.Id)
+
+    const [monacoEditor, setMonacoEditor] = useState<Monaco | null>(null)
+    const [sugDisposed, setSugDisposed] = useState<monaco.IDisposable>()
+    const [isLoading, setIsLoading] = useState(false)
+    const [lineNumber, setLineNumber] = useState(1)
+    const [blur, setBlur] = useState(false)
 
     useEffect(() => {
         indicatorRef.current = indicator
@@ -281,7 +261,6 @@ export default function EditorComponent({ historyQuery, maximize, setMaximize, r
             observer.disconnect()
         }
     }, [containerRef.current])
-
 
     const fetchSuggestions = async (detail: string): Promise<monaco.languages.CompletionItem[]> => {
         if (indicator === "offline") return []
@@ -388,16 +367,48 @@ export default function EditorComponent({ historyQuery, maximize, setMaximize, r
         return sug
     }
 
+    useEffect(() => {
+        if (monacoEditor) {
+            addSuggestions(monacoEditor)
+        }
+    }, [monacoEditor, graphIdRef.current])
+
+    const setTheme = (monacoI: Monaco) => {
+        monacoI.editor.defineTheme('custom-theme', {
+            base: 'vs-dark',
+            inherit: true,
+            rules: [
+                { token: 'keyword', foreground: '#99E4E5' },
+                { token: 'function', foreground: '#DCDCAA' },
+                { token: 'type', foreground: '#89D86D' },
+                { token: 'string', foreground: '#CE9178' },
+                { token: 'number', foreground: '#b5cea8' },
+            ],
+            colors: {
+                'editor.background': '#191919',
+                'editor.foreground': '#ffffff',
+                'editorSuggestWidget.background': '#272745',
+                'editorSuggestWidget.foreground': '#FFFFFF',
+                'editorSuggestWidget.selectedBackground': '#57577B',
+                'editorSuggestWidget.hoverBackground': '#28283F',
+                'focusBorder': '#00000000',
+            },
+        });
+
+        monacoI.editor.setTheme('custom-theme')
+    }
+
     const handleSubmit = async () => {
         try {
             setIsLoading(true)
-            await runQuery(historyQuery.query)
+            await runQuery(historyQuery.query.trim())
         } finally {
             setIsLoading(false)
         }
     }
 
     const handleEditorWillMount = async (monacoI: Monaco) => {
+        setMonacoEditor(monacoI)
 
         monacoI.languages.register({ id: "custom-language" })
 
@@ -449,6 +460,8 @@ export default function EditorComponent({ historyQuery, maximize, setMaximize, r
                 { open: "'", close: "'" }
             ]
         });
+
+        addSuggestions(monacoI)
 
         const provider = monacoI.languages.registerCompletionItemProvider("custom-language", {
             provideCompletionItems: async (model, position) => {
@@ -554,15 +567,15 @@ export default function EditorComponent({ historyQuery, maximize, setMaximize, r
             run: async () => {
                 setHistoryQuery(prev => {
                     if (prev.queries.length === 0) return prev
-                    
+
                     let counter
-                    
+
                     if (prev.counter) {
                         counter = prev.counter + 1 > prev.queries.length ? 0 : prev.counter + 1
                     } else {
                         counter = 0
                     }
-                    
+
                     return {
                         ...prev,
                         counter

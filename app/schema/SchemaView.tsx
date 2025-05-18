@@ -10,7 +10,7 @@ import SchemaDataPanel from "./SchemaDataPanel"
 import Labels from "../graph/labels"
 import { Category, Link, Node, GraphData } from "../api/graph/model"
 import CreateElement from "./SchemaCreateElement"
-import { IndicatorContext, GraphContext } from "../components/provider"
+import { IndicatorContext, SchemaContext } from "../components/provider"
 import Controls from "../graph/controls"
 import GraphDetails from "../graph/GraphDetails"
 
@@ -31,7 +31,7 @@ interface Props {
     setIsAddEntity: Dispatch<SetStateAction<boolean>>
     chartRef: GraphRef
     cooldownTicks: number | undefined
-    setCooldownTicks: Dispatch<SetStateAction<number | undefined>>
+    handleCooldown: () => void
     data: GraphData
     setData: Dispatch<SetStateAction<GraphData>>
     handleDeleteElement: () => Promise<void>
@@ -55,7 +55,7 @@ export default function SchemaView({
     setIsAddEntity,
     chartRef,
     cooldownTicks,
-    setCooldownTicks,
+    handleCooldown,
     data,
     setData,
     handleDeleteElement,
@@ -64,10 +64,12 @@ export default function SchemaView({
     labels,
     categories
 }: Props) {
-    const [selectedNodes, setSelectedNodes] = useState<[Node | undefined, Node | undefined]>([undefined, undefined]);
-    const { graph: schema } = useContext(GraphContext)
-    const { toast } = useToast()
     const { setIndicator } = useContext(IndicatorContext)
+    const { schema } = useContext(SchemaContext)
+    
+    const { toast } = useToast()
+    
+    const [selectedNodes, setSelectedNodes] = useState<[Node | undefined, Node | undefined]>([undefined, undefined]);
 
     useEffect(() => {
         setData({ ...schema.Elements })
@@ -86,10 +88,6 @@ export default function SchemaView({
     useEffect(() => {
         setSelectedNodes([undefined, undefined])
     }, [isAddRelation])
-
-    const handleCooldown = (ticks?: number) => {
-        setCooldownTicks(ticks)
-    }
 
     const onCategoryClick = (category: Category<Node>) => {
         category.show = !category.show
@@ -157,6 +155,7 @@ export default function SchemaView({
                 {
                     schema.getElements().length > 0 &&
                     <Controls
+                        graph={schema}
                         disabled={!schema.Id}
                         chartRef={chartRef}
                         handleCooldown={handleCooldown}
@@ -166,6 +165,7 @@ export default function SchemaView({
             </div>
             <div className="relative h-full w-full rounded-lg overflow-hidden">
                 <ForceGraph
+                    graph={schema}
                     chartRef={chartRef}
                     data={data}
                     setData={setData}
@@ -183,8 +183,8 @@ export default function SchemaView({
                 {
                     (categories.length > 0 || labels.length > 0) &&
                     <>
-                        <Labels type="Schema" className="left-2" label="Labels" categories={categories} onClick={onCategoryClick} />
-                        <Labels type="Schema" className="right-2 text-end" label="RelationshipTypes" categories={labels} onClick={onLabelClick} />
+                        <Labels graph={schema} type="Schema" className="left-2" label="Labels" categories={categories} onClick={onCategoryClick} />
+                        <Labels graph={schema} type="Schema" className="right-2 text-end" label="RelationshipTypes" categories={labels} onClick={onLabelClick} />
                     </>
                 }
                 {

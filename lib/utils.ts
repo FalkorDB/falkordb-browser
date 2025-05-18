@@ -19,19 +19,6 @@ export const screenSize = {
 
 export type GraphRef = MutableRefObject<ForceGraphMethods<Node, Link> | undefined>
 
-export interface HistoryQuery {
-  queries: Query[]
-  query: string
-  currentQuery: string
-  counter: number
-}
-
-export interface Query {
-  text: string
-  metadata: string[]
-  explain: string[]
-}
-
 export type SelectCell = {
   value: string,
   type: "select",
@@ -142,7 +129,7 @@ export function rgbToHSL(hex: string): string {
   return `hsl(${hDeg}, ${sPct}%, ${lPct}%)`;
 }
 
-export function handleZoomToFit(chartRef?: GraphRef, filter?: (node: Node) => boolean) {
+export function handleZoomToFit(chartRef?: GraphRef, filter?: (node: Node) => boolean, paddingMultiplier = 1) {
   const chart = chartRef?.current
   if (chart) {
     // Get canvas dimensions
@@ -152,7 +139,7 @@ export function handleZoomToFit(chartRef?: GraphRef, filter?: (node: Node) => bo
     // Calculate padding as 10% of the smallest canvas dimension, with minimum of 40px
     const minDimension = Math.min(canvas.width, canvas.height);
     const padding = minDimension * 0.1
-    chart.zoomToFit(1000, padding, filter)
+    chart.zoomToFit(1000, padding * paddingMultiplier, filter)
   }
 }
 

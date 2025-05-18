@@ -1,24 +1,29 @@
 'use client'
 
 import { useEffect, useState, useContext, useCallback, Dispatch, SetStateAction, useRef } from "react";
-import { cn, HistoryQuery, Query, securedFetch, GraphRef } from "@/lib/utils";
+import { cn, securedFetch, GraphRef } from "@/lib/utils";
 import { History, Info, Maximize2, RefreshCcw } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import * as monaco from "monaco-editor";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Editor, Monaco } from "@monaco-editor/react";
+import { Editor } from "@monaco-editor/react";
 import Combobox from "../components/ui/combobox";
 import Button from "../components/ui/Button";
-import { GraphNameContext, GraphNamesContext, IndicatorContext } from "../components/provider";
-import EditorComponent, { setTheme } from "../components/EditorComponent";
+import { IndicatorContext } from "../components/provider";
+import EditorComponent from "../components/EditorComponent";
 import DialogComponent from "../components/DialogComponent";
 import Input from "../components/ui/Input";
 import Toolbar from "./toolbar";
-import { Node, Link } from "../api/graph/model";
+import { Node, Link, Graph, Query, HistoryQuery } from "../api/graph/model";
 import { Explain, Metadata, Profile } from "./MetadataView";
 
 interface Props {
+    graph: Graph
+    options: string[]
+    setOptions: Dispatch<SetStateAction<string[]>>
+    graphName: string
+    setGraphName: Dispatch<SetStateAction<string>>
     runQuery?: (query: string) => Promise<void>
     historyQuery?: HistoryQuery
     setHistoryQuery?: Dispatch<SetStateAction<HistoryQuery>>
@@ -34,32 +39,29 @@ interface Props {
 
 const STEP = 8
 
-export default function Selector({ runQuery, historyQuery, setHistoryQuery, fetchCount, selectedElements, setSelectedElement, handleDeleteElement, chartRef, setIsAddEntity, setIsAddRelation, currentQuery }: Props) {
+export default function Selector({ graph, options, setOptions, graphName, setGraphName, runQuery, historyQuery, setHistoryQuery, fetchCount, selectedElements, setSelectedElement, handleDeleteElement, chartRef, setIsAddEntity, setIsAddRelation, currentQuery }: Props) {
+
+    const { indicator, setIndicator } = useContext(IndicatorContext)
+
+    const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null)
+    const submitQuery = useRef<HTMLButtonElement>(null)
+
+    const { toast } = useToast()
 
     const [filteredQueries, setFilteredQueries] = useState<Query[]>([])
     const [queriesOpen, setQueriesOpen] = useState(false)
     const [isRotating, setIsRotating] = useState(false);
     const [isLoading, setIsLoading] = useState(false)
+    const [stepCounter, setStepCounter] = useState(0)
     const [maximize, setMaximize] = useState(false)
     const [search, setSearch] = useState("")
-    const [stepCounter, setStepCounter] = useState(0)
     const [tab, setTab] = useState("")
-    const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null)
-    const submitQuery = useRef<HTMLButtonElement>(null)
-
-    const { toast } = useToast()
-    const { indicator, setIndicator } = useContext(IndicatorContext)
-    const { graphName, setGraphName } = useContext(GraphNameContext)
-    const { graphNames: options, setGraphNames: setOptions } = useContext(GraphNamesContext)
 
     const type = runQuery && historyQuery && setHistoryQuery ? "Graph" : "Schema"
     const pageCount = Math.ceil(filteredQueries.length / STEP)
     const startIndex = stepCounter ? stepCounter * STEP : 0
     const endIndex = startIndex + STEP
     const items = filteredQueries.slice(startIndex, Math.min(endIndex, filteredQueries.length))
-
-    console.log(startIndex, endIndex, items);
-    console.log(filteredQueries);
 
     useEffect(() => {
         if (!currentQuery) {
@@ -76,7 +78,7 @@ export default function Selector({ runQuery, historyQuery, setHistoryQuery, fetc
     const handleOnChange = useCallback(async (name: string) => {
         const formattedName = name === '""' ? "" : name
         setGraphName(formattedName)
-    }, [setGraphName, setIndicator, toast, type])
+    }, [setGraphName])
 
     const getOptions = useCallback(async () => {
         if (indicator === "offline") return
@@ -168,14 +170,10 @@ export default function Selector({ runQuery, historyQuery, setHistoryQuery, fetc
         });
     }
 
-    const handleEditorWillMount = (monacoI: Monaco) => {
-        setTheme(monacoI, "#242424")
-    }
-
     const handleSubmit = async () => {
         try {
             setIsLoading(true)
-            await runQuery!(historyQuery!.query)
+            await runQuery!(historyQuery!.query.trim())
             setQueriesOpen(false)
         } finally {
             setIsLoading(false)
@@ -210,6 +208,7 @@ export default function Selector({ runQuery, historyQuery, setHistoryQuery, fetc
                     <>
                         <div className="h-[56px] w-full relative overflow-visible">
                             <EditorComponent
+                                graph={graph}
                                 maximize={maximize}
                                 setMaximize={setMaximize}
                                 runQuery={runQuery}
@@ -347,11 +346,10 @@ export default function Selector({ runQuery, historyQuery, setHistoryQuery, fetc
                                                         query: value || ""
                                                     }))}
                                                     onMount={handleEditorDidMount}
-                                                    beforeMount={handleEditorWillMount}
                                                 />
                                             </TabsContent>
                                             <TabsContent className="w-full h-1 grow bg-background rounded-lg p-8" value="profile">
-                                                <Profile query={currentQuery!} fetchCount={fetchCount} />
+                                                <Profile graphName={graphName} query={currentQuery!} fetchCount={fetchCount} />
                                             </TabsContent>
                                             <TabsContent className="w-full h-1 grow bg-background rounded-lg p-8" value="metadata">
                                                 <Metadata query={currentQuery!} />
@@ -375,6 +373,7 @@ export default function Selector({ runQuery, historyQuery, setHistoryQuery, fetc
                     </>
                     : <div className="w-full h-[56px]">
                         <Toolbar
+                            graph={graph}
                             label={type}
                             selectedElements={selectedElements}
                             setSelectedElement={setSelectedElement}

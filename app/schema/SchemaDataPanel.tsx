@@ -31,25 +31,27 @@ interface Props {
 
 export default function SchemaDataPanel({ object, setObject, onDeleteElement, schema, setCategories }: Props) {
 
-    const [attribute, setAttribute] = useState<[string, string[]]>(getDefaultAttribute())
-    const [attributes, setAttributes] = useState<[string, string[]][]>([])
-    const [label, setLabel] = useState<string[]>([])
-    const [editable, setEditable] = useState<string>("")
-    const [hover, setHover] = useState<string>("")
-    const [labelsHover, setLabelsHover] = useState<boolean>(false)
-    const [labelsEditable, setLabelsEditable] = useState<boolean>(false)
-    const [newLabel, setNewLabel] = useState<string>("")
-    const [isAddValue, setIsAddValue] = useState<boolean>(false)
-    const [isAddLoading, setIsAddLoading] = useState<boolean>(false)
-    const [isRemoveLoading, setIsRemoveLoading] = useState<boolean>(false)
-    const [isSetLoading, setIsSetLoading] = useState<boolean>(false)
-    const [isLabelLoading, setIsLabelLoading] = useState<boolean>(false)
-    const [isRemoveLabelLoading, setIsRemoveLabelLoading] = useState<boolean>(false)
-    const [deleteOpen, setDeleteOpen] = useState<boolean>(false)
-    const type = !!object.category
-    const { toast } = useToast()
-    const { data: session } = useSession()
     const { indicator } = useContext(IndicatorContext)
+
+    const { data: session } = useSession()
+    const { toast } = useToast()
+    
+    const [attribute, setAttribute] = useState<[string, string[]]>(getDefaultAttribute())
+    const [isRemoveLabelLoading, setIsRemoveLabelLoading] = useState<boolean>(false)
+    const [attributes, setAttributes] = useState<[string, string[]][]>([])
+    const [isRemoveLoading, setIsRemoveLoading] = useState<boolean>(false)
+    const [labelsEditable, setLabelsEditable] = useState<boolean>(false)
+    const [isLabelLoading, setIsLabelLoading] = useState<boolean>(false)
+    const [isAddLoading, setIsAddLoading] = useState<boolean>(false)
+    const [isSetLoading, setIsSetLoading] = useState<boolean>(false)
+    const [labelsHover, setLabelsHover] = useState<boolean>(false)
+    const [isAddValue, setIsAddValue] = useState<boolean>(false)
+    const [deleteOpen, setDeleteOpen] = useState<boolean>(false)
+    const [editable, setEditable] = useState<string>("")
+    const [newLabel, setNewLabel] = useState<string>("")
+    const [label, setLabel] = useState<string[]>([])
+    const [hover, setHover] = useState<string>("")
+    const type = !!object.category
 
     useEffect(() => {
         setAttributes(Object.entries(object.data).filter(([key, val]) => !(key === "name" && Number(val) === object.id)).map(([key, val]) => [key, Array.isArray(val) ? val : (val as string).split(',')]))
