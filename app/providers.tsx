@@ -27,6 +27,16 @@ export default function NextAuthProvider({ children }: { children: React.ReactNo
   const schemaNameContext = useMemo(() => ({ schemaName, setSchemaName }), [schemaName, setSchemaName])
   const schemaNamesContext = useMemo(() => ({ schemaNames, setSchemaNames }), [schemaNames, setSchemaNames])
 
+  const handleOnSetGraphName = (newGraphName: string) => {
+    if (pathname.includes("/schema")) {
+      setSchemaName(newGraphName)
+      setSchemaNames(prev => [...prev, newGraphName])
+    } else {
+      setGraphName(newGraphName)
+      setGraphNames(prev => [...prev, newGraphName])
+    }
+  }
+
   return (
     <SessionProvider>
       <ThemeProvider attribute="class" enableSystem>
@@ -37,7 +47,7 @@ export default function NextAuthProvider({ children }: { children: React.ReactNo
                 <GraphContext.Provider value={graphContext}>
                   <GraphNameContext.Provider value={graphNameContext}>
                     <GraphNamesContext.Provider value={graphNamesContext}>
-                      {pathname !== "/" && pathname !== "/login" && <Header graphNames={pathname.includes("/schema") ? schemaNames : graphNames} onSetGraphName={pathname.includes("/schema") ? setSchemaName : setGraphName} />}
+                      {pathname !== "/" && pathname !== "/login" && <Header graphNames={pathname.includes("/schema") ? schemaNames : graphNames} onSetGraphName={handleOnSetGraphName} />}
                       {children}
                     </GraphNamesContext.Provider>
                   </GraphNameContext.Provider>
