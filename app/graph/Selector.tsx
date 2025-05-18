@@ -2,7 +2,6 @@
 
 import { useEffect, useState, useContext, useCallback, Dispatch, SetStateAction, useRef } from "react";
 import { cn, HistoryQuery, Query, securedFetch, GraphRef } from "@/lib/utils";
-import { useSession } from "next-auth/react";
 import { History, Info, Maximize2, RefreshCcw } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { DialogTitle } from "@/components/ui/dialog";
@@ -10,7 +9,6 @@ import * as monaco from "monaco-editor";
 import { Editor } from "@monaco-editor/react";
 import Combobox from "../components/ui/combobox";
 import Button from "../components/ui/Button";
-import CreateGraph from "../components/CreateGraph";
 import { GraphNameContext, GraphNamesContext, IndicatorContext } from "../components/provider";
 import EditorComponent from "../components/EditorComponent";
 import DialogComponent from "../components/DialogComponent";
@@ -43,7 +41,6 @@ export default function Selector({ runQuery, historyQuery, setHistoryQuery, fetc
     const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null)
 
     const { toast } = useToast()
-    const { data: session } = useSession()
     const { indicator, setIndicator } = useContext(IndicatorContext)
     const { graphName, setGraphName } = useContext(GraphNameContext)
     const { graphNames: options, setGraphNames: setOptions } = useContext(GraphNamesContext)
@@ -139,17 +136,6 @@ export default function Selector({ runQuery, historyQuery, setHistoryQuery, fetc
 
     return (
         <div className="z-20 absolute top-5 inset-x-24 h-[56px] flex flex-row gap-4 items-center">
-            {
-                session?.user?.role !== "Read-Only" &&
-                <CreateGraph
-                    type={type}
-                    graphNames={options}
-                    onSetGraphName={(name) => {
-                        handleOnChange(name)
-                        setOptions(prev => [...prev, name])
-                    }}
-                />
-            }
             <div className="p-2 border rounded-lg overflow-hidden bg-foreground">
                 <Button
                     data-testid={`reload${type}sList`}

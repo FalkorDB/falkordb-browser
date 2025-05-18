@@ -28,7 +28,7 @@ export default function Header({ onSetGraphName, graphNames }: Props) {
     const pathname = usePathname()
     const type = pathname.includes("/schema") ? "Schema" : "Graph"
     const { data: session } = useSession()
-    const showCreate = !pathname.includes("/create") && session?.user?.role !== "Read-Only"
+    const showCreate = (pathname.includes("/graph") || pathname.includes("/schema")) && session?.user?.role !== "Read-Only"
     const { indicator } = useContext(IndicatorContext)
 
     return (
@@ -42,6 +42,15 @@ export default function Header({ onSetGraphName, graphNames }: Props) {
                 >
                     <Image style={{ width: 'auto', height: 'auto' }} priority src="/Logo.svg" alt="FalkorDB Logo" width={0} height={0} />
                 </Link>
+                {
+                    showCreate &&
+                    <CreateGraph
+                        label="Header"
+                        onSetGraphName={onSetGraphName}
+                        type={type}
+                        graphNames={graphNames}
+                    />
+                }
                 <div className="flex flex-col gap-2 items-center">
                     <Button
                         label="GRAPHS"
@@ -123,18 +132,6 @@ export default function Header({ onSetGraphName, graphNames }: Props) {
                         </div>
                     </DrawerContent>
                 </Drawer>
-                {
-                    showCreate &&
-                    <>
-                        <div className="h-[1px] w-[80%] bg-white" />
-                        <CreateGraph
-                            label="Header"
-                            onSetGraphName={onSetGraphName}
-                            type={type}
-                            graphNames={graphNames}
-                        />
-                    </>
-                }
                 {
                     indicator === "offline" &&
                     <>
