@@ -6,7 +6,7 @@
 
 import { prepareArg, securedFetch } from "@/lib/utils";
 import { Dispatch, SetStateAction, useContext, useEffect, useRef, useState } from "react";
-import { Check, Pencil, X } from "lucide-react";
+import { Check, Pencil, Plus, Trash2, X } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { useSession } from "next-auth/react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -25,20 +25,29 @@ interface Props {
 }
 
 export default function GraphDataPanel({ object, setObject, onDeleteElement, setCategories }: Props) {
-
-    const [selectedLabel, setSelectedLabel] = useState<string>("")
-    const [label, setLabel] = useState<string[]>([]);
-    const [labelsHover, setLabelsHover] = useState(false)
-    const [labelsEditable, setLabelsEditable] = useState(false)
-    const [newLabel, setNewLabel] = useState("")
-    const type = !("source" in object)
-    const [isLabelLoading, setIsLabelLoading] = useState(false)
-    const { toast } = useToast()
-    const { data: session } = useSession()
     const { indicator, setIndicator } = useContext(IndicatorContext)
     const { graph } = useContext(GraphContext)
+
     const lastObjId = useRef<number | undefined>(undefined)
     const labelsListRef = useRef<HTMLUListElement>(null)
+
+    const { toast } = useToast()
+    const { data: session } = useSession()
+
+    const [selectedLabel, setSelectedLabel] = useState<string>("")
+    const [labelsEditable, setLabelsEditable] = useState(false)
+    const [isLabelLoading, setIsLabelLoading] = useState(false)
+    const [showAsDialog, setShowAsDialog] = useState(false)
+    const [labelsHover, setLabelsHover] = useState(false)
+    const [label, setLabel] = useState<string[]>([]);
+    const [newLabel, setNewLabel] = useState("")
+    const type = !("source" in object)
+
+    useEffect(() => {
+        if (labelsListRef.current && !labelsEditable) {
+            setShowAsDialog(labelsListRef.current.clientHeight > 80)
+        }
+    }, [labelsListRef.current?.clientHeight, labelsEditable])
 
     useEffect(() => {
         if (lastObjId.current !== object.id) {
@@ -103,9 +112,65 @@ export default function GraphDataPanel({ object, setObject, onDeleteElement, set
             setCategories([...graph.Categories])
             setLabel([...node.category])
         }
+
+        setShowAsDialog(false)
     }
 
-    return false ? (
+    return showAsDialog ? (
+        <Dialog open>
+            <DialogContent className="flex flex-col bg-foreground w-[80%] h-[90%] rounded-lg border-none gap-8 p-8" disableClose>
+                <DialogHeader className="flex-row justify-between items-center border-b pb-4">
+                    <div className="flex flex-col gap-2">
+                        <DialogTitle>Graph ID: <span className="Gradient text-transparent bg-clip-text">{object.id}</span></DialogTitle>
+                        <p data-testid="DataPanelAttributesCount" className="font-medium text-xl text-nowrap">Attributes: <span className="Gradient text-transparent bg-clip-text">{Object.keys(object.data).length}</span></p>
+                    </div>
+                    <Button
+                        onClick={() => setObject(undefined)}
+                    >
+                        <X />
+                    </Button>
+                </DialogHeader>
+                <div className="h-1 grow flex gap-8">
+                    <PaginationList
+                        label="Label"
+                        className="w-[40%] bg-background rounded-lg"
+                        list={label}
+                        step={12}
+                        dataTestId="attributes"
+                        onClick={(l) => setSelectedLabel(l)}
+                        isSelected={(item) => item === selectedLabel}
+                        afterSearchCallback={() => { }}
+                    >
+                        <Button
+                            variant="Primary"
+                            label="Add Label"
+                            title=""
+                            onClick={() => setLabelsEditable(true)}
+                        >
+                            <Plus size={15} />
+                        </Button>
+                        <Button
+                            variant="Delete"
+                            label="Delete Label"
+                            title=""
+                            onClick={() => handleRemoveLabel(selectedLabel)}
+                        >
+                            <Trash2 size={15} />
+                        </Button>
+                    </PaginationList>
+                    <div className="w-[60%] bg-background rounded-lg flex flex-col gap-4">
+                        <GraphDataTable
+                            graph={graph}
+                            object={object}
+                            type={type}
+                            onDeleteElement={onDeleteElement}
+                            lastObjId={lastObjId}
+                        />
+                    </div>
+                </div>
+            </DialogContent>
+        </Dialog>
+    ) : (
         <div data-testid="DataPanel" className="DataPanel">
             <div className="relative flex justify-between items-center p-6">
                 <Button
@@ -134,9 +199,10 @@ export default function GraphDataPanel({ object, setObject, onDeleteElement, set
                                 session?.user?.role !== "Read-Only" &&
                                 <Button
                                     data-testid={`DataPanelRemoveLabel${l}`}
-                                    title="Remove"
+                                    title="Remove Label"
                                     onClick={() => handleRemoveLabel(l)}
                                     indicator={indicator}
+                                    tooltipVariant="Delete"
                                 >
                                     <X size={15} />
                                 </Button>
@@ -150,8 +216,8 @@ export default function GraphDataPanel({ object, setObject, onDeleteElement, set
                                 data-testid="DataPanelAddLabel"
                                 className="p-2 text-xs justify-center border border-background"
                                 variant="Secondary"
-                                label="Add"
-                                title="Add a new label"
+                                label="Add Label"
+                                title=""
                                 onClick={() => setLabelsEditable(true)}
                             >
                                 <Pencil size={15} />
@@ -212,7 +278,10 @@ export default function GraphDataPanel({ object, setObject, onDeleteElement, set
                         }
                     </li>
                 </ul>
-                <p data-testid="DataPanelAttributesCount" className="font-medium text-xl text-nowrap">{Object.keys(object.data).length}&ensp;Attributes</p>
+                <div className="flex flex-col items-center gap-2 font-medium text-xl text-nowrap">
+                    <p>Graph ID: <span className="Gradient text-transparent bg-clip-text">{object.id}</span></p>
+                    <p data-testid="DataPanelAttributesCount">Attributes: <span className="Gradient text-transparent bg-clip-text">{Object.keys(object.data).length}</span></p>
+                </div>
             </div>
             <GraphDataTable
                 lastObjId={lastObjId}
@@ -222,41 +291,5 @@ export default function GraphDataPanel({ object, setObject, onDeleteElement, set
                 onDeleteElement={onDeleteElement}
             />
         </div >
-    ) : (
-        <Dialog open>
-            <DialogContent className="flex flex-col bg-foreground w-[80%] h-[90%] rounded-lg border-none gap-8 p-8" disableClose>
-                <Button
-                    className="absolute top-2 right-2"
-
-                    onClick={() => setObject(undefined)}
-                >
-                    <X size={15} />
-                </Button>
-                <DialogHeader className="flex-row justify-between items-center border-b pb-4">
-                    <DialogTitle>Graph ID: {object.id}</DialogTitle>
-                    <p data-testid="DataPanelAttributesCount" className="font-medium text-xl text-nowrap">{Object.keys(object.data).length}&ensp;Attributes</p>
-                </DialogHeader>
-                <div className="h-1 grow flex gap-8">
-                    <PaginationList
-                        className="w-[40%] bg-background rounded-lg"
-                        list={label}
-                        step={12}
-                        dataTestId="attributes"
-                        onClick={(l) => setSelectedLabel(l)}
-                        isSelected={(item) => item === selectedLabel}
-                        afterSearchCallback={() => { }}
-                    />
-                    <div className="w-[60%] bg-background rounded-lg flex flex-col gap-4">
-                        <GraphDataTable
-                            graph={graph}
-                            object={object}
-                            type={type}
-                            onDeleteElement={onDeleteElement}
-                            lastObjId={lastObjId}
-                        />
-                    </div>
-                </div>
-            </DialogContent>
-        </Dialog>
     )
 }

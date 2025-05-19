@@ -8,15 +8,17 @@ type Item = string | Query
 
 interface Props<T extends Item> {
     list: T[]
-    className?: string
     step: number
     onClick: (label: string) => void
     dataTestId: string
+    label: string
     afterSearchCallback: (newFilteredList: T[]) => void
     isSelected: (item: T) => boolean
+    className?: string
+    children?: React.ReactNode
 }
 
-export default function PaginationList<T extends Item>({ list, step, onClick, className = "", dataTestId, afterSearchCallback, isSelected }: Props<T>) {
+export default function PaginationList<T extends Item>({ list, step, onClick, className = "", dataTestId, afterSearchCallback, isSelected, label, children }: Props<T>) {
     const [filteredList, setFilteredList] = useState<T[]>(list)
     const [stepCounter, setStepCounter] = useState(0)
     const [pageCount, setPageCount] = useState(0)
@@ -51,9 +53,15 @@ export default function PaginationList<T extends Item>({ list, step, onClick, cl
                 data-testid="queryHistorySearch"
                 className="w-full bg-foreground text-white"
                 value={search}
-                placeholder="Search for a query"
+                placeholder={`Search for a ${label}`}
                 onChange={(e) => setSearch(e.target.value)}
             />
+            {
+                children &&
+                <div className="flex gap-2 items-center">
+                    {children}
+                </div>
+            }
             <ul
                 data-testid={dataTestId}
                 className="h-1 grow flex flex-col p-6"
@@ -101,4 +109,5 @@ export default function PaginationList<T extends Item>({ list, step, onClick, cl
 
 PaginationList.defaultProps = {
     className: "",
+    children: undefined
 }

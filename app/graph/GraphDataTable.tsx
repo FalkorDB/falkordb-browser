@@ -188,11 +188,6 @@ export default function GraphDataTable({ graph, object, type, onDeleteElement, l
                     </TableRow>
                 </TableHeader>
                 <TableBody>
-                    <TableRow>
-                        <TableCell />
-                        <TableCell>id:</TableCell>
-                        <TableCell>{object.id}</TableCell>
-                    </TableRow>
                     {
                         attributes.map((key) => (
                             <TableRow

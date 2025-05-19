@@ -219,6 +219,7 @@ export default function Selector({ graph, options, setOptions, graphName, setGra
                                 >
                                     <div className="h-1 grow flex gap-8 p-8">
                                         <PaginationList
+                                            label="Query"
                                             className="w-[40%] bg-background rounded-lg"
                                             isSelected={(item) => historyQuery.queries.findIndex(q => q.text === item.text) + 1 === historyQuery.counter}
                                             afterSearchCallback={(newFilteredList) => {
