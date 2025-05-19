@@ -324,7 +324,6 @@ export default function SchemaCreateElement({ onCreate, setIsAdd, selectedNodes,
                               return p
                             })}
                             inTable
-
                             label="Type"
                             selectedValue={attribute[1][0]}
                           />

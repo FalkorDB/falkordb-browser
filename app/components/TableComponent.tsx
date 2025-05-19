@@ -196,6 +196,7 @@ export default function TableComponent({ headers, rows, label, children, setRows
                                                             {
                                                                 cell.type === "select" ?
                                                                     <Combobox
+                                                                        inTable
                                                                         options={cell.options}
                                                                         setSelectedValue={async (value) => {
                                                                             const result = await cell.onChange(value)
