@@ -6,16 +6,17 @@
 
 import { prepareArg, securedFetch } from "@/lib/utils";
 import { Dispatch, SetStateAction, useContext, useEffect, useRef, useState } from "react";
-import { Check, Pencil, Plus, Trash2, X } from "lucide-react";
+import { Pencil, X } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { useSession } from "next-auth/react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import Button from "../components/ui/Button";
 import { Category, Link, Node } from "../api/graph/model";
-import Input from "../components/ui/Input";
 import { IndicatorContext, GraphContext } from "../components/provider";
 import GraphDataTable from "./GraphDataTable";
 import PaginationList from "../components/PaginationList";
+import AddLabel from "./addLabel";
+import RemoveLabel from "./RemoveLabel";
 
 interface Props {
     object: Node | Link;
@@ -25,7 +26,7 @@ interface Props {
 }
 
 export default function GraphDataPanel({ object, setObject, onDeleteElement, setCategories }: Props) {
-    const { indicator, setIndicator } = useContext(IndicatorContext)
+    const { setIndicator } = useContext(IndicatorContext)
     const { graph } = useContext(GraphContext)
 
     const lastObjId = useRef<number | undefined>(undefined)
@@ -35,30 +36,26 @@ export default function GraphDataPanel({ object, setObject, onDeleteElement, set
     const { data: session } = useSession()
 
     const [selectedLabel, setSelectedLabel] = useState<string>("")
-    const [labelsEditable, setLabelsEditable] = useState(false)
-    const [isLabelLoading, setIsLabelLoading] = useState(false)
     const [showAsDialog, setShowAsDialog] = useState(false)
     const [labelsHover, setLabelsHover] = useState(false)
     const [label, setLabel] = useState<string[]>([]);
-    const [newLabel, setNewLabel] = useState("")
     const type = !("source" in object)
 
     useEffect(() => {
-        if (labelsListRef.current && !labelsEditable) {
+        if (labelsListRef.current) {
             setShowAsDialog(labelsListRef.current.clientHeight > 80)
         }
-    }, [labelsListRef.current?.clientHeight, labelsEditable])
+    }, [labelsListRef.current?.clientHeight])
 
     useEffect(() => {
         if (lastObjId.current !== object.id) {
-            setLabelsEditable(false)
             setLabelsHover(false)
         }
         setLabel(type ? [...object.category.filter((c) => c !== "")] : [object.label]);
         lastObjId.current = object.id
     }, [object, type]);
 
-    const handleAddLabel = async () => {
+    const handleAddLabel = async (newLabel: string) => {
         const node = object as Node
         if (newLabel === "") {
             toast({
@@ -66,7 +63,7 @@ export default function GraphDataPanel({ object, setObject, onDeleteElement, set
                 description: "Please fill the label",
                 variant: "destructive"
             })
-            return
+            return false
         }
         if (label.includes(newLabel)) {
             toast({
@@ -74,27 +71,23 @@ export default function GraphDataPanel({ object, setObject, onDeleteElement, set
                 description: "Label already exists",
                 variant: "destructive"
             })
-            return
+            return false
         }
-        try {
-            setIsLabelLoading(true)
-            const result = await securedFetch(`api/graph/${prepareArg(graph.Id)}/${node.id}/label`, {
-                method: "POST",
-                body: JSON.stringify({
-                    label: newLabel
-                })
-            }, toast, setIndicator)
+        const result = await securedFetch(`api/graph/${prepareArg(graph.Id)}/${node.id}/label`, {
+            method: "POST",
+            body: JSON.stringify({
+                label: newLabel
+            })
+        }, toast, setIndicator)
 
-            if (result.ok) {
-                graph.addCategory(newLabel, node)
-                setCategories([...graph.Categories])
-                setLabel([...node.category])
-                setNewLabel("")
-                setLabelsEditable(false)
-            }
-        } finally {
-            setIsLabelLoading(false)
+        if (result.ok) {
+            graph.addCategory(newLabel, node)
+            setCategories([...graph.Categories])
+            setLabel([...node.category])
+            return true
         }
+
+        return false
     }
 
     const handleRemoveLabel = async (removeLabel: string) => {
@@ -111,9 +104,12 @@ export default function GraphDataPanel({ object, setObject, onDeleteElement, set
             graph.removeCategory(removeLabel, node)
             setCategories([...graph.Categories])
             setLabel([...node.category])
+            setShowAsDialog(false)
+            return true
         }
 
-        setShowAsDialog(false)
+        return false
+
     }
 
     return showAsDialog ? (
@@ -137,26 +133,16 @@ export default function GraphDataPanel({ object, setObject, onDeleteElement, set
                         list={label}
                         step={12}
                         dataTestId="attributes"
-                        onClick={(l) => setSelectedLabel(l)}
+                        onClick={(l) => selectedLabel === l ? setSelectedLabel("") : setSelectedLabel(l)}
                         isSelected={(item) => item === selectedLabel}
-                        afterSearchCallback={() => { }}
+                        afterSearchCallback={(filteredList) => {
+                            if (!filteredList.includes(selectedLabel)) {
+                                setSelectedLabel("")
+                            }
+                        }}
                     >
-                        <Button
-                            variant="Primary"
-                            label="Add Label"
-                            title=""
-                            onClick={() => setLabelsEditable(true)}
-                        >
-                            <Plus size={15} />
-                        </Button>
-                        <Button
-                            variant="Delete"
-                            label="Delete Label"
-                            title=""
-                            onClick={() => handleRemoveLabel(selectedLabel)}
-                        >
-                            <Trash2 size={15} />
-                        </Button>
+                        <AddLabel onAddLabel={handleAddLabel} />
+                        <RemoveLabel onRemoveLabel={handleRemoveLabel} selectedLabel={selectedLabel} />
                     </PaginationList>
                     <div className="w-[60%] bg-background rounded-lg flex flex-col gap-4">
                         <GraphDataTable
@@ -197,84 +183,39 @@ export default function GraphDataPanel({ object, setObject, onDeleteElement, set
                             <p>{l}</p>
                             {
                                 session?.user?.role !== "Read-Only" &&
-                                <Button
-                                    data-testid={`DataPanelRemoveLabel${l}`}
-                                    title="Remove Label"
-                                    onClick={() => handleRemoveLabel(l)}
-                                    indicator={indicator}
-                                    tooltipVariant="Delete"
-                                >
-                                    <X size={15} />
-                                </Button>
+                                <RemoveLabel
+                                    onRemoveLabel={handleRemoveLabel}
+                                    selectedLabel={l}
+                                    trigger={
+                                        <Button
+                                            data-testid={`DataPanelRemoveLabel${l}`}
+                                            title="Remove Label"
+                                            tooltipVariant="Delete"
+                                        >
+                                            <X size={15} />
+                                        </Button>
+                                    }
+                                />
                             }
                         </li>
                     ))}
                     <li className="h-8 flex flex-wrap gap-2">
                         {
-                            type && (labelsHover || label.length === 0) && !labelsEditable && session?.user?.role !== "Read-Only" &&
-                            <Button
-                                data-testid="DataPanelAddLabel"
-                                className="p-2 text-xs justify-center border border-background"
-                                variant="Secondary"
-                                label="Add Label"
-                                title=""
-                                onClick={() => setLabelsEditable(true)}
-                            >
-                                <Pencil size={15} />
-                            </Button>
-                        }
-                        {
-                            labelsEditable &&
-                            <>
-                                <Input
-                                    data-testid="DataPanelAddLabelInput"
-                                    ref={ref => ref?.focus()}
-                                    className="max-w-[50%] h-full bg-background border-none text-white"
-                                    value={newLabel}
-                                    onChange={(e) => setNewLabel(e.target.value)}
-                                    onKeyDown={(e) => {
-
-                                        if (e.key === "Escape") {
-                                            e.preventDefault()
-                                            setLabelsEditable(false)
-                                            setNewLabel("")
-                                        }
-
-                                        if (e.key !== "Enter" || isLabelLoading) return
-
-                                        e.preventDefault()
-                                        handleAddLabel()
-                                    }}
-                                />
-                                <Button
-                                    data-testid="DataPanelAddLabelConfirm"
-                                    className="p-2 text-xs justify-center border border-background"
-                                    variant="Secondary"
-                                    label="Save"
-                                    title="Save the new label"
-                                    onClick={() => handleAddLabel()}
-                                    isLoading={isLabelLoading}
-                                    indicator={indicator}
-                                >
-                                    <Check size={15} />
-                                </Button>
-                                {
-                                    !isLabelLoading &&
+                            type && (labelsHover || label.length === 0) && session?.user?.role !== "Read-Only" &&
+                            <AddLabel
+                                onAddLabel={handleAddLabel}
+                                trigger={
                                     <Button
-                                        data-testid="DataPanelAddLabelCancel"
+                                        data-testid="DataPanelAddLabel"
                                         className="p-2 text-xs justify-center border border-background"
                                         variant="Secondary"
-                                        label="Cancel"
-                                        title="Discard new label"
-                                        onClick={() => {
-                                            setLabelsEditable(false)
-                                            setNewLabel("")
-                                        }}
+                                        label="Add Label"
+                                        title=""
                                     >
-                                        <X size={15} />
+                                        <Pencil size={15} />
                                     </Button>
                                 }
-                            </>
+                            />
                         }
                     </li>
                 </ul>
