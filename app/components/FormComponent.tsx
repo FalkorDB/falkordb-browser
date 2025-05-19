@@ -171,7 +171,7 @@ export default function FormComponent({ handleSubmit, fields, error = undefined,
                 })
             }
             {children}
-            {error?.show && <p className="text-sm text-red-500">{error.message}</p>}
+            {error && <p className="text-sm text-red-500 h-5">{error.show ? error.message : ""}</p>}
             <div className="flex justify-end gap-2 mt-10">
                 <Button
                     className="grow bg-primary p-4 rounded-lg flex justify-center items-center gap-2"
