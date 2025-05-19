@@ -73,16 +73,16 @@ export default function Users() {
                         value: username,
                         type: "readonly"
                     }, username === "default" ? {
-                        type: "readonly",
                         value: role,
+                        type: "readonly",
                     } : {
                         value: role,
+                        type: "select",
                         onChange: async (value: string) => {
                             setNewUser({ username, role: value, oldRole: role })
                             setOpen(true)
                             return true
                         },
-                        type: "select",
                         options: ROLES,
                         selectType: "Role"
                     }],
@@ -110,14 +110,15 @@ export default function Users() {
             setRows(prev => [...prev, {
                 cells: [{
                     value: username,
+                    type: "readonly"
                 }, {
                     value: role,
                     onChange: (value: string) => {
                         setNewUser({ username, role: value, oldRole: role })
                         setOpen(true)
                     },
-                    type: "combobox",
-                    comboboxType: "Role"
+                    type: "select",
+                    selectType: "Role"
                 }],
                 checked: false,
             }] as Row[])

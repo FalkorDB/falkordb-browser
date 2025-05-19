@@ -129,7 +129,6 @@ export default function FormComponent({ handleSubmit, fields, error = undefined,
                                 {
                                     field.type === "select" ?
                                         <Combobox
-                                            inTable
                                             options={field.options}
                                             label={field.selectType}
                                             selectedValue={field.value}

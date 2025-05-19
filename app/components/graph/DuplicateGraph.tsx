@@ -1,12 +1,12 @@
 import { FormEvent, useContext, useState } from "react";
 import { prepareArg, securedFetch } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
-import DialogComponent from "../components/DialogComponent";
-import Button from "../components/ui/Button";
-import Input from "../components/ui/Input";
-import { IndicatorContext } from "../components/provider";
+import DialogComponent from "../DialogComponent";
+import Button from "../ui/Button";
+import Input from "../ui/Input";
+import { IndicatorContext } from "../provider";
 
-export default function Duplicate({ open, onOpenChange, selectedValue, onDuplicate, disabled, type }: {
+export default function DuplicateGraph({ open, onOpenChange, selectedValue, onDuplicate, disabled, type }: {
     selectedValue: string,
     open: boolean,
     onOpenChange: (open: boolean) => void
@@ -22,8 +22,16 @@ export default function Duplicate({ open, onOpenChange, selectedValue, onDuplica
 
     const handleDuplicate = async (e: FormEvent) => {
         e.preventDefault()
-        try {
 
+        if (duplicateName === "") {
+            toast({
+                title: "Error",
+                description: "Graph name cannot be empty",
+            })
+            return
+        }
+
+        try {
             setIsLoading(true)
             const result = await securedFetch(`api/${type === "Graph" ? "graph" : "schema"}/${prepareArg(duplicateName)}/duplicate/?sourceName=${prepareArg(selectedValue)}`, {
                 method: "PATCH"
@@ -47,6 +55,7 @@ export default function Duplicate({ open, onOpenChange, selectedValue, onDuplica
             open={open}
             onOpenChange={onOpenChange}
             trigger={<Button
+                variant="Primary"
                 label="Duplicate"
                 title={`Create a copy of the selected ${type}`}
                 disabled={disabled}
@@ -57,13 +66,16 @@ export default function Duplicate({ open, onOpenChange, selectedValue, onDuplica
             <form onSubmit={handleDuplicate} className="flex flex-col gap-12">
                 <div className="flex flex-col gap-4">
                     <Input
+                        data-testid={`duplicate${type}Input`}
+                        ref={ref => ref?.focus()}
+                        variant="primary"
                         placeholder={`Enter a name for the duplicated ${type}`}
                         onChange={(e) => setDuplicateName(e.target.value)}
-                        required
                     />
                 </div>
                 <div className="flex gap-4">
                     <Button
+                        data-testid={`duplicate${type}Confirm`}
                         indicator={indicator}
                         variant="Primary"
                         label="Duplicate"
@@ -72,6 +84,7 @@ export default function Duplicate({ open, onOpenChange, selectedValue, onDuplica
                         isLoading={isLoading}
                     />
                     <Button
+                        data-testid={`duplicate${type}Cancel`}
                         variant="Secondary"
                         label="Cancel"
                         title={`Cancel the duplication of the ${type}`}
