@@ -12,6 +12,7 @@ import { useToast } from "@/components/ui/use-toast"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { useSession } from "next-auth/react"
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden"
+import { RefreshCcw } from "lucide-react"
 import Button from "./Button"
 import TableComponent from "../TableComponent"
 import CloseDialog from "../CloseDialog"
@@ -19,6 +20,7 @@ import ExportGraph from "../ExportGraph"
 import DeleteGraph from "../graph/DeleteGraph"
 import Input from "./Input"
 import { IndicatorContext } from "../provider"
+import DuplicateGraph from "../graph/DuplicateGraph"
 
 interface ComboboxProps {
   options: string[],
@@ -30,7 +32,7 @@ interface ComboboxProps {
   label?: "Graph" | "Schema" | "Role" | "Type",
   setOptions?: (value: string[]) => void,
   defaultOpen?: boolean,
-  onOpenChange?: (open: boolean) => void
+  onOpenChange?: (open: boolean) => Promise<void>
 }
 
 const STEP = 4
@@ -38,14 +40,16 @@ const STEP = 4
 export default function Combobox({ disabled = false, inTable, type = "Graph", label = type, options, setOptions, selectedValue, setSelectedValue, defaultOpen = false, onOpenChange }: ComboboxProps) {
 
   const { indicator, setIndicator } = useContext(IndicatorContext)
-  
+
   const { data: session } = useSession()
   const { toast } = useToast()
-  
+
   const [filteredOptions, setFilteredOptions] = useState<string[]>([])
+  const [isLoading, setIsLoading] = useState<boolean>(false)
   const [openMenage, setOpenMenage] = useState<boolean>(false)
   const [maxOptions, setMaxOptions] = useState<number>(STEP)
   const [open, setOpen] = useState<boolean>(defaultOpen)
+  const [openDuplicate, setOpenDuplicate] = useState<boolean>(false)
   const [search, setSearch] = useState<string>("")
   const [rows, setRows] = useState<Row[]>([])
 
@@ -93,9 +97,16 @@ export default function Combobox({ disabled = false, inTable, type = "Graph", la
         value={selectedValue}
         onValueChange={setSelectedValue}
         open={open}
-        onOpenChange={(o) => {
+        onOpenChange={async (o) => {
           setOpen(o)
-          if (onOpenChange) onOpenChange(o)
+          if (onOpenChange) {
+            try {
+              setIsLoading(o)
+              await onOpenChange(o)
+            } finally {
+              setIsLoading(false)
+            }
+          }
         }}
       >
         <Tooltip>
@@ -103,7 +114,7 @@ export default function Combobox({ disabled = false, inTable, type = "Graph", la
             <SelectTrigger
               data-testid={`select${label}`}
               data-type="select"
-              className={cn("w-fit gap-2 items-center border p-2 disabled:text-gray-400 disabled:opacity-100 disabled:cursor-not-allowed max-w-[10%]", inTable ? "text-sm font-light" : "text-xl font-medium")}
+              className={cn("w-fit gap-2 items-center border p-2 disabled:text-gray-400 disabled:opacity-100 disabled:cursor-not-allowed", type === label && "max-w-[15%]", inTable ? "text-sm font-light" : "text-xl font-medium")}
             >
               <SelectValue placeholder={`Select ${label}`} />
             </SelectTrigger>
@@ -113,12 +124,12 @@ export default function Combobox({ disabled = false, inTable, type = "Graph", la
             {indicator !== "offline" && (options.length === 0 ? "There are no graphs" : selectedValue || `Select ${label}`)}
           </TooltipContent>
         </Tooltip>
-        <SelectContent className="min-w-52 max-h-[40lvh] bg-foreground">
-          <div className="p-4">
+        <SelectContent className="min-w-52 max-h-[40dvh] bg-foreground">
+          <div className="p-4 flex gap-2 items-center">
             <Input
               data-testid={`search${label}`}
               ref={ref => ref?.focus()}
-              className="w-full"
+              className="w-1 grow"
               placeholder={`Search for a ${label}`}
               onChange={(e) => {
                 setSearch(e.target.value)
@@ -126,6 +137,10 @@ export default function Combobox({ disabled = false, inTable, type = "Graph", la
               }}
               value={search}
             />
+            {
+              isLoading &&
+              <RefreshCcw size={20} className="animate-spin duration-[infinite]" />
+            }
           </div>
           <SelectGroup>
             <ul className="shrink grow overflow-auto">
@@ -210,6 +225,17 @@ export default function Combobox({ disabled = false, inTable, type = "Graph", la
               <ExportGraph
                 selectedValues={rows.filter(opt => opt.checked).map(opt => opt.cells[0].value as string)}
                 type={type}
+              />
+              <DuplicateGraph
+                selectedValue={rows.filter(opt => opt.checked).map(opt => opt.cells[0].value as string)[0]}
+                type={type}
+                open={openDuplicate}
+                onOpenChange={setOpenDuplicate}
+                onDuplicate={(duplicateName) => {
+                  setSelectedValue(duplicateName)
+                  setOptions!([...options, duplicateName])
+                }}
+                disabled={rows.filter(opt => opt.checked).length !== 1}
               />
             </>
           }

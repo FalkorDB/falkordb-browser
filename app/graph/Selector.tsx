@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useContext, useCallback, Dispatch, SetStateAction, useRef } from "react";
 import { cn, securedFetch, GraphRef } from "@/lib/utils";
-import { History, Info, Maximize2, RefreshCcw } from "lucide-react";
+import { History, Info, Maximize2 } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import * as monaco from "monaco-editor";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -49,7 +49,6 @@ export default function Selector({ graph, options, setOptions, graphName, setGra
     const { toast } = useToast()
 
     const [queriesOpen, setQueriesOpen] = useState(false)
-    const [isRotating, setIsRotating] = useState(false);
     const [isLoading, setIsLoading] = useState(false)
     const [maximize, setMaximize] = useState(false)
     const [tab, setTab] = useState("")
@@ -81,20 +80,6 @@ export default function Selector({ graph, options, setOptions, graphName, setGra
         if (opts.length === 1) handleOnChange(opts[0])
         if (opts.length === 0) handleOnChange("")
     }, [indicator, type, toast, setIndicator, setOptions, handleOnChange])
-
-    useEffect(() => {
-        getOptions()
-    }, [getOptions])
-
-    useEffect(() => {
-        if (indicator === "online") getOptions()
-    }, [indicator, getOptions])
-
-    const handleReloadClick = () => {
-        setIsRotating(true);
-        getOptions();
-        setTimeout(() => setIsRotating(false), 1000);
-    };
 
     const focusEditorAtEnd = () => {
         if (editorRef.current) {
@@ -150,22 +135,11 @@ export default function Selector({ graph, options, setOptions, graphName, setGra
 
     return (
         <div className="z-20 absolute top-5 inset-x-24 h-[56px] flex flex-row gap-4 items-center">
-            <div className="p-2 border rounded-lg overflow-hidden bg-foreground">
-                <Button
-                    data-testid={`reload${type}sList`}
-                    indicator={indicator}
-                    className={cn(
-                        "transition-transform w-full h-full",
-                        isRotating && "animate-spin duration-1000"
-                    )}
-                    onClick={handleReloadClick}
-                    title="Reload Graphs List"
-                >
-                    <RefreshCcw size={20} />
-                </Button>
-            </div>
             <Combobox
                 type={type}
+                onOpenChange={async (open) => {
+                    if (open) await getOptions()
+                }}
                 options={options}
                 setOptions={setOptions}
                 selectedValue={graphName}
@@ -174,7 +148,7 @@ export default function Selector({ graph, options, setOptions, graphName, setGra
             {
                 runQuery && historyQuery && setHistoryQuery ?
                     <>
-                        <div className="h-[56px] w-full relative overflow-visible">
+                        <div className="h-[56px] w-1 grow relative overflow-visible">
                             <EditorComponent
                                 graph={graph}
                                 maximize={maximize}

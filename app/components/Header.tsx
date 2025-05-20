@@ -2,7 +2,7 @@
 
 'use client'
 
-import { LifeBuoy, LogOut, Settings } from "lucide-react";
+import { ArrowUpRight, LifeBuoy, LogOut, Settings } from "lucide-react";
 import { useContext } from "react";
 import Image from "next/image";
 import { cn } from "@/lib/utils";
@@ -12,7 +12,7 @@ import pkg from '@/package.json';
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import { Drawer, DrawerContent, DrawerDescription, DrawerTitle, DrawerTrigger } from "@/components/ui/drawer";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import Link from "next/link";
 import Button from "./ui/Button";
 import CreateGraph from "./CreateGraph";
@@ -87,27 +87,36 @@ export default function Header({ onSetGraphName, graphNames }: Props) {
                             <LifeBuoy size={25} />
                             <p>Help</p>
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent side="right" className="w-full p-6 ml-4">
-                            <ul className="h-full w-full flex flex-col gap-2 p-2">
-                                <li>
-                                    <a href="https://docs.falkordb.com/" target="_blank" rel="noreferrer">
-                                        Documentation
-                                    </a>
-                                </li>
-                                <li>
-                                    <a href="https://discord.com/invite/jyUgBweNQz" target="_blank" rel="noreferrer">
-                                        Support
-                                    </a>
-                                </li>
-                                <li>
+                        <DropdownMenuContent side="right" className="bg-background w-full p-4 ml-4">
+                            <DropdownMenuGroup className="h-full w-full flex flex-col gap-2 p-2">
+                                <DropdownMenuItem className="focus:bg-transparent">
+                                    <Link className="flex gap-2 items-center" href="https://docs.falkordb.com/" target="_blank" rel="noreferrer">
+                                        <span>
+                                            Documentation
+                                        </span>
+                                        <ArrowUpRight size={15} />
+                                    </Link>
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem className="focus:bg-transparent">
+                                    <Link className="flex gap-2 items-center" href="https://discord.com/invite/jyUgBweNQz" target="_blank" rel="noreferrer">
+                                        <Image style={{ width: 'auto', height: '14px' }} src="/icons/discord.svg" alt="" width={0} height={0} />
+                                        <span>
+                                            Get Support
+                                        </span>
+                                        <ArrowUpRight size={15} />
+                                    </Link>
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem className="focus:bg-transparent">
                                     <DrawerTrigger asChild>
                                         <Button
                                             label="About"
                                             title="Learn more about the application"
                                         />
                                     </DrawerTrigger>
-                                </li>
-                            </ul>
+                                </DropdownMenuItem>
+                            </DropdownMenuGroup>
                         </DropdownMenuContent>
                     </DropdownMenu>
                     <DrawerContent side="right" className="bg-popover-foreground gap-4 items-center text-foreground" id="about">
