@@ -121,7 +121,7 @@ export default function Combobox({ disabled = false, inTable, type = "Graph", la
           </TooltipTrigger>
           <TooltipContent>
             {indicator === "offline" && "The FalkorDB server is offline"}
-            {indicator !== "offline" && (options.length === 0 ? "There are no graphs" : selectedValue || `Select ${label}`)}
+            {indicator !== "offline" && (options.length === 0 ? `There are no ${label}s` : selectedValue || `Select ${label}`)}
           </TooltipContent>
         </Tooltip>
         <SelectContent className="min-w-52 max-h-[40dvh] bg-foreground">

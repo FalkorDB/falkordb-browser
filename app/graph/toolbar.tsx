@@ -1,7 +1,8 @@
 import { PlusCircle } from "lucide-react"
-import { Dispatch, SetStateAction, useEffect, useRef, useState } from "react"
+import { Dispatch, SetStateAction, useCallback, useEffect, useRef, useState } from "react"
 import { cn, GraphRef, handleZoomToFit } from "@/lib/utils"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { Graph, Link, Node } from "../api/graph/model"
 import Input from "../components/ui/Input"
 import Button from "../components/ui/Button"
@@ -39,14 +40,8 @@ export default function Toolbar({
     const [deleteOpen, setDeleteOpen] = useState(false)
     const [addOpen, setAddOpen] = useState(false)
 
-    const scrollToSuggestion = (index: number) => {
-        const suggestionElement = suggestionRef.current?.querySelector(`li:nth-child(${index + 1})`)
-        if (suggestionElement) {
-            suggestionRef.current?.scrollTo({ top: (suggestionElement.clientHeight + 8) * index, behavior: "smooth" })
-        }
-    }
-
-    const handleOnChange = async () => {
+    
+    const handleOnChange = useCallback(async () => {
         if (!searchElement) {
             setSuggestions([])
             return
@@ -58,17 +53,17 @@ export default function Toolbar({
             || el.label && (el as Link).label.toLowerCase().includes(searchElement.toLowerCase())
             || el.category && (el as Node).category.some(c => c.toLowerCase().includes(searchElement.toLowerCase()))
         )
-
+        
         setSuggestions(elements)
-    }
-
+    }, [graph, searchElement])
+    
     useEffect(() => {
         const timeout = setTimeout(handleOnChange, 500)
-
+        
         return () => {
             clearTimeout(timeout)
         }
-    }, [graph, searchElement])
+    }, [graph, handleOnChange, searchElement])
 
     const handleSearchElement = (element: Node | Link) => {
         handleZoomToFit(chartRef, (node: Node) => element.category ? element.id === node.id : node.id === element.source.id || node.id === element.target.id)
@@ -77,6 +72,13 @@ export default function Toolbar({
         setSuggestions([])
     }
 
+    const scrollToSuggestion = (index: number) => {
+        const suggestionElement = suggestionRef.current?.querySelector(`li:nth-child(${index + 1})`)
+        if (suggestionElement) {
+            suggestionRef.current?.scrollTo({ top: (suggestionElement.clientHeight + 8) * index, behavior: "smooth" })
+        }
+    }
+    
     return (
         <div className="w-full h-full flex justify-between items-center">
             <div className="relative pointer-events-auto">
@@ -171,12 +173,19 @@ export default function Toolbar({
                                         onClick={() => handleSearchElement(suggestion)}
                                         onMouseEnter={() => setSuggestionIndex(index)}
                                     >
+                                        <Tooltip>
+                                            <TooltipTrigger>
                                         <div
-                                            className="rounded-lg p-1"
+                                            className="rounded-full h-8 w-8 p-2 flex items-center justify-center"
                                             style={{ backgroundColor: suggestion.color }}
-                                        >
+                                            >
+                                            <p className="text-white text-sm font-bold truncate">{suggestion.label || suggestion.category}</p>
+                                            </div>
+                                        </TooltipTrigger>
+                                        <TooltipContent>
                                             {suggestion.label || suggestion.category}
-                                        </div>
+                                        </TooltipContent>
+                                        </Tooltip>
                                         <div
                                             className={cn("w-1 grow text-center truncate", index === suggestionIndex ? "text-black" : "text-white")}
                                         >

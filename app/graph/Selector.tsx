@@ -62,6 +62,7 @@ export default function Selector({ graph, options, setOptions, graphName, setGra
     const endIndex = startIndex + STEP
     const items = filteredQueries.slice(startIndex, Math.min(endIndex, filteredQueries.length))
 
+
     useEffect(() => {
         if (!currentQuery) {
             setTab("query")
@@ -73,7 +74,7 @@ export default function Selector({ graph, options, setOptions, graphName, setGra
     useEffect(() => {
         setStepCounter(0)
     }, [historyQuery?.queries])
-
+    
     const handleOnChange = useCallback(async (name: string) => {
         const formattedName = name === '""' ? "" : name
         setGraphName(formattedName)
@@ -91,6 +92,10 @@ export default function Selector({ graph, options, setOptions, graphName, setGra
         if (opts.length === 1) handleOnChange(opts[0])
         if (opts.length === 0) handleOnChange("")
     }, [indicator, type, toast, setIndicator, setOptions, handleOnChange])
+
+    useEffect(() => {
+        getOptions()
+    }, [])
 
     const focusEditorAtEnd = () => {
         if (editorRef.current) {
