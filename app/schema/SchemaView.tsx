@@ -141,6 +141,8 @@ export default function SchemaView({
 
         setData({ ...schema.Elements })
 
+        handleCooldown()
+
         return result.ok
     }
 

@@ -128,7 +128,7 @@ function GraphView({
     }
 
     return (
-        <Tabs value={tabsValue} className="h-full w-full relative border rounded-lg overflow-hidden">
+        <Tabs value={tabsValue} onValueChange={setTabsValue} className="h-full w-full relative border rounded-lg overflow-hidden">
             <div className="absolute bottom-4 inset-x-12 pointer-events-none z-10 flex gap-4 justify-between items-center">
                 <GraphDetails
                     graph={graph}
@@ -145,7 +145,6 @@ function GraphView({
                         <Button
                             disabled={graph.getElements().length === 0}
                             className="tabs-trigger"
-                            onClick={() => setTabsValue("Graph")}
                             title="Graph"
                         >
                             <GitGraph />
@@ -159,7 +158,6 @@ function GraphView({
                         <Button
                             disabled={graph.Data.length === 0}
                             className="tabs-trigger"
-                            onClick={() => setTabsValue("Table")}
                             title="Table"
                         >
                             <Table />
@@ -173,7 +171,6 @@ function GraphView({
                         <Button
                             disabled={!graph.CurrentQuery || graph.CurrentQuery.metadata.length === 0 || graph.CurrentQuery.explain.length === 0 || graph.Metadata.length === 0}
                             className="tabs-trigger"
-                            onClick={() => setTabsValue("Metadata")}
                             title="Metadata"
                         >
                             <Info />

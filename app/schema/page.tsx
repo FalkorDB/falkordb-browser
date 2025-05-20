@@ -37,7 +37,7 @@ export default function Page() {
             method: "GET"
         }, toast, setIndicator)
 
-        if (!result) return
+        if (!result.ok) return
 
         const json = await result.json()
 

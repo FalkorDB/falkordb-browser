@@ -51,6 +51,8 @@ export default function Page() {
             method: "GET"
         }, toast, setIndicator)
 
+        if (!result.ok) return
+
         const json = await result.json()
 
         setEdgesCount(json.result.edges)
