@@ -55,6 +55,7 @@ export default function Selector({ graph, options, setOptions, graphName, setGra
 
     const type = runQuery && historyQuery && setHistoryQuery ? "Graph" : "Schema"
 
+
     useEffect(() => {
         if (!currentQuery) {
             setTab("query")
@@ -62,6 +63,7 @@ export default function Selector({ graph, options, setOptions, graphName, setGra
             setTab("profile")
         }
     }, [currentQuery, historyQuery?.query])
+
 
     const handleOnChange = useCallback((name: string) => {
         const formattedName = name === '""' ? "" : name
@@ -92,6 +94,10 @@ export default function Selector({ graph, options, setOptions, graphName, setGra
     useEffect(() => {
         if (indicator === "online") getOptions()
     }, [indicator, getOptions])
+
+    useEffect(() => {
+        getOptions()
+    }, [])
 
     const focusEditorAtEnd = () => {
         if (editorRef.current) {
