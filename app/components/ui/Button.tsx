@@ -16,6 +16,7 @@ export interface Props extends React.DetailedHTMLProps<React.ButtonHTMLAttribute
     children?: React.ReactNode
     isLoading?: boolean
     indicator?: "offline" | "online"
+    tooltipVariant?: Variant
 }
 
 const getClassName = (variant: Variant, disable: boolean | undefined, open: boolean | undefined, isLoading: boolean, classN: string | undefined) => {
@@ -50,8 +51,8 @@ const getClassName = (variant: Variant, disable: boolean | undefined, open: bool
     return className
 }
 
-const Button = forwardRef<HTMLButtonElement, Props>(({ label, variant = "button", open, className, title, type = "button", disabled, children, isLoading = false, indicator, ...props }, ref) =>
-    (title || label || indicator === "offline") && variant !== "Cancel" ? (
+const Button = forwardRef<HTMLButtonElement, Props>(({ label, variant = "button", open, className, title, type = "button", disabled, children, isLoading = false, indicator, tooltipVariant = variant, ...props }, ref) =>
+    title !== "" && (title || label || indicator === "offline") && variant !== "Cancel" ? (
         <Tooltip>
             <TooltipTrigger asChild>
                 <button
@@ -77,7 +78,7 @@ const Button = forwardRef<HTMLButtonElement, Props>(({ label, variant = "button"
                     }
                 </button>
             </TooltipTrigger>
-            <TooltipContent className={cn(variant === "Delete" && "bg-red-500 border-white text-white")}>
+            <TooltipContent className={cn(tooltipVariant === "Delete" && "bg-red-500 border-white text-white")}>
                 {
                     indicator === "offline" && "The FalkorDB server is offline"
                 }
