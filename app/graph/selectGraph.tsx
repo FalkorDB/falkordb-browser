@@ -90,10 +90,9 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
     return (
         <Dialog open={openMenage} onOpenChange={setOpenMenage}>
             <DropdownMenu open={open} onOpenChange={handleOpenChange}>
-                <DropdownMenuTrigger asChild>
+                <DropdownMenuTrigger disabled={options.length === 0 || indicator === "offline"} asChild>
                     <Button
-                        className="w-[200px] bg-foreground rounded-lg border p-2 justify-center"
-                        disabled={options.length === 0 || indicator === "offline"}
+                        className="w-[200px] bg-foreground rounded-lg border p-2 justify-center disabled:text-gray-400 disabled:opacity-100"
                         label={selectedValue || `Select ${type}`}
                         title={options.length === 0 ? `There are no ${type}` : undefined}
                         indicator={indicator}

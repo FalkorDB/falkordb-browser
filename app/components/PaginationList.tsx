@@ -28,9 +28,6 @@ export default function PaginationList<T extends Item>({ list, step, onClick, da
     const startIndex = stepCounter * step
     const endIndex = Math.min(startIndex + step, filteredList.length)
 
-    console.log(stepCounter, pageCount, startIndex, endIndex, filteredList.length, filteredList.slice(startIndex, endIndex), list.length, list);
-
-
     useEffect(() => {
         setStepCounter(0)
     }, [list])

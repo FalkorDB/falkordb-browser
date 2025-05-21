@@ -53,12 +53,23 @@ export default function Page() {
 
         if (!result.ok) return
 
-        const json = await result.json()
+        let json = await result.json()
+
+        while (typeof json.result === "number") {
+            // eslint-disable-next-line no-await-in-loop
+            const res = await securedFetch(`api/graph/${prepareArg(graphName)}/query/?id=${prepareArg(json.result.toString())}`, {
+                method: "GET"
+            }, toast, setIndicator)
+
+            if (!res.ok) return
+
+            // eslint-disable-next-line no-await-in-loop
+            json = await res.json()
+        }
 
         setEdgesCount(json.result.edges)
         setNodesCount(json.result.nodes)
     }, [graphName, toast, setIndicator])
-
 
     useEffect(() => {
         setHistoryQuery({
