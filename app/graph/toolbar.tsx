@@ -40,7 +40,7 @@ export default function Toolbar({
     const [deleteOpen, setDeleteOpen] = useState(false)
     const [addOpen, setAddOpen] = useState(false)
 
-    
+
     const handleOnChange = useCallback(async () => {
         if (!searchElement) {
             setSuggestions([])
@@ -53,13 +53,13 @@ export default function Toolbar({
             || el.label && (el as Link).label.toLowerCase().includes(searchElement.toLowerCase())
             || el.category && (el as Node).category.some(c => c.toLowerCase().includes(searchElement.toLowerCase()))
         )
-        
+
         setSuggestions(elements)
     }, [graph, searchElement])
-    
+
     useEffect(() => {
         const timeout = setTimeout(handleOnChange, 500)
-        
+
         return () => {
             clearTimeout(timeout)
         }
@@ -78,7 +78,7 @@ export default function Toolbar({
             suggestionRef.current?.scrollTo({ top: (suggestionElement.clientHeight + 8) * index, behavior: "smooth" })
         }
     }
-    
+
     return (
         <div className="w-full h-full flex justify-between items-center">
             <div className="relative pointer-events-auto">
@@ -175,16 +175,16 @@ export default function Toolbar({
                                     >
                                         <Tooltip>
                                             <TooltipTrigger>
-                                        <div
-                                            className="rounded-full h-8 w-8 p-2 flex items-center justify-center"
-                                            style={{ backgroundColor: suggestion.color }}
-                                            >
-                                            <p className="text-white text-sm font-bold truncate">{suggestion.label || suggestion.category}</p>
-                                            </div>
-                                        </TooltipTrigger>
-                                        <TooltipContent>
-                                            {suggestion.label || suggestion.category}
-                                        </TooltipContent>
+                                                <div
+                                                    className="rounded-full h-8 w-8 p-2 flex items-center justify-center"
+                                                    style={{ backgroundColor: suggestion.color }}
+                                                >
+                                                    <p className="text-white text-sm font-bold truncate">{suggestion.label || suggestion.category}</p>
+                                                </div>
+                                            </TooltipTrigger>
+                                            <TooltipContent>
+                                                {suggestion.label || suggestion.category}
+                                            </TooltipContent>
                                         </Tooltip>
                                         <div
                                             className={cn("w-1 grow text-center truncate", index === suggestionIndex ? "text-black" : "text-white")}
@@ -202,6 +202,17 @@ export default function Toolbar({
                 {
                     graph.Id &&
                     <>
+                        {
+                            selectedElements.length > 1 &&
+                            <DeleteElement
+                                label={label}
+                                description="Are you sure you want to delete this element(s)?"
+                                open={deleteOpen}
+                                setOpen={setDeleteOpen}
+                                onDeleteElement={handleDeleteElement}
+                                backgroundColor={backgroundColor}
+                            />
+                        }
                         {
                             setIsAddEntity && setIsAddRelation &&
                             <DropdownMenu open={addOpen} onOpenChange={setAddOpen}>
@@ -246,17 +257,6 @@ export default function Toolbar({
                                     </Button>
                                 </DropdownMenuContent>
                             </DropdownMenu>
-                        }
-                        {
-                            selectedElements.length > 1 &&
-                            <DeleteElement
-                                label={label}
-                                description="Are you sure you want to delete this element(s)?"
-                                open={deleteOpen}
-                                setOpen={setDeleteOpen}
-                                onDeleteElement={handleDeleteElement}
-                                backgroundColor={backgroundColor}
-                            />
                         }
                     </>
                 }

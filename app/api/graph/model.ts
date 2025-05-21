@@ -680,8 +680,16 @@ export class Graph {
             this.removeCategory(selectedElement.category[emptyCategoryIndex], selectedElement)
             selectedElement.category.splice(emptyCategoryIndex, 1)
             selectedElement.color = this.getCategoryColorValue(category.index)
-        }
 
+            const emptyCategory = this.categoriesMap.get("")
+            if (emptyCategory) {
+                emptyCategory.elements = emptyCategory.elements.filter(e => e.id !== selectedElement.id)
+                if (emptyCategory.elements.length === 0) {
+                    this.categories.splice(this.categories.findIndex(c => c.name === emptyCategory.name), 1)
+                    this.categoriesMap.delete(emptyCategory.name)
+                }
+            }
+        }
         selectedElement.category.push(label)
     }
 
