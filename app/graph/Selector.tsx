@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useContext, useCallback, Dispatch, SetStateAction, useRef } from "react";
+import { useEffect, useState, useContext, Dispatch, SetStateAction, useRef, useCallback } from "react";
 import { cn, securedFetch, GraphRef } from "@/lib/utils";
 import { History, Info, Maximize2 } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
@@ -8,7 +8,6 @@ import * as monaco from "monaco-editor";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Editor } from "@monaco-editor/react";
-import Combobox from "../components/ui/combobox";
 import Button from "../components/ui/Button";
 import { IndicatorContext } from "../components/provider";
 import EditorComponent, { setTheme } from "../components/EditorComponent";
@@ -17,6 +16,7 @@ import Toolbar from "./toolbar";
 import { Node, Link, Graph, Query, HistoryQuery } from "../api/graph/model";
 import { Explain, Metadata, Profile } from "./MetadataView";
 import PaginationList from "../components/PaginationList";
+import SelectGraph from "./selectGraph";
 
 interface Props {
     graph: Graph
@@ -61,9 +61,9 @@ export default function Selector({ graph, options, setOptions, graphName, setGra
         } else if (!historyQuery?.query) {
             setTab("profile")
         }
-    }, [currentQuery])
+    }, [currentQuery, historyQuery?.query])
 
-    const handleOnChange = useCallback(async (name: string) => {
+    const handleOnChange = useCallback((name: string) => {
         const formattedName = name === '""' ? "" : name
         setGraphName(formattedName)
     }, [setGraphName])
@@ -74,12 +74,24 @@ export default function Selector({ graph, options, setOptions, graphName, setGra
         const result = await securedFetch(`api/${type === "Graph" ? "graph" : "schema"}`, {
             method: "GET"
         }, toast, setIndicator)
+
         if (!result.ok) return
+
         const { opts } = (await result.json()) as { opts: string[] }
+
         setOptions(opts)
+
         if (opts.length === 1) handleOnChange(opts[0])
         if (opts.length === 0) handleOnChange("")
-    }, [indicator, type, toast, setIndicator, setOptions, handleOnChange])
+    }, [handleOnChange, indicator, setIndicator, setOptions, toast, type])
+
+    useEffect(() => {
+        getOptions()
+    }, [getOptions])
+
+    useEffect(() => {
+        if (indicator === "online") getOptions()
+    }, [indicator, getOptions])
 
     const focusEditorAtEnd = () => {
         if (editorRef.current) {
@@ -135,15 +147,15 @@ export default function Selector({ graph, options, setOptions, graphName, setGra
 
     return (
         <div className="z-20 absolute top-5 inset-x-24 h-[56px] flex flex-row gap-4 items-center">
-            <Combobox
-                type={type}
-                onOpenChange={async (open) => {
-                    if (open) await getOptions()
-                }}
+            <SelectGraph
                 options={options}
                 setOptions={setOptions}
                 selectedValue={graphName}
-                setSelectedValue={handleOnChange}
+                setSelectedValue={setGraphName}
+                type={type}
+                onOpenChange={async (o) => {
+                    if (o) await getOptions()
+                }}
             />
             {
                 runQuery && historyQuery && setHistoryQuery ?
@@ -194,7 +206,7 @@ export default function Selector({ graph, options, setOptions, graphName, setGra
                                     <div className="h-1 grow flex gap-8 p-8">
                                         <PaginationList
                                             label="Query"
-                                            className="w-[40%] bg-background rounded-lg"
+                                            className="w-[40%] bg-background rounded-lg overflow-hidden"
                                             isSelected={(item) => historyQuery.queries.findIndex(q => q.text === item.text) + 1 === historyQuery.counter}
                                             afterSearchCallback={(newFilteredList) => {
                                                 if (newFilteredList.every(q => q.text !== historyQuery.query)) {
@@ -213,7 +225,7 @@ export default function Selector({ graph, options, setOptions, graphName, setGra
                                                     ...prev,
                                                     counter: historyQuery.queries.findIndex(q => q.text === counter) + 1
                                                 }))
-                                                
+
                                                 setTab("query")
                                             }}
                                         />

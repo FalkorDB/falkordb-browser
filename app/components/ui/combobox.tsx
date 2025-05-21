@@ -1,57 +1,36 @@
-/* eslint-disable import/no-cycle */
-/* eslint-disable @typescript-eslint/no-use-before-define */
-/* eslint-disable react/require-default-props */
 
 "use client"
 
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { cn, prepareArg, Row, securedFetch } from "@/lib/utils"
+import { Dialog } from "@/components/ui/dialog"
+import { cn } from "@/lib/utils"
 import { useContext, useEffect, useState } from "react"
-import { Select, SelectContent, SelectGroup, SelectItem, SelectSeparator, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { useToast } from "@/components/ui/use-toast"
+import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
-import { useSession } from "next-auth/react"
-import { VisuallyHidden } from "@radix-ui/react-visually-hidden"
-import { RefreshCcw } from "lucide-react"
 import Button from "./Button"
-import TableComponent from "../TableComponent"
-import CloseDialog from "../CloseDialog"
-import ExportGraph from "../ExportGraph"
-import DeleteGraph from "../graph/DeleteGraph"
 import Input from "./Input"
 import { IndicatorContext } from "../provider"
-import DuplicateGraph from "../graph/DuplicateGraph"
 
 interface ComboboxProps {
   options: string[],
   selectedValue: string,
   setSelectedValue: (value: string) => void,
-  type?: "Graph" | "Schema",
+  label: "Role" | "Type",
   disabled?: boolean,
   inTable?: boolean,
-  label?: "Graph" | "Schema" | "Role" | "Type",
-  setOptions?: (value: string[]) => void,
   defaultOpen?: boolean,
-  onOpenChange?: (open: boolean) => Promise<void>
 }
 
 const STEP = 4
 
-export default function Combobox({ disabled = false, inTable, type = "Graph", label = type, options, setOptions, selectedValue, setSelectedValue, defaultOpen = false, onOpenChange }: ComboboxProps) {
+export default function Combobox({ disabled = false, inTable = false, label, options, selectedValue, setSelectedValue, defaultOpen = false }: ComboboxProps) {
 
-  const { indicator, setIndicator } = useContext(IndicatorContext)
-
-  const { data: session } = useSession()
-  const { toast } = useToast()
+  const { indicator } = useContext(IndicatorContext)
 
   const [filteredOptions, setFilteredOptions] = useState<string[]>([])
-  const [isLoading, setIsLoading] = useState<boolean>(false)
   const [openMenage, setOpenMenage] = useState<boolean>(false)
   const [maxOptions, setMaxOptions] = useState<number>(STEP)
   const [open, setOpen] = useState<boolean>(defaultOpen)
-  const [openDuplicate, setOpenDuplicate] = useState<boolean>(false)
   const [search, setSearch] = useState<string>("")
-  const [rows, setRows] = useState<Row[]>([])
 
   useEffect(() => {
     const timeout = setTimeout(() => {
@@ -61,60 +40,21 @@ export default function Combobox({ disabled = false, inTable, type = "Graph", la
     return () => clearTimeout(timeout)
   }, [options, search])
 
-  const handleSetOption = async (option: string, optionName: string) => {
-    const result = await securedFetch(`api/${type === "Graph" ? "graph" : "schema"}/${prepareArg(option)}/?sourceName=${prepareArg(optionName)}`, {
-      method: "PATCH",
-      headers: {
-        "Content-Type": "application/json"
-      },
-    }, toast, setIndicator)
-
-    if (result.ok) {
-
-      const newOptions = options.map((opt) => opt === optionName ? option : opt)
-      setOptions!(newOptions)
-
-      if (setSelectedValue && optionName === selectedValue) setSelectedValue(option)
-
-      handleSetRows(newOptions)
-    }
-
-    return result.ok
-  }
-
-  const handleSetRows = (opts: string[]) => {
-    setRows(opts.map(opt => session?.user?.role === "Admin" ? ({ checked: false, name: opt, cells: [{ value: opt, onChange: (value: string) => handleSetOption(value, opt), type: "text" }] }) : ({ checked: false, name: opt, cells: [{ value: opt, type: "readonly" }] })))
-  }
-
-  useEffect(() => {
-    handleSetRows(options)
-  }, [options])
-
   return (
     <Dialog open={openMenage} onOpenChange={setOpenMenage}>
       <Select
-        disabled={disabled || options.length === 0 || (indicator === "offline" && label === type)}
+        disabled={disabled || options.length === 0}
         value={selectedValue}
         onValueChange={setSelectedValue}
         open={open}
-        onOpenChange={async (o) => {
-          setOpen(o)
-          if (onOpenChange) {
-            try {
-              setIsLoading(o)
-              await onOpenChange(o)
-            } finally {
-              setIsLoading(false)
-            }
-          }
-        }}
+        onOpenChange={setOpen}
       >
         <Tooltip>
           <TooltipTrigger asChild>
             <SelectTrigger
               data-testid={`select${label}`}
               data-type="select"
-              className={cn("w-fit gap-2 items-center border p-2 disabled:text-gray-400 disabled:opacity-100 disabled:cursor-not-allowed", type === label && "max-w-[15%]", inTable ? "text-sm font-light" : "text-xl font-medium")}
+              className={cn("w-fit gap-2 items-center border p-2 disabled:text-gray-400 disabled:opacity-100 disabled:cursor-not-allowed", inTable ? "text-sm font-light" : "text-xl font-medium")}
             >
               <SelectValue placeholder={`Select ${label}`} />
             </SelectTrigger>
@@ -137,10 +77,6 @@ export default function Combobox({ disabled = false, inTable, type = "Graph", la
               }}
               value={search}
             />
-            {
-              isLoading &&
-              <RefreshCcw size={20} className="animate-spin duration-[infinite]" />
-            }
           </div>
           <SelectGroup>
             <ul className="shrink grow overflow-auto">
@@ -179,68 +115,14 @@ export default function Combobox({ disabled = false, inTable, type = "Graph", la
               <p className="text-center text-sm">({maxOptions > filteredOptions.length ? filteredOptions.length : maxOptions}/{filteredOptions.length} results)</p>
             </ul>
           </SelectGroup>
-          {
-            type === "Graph" &&
-            <>
-              <SelectSeparator className="bg-secondary" />
-              <DialogTrigger asChild>
-                <Button
-                  data-testid={`manage${label}s`}
-                  onClick={() => setOpen(false)}
-                  className="w-full p-2 justify-center"
-                  label="Manage Graphs"
-                  title="Organize and edit your graphs"
-                />
-              </DialogTrigger>
-            </>
-          }
         </SelectContent>
       </Select>
-      <DialogContent disableClose className="flex flex-col border-none rounded-lg max-w-none max-h-[90dvh]">
-        <DialogHeader className="flex-row justify-between items-center border-b border-secondary pb-4">
-          <DialogTitle className="text-2xl font-medium">Manage Graphs</DialogTitle>
-          <CloseDialog />
-        </DialogHeader>
-        <VisuallyHidden>
-          <DialogDescription />
-        </VisuallyHidden>
-        <TableComponent
-          className="grow overflow-hidden"
-          label={`${type}s`}
-          headers={["Name"]}
-          rows={rows}
-          setRows={setRows}
-        >
-          {
-            session?.user?.role !== "Read-Only" &&
-            <>
-              <DeleteGraph
-                type={type}
-                rows={rows}
-                handleSetRows={handleSetRows}
-                setOpenMenage={setOpenMenage}
-                selectedValue={selectedValue}
-                setSelectedValue={setSelectedValue}
-              />
-              <ExportGraph
-                selectedValues={rows.filter(opt => opt.checked).map(opt => opt.cells[0].value as string)}
-                type={type}
-              />
-              <DuplicateGraph
-                selectedValue={rows.filter(opt => opt.checked).map(opt => opt.cells[0].value as string)[0]}
-                type={type}
-                open={openDuplicate}
-                onOpenChange={setOpenDuplicate}
-                onDuplicate={(duplicateName) => {
-                  setSelectedValue(duplicateName)
-                  setOptions!([...options, duplicateName])
-                }}
-                disabled={rows.filter(opt => opt.checked).length !== 1}
-              />
-            </>
-          }
-        </TableComponent>
-      </DialogContent>
     </Dialog >
   )
+}
+
+Combobox.defaultProps = {
+  disabled: false,
+  inTable: false,
+  defaultOpen: false,
 }

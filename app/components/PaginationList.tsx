@@ -1,5 +1,6 @@
 import { cn } from "@/lib/utils"
 import { useEffect, useState } from "react"
+import { Loader2 } from "lucide-react"
 import Button from "./ui/Button"
 import { Query } from "../api/graph/model"
 import Input from "./ui/Input"
@@ -14,17 +15,21 @@ interface Props<T extends Item> {
     label: string
     afterSearchCallback: (newFilteredList: T[]) => void
     isSelected: (item: T) => boolean
+    isLoading?: boolean
     className?: string
     children?: React.ReactNode
 }
 
-export default function PaginationList<T extends Item>({ list, step, onClick, className = "", dataTestId, afterSearchCallback, isSelected, label, children }: Props<T>) {
-    const [filteredList, setFilteredList] = useState<T[]>(list)
+export default function PaginationList<T extends Item>({ list, step, onClick, dataTestId, afterSearchCallback, isSelected, label, isLoading, className, children }: Props<T>) {
+    const [filteredList, setFilteredList] = useState<T[]>([...list])
     const [stepCounter, setStepCounter] = useState(0)
     const [pageCount, setPageCount] = useState(0)
     const [search, setSearch] = useState("")
-    const startIndex = stepCounter ? stepCounter - 1 : 0
+    const startIndex = stepCounter * step
     const endIndex = Math.min(startIndex + step, filteredList.length)
+
+    console.log(stepCounter, pageCount, startIndex, endIndex, filteredList.length, filteredList.slice(startIndex, endIndex), list.length, list);
+
 
     useEffect(() => {
         setStepCounter(0)
@@ -37,9 +42,9 @@ export default function PaginationList<T extends Item>({ list, step, onClick, cl
     useEffect(() => {
         const timeout = setTimeout(() => {
             const newFilteredList = list.filter((item) => !search || (typeof item === "string" ? item.toLowerCase().includes(search.toLowerCase()) : item.text.toLowerCase().includes(search.toLowerCase()))) || []
-            setFilteredList(newFilteredList)
+            setFilteredList([...newFilteredList])
             setStepCounter(0)
-            afterSearchCallback(newFilteredList)
+            afterSearchCallback([...newFilteredList])
         }, 500)
 
         return () => {
@@ -48,14 +53,17 @@ export default function PaginationList<T extends Item>({ list, step, onClick, cl
     }, [list, search])
 
     return (
-        <div className={cn("flex flex-col gap-4 p-6", className)}>
-            <Input
-                data-testid="queryHistorySearch"
-                className="w-full bg-foreground text-white"
-                value={search}
-                placeholder={`Search for a ${label}`}
-                onChange={(e) => setSearch(e.target.value)}
-            />
+        <div className={cn("w-full flex flex-col gap-4 p-6", className)}>
+            <div className="flex gap-2 items-center">
+                <Input
+                    data-testid="queryHistorySearch"
+                    className="w-full bg-foreground text-white"
+                    value={search}
+                    placeholder={`Search for a ${label}`}
+                    onChange={(e) => setSearch(e.target.value)}
+                />
+                {isLoading && <Loader2 className="w-4 h-4 animate-spin duration-[infinite]" />}
+            </div>
             {
                 children &&
                 <div className="flex gap-2 items-center">
@@ -64,26 +72,31 @@ export default function PaginationList<T extends Item>({ list, step, onClick, cl
             }
             <ul
                 data-testid={dataTestId}
-                className="h-1 grow flex flex-col p-6"
+                className="h-1 grow flex flex-col p-2"
             >
-                {filteredList.slice(startIndex, endIndex).map((item, index) => (
-                    <li
-                        data-testid={`${dataTestId}${index}`}
-                        className="border-b"
-                        style={{ height: `${1 / step * 100}%` }}
-                        key={typeof item === "string" ? item : item.text}
-                    >
-                        {
-                            onClick ?
-                                <Button
-                                    className={cn("w-full h-full text-xl text-center", isSelected(item) ? "text-white" : "text-gray-500")}
-                                    label={typeof item === "string" ? item : item.text}
-                                    onClick={() => onClick(typeof item === "string" ? item : item.text)}
-                                />
-                                : <p className="w-full h-full text-xl text-center">{typeof item === "string" ? item : item.text}</p>
-                        }
-                    </li>
-                ))}
+                {
+                    filteredList.slice(startIndex, endIndex).map((item, index) => {
+                        const selected = isSelected ? isSelected(item) : false
+                        return (
+                            <li
+                                data-testid={`${dataTestId}${index}`}
+                                className={cn("border-b", !selected && "border-gray-500")}
+                                style={{ height: `${1 / step * 100}%` }}
+                                key={typeof item === "string" ? item : item.text}
+                            >
+                                {
+                                    onClick ?
+                                        <Button
+                                            className={cn("w-full h-full text-xl text-center", !selected && "text-gray-500")}
+                                            label={typeof item === "string" ? item : item.text}
+                                            onClick={() => onClick(typeof item === "string" ? item : item.text)}
+                                        />
+                                        : <p className="w-full h-full text-xl text-center">{typeof item === "string" ? item : item.text}</p>
+                                }
+                            </li>
+                        )
+                    })
+                }
             </ul>
             <ul className="flex gap-6 p-4 items-center justify-center">
                 <li className="flex gap-4">
@@ -91,12 +104,27 @@ export default function PaginationList<T extends Item>({ list, step, onClick, cl
                     <Button disabled={stepCounter === 0} label="<" title="Previous page" onClick={() => setStepCounter(prev => prev > 0 ? prev - 1 : prev)} />
                 </li>
                 {
-                    Array(pageCount).fill(0).map((_, index) => index).slice(stepCounter ? stepCounter - 1 : 0, Math.min(stepCounter + step, pageCount)).map((index) => (
-                        // eslint-disable-next-line react/no-array-index-key
-                        <li key={index}>
-                            <Button className={cn(index === stepCounter ? "text-white" : "text-gray-500")} label={`[${index + 1}]`} title={`Page ${index + 1}`} onClick={() => setStepCounter(index)} />
-                        </li>
-                    ))
+                    Array(pageCount).fill(0).map((_, index) => index)
+                        .slice(
+                            Math.max(0, Math.min(
+                                stepCounter - 1,
+                                pageCount - 3
+                            )),
+                            Math.min(
+                                Math.max(3, stepCounter + 2),
+                                pageCount
+                            )
+                        )
+                        .map((index) => (
+                            <li key={index}>
+                                <Button
+                                    className={cn(index === stepCounter ? "text-white" : "text-gray-500")}
+                                    label={`[${index + 1}]`}
+                                    title={`Page ${index + 1}`}
+                                    onClick={() => setStepCounter(index)}
+                                />
+                            </li>
+                        ))
                 }
                 <li className="flex gap-4">
                     <Button disabled={stepCounter > pageCount - 2} label=">" title="Next page" onClick={() => setStepCounter(prev => prev < pageCount - 1 ? prev + 1 : prev)} />
@@ -108,6 +136,7 @@ export default function PaginationList<T extends Item>({ list, step, onClick, cl
 }
 
 PaginationList.defaultProps = {
-    className: "",
-    children: undefined
+    className: undefined,
+    children: undefined,
+    isLoading: undefined
 }
