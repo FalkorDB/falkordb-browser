@@ -54,7 +54,7 @@ export default function Page() {
         if (!result.ok) return
 
         let json = await result.json()
-
+        
         while (typeof json.result === "number") {
             // eslint-disable-next-line no-await-in-loop
             const res = await securedFetch(`api/graph/${prepareArg(graphName)}/query/?id=${prepareArg(json.result.toString())}`, {
@@ -67,8 +67,10 @@ export default function Page() {
             json = await res.json()
         }
 
-        setEdgesCount(json.result.edges)
-        setNodesCount(json.result.nodes)
+        [json] = json.result.data
+
+        setEdgesCount(json.edges)
+        setNodesCount(json.nodes)
     }, [graphName, toast, setIndicator])
 
     useEffect(() => {

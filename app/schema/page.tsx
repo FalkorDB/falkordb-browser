@@ -53,8 +53,10 @@ export default function Page() {
             json = await res.json()
         }
 
-        setEdgesCount(json.result.edges)
-        setNodesCount(json.result.nodes)
+        [json] = json.result.data
+
+        setEdgesCount(json.edges)
+        setNodesCount(json.nodes)
     }, [schemaName, toast, setIndicator])
 
     const handleCooldown = (ticks?: number) => {

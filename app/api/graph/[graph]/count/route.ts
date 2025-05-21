@@ -25,7 +25,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
         const json = await result.json()
 
-        const data = json.result.data[0]
+        const data = typeof json.result === "number" ? json.result : json.result.data[0] || { edges: 0, nodes: 0 }
 
         return NextResponse.json({ result: data }, { status: 200 })
     } catch (error) {
