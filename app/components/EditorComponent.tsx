@@ -7,7 +7,7 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/compone
 import { Editor, Monaco } from "@monaco-editor/react"
 import { SetStateAction, Dispatch, useEffect, useRef, useState, useContext } from "react"
 import * as monaco from "monaco-editor";
-import { Minimize2 } from "lucide-react";
+import { Minimize2, X } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { prepareArg, securedFetch } from "@/lib/utils";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
@@ -229,6 +229,7 @@ export default function EditorComponent({ graph, historyQuery, maximize, setMaxi
     const { toast } = useToast()
 
     const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null)
+    const dialogEditorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null)
     const placeholderRef = useRef<HTMLDivElement>(null)
     const submitQuery = useRef<HTMLButtonElement>(null)
     const containerRef = useRef<HTMLDivElement>(null)
@@ -286,6 +287,10 @@ export default function EditorComponent({ graph, historyQuery, maximize, setMaxi
             observer.disconnect()
         }
     }, [containerRef.current])
+
+    useEffect(() => {
+        setLineNumber(historyQuery.query.split("\n").length)
+    }, [historyQuery.query])
 
     const fetchSuggestions = async (detail: string): Promise<monaco.languages.CompletionItem[]> => {
         if (indicator === "offline") return []
@@ -477,8 +482,6 @@ export default function EditorComponent({ graph, historyQuery, maximize, setMaxi
     }
 
     const handleEditorDidMount = (e: monaco.editor.IStandaloneCodeEditor) => {
-        editorRef.current = e
-
         const updatePlaceholderVisibility = () => {
             const hasContent = !!e.getValue();
             if (placeholderRef.current) {
@@ -590,10 +593,6 @@ export default function EditorComponent({ graph, historyQuery, maximize, setMaxi
         e.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyF, () => { });
     }
 
-    useEffect(() => {
-        setLineNumber(historyQuery.query.split("\n").length)
-    }, [historyQuery.query])
-
     return (
         <div className="absolute w-full flex items-start gap-8 border rounded-lg overflow-hidden bg-foreground p-2">
             <div className="w-1 grow flex rounded-lg overflow-hidden">
@@ -623,10 +622,30 @@ export default function EditorComponent({ graph, historyQuery, maximize, setMaxi
                         }}
                         theme="editor-theme"
                         beforeMount={handleEditorWillMount}
-                        onMount={handleEditorDidMount}
+                        onMount={(e) => {
+                            handleEditorDidMount(e)
+                            editorRef.current = e
+                        }}
                     />
                     <div ref={placeholderRef} className="absolute top-2 left-2 pointer-events-none">
                         {PLACEHOLDER}
+                    </div>
+                    <div className="absolute top-2 right-2">
+                        {
+                            historyQuery.query &&
+                            <Button
+                                title="Clear"
+                                onClick={() => {
+                                    setHistoryQuery(prev => ({
+                                        ...prev,
+                                        query: "",
+                                    }))
+                                    editorRef.current?.focus()
+                                }}
+                            >
+                                <X />
+                            </Button>
+                        }
                     </div>
                 </div>
                 <Button
@@ -654,21 +673,41 @@ export default function EditorComponent({ graph, historyQuery, maximize, setMaxi
                             >
                                 <Minimize2 size={20} />
                             </CloseDialog>
-                            <CloseDialog
-                                data-testid="editorRun"
-                                className="pointer-events-auto py-2 px-8"
-                                indicator={indicator}
-                                variant="Primary"
-                                label="Run"
-                                title="Press Enter to run the query"
-                                onClick={handleSubmit}
-                                isLoading={isLoading}
-                            />
+                            <div className="flex gap-2 items-center pointer-events-auto">
+                                {
+                                    historyQuery.query &&
+                                    <Button
+                                        title="Clear"
+                                        onClick={() => {
+                                            setHistoryQuery(prev => ({
+                                                ...prev,
+                                                query: "",
+                                            }))
+                                            dialogEditorRef.current?.focus()
+                                        }}
+                                    >
+                                        <X />
+                                    </Button>
+                                }
+                                <CloseDialog
+                                    data-testid="editorRun"
+                                    className="pointer-events-auto py-2 px-8"
+                                    indicator={indicator}
+                                    variant="Primary"
+                                    label="Run"
+                                    title="Press Enter to run the query"
+                                    onClick={handleSubmit}
+                                    isLoading={isLoading}
+                                />
+                            </div>
                         </div>
                         <Editor
                             className="w-full h-full"
-                            onMount={handleEditorDidMount}
-                            theme="custom-theme"
+                            onMount={(e) => {
+                                handleEditorDidMount(e)
+                                dialogEditorRef.current = e
+                            }}
+                            theme="editor-theme"
                             options={{
                                 padding: {
                                     bottom: 10,
