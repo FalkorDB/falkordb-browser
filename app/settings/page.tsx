@@ -16,6 +16,22 @@ export default function Settings() {
     const { data: session } = useSession()
 
     useEffect(() => {
+        window.addEventListener("keydown", (e) => {
+            if (e.key === "Escape") {
+                router.back()
+            }
+        })
+
+        return () => {
+            window.removeEventListener("keydown", (e) => {
+                if (e.key === "Escape") {
+                    router.back()
+                }
+            })
+        }
+    }, [router])
+
+    useEffect(() => {
         if (session && session.user.role !== "Admin") router.back()
     }, [router, session])
 
