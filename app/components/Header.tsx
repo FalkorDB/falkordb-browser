@@ -74,7 +74,7 @@ export default function Header({ onSetGraphName, graphNames }: Props) {
                         <Button
                             indicator={indicator}
                             title="Adjust application settings"
-                            onClick={() => router.push("/settings")}
+                            onClick={() => pathname.includes("/settings") ? router.back() : router.push("/settings")}
                         >
                             <Settings size={35} />
                         </Button>
