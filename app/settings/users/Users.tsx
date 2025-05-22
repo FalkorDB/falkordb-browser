@@ -129,6 +129,7 @@ export default function Users() {
         <div className="w-full h-full flex flex-col space-y-4">
             <TableComponent
                 label="Users"
+                entityName="User"
                 headers={["Name", "Role"]}
                 rows={rows}
                 setRows={setRows}
