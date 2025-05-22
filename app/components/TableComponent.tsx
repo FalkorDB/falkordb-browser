@@ -22,15 +22,15 @@ interface Props {
     headers: string[],
     rows: Row[],
     label: "Graphs" | "Schemas" | "Configs" | "Users" | "TableView",
+    entityName?: "Graph" | "Schema" | "Config" | "User",
     children?: React.ReactNode,
     setRows?: (rows: Row[]) => void,
     className?: string
 }
 
-export default function TableComponent({ headers, rows, label, children, setRows, className }: Props) {
+export default function TableComponent({ headers, rows, label, entityName, children, setRows, className }: Props) {
 
     const [search, setSearch] = useState<string>("")
-    const [isSearchable, setIsSearchable] = useState<boolean>(false)
     const [editable, setEditable] = useState<string>("")
     const [hover, setHover] = useState<string>("")
     const [newValue, setNewValue] = useState<string>("")
@@ -78,38 +78,25 @@ export default function TableComponent({ headers, rows, label, children, setRows
         <div className={cn("h-full w-full flex flex-col gap-4", className)}>
             <div className="flex gap-4">
                 {children}
-                {
-                    isSearchable ?
-                        <Input
-                            data-testid={`searchInput${label}`}
-                            ref={ref => ref?.focus()}
-                            variant="primary"
-                            className="grow"
-                            value={search}
-                            type="text"
-                            placeholder="Search for"
-                            onBlur={() => setIsSearchable(false)}
-                            onKeyDown={(e) => {
-                                if (e.key === "Escape") {
-                                    e.preventDefault()
-                                    setIsSearchable(false)
-                                    setSearch("")
-                                }
+                <Input
+                    data-testid={`searchInput${label}`}
+                    ref={ref => ref?.focus()}
+                    variant="primary"
+                    className="grow"
+                    value={search}
+                    type="text"
+                    placeholder={`Search for${entityName ? ` a ${entityName}` : ""}`}
+                    onKeyDown={(e) => {
+                        if (e.key === "Escape") {
+                            e.preventDefault()
+                            setSearch("")
+                        }
 
-                                if (e.key !== "Enter") return
-                                e.preventDefault()
-                                setIsSearchable(false)
-                            }}
-                            onChange={(e) => setSearch(e.target.value)}
-                        />
-                        : <Button
-                            data-testid={`searchButton${label}`}
-                            variant="Secondary"
-                            label="Search"
-                            title="Search within the table"
-                            onClick={() => setIsSearchable(true)}
-                        />
-                }
+                        if (e.key !== "Enter") return
+                        e.preventDefault()
+                    }}
+                    onChange={(e) => setSearch(e.target.value)}
+                />
             </div>
             <Table className="h-full overflow-hidden">
                 <TableHeader>

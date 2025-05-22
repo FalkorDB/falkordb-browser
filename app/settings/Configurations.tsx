@@ -234,6 +234,7 @@ export default function Configurations() {
     return (
         <TableComponent
             label="Configs"
+            entityName="Config"
             headers={["Name", "Description", "Value"]}
             rows={configs}
         />

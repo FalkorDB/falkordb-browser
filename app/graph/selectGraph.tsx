@@ -126,7 +126,7 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
                     </DialogTrigger>
                 </DropdownMenuContent>
             </DropdownMenu>
-            <DialogContent disableClose className="flex flex-col border-none rounded-lg max-w-none max-h-[90dvh]">
+            <DialogContent disableClose className="flex flex-col border-none rounded-lg max-w-none h-[90dvh]">
                 <DialogHeader className="flex-row justify-between items-center border-b border-secondary pb-4">
                     <DialogTitle className="text-2xl font-medium">Manage Graphs</DialogTitle>
                     <CloseDialog />
@@ -137,6 +137,7 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
                 <TableComponent
                     className="grow overflow-hidden"
                     label={`${type}s`}
+                    entityName={type}
                     headers={["Name"]}
                     rows={rows}
                     setRows={setRows}
