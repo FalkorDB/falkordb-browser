@@ -7,6 +7,7 @@ import { Dispatch, SetStateAction, useContext, useState } from "react";
 import { ArrowRight, ArrowRightLeft, Check, Pencil, Plus, Trash2, X } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/components/ui/use-toast";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import Button from "../components/ui/Button";
 import Combobox from "../components/ui/combobox";
 import { Node } from "../api/graph/model";
@@ -29,11 +30,11 @@ export const OPTIONS = ["String", "Integer", "Float", "Geospatial", "Boolean"]
 export const getDefaultAttribute = (): [string, string[]] => ["", ["", "", "false", "false"]]
 
 export default function SchemaCreateElement({ onCreate, setIsAdd, selectedNodes, setSelectedNodes, type }: Props) {
-  
+
   const { indicator } = useContext(IndicatorContext)
-  
+
   const { toast } = useToast()
-  
+
   const [newAttribute, setNewAttribute] = useState<[string, string[]]>(getDefaultAttribute())
   const [attribute, setAttribute] = useState<[string, string[]]>(getDefaultAttribute())
   const [attributes, setAttributes] = useState<[string, string[]][]>([])
@@ -583,12 +584,26 @@ export default function SchemaCreateElement({ onCreate, setIsAdd, selectedNodes,
           !type &&
           <div className="w-full flex flex-col gap-2">
             <div className="w-full flex justify-between p-4 items-center">
-              <div style={{ backgroundColor: selectedNodes[0]?.color }} className="flex h-16 w-16 rounded-full border-2 border-background justify-center items-center">
-                <p>{selectedNodes[0]?.category}</p>
+              <div style={{ backgroundColor: selectedNodes[0]?.color }} className="flex h-16 w-16 rounded-full border-2 border-background justify-center items-center overflow-hidden">
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <p className="truncate">{selectedNodes[0]?.category}</p>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>{selectedNodes[0]?.category}</p>
+                  </TooltipContent>
+                </Tooltip>
               </div>
               <ArrowRight strokeWidth={1} size={40} />
-              <div style={{ backgroundColor: selectedNodes[1]?.color }} className="flex h-16 w-16 rounded-full border-2 border-background justify-center items-center">
-                <p>{selectedNodes[1]?.category}</p>
+              <div style={{ backgroundColor: selectedNodes[1]?.color }} className="flex h-16 w-16 rounded-full border-2 border-background justify-center items-center overflow-hidden">
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <p className="truncate">{selectedNodes[1]?.category}</p>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>{selectedNodes[1]?.category}</p>
+                  </TooltipContent>
+                </Tooltip>
               </div>
             </div>
             <div className="w-full flex justify-center gap-8">

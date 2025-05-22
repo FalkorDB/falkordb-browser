@@ -114,11 +114,11 @@ export default function GraphDataPanel({ object, setObject, onDeleteElement, set
 
     return showAsDialog ? (
         <Dialog open>
-            <DialogContent className="flex flex-col bg-foreground w-[80%] h-[90%] rounded-lg border-none gap-8 p-8" disableClose>
+            <DialogContent className="flex flex-col bg-foreground w-[90%] h-[90%] rounded-lg border-none gap-8 p-8" disableClose>
                 <DialogHeader className="flex-row justify-between items-center border-b pb-4">
-                    <div className="flex flex-col gap-2">
-                        <DialogTitle>Graph ID: <span className="Gradient text-transparent bg-clip-text">{object.id}</span></DialogTitle>
-                        <p data-testid="DataPanelAttributesCount" className="font-medium text-xl text-nowrap">Attributes: <span className="Gradient text-transparent bg-clip-text">{Object.keys(object.data).length}</span></p>
+                    <div className="flex flex-col gap-2 font-medium text-xl text-nowrap">
+                        <DialogTitle>ID: <span className="Gradient text-transparent bg-clip-text">{object.id}</span></DialogTitle>
+                        <p data-testid="DataPanelAttributesCount">Attributes: <span className="Gradient text-transparent bg-clip-text">{Object.keys(object.data).length}</span></p>
                     </div>
                     <Button
                         onClick={() => setObject(undefined)}
@@ -157,20 +157,25 @@ export default function GraphDataPanel({ object, setObject, onDeleteElement, set
             </DialogContent>
         </Dialog>
     ) : (
-        <div data-testid="DataPanel" className="DataPanel">
-            <div className="relative flex justify-between items-center p-6">
-                <Button
-                    data-testid="DataPanelClose"
-                    className="absolute top-2 right-2"
-                    title="Close"
-                    onClick={() => setObject(undefined)}
-                >
-                    <X size={15} />
-                </Button>
+        <div data-testid="DataPanel" className="DataPanel p-6">
+            <div className="relative flex flex-col gap-6 pb-4 border-b">
+                <div className="flex flex-row justify-between items-center">
+                    <div className="flex flex-col gap-2 font-medium text-xl text-nowrap">
+                        <p>ID: <span className="Gradient text-transparent bg-clip-text">{object.id}</span></p>
+                        <p data-testid="DataPanelAttributesCount">Attributes: <span className="Gradient text-transparent bg-clip-text">{Object.keys(object.data).length}</span></p>
+                    </div>
+                    <Button
+                        data-testid="DataPanelClose"
+                        title="Close"
+                        onClick={() => setObject(undefined)}
+                    >
+                        <X />
+                    </Button>
+                </div>
                 <ul
                     ref={labelsListRef}
                     data-testid="DataPanelLabel"
-                    className="flex flex-wrap gap-4 min-w-[10%]"
+                    className="flex flex-wrap gap-4"
                     onMouseEnter={() => setLabelsHover(true)}
                     onMouseLeave={() => setLabelsHover(false)}
                 >
@@ -180,9 +185,9 @@ export default function GraphDataPanel({ object, setObject, onDeleteElement, set
                             key={l}
                             className="flex gap-2 px-2 py-1 bg-background rounded-full items-center"
                         >
-                            <p>{l}</p>
+                            <p>{l || "No Label"}</p>
                             {
-                                session?.user?.role !== "Read-Only" &&
+                                l && session?.user?.role !== "Read-Only" &&
                                 <RemoveLabel
                                     onRemoveLabel={handleRemoveLabel}
                                     selectedLabel={l}
@@ -199,7 +204,7 @@ export default function GraphDataPanel({ object, setObject, onDeleteElement, set
                             }
                         </li>
                     ))}
-                    <li className="h-8 flex flex-wrap gap-2">
+                    <li className="h-8 w-[106px] flex justify-center items-center" key="addLabel">
                         {
                             type && (labelsHover || label.length === 0) && session?.user?.role !== "Read-Only" &&
                             <AddLabel
@@ -207,8 +212,7 @@ export default function GraphDataPanel({ object, setObject, onDeleteElement, set
                                 trigger={
                                     <Button
                                         data-testid="DataPanelAddLabel"
-                                        className="p-2 text-xs justify-center border border-background"
-                                        variant="Secondary"
+                                        className="p-2 text-nowrap text-xs justify-center border border-background rounded-full"
                                         label="Add Label"
                                         title=""
                                     >
@@ -219,18 +223,16 @@ export default function GraphDataPanel({ object, setObject, onDeleteElement, set
                         }
                     </li>
                 </ul>
-                <div className="flex flex-col items-center gap-2 font-medium text-xl text-nowrap">
-                    <p>Graph ID: <span className="Gradient text-transparent bg-clip-text">{object.id}</span></p>
-                    <p data-testid="DataPanelAttributesCount">Attributes: <span className="Gradient text-transparent bg-clip-text">{Object.keys(object.data).length}</span></p>
-                </div>
             </div>
-            <GraphDataTable
-                lastObjId={lastObjId}
-                graph={graph}
-                object={object}
-                type={type}
-                onDeleteElement={onDeleteElement}
-            />
+            <div className="h-1 grow flex flex-col bg-background rounded-lg">
+                <GraphDataTable
+                    lastObjId={lastObjId}
+                    graph={graph}
+                    object={object}
+                    type={type}
+                    onDeleteElement={onDeleteElement}
+                />
+            </div>
         </div >
     )
 }

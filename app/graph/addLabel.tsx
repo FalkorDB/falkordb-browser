@@ -13,6 +13,7 @@ interface Props {
 
 export default function AddLabel({
     trigger = <Button
+        className="py-1"
         variant="Primary"
         label="Add Label"
         title=""

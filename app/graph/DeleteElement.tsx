@@ -16,6 +16,7 @@ interface Props {
     setOpen: (open: boolean) => void
     description: string
     label?: "Graph" | "Schema"
+    trigger?: React.ReactNode
     backgroundColor?: string
 }
 
@@ -25,7 +26,15 @@ export default function DeleteElement({
     setOpen,
     description,
     backgroundColor,
-    label = "Graph"
+    label = "Graph",
+    trigger = <Button
+        data-testid={`deleteElement${label}`}
+        className={cn("pointer-events-auto", backgroundColor)}
+        variant="Delete"
+        title="Delete Element(s)"
+    >
+        <Trash2 size={20} />
+    </Button>,
 }: Props) {
 
     const { indicator } = useContext(IndicatorContext)
@@ -46,16 +55,7 @@ export default function DeleteElement({
             open={open}
             title="Delete Elements"
             description={description}
-            trigger={
-                <Button
-                    data-testid={`deleteElement${label}`}
-                    className={cn("pointer-events-auto", backgroundColor)}
-                    variant="Delete"
-                    title="Delete Element(s)"
-                >
-                    <Trash2 size={20} />
-                </Button>
-            }
+            trigger={trigger}
         >
             <div className="flex justify-end gap-4">
                 <Button

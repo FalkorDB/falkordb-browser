@@ -1,5 +1,5 @@
 /* eslint-disable no-param-reassign */
-import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Check, Pencil, Plus, Trash2, X } from "lucide-react"
 import { prepareArg, securedFetch } from "@/lib/utils"
 import { toast } from "@/components/ui/use-toast"
@@ -45,7 +45,7 @@ export default function GraphDataTable({ graph, object, type, onDeleteElement, l
         }
         setAttributes(Object.keys(object.data))
     }, [lastObjId, object, setAttributes, type])
-    
+
     const handleSetEditable = (key: string, val: string) => {
         if (key !== "") {
             setIsAddValue(false)
@@ -182,7 +182,7 @@ export default function GraphDataTable({ graph, object, type, onDeleteElement, l
             <Table parentClassName="grow">
                 <TableHeader>
                     <TableRow>
-                        <TableHead className="w-1" />
+                        <TableHead className="w-6"><div className="h-12 w-6" /></TableHead>
                         <TableHead>Key</TableHead>
                         <TableHead>Value</TableHead>
                     </TableRow>
@@ -197,7 +197,7 @@ export default function GraphDataTable({ graph, object, type, onDeleteElement, l
                                 key={key}
                             >
                                 <TableCell>
-                                    <div className="h-10 w-6 flex flex-col items-center gap-2 justify-center">
+                                    <div className="h-12 w-6 flex flex-col items-center gap-2 justify-center">
                                         {
                                             session?.user?.role !== "Read-Only" && (
                                                 editable === key ?
@@ -254,7 +254,7 @@ export default function GraphDataTable({ graph, object, type, onDeleteElement, l
                                                             <div className="flex justify-end gap-4">
                                                                 <Button
                                                                     data-testid="DataPanelDeleteAttributeConfirm"
-                                                                    variant="Primary"
+                                                                    variant="Delete"
                                                                     label="Delete"
                                                                     onClick={() => removeProperty(key)}
                                                                     isLoading={isRemoveLoading}
@@ -342,23 +342,21 @@ export default function GraphDataTable({ graph, object, type, onDeleteElement, l
                         </TableRow >
                     }
                 </TableBody >
-                <TableCaption>
-                    {
-                        session?.user?.role !== "Read-Only" &&
-                        <Button
-                            disabled={attributes.some((key) => key === editable)}
-                            variant="Primary"
-                            data-testid="DataPanelAddAttribute"
-                            label="Add Attribute"
-                            title="Add a new attribute"
-                            onClick={() => setIsAddValue(true)}
-                        >
-                            <Plus size={20} />
-                        </Button>
-                    }
-                </TableCaption>
             </Table >
-            <div className="flex justify-end p-4">
+            <div className="flex justify-between p-4">
+                {
+                    session?.user?.role !== "Read-Only" &&
+                    <Button
+                        disabled={attributes.some((key) => key === editable)}
+                        variant="Primary"
+                        data-testid="DataPanelAddAttribute"
+                        label="Add Attribute"
+                        title="Add a new attribute"
+                        onClick={() => setIsAddValue(true)}
+                    >
+                        <Plus size={20} />
+                    </Button>
+                }
                 {
                     session?.user?.role !== "Read-Only" &&
                     <DeleteElement
@@ -366,6 +364,13 @@ export default function GraphDataTable({ graph, object, type, onDeleteElement, l
                         open={deleteOpen}
                         setOpen={setDeleteOpen}
                         onDeleteElement={handleDeleteElement}
+                        trigger={<Button
+                            data-testid={`delete${type ? "Node" : "Relation"}`}
+                            variant="Delete"
+                            title="Delete Element"
+                        >
+                            <Trash2 size={20} />
+                        </Button>}
                     />
                 }
             </div>
