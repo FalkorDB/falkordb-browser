@@ -1,6 +1,6 @@
 import { Locator } from "@playwright/test";
 import BasePage from "@/e2e/infra/ui/basePage";
-import { waitForElementToBeVisible, waitForTimeOut } from '../../infra/utils'
+import { interactWhenVisible, waitForElementToBeVisible, waitForTimeOut } from '../../infra/utils'
 
 export default class SettingsUsersPage extends BasePage {
 
@@ -95,47 +95,67 @@ export default class SettingsUsersPage extends BasePage {
         return isVisible;
     }
 
-    async clickOnAddUserBtn(): Promise<void>{
-        const isVisible = await waitForElementToBeVisible(this.addUserButton);
-        if (!isVisible) throw new Error("add user button is not visible!");
-        await this.addUserButton.click();
+    async clickOnAddUserBtn(): Promise<void> {
+        await interactWhenVisible(this.addUserButton, (el) => el.click(), "add user button");
+    }
+    
+    async fillUserNameField(userName: string): Promise<void> {
+        await interactWhenVisible(this.userNameField, (el) => el.fill(userName), "user name input");
+    }
+    
+    async fillPasswordField(password: string): Promise<void> {
+        await interactWhenVisible(this.passwordField, (el) => el.fill(password), "password input");
+    }
+    
+    async fillConfirmPasswordField(confirmPassword: string): Promise<void> {
+        await interactWhenVisible(this.confirmPasswordField, (el) => el.fill(confirmPassword), "confirm password input");
+    }
+    
+    async clickOnSelectRoleBtnInAddUser(): Promise<void> {
+        await interactWhenVisible(this.selectRoleBtnInAddUser, (el) => el.click(), "select role button");
+    }
+    
+    async clickOnSelectUserRole(role: string): Promise<void> {
+        await interactWhenVisible(this.selectUserRole(role), (el) => el.click(), `select user role: ${role}`);
+    }
+    
+    async clickOnSubmitUserAddition(): Promise<void> {
+        await interactWhenVisible(this.submitUserAddition, (el) => el.click(), "submit user addition button");
     }
 
-    async fillUserNameField(userName: string): Promise<void>{
-        const isVisible = await waitForElementToBeVisible(this.userNameField);
-        if (!isVisible) throw new Error("user name input is not visible!");
-        await this.userNameField.fill(userName);
+    async clickUserRow(selectedUser: string): Promise<void> {
+        await interactWhenVisible(this.userRow(selectedUser), (el) => el.hover(), `user row ${selectedUser}`);
+    }
+    
+    async clickUserSelectRoleEditBtn(selectedUser: string): Promise<void> {
+        await interactWhenVisible(this.userSelectRoleEditBtn(selectedUser), (el) => el.click(), `select role edit button for ${selectedUser}`);
     }
 
-    async fillPasswordField(password: string): Promise<void>{
-        const isVisible = await waitForElementToBeVisible(this.passwordField);
-        if (!isVisible) throw new Error("password input is not visible!");
-        await this.passwordField.fill(password);
+    async clickUserSelectRoleBtn(): Promise<void> {
+        await interactWhenVisible(this.userSelectRoleBtn, (el) => el.click(), "select role button");
     }
 
-    async fillConfirmPasswordField(confirmPassword: string): Promise<void>{
-        const isVisible = await waitForElementToBeVisible(this.passwordField);
-        if (!isVisible) throw new Error("confirm password input is not visible!");
-        await this.confirmPasswordField.fill(confirmPassword);
+    async clickDeleteUsersBtn(): Promise<void> {
+        await interactWhenVisible(this.deleteUsersBtn, (el) => el.click(), "delete users button");
     }
 
-    async clickOnSelectRoleBtnInAddUser(): Promise<void>{
-        const isVisible = await waitForElementToBeVisible(this.selectRoleBtnInAddUser);
-        if (!isVisible) throw new Error("select role button is not visible!");
-        await this.selectRoleBtnInAddUser.click();
+    async clickConfirmUserDeleteMsg(): Promise<void> {
+        await interactWhenVisible(this.confirmUserDeleteMsg, (el) => el.click(), "confirm user delete message button");
+    }
+    
+    async clickUserCheckboxBtn(selectedUser: string): Promise<void> {
+        await interactWhenVisible(this.userCheckboxBtn(selectedUser), (el) => el.click(), `checkbox button for ${selectedUser}`);
+    }
+    
+    async clickConfirmModifyingUserRole(): Promise<void> {
+        await interactWhenVisible(this.confirmModifyingUserRole, (el) => el.click(), "set user button");
     }
 
-    async clickOnSelectUserRole(role: string): Promise<void>{
-        const isVisible = await waitForElementToBeVisible(this.selectRoleBtnInAddUser);
-        if (!isVisible) throw new Error("select role button is not visible!");
-        await this.selectUserRole(role).click();
+    async fillSearchInput(value: string): Promise<void> {
+        await interactWhenVisible(this.searchInput, (el) => el.fill(value), "search input");
     }
-
-    async clickOnSubmitUserAddition(): Promise<void>{
-        const isVisible = await waitForElementToBeVisible(this.submitUserAddition);
-        if (!isVisible) throw new Error("submit user addition button is not visible!");
-        await this.submitUserAddition.click();
-    }
+    
+    
 
     async addUser(userDetails: { [key: string]: string }): Promise<void> {
         await this.waitForPageIdle();
@@ -159,33 +179,32 @@ export default class SettingsUsersPage extends BasePage {
 
     async modifyUserRole(selectedUser: string, role: string): Promise<void> {
         await this.waitForPageIdle();
-        await this.userRow(selectedUser).hover();
-        await this.userSelectRoleEditBtn(selectedUser).waitFor({ state: "visible" });
-        await this.userSelectRoleEditBtn(selectedUser).click();
-        await this.userSelectRoleBtn.click();
-        await this.selectUserRole(role).click();
+        await this.clickUserRow(selectedUser);
+        await this.clickUserSelectRoleEditBtn(selectedUser);
+        await this.clickUserSelectRoleBtn();
+        await this.clickOnSelectUserRole(role);
         await this.clickOnConfirmModifyingUserRole();
         await waitForTimeOut(this.page, 1500)
     }
 
     async deleteTwoUsers(selectedUser1: string, selectedUser2: string): Promise<void> {
         await this.waitForPageIdle();
-        await this.userCheckboxBtn(selectedUser1).click()
-        await this.userCheckboxBtn(selectedUser2).click()
-        await this.deleteUsersBtn.click()
-        await this.confirmUserDeleteMsg.click()
+        await this.clickUserCheckboxBtn(selectedUser1);
+        await this.clickUserCheckboxBtn(selectedUser2);
+        await this.clickDeleteUsersBtn()
+        await this.clickConfirmUserDeleteMsg()
         await waitForTimeOut(this.page, 1500)
     }
 
     async removeUser(selectedUser: string): Promise<void> {
         await this.waitForPageIdle();
-        await this.userCheckboxBtn(selectedUser).click();
-        await this.deleteUsersBtn.click();
-        await this.confirmUserDeleteMsg.click();
+        await this.clickUserCheckboxBtn(selectedUser);
+        await this.clickDeleteUsersBtn();
+        await this.clickConfirmUserDeleteMsg();
     }
 
     async searchForElement(element: string):  Promise<void>{
-        await this.searchInput.fill(element);
+        await this.fillSearchInput(element);
         await this.page.keyboard.press('Enter');
     }
 
@@ -196,6 +215,6 @@ export default class SettingsUsersPage extends BasePage {
     }
 
     async clickOnConfirmModifyingUserRole():  Promise<void>{
-        await this.confirmModifyingUserRole.click();
+        await this.clickConfirmModifyingUserRole();
     }
 }
