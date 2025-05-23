@@ -9,7 +9,7 @@ export default class SettingsUsersPage extends BasePage {
     }
 
     private get addUserButton(): Locator {
-        return this.page.locator("//button[contains(text(), 'Add User')]");
+        return this.page.locator("button#add-user");
     }
 
     private get submitUserAddition(): Locator {
@@ -28,8 +28,8 @@ export default class SettingsUsersPage extends BasePage {
         return (selectedUser: string) => this.page.locator(`//tbody/tr[@data-id='${selectedUser}']`)
     }
     
-    private get userSelectRoleBtn(): (selectedUser: string) => Locator {
-        return (selectedUser: string) => this.page.locator(`//tbody/tr[@data-id='${selectedUser}']/td[3]//button`).first();
+    private get userSelectRoleBtn(): Locator {
+        return this.page.locator(`button[data-testid="selectRole"]`);
     }
 
     private get selectUserRole(): (role: string) => Locator {
@@ -69,7 +69,7 @@ export default class SettingsUsersPage extends BasePage {
     }
 
     private get deleteUsersBtn(): Locator {
-        return this.page.locator("//button[contains(text(), 'Delete Users')]")
+        return this.page.locator("button#delete-user")
     }
 
     private get searchBtn(): Locator {
@@ -77,7 +77,7 @@ export default class SettingsUsersPage extends BasePage {
     }
 
     private get searchInput(): Locator {
-        return this.page.locator("//div[@id='tableComponent']/input");
+        return this.page.locator('input[data-testid="searchInputUsers"]');
     }
 
     private get tableRoles(): Locator {
@@ -162,7 +162,7 @@ export default class SettingsUsersPage extends BasePage {
         await this.userRow(selectedUser).hover();
         await this.userSelectRoleEditBtn(selectedUser).waitFor({ state: "visible" });
         await this.userSelectRoleEditBtn(selectedUser).click();
-        await this.userSelectRoleBtn(selectedUser).click();
+        await this.userSelectRoleBtn.click();
         await this.selectUserRole(role).click();
         await this.clickOnConfirmModifyingUserRole();
         await waitForTimeOut(this.page, 1500)
@@ -185,7 +185,6 @@ export default class SettingsUsersPage extends BasePage {
     }
 
     async searchForElement(element: string):  Promise<void>{
-        await this.searchBtn.click();
         await this.searchInput.fill(element);
         await this.page.keyboard.press('Enter');
     }

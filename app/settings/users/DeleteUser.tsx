@@ -44,6 +44,7 @@ export default function DeleteUser({ users, setUsers, setRows }: DeleteUserProps
                 <Button
                     disabled={users.length === 0}
                     variant="Primary"
+                    id="delete-user"
                     label="Delete Users"
                     title="Remove selected users"
                 >
