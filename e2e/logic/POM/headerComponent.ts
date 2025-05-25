@@ -1,21 +1,19 @@
-
 import { Locator, Page } from "playwright";
 import BasePage from "@/e2e/infra/ui/basePage";
-import { waitForURL } from "@/e2e/infra/utils";
+import { interactWhenVisible, waitForURL } from "@/e2e/infra/utils";
 import urls from '../../config/urls.json'
 
-export default class NavBarComponent extends BasePage {
-
+export default class HeaderComponent extends BasePage {
     private get falkorDBLogo(): Locator {
         return this.page.getByLabel("FalkorDB");
     }
 
     private get graphsButton(): Locator {
-        return this.page.locator("//button[contains(text(), 'Graphs')]");
+        return this.page.getByTestId("GraphsButton");
     }
 
     private get schemaButton(): Locator {
-        return this.page.getByRole("button", { name: "Schemas" });
+        return this.page.getByTestId("SchemasButton");
     }
 
     private get helpButton(): Locator {
@@ -39,45 +37,45 @@ export default class NavBarComponent extends BasePage {
     }
 
     private get LogoutButton(): Locator {
-        return this.page.getByRole("button", { name: "Log Out" })
+        return this.page.getByTestId("logoutButton")
     }
 
     private get aboutPopUp(): Locator {
         return this.page.locator('//div[@id="about"]');
     }
 
-    async clickOnFalkorLogo(): Promise<void> {
-        await this.falkorDBLogo.click();
+    async clickFalkorDBLogo(): Promise<void> {
+        await interactWhenVisible(this.falkorDBLogo, (el) => el.click(), "Click FalkorDB Logo");
     }
 
     async clickOnGraphsButton(): Promise<void> {
-        await this.graphsButton.click();
+        await interactWhenVisible(this.graphsButton, (el) => el.click(), "Click Graphs Button");
         await waitForURL(this.page, urls.graphUrl);
     }
 
     async clickOnSchemasButton(): Promise<void> {
-        await this.schemaButton.click();
+        await interactWhenVisible(this.schemaButton, (el) => el.click(), "Click Schemas Button");
         await waitForURL(this.page, urls.schemaUrl);
     }
 
     async clickOnHelpBtn(): Promise<void> {
-        await this.helpButton.click();
+        await interactWhenVisible(this.helpButton, (el) => el.click(), "Click Help Button");
     }
 
     async clickOnAboutBtn(): Promise<void> {
-        await this.aboutButton.click();
+        await interactWhenVisible(this.aboutButton, (el) => el.click(), "Click About Button");
     }
 
     async clickOnDocumentationBtn(): Promise<void> {
-        await this.documentationButton.click();
+        await interactWhenVisible(this.documentationButton, (el) => el.click(), "Click Documentation Button");
     }
 
     async clickOnSupportBtn(): Promise<void> {
-        await this.supportButton.click();
+        await interactWhenVisible(this.supportButton, (el) => el.click(), "Click Support Button");
     }
 
     async clickOnSettingsBtn(): Promise<void> {
-        await this.settingsButton.click();
+        await interactWhenVisible(this.settingsButton, (el) => el.click(), "Click Settings Button");
         await waitForURL(this.page, urls.settingsUrl);
     }
 
@@ -88,7 +86,7 @@ export default class NavBarComponent extends BasePage {
 
     async Logout(): Promise<void> {
         await this.waitForPageIdle();
-        await this.LogoutButton.click()
+        await interactWhenVisible(this.LogoutButton, (el) => el.click(), "Click Logout Button");
         await waitForURL(this.page, urls.loginUrl);
     }
 
@@ -96,9 +94,9 @@ export default class NavBarComponent extends BasePage {
         await this.waitForPageIdle();
         const [newPage] = await Promise.all([
             this.page.waitForEvent('popup'),
-            this.clickOnFalkorLogo(),
+            this.clickFalkorDBLogo()
         ]);
-        return newPage
+        return newPage;
     }
 
     async clickOnDocumentation(): Promise<Page> {
@@ -106,9 +104,9 @@ export default class NavBarComponent extends BasePage {
         const [newPage] = await Promise.all([
             this.page.waitForEvent('popup'),
             this.clickOnHelpBtn(),
-            this.clickOnDocumentationBtn(),
+            this.clickOnDocumentationBtn()
         ]);
-        return newPage
+        return newPage;
     }
 
     async clickOnSupport(): Promise<Page> {
@@ -116,17 +114,17 @@ export default class NavBarComponent extends BasePage {
         const [newPage] = await Promise.all([
             this.page.waitForEvent('popup'),
             this.clickOnHelpBtn(),
-            this.clickOnSupportBtn(),
+            this.clickOnSupportBtn()
         ]);
-        return newPage
+        return newPage;
     }
 
-    async isAboutPopUp(): Promise<boolean>{
+    async isAboutPopUp(): Promise<boolean> {
         const isVisible = await this.aboutPopUp.isVisible();
         return isVisible;
     }
 
-    async closePopUp(): Promise<void>{
+    async closePopUp(): Promise<void> {
         await this.page.mouse.click(10, 10);
         await this.page.waitForTimeout(1000);
     }
