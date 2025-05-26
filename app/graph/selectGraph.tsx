@@ -96,6 +96,7 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
                         label={selectedValue || `Select ${type}`}
                         title={options.length === 0 ? `There are no ${type}` : undefined}
                         indicator={indicator}
+                        data-testid={`select${type}`}
                     >
                         {
                             open ?

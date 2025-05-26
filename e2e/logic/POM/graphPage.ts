@@ -20,8 +20,8 @@ export default class GraphPage extends Page {
     }
 
     // EDITOR
-    public get editorInput(): Locator {
-        return this.page.getByTestId(`editorInput`);
+    public get editorContainer(): Locator {
+        return this.page.getByTestId(`editorContainer`);
     }
 
     public get editorRun(): Locator {
@@ -53,6 +53,10 @@ export default class GraphPage extends Page {
         return this.page.getByTestId(`queryHistoryEditorRun`);
     }
 
+    public get elementCanvasSuggestionsListGraph(): Locator {
+        return this.page.getByTestId(`elementCanvasSuggestionsListGraph`);
+    }
+
     async getBoundingBoxCanvasElement(): Promise<null | {
         x: number;
         y: number;
@@ -68,8 +72,8 @@ export default class GraphPage extends Page {
         return attributeValue ?? "";
     }
 
-    async fillCreateInput(text: string): Promise<void> {
-        await interactWhenVisible(this.createInput("Graph"), (el) => el.fill(text), "Create Graph Input");
+    async fillCreateGraphInput(text: string): Promise<void> {
+        await interactWhenVisible(this.insertInput("Graph"), (el) => el.fill(text), "Create Graph Input");
     }
 
     async fillSearch(text: string): Promise<void> {
@@ -84,7 +88,7 @@ export default class GraphPage extends Page {
         await interactWhenVisible(this.queryHistorySearch, (el) => el.fill(text), "Query History Search");
     }
 
-    async fillElementCanvasSearch(text: string): Promise<void> {
+    async fillElementCanvasSearch(text: string): Promise<void> {        
         await interactWhenVisible(this.elementCanvasSearch("Graph"), (el) => el.fill(text), "Element Canvas Search");
     }
 
@@ -93,14 +97,14 @@ export default class GraphPage extends Page {
     }
 
     async clickEditorInput(): Promise<void> {
-        await interactWhenVisible(this.editorInput, (el) => el.click(), "Editor Input");
+        await interactWhenVisible(this.editorContainer, (el) => el.click(), "Editor Input");
     }
 
-    async clickCreate(): Promise<void> {
+    async clickCreateGraph(): Promise<void> {        
         await interactWhenVisible(this.create("Graph"), (el) => el.click(), "Create Graph");
     }
 
-    async clickCreateConfirm(): Promise<void> {
+    async clickConfirmCreateGraph(): Promise<void> {
         await interactWhenVisible(this.createConfirm("Graph"), (el) => el.click(), "Create Graph Confirm");
     }
 
@@ -137,7 +141,7 @@ export default class GraphPage extends Page {
     }
 
     async clickSelectItem(graphName: string): Promise<void> {
-    await interactWhenVisible(this.selectItem("Graph", graphName), (el) => el.click(), `Select Graph Item ${graphName}`);
+        await interactWhenVisible(this.selectItemBySearch("Graph", graphName), (el) => el.click(), `Select Graph Item ${graphName}`);
     }
 
     async clickSearch(): Promise<void> {
@@ -156,8 +160,8 @@ export default class GraphPage extends Page {
         await interactWhenVisible(this.elementCanvasAddEdge("Graph"), (el) => el.click(), "Add Edge");
     }
 
-    async clickDeleteElement(): Promise<void> {
-        await interactWhenVisible(this.deleteElement("Graph"), (el) => el.click(), "Delete Element");
+    async clickDeleteElement(): Promise<void> { 
+        await interactWhenVisible(this.deleteElement("Node"), (el) => el.click(), "Delete Element");
     }
 
     async clickDeleteElementConfirm(): Promise<void> {
@@ -169,19 +173,19 @@ export default class GraphPage extends Page {
     }
 
     async clickAnimationControl(): Promise<void> {
-        await interactWhenVisible(this.animationControl("Graph"), (el) => el.click(), "Animation Control");
+        await interactWhenVisible(this.animationControl(), (el) => el.click(), "Animation Control");
     }
 
     async clickZoomInControl(): Promise<void> {
-        await interactWhenVisible(this.zoomInControl("Graph"), (el) => el.click(), "Zoom In Control");
+        await interactWhenVisible(this.zoomInControl(), (el) => el.click(), "Zoom In Control");
     }
 
     async clickZoomOutControl(): Promise<void> {
-        await interactWhenVisible(this.zoomOutControl("Graph"), (el) => el.click(), "Zoom Out Control");
+        await interactWhenVisible(this.zoomOutControl(), (el) => el.click(), "Zoom Out Control");
     }
 
     async clickCenterControl(): Promise<void> {
-        await interactWhenVisible(this.centerControl("Graph"), (el) => el.click(), "Center Control");
+        await interactWhenVisible(this.centerControl(), (el) => el.click(), "Center Control");
     }
 
     async clickGraphTab(): Promise<void> {
@@ -196,7 +200,7 @@ export default class GraphPage extends Page {
         await interactWhenVisible(this.metadataTab, (el) => el.click(), "Metadata Tab");
     }
 
-    async clickElementCanvasSuggestionByName(name: string): Promise<void> {
+    async clickElementCanvasSuggestionByName(name: string): Promise<void> {   
         await interactWhenVisible(this.elementCanvasSuggestionByName("Graph", name), (el) => el.click(), `Element Canvas Suggestion ${name}`);
     }
 
@@ -237,11 +241,11 @@ export default class GraphPage extends Page {
     }
 
     async isVisibleSelectItem(name: string): Promise<boolean> {
-        const isVisible = await waitForElementToBeVisible(this.selectItem("Graph", name));
+        const isVisible = await waitForElementToBeVisible(this.selectItemBySearch("Graph", name));
         return isVisible;
     }
 
-    async isVisibleLabelsButtonByName(label: "RelationshipTypes" | "Labels", name: string): Promise<boolean> {
+    async isVisibleLabelsButtonByName(label: "RelationshipTypes" | "Labels", name: string): Promise<boolean> { 
         const isVisible = await waitForElementToBeVisible(this.labelsButtonByName("Graph", label, name));
         return isVisible;
     }
@@ -281,6 +285,11 @@ export default class GraphPage extends Page {
         await this.clickElementCanvasSuggestionByName(name);
     }
 
+    async isSearchElementInCanvasVisible(name: string): Promise<boolean> {
+        await this.fillElementCanvasSearch(name);
+        return await this.elementCanvasSuggestionsListGraph.isVisible();
+    }
+
     async verifyGraphExists(graphName: string): Promise<boolean> {
         await this.clickSelect();
         await this.fillSearch(graphName);
@@ -289,9 +298,9 @@ export default class GraphPage extends Page {
     }
 
     async addGraph(graphName: string): Promise<void> {
-        await this.clickCreate();
-        await this.fillCreateInput(graphName);
-        await this.clickCreateConfirm();
+        await this.clickCreateGraph();
+        await this.fillCreateGraphInput(graphName);
+        await this.clickConfirmCreateGraph();
         await waitForElementToNotBeVisible(this.create("Graph"));
     }
 
@@ -346,7 +355,7 @@ export default class GraphPage extends Page {
     async selectGraphByName(graphName: string): Promise<void> {
         await this.clickSelect();
         await this.fillSearch(graphName);
-        await this.clickSelectItem(graphName);
+        await this.clickSelectItem("0"); // selecting the first item in list after search
     }
 
     async getNodesCount(): Promise<string> {
@@ -372,7 +381,7 @@ export default class GraphPage extends Page {
         await this.searchElementInCanvas(name);
         await this.clickDeleteElement();
         await this.clickDeleteElementConfirm();
-        await waitForElementToNotBeVisible(this.deleteElement("Graph"));
+        await waitForElementToNotBeVisible(this.deleteElement("Node"));
     }
 
     async getErrorNotification(): Promise<boolean> {
@@ -388,8 +397,8 @@ export default class GraphPage extends Page {
 
     // 6000 is the timeout for the animation to end
     // 1500 is the timeout for the fit to size animation
-    // 2000 is extra timeout to ensure the animation is over
-    async waitForCanvasAnimationToEnd(timeout = 9500): Promise<void> {
+    // 1500 is extra timeout to ensure the animation is over
+    async waitForCanvasAnimationToEnd(timeout = 9000): Promise<void> {
         await this.page.waitForFunction(
             (selector: string) => {
                 const canvas = document.querySelector(selector) as HTMLCanvasElement;
@@ -410,6 +419,18 @@ export default class GraphPage extends Page {
         await this.page.waitForTimeout(1000);
         const toolTipText = await this.getNodeCanvasToolTipContent();
         return toolTipText;
+    }
+
+    async getCanvasScaling(): Promise<{ scaleX: number; scaleY: number }> {
+        const { scaleX, scaleY } = await this.canvasElement.evaluate((canvas: HTMLCanvasElement) => {
+            const ctx = canvas.getContext('2d');
+            const transform = ctx?.getTransform();
+            return {
+                scaleX: transform?.a || 1,
+                scaleY: transform?.d || 1,
+            };
+        });
+        return { scaleX, scaleY };
     }
 
     // eslint-disable-next-line class-methods-use-this

@@ -70,11 +70,13 @@ export default function AddLabel({
                         title="Add a new label"
                         type="submit"
                         isLoading={isLoading}
+                        data-testid="addLabelButton"
                     />
                     <CloseDialog
                         variant="Cancel"
                         label="Cancel"
                         type="button"
+                        data-testid="cancelLabelButton"
                     />
                 </div>
             </form>
