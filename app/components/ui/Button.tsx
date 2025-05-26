@@ -32,13 +32,13 @@ const getClassName = (variant: Variant, disable: boolean | undefined, open: bool
     switch (variant) {
         case "Primary":
             className = cn(
-                "px-4 py-2 bg-primary",
+                "px-4 py-[10px] bg-primary",
                 !disable && "hover:bg-primary",
                 className
             )
             break
         case "Secondary":
-            className = cn("px-12 py-2 bg-transparent border-[3px] border-primary", className)
+            className = cn("px-12 py-2 bg-transparent border-2 border-primary", className)
             break
         case "Cancel":
             className = cn("px-12 py-2 bg-transparent border-2 border-secondary", className)
