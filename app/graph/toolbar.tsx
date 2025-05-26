@@ -81,12 +81,12 @@ export default function Toolbar({
 
     return (
         <div className="w-full h-full flex justify-between items-center">
-            <div className="relative pointer-events-auto">
+            <div className={cn("relative pointer-events-auto", label === "Schema" && "h-full")}>
                 {
                     graph.getElements().length > 0 &&
                     <Input
                         data-testid={`elementCanvasSearch${label}`}
-                        className={cn("w-[30dvw] text-white border border-primary", backgroundColor)}
+                        className={cn("w-[30dvw] text-white border border-primary", label === "Schema" && "h-full", backgroundColor)}
                         placeholder="Search for element in the graph"
                         value={searchElement}
                         onChange={(e) => setSearchElement(e.target.value)}
@@ -198,7 +198,7 @@ export default function Toolbar({
                     </ul>
                 }
             </div>
-            <div className="flex gap-2">
+            <div className={cn("flex gap-2", label === "Schema" && "h-full")}>
                 {
                     graph.Id &&
                     <>
