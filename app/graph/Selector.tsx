@@ -152,7 +152,7 @@ export default function Selector({ graph, options, setOptions, graphName, setGra
     }
 
     return (
-        <div className="z-20 absolute top-5 inset-x-24 h-[56px] flex flex-row gap-4 items-center">
+        <div className="z-20 absolute top-5 inset-x-24 h-[58px] flex flex-row gap-4 items-center">
             <SelectGraph
                 options={options}
                 setOptions={setOptions}
@@ -166,7 +166,7 @@ export default function Selector({ graph, options, setOptions, graphName, setGra
             {
                 runQuery && historyQuery && setHistoryQuery ?
                     <>
-                        <div className="h-[56px] w-1 grow relative overflow-visible">
+                        <div className="h-full w-1 grow relative overflow-visible">
                             <EditorComponent
                                 graph={graph}
                                 maximize={maximize}
@@ -176,7 +176,7 @@ export default function Selector({ graph, options, setOptions, graphName, setGra
                                 setHistoryQuery={setHistoryQuery}
                             />
                         </div>
-                        <div className="flex gap-2 p-2 border rounded-lg bg-foreground">
+                        <div className="h-full flex gap-2 p-2 border rounded-lg bg-foreground">
                             <Tooltip>
                                 <TooltipTrigger className="cursor-default">
                                     <Info />
@@ -305,7 +305,7 @@ export default function Selector({ graph, options, setOptions, graphName, setGra
                             </Button>
                         </div>
                     </>
-                    : <div className="w-full h-[56px]">
+                    : <div className="w-full h-[58px]">
                         <Toolbar
                             graph={graph}
                             label={type}
