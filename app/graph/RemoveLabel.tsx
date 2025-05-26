@@ -19,7 +19,7 @@ export default function RemoveLabel({
         title=""
         disabled={!selectedLabel}
     >
-        <Trash2 size={15} />
+        <Trash2 />
     </Button>,
     onRemoveLabel,
 }: Props) {
