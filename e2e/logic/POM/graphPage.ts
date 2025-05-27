@@ -19,6 +19,10 @@ export default class GraphPage extends Page {
         return this.page.getByTestId("metadataTab");
     }
 
+    private get graphsTabInHeader(): Locator {
+        return this.page.getByTestId("GraphsButton");
+    }
+
     // EDITOR
     public get editorContainer(): Locator {
         return this.page.getByTestId(`editorContainer`);
@@ -243,6 +247,10 @@ export default class GraphPage extends Page {
     async isVisibleSelectItem(name: string): Promise<boolean> {
         const isVisible = await waitForElementToBeVisible(this.selectItemBySearch("Graph", name));
         return isVisible;
+    }
+
+    async clickGraphsTabInHeader(): Promise<void> {
+        await interactWhenVisible(this.graphsTabInHeader, (el) => el.click(), "Graphs Tab in Header");
     }
 
     async isVisibleLabelsButtonByName(label: "RelationshipTypes" | "Labels", name: string): Promise<boolean> { 
