@@ -127,23 +127,26 @@ export default function GraphDataPanel({ object, setObject, onDeleteElement, set
                     </Button>
                 </DialogHeader>
                 <div className="h-1 grow flex gap-8">
-                    <PaginationList
-                        label="Label"
-                        className="w-[40%] bg-background rounded-lg"
-                        list={label}
-                        step={12}
-                        dataTestId="attributes"
-                        onClick={(l) => selectedLabel === l ? setSelectedLabel("") : setSelectedLabel(l)}
-                        isSelected={(item) => item === selectedLabel}
-                        afterSearchCallback={(filteredList) => {
-                            if (!filteredList.includes(selectedLabel)) {
-                                setSelectedLabel("")
-                            }
-                        }}
-                    >
-                        <AddLabel onAddLabel={handleAddLabel} />
-                        <RemoveLabel onRemoveLabel={handleRemoveLabel} selectedLabel={selectedLabel} />
-                    </PaginationList>
+                    <div className="w-[40%] bg-background rounded-lg flex flex-col">
+                        <PaginationList
+                            className="h-1 grow"
+                            label="Label"
+                            list={label}
+                            step={12}
+                            dataTestId="attributes"
+                            onClick={(l) => selectedLabel === l ? setSelectedLabel("") : setSelectedLabel(l)}
+                            isSelected={(item) => item === selectedLabel}
+                            afterSearchCallback={(filteredList) => {
+                                if (!filteredList.includes(selectedLabel)) {
+                                    setSelectedLabel("")
+                                }
+                            }}
+                        />
+                        <div className="flex gap-4 p-4 justify-between">
+                            <AddLabel onAddLabel={handleAddLabel} />
+                            <RemoveLabel onRemoveLabel={handleRemoveLabel} selectedLabel={selectedLabel} />
+                        </div>
+                    </div>
                     <div className="w-[60%] bg-background rounded-lg flex flex-col gap-4">
                         <GraphDataTable
                             graph={graph}

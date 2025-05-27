@@ -16,18 +16,17 @@ export default function Settings() {
     const { data: session } = useSession()
 
     useEffect(() => {
-        window.addEventListener("keydown", (e) => {
+        const navigateBack = (e: KeyboardEvent) => {
             if (e.key === "Escape") {
+                e.preventDefault()
                 router.back()
             }
-        })
+        }
+
+        window.addEventListener("keydown", navigateBack)
 
         return () => {
-            window.removeEventListener("keydown", (e) => {
-                if (e.key === "Escape") {
-                    router.back()
-                }
-            })
+            window.removeEventListener("keydown", navigateBack)
         }
     }, [router])
 

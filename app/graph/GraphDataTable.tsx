@@ -343,7 +343,7 @@ export default function GraphDataTable({ graph, object, type, onDeleteElement, l
                     }
                 </TableBody >
             </Table >
-            <div className="flex justify-between p-4">
+            <div className="flex justify-between gap-4 p-4">
                 {
                     session?.user?.role !== "Read-Only" &&
                     <Button

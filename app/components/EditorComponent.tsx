@@ -630,35 +630,34 @@ export default function EditorComponent({ graph, historyQuery, maximize, setMaxi
                     <div ref={placeholderRef} className="absolute top-2 left-2 pointer-events-none">
                         {PLACEHOLDER}
                     </div>
-                    <div className="absolute top-2 right-2">
-                        {
-                            historyQuery.query &&
-                            <Button
-                                title="Clear"
-                                onClick={() => {
-                                    setHistoryQuery(prev => ({
-                                        ...prev,
-                                        query: "",
-                                    }))
-                                    editorRef.current?.focus()
-                                }}
-                            >
-                                <X />
-                            </Button>
-                        }
-                    </div>
                 </div>
-                <Button
-                    data-testid="editorRun"
-                    ref={submitQuery}
-                    indicator={indicator}
-                    className="h-[38px]"
-                    variant="Primary"
-                    label="RUN"
-                    title="Press Enter to run the query"
-                    onClick={handleSubmit}
-                    isLoading={isLoading}
-                />
+                <div className="flex gap-2">
+                    {
+                        historyQuery.query &&
+                        <Button
+                            title="Clear"
+                            onClick={() => {
+                                setHistoryQuery(prev => ({
+                                    ...prev,
+                                    query: "",
+                                }))
+                                editorRef.current?.focus()
+                            }}
+                        >
+                            <X />
+                        </Button>
+                    }
+                    <Button
+                        data-testid="editorRun"
+                        ref={submitQuery}
+                        indicator={indicator}
+                        variant="Primary"
+                        label="RUN"
+                        title="Press Enter to run the query"
+                        onClick={handleSubmit}
+                        isLoading={isLoading}
+                    />
+                </div>
             </div>
             <Dialog open={maximize} onOpenChange={setMaximize}>
                 <DialogContent disableClose className="w-full h-full">
