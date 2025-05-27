@@ -68,7 +68,7 @@ export default function PaginationList<T extends Item>({ list, step, onClick, da
                 </div>
             }
             <ul
-                data-testid={dataTestId}
+                data-testid="queryList"
                 className="h-1 grow flex flex-col p-2"
             >
                 {
