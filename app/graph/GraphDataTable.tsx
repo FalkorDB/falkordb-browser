@@ -367,7 +367,7 @@ export default function GraphDataTable({ graph, object, type, onDeleteElement, l
                         trigger={<Button
                             data-testid={`delete${type ? "Node" : "Relation"}`}
                             variant="Delete"
-                            title="Delete Element"
+                            label={`Delete ${type ? "Node" : "Relation"}`}
                         >
                             <Trash2 size={20} />
                         </Button>}

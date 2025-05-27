@@ -5,11 +5,11 @@
 
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { Editor, Monaco } from "@monaco-editor/react"
-import { SetStateAction, Dispatch, useEffect, useRef, useState, useContext } from "react"
+import { SetStateAction, Dispatch, useEffect, useRef, useState, useContext, useMemo } from "react"
 import * as monaco from "monaco-editor";
 import { Minimize2, X } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
-import { prepareArg, securedFetch } from "@/lib/utils";
+import { cn, prepareArg, securedFetch } from "@/lib/utils";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import Button from "./ui/Button";
 import CloseDialog from "./CloseDialog";
@@ -66,10 +66,10 @@ const monacoOptions: monaco.editor.IStandaloneEditorConstructionOptions = {
     links: false,
     minimap: { enabled: false },
     automaticLayout: true,
-    fontSize: 26,
-    fontWeight: "200",
+    fontSize: 30,
+    fontWeight: "400",
     wordWrap: "off",
-    lineHeight: 37,
+    lineHeight: 36,
     lineNumbersMinChars: 2,
     overviewRulerLanes: 0,
     overviewRulerBorder: false,
@@ -218,7 +218,7 @@ const SUGGESTIONS: monaco.languages.CompletionItem[] = [
 ]
 
 const MAX_HEIGHT = 20
-const LINE_HEIGHT = 38
+const LINE_HEIGHT = 36
 
 const PLACEHOLDER = "Type your query here to start"
 
@@ -241,6 +241,11 @@ export default function EditorComponent({ graph, historyQuery, maximize, setMaxi
     const [isLoading, setIsLoading] = useState(false)
     const [lineNumber, setLineNumber] = useState(1)
     const [blur, setBlur] = useState(false)
+
+    const editorHeight = useMemo(() => blur
+        ? LINE_HEIGHT
+        : Math.min(lineNumber * LINE_HEIGHT, document.body.clientHeight / 100 * MAX_HEIGHT),
+        [blur, lineNumber])
 
     useEffect(() => {
         indicatorRef.current = indicator
@@ -504,14 +509,24 @@ export default function EditorComponent({ graph, historyQuery, maximize, setMaxi
         updatePlaceholderVisibility();
 
         const isFirstLine = e.createContextKey<boolean>('isFirstLine', true);
+        const isLastLine = e.createContextKey<boolean>('isLastLine', true);
 
         // Update the context key value based on the cursor position
         e.onDidChangeCursorPosition(() => {
             const position = e.getPosition();
             if (position) {
                 isFirstLine.set(position.lineNumber === 1);
+                isLastLine.set(position.lineNumber === e.getModel()?.getLineCount());
             }
         });
+
+        e.addCommand(monaco.KeyCode.Escape, () => {
+            const domNode = e.getDomNode();
+            if (domNode) {
+                const textarea = domNode.querySelector('textarea');
+                if (textarea) (textarea as HTMLTextAreaElement).blur();
+            }
+        })
 
         // eslint-disable-next-line no-bitwise
         e.addCommand(monaco.KeyMod.Shift | monaco.KeyCode.Enter, () => {
@@ -585,7 +600,7 @@ export default function EditorComponent({ graph, historyQuery, maximize, setMaxi
                     }
                 })
             },
-            precondition: 'isFirstLine && !suggestWidgetVisible',
+            precondition: 'isLastLine && !suggestWidgetVisible',
         });
 
         // Override the default Ctrl + F keybinding
@@ -594,12 +609,11 @@ export default function EditorComponent({ graph, historyQuery, maximize, setMaxi
     }
 
     return (
-        <div className="absolute w-full flex items-start gap-8 border rounded-lg overflow-hidden bg-foreground p-2">
-            <div className="w-1 grow flex rounded-lg overflow-hidden">
-                <div ref={containerRef} className="relative grow w-1" data-testid="editorContainer">
+        <div style={{ height: editorHeight + 18 }} className="absolute w-full flex items-start gap-8 border rounded-lg overflow-hidden bg-foreground p-2">
+            <div className="h-full w-1 grow flex rounded-lg overflow-hidden">
+                <div ref={containerRef} className="h-full relative grow w-1" data-testid="editorContainer">
                     <Editor
-                        // eslint-disable-next-line no-nested-ternary
-                        height={blur ? LINE_HEIGHT : lineNumber * LINE_HEIGHT > document.body.clientHeight / 100 * MAX_HEIGHT ? document.body.clientHeight / 100 * MAX_HEIGHT : lineNumber * LINE_HEIGHT}
+                        height={editorHeight}
                         language="custom-language"
                         options={{
                             ...monacoOptions,
@@ -627,11 +641,11 @@ export default function EditorComponent({ graph, historyQuery, maximize, setMaxi
                             editorRef.current = e
                         }}
                     />
-                    <div ref={placeholderRef} className="absolute top-2 left-2 pointer-events-none">
+                    <span ref={placeholderRef} className="w-full top-0 left-0 absolute pointer-events-none text-3xl truncate">
                         {PLACEHOLDER}
-                    </div>
+                    </span>
                 </div>
-                <div className="flex gap-2">
+                <div style={{ height: LINE_HEIGHT }} className={cn("flex gap-2")}>
                     {
                         historyQuery.query &&
                         <Button
