@@ -7,7 +7,7 @@ import ApiCalls from "../logic/api/apiCalls";
 import GraphPage from "../logic/POM/graphPage";
 import urls from '../config/urls.json'
 import { BATCH_CREATE_PERSONS } from "../config/constants";
-import { CREATE_TWO_NODES_QUERY, getRandomString } from "../infra/utils";
+import { CREATE_NODE_QUERY, CREATE_QUERY, CREATE_TWO_NODES_QUERY, getRandomString } from "../infra/utils";
 
 test.describe('Canvas Tests', () => {
     let browser: BrowserWrapper;
@@ -156,84 +156,84 @@ test.describe('Canvas Tests', () => {
         await apicalls.removeGraph(graphName);
     });
 
-    // test(`@readwrite moving a node to another node's position while animation is off should place them at the same position`, async () => {
-    //     const graphName = getRandomString('graph');
-    //     await apiCall.addGraph(graphName);
-    //     const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
-    //     await browser.setPageToFullScreen();
-    //     await graph.selectGraphByName(graphName);
-    //     await graph.insertQuery(CREATE_TWO_NODES_QUERY);
-    //     await graph.clickRunQuery(true);
-    //     expect(await graph.getAnimationControl()).toBe(false);
-    //     await graph.clickCenterControl();
-    //     const initNodes = await graph.getNodesScreenPositions('graph');
-    //     const fromX = initNodes[0].screenX;
-    //     const fromY = initNodes[0].screenY;
-    //     const toX = initNodes[1].screenX;;
-    //     const toY = initNodes[1].screenY;
-    //     await graph.changeNodePosition(fromX, fromY, toX, toY);
-    //     await graph.waitForCanvasAnimationToEnd();
-    //     const nodes = await graph.getNodesScreenPositions('graph');
-    //     expect(nodes[1].screenX - nodes[0].screenX).toBeLessThanOrEqual(2);
-    //     expect(nodes[1].screenY - nodes[0].screenY).toBeLessThanOrEqual(2);
-    //     await apiCall.removeGraph(graphName);
-    // });
+    test(`@readwrite moving a node to another node's position while animation is off should place them at the same position`, async () => {
+        const graphName = getRandomString('graph');
+        await apicalls.addGraph(graphName);
+        const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+        await browser.setPageToFullScreen();
+        await graph.selectGraphByName(graphName);
+        await graph.insertQuery(CREATE_TWO_NODES_QUERY);
+        await graph.clickRunQuery(true);
+        expect(await graph.getAnimationControl()).toBe(false);
+        await graph.clickCenterControl();
+        const initNodes = await graph.getNodesScreenPositions('graph');
+        const fromX = initNodes[0].screenX;
+        const fromY = initNodes[0].screenY;
+        const toX = initNodes[1].screenX;;
+        const toY = initNodes[1].screenY;
+        await graph.changeNodePosition(fromX, fromY, toX, toY);
+        await graph.waitForCanvasAnimationToEnd();
+        const nodes = await graph.getNodesScreenPositions('graph');
+        expect(nodes[1].screenX - nodes[0].screenX).toBeLessThanOrEqual(2);
+        expect(nodes[1].screenY - nodes[0].screenY).toBeLessThanOrEqual(2);
+        await apicalls.removeGraph(graphName);
+    });
 
-    // test(`@readwrite moving a node to another node's position while animation is on should push them apart`, async () => {
-    //     const graphName = getRandomString('graph');
-    //     await apiCall.addGraph(graphName);
-    //     const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
-    //     await browser.setPageToFullScreen();
-    //     await graph.selectGraphByName(graphName);
-    //     await graph.insertQuery(CREATE_TWO_NODES_QUERY);
-    //     await graph.clickRunQuery(true);
-    //     const initNodes = await graph.getNodesScreenPositions('graph');
-    //     await graph.clickAnimationControl();
-    //     expect(await graph.getAnimationControl()).toBe(true);
-    //     const fromX = initNodes[0].screenX;
-    //     const fromY = initNodes[0].screenY;
-    //     const toX = initNodes[1].screenX;;
-    //     const toY = initNodes[1].screenY;
-    //     await graph.changeNodePosition(fromX, fromY, toX, toY);
-    //     await graph.waitForCanvasAnimationToEnd();
-    //     const nodes = await graph.getNodesScreenPositions('graph');
-    //     expect(Math.abs(nodes[1].screenX - nodes[0].screenX)).toBeGreaterThan(2);
-    //     expect(Math.abs(nodes[1].screenY - nodes[0].screenY)).toBeGreaterThan(2);
-    //     await apiCall.removeGraph(graphName);
-    // });
+    test(`@readwrite moving a node to another node's position while animation is on should push them apart`, async () => {
+        const graphName = getRandomString('graph');
+        await apicalls.addGraph(graphName);
+        const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+        await browser.setPageToFullScreen();
+        await graph.selectGraphByName(graphName);
+        await graph.insertQuery(CREATE_TWO_NODES_QUERY);
+        await graph.clickRunQuery(true);
+        const initNodes = await graph.getNodesScreenPositions('graph');
+        await graph.clickAnimationControl();
+        expect(await graph.getAnimationControl()).toBe(true);
+        const fromX = initNodes[0].screenX;
+        const fromY = initNodes[0].screenY;
+        const toX = initNodes[1].screenX;;
+        const toY = initNodes[1].screenY;
+        await graph.changeNodePosition(fromX, fromY, toX, toY);
+        await graph.waitForCanvasAnimationToEnd();
+        const nodes = await graph.getNodesScreenPositions('graph');
+        expect(Math.abs(nodes[1].screenX - nodes[0].screenX)).toBeGreaterThan(2);
+        expect(Math.abs(nodes[1].screenY - nodes[0].screenY)).toBeGreaterThan(2);
+        await apicalls.removeGraph(graphName);
+    });
 
-    // test(`@admin Validate that toggling a category label updates node visibility on the canvas`, async () => {
-    //     const graphName = getRandomString('graph');
-    //     await apiCall.addGraph(graphName);
-    //     const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
-    //     await browser.setPageToFullScreen();
-    //     await graph.selectGraphByName(graphName);
-    //     await graph.insertQuery(CREATE_NODE_QUERY);
-    //     await graph.clickRunQuery();
-    //     await graph.clickLabelsButtonByLabel("Labels", "person1");
-    //     const nodes1 = await graph.getNodesScreenPositions('graph');
-    //     expect(nodes1[0].visible).toBeFalsy();
-    //     await graph.clickLabelsButtonByLabel("Labels", "person1");
-    //     const nodes2 = await graph.getNodesScreenPositions('graph');
-    //     expect(nodes2[0].visible).toBeTruthy();
-    //     await apiCall.removeGraph(graphName);
-    // });
+    test(`@admin Validate that toggling a category label updates node visibility on the canvas`, async () => {
+        const graphName = getRandomString('graph');
+        await apicalls.addGraph(graphName);
+        const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+        await browser.setPageToFullScreen();
+        await graph.selectGraphByName(graphName);
+        await graph.insertQuery(CREATE_NODE_QUERY);
+        await graph.clickRunQuery();
+        await graph.clickLabelsButtonByLabel("Labels", "person1");
+        const nodes1 = await graph.getNodesScreenPositions('graph');
+        expect(nodes1[0].visible).toBeFalsy();
+        await graph.clickLabelsButtonByLabel("Labels", "person1");
+        const nodes2 = await graph.getNodesScreenPositions('graph');
+        expect(nodes2[0].visible).toBeTruthy();
+        await apicalls.removeGraph(graphName);
+    });
 
-    // test(`@admin Validate that toggling a relationship label updates edge visibility on the canvas`, async () => {
-    //     const graphName = getRandomString('graph');
-    //     await apiCall.addGraph(graphName);
-    //     const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
-    //     await browser.setPageToFullScreen();
-    //     await graph.selectGraphByName(graphName);
-    //     await graph.insertQuery(CREATE_QUERY);
-    //     await graph.clickRunQuery();
-    //     await graph.clickLabelsButtonByLabel("RelationshipTypes", "KNOWS");
-    //     const links1 = await graph.getLinksScreenPositions('graph');
-    //     expect(links1[0].visible).toBeFalsy();
-    //     await graph.clickLabelsButtonByLabel("RelationshipTypes", "KNOWS");
-    //     const links2 = await graph.getLinksScreenPositions('graph');
-    //     expect(links2[0].visible).toBeTruthy();
-    //     await apiCall.removeGraph(graphName);
-    // });
+    test(`@admin Validate that toggling a relationship label updates edge visibility on the canvas`, async () => {
+        const graphName = getRandomString('graph');
+        await apicalls.addGraph(graphName);
+        const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+        await browser.setPageToFullScreen();
+        await graph.selectGraphByName(graphName);
+        await graph.insertQuery(CREATE_QUERY);
+        await graph.clickRunQuery();
+        await graph.clickLabelsButtonByLabel("RelationshipTypes", "KNOWS");
+        const links1 = await graph.getLinksScreenPositions('graph');
+        expect(links1[0].visible).toBeFalsy();
+        await graph.clickLabelsButtonByLabel("RelationshipTypes", "KNOWS");
+        const links2 = await graph.getLinksScreenPositions('graph');
+        expect(links2[0].visible).toBeTruthy();
+        await apicalls.removeGraph(graphName);
+    });
 
 })
