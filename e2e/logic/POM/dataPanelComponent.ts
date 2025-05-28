@@ -235,6 +235,15 @@ export default class DataPanel extends GraphPage {
         return await interactWhenVisible(this.attributeValue(attribute), (el) => el.textContent(), "Data Panel Delete Attribute Cancel");
     }
 
+    async getAttributeValue(key: string): Promise<string | null> {
+        const value = await interactWhenVisible(this.dataPanelAttribute(key), (el) => el.textContent(), `Data Panel Attribute ${key}`);
+        return value ? value.trim() : null;
+    }
+
+    async clickUnDoButtonInToast(): Promise<void> {
+        await interactWhenVisible(this.toastUnDoButton, (el) => el.click(), `Toast UnDo Button}`);
+    }
+
     async isAttributeValueByNameVisible(attribute: string): Promise<boolean> {
         return await this.attributeValue(attribute).isVisible();
     }
@@ -290,5 +299,13 @@ export default class DataPanel extends GraphPage {
         await this.clickDataPanelDeleteAttribute();
         await this.clickDataPanelDeleteAttributeConfirm();
         await waitForElementToNotBeVisible(this.dataPanelDeleteAttributeConfirm);
+    }
+
+    async modifyAttribute(key: string, value: string): Promise<void> {
+        await this.hoverDataPanelAttribute(key);
+        await this.clickDataPanelValueSetAttribute();
+        await this.fillDataPanelSetAttributeInput(value);
+        await this.clickDataPanelSetAttributeConfirm();
+        await waitForElementToNotBeVisible(this.dataPanelSetAttributeConfirm);
     }
 }
