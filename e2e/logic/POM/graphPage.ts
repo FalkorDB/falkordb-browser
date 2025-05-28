@@ -85,6 +85,8 @@ export default class GraphPage extends Page {
     }
 
     async fillInput(text: string): Promise<void> {
+        console.log(this.input("Graph"));
+        
         await interactWhenVisible(this.input("Graph"), (el) => el.fill(text), "Input Graphs");
     }
 
@@ -164,8 +166,9 @@ export default class GraphPage extends Page {
         await interactWhenVisible(this.elementCanvasAddEdge("Graph"), (el) => el.click(), "Add Edge");
     }
 
-    async clickDeleteElement(): Promise<void> { 
-        await interactWhenVisible(this.deleteElement("Node"), (el) => el.click(), "Delete Element");
+    async clickDeleteElement(type: string): Promise<void> {
+        const element = type === "Node" ? "Node" : "Relation";      
+        await interactWhenVisible(this.deleteElement(element), (el) => el.click(), "Delete Element");
     }
 
     async clickDeleteElementConfirm(): Promise<void> {
@@ -217,6 +220,8 @@ export default class GraphPage extends Page {
     }
 
     async clickManage(): Promise<void> {
+        console.log(this.manage("Graph"));
+        
         await interactWhenVisible(this.manage("Graph"), (el) => el.click(), "Manage Graphs Button");
     }
 
@@ -229,6 +234,8 @@ export default class GraphPage extends Page {
     }
 
     async clickEditButton(): Promise<void> {
+        console.log(this.editButton("Graph"));
+        
         await interactWhenVisible(this.editButton("Graph"), (el) => el.click(), "Edit Button Graphs");
     }
 
@@ -241,6 +248,8 @@ export default class GraphPage extends Page {
     }
 
     async hoverTableRowByName(name: string): Promise<void> {
+        console.log(this.tableRowByName("Graph", name));
+        
         await interactWhenVisible(this.tableRowByName("Graph", name), (el) => el.hover(), `Table Graphs Row ${name}`);
     }
 
@@ -279,12 +288,12 @@ export default class GraphPage extends Page {
     }
 
     async getNodeCountContent(): Promise<string> {
-        const count = await interactWhenVisible(this.nodesCount("Graph"), (el) => el.textContent(), "Nodes Count");
+        const count = await interactWhenVisible(this.nodesCount(), (el) => el.textContent(), "Nodes Count");
         return count?.split(" ")[1] ?? "0";
     }
 
     async getEdgesCountContent(): Promise<string> {
-        const count = await interactWhenVisible(this.edgesCount("Graph"), (el) => el.textContent(), "Edges Count");
+        const count = await interactWhenVisible(this.edgesCount(), (el) => el.textContent(), "Edges Count");
         return count?.split(" ")[1] ?? "0";
     }
 
@@ -301,7 +310,8 @@ export default class GraphPage extends Page {
     async verifyGraphExists(graphName: string): Promise<boolean> {
         await this.clickSelect();
         await this.fillSearch(graphName);
-        const isVisible = await this.isVisibleSelectItem(graphName);
+        const graphId = "0"; // always select the first result
+        const isVisible = await this.isVisibleSelectItem(graphId);
         return isVisible;
     }
 
@@ -363,6 +373,7 @@ export default class GraphPage extends Page {
     async selectGraphByName(graphName: string): Promise<void> {
         await this.clickSelect();
         await this.fillSearch(graphName);
+        await this.isVisibleSelectItem(graphName);
         await this.clickSelectItem("0"); // selecting the first item in list after search
     }
 
@@ -376,18 +387,18 @@ export default class GraphPage extends Page {
         return count;
     }
 
-    async deleteElementsByPosition(positions: { x: number, y: number }[]): Promise<void> {
+    async deleteElementsByPosition(positions: { x: number, y: number }[], type: string): Promise<void> {
         positions.forEach(async (position) => {
             await this.elementClick(position.x, position.y);
         });
-        await this.clickDeleteElement();
+        await this.clickDeleteElement(type);
         await this.clickDeleteElementConfirm();
         await waitForElementToNotBeVisible(this.deleteElement("Graph"));
     }
 
-    async deleteElementByName(name: string): Promise<void> {
+    async deleteElementByName(name: string, type: string): Promise<void> {
         await this.searchElementInCanvas(name);
-        await this.clickDeleteElement();
+        await this.clickDeleteElement(type);
         await this.clickDeleteElementConfirm();
         await waitForElementToNotBeVisible(this.deleteElement("Node"));
     }
