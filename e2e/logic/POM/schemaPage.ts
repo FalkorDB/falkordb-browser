@@ -7,9 +7,9 @@ export default class SchemaPage extends Page {
         await interactWhenVisible(this.create("Schema"), (el) => el.click(), "Click Create");
     }
 
-    async clickCreateInput(): Promise<void> {
-        await interactWhenVisible(this.createInput("Schema"), (el) => el.click(), "Click Create Input");
-    }
+    // async clickCreateInput(): Promise<void> {
+    //     await interactWhenVisible(this.createInput("Schema"), (el) => el.click(), "Click Create Input");
+    // }
 
     async clickCreateConfirm(): Promise<void> {
         await interactWhenVisible(this.createConfirm("Schema"), (el) => el.click(), "Click Create Confirm");
@@ -52,7 +52,7 @@ export default class SchemaPage extends Page {
     }
 
     async clickSelectItem(name: string): Promise<void> {
-        await interactWhenVisible(this.selectItem("Schema", name), (el) => el.click(), "Click Select Item");
+        await interactWhenVisible(this.selectItemBySearch("Schema", name), (el) => el.click(), "Click Select Item");
     }
 
     async clickSearch(): Promise<void> {
@@ -120,19 +120,19 @@ export default class SchemaPage extends Page {
     }
 
     async clickAnimationControl(): Promise<void> {
-        await interactWhenVisible(this.animationControl("Schema"), (el) => el.click(), "Animation Control");
+        await interactWhenVisible(this.animationControl(), (el) => el.click(), "Animation Control");
     }
 
     async clickZoomInControl(): Promise<void> {
-        await interactWhenVisible(this.zoomInControl("Schema"), (el) => el.click(), "Zoom In Control");
+        await interactWhenVisible(this.zoomInControl(), (el) => el.click(), "Zoom In Control");
     }
 
     async clickZoomOutControl(): Promise<void> {
-        await interactWhenVisible(this.zoomOutControl("Schema"), (el) => el.click(), "Zoom Out Control");
+        await interactWhenVisible(this.zoomOutControl(), (el) => el.click(), "Zoom Out Control");
     }
 
     async clickCenterControl(): Promise<void> {
-        await interactWhenVisible(this.centerControl("Schema"), (el) => el.click(), "Center Control");
+        await interactWhenVisible(this.centerControl(), (el) => el.click(), "Center Control");
     }
 
     async fillElementCanvasSearch(text: string): Promise<void> {
@@ -148,12 +148,12 @@ export default class SchemaPage extends Page {
     }
 
     async getNodesCount(): Promise<string> {
-        const count = await interactWhenVisible(this.nodesCount("Schema"), (el) => el.textContent(), "Nodes Count");
+        const count = await interactWhenVisible(this.nodesCount(), (el) => el.textContent(), "Nodes Count");
         return count?.split(" ")[1] ?? "0";
     }
 
     async getEdgesCount(): Promise<string> {
-        const count = await interactWhenVisible(this.edgesCount("Schema"), (el) => el.textContent(), "Edges Count");
+        const count = await interactWhenVisible(this.edgesCount(), (el) => el.textContent(), "Edges Count");
         return count?.split(" ")[1] ?? "0";
     }
 
