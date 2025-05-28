@@ -51,7 +51,7 @@ test.describe('Query history Tests', () => {
         await apicalls.removeGraph(graphName);        
     });
 
-    test.only(`@admin verify query selection from history displays the correct query`, async () => {
+    test(`@admin verify query selection from history displays the correct query`, async () => {
         const graph = await browser.createNewPage(QueryHistory, urls.graphUrl);
         await browser.setPageToFullScreen();
         const graphName = getRandomString('queryhistory');
