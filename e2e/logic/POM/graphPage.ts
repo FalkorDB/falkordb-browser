@@ -61,6 +61,14 @@ export default class GraphPage extends Page {
         return this.page.getByTestId(`elementCanvasSuggestionsListGraph`);
     }
 
+    private get querySearchList(): Locator {
+        return this.page.locator("//div[contains(@class, 'tree')]");
+    }
+
+    private get querySearchListItems(): Locator {
+        return this.page.locator("//div[contains(@class, 'tree')]//div[contains(@class, 'contents')]");
+    }
+
     async getBoundingBoxCanvasElement(): Promise<null | {
         x: number;
         y: number;
@@ -84,9 +92,7 @@ export default class GraphPage extends Page {
         await interactWhenVisible(this.search("Graph"), (el) => el.fill(text), "Search Graph");
     }
 
-    async fillInput(text: string): Promise<void> {
-        console.log(this.input("Graph"));
-        
+    async fillInput(text: string): Promise<void> { 
         await interactWhenVisible(this.input("Graph"), (el) => el.fill(text), "Input Graphs");
     }
 
@@ -220,8 +226,6 @@ export default class GraphPage extends Page {
     }
 
     async clickManage(): Promise<void> {
-        console.log(this.manage("Graph"));
-        
         await interactWhenVisible(this.manage("Graph"), (el) => el.click(), "Manage Graphs Button");
     }
 
@@ -234,8 +238,6 @@ export default class GraphPage extends Page {
     }
 
     async clickEditButton(): Promise<void> {
-        console.log(this.editButton("Graph"));
-        
         await interactWhenVisible(this.editButton("Graph"), (el) => el.click(), "Edit Button Graphs");
     }
 
@@ -248,12 +250,11 @@ export default class GraphPage extends Page {
     }
 
     async hoverTableRowByName(name: string): Promise<void> {
-        console.log(this.tableRowByName("Graph", name));
-        
         await interactWhenVisible(this.tableRowByName("Graph", name), (el) => el.hover(), `Table Graphs Row ${name}`);
     }
 
     async isVisibleSelectItem(name: string): Promise<boolean> {
+        await this.page.waitForTimeout(500); // wait for the list to be populated
         const isVisible = await waitForElementToBeVisible(this.selectItemBySearch("Graph", name));
         return isVisible;
     }
@@ -307,6 +308,14 @@ export default class GraphPage extends Page {
         return await this.elementCanvasSuggestionsListGraph.isVisible();
     }
 
+    async getGraphsCountInList(graphName: string): Promise<number> {
+        await this.clickSelect();
+        await this.fillSearch(graphName);
+        const items = this.page.locator('//ul[@data-testid="queryList"]//li');
+        const count = await items.count();
+        return count;
+    }
+
     async verifyGraphExists(graphName: string): Promise<boolean> {
         await this.clickSelect();
         await this.fillSearch(graphName);
@@ -319,7 +328,16 @@ export default class GraphPage extends Page {
         await this.clickCreateGraph();
         await this.fillCreateGraphInput(graphName);
         await this.clickConfirmCreateGraph();
-        await waitForElementToNotBeVisible(this.create("Graph"));
+        await this.isVisibleToast();
+    }
+
+    async removeGraph(graphName: string): Promise<void> {
+        await this.clickSelect();
+        await this.clickManage();
+        await this.clickTableCheckboxByName(graphName);
+        await this.clickDelete();
+        await this.clickDeleteConfirm();
+        await this.isVisibleToast();
     }
 
     async insertQuery(query: string): Promise<void> {
@@ -619,5 +637,20 @@ export default class GraphPage extends Page {
         await this.hoverCanvasElement(x, y);
         await this.page.waitForTimeout(500);
         await this.clickCanvasElement(x, y);
+    }
+
+    async getQuerySearchListText(): Promise<string[]> {
+        await waitForElementToBeVisible(this.querySearchList);
+        const elements = this.querySearchListItems;
+        const count = await elements.count();
+        const texts: string[] = [];
+    
+        for (let i = 0; i < count; i++) {
+            const item = elements.nth(i);
+            const text = await interactWhenVisible(item, el => el.textContent(), `Query search list item #${i}`);
+            if (text) texts.push(text.trim());
+        }
+    
+        return texts;
     }
 }
