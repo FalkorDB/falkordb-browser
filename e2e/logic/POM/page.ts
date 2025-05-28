@@ -1,7 +1,7 @@
 import BasePage from "@/e2e/infra/ui/basePage";
 import { Locator } from "@playwright/test";
 
-type Type = "Graph" | "Schema" | "Node"
+type Type = "Graph" | "Schema" | "Node" | "Relation"
 
 export default class Page extends BasePage {
     // CREATE
@@ -77,23 +77,23 @@ export default class Page extends BasePage {
     }
 
     public get tableRowByName(): (type: Type, name: string) => Locator {
-        return (type: Type, name: string) => this.page.getByTestId(`table${type}Row${name}`);
+        return (type: Type, name: string) => this.page.getByTestId(`tableRow${type}s${name}`);
     }
 
     public get tableCheckboxByName(): (type: Type, name: string) => Locator {
-        return (type: Type, name: string) => this.page.getByTestId(`table${type}Checkbox${name}`);
+        return (type: Type, name: string) => this.page.getByTestId(`tableCheckbox${type}s${name}`);
     }
 
     public get editButton(): (type: Type) => Locator {
-        return (type: Type) => this.page.getByTestId(`edit${type}Button`);
+        return (type: Type) => this.page.getByTestId(`editButton${type}s`);
     }
 
     public get input(): (type: Type) => Locator {
-        return (type: Type) => this.page.getByTestId(`input${type}`);
+        return (type: Type) => this.page.getByTestId(`input${type}s`);
     }
 
     public get saveButton(): (type: Type) => Locator {
-        return (type: Type) => this.page.getByTestId(`save${type}Button`);
+        return (type: Type) => this.page.getByTestId(`saveButton${type}s`);
     }
 
     public get cancelButton(): (type: Type) => Locator {
@@ -129,8 +129,8 @@ export default class Page extends BasePage {
     }
 
     // DELETE
-    public get deleteElement(): (type: Type) => Locator {
-        return (type: Type) => this.page.getByTestId(`delete${type}`);
+    public get deleteElement(): (type: "Node" | "Relation" | Type) => Locator {
+        return (type: "Node" | "Relation" | Type) => this.page.getByTestId(`delete${type}`);
     }
 
     public get deleteElementConfirm(): (type: Type) => Locator {
@@ -164,12 +164,12 @@ export default class Page extends BasePage {
     }    
 
     // COUNT
-    public get nodesCount(): (type: Type) => Locator {
-        return (type: Type) => this.page.getByTestId(`nodesCount${type}`);
+    public get nodesCount(): () => Locator {
+        return () => this.page.getByTestId(`nodesCount`);
     }
 
-    public get edgesCount(): (type: Type) => Locator {
-        return (type: Type) => this.page.getByTestId(`edgesCount${type}`);
+    public get edgesCount(): () => Locator {
+        return () => this.page.getByTestId(`edgesCount`);
     }
 
     // CANVAS TOOLTIP

@@ -134,13 +134,13 @@ test.describe('Canvas Tests', () => {
         await graph.selectGraphByName(graphName);
         await graph.insertQuery('CREATE (a:Person {name: "Alice"}), (b:Person {name: "Bob"}) return a, b');
         await graph.clickRunQuery();
-        await graph.deleteElementByName("Bob");
+        await graph.deleteElementByName("Bob", "Node");
         await graph.waitForCanvasAnimationToEnd();
         expect(await graph.isSearchElementInCanvasVisible("Bob")).toBe(false);
         await apicalls.removeGraph(graphName);
     });
 
-    test(`@admin validate hovering on a node display correct tool tip`, async () => {
+    test(`@admin validate hovering on a node display correct toolTip`, async () => {
         const graphName = getRandomString('canvas');
         await apicalls.addGraph(graphName);
         const graph = await browser.createNewPage(GraphPage, urls.graphUrl);

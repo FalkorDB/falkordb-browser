@@ -21,7 +21,7 @@ export default class DataPanel extends GraphPage {
 
     // COUNT
     private get dataPanelAttributesCount(): Locator {
-        return this.page.getByTestId("DataPanelAttributesCount");
+        return this.page.getByTestId("DataPanelAttributesCount").locator("span");
     }
 
     // LABEL
@@ -29,13 +29,17 @@ export default class DataPanel extends GraphPage {
         return this.page.getByTestId("DataPanelLabel");
     }
 
-    private get dataPanelLabelByName(): (label: string) => Locator {
-        return (label: string) => this.page.getByTestId(`DataPanelLabel${label}`);
+    dataPanelLabelByName(label: string): Locator {
+        return this.page.getByTestId(`DataPanelLabel${label}`);
     }
 
     // REMOVE LABEL
     private get dataPanelRemoveLabelByLabel(): (label: string) => Locator {
         return (label: string) => this.page.getByTestId(`DataPanelRemoveLabel${label}`);
+    }
+
+    private get dataPanelRemoveLabelButtonConfirm(): Locator {
+        return this.page.getByTestId("removeLabelButton");
     }
 
     // ADD LABEL
@@ -44,11 +48,11 @@ export default class DataPanel extends GraphPage {
     }
 
     private get dataPanelAddLabelInput(): Locator {
-        return this.page.getByTestId("DataPanelAddLabelInput");
+        return this.page.getByTestId("addLabelInput");
     }
 
-    private get dataPanelAddLabelConfirm(): Locator {
-        return this.page.getByTestId("DataPanelAddLabelConfirm");
+    private get dataPanelAddLabelButton(): Locator {
+        return this.page.getByTestId("addLabelButton");
     }
 
     private get dataPanelAddLabelCancel(): Locator {
@@ -114,6 +118,11 @@ export default class DataPanel extends GraphPage {
         return this.page.getByTestId("DataPanelDeleteAttributeCancel");
     }
 
+    // GET ATTRIBUTE
+    private attributeValue(type: string): Locator {
+        return this.page.getByTestId(`DataPanelAttribute${type}`);
+    }
+
     async getContentDataPanelAttributesCount(): Promise<number> {
         const content = await interactWhenVisible(this.dataPanelAttributesCount, (el) => el.textContent(), "Data Panel Attributes Count");
         return Number(content ?? "0")
@@ -171,7 +180,11 @@ export default class DataPanel extends GraphPage {
     }
 
     async clickDataPanelAddLabelConfirm(): Promise<void> {
-        await interactWhenVisible(this.dataPanelAddLabelConfirm, (el) => el.click(), "Data Panel Add Label Confirm");
+        await interactWhenVisible(this.dataPanelAddLabelButton, (el) => el.click(), "Data Panel Add Label Confirm");
+    }
+
+    async clickDataPanelRemoveLabelConfirm(): Promise<void> {
+        await interactWhenVisible(this.dataPanelRemoveLabelButtonConfirm, (el) => el.click(), "Data Panel Add Label Confirm");
     }
 
     async clickDataPanelAddLabelCancel(): Promise<void> {
@@ -218,12 +231,21 @@ export default class DataPanel extends GraphPage {
         await interactWhenVisible(this.dataPanelDeleteAttributeCancel, (el) => el.click(), "Data Panel Delete Attribute Cancel");
     }
 
+    async getAttributeValueByName(attribute: string): Promise<string | null> {
+        return await interactWhenVisible(this.attributeValue(attribute), (el) => el.textContent(), "Data Panel Delete Attribute Cancel");
+    }
+
+    async isAttributeValueByNameVisible(attribute: string): Promise<boolean> {
+        return await this.attributeValue(attribute).isVisible();
+    }
+
     async closeDataPanel(): Promise<void> {
         await this.clickDataPanelClose();
     }
 
     async removeLabel(label: string): Promise<void> {
         await this.clickDataPanelRemoveLabelByLabel(label);
+        await this.clickDataPanelRemoveLabelConfirm();
         await waitForElementToNotBeVisible(this.dataPanelRemoveLabelByLabel(label));
     }
 
@@ -235,6 +257,16 @@ export default class DataPanel extends GraphPage {
         await this.clickDataPanelAddLabel();
         await this.fillDataPanelAddLabelInput(label);
         await this.clickDataPanelAddLabelConfirm();
+    }
+
+    async getAttributesCount(): Promise<number> {
+        const count = await this.getContentDataPanelAttributesCount();
+        return count;
+    }
+
+    async getLabel(label: string): Promise<string> {
+        const labelValue =  await this.dataPanelLabelByName(label).textContent();
+        return labelValue ? labelValue.trim() : "";
     }
 
     async setAttribute(key: string, value: string): Promise<void> {
