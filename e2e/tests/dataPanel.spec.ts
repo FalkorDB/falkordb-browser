@@ -226,8 +226,9 @@ test.describe('Data panel Tests', () => {
         await dataPanel.clickRunQuery();
         await dataPanel.searchElementInCanvas("a");
         await dataPanel.addLabel("test", true);
-        await dataPanel.removeLabel("test");
-        expect(await dataPanel.isVisibleLabelsButtonByName("Labels", "test")).toBe(false);
+        await dataPanel.removeLabel("person1");
+        await dataPanel.closeDataPanel();
+        expect(await dataPanel.isVisibleLabelsButtonByName("Labels", "test")).toBe(true);
     })
     
     test("@readwrite validate removing node label updates data panel lables", async () => {
@@ -239,8 +240,8 @@ test.describe('Data panel Tests', () => {
         await dataPanel.clickRunQuery();
         await dataPanel.searchElementInCanvas("a");
         await dataPanel.addLabel("test");
-        await dataPanel.removeLabel("test");
-        expect(await dataPanel.isVisibleLabel("test")).toBe(false);
+        await dataPanel.removeLabel("person1");
+        expect(await dataPanel.isVisibleLabel("person1")).toBe(false);
     })
     
     test("@readwrite validate adding node attribute update attribute count", async () => {
@@ -283,4 +284,174 @@ test.describe('Data panel Tests', () => {
         await dataPanel.deleteElementByName("a", "Node");
         expect(await dataPanel.isVisibleDataPanel()).toBe(false);
     })
+
+    // test(`@readwrite validate undo functionally after modifying node attributes update correctly`, async () => {
+    //     const graphName = getRandomString('graph');
+    //     await apiCall.addGraph(graphName);
+    //     const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+    //     await browser.setPageToFullScreen();
+    //     await graph.selectGraph(graphName);
+    //     await graph.insertQuery('CREATE (a:person1 {id: "1"}), (b:person2 {id: "2"}) RETURN a, b');
+    //     await graph.clickRunQuery();
+    //     await graph.searchElementInCanvas("1");
+    //     const valueAttribute = await graph.getLastAttributeValue();
+    //     await graph.modifyAttribute("10");
+    //     await graph.clickUndoBtnInNotification();
+    //     expect(await graph.getLastAttributeValue()).toBe(valueAttribute);
+    //     await apiCall.removeGraph(graphName);
+    // });
+
+    // test(`@readwrite validate adding attribute updates attributes stats in data panel`, async () => {
+    //     const graphName = getRandomString('graph');
+    //     await apiCall.addGraph(graphName);
+    //     const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+    //     await browser.setPageToFullScreen();
+    //     await graph.selectExistingGraph(graphName);
+    //     await graph.insertQuery('CREATE (a:person1 {id: "1"}), (b:person2 {id: "2"}) RETURN a, b');
+    //     await graph.clickRunQuery();
+    //     await graph.addGraphAttribute("1", "name", "Naseem");
+    //     expect(parseInt(await graph.getAttributesStatsInDataPanel() ?? "", 10)).toBe(2);
+    //     await apiCall.removeGraph(graphName);
+    // });
+
+    // test(`@readwrite validate removing attribute updates attributes stats in data panel`, async () => {
+    //     const graphName = getRandomString('graph');
+    //     await apiCall.addGraph(graphName);
+    //     const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+    //     await browser.setPageToFullScreen();
+    //     await graph.selectExistingGraph(graphName);
+    //     await graph.insertQuery('CREATE (a:Person {id: "1", name: "Alice"}) RETURN a');
+    //     await graph.clickRunQuery();
+    //     await graph.openDataPanelForElementInCanvas("Alice");
+    //     await graph.deleteGraphAttribute();
+    //     expect(parseInt(await graph.getAttributesStatsInDataPanel() ?? "", 10)).toBe(1);
+    //     await apiCall.removeGraph(graphName);
+    // });
+
+    // test(`@readwrite validate modifying attribute via UI and verify via API`, async () => {
+    //     const graphName = getRandomString('graph');
+    //     await apiCall.addGraph(graphName);
+    //     const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+    //     await browser.setPageToFullScreen();
+    //     await graph.selectGraph(graphName);
+    //     await graph.insertQuery('CREATE (a:person1 {id: "1"}), (b:person2 {id: "2"}) RETURN a, b');
+    //     await graph.clickRunQuery();
+    //     await graph.searchElementInCanvas("1");
+    //     await graph.modifyAttribute("10");
+    //     const response = await apiCall.runQuery(graphName, "match (n) return n");
+    //     expect(response.result.data[1].n.properties.id).toBe('10')
+    //     await apiCall.removeGraph(graphName);
+    // });
+
+    // test(`@readwrite validate deleting attribute via UI and verify via API`, async () => {
+    //     const graphName = getRandomString('graph');
+    //     await apiCall.addGraph(graphName);
+    //     const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+    //     await browser.setPageToFullScreen();
+    //     await graph.selectGraph(graphName);
+    //     await graph.insertQuery('CREATE (a:Person {id: "1", name: "Alice"}) RETURN a');
+    //     await graph.clickRunQuery();
+    //     await graph.searchElementInCanvas("Alice");
+    //     await graph.deleteGraphAttribute();
+    //     const response = await apiCall.runQuery(graphName, "match (n) return n");
+    //     expect(response.result.data[0].n.properties).not.toHaveProperty('name');
+    //     await apiCall.removeGraph(graphName);
+    // });
+
+    // test(`@readwrite validate undo functionally after deleting attribute update correctly`, async () => {
+    //     const graphName = getRandomString('graph');
+    //     await apiCall.addGraph(graphName);
+    //     const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+    //     await browser.setPageToFullScreen();
+    //     await graph.selectGraph(graphName);
+    //     await graph.insertQuery('CREATE (a:Person {id: "1", name: "Alice"}) RETURN a');
+    //     await graph.clickRunQuery();
+    //     await graph.openDataPanelForElementInCanvas("Alice");
+    //     await graph.deleteGraphAttribute();
+    //     await graph.clickUndoBtnInNotification();
+    //     expect(parseInt(await graph.getAttributesStatsInDataPanel() ?? "", 10)).toBe(2);
+    //     await apiCall.removeGraph(graphName);
+    // });
+
+    // test(`@readwrite Attempting to add existing label name for a node display error`, async () => {
+    //     const graphName = getRandomString('graph');
+    //     await apiCall.addGraph(graphName);
+    //     const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+    //     await browser.setPageToFullScreen();
+    //     await graph.selectExistingGraph(graphName);
+    //     await graph.insertQuery('CREATE (a:Person {id: "1", name: "Alice"}) RETURN a');
+    //     await graph.clickRunQuery();
+    //     await graph.modifyLabel("Alice", "Person");
+    //     expect(await graph.getLabesCountlInDataPanel()).toBe(2)
+    //     expect(await graph.getErrorNotification()).toBeTruthy();
+    //     await apiCall.removeGraph(graphName);
+    // });
+
+    // test(`@readwrite add node label via API and validate label count via UI`, async () => {
+    //     const graphName = getRandomString('graph');
+    //     await apiCall.addGraph(graphName);
+    //     await apiCall.runQuery(graphName, CREATE_QUERY, "admin")
+    //     await apiCall.addGraphNodeLabel(graphName, "0", { "label": "artist" });
+
+    //     const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+    //     await browser.setPageToFullScreen();
+    //     await graph.selectGraphByName(graphName);
+    //     await graph.insertQuery("match(n) return *");
+    //     await graph.clickRunQuery();
+    //     expect(await graph.isVisibleLabelsButtonByName("Labels", "artist")).toBeTruthy();
+    //     await apiCall.removeGraph(graphName);
+    // });
+
+    // test(`@readwrite delete node label via API and validate label count via UI`, async () => {
+    //     const graphName = getRandomString('graph');
+    //     await apiCall.addGraph(graphName);
+    //     const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+    //     await browser.setPageToFullScreen();
+    //     await graph.selectGraphByName(graphName);
+    //     await graph.insertQuery(CREATE_NODE_QUERY);
+    //     await graph.clickRunQuery(false);
+    //     await apiCall.deleteGraphNodeLabel(graphName, "0", { "label": "Employee" })
+    //     await graph.refreshPage();
+    //     await graph.selectGraphByName(graphName);
+    //     await graph.insertQuery("match(n) return *");
+    //     await graph.clickRunQuery(false);
+    //     expect(await graph.isVisibleLabelsButtonByName("Labels", "Employee")).toBeFalsy();
+    //     await apiCall.removeGraph(graphName);
+    // });
+
+    // test(`@readwrite delete node via API and validate node count via UI`, async () => {
+    //     const graphName = getRandomString('graph');
+    //     await apiCall.addGraph(graphName);
+    //     const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+    //     await browser.setPageToFullScreen();
+    //     await graph.selectGraphByName(graphName);
+    //     await graph.insertQuery(CREATE_TWO_NODES_QUERY);
+    //     await graph.clickRunQuery(false);
+    //     await apiCall.deleteGraphNode(graphName, "0", { "type": "true" })
+    //     await graph.refreshPage();
+    //     await graph.selectGraphByName(graphName);
+    //     await graph.insertQuery("match(n) return *");
+    //     await graph.clickRunQuery(false);
+    //     expect(parseInt(await graph.getNodesCount(), 10)).toBe(1);
+    //     await apiCall.removeGraph(graphName);
+    // });
+
+    // // test add a new via api and validate via UI
+    // test(`@readwrite add new node via API and validate node count via UI`, async () => {
+    //     const graphName = getRandomString('graph');
+    //     await apiCall.addGraph(graphName);
+    //     const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+    //     await browser.setPageToFullScreen();
+    //     await graph.selectGraphByName(graphName);
+    //     await graph.insertQuery(CREATE_NODE_QUERY);
+    //     await graph.clickRunQuery(false);
+    //     await apiCall.addGraphNode(graphName, { "type": "Person", "properties": { "name": "Alice" } });
+    //     await graph.refreshPage();
+    //     await graph.selectGraphByName(graphName);           
+    //     await graph.insertQuery("match(n) return *");
+    //     await graph.clickRunQuery(false);
+    //     expect(parseInt(await graph.getNodesCount(), 10)).toBe(2);
+    //     await apiCall.removeGraph(graphName);
+    // })
+
 })
