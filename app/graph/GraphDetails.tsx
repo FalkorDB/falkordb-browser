@@ -1,5 +1,4 @@
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
-import { cn } from "@/lib/utils"
 import { Graph } from "../api/graph/model"
 
 export default function GraphDetails({
@@ -18,7 +17,7 @@ export default function GraphDetails({
             {
                 graph.Id && tabsValue === "Graph" &&
                 [["Nodes", nodesCount, "nodesCount"], ["Edges", edgesCount, "edgesCount"], ["GraphName", graph.Id, "graphName"]].map(([label, value, testId]) => (
-                    <div className={cn("flex gap-2 overflow-hidden", label === "GraphName" ? "w-1 grow min-w-fit" : "max-w-[33%]")} key={label}>
+                    <div className="flex gap-2 overflow-hidden w-1 grow max-w-fit" key={label}>
                         <p>
                             {label}:
                         </p>
