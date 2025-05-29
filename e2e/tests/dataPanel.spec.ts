@@ -165,8 +165,8 @@ test.describe('Data panel Tests', () => {
         expect(response.result.data.length).toBe(1);
         await apicalls.removeGraph(graphName);
     });
-    //issue 988
-    test.skip(`@readwrite Validate delete node via API and validation via UI`, async () => {
+
+    test(`@readwrite Validate delete node via API and validation via UI`, async () => {
         const graphName = getRandomString('datapanel');        
         await apicalls.addGraph(graphName);
         await apicalls.runQuery(graphName, 'CREATE (a:Person {name: "Alice", age: 30}), (b:Person {name: "Bob"})');
@@ -427,8 +427,8 @@ test.describe('Data panel Tests', () => {
         expect(await graph.isVisibleLabelsButtonByName("Labels", "Employee")).toBeFalsy();
         await apicalls.removeGraph(graphName);
     });
-    //issue #988
-    test.skip(`@readwrite delete node via API and validate node count via UI`, async () => {
+    
+    test.only(`@readwrite delete node via API and validate node count via UI`, async () => {
         const graphName = getRandomString('graph');
         await apicalls.addGraph(graphName);
         const graph = await browser.createNewPage(DataPanel, urls.graphUrl);
@@ -441,12 +441,12 @@ test.describe('Data panel Tests', () => {
         await graph.selectGraphByName(graphName);
         await graph.insertQuery("match(n) return *");
         await graph.clickRunQuery(false);
-        expect(parseInt(await graph.getNodesCount(), 10)).toBe(1);
+        const nodesCount = await graph.getNodesCount();
+        expect(parseInt(nodesCount ?? "0", 10)).toBe(1);
         await apicalls.removeGraph(graphName);
     });
 
-    //issue #988
-    test.skip(`@readwrite add node via API and validate node count via UI`, async () => {
+    test(`@readwrite add node via API and validate node count via UI`, async () => {
         const graphName = getRandomString('graph');
         await apicalls.addGraph(graphName);
         await apicalls.runQuery(graphName, CREATE_QUERY);
@@ -455,7 +455,8 @@ test.describe('Data panel Tests', () => {
         await graph.selectGraphByName(graphName);           
         await graph.insertQuery("match(n) return *");
         await graph.clickRunQuery(false);
-        expect(parseInt(await graph.getNodesCount(), 10)).toBe(2);
+        const nodesCount = await graph.getNodesCount();
+        expect(parseInt(nodesCount ?? "0", 10)).toBe(2);
         await apicalls.removeGraph(graphName);
     })
 

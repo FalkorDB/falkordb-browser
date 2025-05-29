@@ -117,8 +117,8 @@ test.describe('Graph Tests', () => {
         await apiCall.removeGraph(graphName1);
         await apiCall.removeGraph(graphName2);
     });
-    //issue: #988
-    test.skip(`@readwrite Validate that running multiple queries updates the node and edge count correctly`, async () => {
+
+    test(`@readwrite Validate that running multiple queries updates the node and edge count correctly`, async () => {
         const graphName = getRandomString('graph');
         await apiCall.addGraph(graphName);
         const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
@@ -128,12 +128,12 @@ test.describe('Graph Tests', () => {
         await graph.clickRunQuery(true);
         const nodes = await graph.getNodesCount();
         const edges = await graph.getEdgesCount();
-        expect(parseInt(nodes, 10)).toBe(20);
-        expect(parseInt(edges, 10)).toBe(10);
+        expect(parseInt(nodes ?? "0", 10)).toBe(20);
+        expect(parseInt(edges ?? "0", 10)).toBe(10);
         await apiCall.removeGraph(graphName);
     });
-    //issue: #988
-    test.skip(`@readwrite validate that deleting graph relation doesn't decreases node count`, async () => {
+
+    test(`@readwrite validate that deleting graph relation doesn't decreases node count`, async () => {
         const graphName = getRandomString('graph');
         await apiCall.addGraph(graphName);
         const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
@@ -146,8 +146,8 @@ test.describe('Graph Tests', () => {
         expect(parseInt(await graph.getNodesCount() ?? "", 10)).toBe(initCount);
         await apiCall.removeGraph(graphName);
     });
-    //issue: #988
-    test.skip(`@readwrite validate that deleting graph node decreases relation count by one`, async () => {
+
+    test(`@readwrite validate that deleting graph connected node decreases relation count by one`, async () => {
         const graphName = getRandomString('graph');
         await apiCall.addGraph(graphName);
         const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
@@ -155,13 +155,14 @@ test.describe('Graph Tests', () => {
         await graph.selectGraphByName(graphName);
         await graph.insertQuery(CREATE_QUERY);
         await graph.clickRunQuery();
-        const initCount = parseInt(await graph.getEdgesCount(), 10);
+        const initEdgesCount = await graph.getEdgesCount();
         await graph.deleteElementByName("a", "Node");
-        expect(parseInt(await graph.getEdgesCount(), 10)).toBe(initCount - 1);
+        const edgesCount = await graph.getEdgesCount();
+        expect(parseInt(edgesCount ?? "0", 10)).toBe(parseInt(initEdgesCount ?? "0", 10) - 1);
         await apiCall.removeGraph(graphName);
     });
-    //issue: #988
-    test.skip(`@readwrite validate that deleting graph relation decreases relation count`, async () => {
+
+    test(`@readwrite validate that deleting graph relation decreases relation count`, async () => {
         const graphName = getRandomString('graph');
         await apiCall.addGraph(graphName);
         const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
@@ -169,13 +170,14 @@ test.describe('Graph Tests', () => {
         await graph.selectGraphByName(graphName);
         await graph.insertQuery(CREATE_QUERY);
         await graph.clickRunQuery();
-        const initCount = parseInt(await graph.getEdgesCount(), 10);
+        const initEdgesCount = await graph.getEdgesCount();
         await graph.deleteElementByName("knows", "Relation");
-        expect(parseInt(await graph.getEdgesCount(), 10)).toBe(initCount - 1);
+        const edgesCount = await graph.getEdgesCount();
+        expect(parseInt(edgesCount ?? "0", 10)).toBe(parseInt(initEdgesCount ?? "0", 10) - 1);
         await apiCall.removeGraph(graphName);
     });
-    //issue: #988
-    test.skip(`@readwrite validate that deleting graph node decreases node count`, async () => {
+
+    test(`@readwrite validate that deleting graph node decreases node count`, async () => {
         const graphName = getRandomString('graph');
         await apiCall.addGraph(graphName);
         const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
@@ -183,13 +185,14 @@ test.describe('Graph Tests', () => {
         await graph.selectGraphByName(graphName);
         await graph.insertQuery(CREATE_QUERY);
         await graph.clickRunQuery();
-        const initCount = parseInt(await graph.getNodesCount(), 10);
+        const initNodesCount = await graph.getNodesCount();
         await graph.deleteElementByName("a", "Node");
-        expect(parseInt(await graph.getNodesCount(), 10)).toBe(initCount - 1);
+        const nodesCount = await graph.getNodesCount();
+        expect(parseInt(nodesCount ?? "0", 10)).toBe(parseInt(initNodesCount ?? "0", 10) - 1);
         await apiCall.removeGraph(graphName);
     });
-    //issue: #988
-    test.skip(`@readwrite validate deleting graph relation via the canvas panels`, async () => {
+
+    test(`@readwrite validate deleting graph relation via the canvas panels`, async () => {
         const graphName = getRandomString('graph');
         await apiCall.addGraph(graphName);
         const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
@@ -197,9 +200,10 @@ test.describe('Graph Tests', () => {
         await graph.selectGraphByName(graphName);
         await graph.insertQuery(CREATE_QUERY);
         await graph.clickRunQuery();
-        const initCount = parseInt(await graph.getEdgesCount(), 10);
+        const initEdgesCount = await graph.getEdgesCount();
         await graph.deleteElementByName("knows", "Relation");
-        expect(parseInt(await graph.getEdgesCount(), 10)).toBe(initCount - 1);
+        const edgesCount = await graph.getEdgesCount();
+        expect(parseInt(edgesCount ?? "0", 10)).toBe(parseInt(initEdgesCount ?? "0", 10) - 1);
         await apiCall.removeGraph(graphName);
     });
 

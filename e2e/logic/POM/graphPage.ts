@@ -288,14 +288,12 @@ export default class GraphPage extends Page {
         return content;
     }
 
-    async getNodeCountContent(): Promise<string> {
-        const count = await interactWhenVisible(this.nodesCount(), (el) => el.textContent(), "Nodes Count");
-        return count?.split(" ")[1] ?? "0";
+    async getNodesCount(): Promise<string | null> {
+        return await interactWhenVisible(this.nodesCount(), (el) => el.textContent(), "Nodes Count");
     }
 
-    async getEdgesCountContent(): Promise<string> {
-        const count = await interactWhenVisible(this.edgesCount(), (el) => el.textContent(), "Edges Count");
-        return count?.split(" ")[1] ?? "0";
+    async getEdgesCount(): Promise<string | null> {
+        return await interactWhenVisible(this.edgesCount(), (el) => el.textContent(), "Edges Count");
     }
 
     async searchElementInCanvas(name: string): Promise<void> {
@@ -393,16 +391,6 @@ export default class GraphPage extends Page {
         await this.fillSearch(graphName);
         await this.isVisibleSelectItem(graphName);
         await this.clickSelectItem("0"); // selecting the first item in list after search
-    }
-
-    async getNodesCount(): Promise<string> {
-        const count = await this.getNodeCountContent();
-        return count;
-    }
-
-    async getEdgesCount(): Promise<string> {
-        const count = await this.getEdgesCountContent();
-        return count;
     }
 
     async deleteElementsByPosition(positions: { x: number, y: number }[], type: string): Promise<void> {
