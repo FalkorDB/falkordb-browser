@@ -427,8 +427,8 @@ test.describe('Data panel Tests', () => {
         expect(await graph.isVisibleLabelsButtonByName("Labels", "Employee")).toBeFalsy();
         await apicalls.removeGraph(graphName);
     });
-    
-    test.only(`@readwrite delete node via API and validate node count via UI`, async () => {
+
+    test(`@readwrite delete node via API and validate node count via UI`, async () => {
         const graphName = getRandomString('graph');
         await apicalls.addGraph(graphName);
         const graph = await browser.createNewPage(DataPanel, urls.graphUrl);

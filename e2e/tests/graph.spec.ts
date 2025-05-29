@@ -3,7 +3,7 @@
 /* eslint-disable no-await-in-loop */
 import { expect, test } from "@playwright/test";
 import fs from 'fs';
-import { getRandomString, DEFAULT_CREATE_QUERY, CREATE_QUERY, CREATE_TWO_NODES_QUERY, CREATE_NODE_QUERY } from "../infra/utils";
+import { getRandomString, DEFAULT_CREATE_QUERY, CREATE_QUERY } from "../infra/utils";
 import BrowserWrapper from "../infra/ui/browserWrapper";
 import ApiCalls from "../logic/api/apiCalls";
 import GraphPage from "../logic/POM/graphPage";
