@@ -66,7 +66,7 @@ export default function Toolbar({
     }, [graph, handleOnChange, searchElement])
 
     const handleSearchElement = (element: Node | Link) => {
-        handleZoomToFit(chartRef, (node: Node) => element.category ? element.id === node.id : node.id === element.source.id || node.id === element.target.id)
+        handleZoomToFit(chartRef, (node: Node) => element.category ? element.id === node.id : node.id === element.source.id || node.id === element.target.id, 4)
         setSelectedElement(element)
         setSearchElement("")
         setSuggestions([])
@@ -165,33 +165,33 @@ export default function Toolbar({
                             suggestions.map((suggestion, index) =>
                                 // eslint-disable-next-line react/no-array-index-key
                                 <li key={index}>
-                                    <Button
-                                        role="option"
-                                        aria-selected={index === suggestionIndex}
-                                        data-testid={`elementCanvasSuggestion${label}${suggestion.data.name || suggestion.id}`}
-                                        className={cn("w-full h-full p-2 rounded-lg flex gap-2", index === suggestionIndex ? "bg-gray-300" : "bg-gray-500")}
-                                        onClick={() => handleSearchElement(suggestion)}
-                                        onMouseEnter={() => setSuggestionIndex(index)}
-                                    >
-                                        <Tooltip>
-                                            <TooltipTrigger>
+                                    <Tooltip>
+                                        <TooltipTrigger asChild>
+                                            <Button
+                                                role="option"
+                                                aria-selected={index === suggestionIndex}
+                                                data-testid={`elementCanvasSuggestion${label}${suggestion.data.name || suggestion.id}`}
+                                                className={cn("w-full h-full p-2 rounded-lg flex gap-2", index === suggestionIndex ? "bg-gray-300" : "bg-gray-500")}
+                                                onClick={() => handleSearchElement(suggestion)}
+                                                onMouseEnter={() => setSuggestionIndex(index)}
+                                            >
                                                 <div
                                                     className="rounded-full h-8 w-8 p-2 flex items-center justify-center"
                                                     style={{ backgroundColor: suggestion.color }}
                                                 >
                                                     <p className="text-white text-sm font-bold truncate">{suggestion.label || suggestion.category}</p>
                                                 </div>
-                                            </TooltipTrigger>
-                                            <TooltipContent>
-                                                {suggestion.label || suggestion.category}
-                                            </TooltipContent>
-                                        </Tooltip>
-                                        <div
-                                            className={cn("w-1 grow text-center truncate", index === suggestionIndex ? "text-black" : "text-white")}
-                                        >
-                                            {suggestion.data.name || suggestion.id}
-                                        </div>
-                                    </Button>
+                                                <div
+                                                    className={cn("w-1 grow text-center truncate", index === suggestionIndex ? "text-black" : "text-white")}
+                                                >
+                                                    {suggestion.data.name || suggestion.id}
+                                                </div>
+                                            </Button>
+                                        </TooltipTrigger>
+                                        <TooltipContent>
+                                            {suggestion.label || suggestion.category}
+                                        </TooltipContent>
+                                    </Tooltip>
                                 </li>
                             )
                         }
