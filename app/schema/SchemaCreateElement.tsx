@@ -382,7 +382,7 @@ export default function SchemaCreateElement({ onCreate, setIsAdd, selectedNodes,
                               className="p-2 justify-center border border-foreground rounded-lg"
                               label="Save"
                               title="Save the attribute changes"
-                              data-testid={`saveAttributeButton`}
+                              data-testid="saveAttributeButton"
                               onClick={(e) => {
                                 e.stopPropagation()
                                 handleSetAttribute(true)
@@ -394,7 +394,7 @@ export default function SchemaCreateElement({ onCreate, setIsAdd, selectedNodes,
                               className="p-2 justify-center border border-foreground rounded-lg"
                               label="Cancel"
                               title="Discard the attribute changes"
-                              data-testid={`cancelAttributeButton`}
+                              data-testid="cancelAttributeButton"
                               onClick={(e) => {
                                 e.stopPropagation()
                                 handleSetEditable()
