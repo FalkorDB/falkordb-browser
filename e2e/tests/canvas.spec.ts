@@ -104,7 +104,7 @@ test.describe('Canvas Tests', () => {
         const fromX = initialGraph[0].screenX;
         const fromY = initialGraph[0].screenY;
         const toX = fromX + 100;
-        const toY = fromY + 50;
+        const toY = fromY + 100;
         await graph.changeNodePosition(fromX, fromY, toX, toY);
         const updateGraph = await graph.getNodesScreenPositions('graph');
         expect(updateGraph[0].x).not.toBe(initialGraph[0].x);
