@@ -284,7 +284,7 @@ export default function SchemaCreateElement({ onCreate, setIsAdd, selectedNodes,
             }
           </li>
         </ul>
-        <p className="font-medium text-xl">{attributes.length}&ensp;Attributes</p>
+        <p className="font-medium text-xl" data-testid="DataPanelAttributesCount">{attributes.length}&ensp;Attributes</p>
       </div>
       <div className="w-full h-1 grow flex flex-col justify-between items-start font-medium">
         <Table data-testid="attributesTable">

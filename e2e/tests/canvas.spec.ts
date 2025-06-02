@@ -32,7 +32,7 @@ test.describe('Canvas Tests', () => {
             await graph.insertQuery(BATCH_CREATE_PERSONS);
             await graph.clickRunQuery();
             const searchQuery = `Person ${node}`;
-            await graph.searchElementInCanvas(searchQuery);
+            await graph.searchElementInCanvas("Graph", searchQuery);
             await graph.hoverAtCanvasCenter();
             expect(await graph.getNodeCanvasToolTip()).toBe(searchQuery);
             await apicalls.removeGraph(graphName);
@@ -120,7 +120,7 @@ test.describe('Canvas Tests', () => {
         await graph.insertQuery('CREATE (p:Person {name: "Alice", age: 30}) return p');
         await graph.clickRunQuery();
         await graph.getNodesScreenPositions('graph');
-        await graph.searchElementInCanvas("Alice");
+        await graph.searchElementInCanvas("Graph", "Alice");
         await graph.hoverAtCanvasCenter();
         expect(await graph.getNodeCanvasToolTip()).toBe("Alice");
         await apicalls.removeGraph(graphName);
@@ -148,7 +148,7 @@ test.describe('Canvas Tests', () => {
         await graph.selectGraphByName(graphName);
         await graph.insertQuery('CREATE (a:Person {name: "Bob"}) return a');
         await graph.clickRunQuery();
-        await graph.searchElementInCanvas("Bob");
+        await graph.searchElementInCanvas("Graph", "Bob");
         await graph.waitForCanvasAnimationToEnd();
         await graph.hoverAtCanvasCenter();
         expect(await graph.isNodeCanvasToolTipVisible())

@@ -1,102 +1,113 @@
-import { interactWhenVisible, waitForElementToBeVisible } from "@/e2e/infra/utils";
+import { interactWhenVisible, waitForElementToBeVisible, waitForElementToNotBeVisible } from "@/e2e/infra/utils";
 import Page from "./page";
+import GraphPage from "./graphPage";
+import { Locator } from "playwright";
 
-export default class SchemaPage extends Page {
+export default class SchemaPage extends GraphPage {
 
-    async clickCreate(): Promise<void> {
-        await interactWhenVisible(this.create("Schema"), (el) => el.click(), "Click Create");
+    // TABLE
+    private get dataPanelTable(): Locator {
+        return this.page.getByTestId("attributesTableBody");
     }
 
-    // async clickCreateInput(): Promise<void> {
-    //     await interactWhenVisible(this.createInput("Schema"), (el) => el.click(), "Click Create Input");
-    // }
-
-    async clickCreateConfirm(): Promise<void> {
-        await interactWhenVisible(this.createConfirm("Schema"), (el) => el.click(), "Click Create Confirm");
+    private tableRowInDataPanel(type: string): Locator {
+        return this.dataPanelTable.locator(`tr:nth-of-type(${type})`);
     }
 
-    async clickCreateCancel(): Promise<void> {
-        await interactWhenVisible(this.createCancel("Schema"), (el) => el.click(), "Click Create Cancel");
+    //ADD ATTRIBUTES
+    private insertAttriubute(attriubuteRow: string, typeInput: string): Locator {
+        return this.dataPanelTable.locator(`tr:nth-of-type(${attriubuteRow})`).locator(`td:nth-of-type(${typeInput})`).locator("input");
     }
 
-    async clickDelete(): Promise<void> {
-        await interactWhenVisible(this.delete("Schema"), (el) => el.click(), "Click Delete");
+    private addAttriubuteButton(): Locator {
+        return this.page.getByTestId(`addAttributeButton`);
     }
 
-    async clickDeleteConfirm(): Promise<void> {
-        await interactWhenVisible(this.deleteConfirm("Schema"), (el) => el.click(), "Click Delete Confirm");
+    private saveAddValueButton(): Locator {
+        return this.page.getByTestId(`saveAddValueButton`);
     }
 
-    async clickDeleteCancel(): Promise<void> {
-        await interactWhenVisible(this.deleteCancel("Schema"), (el) => el.click(), "Click Delete Cancel");
+    // CREATE NODE
+    private createNewNodeButton(): Locator {
+        return this.page.getByTestId(`createElementButton`);
     }
 
-    async clickExport(): Promise<void> {
-        await interactWhenVisible(this.export("Schema"), (el) => el.click(), "Click Export");
+    // DATA PANEL
+    private addNewLabelButton(): Locator {
+        return this.page.getByTestId(`addNewLabelButton`);
     }
 
-    async clickExportConfirm(): Promise<void> {
-        await interactWhenVisible(this.exportConfirm("Schema"), (el) => el.click(), "Click Export Confirm");
+    private addNewLabelInput(): Locator {
+        return this.page.getByTestId(`newLabelInput`);
     }
 
-    async clickExportCancel(): Promise<void> {
-        await interactWhenVisible(this.exportCancel("Schema"), (el) => el.click(), "Click Export Cancel");
+    private saveNewLabelButton(): Locator {
+        return this.page.getByTestId(`saveNewLabelButton`);
     }
 
-    async clickReloadList(): Promise<void> {
-        await interactWhenVisible(this.reloadList("Schema"), (el) => el.click(), "Click Reload List");
+    private searchTypeInput(): Locator {
+        return this.page.getByTestId(`searchType`);
     }
 
-    async clickSelect(): Promise<void> {
-        await interactWhenVisible(this.select("Schema"), (el) => el.click(), "Click Select");
+    private selectTypeItem(type: string): Locator {
+        return this.page.getByTestId(`selectTypeItem${type}`);
     }
 
-    async clickSelectItem(name: string): Promise<void> {
-        await interactWhenVisible(this.selectItemBySearch("Schema", name), (el) => el.click(), "Click Select Item");
+    private get dataPanelAttributesCount(): Locator {
+        return this.page.getByTestId("DataPanelAttributesCount");
     }
 
-    async clickSearch(): Promise<void> {
-        await interactWhenVisible(this.search("Schema"), (el) => el.click(), "Click Search");
+    private dataPanelNodeSelection(nodeId: string): Locator {
+        return this.page.getByTestId(`selectedNode${nodeId}`);
     }
 
-    async clickManage(): Promise<void> {
-        await interactWhenVisible(this.manage("Schema"), (el) => el.click(), "Click Manage");
+    private deleteElementSchema(): Locator {
+        return this.page.getByTestId(`deleteElementSchema`);
     }
 
-    async clickTableCheckbox(): Promise<void> {
-        await interactWhenVisible(this.tableCheckbox("Schema"), (el) => el.click(), "Click Table Checkbox");
+    private confirmDeleteElementSchema(): Locator {
+        return this.page.getByTestId(`deleteElementConfirmSchema`);
     }
 
-    async clickTableCheckboxByName(name: string): Promise<void> {
-        await interactWhenVisible(this.tableCheckboxByName("Schema", name), (el) => el.click(), "Click Table Checkbox By Name");
+    private confirmRemoveAttributeButton(): Locator {
+        return this.page.getByTestId(`confirmRemoveAttributeButton`);
     }
 
-    async clickEditButton(): Promise<void> {
-        await interactWhenVisible(this.editButton("Schema"), (el) => el.click(), "Click Edit Button");
+    private addValueButton(): Locator {
+        return this.page.getByTestId(`addValueButton`);
     }
 
-    async clickInput(): Promise<void> {
-        await interactWhenVisible(this.input("Schema"), (el) => el.click(), "Click Input");
+    private removeAttributeButton(): Locator {
+        return this.page.getByTestId(`removeAttributeButton`);
     }
 
-    async clickSaveButton(): Promise<void> {
-        await interactWhenVisible(this.saveButton("Schema"), (el) => el.click(), "Click Save Button");
+    private editAttributeButton(): Locator {
+        return this.page.getByTestId(`editAttributeButton`);
     }
 
-    async clickCancelButton(): Promise<void> {
-        await interactWhenVisible(this.cancelButton("Schema"), (el) => el.click(), "Click Cancel Button");
+    async clickRemoveAttributeButton(): Promise<void> {
+        await interactWhenVisible(this.removeAttributeButton(), (el) => el.click(), "Click Remove Attribute Button");
     }
 
-    async clickCanvasElement(x: number, y: number): Promise<void> {
-        await interactWhenVisible(this.canvasElement, (el) => el.click({ position: { x, y }, button: "right" }), "Canvas Element");
+    async clickEditAttributeButton(): Promise<void> {
+        await interactWhenVisible(this.editAttributeButton(), (el) => el.click(), "Click Edit Attribute Button");
     }
 
-    async hoverCanvasElement(x: number, y: number): Promise<void> {
-        await interactWhenVisible(this.canvasElement, (el) => el.hover({ position: { x, y } }), "Canvas Element");
+    async getContentDataPanelAttributesCount(): Promise<number> {
+        const content = await interactWhenVisible(this.dataPanelAttributesCount, (el) => el.textContent(), "Data Panel Attributes Count");
+        return parseInt(content ?? "0")
+    }
+
+    async getDataPanelNodeSelection(nodeId: string): Promise<string | null> {
+        return await interactWhenVisible(this.dataPanelNodeSelection(nodeId), (el) => el.textContent(), "Data Panel Node Selection Count");
+    }
+
+    private clickAttriubute(attriubuteRow: string, typeInput: string): Locator {
+        return this.dataPanelTable.locator(`tr:nth-of-type(${attriubuteRow})`).locator(`td:nth-of-type(${typeInput})`).locator("button");
     }
 
     async clickElementCanvasAdd(): Promise<void> {
-        await interactWhenVisible(this.elementCanvasAdd("Schema"), (el) => el.click(), "Add Element");
+        await interactWhenVisible(this.elementCanvasAdd("Schema"), (el) => el.click(), "Add schema Element");
     }
 
     async clickElementCanvasAddNode(): Promise<void> {
@@ -107,68 +118,235 @@ export default class SchemaPage extends Page {
         await interactWhenVisible(this.elementCanvasAddEdge("Schema"), (el) => el.click(), "Add Edge");
     }
 
-    async clickDeleteElement(): Promise<void> {
-        await interactWhenVisible(this.deleteElement("Schema"), (el) => el.click(), "Delete Element");
+    async clickAddNewLabelButton(): Promise<void> {
+        await interactWhenVisible(this.addNewLabelButton(), (el) => el.click(), "Click Add New Label Button");
     }
 
-    async clickDeleteElementConfirm(): Promise<void> {
-        await interactWhenVisible(this.deleteElementConfirm("Schema"), (el) => el.click(), "Confirm Delete Element");
+    async insertAddNewLabelInput(labelInput: string): Promise<void> {
+        await interactWhenVisible(this.addNewLabelInput(), (el) => el.fill(labelInput), "Insert Add New Label Input");
     }
 
-    async clickDeleteElementCancel(): Promise<void> {
-        await interactWhenVisible(this.deleteElementCancel("Schema"), (el) => el.click(), "Cancel Delete Element");
+    async clickSaveNewLabelButton(): Promise<void> {
+        await interactWhenVisible(this.saveNewLabelButton(), (el) => el.click(), "Click Save New Label Button");
     }
 
-    async clickAnimationControl(): Promise<void> {
-        await interactWhenVisible(this.animationControl(), (el) => el.click(), "Animation Control");
+    async insertSeachType(searchInput: string): Promise<void> {
+        await interactWhenVisible(this.searchTypeInput(), (el) => el.fill(searchInput), "Insert Search Type Input");
     }
 
-    async clickZoomInControl(): Promise<void> {
-        await interactWhenVisible(this.zoomInControl(), (el) => el.click(), "Zoom In Control");
+    async clickDeleteElementSchema(): Promise<void> {
+        await interactWhenVisible(this.deleteElementSchema(), (el) => el.click(), "Click Delete Element Schema");
     }
 
-    async clickZoomOutControl(): Promise<void> {
-        await interactWhenVisible(this.zoomOutControl(), (el) => el.click(), "Zoom Out Control");
+    async clickConfirmDeleteElementSchema(): Promise<void> {
+        await interactWhenVisible(this.confirmDeleteElementSchema(), (el) => el.click(), "Click Confirm Delete Element Schema");
     }
 
-    async clickCenterControl(): Promise<void> {
-        await interactWhenVisible(this.centerControl(), (el) => el.click(), "Center Control");
+    async clickAddValueButton(): Promise<void> {
+        await interactWhenVisible(this.addValueButton(), (el) => el.click(), "Click Add Value Button");
     }
 
-    async fillElementCanvasSearch(text: string): Promise<void> {
-        await interactWhenVisible(this.elementCanvasSearch("Schema"), (el) => el.fill(text), "Element Canvas Search");
+    async clickSaveAddValueButton(): Promise<void> {
+        await interactWhenVisible(this.saveAddValueButton(), (el) => el.click(), "Click Save Add Value Button");
+    }
+    
+    async clickManage(): Promise<void> {
+        await interactWhenVisible(this.manage("Schema"), (el) => el.click(), "Manage Schemas Button");
     }
 
-    async clickElementCanvasSuggestionByName(name: string): Promise<void> {
-        await interactWhenVisible(this.elementCanvasSuggestionByName("Schema", name), (el) => el.click(), `Element Canvas Suggestion ${name}`);
+    async clickTableCheckboxByName(name: string): Promise<void> {
+        await interactWhenVisible(this.tableCheckboxByName("Schema", name), (el) => el.click(), `Table Schemas Checkbox ${name}`);
     }
 
-    async clickLabelsButtonByLabel(label: "RelationshipTypes" | "Labels", name: string): Promise<void> {
-        await interactWhenVisible(this.labelsButtonByName("Schema", label, name), (el) => el.click(), `Labels Panel Button ${label} ${name}`);
+    async hoverTableRowByName(name: string): Promise<void> {
+        await interactWhenVisible(this.tableRowByName("Schema", name), (el) => el.hover(), `Table Schemas Row ${name}`);
     }
 
-    async getNodesCount(): Promise<string> {
-        const count = await interactWhenVisible(this.nodesCount(), (el) => el.textContent(), "Nodes Count");
-        return count?.split(" ")[1] ?? "0";
+    async hoverTableRowInDataPanel(type: string): Promise<void> {
+        await interactWhenVisible(this.tableRowInDataPanel(type), (el) => el.hover(), `Table Row in Data Panel ${type}`);
     }
 
-    async getEdgesCount(): Promise<string> {
-        const count = await interactWhenVisible(this.edgesCount(), (el) => el.textContent(), "Edges Count");
-        return count?.split(" ")[1] ?? "0";
+    async insertAttriubuteValue(attriubuteRow: string, typeInput: string, value: string): Promise<void> {
+        await interactWhenVisible(this.insertAttriubute(attriubuteRow, typeInput), (el) => el.fill(value), "Insert Attribute Value");
     }
 
-    async isVisibleLabelsButtonByName(label: "RelationshipTypes" | "Labels", name: string): Promise<boolean> {
-        const isVisible = await waitForElementToBeVisible(this.labelsButtonByName("Schema", label, name));
+    async clickAttriubuteButton(attriubuteRow: string, typeInput: string): Promise<void> {
+        await interactWhenVisible(this.clickAttriubute(attriubuteRow, typeInput), (el) => el.click(), "Click Attribute Button");
+    }
+
+    async clickCreateSchema(): Promise<void> {
+        await interactWhenVisible(this.create("Schema"), (el) => el.click(), "Click Create");
+    }
+
+    async fillCreateSchemaInput(text: string): Promise<void> {
+        await interactWhenVisible(this.insertInput("Schema"), (el) => el.fill(text), "Create Schema Input");
+    }
+
+    async clickConfirmCreateSchema(): Promise<void> {
+        await interactWhenVisible(this.createConfirm("Schema"), (el) => el.click(), "Click Create Confirm");
+    }
+
+    async clickAddAttributeButton(): Promise<void> {
+        await interactWhenVisible(this.addAttriubuteButton(), (el) => el.click(), "Click Add Attribute Button");
+    }
+
+    async clickCreateNewNodeButton(): Promise<void> {
+        await interactWhenVisible(this.createNewNodeButton(), (el) => el.click(), "Click Add Attribute Button");
+    }
+
+    async clickEditButton(): Promise<void> {
+        await interactWhenVisible(this.editButton("Schema"), (el) => el.click(), "Edit Button Schemas");
+    }
+
+    async clickSelectTypeItem(type: string): Promise<void> {
+        await interactWhenVisible(this.selectTypeItem(type), (el) => el.click(), "Edit Button Schemas");
+    }
+
+    async clickConfirmRemoveAttributeButton(): Promise<void> {
+        await interactWhenVisible(this.confirmRemoveAttributeButton(), (el) => el.click(), "Click Confirm Remove Attribute Button");
+    }
+
+    async modifySchemaName(oldName: string, newName: string): Promise<void> {
+        await this.clickSelect("Schema");
+        await this.clickManage();
+        await this.hoverTableRowByName(oldName);
+        await this.clickEditButton();
+        await this.fillInput("Schema", newName);
+        await this.clickSaveButton("Schema");
+        await waitForElementToNotBeVisible(this.saveButton("Schema"));
+    }
+
+    async verifySchemaExists(schemaName: string): Promise<boolean> {
+        await this.clickSelect("Schema");
+        await this.fillSearch(schemaName);
+        const schemaId = "0"; // always select the first result
+        const isVisible = await this.isVisibleSelectItem(schemaId);
         return isVisible;
     }
 
-    async isVisibleNodeCanvasToolTip(): Promise<boolean> {
-        const isVisible = await waitForElementToBeVisible(this.nodeCanvasToolTip);
-        return isVisible;
+    async selectSchemaByName(schemaName: string): Promise<void> {
+        await this.clickSelect("Schema");
+        await this.fillSearch(schemaName);
+        await this.isVisibleSelectItem(schemaName);
+        await this.clickSelectItem("0"); // selecting the first item in list after search
     }
 
-    async getNodeCanvasToolTipContent(): Promise<string | null> {
-        const content = await interactWhenVisible(this.nodeCanvasToolTip, (el) => el.textContent(), "Node Canvas Tooltip");
-        return content;
+
+    async addSchema(schemaName: string): Promise<void> {
+        await this.clickCreateSchema();
+        await this.fillCreateSchemaInput(schemaName);
+        await this.clickConfirmCreateSchema();
+        await this.isVisibleToast();
     }
+
+    async deleteSchema(schemaName: string): Promise<void> {
+        await this.clickSelect("Schema");
+        await this.clickManage();
+        await this.clickTableCheckboxByName(schemaName);
+        await this.clickDelete();
+        await this.clickDeleteConfirm();
+        await this.isVisibleToast();
+    }
+
+    async addLabelToNode(label: string): Promise<void> {
+        await this.clickAddNewLabelButton();
+        await this.insertAddNewLabelInput(label);
+        await this.clickSaveNewLabelButton();
+    }
+
+    async selectAttriubuteType(attriubuteRow: string, type: string): Promise<void> {
+        await this.clickAttriubuteButton(attriubuteRow, "2"); //click type button
+        await this.insertSeachType(type); //search for type
+        await this.clickSelectTypeItem(type); //select type from list
+    }
+
+    async addAttribute(attributeRow: string, key: string, type: string, description: string, unique: boolean, required: boolean): Promise<void> {
+        await this.insertAttriubuteValue(attributeRow, "1", key); //key
+        await this.selectAttriubuteType(attributeRow, type); //type
+        await this.insertAttriubuteValue(attributeRow, "3", description); //description
+        unique ? await this.clickAttriubuteButton(attributeRow, "4") : null; //Enable Unique
+        required ? await this.clickAttriubuteButton(attributeRow, "5") : null; //Enable Required
+        await this.clickAddAttributeButton();
+    }
+
+    async addValueToExistingElementDataPanel(attributeRow: string, key: string, type: string, description: string, unique: boolean, required: boolean): Promise<void> {
+        await this.insertAttriubuteValue(attributeRow, "1", key); //key
+        await this.selectAttriubuteType(attributeRow, type); //type
+        await this.insertAttriubuteValue(attributeRow, "3", description); //description
+        unique ? await this.clickAttriubuteButton(attributeRow, "4") : null; //Enable Unique
+        required ? await this.clickAttriubuteButton(attributeRow, "5") : null; //Enable Required
+        await this.clickSaveAddValueButton();
+    }
+
+    async addNode(attributeRow: string, label: string, key: string, type: string, description: string, unique: boolean, required: boolean): Promise<void> {
+        await this.clickElementCanvasAdd();
+        await this.clickElementCanvasAddNode();
+        await this.addLabelToNode(label);
+        await this.addAttribute(attributeRow, key, type, description, unique, required);
+        await this.clickCreateNewNodeButton();
+    }
+
+    async searchElementInCanvasSelectFirst(name: string): Promise<void> {
+        await this.fillElementCanvasSearch("Schema", name);
+        await this.clickElementCanvasSuggestionByName("Schema", "0"); // always select the first result
+    }
+
+    async deleteSchemaElement(): Promise<void> {
+        await this.clickDeleteElementSchema();
+        await this.clickConfirmDeleteElementSchema();
+        await this.isVisibleToast();
+    }
+
+    async selectTwoNodesForEdge(node1x: number, node1y: number, node2x: number, node2y: number): Promise<void> {
+        await this.elementClick(node1x, node1y);
+        await this.page.waitForTimeout(500);
+        await this.elementClick(node2x, node2y);
+    }
+
+    async addEdge(attributeRow: string, label: string, key: string, type: string, description: string, unique: boolean, required: boolean, node1x: number, node1y: number, node2x: number, node2y: number): Promise<void> {
+        await this.clickElementCanvasAdd();
+        await this.clickElementCanvasAddEdge();
+        await this.addLabelToNode(label);
+        await this.addAttribute(attributeRow, key, type, description, unique, required);
+        const check = await this.selectTwoNodesForEdge(node1x, node1y, node2x, node2y);
+        await this.clickCreateNewNodeButton();
+    }
+
+    async exportSchema(schemaName: string): Promise<void> { // must check if its working
+        await this.clickExport();
+        await this.fillCreateSchemaInput(schemaName);
+        await this.clickExportConfirm();
+        await this.isVisibleToast();
+    }
+
+    async swapNodesInAddEdgeDataPanel(node1: string, node2: string): Promise<void> {
+        // click add element button
+        // click add edge button from dropdown
+         // must make two clicks one for first node and one for second node
+         // then click swap nodes button
+
+    }
+
+    async clearNodesInAddEdgeDataPanel(): Promise<void> {
+        //click add element button
+        // click add edge button from dropdown
+        // must make two clicks one for first node and one for second node
+        // then click clear nodes button
+    }
+
+    async modifyAttributeValueByRow(attributeRow: string, type: string, description: string, unique: boolean, required: boolean): Promise<void> {
+        await this.hoverTableRowInDataPanel(attributeRow);
+        await this.clickEditAttributeButton();
+        await this.selectAttriubuteType(attributeRow, type); //type
+        await this.insertAttriubuteValue(attributeRow, "3", description); //description
+        unique ? await this.clickAttriubuteButton(attributeRow, "4") : null; //Enable Unique
+        required ? await this.clickAttriubuteButton(attributeRow, "5") : null; //Enable Required
+    }
+
+    async removeAttributeByRow(attributeRow: string): Promise<void> {
+        await this.hoverTableRowInDataPanel(attributeRow);
+        await this.clickRemoveAttributeButton();
+        await this.clickConfirmRemoveAttributeButton();
+    }
+
 }
