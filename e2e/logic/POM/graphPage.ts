@@ -423,13 +423,11 @@ export default class GraphPage extends Page {
                 const canvas = document.querySelector(selector);
                 return canvas?.getAttribute("data-engine-status") === "stop";
             },
-            { selector: '.force-graph-container canvas' }, // argument passed to the function
-            { timeout } // waitForFunction options
+            { selector: '.force-graph-container canvas' },
+            { timeout }
         );
     }
     
-
-
     async isNodeCanvasToolTipVisible(): Promise<boolean> {
         await this.page.waitForTimeout(500);
         const isVisible = await this.isVisibleNodeCanvasToolTip();
