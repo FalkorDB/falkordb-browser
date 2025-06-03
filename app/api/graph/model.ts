@@ -21,6 +21,10 @@ export type Query = {
   }
 
 const getSchemaValue = (value: string): string[] => {
+    if (typeof value !== "string") {
+        return ["string", "", "false", "false"];
+    }
+    
     let unique, required, type, description
     if (value.includes("!")) {
         value = value.replace("!", "")

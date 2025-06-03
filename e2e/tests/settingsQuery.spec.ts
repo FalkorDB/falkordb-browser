@@ -25,12 +25,11 @@ test.describe("Query Settings", () => {
         const querySettings = await browser.createNewPage(QuerySettingsPage, urls.settingsUrl);
         const timeout = 1;
         await querySettings.fillTimeout(timeout);
-        await querySettings.clickOnGraph();
-        await querySettings.selectExistingGraph(graphName)
+        await querySettings.clickGraphsTabInHeader();
+        await querySettings.selectGraphByName(graphName)
         const query = `UNWIND range(1, 100000000) AS x RETURN count(x)`;
         await querySettings.insertQuery(query);
         await querySettings.clickRunQuery(false);
-        await querySettings.waitForRunQueryToBeEnabled();
         expect(await querySettings.getErrorNotification()).toBe(true);
         await apiCall.removeGraph(graphName);
     });
@@ -41,14 +40,13 @@ test.describe("Query Settings", () => {
         const querySettings = await browser.createNewPage(QuerySettingsPage, urls.settingsUrl);
         const limit = 5;
         await querySettings.fillLimit(limit);
-        await querySettings.clickOnGraph();
-        await querySettings.selectExistingGraph(graphName);
+        await querySettings.clickGraphsTabInHeader();
+        await querySettings.selectGraphByName(graphName);
         const query = `UNWIND range(1, 10) AS i CREATE (p:Person {id: i, name: 'Person ' + toString(i)}) RETURN p`;
         await querySettings.insertQuery(query);
-        await querySettings.clickRunQuery()
-        const res = await querySettings.getNodeScreenPositions('graph');
+        await querySettings.clickRunQuery();
+        const res = await querySettings.getNodesScreenPositions('graph');  
         expect(res.length).toBe(5);
-        await querySettings.clickOnSettings();
         await apiCall.removeGraph(graphName);
     });
 

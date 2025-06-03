@@ -56,11 +56,13 @@ export default function RemoveLabel({
                     onClick={handleRemoveLabel}
                     isLoading={isLoading}
                     indicator={indicator}
+                    data-testid="removeLabelButton"
                 />
                 <CloseDialog
                     variant="Cancel"
                     label="Cancel"
                     type="button"
+                    data-testid="cancelLabelButton"
                 />
             </div>
         </DialogComponent>
