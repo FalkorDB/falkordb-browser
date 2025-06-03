@@ -52,20 +52,18 @@ test.describe('Schema Tests', () => {
         await apicalls.removeSchema(newSchemaName);
     });
     
-    test(`@admin Validate that a newly added node is rendered on the canvas and categorized correctly`, async () => {
+    test(`@admin Validate that a creating a node updates labels on the canvas`, async () => {
         const schema = await browser.createNewPage(SchemaPage, urls.schemaUrl);
         await browser.setPageToFullScreen();
         const schemaName = getRandomString('schema');
         await schema.addSchema(schemaName);
         const attributeRow = "1"
         await schema.addNode(attributeRow, "person", 'id', "Integer", "100", true, true);
-        await schema.searchElementInCanvas("Schema", "0");
-        expect(await schema.getContentDataPanelAttributesCount()).toBe(1);
-        // expect(await schema.getCategoriesPanelBtn()).toBe("person")
+        expect(await schema.isVisibleLabelsButtonByName("Schema", "Labels", "person")).toBeTruthy();
         await apicalls.removeSchema(schemaName);
     });
-    // re check
-    test(`@admin Validate that a creating edge updates the edges count, and updates the relationship types panel`, async () => {
+    
+    test(`@admin Validate that a creating edge updates relationship types panel`, async () => {
         const schemaName = getRandomString('schema');
         await apicalls.runSchemaQuery(schemaName, 'CREATE (a:person1 {id: "Integer!*-1"}), (b:person2 {id: "Integer!*-2"}) RETURN a, b');
         const schema = await browser.createNewPage(SchemaPage, urls.schemaUrl);
@@ -75,64 +73,24 @@ test.describe('Schema Tests', () => {
         const nodes = await schema.getNodesScreenPositions('schema');
         const attributeRow = "1"
         await schema.addEdge(attributeRow, "knows", 'id', "Integer", "100", true, true, nodes[0].screenX, nodes[0].screenY, nodes[1].screenX, nodes[1].screenY);
-        await new Promise(resolve => setTimeout(resolve, 2000));
-        const edgesCount = await schema.getEdgesCount();
-        expect(expect(parseInt(edgesCount ?? "0", 10)).toBe(1));
-        await schema.waitForCanvasAnimationToEnd();
-        const edges = await schema.getLinksScreenPositions('schema');
-        await schema.elementClick(edges[0].midX, edges[0].midY);
-        // expect(await schema.isRelationshipTypesPanelBtnHidden()).toBeFalsy();
+        expect(await schema.isVisibleLabelsButtonByName("Schema", "RelationshipTypes", "knows")).toBeTruthy();
         await apicalls.removeSchema(schemaName);
     });
 
-    test(`@admin Validate that deleting a node removes it from the canvas and updates the category panel`, async () => {
+    test(`@admin Validate that deleting a node removes updates the labels panel`, async () => {
         const schemaName = getRandomString('schema');
-        await apicalls.runSchemaQuery(schemaName, 'CREATE (n:person1 {id: "Integer!*-1"}) RETURN n');
+        await apicalls.runSchemaQuery(schemaName, 'CREATE (a:person1 {id: "Integer!*-1"}), (b:person2 {id: "Integer!*-2"}) RETURN a, b');
         const schema = await browser.createNewPage(SchemaPage, urls.schemaUrl);
         await browser.setPageToFullScreen();
         await schema.selectSchemaByName(schemaName);
         await schema.waitForCanvasAnimationToEnd();
         await schema.searchElementInCanvas("Schema", "0");
         await schema.deleteSchemaElement();;
-        const nodesCount = await schema.getNodesCount();
-        expect(expect(parseInt(nodesCount ?? "0", 10)).toBe(0));
-        // expect(await schema.isCategoriesPanelBtnHidden()).toBeTruthy();
+        expect(await schema.isVisibleLabelsButtonByName("Schema", "Labels", "person")).toBeFalsy();
         await apicalls.removeSchema(schemaName);
     });
 
-    // test.skip(`@admin Validate that toggling a category label updates edge visibility on the canvas`, async () => {
-    //     const schemaName = getRandomString('schema');
-    //     await apicalls.runSchemaQuery(schemaName, 'CREATE (n:person1 {id: "Integer!*-1"}) RETURN n');
-    //     const schema = await browser.createNewPage(SchemaPage, urls.schemaUrl);
-    //     await browser.setPageToFullScreen();
-    //     await schema.selectSchemaByName(schemaName);
-    //     await schema.clickCategoriesPanelBtn();
-    //     expect(await schema.getCategoriesPanelBtn()).toBe("person1")
-    //     const nodes1 = await schema.getNodeScreenPositions('schema');
-    //     expect(nodes1[0].visible).toBeFalsy();
-    //     await schema.clickCategoriesPanelBtn();
-    //     const nodes2 = await schema.getNodeScreenPositions('schema');
-    //     expect(nodes2[0].visible).toBeTruthy();
-    //     await apicalls.removeSchema(schemaName);
-    // });
-
-    // test.skip(`@admin Validate that toggling a relationship label updates edge visibility on the canvas`, async () => {
-    //     const schemaName = getRandomString('schema');
-    //     await apicalls.runSchemaQuery(schemaName, 'CREATE (a:person1 {id: "Integer!*-1"}), (b:person2 {id: "Integer!*-2"}), (a)-[:knows]->(b) RETURN a, b');
-    //     const schema = await browser.createNewPage(SchemaPage, urls.schemaUrl);
-    //     await browser.setPageToFullScreen();
-    //     await schema.selectSchemaByName(schemaName);
-    //     await schema.clickRelationshipTypesPanelBtn();
-    //     expect(await schema.getRelationshipTypesPanelBtn()).toBe("knows");
-    //     const links1 = await schema.getLinksScreenPositions('schema');
-    //     expect(links1[0].visible).toBeFalsy();
-    //     await schema.clickRelationshipTypesPanelBtn();
-    //     const links2 = await schema.getLinksScreenPositions('schema'); 
-    //     expect(links2[0].visible).toBeTruthy();
-    //     await apicalls.removeSchema(schemaName);
-    // });
-
-    test(`@admin Validate that deleting a relationship removes it from the canvas and updates the relationship types panel`, async () => { //duplocated unless we check canvas itself and panels
+    test(`@admin Validate that deleting a relationship updates the relationship types panel`, async () => {
         const schemaName = getRandomString('schema');
         await apicalls.runSchemaQuery(schemaName, 'CREATE (a:person1 {id: "Integer!*-1"}), (b:person2 {id: "Integer!*-2"}), (a)-[:knows]->(b) RETURN a, b');
         const schema = await browser.createNewPage(SchemaPage, urls.schemaUrl);
@@ -142,9 +100,37 @@ test.describe('Schema Tests', () => {
         const links1 = await schema.getLinksScreenPositions('schema');
         await schema.searchElementInCanvasSelectFirst("knows");
         await schema.deleteSchemaElement();;
-        const edgesCount = await schema.getEdgesCount();
-        expect(expect(parseInt(edgesCount ?? "0", 10)).toBe(0));
-        // expect(await schema.isRelationshipTypesPanelBtnHidden()).toBeTruthy();
+        expect(await schema.isVisibleLabelsButtonByName("Schema", "RelationshipTypes", "knows")).toBeFalsy();
+        await apicalls.removeSchema(schemaName);
+    });
+
+    test(`@admin Validate that toggling a category label updates edge visibility on the canvas`, async () => {
+        const schemaName = getRandomString('schema');
+        await apicalls.runSchemaQuery(schemaName, 'CREATE (n:person1 {id: "Integer!*-1"}) RETURN n');
+        const schema = await browser.createNewPage(SchemaPage, urls.schemaUrl);
+        await browser.setPageToFullScreen();
+        await schema.selectSchemaByName(schemaName);
+        await schema.clickLabelsButtonByLabel("Schema", "Labels", "person1");
+        const nodes1 = await schema.getNodesScreenPositions('schema');
+        expect(nodes1[0].visible).toBeFalsy();
+        await schema.clickLabelsButtonByLabel("Schema", "Labels", "person1");
+        const nodes2 = await schema.getNodesScreenPositions('schema');
+        expect(nodes2[0].visible).toBeTruthy();
+        await apicalls.removeSchema(schemaName);
+    });
+
+    test(`@admin Validate that toggling a relationship label updates edge visibility on the canvas`, async () => {
+        const schemaName = getRandomString('schema');
+        await apicalls.runSchemaQuery(schemaName, 'CREATE (a:person1 {id: "Integer!*-1"}), (b:person2 {id: "Integer!*-2"}), (a)-[:knows]->(b) RETURN a, b');
+        const schema = await browser.createNewPage(SchemaPage, urls.schemaUrl);
+        await browser.setPageToFullScreen();
+        await schema.selectSchemaByName(schemaName);
+        await schema.clickLabelsButtonByLabel("Schema", "RelationshipTypes", "knows");
+        const links1 = await schema.getLinksScreenPositions('schema');
+        expect(links1[0].visible).toBeFalsy();
+        await schema.clickLabelsButtonByLabel("Schema", "RelationshipTypes", "knows");
+        const links2 = await schema.getLinksScreenPositions('schema');
+        expect(links2[0].visible).toBeTruthy();
         await apicalls.removeSchema(schemaName);
     });
 

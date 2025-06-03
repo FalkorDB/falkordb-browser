@@ -217,10 +217,10 @@ export default class GraphPage extends Page {
         await interactWhenVisible(this.elementCanvasSuggestionByName(type, name),(el) => el.click(), `Element Canvas Suggestion ${type} ${name}`);
     }
     
-    async clickLabelsButtonByLabel(label: "RelationshipTypes" | "Labels", name: string): Promise<void> {
-        await interactWhenVisible(this.labelsButtonByName("Graph", label, name), (el) => el.click(), `Labels Panel Button ${label} ${name}`);
+    async clickLabelsButtonByLabel(tab: "Graph" | "Schema", label: "RelationshipTypes" | "Labels", name: string): Promise<void> {
+        await interactWhenVisible(this.labelsButtonByName(tab, label, name), (el) => el.click(), `Labels Panel Button ${tab} ${label} ${name}`);
     }
-
+    
     async clickEditorRun(): Promise<void> {
         await interactWhenVisible(this.editorRun, (el) => el.click(), "Editor Run");
     }
@@ -259,11 +259,11 @@ export default class GraphPage extends Page {
         await interactWhenVisible(this.graphsTabInHeader, (el) => el.click(), "Graphs Tab in Header");
     }
 
-    async isVisibleLabelsButtonByName(label: "RelationshipTypes" | "Labels", name: string): Promise<boolean> { 
-        const isVisible = await waitForElementToBeVisible(this.labelsButtonByName("Graph", label, name));
+    async isVisibleLabelsButtonByName(tab: "Graph" | "Schema", label: "RelationshipTypes" | "Labels", name: string): Promise<boolean> {
+        const isVisible = await waitForElementToBeVisible(this.labelsButtonByName(tab, label, name));
         return isVisible;
     }
-
+    
     async isVisibleEditButton(): Promise<boolean> {
         const isVisible = await waitForElementToBeVisible(this.editButton("Graph"));
         return isVisible;

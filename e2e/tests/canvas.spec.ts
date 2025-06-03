@@ -99,7 +99,7 @@ test.describe('Canvas Tests', () => {
         const graphName = getRandomString('canvas');
         await graph.addGraph(graphName);
         await graph.insertQuery(BATCH_CREATE_PERSONS);
-        await graph.clickRunQuery();
+        await graph.clickRunQuery(true);
         const initialGraph = await graph.getNodesScreenPositions('graph');
         const fromX = initialGraph[0].screenX;
         const fromY = initialGraph[0].screenY;
@@ -210,10 +210,10 @@ test.describe('Canvas Tests', () => {
         await graph.selectGraphByName(graphName);
         await graph.insertQuery(CREATE_NODE_QUERY);
         await graph.clickRunQuery();
-        await graph.clickLabelsButtonByLabel("Labels", "person1");
+        await graph.clickLabelsButtonByLabel("Graph", "Labels", "person1");
         const nodes1 = await graph.getNodesScreenPositions('graph');
         expect(nodes1[0].visible).toBeFalsy();
-        await graph.clickLabelsButtonByLabel("Labels", "person1");
+        await graph.clickLabelsButtonByLabel("Graph", "Labels", "person1");
         const nodes2 = await graph.getNodesScreenPositions('graph');
         expect(nodes2[0].visible).toBeTruthy();
         await apicalls.removeGraph(graphName);
@@ -227,10 +227,10 @@ test.describe('Canvas Tests', () => {
         await graph.selectGraphByName(graphName);
         await graph.insertQuery(CREATE_QUERY);
         await graph.clickRunQuery();
-        await graph.clickLabelsButtonByLabel("RelationshipTypes", "KNOWS");
+        await graph.clickLabelsButtonByLabel("Graph", "RelationshipTypes", "KNOWS");
         const links1 = await graph.getLinksScreenPositions('graph');
         expect(links1[0].visible).toBeFalsy();
-        await graph.clickLabelsButtonByLabel("RelationshipTypes", "KNOWS");
+        await graph.clickLabelsButtonByLabel("Graph", "RelationshipTypes", "KNOWS");
         const links2 = await graph.getLinksScreenPositions('graph');
         expect(links2[0].visible).toBeTruthy();
         await apicalls.removeGraph(graphName);
