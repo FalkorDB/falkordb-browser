@@ -286,12 +286,12 @@ export default class GraphPage extends Page {
     }
 
     async getNodesCount(): Promise<string | null> {
-        await this.page.waitForTimeout(500); // wait for the nodes count to be updated
+        await this.page.waitForTimeout(1000); // wait for the nodes count to be updated
         return await interactWhenVisible(this.nodesCount(), (el) => el.textContent(), "Nodes Count");
     }
 
     async getEdgesCount(): Promise<string | null> {
-        await this.page.waitForTimeout(500); // wait for the edges count to be updated
+        await this.page.waitForTimeout(1000); // wait for the edges count to be updated
         return await interactWhenVisible(this.edgesCount(), (el) => el.textContent(), "Edges Count");
     }
 
@@ -314,6 +314,7 @@ export default class GraphPage extends Page {
     }
 
     async verifyGraphExists(graphName: string): Promise<boolean> {
+        await this.page.waitForTimeout(500); // wait for the list to be populated
         await this.clickSelect("Graph");
         await this.fillSearch(graphName);
         const graphId = "0"; // always select the first result
@@ -326,7 +327,6 @@ export default class GraphPage extends Page {
         await this.fillCreateGraphInput(graphName);
         await this.clickConfirmCreateGraph();
         await this.isVisibleToast();
-        await this.waitForPageIdle();
     }
 
     async removeGraph(graphName: string): Promise<void> {
@@ -336,7 +336,6 @@ export default class GraphPage extends Page {
         await this.clickDelete();
         await this.clickDeleteConfirm();
         await this.isVisibleToast();
-        await this.waitForPageIdle();
     }
 
     async insertQuery(query: string): Promise<void> {
@@ -403,6 +402,7 @@ export default class GraphPage extends Page {
         await this.clickDeleteElement(type);
         await this.clickDeleteElementConfirm();
         await waitForElementToNotBeVisible(this.deleteElement("Node"));
+        await this.page.waitForTimeout(1500); // wait for the element to be deleted
     }
 
     async getErrorNotification(): Promise<boolean> {
@@ -481,6 +481,7 @@ export default class GraphPage extends Page {
     async getNodesScreenPositions(windowKey: 'graph' | 'schema'): Promise<any[]> {
         // Wait for canvas to be ready and animations to settle
         await this.waitForCanvasAnimationToEnd();
+        await this.page.waitForTimeout(1500); // Allow some time for the canvas to render properly
         
         // Get canvas element and its properties
         const canvasInfo = await this.page.evaluate((selector) => {

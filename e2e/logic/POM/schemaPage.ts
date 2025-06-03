@@ -13,11 +13,11 @@ export default class SchemaPage extends GraphPage {
     }
 
     //ADD ATTRIBUTES
-    private insertAttriubute(attriubuteRow: string, typeInput: string): Locator {
-        return this.dataPanelTable.locator(`tr:nth-of-type(${attriubuteRow})`).locator(`td:nth-of-type(${typeInput})`).locator("input");
+    private insertAttribute(attributeRow: string, typeInput: string): Locator {
+        return this.dataPanelTable.locator(`tr:nth-of-type(${attributeRow})`).locator(`td:nth-of-type(${typeInput})`).locator("input");
     }
 
-    private addAttriubuteButton(): Locator {
+    private addAttributeButton(): Locator {
         return this.page.getByTestId(`addAttributeButton`);
     }
 
@@ -101,8 +101,8 @@ export default class SchemaPage extends GraphPage {
         return await interactWhenVisible(this.dataPanelNodeSelection(nodeId), (el) => el.textContent(), "Data Panel Node Selection Count");
     }
 
-    private clickAttriubute(attriubuteRow: string, typeInput: string): Locator {
-        return this.dataPanelTable.locator(`tr:nth-of-type(${attriubuteRow})`).locator(`td:nth-of-type(${typeInput})`).locator("button");
+    private clickAttribute(attributeRow: string, typeInput: string): Locator {
+        return this.dataPanelTable.locator(`tr:nth-of-type(${attributeRow})`).locator(`td:nth-of-type(${typeInput})`).locator("button");
     }
 
     async clickElementCanvasAdd(): Promise<void> {
@@ -165,12 +165,12 @@ export default class SchemaPage extends GraphPage {
         await interactWhenVisible(this.tableRowInDataPanel(type), (el) => el.hover(), `Table Row in Data Panel ${type}`);
     }
 
-    async insertAttriubuteValue(attriubuteRow: string, typeInput: string, value: string): Promise<void> {
-        await interactWhenVisible(this.insertAttriubute(attriubuteRow, typeInput), (el) => el.fill(value), "Insert Attribute Value");
+    async insertAttributeValue(attributeRow: string, typeInput: string, value: string): Promise<void> {
+        await interactWhenVisible(this.insertAttribute(attributeRow, typeInput), (el) => el.fill(value), "Insert Attribute Value");
     }
 
-    async clickAttriubuteButton(attriubuteRow: string, typeInput: string): Promise<void> {
-        await interactWhenVisible(this.clickAttriubute(attriubuteRow, typeInput), (el) => el.click(), "Click Attribute Button");
+    async clickAttributeButton(attributeRow: string, typeInput: string): Promise<void> {
+        await interactWhenVisible(this.clickAttribute(attributeRow, typeInput), (el) => el.click(), "Click Attribute Button");
     }
 
     async clickCreateSchema(): Promise<void> {
@@ -186,11 +186,11 @@ export default class SchemaPage extends GraphPage {
     }
 
     async clickAddAttributeButton(): Promise<void> {
-        await interactWhenVisible(this.addAttriubuteButton(), (el) => el.click(), "Click Add Attribute Button");
+        await interactWhenVisible(this.addAttributeButton(), (el) => el.click(), "Click Add Attribute Button");
     }
 
     async clickCreateNewNodeButton(): Promise<void> {
-        await interactWhenVisible(this.createNewNodeButton(), (el) => el.click(), "Click Add Attribute Button");
+        await interactWhenVisible(this.createNewNodeButton(), (el) => el.click(), "Click Create New Node Button");
     }
 
     async clickEditButton(): Promise<void> {
@@ -252,27 +252,27 @@ export default class SchemaPage extends GraphPage {
         await this.clickSaveNewLabelButton();
     }
 
-    async selectAttriubuteType(attriubuteRow: string, type: string): Promise<void> {
-        await this.clickAttriubuteButton(attriubuteRow, "2"); //click type button
+    async selectAttributeType(attributeRow: string, type: string): Promise<void> {
+        await this.clickAttributeButton(attributeRow, "2"); //click type button
         await this.insertSeachType(type); //search for type
         await this.clickSelectTypeItem(type); //select type from list
     }
 
     async addAttribute(attributeRow: string, key: string, type: string, description: string, unique: boolean, required: boolean): Promise<void> {
-        await this.insertAttriubuteValue(attributeRow, "1", key); //key
-        await this.selectAttriubuteType(attributeRow, type); //type
-        await this.insertAttriubuteValue(attributeRow, "3", description); //description
-        unique ? await this.clickAttriubuteButton(attributeRow, "4") : null; //Enable Unique
-        required ? await this.clickAttriubuteButton(attributeRow, "5") : null; //Enable Required
+        await this.insertAttributeValue(attributeRow, "1", key); //key
+        await this.selectAttributeType(attributeRow, type); //type
+        await this.insertAttributeValue(attributeRow, "3", description); //description
+        unique ? await this.clickAttributeButton(attributeRow, "4") : null; //Enable Unique
+        required ? await this.clickAttributeButton(attributeRow, "5") : null; //Enable Required
         await this.clickAddAttributeButton();
     }
 
     async addValueToExistingElementDataPanel(attributeRow: string, key: string, type: string, description: string, unique: boolean, required: boolean): Promise<void> {
-        await this.insertAttriubuteValue(attributeRow, "1", key); //key
-        await this.selectAttriubuteType(attributeRow, type); //type
-        await this.insertAttriubuteValue(attributeRow, "3", description); //description
-        unique ? await this.clickAttriubuteButton(attributeRow, "4") : null; //Enable Unique
-        required ? await this.clickAttriubuteButton(attributeRow, "5") : null; //Enable Required
+        await this.insertAttributeValue(attributeRow, "1", key); //key
+        await this.selectAttributeType(attributeRow, type); //type
+        await this.insertAttributeValue(attributeRow, "3", description); //description
+        unique ? await this.clickAttributeButton(attributeRow, "4") : null; //Enable Unique
+        required ? await this.clickAttributeButton(attributeRow, "5") : null; //Enable Required
         await this.clickSaveAddValueButton();
     }
 
@@ -341,10 +341,10 @@ export default class SchemaPage extends GraphPage {
     async modifyAttributeValueByRow(attributeRow: string, type: string, description: string, unique: boolean, required: boolean): Promise<void> {
         await this.hoverTableRowInDataPanel(attributeRow);
         await this.clickEditAttributeButton();
-        await this.selectAttriubuteType(attributeRow, type); //type
-        await this.insertAttriubuteValue(attributeRow, "3", description); //description
-        unique ? await this.clickAttriubuteButton(attributeRow, "4") : null; //Enable Unique
-        required ? await this.clickAttriubuteButton(attributeRow, "5") : null; //Enable Required
+        await this.selectAttributeType(attributeRow, type); //type
+        await this.insertAttributeValue(attributeRow, "3", description); //description
+        unique ? await this.clickAttributeButton(attributeRow, "4") : null; //Enable Unique
+        required ? await this.clickAttributeButton(attributeRow, "5") : null; //Enable Required
     }
 
     async removeAttributeByRow(attributeRow: string): Promise<void> {
