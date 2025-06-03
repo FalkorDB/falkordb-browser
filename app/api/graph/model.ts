@@ -17,6 +17,7 @@ export type Query = {
     text: string
     metadata: string[]
     explain: string[]
+    profile: string[]
   }
 
 const getSchemaValue = (value: string): string[] => {
@@ -160,7 +161,7 @@ export class Graph {
         this.columns = [];
         this.data = [];
         this.metadata = [];
-        this.currentQuery = currentQuery || { text: "", metadata: [], explain: [] };
+        this.currentQuery = currentQuery || { text: "", metadata: [], explain: [], profile: [] };
         this.categories = categories;
         this.labels = labels;
         this.elements = elements;
