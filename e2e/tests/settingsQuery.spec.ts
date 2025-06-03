@@ -44,7 +44,7 @@ test.describe("Query Settings", () => {
         await querySettings.selectGraphByName(graphName);
         const query = `UNWIND range(1, 10) AS i CREATE (p:Person {id: i, name: 'Person ' + toString(i)}) RETURN p`;
         await querySettings.insertQuery(query);
-        await querySettings.clickRunQuery()
+        await querySettings.clickRunQuery();
         const res = await querySettings.getNodesScreenPositions('graph');  
         expect(res.length).toBe(5);
         await apiCall.removeGraph(graphName);

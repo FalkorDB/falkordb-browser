@@ -216,7 +216,7 @@ test.describe('Data panel Tests', () => {
         await dataPanel.searchElementInCanvas("Graph", "a");
         await dataPanel.addLabel("test", true);
         await dataPanel.closeDataPanel();
-        expect(await dataPanel.isVisibleLabelsButtonByName("Labels", "test")).toBe(true);
+        expect(await dataPanel.isVisibleLabelsButtonByName("Graph", "Labels", "test")).toBe(true);
         await apicalls.removeGraph(graphName);
     })
 
@@ -231,7 +231,7 @@ test.describe('Data panel Tests', () => {
         await dataPanel.addLabel("test", true);
         await dataPanel.removeLabel("person1");
         await dataPanel.closeDataPanel();
-        expect(await dataPanel.isVisibleLabelsButtonByName("Labels", "test")).toBe(true);
+        expect(await dataPanel.isVisibleLabelsButtonByName("Graph", "Labels", "test")).toBe(true);
         await apicalls.removeGraph(graphName);
     })
     
@@ -407,7 +407,7 @@ test.describe('Data panel Tests', () => {
         await graph.selectGraphByName(graphName);
         await graph.insertQuery("match(n) return *");
         await graph.clickRunQuery();
-        expect(await graph.isVisibleLabelsButtonByName("Labels", "artist")).toBeTruthy();
+        expect(await graph.isVisibleLabelsButtonByName("Graph", "Labels", "artist")).toBeTruthy();
         await apicalls.removeGraph(graphName);
     });
 
@@ -424,7 +424,7 @@ test.describe('Data panel Tests', () => {
         await graph.selectGraphByName(graphName);
         await graph.insertQuery("match(n) return *");
         await graph.clickRunQuery(false);
-        expect(await graph.isVisibleLabelsButtonByName("Labels", "Employee")).toBeFalsy();
+        expect(await graph.isVisibleLabelsButtonByName("Graph", "Labels", "Employee")).toBeFalsy();
         await apicalls.removeGraph(graphName);
     });
 

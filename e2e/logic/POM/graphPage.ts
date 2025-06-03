@@ -326,6 +326,7 @@ export default class GraphPage extends Page {
         await this.fillCreateGraphInput(graphName);
         await this.clickConfirmCreateGraph();
         await this.isVisibleToast();
+        await this.waitForPageIdle();
     }
 
     async removeGraph(graphName: string): Promise<void> {
@@ -335,6 +336,7 @@ export default class GraphPage extends Page {
         await this.clickDelete();
         await this.clickDeleteConfirm();
         await this.isVisibleToast();
+        await this.waitForPageIdle();
     }
 
     async insertQuery(query: string): Promise<void> {
