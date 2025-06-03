@@ -183,11 +183,20 @@ export default function SchemaView({
                     setLabels={setLabels}
                 />
                 {
-                    (categories.length > 0 || labels.length > 0) &&
-                    <>
-                        <Labels graph={schema} type="Schema" className="left-2" label="Labels" categories={categories} onClick={onCategoryClick} />
-                        <Labels graph={schema} type="Schema" className="right-2 text-end" label="RelationshipTypes" categories={labels} onClick={onLabelClick} />
-                    </>
+                    ((categories.length > 0 || labels.length > 0) || (isAddEntity || isAddRelation)) &&
+                    <div className="h-full z-10 absolute top-12 inset-x-12 pointer-events-none flex gap-8">
+                        {
+                            (categories.length > 0 || isAddEntity) &&
+                            <Labels graph={schema} type="Schema" className="left-2" label="Labels" categories={categories} onClick={onCategoryClick} />
+                        }
+                        <div className="w-1 grow h-fit">
+                            {/* Content can go here if needed */}
+                        </div>
+                        {
+                            (labels.length > 0 || isAddRelation) &&
+                            <Labels graph={schema} type="Schema" className="right-2 text-end" label="RelationshipTypes" categories={labels} onClick={onLabelClick} />
+                        }
+                    </div>
                 }
                 {
                     selectedElement ?
