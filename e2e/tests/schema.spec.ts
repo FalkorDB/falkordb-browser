@@ -63,13 +63,12 @@ test.describe('Schema Tests', () => {
         await apicalls.removeSchema(schemaName);
     });
     
-    test.skip(`@admin Validate that a creating edge updates relationship types panel`, async () => {
+    test(`@admin Validate that a creating edge updates relationship types panel`, async () => {
         const schemaName = getRandomString('schema');
         await apicalls.runSchemaQuery(schemaName, 'CREATE (a:person1 {id: "Integer!*-1"}), (b:person2 {id: "Integer!*-2"}) RETURN a, b');
         const schema = await browser.createNewPage(SchemaPage, urls.schemaUrl);
         await browser.setPageToFullScreen();
         await schema.selectSchemaByName(schemaName);
-        await schema.waitForCanvasAnimationToEnd();
         const nodes = await schema.getNodesScreenPositions('schema');
         const attributeRow = "1"
         await schema.addEdge(attributeRow, "knows", 'id', "Integer", "100", true, true, nodes[0].screenX, nodes[0].screenY, nodes[1].screenX, nodes[1].screenY);
@@ -83,7 +82,6 @@ test.describe('Schema Tests', () => {
         const schema = await browser.createNewPage(SchemaPage, urls.schemaUrl);
         await browser.setPageToFullScreen();
         await schema.selectSchemaByName(schemaName);
-        await schema.waitForCanvasAnimationToEnd();
         await schema.searchElementInCanvas("Schema", "0");
         await schema.deleteSchemaElement();;
         expect(await schema.isVisibleLabelsButtonByName("Schema", "Labels", "person")).toBeFalsy();
@@ -96,7 +94,6 @@ test.describe('Schema Tests', () => {
         const schema = await browser.createNewPage(SchemaPage, urls.schemaUrl);
         await browser.setPageToFullScreen();
         await schema.selectSchemaByName(schemaName);
-        await schema.waitForCanvasAnimationToEnd();
         const links1 = await schema.getLinksScreenPositions('schema');
         await schema.searchElementInCanvasSelectFirst("knows");
         await schema.deleteSchemaElement();;
@@ -226,7 +223,7 @@ test.describe('Schema Tests', () => {
         await apicalls.removeSchema(schemaName);
     });
 
-    test.skip(`@admin validate that adding a schema node increases node count`, async () => {
+    test(`@admin validate that adding a schema node increases node count`, async () => {
         const schemaName = getRandomString('schema');
         await apicalls.runSchemaQuery(schemaName, 'CREATE (a:person1 {id: "Integer!*-1"}), (b:person2 {id: "Integer!*-2"}) RETURN a, b');
         const schema = await browser.createNewPage(SchemaPage, urls.schemaUrl);
@@ -239,13 +236,12 @@ test.describe('Schema Tests', () => {
         await apicalls.removeSchema(schemaName);
     });
 
-    test.skip(`@admin validate that adding a schema edge increases edge count`, async () => {
+    test(`@admin validate that adding a schema edge increases edge count`, async () => {
         const schemaName = getRandomString('schema');
         await apicalls.runSchemaQuery(schemaName, 'CREATE (a:person1 {id: "Integer!*-1"}), (b:person2 {id: "Integer!*-2"}) RETURN a, b');
         const schema = await browser.createNewPage(SchemaPage, urls.schemaUrl);
         await browser.setPageToFullScreen();
         await schema.selectSchemaByName(schemaName);
-        await schema.waitForCanvasAnimationToEnd();
         const nodes = await schema.getNodesScreenPositions('schema');
         const attributeRow = "1"
         await schema.addEdge(attributeRow, "knows", 'id', "Integer", "100", true, true, nodes[0].screenX, nodes[0].screenY, nodes[1].screenX, nodes[1].screenY);
@@ -260,7 +256,6 @@ test.describe('Schema Tests', () => {
         const schema = await browser.createNewPage(SchemaPage, urls.schemaUrl);
         await browser.setPageToFullScreen();
         await schema.selectSchemaByName(schemaName);
-        await schema.waitForCanvasAnimationToEnd();
         await schema.searchElementInCanvasSelectFirst("knows");
         await schema.deleteSchemaElement();;
         const edgesCount = await schema.getEdgesCount();
@@ -268,15 +263,14 @@ test.describe('Schema Tests', () => {
         await apicalls.removeSchema(schemaName);
     });
 
-    test.skip(`@admin validate that deleting a schema edge doesn't decreases node count`, async () => {
+    test(`@admin validate that deleting a schema edge doesn't decreases node count`, async () => {
         const schemaName = getRandomString('schema');
         await apicalls.runSchemaQuery(schemaName, 'CREATE (a:person1 {id: "Integer!*-1"}), (b:person2 {id: "Integer!*-2"}), (a)-[:knows]->(b) RETURN a, b');
         const schema = await browser.createNewPage(SchemaPage, urls.schemaUrl);
         await browser.setPageToFullScreen();
         await schema.selectSchemaByName(schemaName);
-        await schema.waitForCanvasAnimationToEnd();
         await schema.searchElementInCanvasSelectFirst("knows");
-        await schema.deleteSchemaElement();;
+        await schema.deleteSchemaElement();
         const nodesCount = await schema.getNodesCount();
         expect(expect(parseInt(nodesCount ?? "0", 10)).toBe(2));
         await apicalls.removeSchema(schemaName);
@@ -288,7 +282,6 @@ test.describe('Schema Tests', () => {
         const schema = await browser.createNewPage(SchemaPage, urls.schemaUrl);
         await browser.setPageToFullScreen();
         await schema.selectSchemaByName(schemaName);
-        await schema.waitForCanvasAnimationToEnd();
         await schema.searchElementInCanvas("Schema", "2");
         await schema.deleteSchemaElement();
         const nodesCount = await schema.getNodesCount();
@@ -302,7 +295,6 @@ test.describe('Schema Tests', () => {
         const schema = await browser.createNewPage(SchemaPage, urls.schemaUrl);
         await browser.setPageToFullScreen();
         await schema.selectSchemaByName(schemaName);
-        await schema.waitForCanvasAnimationToEnd();
         await schema.searchElementInCanvas("Schema", "1");
         await schema.deleteSchemaElement();
         const edgesCount = await schema.getEdgesCount();
@@ -330,7 +322,6 @@ test.describe('Schema Tests', () => {
         const schema = await browser.createNewPage(SchemaPage, urls.schemaUrl);
         await browser.setPageToFullScreen();
         await schema.selectSchemaByName(schemaName);
-        await schema.waitForCanvasAnimationToEnd();
         const nodes = await schema.getNodesScreenPositions('schema');
         const attributeRow = "1"
         await schema.addEdge(attributeRow, "knows", 'id', "Integer", "100", true, true, nodes[0].screenX, nodes[0].screenY, nodes[1].screenX, nodes[1].screenY);

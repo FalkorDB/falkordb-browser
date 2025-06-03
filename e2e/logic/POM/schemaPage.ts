@@ -1,10 +1,8 @@
-import { interactWhenVisible, waitForElementToBeVisible, waitForElementToNotBeVisible } from "@/e2e/infra/utils";
-import Page from "./page";
+import { interactWhenVisible, waitForElementToNotBeVisible } from "@/e2e/infra/utils";
 import GraphPage from "./graphPage";
 import { Locator } from "playwright";
 
 export default class SchemaPage extends GraphPage {
-
     // TABLE
     private get dataPanelTable(): Locator {
         return this.page.getByTestId("attributesTableBody");
@@ -94,7 +92,7 @@ export default class SchemaPage extends GraphPage {
     }
 
     async getContentDataPanelAttributesCount(): Promise<number> {
-        await this.page.waitForTimeout(500); // wait for the data panel to load
+        await this.page.waitForTimeout(1000); // wait for the data panel to load
         const content = await interactWhenVisible(this.dataPanelAttributesCount, (el) => el.textContent(), "Data Panel Attributes Count");
         return parseInt(content ?? "0")
     }
@@ -285,6 +283,7 @@ export default class SchemaPage extends GraphPage {
         await this.addAttribute(attributeRow, key, type, description, unique, required);
         await this.clickCreateNewNodeButton();
         await this.waitForPageIdle();
+        await this.page.waitForTimeout(1500); // wait for the element to be created
     }
 
     async searchElementInCanvasSelectFirst(name: string): Promise<void> {
@@ -297,6 +296,7 @@ export default class SchemaPage extends GraphPage {
         await this.clickConfirmDeleteElementSchema();
         await this.isVisibleToast();
         await this.waitForPageIdle();
+        await this.page.waitForTimeout(1500); // wait for the element to be deleted
     }
 
     async selectTwoNodesForEdge(node1x: number, node1y: number, node2x: number, node2y: number): Promise<void> {
@@ -313,6 +313,7 @@ export default class SchemaPage extends GraphPage {
         const check = await this.selectTwoNodesForEdge(node1x, node1y, node2x, node2y);
         await this.clickCreateNewNodeButton();
         await this.waitForPageIdle();
+        await this.page.waitForTimeout(1500); // wait for the edge to be created
     }
 
     async exportSchema(schemaName: string): Promise<void> { // must check if its working
