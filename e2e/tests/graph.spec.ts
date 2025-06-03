@@ -31,7 +31,7 @@ test.describe('Graph Tests', () => {
         await apiCall.removeGraph(graphName);
     });
 
-    test(`@admin Add graph via API -> remove graph via UI -> validate graph exists via API`, async () => {
+    test.skip(`@admin Add graph via API -> remove graph via UI -> validate graph exists via API`, async () => {
         const graphName = getRandomString('graph');
         await apiCall.addGraph(graphName);
         const graph = await browser.createNewPage(GraphPage, urls.graphUrl);

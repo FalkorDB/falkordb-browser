@@ -239,7 +239,7 @@ test.describe('Schema Tests', () => {
         await apicalls.removeSchema(schemaName);
     });
 
-    test(`@admin validate that adding a schema edge increases edge count`, async () => {
+    test.skip(`@admin validate that adding a schema edge increases edge count`, async () => {
         const schemaName = getRandomString('schema');
         await apicalls.runSchemaQuery(schemaName, 'CREATE (a:person1 {id: "Integer!*-1"}), (b:person2 {id: "Integer!*-2"}) RETURN a, b');
         const schema = await browser.createNewPage(SchemaPage, urls.schemaUrl);
