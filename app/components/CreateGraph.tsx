@@ -28,7 +28,7 @@ export default function CreateGraph({
     label = "",
     trigger = (
         <Button
-            data-testid={`create${type}${label}`}
+            data-testid={`create${type}`}
             variant="Primary"
             title={`Create New ${type}`}
         >
@@ -103,7 +103,7 @@ export default function CreateGraph({
                     </Tooltip>
                     <p className="font-normal text-2xl">Name your {type}:</p>
                     <Input
-                        data-testid={`create${type}${label}Input`}
+                        data-testid={`create${type}Input`}
                         variant="primary"
                         ref={ref => ref?.focus()}
                         value={graphName}
@@ -112,7 +112,7 @@ export default function CreateGraph({
                 </div>
                 <div className="flex gap-4 justify-end">
                     <Button
-                        data-testid={`create${type}${label}Confirm`}
+                        data-testid={`create${type}Confirm`}
                         indicator={indicator}
                         variant="Primary"
                         label={`Create your ${type}`}

@@ -96,6 +96,7 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
                         label={selectedValue || `Select ${type}`}
                         title={options.length === 0 ? `There are no ${type}` : undefined}
                         indicator={indicator}
+                        data-testid={`select${type}`}
                     >
                         {
                             open ?
@@ -122,6 +123,7 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
                             className="w-fit"
                             variant="Primary"
                             label={`Manage ${type}s`}
+                            data-testid={`manage${type}s`}
                         />
                     </DialogTrigger>
                 </DropdownMenuContent>

@@ -57,6 +57,7 @@ export default function Header({ onSetGraphName, graphNames }: Props) {
                         title="View and manage your graphs"
                         className={cn(pathname.includes("/graph") ? "text-primary" : "text-white")}
                         onClick={() => router.push("/graph")}
+                        data-testid="GraphsButton"
                     />
                     <div className="h-[1px] w-[80%] bg-white rounded-lg" />
                     <Button
@@ -64,6 +65,7 @@ export default function Header({ onSetGraphName, graphNames }: Props) {
                         title="View and manage your schemas"
                         className={cn(pathname.includes("/schema") ? "text-primary" : "text-white")}
                         onClick={() => router.push("/schema")}
+                        data-testid="SchemasButton"
                     />
                 </div>
             </div>
@@ -160,6 +162,7 @@ export default function Header({ onSetGraphName, graphNames }: Props) {
                 <div className="h-[1px] w-[80%] bg-white" />
                 <Button
                     title="Log Out"
+                    data-testid="logoutButton"
                     onClick={() => signOut({ callbackUrl: "/login" })}
                 >
                     <LogOut size={25} />

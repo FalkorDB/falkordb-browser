@@ -31,7 +31,7 @@ test.describe('Table View Tests', () => {
         const graphName = getRandomString('table');
         await apiCalls.addGraph(graphName);
         const tableView = await browser.createNewPage(TableView, urls.graphUrl);
-        await tableView.selectExistingGraph(graphName);
+        await tableView.selectGraphByName(graphName);
         await tableView.insertQuery("CREATE (n) RETURN n");
         await tableView.clickRunQuery(false);
         const isTableViewEnabled = await tableView.GetIsTableViewTabEnabled();
@@ -42,7 +42,7 @@ test.describe('Table View Tests', () => {
         const graphName = getRandomString('table');
         await apiCalls.addGraph(graphName);
         const tableView = await browser.createNewPage(TableView, urls.graphUrl);
-        await tableView.selectExistingGraph(graphName);
+        await tableView.selectGraphByName(graphName);
         await tableView.insertQuery("UNWIND range(1, 10) AS x RETURN x");
         await tableView.clickRunQuery(false);
         const isTableViewSelected = await tableView.GetIsTableViewTabSelected();
@@ -53,11 +53,10 @@ test.describe('Table View Tests', () => {
         const graphName = getRandomString('table');
         await apiCalls.addGraph(graphName);
         const tableView = await browser.createNewPage(TableView, urls.graphUrl);
-        await tableView.selectExistingGraph(graphName);
+        await tableView.selectGraphByName(graphName);
         const query = "UNWIND range(1, 10) AS x RETURN x";
         await tableView.insertQuery(query);
         await tableView.clickRunQuery(false);
-        await tableView.waitForRunQueryToBeEnabled();
         const data = await tableView.getRowsCount();
         expect(data).toBe(10);
     })

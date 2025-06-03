@@ -1,7 +1,7 @@
 import BasePage from "@/e2e/infra/ui/basePage";
 import { Locator } from "@playwright/test";
 
-type Type = "Graph" | "Schema"
+type Type = "Graph" | "Schema" | "Node" | "Relation"
 
 export default class Page extends BasePage {
     // CREATE
@@ -9,7 +9,7 @@ export default class Page extends BasePage {
         return (type: Type) => this.page.getByTestId(`create${type}`);
     }
 
-    public get createInput(): (type: Type) => Locator {
+    public get insertInput(): (type: Type) => Locator {
         return (type: Type) => this.page.getByTestId(`create${type}Input`);
     }
 
@@ -57,9 +57,8 @@ export default class Page extends BasePage {
         return (type: Type) => this.page.getByTestId(`select${type}`);
     }
 
-
-    public get selectItem(): (type: Type, graphName: string) => Locator {
-        return (type: Type, graphName: string) => this.page.getByTestId(`select${type}Item${graphName}`);
+    public get selectItemBySearch(): (type: Type, graphId: string) => Locator {
+        return (type: Type, graphId: string) => this.page.getByTestId(`select${type}${graphId}`);
     }
 
     // SEARCH
@@ -78,23 +77,23 @@ export default class Page extends BasePage {
     }
 
     public get tableRowByName(): (type: Type, name: string) => Locator {
-        return (type: Type, name: string) => this.page.getByTestId(`table${type}Row${name}`);
+        return (type: Type, name: string) => this.page.getByTestId(`tableRow${type}s${name}`);
     }
 
     public get tableCheckboxByName(): (type: Type, name: string) => Locator {
-        return (type: Type, name: string) => this.page.getByTestId(`table${type}Checkbox${name}`);
+        return (type: Type, name: string) => this.page.getByTestId(`tableCheckbox${type}s${name}`);
     }
 
     public get editButton(): (type: Type) => Locator {
-        return (type: Type) => this.page.getByTestId(`edit${type}Button`);
+        return (type: Type) => this.page.getByTestId(`editButton${type}s`);
     }
 
     public get input(): (type: Type) => Locator {
-        return (type: Type) => this.page.getByTestId(`input${type}`);
+        return (type: Type) => this.page.getByTestId(`input${type}s`);
     }
 
     public get saveButton(): (type: Type) => Locator {
-        return (type: Type) => this.page.getByTestId(`save${type}Button`);
+        return (type: Type) => this.page.getByTestId(`saveButton${type}s`);
     }
 
     public get cancelButton(): (type: Type) => Locator {
@@ -130,8 +129,8 @@ export default class Page extends BasePage {
     }
 
     // DELETE
-    public get deleteElement(): (type: Type) => Locator {
-        return (type: Type) => this.page.getByTestId(`deleteElement${type}`);
+    public get deleteElement(): (type: "Node" | "Relation" | Type) => Locator {
+        return (type: "Node" | "Relation" | Type) => this.page.getByTestId(`delete${type}`);
     }
 
     public get deleteElementConfirm(): (type: Type) => Locator {
@@ -144,33 +143,33 @@ export default class Page extends BasePage {
 
     // LABELS
     public get labelsButtonByName(): (type: Type, label: "RelationshipTypes" | "Labels", name: string) => Locator {
-        return (type: Type, label: "RelationshipTypes" | "Labels", name: string) => this.page.getByTestId(`${label}Button${type}${name}`);
+        return (type: Type, label: "RelationshipTypes" | "Labels", name: string) => this.page.getByTestId(`${type}${label}Button${name}`);
     }
 
     // CANVAS CONTROLS
-    public get animationControl(): (type: Type) => Locator {
-        return (type: Type) => this.page.getByTestId(`animationControl${type}`);
+    public get animationControl(): () => Locator {
+        return () => this.page.getByTestId(`animationControl`);
     }
 
-    public get zoomInControl(): (type: Type) => Locator {
-        return (type: Type) => this.page.getByTestId(`zoomInControl${type}`);
+    public get zoomInControl(): () => Locator {
+        return () => this.page.getByTestId(`zoomInControl`);
     }
 
-    public get zoomOutControl(): (type: Type) => Locator {
-        return (type: Type) => this.page.getByTestId(`zoomOutControl${type}`);
+    public get zoomOutControl(): () => Locator {
+        return () => this.page.getByTestId(`zoomOutControl`);
     }
 
-    public get centerControl(): (type: Type) => Locator {
-        return (type: Type) => this.page.getByTestId(`centerControl${type}`);
-    }
+    public get centerControl(): () => Locator {
+        return () => this.page.getByTestId('centerControl');
+    }    
 
     // COUNT
-    public get nodesCount(): (type: Type) => Locator {
-        return (type: Type) => this.page.getByTestId(`nodesCount${type}`);
+    public get nodesCount(): () => Locator {
+        return () => this.page.getByTestId(`nodesCount`);
     }
 
-    public get edgesCount(): (type: Type) => Locator {
-        return (type: Type) => this.page.getByTestId(`edgesCount${type}`);
+    public get edgesCount(): () => Locator {
+        return () => this.page.getByTestId(`edgesCount`);
     }
 
     // CANVAS TOOLTIP
@@ -186,5 +185,9 @@ export default class Page extends BasePage {
     // TOAST
     public get toast(): Locator {
         return this.page.getByTestId(`toast`);
+    }
+
+    public get toastUnDoButton(): Locator {
+        return this.page.getByTestId('toast').getByRole('button', { name: 'Undo' });
     }
 }
