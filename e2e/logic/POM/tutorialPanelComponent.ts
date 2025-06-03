@@ -50,7 +50,7 @@ export default class TutorialPanel extends GraphPage {
     await interactWhenVisible(
       this.createNewGraphBtn,
       (el) => el.click(),
-      "content in center"
+      "create new graph button"
     );
   }
 
