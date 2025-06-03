@@ -13,7 +13,7 @@ export default class TutorialPanel extends GraphPage {
   private get sideButtons(): (side: string) => Locator {
     return (side: string) =>
       this.page.locator(
-        `//div[@id='graphTutoria#l']//div[@class='overflow-hidden']/following-sibling::button[${side}]`
+        `//div[@id='graphTutorial']//div[@class='overflow-hidden']/following-sibling::button[${side}]`
       );
   }
 
