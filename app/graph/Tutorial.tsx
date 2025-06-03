@@ -58,7 +58,7 @@ export default function Tutorial() {
                                     <CreateGraph
                                         trigger={
                                             <Button
-                                                data-testid="createGraphTutorial"
+                                                data-testid="createGraph"
                                                 variant="Primary"
                                             >
                                                 Create new graph
