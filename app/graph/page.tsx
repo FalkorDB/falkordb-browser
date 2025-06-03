@@ -146,7 +146,7 @@ export default function Page() {
         }, toast, setIndicator)
         if (!explain.ok) return
         const explainJson = await explain.json()
-        const newQuery = { text: q, metadata: result.metadata, explain: explainJson.result }
+        const newQuery = { text: q, metadata: result.metadata, explain: explainJson.result, profile: [] }
         const queryArr = historyQuery.queries.some(qu => qu.text === q) ? historyQuery.queries : [...historyQuery.queries, newQuery]
         setHistoryQuery(prev => ({
             ...prev,
@@ -242,7 +242,6 @@ export default function Page() {
                 setSelectedElement={setSelectedElement}
                 handleDeleteElement={handleDeleteElement}
                 chartRef={chartRef}
-                currentQuery={graph.CurrentQuery}
             />
             <div className="h-1 grow p-12">
                 <GraphView

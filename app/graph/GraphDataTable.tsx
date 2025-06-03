@@ -1,7 +1,7 @@
 /* eslint-disable no-param-reassign */
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Check, Pencil, Plus, Trash2, X } from "lucide-react"
-import { prepareArg, securedFetch } from "@/lib/utils"
+import { cn, prepareArg, securedFetch } from "@/lib/utils"
 import { toast } from "@/components/ui/use-toast"
 import { MutableRefObject, useContext, useEffect, useState } from "react"
 import { useSession } from "next-auth/react"
@@ -20,9 +20,10 @@ interface Props {
     type: boolean
     onDeleteElement: () => Promise<void>
     lastObjId: MutableRefObject<number | undefined>
+    className?: string
 }
 
-export default function GraphDataTable({ graph, object, type, onDeleteElement, lastObjId }: Props) {
+export default function GraphDataTable({ graph, object, type, onDeleteElement, lastObjId, className }: Props) {
     const [hover, setHover] = useState<string>("")
     const [editable, setEditable] = useState<string>("")
     const [isAddValue, setIsAddValue] = useState<boolean>(false)
@@ -178,7 +179,7 @@ export default function GraphDataTable({ graph, object, type, onDeleteElement, l
     }
 
     return (
-        <>
+        <div className={cn("flex flex-col bg-background rounded-lg overflow-hidden", className)}>
             <Table parentClassName="grow">
                 <TableHeader>
                     <TableRow>
@@ -374,6 +375,10 @@ export default function GraphDataTable({ graph, object, type, onDeleteElement, l
                     />
                 }
             </div>
-        </>
+        </div>
     )
+}
+
+GraphDataTable.defaultProps = {
+    className: undefined
 }

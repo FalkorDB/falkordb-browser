@@ -236,6 +236,12 @@ function GraphView({
             </TabsContent>
             <TabsContent value="Metadata" className="h-full w-full mt-0 overflow-hidden">
                 <MetadataView
+                    setQuery={({ profile }) => {
+                        graph.CurrentQuery = {
+                            ...graph.CurrentQuery,
+                            profile: profile || []
+                        }
+                    }}
                     graphName={graph.Id}
                     query={graph.CurrentQuery}
                     fetchCount={fetchCount}

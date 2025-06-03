@@ -1,3 +1,5 @@
+/* eslint-disable no-param-reassign */
+
 'use client'
 
 import { useEffect, useState, useContext, Dispatch, SetStateAction, useRef, useCallback } from "react";
@@ -13,7 +15,7 @@ import { IndicatorContext } from "../components/provider";
 import EditorComponent, { setTheme } from "../components/EditorComponent";
 import DialogComponent from "../components/DialogComponent";
 import Toolbar from "./toolbar";
-import { Node, Link, Graph, Query, HistoryQuery } from "../api/graph/model";
+import { Node, Link, Graph, HistoryQuery } from "../api/graph/model";
 import { Explain, Metadata, Profile } from "./MetadataView";
 import PaginationList from "../components/PaginationList";
 import SelectGraph from "./selectGraph";
@@ -34,12 +36,11 @@ interface Props {
     chartRef: GraphRef
     setIsAddEntity?: Dispatch<SetStateAction<boolean>>
     setIsAddRelation?: Dispatch<SetStateAction<boolean>>
-    currentQuery?: Query
 }
 
 const STEP = 8
 
-export default function Selector({ graph, options, setOptions, graphName, setGraphName, runQuery, historyQuery, setHistoryQuery, fetchCount, selectedElements, setSelectedElement, handleDeleteElement, chartRef, setIsAddEntity, setIsAddRelation, currentQuery }: Props) {
+export default function Selector({ graph, options, setOptions, graphName, setGraphName, runQuery, historyQuery, setHistoryQuery, fetchCount, selectedElements, setSelectedElement, handleDeleteElement, chartRef, setIsAddEntity, setIsAddRelation }: Props) {
 
     const { indicator, setIndicator } = useContext(IndicatorContext)
 
@@ -53,8 +54,8 @@ export default function Selector({ graph, options, setOptions, graphName, setGra
     const [maximize, setMaximize] = useState(false)
     const [tab, setTab] = useState("")
 
+    const currentQuery = (historyQuery?.currentQuery === historyQuery?.query && historyQuery?.counter === 0 && graph.CurrentQuery) || historyQuery?.queries.find(q => q.text === historyQuery?.query)
     const type = runQuery && historyQuery && setHistoryQuery ? "Graph" : "Schema"
-
 
     useEffect(() => {
         if (!currentQuery) {
@@ -62,8 +63,7 @@ export default function Selector({ graph, options, setOptions, graphName, setGra
         } else if (!historyQuery?.query) {
             setTab("profile")
         }
-    }, [currentQuery, historyQuery?.query])
-
+    }, [historyQuery?.query, currentQuery, setTab])
 
     const handleOnChange = useCallback((name: string) => {
         const formattedName = name === '""' ? "" : name
@@ -283,13 +283,35 @@ export default function Selector({ graph, options, setOptions, graphName, setGra
                                                 />
                                             </TabsContent>
                                             <TabsContent className="w-full h-1 grow bg-background rounded-lg p-8" value="profile">
-                                                <Profile graphName={graphName} query={currentQuery!} fetchCount={fetchCount} />
+                                                <div className="h-full w-full overflow-hidden flex flex-col">
+                                                    <Profile
+                                                        graphName={graphName}
+                                                        query={currentQuery!}
+                                                        setQuery={({ profile, text }) => {
+                                                            const newQueries = historyQuery!.queries.map(q => q.text === text ? { ...q, profile } : q)
+                                                            localStorage.setItem("query history", JSON.stringify(newQueries))
+                                                            setHistoryQuery(prev => ({
+                                                                ...prev,
+                                                                queries: newQueries,
+                                                            }))
+                                                        }}
+                                                        fetchCount={fetchCount}
+                                                    />
+                                                </div>
                                             </TabsContent>
                                             <TabsContent className="w-full h-1 grow bg-background rounded-lg p-8" value="metadata">
-                                                <Metadata query={currentQuery!} />
+                                                <div className="h-full w-full overflow-hidden flex flex-col">
+                                                    <Metadata
+                                                        query={currentQuery!}
+                                                    />
+                                                </div>
                                             </TabsContent>
                                             <TabsContent className="w-full h-1 grow bg-background rounded-lg p-8" value="explain">
-                                                <Explain query={currentQuery!} />
+                                                <div className="h-full w-full overflow-hidden flex flex-col">
+                                                    <Explain
+                                                        query={currentQuery!}
+                                                    />
+                                                </div>
                                             </TabsContent>
                                         </Tabs>
                                     </div>
@@ -329,5 +351,4 @@ Selector.defaultProps = {
     setHistoryQuery: undefined,
     setIsAddEntity: undefined,
     setIsAddRelation: undefined,
-    currentQuery: undefined
 }
