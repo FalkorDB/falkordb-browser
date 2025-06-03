@@ -150,26 +150,18 @@ export function createNestedObject(arr: string[]): object {
   return { [first]: createNestedObject(rest) };
 }
 
-export function getMainReturnLimit(query: string): number {
+export function getMainReturnLimit(query: string) {
   const match = query.match(/.*\bRETURN\b.*?(?:\bLIMIT\b\s*(\d+))?(?:\s*;?\s*$|\s*$)/i);
-  return match && match[1] ? parseInt(match[1], 10) : -1;
-}
-
-export function removeMainReturnLimit(query: string) {
-  return query.replace(/(\bRETURN\b\s+[^;]*?)\bLIMIT\b\s+\d+\s*$/i, '$1').trim();
+  return match && match[1];
 }
 
 export function getQueryWithLimit(query: string, limit: number) {
   if (limit === 0) return query
 
-  const mainReturnLimit = getMainReturnLimit(query)
+  const hasMainReturnLimit = getMainReturnLimit(query)
 
-  if (mainReturnLimit !== -1) {
-    if (mainReturnLimit > limit) {
-      return query
-    }
-
-    return `${removeMainReturnLimit(query)} LIMIT ${limit}`
+  if (hasMainReturnLimit) {
+    return query
   }
 
   return `${query} LIMIT ${limit}`
