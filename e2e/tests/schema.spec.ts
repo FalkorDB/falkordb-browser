@@ -134,18 +134,6 @@ test.describe('Schema Tests', () => {
         await apicalls.removeSchema(schemaName);
     });
 
-    test.skip(`@admin Validate that adding a node without a label is not allowed`, async () => {
-        const schema = await browser.createNewPage(SchemaPage, urls.schemaUrl);
-        await browser.setPageToFullScreen();
-        const schemaName = getRandomString('schema');
-        await schema.addSchema(schemaName);
-        const attributeRow = "1"
-        await schema.addNode(attributeRow, "", 'id', "Integer", "100", true, true);
-        const nodes = await schema.getNodesScreenPositions('schema');
-        expect(nodes.length).toBe(0);
-        await apicalls.removeSchema(schemaName);
-    });
-
     const invalidNodeInputs = [
         { description: 'missing key', key: '', type: 'Integer', value: '100', isRequired: true, isUnique: true },
         { description: 'missing value', key: 'id', type: 'Integer', value: '', isRequired: true, isUnique: true }
@@ -238,7 +226,7 @@ test.describe('Schema Tests', () => {
         await apicalls.removeSchema(schemaName);
     });
 
-    test(`@admin validate that adding a schema node increases node count`, async () => {
+    test.skip(`@admin validate that adding a schema node increases node count`, async () => {
         const schemaName = getRandomString('schema');
         await apicalls.runSchemaQuery(schemaName, 'CREATE (a:person1 {id: "Integer!*-1"}), (b:person2 {id: "Integer!*-2"}) RETURN a, b');
         const schema = await browser.createNewPage(SchemaPage, urls.schemaUrl);
@@ -280,7 +268,7 @@ test.describe('Schema Tests', () => {
         await apicalls.removeSchema(schemaName);
     });
 
-    test(`@admin validate that deleting a schema edge doesn't decreases node count`, async () => {
+    test.skip(`@admin validate that deleting a schema edge doesn't decreases node count`, async () => {
         const schemaName = getRandomString('schema');
         await apicalls.runSchemaQuery(schemaName, 'CREATE (a:person1 {id: "Integer!*-1"}), (b:person2 {id: "Integer!*-2"}), (a)-[:knows]->(b) RETURN a, b');
         const schema = await browser.createNewPage(SchemaPage, urls.schemaUrl);

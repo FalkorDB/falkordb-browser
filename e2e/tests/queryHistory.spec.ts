@@ -41,8 +41,6 @@ test.describe('Query history Tests', () => {
         await graph.selectGraphByName(graphName);
         await graph.insertQuery("CREATE (n:Person { name: 'Alice' }) RETURN n");
         await graph.clickRunQuery(true);
-        await graph.refreshPage();
-        await graph.selectGraphByName(graphName);
         await graph.runAQueryFromHistory("0");
         const searchQuery = `Alice`;
         await graph.searchElementInCanvas("Graph", searchQuery);

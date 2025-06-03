@@ -94,6 +94,7 @@ export default class SchemaPage extends GraphPage {
     }
 
     async getContentDataPanelAttributesCount(): Promise<number> {
+        await this.page.waitForTimeout(500); // wait for the data panel to load
         const content = await interactWhenVisible(this.dataPanelAttributesCount, (el) => el.textContent(), "Data Panel Attributes Count");
         return parseInt(content ?? "0")
     }
@@ -231,7 +232,6 @@ export default class SchemaPage extends GraphPage {
         await this.clickSelectItem("0"); // selecting the first item in list after search
     }
 
-
     async addSchema(schemaName: string): Promise<void> {
         await this.clickCreateSchema();
         await this.fillCreateSchemaInput(schemaName);
@@ -284,6 +284,7 @@ export default class SchemaPage extends GraphPage {
         await this.addLabelToNode(label);
         await this.addAttribute(attributeRow, key, type, description, unique, required);
         await this.clickCreateNewNodeButton();
+        await this.waitForPageIdle();
     }
 
     async searchElementInCanvasSelectFirst(name: string): Promise<void> {
@@ -295,6 +296,7 @@ export default class SchemaPage extends GraphPage {
         await this.clickDeleteElementSchema();
         await this.clickConfirmDeleteElementSchema();
         await this.isVisibleToast();
+        await this.waitForPageIdle();
     }
 
     async selectTwoNodesForEdge(node1x: number, node1y: number, node2x: number, node2y: number): Promise<void> {
@@ -310,6 +312,7 @@ export default class SchemaPage extends GraphPage {
         await this.addAttribute(attributeRow, key, type, description, unique, required);
         const check = await this.selectTwoNodesForEdge(node1x, node1y, node2x, node2y);
         await this.clickCreateNewNodeButton();
+        await this.waitForPageIdle();
     }
 
     async exportSchema(schemaName: string): Promise<void> { // must check if its working
@@ -347,6 +350,8 @@ export default class SchemaPage extends GraphPage {
         await this.hoverTableRowInDataPanel(attributeRow);
         await this.clickRemoveAttributeButton();
         await this.clickConfirmRemoveAttributeButton();
+        await this.isVisibleToast();
+        await this.waitForPageIdle();
     }
 
 }

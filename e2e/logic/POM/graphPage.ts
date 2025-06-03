@@ -260,6 +260,7 @@ export default class GraphPage extends Page {
     }
 
     async isVisibleLabelsButtonByName(tab: "Graph" | "Schema", label: "RelationshipTypes" | "Labels", name: string): Promise<boolean> {
+        await this.page.waitForTimeout(500); // wait for the labels to be populated
         const isVisible = await waitForElementToBeVisible(this.labelsButtonByName(tab, label, name));
         return isVisible;
     }
@@ -285,10 +286,12 @@ export default class GraphPage extends Page {
     }
 
     async getNodesCount(): Promise<string | null> {
+        await this.page.waitForTimeout(500); // wait for the nodes count to be updated
         return await interactWhenVisible(this.nodesCount(), (el) => el.textContent(), "Nodes Count");
     }
 
     async getEdgesCount(): Promise<string | null> {
+        await this.page.waitForTimeout(500); // wait for the edges count to be updated
         return await interactWhenVisible(this.edgesCount(), (el) => el.textContent(), "Edges Count");
     }
 
