@@ -147,15 +147,14 @@ export default function GraphDataPanel({ object, setObject, onDeleteElement, set
                             <RemoveLabel onRemoveLabel={handleRemoveLabel} selectedLabel={selectedLabel} />
                         </div>
                     </div>
-                    <div className="w-[60%] bg-background rounded-lg flex flex-col gap-4">
-                        <GraphDataTable
-                            graph={graph}
-                            object={object}
-                            type={type}
-                            onDeleteElement={onDeleteElement}
-                            lastObjId={lastObjId}
-                        />
-                    </div>
+                    <GraphDataTable
+                        className="h-full w-[60%]"
+                        graph={graph}
+                        object={object}
+                        type={type}
+                        onDeleteElement={onDeleteElement}
+                        lastObjId={lastObjId}
+                    />
                 </div>
             </DialogContent>
         </Dialog>
@@ -227,15 +226,14 @@ export default function GraphDataPanel({ object, setObject, onDeleteElement, set
                     </li>
                 </ul>
             </div>
-            <div className="h-1 grow flex flex-col bg-background rounded-lg">
-                <GraphDataTable
-                    lastObjId={lastObjId}
-                    graph={graph}
-                    object={object}
-                    type={type}
-                    onDeleteElement={onDeleteElement}
-                />
-            </div>
+            <GraphDataTable
+                className="h-1 grow w-full"
+                lastObjId={lastObjId}
+                graph={graph}
+                object={object}
+                type={type}
+                onDeleteElement={onDeleteElement}
+            />
         </div >
     )
 }
