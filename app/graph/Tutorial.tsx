@@ -6,6 +6,7 @@ import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import { useSession } from "next-auth/react";
 import CreateGraph from "../components/CreateGraph";
 import { GraphNameContext, GraphNamesContext } from "../components/provider";
+import Button from "../components/ui/Button";
 
 export default function Tutorial() {
 
@@ -55,6 +56,14 @@ export default function Tutorial() {
                                 {
                                     session?.user?.role !== "Read-Only" &&
                                     <CreateGraph
+                                        trigger={
+                                            <Button
+                                                data-testid="createGraphTutorial"
+                                                variant="Primary"
+                                            >
+                                                Create new graph
+                                            </Button> 
+                                        }
                                         label="Tutorial"
                                         graphNames={graphNames}
                                         onSetGraphName={handleSetGraphName}
