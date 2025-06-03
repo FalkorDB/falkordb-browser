@@ -15,7 +15,9 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     try {
         const query = "MATCH (n) OPTIONAL MATCH (n)-[e]->() WITH count(n) as nodes, count(e) as edges RETURN nodes, edges"
 
-        const result = await fetch(`${request.nextUrl.origin}/api/graph/${schemaName}/?query=${encodeURIComponent(query)}`, {
+        // Use relative URL to prevent SSRF vulnerability
+        const baseUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000'
+        const result = await fetch(`${baseUrl}/api/graph/${schemaName}/?query=${encodeURIComponent(query)}`, {
             method: "GET",
             headers: {
                 cookie: request.headers.get('cookie') || '',
