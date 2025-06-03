@@ -53,7 +53,7 @@ export default function PaginationList<T extends Item>({ list, step, onClick, da
         <div className={cn("w-full flex flex-col gap-4 p-6", className)}>
             <div className="flex gap-2 items-center">
                 <Input
-                    data-testid="queryHistorySearch"
+                    data-testid={`search${label.charAt(0).toUpperCase() + label.slice(1)}`}
                     className="w-full bg-foreground text-white"
                     value={search}
                     placeholder={`Search for a ${label}`}
@@ -68,7 +68,7 @@ export default function PaginationList<T extends Item>({ list, step, onClick, da
                 </div>
             }
             <ul
-                data-testid={dataTestId}
+                data-testid="queryList"
                 className="h-1 grow flex flex-col p-2"
             >
                 {

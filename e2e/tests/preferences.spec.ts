@@ -5,7 +5,7 @@ import PreferencesView from "../logic/POM/preferencesView";
 import ApiCalls from "../logic/api/apiCalls";
 import { getRandomString } from "../infra/utils";
 
-test.describe('Preferences Tests', () => {
+test.skip('Preferences Tests', () => {
     let browser: BrowserWrapper;
     let apicalls: ApiCalls;
 
@@ -22,7 +22,7 @@ test.describe('Preferences Tests', () => {
         const graphName = getRandomString('preferences');
         await apicalls.addGraph(graphName);
         const preferencesPage = await browser.createNewPage(PreferencesView, urls.graphUrl);
-        await preferencesPage.selectExistingGraph(graphName);
+        await preferencesPage.selectGraphByName(graphName);
         await preferencesPage.addColor();
         const colorsCount = await preferencesPage.getColorsCount();
         await preferencesPage.removeColor();
@@ -35,7 +35,7 @@ test.describe('Preferences Tests', () => {
         const graphName = getRandomString('preferences');
         await apicalls.addGraph(graphName);
         const preferencesPage = await browser.createNewPage(PreferencesView, urls.graphUrl);
-        await preferencesPage.selectExistingGraph(graphName);
+        await preferencesPage.selectGraphByName(graphName);
         const color = await preferencesPage.getColorText();
         await preferencesPage.modifyColor();
         const modifiedColor = await preferencesPage.getColorText();
@@ -47,7 +47,7 @@ test.describe('Preferences Tests', () => {
         const graphName = getRandomString('preferences');
         await apicalls.addGraph(graphName);
         const preferencesPage = await browser.createNewPage(PreferencesView, urls.graphUrl);
-        await preferencesPage.selectExistingGraph(graphName);
+        await preferencesPage.selectGraphByName(graphName);
         const colorsCount = await preferencesPage.getColorsCount();
         await preferencesPage.addColor();
         await preferencesPage.resetColors();

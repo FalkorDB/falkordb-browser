@@ -59,6 +59,7 @@ export default function DuplicateGraph({ open, onOpenChange, selectedValue, onDu
                 label="Duplicate"
                 title={`Create a copy of the selected ${type}`}
                 disabled={disabled}
+                data-testid="duplicateGraph"
             />}
             className="w-[25%]"
             title={`Duplicate this ${type}`}

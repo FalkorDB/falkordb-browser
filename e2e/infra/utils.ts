@@ -16,10 +16,10 @@ export function delay(ms: number) {
     return new Promise(resolve => { setTimeout(resolve, ms) });
 }
 
-export const waitForElementToBeVisible = async (locator: Locator, time = 500, retry = 10): Promise<boolean> => {
+export const waitForElementToBeVisible = async (locator: Locator, time = 1000, retry = 5): Promise<boolean> => {
     for (let i = 0; i < retry; i += 1) {
         try {
-            if (await locator.count() > 0 && await locator.isVisible()) {
+            if (await locator.isVisible()) {
                 return true;
             }
         } catch (error) {
@@ -30,10 +30,10 @@ export const waitForElementToBeVisible = async (locator: Locator, time = 500, re
     return false;
 };
 
-export const waitForElementToNotBeVisible = async (locator: Locator, time = 500, retry = 10): Promise<boolean> => {
+export const waitForElementToNotBeVisible = async (locator: Locator, time = 1000, retry = 5): Promise<boolean> => {
     for (let i = 0; i < retry; i += 1) {
         try {
-            if (await locator.count() > 0 && !await locator.isVisible()) {
+            if (!await locator.isVisible()) {
                 return true;
             }
         } catch (error) {

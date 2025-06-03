@@ -214,6 +214,7 @@ export default function SchemaCreateElement({ onCreate, setIsAdd, selectedNodes,
               <Button
                 title="Remove"
                 onClick={() => handleRemoveLabel(l)}
+                data-testid={`removeLabelButton${l}`}
               >
                 <X size={15} />
               </Button>
@@ -228,6 +229,7 @@ export default function SchemaCreateElement({ onCreate, setIsAdd, selectedNodes,
                 label="Add"
                 title="Add a new label"
                 onClick={() => setIsAddLabel(true)}
+                data-testid="addNewLabelButton"
               >
                 <Pencil size={15} />
               </Button>
@@ -240,6 +242,7 @@ export default function SchemaCreateElement({ onCreate, setIsAdd, selectedNodes,
                   className="max-w-[20dvw] h-full bg-background border-none text-white"
                   value={newLabel}
                   onChange={(e) => setNewLabel(e.target.value)}
+                  data-testid="newLabelInput"
                   onKeyDown={(e) => {
 
                     if (e.key === "Escape") {
@@ -260,6 +263,7 @@ export default function SchemaCreateElement({ onCreate, setIsAdd, selectedNodes,
                   label="Save"
                   title="Save the new label"
                   onClick={() => handleAddLabel()}
+                  data-testid="saveNewLabelButton"
                 >
                   <Check size={15} />
                 </Button>
@@ -272,6 +276,7 @@ export default function SchemaCreateElement({ onCreate, setIsAdd, selectedNodes,
                     setIsAddLabel(false)
                     setNewLabel("")
                   }}
+                  data-testid="cancelNewLabelButton"
                 >
                   <X size={15} />
                 </Button>
@@ -279,10 +284,10 @@ export default function SchemaCreateElement({ onCreate, setIsAdd, selectedNodes,
             }
           </li>
         </ul>
-        <p className="font-medium text-xl">{attributes.length}&ensp;Attributes</p>
+        <p className="font-medium text-xl" data-testid="DataPanelAttributesCount">{attributes.length}&ensp;Attributes</p>
       </div>
       <div className="w-full h-1 grow flex flex-col justify-between items-start font-medium">
-        <Table>
+        <Table data-testid="attributesTable">
           <TableHeader>
             <TableRow>
               <TableHead key="Key">Key</TableHead>
@@ -294,7 +299,7 @@ export default function SchemaCreateElement({ onCreate, setIsAdd, selectedNodes,
               <TableHead key="buttons" />
             </TableRow>
           </TableHeader>
-          <TableBody>
+          <TableBody data-testid="attributesTableBody">
             {
               attributes.length > 0 &&
               attributes.map(([key, val]) => (
@@ -377,6 +382,7 @@ export default function SchemaCreateElement({ onCreate, setIsAdd, selectedNodes,
                               className="p-2 justify-center border border-foreground rounded-lg"
                               label="Save"
                               title="Save the attribute changes"
+                              data-testid="saveAttributeButton"
                               onClick={(e) => {
                                 e.stopPropagation()
                                 handleSetAttribute(true)
@@ -388,6 +394,7 @@ export default function SchemaCreateElement({ onCreate, setIsAdd, selectedNodes,
                               className="p-2 justify-center border border-foreground rounded-lg"
                               label="Cancel"
                               title="Discard the attribute changes"
+                              data-testid="cancelAttributeButton"
                               onClick={(e) => {
                                 e.stopPropagation()
                                 handleSetEditable()
@@ -499,6 +506,7 @@ export default function SchemaCreateElement({ onCreate, setIsAdd, selectedNodes,
                     className="p-2 justify-center border border-foreground rounded-lg"
                     label="Add"
                     title="Add a new attribute"
+                    data-testid="addAttributeButton"
                     onClick={(e) => {
                       e.stopPropagation()
                       handleAddAttribute()
@@ -510,6 +518,7 @@ export default function SchemaCreateElement({ onCreate, setIsAdd, selectedNodes,
                     className="p-2 justify-center border border-foreground rounded-lg"
                     label="Cancel"
                     title="Discard the new attribute"
+                    data-testid="cancelNewAttributeButton"
                     onClick={(e) => {
                       e.stopPropagation()
                       setNewAttribute(getDefaultAttribute())
@@ -582,12 +591,12 @@ export default function SchemaCreateElement({ onCreate, setIsAdd, selectedNodes,
         </Table>
         {
           !type &&
-          <div className="w-full flex flex-col gap-2">
-            <div className="w-full flex justify-between p-4 items-center">
+          <div className="w-full flex flex-col gap-2" id="relationSelection">
+            <div className="w-full flex justify-between p-4 items-center" data-testid="relationSelectionHeader">
               <div style={{ backgroundColor: selectedNodes[0]?.color }} className="flex h-16 w-16 rounded-full border-2 border-background justify-center items-center overflow-hidden">
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <p className="truncate">{selectedNodes[0]?.category}</p>
+                    <p className="truncate" data-testid="selectedNode1">{selectedNodes[0]?.category}</p>
                   </TooltipTrigger>
                   <TooltipContent>
                     <p>{selectedNodes[0]?.category}</p>
@@ -598,7 +607,7 @@ export default function SchemaCreateElement({ onCreate, setIsAdd, selectedNodes,
               <div style={{ backgroundColor: selectedNodes[1]?.color }} className="flex h-16 w-16 rounded-full border-2 border-background justify-center items-center overflow-hidden">
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <p className="truncate">{selectedNodes[1]?.category}</p>
+                    <p className="truncate" data-testid="selectedNode2">{selectedNodes[1]?.category}</p>
                   </TooltipTrigger>
                   <TooltipContent>
                     <p>{selectedNodes[1]?.category}</p>
@@ -611,6 +620,7 @@ export default function SchemaCreateElement({ onCreate, setIsAdd, selectedNodes,
                 className="flex-col-reverse"
                 label="Clear"
                 title="Clear selected nodes for relation"
+                data-testid="clearSelectedNodesButton"
                 onClick={() => setSelectedNodes([undefined, undefined])}
               >
                 <Trash2 size={40} />
@@ -619,6 +629,7 @@ export default function SchemaCreateElement({ onCreate, setIsAdd, selectedNodes,
                 className="flex-col-reverse"
                 label="Swap"
                 title="Swap the order of selected nodes"
+                data-testid="swapSelectedNodesButton"
                 onClick={() => setSelectedNodes(prev => [prev[1], prev[0]])}
               >
                 <ArrowRightLeft size={40} />
@@ -635,6 +646,7 @@ export default function SchemaCreateElement({ onCreate, setIsAdd, selectedNodes,
               indicator={indicator}
               label={`Create new ${type ? "node" : "edge"}`}
               title={`Add a new ${type ? "node" : "edge"} to the schema`}
+              data-testid="createElementButton"
               variant="Primary"
               onClick={(e) => {
                 e.preventDefault();

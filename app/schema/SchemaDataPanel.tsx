@@ -295,6 +295,7 @@ export default function SchemaDataPanel({ object, setObject, onDeleteElement, sc
                     className="absolute top-2 right-2"
                     title="Close"
                     onClick={() => setObject(undefined)}
+                    data-testid="closeDataPanelButton"
                 >
                     <X size={15} />
                 </Button>
@@ -308,7 +309,9 @@ export default function SchemaDataPanel({ object, setObject, onDeleteElement, sc
                                     indicator={indicator}
                                     title="Remove"
                                     onClick={() => handleRemoveLabel(l)}
+                                    data-testid={`removeLabelButton${l}`}
                                     isLoading={isRemoveLabelLoading}
+
                                 >
                                     <X size={15} />
                                 </Button>
@@ -323,6 +326,7 @@ export default function SchemaDataPanel({ object, setObject, onDeleteElement, sc
                                 variant="Secondary"
                                 label="Add"
                                 title="Add a new label"
+                                data-testid="addLabelButton"
                                 onClick={() => setLabelsEditable(true)}
                             >
                                 <Pencil size={15} />
@@ -336,6 +340,7 @@ export default function SchemaDataPanel({ object, setObject, onDeleteElement, sc
                                     className="max-w-[20dvw] h-full bg-background border-none text-white"
                                     value={newLabel}
                                     onChange={(e) => setNewLabel(e.target.value)}
+                                    data-testid="newLabelInput"
                                     onKeyDown={(e) => {
 
                                         if (e.key === "Escape") {
@@ -356,6 +361,7 @@ export default function SchemaDataPanel({ object, setObject, onDeleteElement, sc
                                     variant="Secondary"
                                     label="Save"
                                     title="Save the new label"
+                                    data-testid="saveLabelButton"
                                     onClick={() => handleAddLabel()}
                                     isLoading={isLabelLoading}
                                 >
@@ -368,6 +374,7 @@ export default function SchemaDataPanel({ object, setObject, onDeleteElement, sc
                                         variant="Secondary"
                                         label="Cancel"
                                         title="Discard the new label"
+                                        data-testid="cancelLabelButton"
                                         onClick={() => {
                                             setLabelsEditable(false)
                                             setNewLabel("")
@@ -380,7 +387,7 @@ export default function SchemaDataPanel({ object, setObject, onDeleteElement, sc
                         }
                     </li>
                 </ul>
-                <p className="font-medium text-xl">{attributes.length}&ensp;Attributes</p>
+                <p className="font-medium text-xl" data-testid="DataPanelAttributesCount">{attributes.length}&ensp;Attributes</p>
             </div>
             <Table parentClassName="grow">
                 <TableHeader>
@@ -399,7 +406,7 @@ export default function SchemaDataPanel({ object, setObject, onDeleteElement, sc
                         }
                     </TableRow>
                 </TableHeader>
-                <TableBody>
+                <TableBody data-testid="attributesTableBody">
                     {
                         attributes.length > 0 &&
                         attributes.map(([key, val]) => (
@@ -484,6 +491,7 @@ export default function SchemaDataPanel({ object, setObject, onDeleteElement, sc
                                                             variant="Secondary"
                                                             label="Save"
                                                             title="Save the attribute changes"
+                                                            data-testid="saveEditAttributeButton"
                                                             onClick={(e) => {
                                                                 e.stopPropagation()
                                                                 handleSetAttribute(true)
@@ -499,6 +507,7 @@ export default function SchemaDataPanel({ object, setObject, onDeleteElement, sc
                                                                 variant="Secondary"
                                                                 label="Cancel"
                                                                 title="Discard the attribute changes"
+                                                                data-testid="cancelEditAttributeButton"
                                                                 onClick={(e) => {
                                                                     e.stopPropagation()
                                                                     handleSetEditable()
@@ -520,6 +529,7 @@ export default function SchemaDataPanel({ object, setObject, onDeleteElement, sc
                                                                     variant="button"
                                                                     title="Delete Attribute"
                                                                     label="Delete"
+                                                                    data-testid="removeAttributeButton"
                                                                 >
                                                                     <Trash2 size={20} />
                                                                 </Button>
@@ -532,6 +542,7 @@ export default function SchemaDataPanel({ object, setObject, onDeleteElement, sc
                                                                     variant="Primary"
                                                                     label="Delete"
                                                                     title="Confirm the deletion of the attribute"
+                                                                    data-testid="confirmRemoveAttributeButton"
                                                                     onClick={(e) => {
                                                                         e.stopPropagation()
                                                                         handleRemoveAttribute(key)
@@ -553,6 +564,7 @@ export default function SchemaDataPanel({ object, setObject, onDeleteElement, sc
                                                             variant="Secondary"
                                                             label="Edit"
                                                             title="Modify this attribute"
+                                                            data-testid="editAttributeButton"
                                                             onClick={(e) => {
                                                                 e.stopPropagation()
                                                                 handleSetEditable([key, [...val]])
@@ -575,6 +587,7 @@ export default function SchemaDataPanel({ object, setObject, onDeleteElement, sc
                                 <Input
                                     className="w-full"
                                     onKeyDown={handleAddKeyDown}
+                                    data-testid="addAttributeKeyInput"
                                     onChange={(e) => setAttribute(prev => {
                                         const p: [string, string[]] = [...prev]
                                         p[0] = e.target.value
@@ -600,6 +613,7 @@ export default function SchemaDataPanel({ object, setObject, onDeleteElement, sc
                                 <Input
                                     className="w-full"
                                     onKeyDown={handleAddKeyDown}
+                                    data-testid="addAttributeValueInput"
                                     onChange={(e) => setAttribute(prev => {
                                         const p: [string, string[]] = [...prev]
                                         p[1][1] = e.target.value
@@ -643,6 +657,7 @@ export default function SchemaDataPanel({ object, setObject, onDeleteElement, sc
                                             handleAddAttribute()
                                         }}
                                         isLoading={isAddLoading}
+                                        data-testid="saveAddValueButton"
                                     >
                                         <Check size={20} />
                                     </Button>
@@ -656,6 +671,7 @@ export default function SchemaDataPanel({ object, setObject, onDeleteElement, sc
                                             handleSetEditable()
                                             setIsAddValue(false)
                                         }}
+                                        data-testid="cancelAddValueButton"
                                     >
                                         <X size={20} />
                                     </Button>
@@ -672,6 +688,7 @@ export default function SchemaDataPanel({ object, setObject, onDeleteElement, sc
                             variant="Primary"
                             label="Add Value"
                             title="Add a new attribute"
+                            data-testid="addValueButton"
                             onClick={() => setIsAddValue(true)}
                         >
                             <PlusCircle size={20} />

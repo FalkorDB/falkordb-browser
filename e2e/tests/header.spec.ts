@@ -1,11 +1,11 @@
 import { expect, test } from "@playwright/test";
 import urls from "../config/urls.json";
 import BrowserWrapper from "../infra/ui/browserWrapper";
-import NavBarComponent from "../logic/POM/navBarComponent";
+import NavBarComponent from "../logic/POM/headerComponent";
 
 const roles = [{ name: "admin" }, { name: "readwrite" }, { name: "readonly" }];
 
-test.describe(`Navbar tests`, () => {
+test.describe(`Header tests`, () => {
     let browser: BrowserWrapper;
 
     test.beforeEach(async () => {
@@ -25,7 +25,7 @@ test.describe(`Navbar tests`, () => {
 
 
     test(`@admin Verify clicking on Graphs button redirects to specified URL`, async () => {
-        const navBar = await browser.createNewPage(NavBarComponent, urls.graphUrl)
+        const navBar = await browser.createNewPage(NavBarComponent, urls.schemaUrl)
         await navBar.clickOnGraphsButton()
         const newUrl = navBar.getCurrentURL();
         expect(newUrl).toBe(urls.graphUrl)
