@@ -184,6 +184,10 @@ export class Graph {
         return this.currentQuery;
     }
 
+    set CurrentQuery(query: Query) {
+        this.currentQuery = query;
+    }
+
     get Categories(): Category<Node>[] {
         return this.categories;
     }
