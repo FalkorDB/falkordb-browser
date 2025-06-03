@@ -26,9 +26,9 @@ export default function Toolbar({
     setSelectedElement,
     handleDeleteElement,
     chartRef,
-    setIsAddEntity,
-    setIsAddRelation,
-    backgroundColor,
+    setIsAddEntity = undefined,
+    setIsAddRelation = undefined,
+    backgroundColor = undefined,
     label
 }: Props) {
 
@@ -42,6 +42,8 @@ export default function Toolbar({
 
 
     const handleOnChange = useCallback(async () => {
+        setSuggestionIndex(0)
+
         if (!searchElement) {
             setSuggestions([])
             return

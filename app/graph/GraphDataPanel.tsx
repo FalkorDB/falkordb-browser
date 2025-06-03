@@ -81,8 +81,7 @@ export default function GraphDataPanel({ object, setObject, onDeleteElement, set
         }, toast, setIndicator)
 
         if (result.ok) {
-            graph.addCategory(newLabel, node)
-            setCategories([...graph.Categories])
+            setCategories([...graph.addCategory(newLabel, node)])
             setLabel([...node.category])
             return true
         }

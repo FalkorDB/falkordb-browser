@@ -24,12 +24,15 @@ interface Props {
 }
 
 export default function Header({ onSetGraphName, graphNames }: Props) {
-    const router = useRouter()
-    const pathname = usePathname()
-    const type = pathname.includes("/schema") ? "Schema" : "Graph"
-    const { data: session } = useSession()
-    const showCreate = (pathname.includes("/graph") || pathname.includes("/schema")) && session?.user?.role !== "Read-Only"
+    
     const { indicator } = useContext(IndicatorContext)
+
+    const { data: session } = useSession()
+    const pathname = usePathname()
+    const router = useRouter()
+    
+    const type = pathname.includes("/schema") ? "Schema" : "Graph"
+    const showCreate = (pathname.includes("/graph") || pathname.includes("/schema")) && session?.user?.role && session.user.role !== "Read-Only"
 
     return (
         <div className="bg-background py-5 px-2 flex flex-col justify-between items-center">
@@ -92,22 +95,22 @@ export default function Header({ onSetGraphName, graphNames }: Props) {
                         <DropdownMenuContent side="right" className="bg-background w-full p-4 ml-4">
                             <DropdownMenuGroup className="h-full w-full flex flex-col gap-2 p-2">
                                 <DropdownMenuItem className="focus:bg-transparent">
-                                    <Link className="flex gap-2 items-center" href="https://docs.falkordb.com/" target="_blank" rel="noreferrer">
+                                    <a className="flex gap-2 items-center" href="https://docs.falkordb.com/" target="_blank" rel="noreferrer noreferrer">
                                         <span>
                                             Documentation
                                         </span>
                                         <ArrowUpRight size={15} />
-                                    </Link>
+                                    </a>
                                 </DropdownMenuItem>
                                 <DropdownMenuSeparator />
                                 <DropdownMenuItem className="focus:bg-transparent">
-                                    <Link className="flex gap-2 items-center" href="https://discord.com/invite/jyUgBweNQz" target="_blank" rel="noreferrer">
+                                    <a className="flex gap-2 items-center" href="https://discord.com/invite/jyUgBweNQz" target="_blank" rel="noreferrer noreferrer">
                                         <Image style={{ width: 'auto', height: '14px' }} src="/icons/discord.svg" alt="" width={0} height={0} />
                                         <span>
                                             Get Support
                                         </span>
                                         <ArrowUpRight size={15} />
-                                    </Link>
+                                    </a>
                                 </DropdownMenuItem>
                                 <DropdownMenuSeparator />
                                 <DropdownMenuItem className="focus:bg-transparent">

@@ -33,7 +33,7 @@ export default function DeleteGraph({
   const handleDelete = async (deleteGraphNames: string[]) => {
     setIsLoading(true)
     try {
-      const newNames = await Promise.all(deleteGraphNames
+      const [failedDeletedGraphs, successDeletedGraphs] = await Promise.all(deleteGraphNames
         .map(async (name) => {
           const result = await securedFetch(`api/${type === "Schema" ? "schema" : "graph"}/${prepareArg(name)}`, {
             method: "DELETE"
@@ -43,14 +43,13 @@ export default function DeleteGraph({
 
           return name
 
-        })).then(newGraphNames => newGraphNames.filter(n => n !== ""))
+        })).then(newGraphNames => [newGraphNames.filter(n => n !== ""), deleteGraphNames.filter(n => !newGraphNames.includes(n))])
 
-      const successDeletedGraphs = graphNames.filter(name => !newNames.includes(name))
-      const failedDeletedGraphs = newNames.filter(name => !graphNames.includes(name))
+      const newGraphNames = graphNames.filter(n => !failedDeletedGraphs.includes(n))
+      
+      setGraphNames(newGraphNames)
 
-      setGraphNames(newNames)
-
-      if (successDeletedGraphs.includes(selectedValue) && setSelectedValue) setSelectedValue(successDeletedGraphs.length > 0 ? newNames[successDeletedGraphs.length - 1] : "")
+      if (successDeletedGraphs.includes(selectedValue) && setSelectedValue) setSelectedValue(successDeletedGraphs.length > 0 ? newGraphNames[successDeletedGraphs.length - 1] : "")
 
       setOpen(false)
       setOpenMenage(false)
