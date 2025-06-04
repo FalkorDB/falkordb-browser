@@ -312,7 +312,7 @@ export default class GraphPage extends Page {
     async verifyGraphExists(graphName: string): Promise<boolean> {
         await this.clickSelect("Graph");
         await this.fillSearch(graphName);
-        await this.page.waitForTimeout(500); // wait for the search results to be populated
+        await this.page.waitForTimeout(1000); // wait for the search results to be populated
         const graphId = "0"; // always select the first result after search
         const isVisible = await this.isVisibleSelectItem(graphId);
         return isVisible;
@@ -321,6 +321,7 @@ export default class GraphPage extends Page {
     async addGraph(graphName: string): Promise<void> {
         await this.clickCreateGraph();
         await this.fillCreateGraphInput(graphName);
+        await this.page.waitForTimeout(500); // wait for the input to be filled
         await this.clickConfirmCreateGraph();
         await this.isVisibleToast();
     }
