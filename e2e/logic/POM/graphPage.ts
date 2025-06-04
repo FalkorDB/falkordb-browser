@@ -310,10 +310,10 @@ export default class GraphPage extends Page {
     }
 
     async verifyGraphExists(graphName: string): Promise<boolean> {
-        await this.page.waitForTimeout(500); // wait for the list to be populated
         await this.clickSelect("Graph");
         await this.fillSearch(graphName);
-        const graphId = "0"; // always select the first result
+        await this.page.waitForTimeout(500); // wait for the search results to be populated
+        const graphId = "0"; // always select the first result after search
         const isVisible = await this.isVisibleSelectItem(graphId);
         return isVisible;
     }

@@ -154,7 +154,7 @@ test.describe('Schema Tests', () => {
     });
 
     invalidNodeInputs.forEach(({ description, key, type, value, isRequired, isUnique }) => {
-        test(`@admin Validate relation attribute with invalid input doesn't update list: ${description}`, async () => {//f
+        test(`@admin Validate relation attribute with invalid input doesn't update list: ${description}`, async () => {
             const schemaName = getRandomString('schema');
             await apicalls.runSchemaQuery(schemaName, 'CREATE (a:person1 {id: "1"}), (b:person2 {id: "2"}) RETURN a, b');
             const schema = await browser.createNewPage(SchemaPage, urls.schemaUrl);
@@ -170,7 +170,7 @@ test.describe('Schema Tests', () => {
         });
     });
 
-    test(`@admin Validate that adding a relation without a label is not allowed`, async () => {//x
+    test(`@admin Validate that adding a relation without a label is not allowed`, async () => {
         const schemaName = getRandomString('schema');
         await apicalls.runSchemaQuery(schemaName, 'CREATE (a:person1 {id: "1"}), (b:person2 {id: "2"}) RETURN a, b');
         const schema = await browser.createNewPage(SchemaPage, urls.schemaUrl);
@@ -211,7 +211,7 @@ test.describe('Schema Tests', () => {
         await apicalls.removeSchema(schemaName);
     });
 
-    test(`@admin validate that deleting a schema node decreases node count`, async () => {//f
+    test(`@admin validate that deleting a schema node decreases node count`, async () => {
         const schemaName = getRandomString('schema');
         await apicalls.runSchemaQuery(schemaName, 'CREATE (a:person1 {id: "1"}), (b:person2 {id: "2"}) RETURN a, b');
         const schema = await browser.createNewPage(SchemaPage, urls.schemaUrl);
@@ -225,7 +225,7 @@ test.describe('Schema Tests', () => {
         await apicalls.removeSchema(schemaName);
     });
 
-    test(`@admin validate that adding a schema node increases node count`, async () => {//f
+    test(`@admin validate that adding a schema node increases node count`, async () => {
         const schemaName = getRandomString('schema');
         await apicalls.runSchemaQuery(schemaName, 'CREATE (a:person1 {id: "1"}), (b:person2 {id: "2"}) RETURN a, b');
         const schema = await browser.createNewPage(SchemaPage, urls.schemaUrl);
@@ -239,7 +239,7 @@ test.describe('Schema Tests', () => {
         await apicalls.removeSchema(schemaName);
     });
 
-    test(`@admin validate that adding a schema edge increases edge count`, async () => {//fixed
+    test(`@admin validate that adding a schema edge increases edge count`, async () => {
         const schemaName = getRandomString('schema');
         await apicalls.runSchemaQuery(schemaName, 'CREATE (a:person1 {id: "1"}), (b:person2 {id: "2"}) RETURN a, b');
         const schema = await browser.createNewPage(SchemaPage, urls.schemaUrl);
@@ -282,7 +282,7 @@ test.describe('Schema Tests', () => {
         await apicalls.removeSchema(schemaName);
     });
 
-    test(`@admin validate that deleting a schema node doesn't decreases edges count`, async () => {//f
+    test(`@admin validate that deleting a schema node doesn't decreases edges count`, async () => {
         const schemaName = getRandomString('schema');
         await apicalls.runSchemaQuery(schemaName, 'CREATE (a:person {id: "1"}), (b:person {id: "2"}), (c:person {id: "3"}), (a)-[:knows]->(b) RETURN a, b, c');
         const schema = await browser.createNewPage(SchemaPage, urls.schemaUrl);
@@ -296,7 +296,7 @@ test.describe('Schema Tests', () => {
         await apicalls.removeSchema(schemaName);
     });
 
-    test(`@admin validate that deleting a connected schema node decreases edges count`, async () => {//f
+    test(`@admin validate that deleting a connected schema node decreases edges count`, async () => {
         const schemaName = getRandomString('schema');
         await apicalls.runSchemaQuery(schemaName, 'CREATE (a:person1 {id: "1"}), (b:person2 {id: "2"}), (a)-[:knows]->(b) RETURN a, b');
         const schema = await browser.createNewPage(SchemaPage, urls.schemaUrl);
@@ -340,7 +340,7 @@ test.describe('Schema Tests', () => {
         await apicalls.removeSchema(schemaName);
     });
 
-    test(`@admin validate adding attribute value to existing node updates attributes count`, async () => {//f
+    test(`@admin validate adding attribute value to existing node updates attributes count`, async () => {
         const schemaName = getRandomString('schema');
         await apicalls.addSchema(schemaName);
         await apicalls.runSchemaQuery(schemaName, 'CREATE (a:person1 {id: "1"}) RETURN a');
