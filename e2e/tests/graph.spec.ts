@@ -46,8 +46,9 @@ test.describe('Graph Tests', () => {
         const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
         const graphName = getRandomString('graph');
         await graph.addGraph(graphName);
-        await apiCall.removeGraph(graphName);
         await graph.refreshPage();
+        await apiCall.removeGraph(graphName);
+        await new Promise(resolve => setTimeout(resolve, 1000));
         expect(await graph.verifyGraphExists(graphName)).toBe(false);
     });
 
@@ -295,7 +296,7 @@ test.describe('Graph Tests', () => {
         await browser.setPageToFullScreen();
         await graph.selectGraphByName(graphName);
         await graph.insertQuery(CREATE_QUERY);
-        await graph.clickRunQuery(true);
+        await graph.clickRunQuery();
         const count = await apiCall.getGraphCount(graphName);
         const edgesCount = count.result.data[0].edges;
         const nodesCount = count.result.data[0].nodes;
