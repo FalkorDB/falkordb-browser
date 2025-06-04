@@ -4,7 +4,6 @@
 
 import { EdgeDataDefinition, NodeDataDefinition } from 'cytoscape';
 import { LinkObject, NodeObject } from 'react-force-graph-2d';
-import { Dispatch, SetStateAction } from 'react';
 
 export type HistoryQuery = {
     queries: Query[]
@@ -543,7 +542,7 @@ export class Graph {
         })
     }
 
-    public removeLinks(setter: Dispatch<SetStateAction<Category<Link>[]>>, ids: number[] = []) {
+    public removeLinks(ids: number[] = []): Category<Link>[] {
         const elements = this.elements.links.filter(link => ids.includes(link.source.id) || ids.includes(link.target.id))
 
         this.elements = {
@@ -561,7 +560,6 @@ export class Graph {
                     if (category.elements.length === 0) {
                         this.labels.splice(this.labels.findIndex(c => c.name === category.name), 1)
                         this.labelsMap.delete(category.name)
-                        setter(this.labels)
                     }
                 }
 
@@ -570,6 +568,8 @@ export class Graph {
                 return undefined
             }).filter(link => link !== undefined)
         }
+
+        return this.labels
     }
 
     public getCategoryColorValue(index: number) {
@@ -617,9 +617,12 @@ export class Graph {
             }
         })
 
+        const nodes = elements.filter((n): n is Node => !("source" in n))
+        const links = elements.filter((l): l is Link => "source" in l)
+
         this.elements = {
-            nodes: this.elements.nodes.filter(node => !elements.filter(e => !e.source).some(element => element.id === node.id)),
-            links: this.elements.links.filter(link => !elements.filter(e => e.source).some(element => element.id === link.id))
+            nodes: this.elements.nodes.filter(node => !nodes.some(n => n.id === node.id)),
+            links: this.elements.links.filter(link => !links.some(l => l.id === link.id))
         }
 
         this.data = this.data.map(row => {
@@ -669,7 +672,7 @@ export class Graph {
         }
     }
 
-    public addCategory(label: string, selectedElement: Node, updateData = true) {
+    public addCategory(label: string, selectedElement: Node, updateData = true): Category<Node>[] {
         const [category] = this.createCategory([label], selectedElement)
 
         if (updateData) {
@@ -699,7 +702,10 @@ export class Graph {
                 }
             }
         }
+
         selectedElement.category.push(label)
+
+        return this.categories
     }
 
     public removeProperty(key: string, id: number, type: boolean) {

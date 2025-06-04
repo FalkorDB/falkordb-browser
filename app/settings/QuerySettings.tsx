@@ -1,7 +1,6 @@
 import { useContext } from "react"
 import { Info, Minus, Plus } from "lucide-react"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
-import Link from "next/link"
 import { cn } from "@/lib/utils"
 import Input from "../components/ui/Input"
 import { LimitContext, TimeoutContext } from "../components/provider"
@@ -23,9 +22,9 @@ export default function QuerySettings() {
                             </TooltipTrigger>
                             <TooltipContent className="flex flex-col gap-2 items-center">
                                 <p>Shows a `Timed Out` error if the query takes longer than the timeout in seconds.</p>
-                                <Link className="underline underline-offset-2" href="https://docs.falkordb.com/configuration.html#query-configurations" target="_blank">
+                                <a className="underline underline-offset-2" href="https://docs.falkordb.com/configuration.html#query-configurations" target="_blank" rel="noreferrer noreferrer">
                                     Learn more
-                                </Link>
+                                </a>
                             </TooltipContent>
                         </Tooltip>
                     </div>
@@ -79,9 +78,9 @@ export default function QuerySettings() {
                             </TooltipTrigger>
                             <TooltipContent className="flex flex-col gap-2 items-center">
                                 <p>Limits the number of rows returned by the query.</p>
-                                <Link className="underline underline-offset-2" href="https://docs.falkordb.com/cypher/limit.html" target="_blank">
+                                <a className="underline underline-offset-2" href="https://docs.falkordb.com/cypher/limit.html" target="_blank" rel="noreferrer noreferrer">
                                     Learn more
-                                </Link>
+                                </a>
                             </TooltipContent>
                         </Tooltip>
                     </div>
