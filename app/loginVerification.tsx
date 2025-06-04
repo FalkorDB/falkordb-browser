@@ -17,7 +17,7 @@ export default function LoginVerification({ children }: { children: React.ReactN
 
     useEffect(() => {
         setTimeout(parseInt(localStorage.getItem("timeout") || "0", 10))
-        setLimit(parseInt(localStorage.getItem("limit") || "0", 10))
+        setLimit(parseInt(localStorage.getItem("limit") || "300", 10))
     }, [])
 
     useEffect(() => {
