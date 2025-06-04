@@ -35,7 +35,7 @@ export default function SchemaDataPanel({ object, setObject, onDeleteElement, sc
 
     const { data: session } = useSession()
     const { toast } = useToast()
-    
+
     const [attribute, setAttribute] = useState<[string, string[]]>(getDefaultAttribute())
     const [isRemoveLabelLoading, setIsRemoveLabelLoading] = useState<boolean>(false)
     const [attributes, setAttributes] = useState<[string, string[]][]>([])
@@ -257,8 +257,7 @@ export default function SchemaDataPanel({ object, setObject, onDeleteElement, sc
             }, toast)
 
             if (result.ok) {
-                schema.addCategory(newLabel, node, false)
-                setCategories([...schema.Categories])
+                setCategories([...schema.addCategory(newLabel, node, false)])
                 setLabel([...node.category])
                 setNewLabel("")
                 setLabelsEditable(false)

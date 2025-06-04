@@ -162,7 +162,7 @@ export default function ForceGraph({
 
         deleteNeighbors(expandedNodes)
 
-        graph.removeLinks(setLabels, nodes.map(n => n.id))
+        setLabels(graph.removeLinks(nodes.map(n => n.id)))
     }
 
     const handleNodeClick = async (node: Node) => {

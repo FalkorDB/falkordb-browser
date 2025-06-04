@@ -214,7 +214,7 @@ export default function Page() {
         setSelectedElements([])
         setSelectedElement(undefined)
 
-        graph.removeLinks(setLabels, selectedElements.map((element) => element.id))
+        setLabels(graph.removeLinks(selectedElements.map((element) => element.id)))
 
         setData({ ...graph.Elements })
         toast({

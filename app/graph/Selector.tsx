@@ -60,10 +60,14 @@ export default function Selector({ graph, options, setOptions, graphName, setGra
     useEffect(() => {
         if (!currentQuery) {
             setTab("query")
-        } else if (!historyQuery?.query) {
+        } else if (currentQuery.profile) {
             setTab("profile")
+        } else if (currentQuery.metadata) {
+            setTab("metadata")
+        } else if (currentQuery.explain) {
+            setTab("explain")
         }
-    }, [historyQuery?.query, currentQuery, setTab])
+    }, [currentQuery, setTab])
 
     const handleOnChange = useCallback((name: string) => {
         const formattedName = name === '""' ? "" : name

@@ -147,7 +147,7 @@ export default function Page() {
             }
         }))
 
-        schema.removeLinks(setLabels, selectedElements.map((element) => element.id))
+        setLabels(schema.removeLinks(selectedElements.map((element) => element.id)))
 
         if (fetchCount) fetchCount()
 
