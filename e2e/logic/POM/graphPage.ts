@@ -262,6 +262,11 @@ export default class GraphPage extends Page {
         const isVisible = await waitForElementToBeVisible(this.labelsButtonByName(tab, label, name));
         return isVisible;
     }
+
+    async getLabelsButtonByNameContent(tab: "Graph" | "Schema", label: "RelationshipTypes" | "Labels", name: string): Promise<string | null> {
+        const content = await interactWhenVisible(this.labelsButtonByName(tab, label, name), (el) => el.textContent(), ``);
+        return content;
+    }
     
     async isVisibleEditButton(): Promise<boolean> {
         const isVisible = await waitForElementToBeVisible(this.editButton("Graph"));

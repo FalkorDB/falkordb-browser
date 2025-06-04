@@ -60,7 +60,8 @@ test.describe('Schema Tests', () => {
         await schema.addSchema(schemaName);
         const attributeRow = "1"
         await schema.addNode(attributeRow, "person", 'id', "Integer", "100", true, true);
-        expect(await schema.isVisibleLabelsButtonByName("Schema", "Labels", "person")).toBeTruthy();
+        const labelContent = await schema.getLabelsButtonByNameContent("Schema", "Labels", "person");
+        expect(labelContent).toBe("person");
         await apicalls.removeSchema(schemaName);
     });
     
@@ -72,8 +73,9 @@ test.describe('Schema Tests', () => {
         await schema.selectSchemaByName(schemaName);
         const nodes = await schema.getNodesScreenPositions('schema');
         const attributeRow = "1"
-        await schema.addEdge(attributeRow, "knows", 'id', "Integer", "100", true, true, nodes[0].screenX, nodes[0].screenY, nodes[1].screenX, nodes[1].screenY);
-        expect(await schema.isVisibleLabelsButtonByName("Schema", "RelationshipTypes", "knows")).toBeTruthy();
+        await schema.addEdge(attributeRow, "knows", 'id', "Integer", "100", true, true, nodes[1].screenX, nodes[1].screenY, nodes[1].screenX, nodes[1].screenY);
+        const labelContent = await schema.getLabelsButtonByNameContent("Schema", "RelationshipTypes", "knows");        
+        expect(labelContent).toBe("knows");
         await apicalls.removeSchema(schemaName);
     });
 

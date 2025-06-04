@@ -296,10 +296,11 @@ test.describe('Graph Tests', () => {
         await graph.selectGraphByName(graphName);
         await graph.insertQuery(CREATE_QUERY);
         await graph.clickRunQuery(true);
-        await graph.waitForPageIdle();
         const count = await apiCall.getGraphCount(graphName);
-        expect(count.result.data[0].edges).toBe(1);
-        expect(count.result.data[0].nodes).toBe(2);
+        const edgesCount = count.result.data[0].edges;
+        const nodesCount = count.result.data[0].nodes;
+        expect(edgesCount).toBe(1);
+        expect(nodesCount).toBe(2);
         await apiCall.removeGraph(graphName);
     });
 
