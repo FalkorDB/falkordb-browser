@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable no-await-in-loop */
 import { Download, Locator } from "@playwright/test";
-import { waitForElementToBeVisible, waitForElementToBeEnabled, waitForElementToNotBeVisible, interactWhenVisible } from "@/e2e/infra/utils";
+import { waitForElementToBeVisible, waitForElementToBeEnabled, waitForElementToNotBeVisible, interactWhenVisible, delay, pollForElementContent } from "@/e2e/infra/utils";
 import Page from "./page";
 
 export default class GraphPage extends Page {
@@ -250,7 +250,6 @@ export default class GraphPage extends Page {
     }
 
     async isVisibleSelectItem(name: string): Promise<boolean> {
-        await this.page.waitForTimeout(500); // wait for the list to be populated
         const isVisible = await waitForElementToBeVisible(this.selectItemBySearch("Graph", name));
         return isVisible;
     }
@@ -260,7 +259,6 @@ export default class GraphPage extends Page {
     }
 
     async isVisibleLabelsButtonByName(tab: "Graph" | "Schema", label: "RelationshipTypes" | "Labels", name: string): Promise<boolean> {
-        await this.page.waitForTimeout(500); // wait for the labels to be populated
         const isVisible = await waitForElementToBeVisible(this.labelsButtonByName(tab, label, name));
         return isVisible;
     }
@@ -286,13 +284,11 @@ export default class GraphPage extends Page {
     }
 
     async getNodesCount(): Promise<string | null> {
-        await this.page.waitForTimeout(1000); // wait for the nodes count to be updated
-        return await interactWhenVisible(this.nodesCount(), (el) => el.textContent(), "Nodes Count");
+        return await pollForElementContent(this.nodesCount(), "Nodes Count");
     }
 
     async getEdgesCount(): Promise<string | null> {
-        await this.page.waitForTimeout(1000); // wait for the edges count to be updated
-        return await interactWhenVisible(this.edgesCount(), (el) => el.textContent(), "Edges Count");
+        return await pollForElementContent(this.edgesCount(), "Edges Count");
     }
 
     async searchElementInCanvas(type: "Graph" | "Schema", name: string): Promise<void> {
@@ -384,7 +380,7 @@ export default class GraphPage extends Page {
     async selectGraphByName(graphName: string): Promise<void> {
         await this.clickSelect("Graph");
         await this.fillSearch(graphName);
-        await this.isVisibleSelectItem(graphName);
+        await this.page.waitForTimeout(500); // wait for the search results to be populated
         await this.clickSelectItem("0"); // selecting the first item in list after search
     }
 

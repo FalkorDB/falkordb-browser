@@ -1,4 +1,4 @@
-import { interactWhenVisible, waitForElementToNotBeVisible } from "@/e2e/infra/utils";
+import { interactWhenVisible, waitForElementToNotBeVisible, waitForElementToBeVisible, delay, pollForElementContent } from "@/e2e/infra/utils";
 import GraphPage from "./graphPage";
 import { Locator } from "playwright";
 
@@ -83,6 +83,10 @@ export default class SchemaPage extends GraphPage {
         return this.page.getByTestId(`editAttributeButton`);
     }
 
+    private elementCanvasSuggestionsListSchemaFirstSuggestion(): Locator {
+        return this.page.getByTestId(`elementCanvasSuggestionsListSchema`).locator("button");
+    }
+
     async clickRemoveAttributeButton(): Promise<void> {
         await interactWhenVisible(this.removeAttributeButton(), (el) => el.click(), "Click Remove Attribute Button");
     }
@@ -92,9 +96,8 @@ export default class SchemaPage extends GraphPage {
     }
 
     async getContentDataPanelAttributesCount(): Promise<number> {
-        await this.page.waitForTimeout(1000); // wait for the data panel to load
-        const content = await interactWhenVisible(this.dataPanelAttributesCount, (el) => el.textContent(), "Data Panel Attributes Count");
-        return parseInt(content ?? "0")
+        const content = await pollForElementContent(this.dataPanelAttributesCount, "Data Panel Attributes Count");
+        return parseInt(content ?? "0");
     }
 
     async getDataPanelNodeSelection(nodeId: string): Promise<string | null> {
@@ -205,6 +208,10 @@ export default class SchemaPage extends GraphPage {
         await interactWhenVisible(this.confirmRemoveAttributeButton(), (el) => el.click(), "Click Confirm Remove Attribute Button");
     }
 
+    async clickFirstElementSuggestionInSearch(): Promise<void> {
+        await interactWhenVisible(this.elementCanvasSuggestionsListSchemaFirstSuggestion(), (el) => el.click(), `Click First Element Suggestion in Search`);
+    }
+
     async modifySchemaName(oldName: string, newName: string): Promise<void> {
         await this.clickSelect("Schema");
         await this.clickManage();
@@ -212,7 +219,8 @@ export default class SchemaPage extends GraphPage {
         await this.clickEditButton();
         await this.fillInput("Schema", newName);
         await this.clickSaveButton("Schema");
-        await waitForElementToNotBeVisible(this.saveButton("Schema"));
+        await this.waitForPageIdle();
+        // await waitForElementToNotBeVisible(this.saveButton("Schema"));
     }
 
     async verifySchemaExists(schemaName: string): Promise<boolean> {
@@ -226,8 +234,9 @@ export default class SchemaPage extends GraphPage {
     async selectSchemaByName(schemaName: string): Promise<void> {
         await this.clickSelect("Schema");
         await this.fillSearch(schemaName);
-        await this.isVisibleSelectItem(schemaName);
+        await this.page.waitForTimeout(1000); // wait for the search results to load
         await this.clickSelectItem("0"); // selecting the first item in list after search
+        await this.waitForCanvasAnimationToEnd();
     }
 
     async addSchema(schemaName: string): Promise<void> {
@@ -288,7 +297,9 @@ export default class SchemaPage extends GraphPage {
 
     async searchElementInCanvasSelectFirst(name: string): Promise<void> {
         await this.fillElementCanvasSearch("Schema", name);
-        await this.clickElementCanvasSuggestionByName("Schema", "0"); // always select the first result
+        // Use first() to handle multiple elements with same test ID
+        await this.clickFirstElementSuggestionInSearch();
+        // await this.page.getByTestId(`elementCanvasSuggestionSchema0`).first().click();
     }
 
     async deleteSchemaElement(): Promise<void> {
@@ -310,7 +321,7 @@ export default class SchemaPage extends GraphPage {
         await this.clickElementCanvasAddEdge();
         await this.addLabelToNode(label);
         await this.addAttribute(attributeRow, key, type, description, unique, required);
-        const check = await this.selectTwoNodesForEdge(node1x, node1y, node2x, node2y);
+        await this.selectTwoNodesForEdge(node1x, node1y, node2x, node2y);
         await this.clickCreateNewNodeButton();
         await this.waitForPageIdle();
         await this.page.waitForTimeout(1500); // wait for the edge to be created
@@ -323,20 +334,9 @@ export default class SchemaPage extends GraphPage {
         await this.isVisibleToast();
     }
 
-    async swapNodesInAddEdgeDataPanel(node1: string, node2: string): Promise<void> {
-        // click add element button
-        // click add edge button from dropdown
-         // must make two clicks one for first node and one for second node
-         // then click swap nodes button
+    // async swapNodesInAddEdgeDataPanel(node1: string, node2: string): Promise<void> {}
 
-    }
-
-    async clearNodesInAddEdgeDataPanel(): Promise<void> {
-        //click add element button
-        // click add edge button from dropdown
-        // must make two clicks one for first node and one for second node
-        // then click clear nodes button
-    }
+    // async clearNodesInAddEdgeDataPanel(): Promise<void> {}
 
     async modifyAttributeValueByRow(attributeRow: string, type: string, description: string, unique: boolean, required: boolean): Promise<void> {
         await this.hoverTableRowInDataPanel(attributeRow);
