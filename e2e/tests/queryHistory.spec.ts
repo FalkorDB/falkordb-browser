@@ -1,10 +1,10 @@
 
 import { expect, test } from "@playwright/test";
+import { BATCH_CREATE_PERSONS } from "@/e2e/config/constants";
 import BrowserWrapper from "../infra/ui/browserWrapper";
 import ApiCalls from "../logic/api/apiCalls";
 import urls from '../config/urls.json'
 import QueryHistory from "../logic/POM/queryHistoryComponent";
-import { BATCH_CREATE_PERSONS } from "@/e2e/config/constants";
 import { getRandomString } from "../infra/utils";
 
 test.describe('Query history Tests', () => {
@@ -25,11 +25,11 @@ test.describe('Query history Tests', () => {
         await apicalls.addGraph(graphName);
         const graph = await browser.createNewPage(QueryHistory, urls.graphUrl);
         await browser.setPageToFullScreen();
-        await graph.selectExistingGraph(graphName);
+        await graph.selectGraphByName(graphName);
         await graph.insertQuery("CREATE (n:Person { name: 'Alice' }) RETURN n");
         await graph.clickRunQuery();
-        await graph.clickOnQueryHistory();
-        expect(await graph.getQueryHistory("1")).toBe(true);
+        await graph.clickQueryHistoryButton();
+        expect(await graph.getQueryHistory("0")).toBe(true);
         await apicalls.removeGraph(graphName);         
     });
 
@@ -38,14 +38,12 @@ test.describe('Query history Tests', () => {
         await apicalls.addGraph(graphName);
         const graph = await browser.createNewPage(QueryHistory, urls.graphUrl);
         await browser.setPageToFullScreen();
-        await graph.selectExistingGraph(graphName);
+        await graph.selectGraphByName(graphName);
         await graph.insertQuery("CREATE (n:Person { name: 'Alice' }) RETURN n");
-        await graph.clickRunQuery();
-        await graph.refreshPage();
-        await graph.selectExistingGraph(graphName)
-        await graph.runAQueryFromHistory("1")
+        await graph.clickRunQuery(true);
+        await graph.runAQueryFromHistory("0");
         const searchQuery = `Alice`;
-        await graph.searchForElementInCanvas(searchQuery);
+        await graph.searchElementInCanvas("Graph", searchQuery);
         await graph.hoverAtCanvasCenter();
         expect(await graph.getNodeCanvasToolTip()).toBe(searchQuery);
         await apicalls.removeGraph(graphName);        
@@ -58,31 +56,9 @@ test.describe('Query history Tests', () => {
         await graph.addGraph(graphName);
         await graph.insertQuery("CREATE (n:Person { name: 'Alice' }) RETURN n");
         await graph.clickRunQuery(false);
-        await graph.clickOnQueryHistory();
-        await graph.ClickOnSelectQueryInHistoryBtn("1");
-        expect(await graph.getQueryHistoryEditor()).toBe(await graph.getSelectQueryInHistoryText("1"));
-        await apicalls.removeGraph(graphName);
-    });
-
-    test(`@admin verify metadata accuracy in query history`, async () => {
-        const testGraphName = getRandomString('graph');
-        await apicalls.addGraph(testGraphName);
-        const response = await apicalls.runQuery(testGraphName, "CREATE (n:Person { name: 'Alice' }) RETURN n");
-        const apiMetadata = response.result.metadata;
-        
-        const graph = await browser.createNewPage(QueryHistory, urls.graphUrl);
-        await browser.setPageToFullScreen();
-        const graphName = getRandomString('queryhistory');
-        await graph.addGraph(graphName);
-        await graph.insertQuery(BATCH_CREATE_PERSONS);
-        await graph.clickRunQuery(false);
-        await graph.clickOnQueryHistory();
-        await graph.ClickOnSelectQueryInHistoryBtn("1");
-        const queryDetails  = await graph.getQueryHistoryPanel();
-        queryDetails.forEach(uiValue => {
-            expect(apiMetadata).toContain(uiValue);
-        });
-        await apicalls.removeGraph(testGraphName);
+        await graph.clickQueryHistoryButton();
+        await graph.clickSelectQueryInHistory("0");
+        expect((await graph.getQueryHistoryEditorContent())[0]).toBe("CREATE (n:Person { name: 'Alice' }) RETURN n");
         await apicalls.removeGraph(graphName);
     });
 

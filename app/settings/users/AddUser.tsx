@@ -98,9 +98,10 @@ export default function AddUser({ onAddUser }: {
         },
         {
             value: role,
-            onSelectedValue: (value) => setRole(value),
+            onChange: (value) => setRole(value),
             label: "Role",
             type: "select",
+            selectType: "Role",
             options: ["Admin", "Read-Write", "Read-Only"],
             required: true,
             errors: [
@@ -128,6 +129,7 @@ export default function AddUser({ onAddUser }: {
                 <Button
                     variant="Primary"
                     label="Add User"
+                    id="add-user"
                     title="Add a new user to the system"
                 >
                     <PlusCircle size={20} />

@@ -9,27 +9,41 @@ import { MutableRefObject } from "react"
 import { ForceGraphMethods } from "react-force-graph-2d"
 import { Node, Link, DataCell } from "@/app/api/graph/model"
 
+export const screenSize = {
+  sm: 640,
+  md: 768,
+  lg: 1024,
+  xl: 1280,
+  '2xl': 1536
+}
+
 export type GraphRef = MutableRefObject<ForceGraphMethods<Node, Link> | undefined>
 
-export interface HistoryQuery {
-  queries: Query[]
-  query: string
-  currentQuery: string
-  counter: number
+export type SelectCell = {
+  value: string,
+  type: "select",
+  options: string[],
+  selectType: "Role"
+  onChange: (value: string) => Promise<boolean>,
 }
 
-export interface Query {
-  text: string
-  metadata: string[]
-  explain: string[]
-}
-
-export type Cell = {
+export type ObjectCell = {
   value: DataCell,
-  onChange?: (value: string) => Promise<boolean>,
-  type?: string
-  comboboxType?: string
+  type: "object",
 }
+
+export type TextCell = {
+  value: string,
+  type: "text",
+  onChange: (value: string) => Promise<boolean>,
+}
+
+export type ReadOnlyCell = {
+  value: string,
+  type: "readonly",
+}
+
+export type Cell = SelectCell | TextCell | ObjectCell | ReadOnlyCell
 export interface Row {
   cells: Cell[]
   checked?: boolean
@@ -115,7 +129,7 @@ export function rgbToHSL(hex: string): string {
   return `hsl(${hDeg}, ${sPct}%, ${lPct}%)`;
 }
 
-export function handleZoomToFit(chartRef?: GraphRef, filter?: (node: Node) => boolean) {
+export function handleZoomToFit(chartRef?: GraphRef, filter?: (node: Node) => boolean, paddingMultiplier = 1) {
   const chart = chartRef?.current
   if (chart) {
     // Get canvas dimensions
@@ -125,7 +139,7 @@ export function handleZoomToFit(chartRef?: GraphRef, filter?: (node: Node) => bo
     // Calculate padding as 10% of the smallest canvas dimension, with minimum of 40px
     const minDimension = Math.min(canvas.width, canvas.height);
     const padding = minDimension * 0.1
-    chart.zoomToFit(1000, padding, filter)
+    chart.zoomToFit(1000, padding * paddingMultiplier, filter)
   }
 }
 
@@ -136,26 +150,18 @@ export function createNestedObject(arr: string[]): object {
   return { [first]: createNestedObject(rest) };
 }
 
-export function getMainReturnLimit(query: string): number {
+export function getMainReturnLimit(query: string) {
   const match = query.match(/.*\bRETURN\b.*?(?:\bLIMIT\b\s*(\d+))?(?:\s*;?\s*$|\s*$)/i);
-  return match && match[1] ? parseInt(match[1], 10) : -1;
-}
-
-export function removeMainReturnLimit(query: string) {
-  return query.replace(/(\bRETURN\b\s+[^;]*?)\bLIMIT\b\s+\d+\s*$/i, '$1').trim();
+  return match && match[1];
 }
 
 export function getQueryWithLimit(query: string, limit: number) {
   if (limit === 0) return query
 
-  const mainReturnLimit = getMainReturnLimit(query)
+  const hasMainReturnLimit = getMainReturnLimit(query)
 
-  if (mainReturnLimit !== -1) {
-    if (mainReturnLimit > limit) {
-      return query
-    }
-
-    return `${removeMainReturnLimit(query)} LIMIT ${limit}`
+  if (hasMainReturnLimit) {
+    return query
   }
 
   return `${query} LIMIT ${limit}`

@@ -4,16 +4,14 @@ import { NextRequest, NextResponse } from "next/server"
 // eslint-disable-next-line import/prefer-default-export
 export async function GET(request: NextRequest, { params }: { params: Promise<{ graph: string }> }) {
     const session = await getClient()
+
     if (session instanceof NextResponse) {
         return session
     }
 
-    const { client } = session
-
+    const { client, user } = session
     const { graph: graphId } = await params
-
     const type = request.nextUrl.searchParams.get("type") as "(function)" | "(property key)" | "(label)" | "(relationship type)" | undefined
-
 
     try {
 
@@ -34,7 +32,9 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
         const graph = client.selectGraph(graphId)
 
-        const result = await graph.query(getQuery())
+        const result = user.role === "Read-Only"
+            ? await graph.roQuery(getQuery())
+            : await graph.query(getQuery())
 
         return NextResponse.json({ result }, { status: 200 })
     } catch (error) {

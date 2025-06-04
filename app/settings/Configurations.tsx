@@ -198,24 +198,28 @@ export default function Configurations() {
 
         const { configs: configurations } = await result.json();
 
-        const newConfigs = configurations.map((config: [string, string | number]) => {
+        const newConfigs: Row[] = configurations.map((config: [string, string | number]) => {
             const [name, value] = config;
             const formattedValue = name === "CMD_INFO"
                 ? (value === 0 ? "no" : "yes")
-                : value;
+                : value as string;
 
             const description = Configs.get(name)?.description ?? "";
 
             return {
                 cells: [
-                    { value: name },
-                    { value: description },
-                    {
-                        value: formattedValue,
-                        onChange: !disableRunTimeConfigs.has(name)
-                            ? (val: string) => handleSetConfig(name, val, true)
-                            : undefined
-                    }
+                    { value: name, type: "readonly" },
+                    { value: description, type: "readonly" },
+                    !disableRunTimeConfigs.has(name)
+                        ? {
+                            value: formattedValue,
+                            onChange: (val: string) => handleSetConfig(name, val, true),
+                            type: "text",
+                        }
+                        : {
+                            value: formattedValue,
+                            type: "readonly"
+                        }
                 ]
             }
         });
@@ -229,6 +233,8 @@ export default function Configurations() {
 
     return (
         <TableComponent
+            label="Configs"
+            entityName="Config"
             headers={["Name", "Description", "Value"]}
             rows={configs}
         />

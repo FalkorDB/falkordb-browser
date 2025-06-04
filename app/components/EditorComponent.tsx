@@ -3,24 +3,50 @@
 
 "use client";
 
-import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { Editor, Monaco } from "@monaco-editor/react"
-import { SetStateAction, Dispatch, useEffect, useRef, useState, useContext } from "react"
+import { SetStateAction, Dispatch, useEffect, useRef, useState, useContext, useMemo } from "react"
 import * as monaco from "monaco-editor";
-import { Info, Maximize2, Minimize2 } from "lucide-react";
+import { Minimize2, X } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
-import { HistoryQuery, prepareArg, securedFetch } from "@/lib/utils";
+import { cn, prepareArg, securedFetch } from "@/lib/utils";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
-import { Graph } from "../api/graph/model";
 import Button from "./ui/Button";
 import CloseDialog from "./CloseDialog";
 import { IndicatorContext } from "./provider";
+import { Graph, HistoryQuery } from "../api/graph/model";
+
+export const setTheme = (monacoI: Monaco, themeName: string, backgroundColor: string) => {
+    monacoI.editor.defineTheme(themeName, {
+        base: 'vs-dark',
+        inherit: true,
+        rules: [
+            { token: 'keyword', foreground: '#99E4E5' },
+            { token: 'function', foreground: '#DCDCAA' },
+            { token: 'type', foreground: '#89D86D' },
+            { token: 'string', foreground: '#CE9178' },
+            { token: 'number', foreground: '#b5cea8' },
+        ],
+        colors: {
+            'editor.background': backgroundColor,
+            'editor.foreground': '#ffffff',
+            'editorSuggestWidget.background': '#272745',
+            'editorSuggestWidget.foreground': '#FFFFFF',
+            'editorSuggestWidget.selectedBackground': '#57577B',
+            'editorSuggestWidget.hoverBackground': '#28283F',
+            'focusBorder': '#00000000',
+        },
+    });
+
+    monacoI.editor.setTheme(themeName)
+}
 
 interface Props {
+    graph: Graph
     historyQuery: HistoryQuery
     maximize: boolean
-    runQuery: (query: string, timeout?: number) => Promise<boolean>
-    graph: Graph
+    setMaximize: Dispatch<SetStateAction<boolean>>
+    runQuery: (query: string) => Promise<void>
     setHistoryQuery: Dispatch<SetStateAction<HistoryQuery>>
 }
 
@@ -40,16 +66,21 @@ const monacoOptions: monaco.editor.IStandaloneEditorConstructionOptions = {
     links: false,
     minimap: { enabled: false },
     automaticLayout: true,
-    fontSize: 26,
-    fontWeight: "200",
+    fontSize: 30,
+    fontWeight: "400",
     wordWrap: "off",
-    lineHeight: 37,
+    lineHeight: 36,
     lineNumbersMinChars: 2,
     overviewRulerLanes: 0,
     overviewRulerBorder: false,
     hideCursorInOverviewRuler: true,
     scrollBeyondLastColumn: 0,
     scrollBeyondLastLine: false,
+    overflowWidgetsDomNode: undefined,
+    scrollbar: {
+        vertical: 'hidden',
+        horizontal: 'hidden'
+    },
 };
 
 const KEYWORDS = [
@@ -187,24 +218,34 @@ const SUGGESTIONS: monaco.languages.CompletionItem[] = [
 ]
 
 const MAX_HEIGHT = 20
-const LINE_HEIGHT = 38
+const LINE_HEIGHT = 36
 
 const PLACEHOLDER = "Type your query here to start"
 
-export default function EditorComponent({ historyQuery, maximize, runQuery, graph, setHistoryQuery }: Props) {
+export default function EditorComponent({ graph, historyQuery, maximize, setMaximize, runQuery, setHistoryQuery }: Props) {
 
     const { indicator, setIndicator } = useContext(IndicatorContext)
-    const placeholderRef = useRef<HTMLDivElement>(null)
-    const [lineNumber, setLineNumber] = useState(1)
-    const graphIdRef = useRef(graph.Id)
-    const [blur, setBlur] = useState(false)
-    const [sugDisposed, setSugDisposed] = useState<monaco.IDisposable>()
-    const [isLoading, setIsLoading] = useState(false)
+
     const { toast } = useToast()
-    const submitQuery = useRef<HTMLButtonElement>(null)
+
     const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null)
+    const dialogEditorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null)
+    const placeholderRef = useRef<HTMLDivElement>(null)
+    const submitQuery = useRef<HTMLButtonElement>(null)
     const containerRef = useRef<HTMLDivElement>(null)
     const indicatorRef = useRef(indicator)
+    const graphIdRef = useRef(graph.Id)
+
+    const [monacoEditor, setMonacoEditor] = useState<Monaco | null>(null)
+    const [sugDisposed, setSugDisposed] = useState<monaco.IDisposable>()
+    const [isLoading, setIsLoading] = useState(false)
+    const [lineNumber, setLineNumber] = useState(1)
+    const [blur, setBlur] = useState(false)
+
+    const editorHeight = useMemo(() => blur
+        ? LINE_HEIGHT
+        : Math.min(lineNumber * LINE_HEIGHT, document.body.clientHeight / 100 * MAX_HEIGHT),
+        [blur, lineNumber])
 
     useEffect(() => {
         indicatorRef.current = indicator
@@ -252,30 +293,9 @@ export default function EditorComponent({ historyQuery, maximize, runQuery, grap
         }
     }, [containerRef.current])
 
-    const setTheme = (monacoI: Monaco) => {
-        monacoI.editor.defineTheme('custom-theme', {
-            base: 'vs-dark',
-            inherit: true,
-            rules: [
-                { token: 'keyword', foreground: '#99E4E5' },
-                { token: 'function', foreground: '#DCDCAA' },
-                { token: 'type', foreground: '#89D86D' },
-                { token: 'string', foreground: '#CE9178' },
-                { token: 'number', foreground: '#b5cea8' },
-            ],
-            colors: {
-                'editor.background': '#191919',
-                'editor.foreground': '#ffffff',
-                'editorSuggestWidget.background': '#272745',
-                'editorSuggestWidget.foreground': '#FFFFFF',
-                'editorSuggestWidget.selectedBackground': '#57577B',
-                'editorSuggestWidget.hoverBackground': '#28283F',
-                'focusBorder': '#00000000',
-            },
-        });
-
-        monacoI.editor.setTheme('custom-theme')
-    }
+    useEffect(() => {
+        setLineNumber(historyQuery.query.split("\n").length)
+    }, [historyQuery.query])
 
     const fetchSuggestions = async (detail: string): Promise<monaco.languages.CompletionItem[]> => {
         if (indicator === "offline") return []
@@ -382,16 +402,23 @@ export default function EditorComponent({ historyQuery, maximize, runQuery, grap
         return sug
     }
 
+    useEffect(() => {
+        if (monacoEditor) {
+            addSuggestions(monacoEditor)
+        }
+    }, [monacoEditor, graphIdRef.current])
+
     const handleSubmit = async () => {
         try {
             setIsLoading(true)
-            await runQuery(historyQuery.query)
+            await runQuery(historyQuery.query.trim())
         } finally {
             setIsLoading(false)
         }
     }
 
     const handleEditorWillMount = async (monacoI: Monaco) => {
+        setMonacoEditor(monacoI)
 
         monacoI.languages.register({ id: "custom-language" })
 
@@ -420,7 +447,7 @@ export default function EditorComponent({ historyQuery, maximize, runQuery, grap
             ignoreCase: true,
         })
 
-        setTheme(monacoI)
+        setTheme(monacoI, "editor-theme", "#191919")
 
         monacoI.languages.setLanguageConfiguration('custom-language', {
             brackets: [
@@ -444,6 +471,8 @@ export default function EditorComponent({ historyQuery, maximize, runQuery, grap
             ]
         });
 
+        addSuggestions(monacoI)
+
         const provider = monacoI.languages.registerCompletionItemProvider("custom-language", {
             provideCompletionItems: async (model, position) => {
                 const word = model.getWordUntilPosition(position)
@@ -458,8 +487,6 @@ export default function EditorComponent({ historyQuery, maximize, runQuery, grap
     }
 
     const handleEditorDidMount = (e: monaco.editor.IStandaloneCodeEditor) => {
-        editorRef.current = e
-
         const updatePlaceholderVisibility = () => {
             const hasContent = !!e.getValue();
             if (placeholderRef.current) {
@@ -482,14 +509,24 @@ export default function EditorComponent({ historyQuery, maximize, runQuery, grap
         updatePlaceholderVisibility();
 
         const isFirstLine = e.createContextKey<boolean>('isFirstLine', true);
+        const isLastLine = e.createContextKey<boolean>('isLastLine', true);
 
         // Update the context key value based on the cursor position
         e.onDidChangeCursorPosition(() => {
             const position = e.getPosition();
             if (position) {
                 isFirstLine.set(position.lineNumber === 1);
+                isLastLine.set(position.lineNumber === e.getModel()?.getLineCount());
             }
         });
+
+        e.addCommand(monaco.KeyCode.Escape, () => {
+            const domNode = e.getDomNode();
+            if (domNode) {
+                const textarea = domNode.querySelector('textarea');
+                if (textarea) (textarea as HTMLTextAreaElement).blur();
+            }
+        })
 
         // eslint-disable-next-line no-bitwise
         e.addCommand(monaco.KeyMod.Shift | monaco.KeyCode.Enter, () => {
@@ -527,10 +564,6 @@ export default function EditorComponent({ historyQuery, maximize, runQuery, grap
                     let counter;
                     if (prev.counter !== 1) {
                         counter = prev.counter ? prev.counter - 1 : prev.queries.length;
-                        // Run provideCompletion when counter changes from 0 to queries.length
-                        if (!prev.counter && counter === prev.queries.length) {
-                            e.trigger('keyboard', 'editor.action.triggerSuggest', {});
-                        }
                     } else {
                         counter = 1;
                     }
@@ -552,19 +585,22 @@ export default function EditorComponent({ historyQuery, maximize, runQuery, grap
             run: async () => {
                 setHistoryQuery(prev => {
                     if (prev.queries.length === 0) return prev
+
                     let counter
+
                     if (prev.counter) {
                         counter = prev.counter + 1 > prev.queries.length ? 0 : prev.counter + 1
                     } else {
                         counter = 0
                     }
+
                     return {
                         ...prev,
                         counter
                     }
                 })
             },
-            precondition: 'isFirstLine && !suggestWidgetVisible',
+            precondition: 'isLastLine && !suggestWidgetVisible',
         });
 
         // Override the default Ctrl + F keybinding
@@ -572,135 +608,149 @@ export default function EditorComponent({ historyQuery, maximize, runQuery, grap
         e.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyF, () => { });
     }
 
-    useEffect(() => {
-        setLineNumber(historyQuery.query.split("\n").length)
-    }, [historyQuery.query])
-
     return (
-        <div>
-            {
-                !maximize &&
-                <Dialog>
-                    <div className="w-full flex items-center gap-8">
-                        <p>Query</p>
-                        <div className="w-1 grow flex rounded-lg overflow-hidden">
-                            <div ref={containerRef} className="relative grow w-1" id="editor-container">
-                                <Editor
-                                    // eslint-disable-next-line no-nested-ternary
-                                    height={blur ? LINE_HEIGHT : lineNumber * LINE_HEIGHT > document.body.clientHeight / 100 * MAX_HEIGHT ? document.body.clientHeight / 100 * MAX_HEIGHT : lineNumber * LINE_HEIGHT}
-                                    language="custom-language"
-                                    options={{
-                                        ...monacoOptions,
-                                        lineNumbers: lineNumber > 1 ? "on" : "off",
-                                    }}
-                                    value={blur ? historyQuery.query.replace(/\s+/g, ' ').trim() : historyQuery.query}
-                                    onChange={(val) => {
-                                        if (!historyQuery.counter) {
-                                            setHistoryQuery(prev => ({
-                                                ...prev,
-                                                currentQuery: val || "",
-                                                query: val || "",
-                                            }))
-                                        } else {
-                                            setHistoryQuery(prev => ({
-                                                ...prev,
-                                                query: val || "",
-                                            }))
-                                        }
-                                    }}
-                                    theme="custom-theme"
-                                    beforeMount={handleEditorWillMount}
-                                    onMount={handleEditorDidMount}
-                                />
-                                <div className="h-full absolute top-0 px-2 right-0 flex gap-2 items-center justify-center pointer-events-none">
-                                    <DialogTrigger className="pointer-events-auto" asChild>
-                                        <Button
-                                            title="Maximize"
-                                        >
-                                            <Maximize2 size={20} />
-                                        </Button>
-                                    </DialogTrigger>
+        <div style={{ height: editorHeight + 18 }} className="absolute w-full flex items-start gap-8 border rounded-lg overflow-hidden bg-foreground p-2">
+            <div className="h-full w-1 grow flex rounded-lg overflow-hidden">
+                <div ref={containerRef} className="h-full relative grow w-1" data-testid="editorContainer">
+                    <Editor
+                        height={editorHeight}
+                        language="custom-language"
+                        options={{
+                            ...monacoOptions,
+                            lineNumbers: lineNumber > 1 ? "on" : "off",
+                        }}
+                        value={blur ? historyQuery.query.replace(/\s+/g, ' ').trim() : historyQuery.query}
+                        onChange={(val) => {
+                            if (!historyQuery.counter) {
+                                setHistoryQuery(prev => ({
+                                    ...prev,
+                                    currentQuery: val || "",
+                                    query: val || "",
+                                }))
+                            } else {
+                                setHistoryQuery(prev => ({
+                                    ...prev,
+                                    query: val || "",
+                                }))
+                            }
+                        }}
+                        theme="editor-theme"
+                        beforeMount={handleEditorWillMount}
+                        onMount={(e) => {
+                            handleEditorDidMount(e)
+                            editorRef.current = e
+                        }}
+                    />
+                    <span ref={placeholderRef} className="w-full top-0 left-0 absolute pointer-events-none text-3xl truncate">
+                        {PLACEHOLDER}
+                    </span>
+                </div>
+                <div style={{ height: LINE_HEIGHT }} className={cn("flex gap-2")}>
+                    {
+                        historyQuery.query &&
+                        <Button
+                            title="Clear"
+                            onClick={() => {
+                                setHistoryQuery(prev => ({
+                                    ...prev,
+                                    query: "",
+                                }))
+                                editorRef.current?.focus()
+                            }}
+                        >
+                            <X />
+                        </Button>
+                    }
+                    <Button
+                        data-testid="editorRun"
+                        ref={submitQuery}
+                        indicator={indicator}
+                        variant="Primary"
+                        label="RUN"
+                        title="Press Enter to run the query"
+                        onClick={handleSubmit}
+                        isLoading={isLoading}
+                    />
+                </div>
+            </div>
+            <Dialog open={maximize} onOpenChange={setMaximize}>
+                <DialogContent disableClose className="w-full h-full">
+                    <div className="relative w-full h-full">
+                        <VisuallyHidden>
+                            <DialogTitle />
+                            <DialogDescription />
+                        </VisuallyHidden>
+                        <div className="z-10 absolute right-0 top-0 bottom-0 py-4 px-8 flex flex-col items-end justify-between pointer-events-none">
+                            <CloseDialog
+                                className="pointer-events-auto"
+                            >
+                                <Minimize2 size={20} />
+                            </CloseDialog>
+                            <div className="flex gap-2 items-center pointer-events-auto">
+                                {
+                                    historyQuery.query &&
                                     <Button
-                                        className="pointer-events-auto"
-                                        title="Run (Enter) History (Arrow Up/Down) Insert new line (Shift + Enter)"
+                                        title="Clear"
+                                        onClick={() => {
+                                            setHistoryQuery(prev => ({
+                                                ...prev,
+                                                query: "",
+                                            }))
+                                            dialogEditorRef.current?.focus()
+                                        }}
                                     >
-                                        <Info />
-                        
+                                        <X />
                                     </Button>
-                                </div>
-                                <div ref={placeholderRef} className="absolute top-2 left-2 pointer-events-none">
-                                    {PLACEHOLDER}
-                                </div>
-                            </div>
-                            <Button
-                                ref={submitQuery}
-                                indicator={indicator}
-                                className="rounded-none py-2 px-8"
-                                variant="Primary"
-                                label="Run"
-                                title="Press Enter to run the query"
-                                onClick={handleSubmit}
-                                isLoading={isLoading}
-                            />
-                        </div>
-                        <DialogContent disableClose className="w-full h-full">
-                            <div className="relative w-full h-full">
-                                <VisuallyHidden>
-                                    <DialogTitle />
-                                    <DialogDescription />
-                                </VisuallyHidden>
-                                <div className="z-10 absolute right-0 top-0 bottom-0 py-4 px-8 flex flex-col items-end justify-between pointer-events-none">
-                                    <CloseDialog
-                                        className="pointer-events-auto"
-                                    >
-                                        <Minimize2 size={20} />
-                                    </CloseDialog>
-                                    <CloseDialog
-                                        className="pointer-events-auto py-2 px-8"
-                                        indicator={indicator}
-                                        variant="Primary"
-                                        label="Run"
-                                        title="Press Enter to run the query"
-                                        onClick={handleSubmit}
-                                        isLoading={isLoading}
-                                    />
-                                </div>
-                                <Editor
-                                    className="w-full h-full"
-                                    onMount={handleEditorDidMount}
-                                    theme="custom-theme"
-                                    options={{
-                                        padding: {
-                                            bottom: 10,
-                                            top: 10,
-                                        },
-                                        lineNumbersMinChars: 3,
-                                        minimap: { enabled: false },
-                                        lineHeight: 30,
-                                        fontSize: 25,
-                                    }}
-                                    value={(blur ? historyQuery.query.replace(/\s+/g, ' ').trim() : historyQuery.query)}
-                                    onChange={(val) => {
-                                        if (historyQuery.counter) {
-                                            setHistoryQuery(prev => ({
-                                                ...prev,
-                                                query: val || ""
-                                            }))
-                                        } else {
-                                            setHistoryQuery(prev => ({
-                                                ...prev,
-                                                query: val || "",
-                                                currentQuery: val || ""
-                                            }))
-                                        }
-                                    }}
-                                    language="custom-language"
+                                }
+                                <CloseDialog
+                                    data-testid="editorRun"
+                                    className="pointer-events-auto py-2 px-8"
+                                    indicator={indicator}
+                                    variant="Primary"
+                                    label="Run"
+                                    title="Press Enter to run the query"
+                                    onClick={handleSubmit}
+                                    isLoading={isLoading}
                                 />
                             </div>
-                        </DialogContent>
+                        </div>
+                        <Editor
+                            className="w-full h-full"
+                            onMount={(e) => {
+                                handleEditorDidMount(e)
+                                dialogEditorRef.current = e
+                            }}
+                            theme="editor-theme"
+                            options={{
+                                padding: {
+                                    bottom: 10,
+                                    top: 10,
+                                },
+                                lineNumbersMinChars: 3,
+                                minimap: { enabled: false },
+                                lineHeight: 30,
+                                fontSize: 25,
+                            }}
+                            value={(blur ? historyQuery.query.replace(/\s+/g, ' ').trim() : historyQuery.query)}
+                            onChange={(val) => {
+                                if (historyQuery.counter) {
+                                    setHistoryQuery(prev => ({
+                                        ...prev,
+                                        query: val || ""
+                                    }))
+                                } else {
+                                    setHistoryQuery(prev => ({
+                                        ...prev,
+                                        query: val || "",
+                                        currentQuery: val || ""
+                                    }))
+                                }
+                            }}
+                            language="custom-language"
+                        />
                     </div>
-                </Dialog>
-            }
-        </div >
+                </DialogContent>
+            </Dialog>
+        </div>
     )
 }

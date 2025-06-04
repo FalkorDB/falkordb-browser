@@ -4,7 +4,6 @@ import { useEffect, useState } from "react"
 import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
-import Header from "../components/Header"
 import Users from "./users/Users"
 import Configurations from "./Configurations"
 import Button from "../components/ui/Button"
@@ -15,6 +14,21 @@ export default function Settings() {
     const [current, setCurrent] = useState<'Query' | 'DB' | 'Users'>('Query')
     const router = useRouter()
     const { data: session } = useSession()
+
+    useEffect(() => {
+        const navigateBack = (e: KeyboardEvent) => {
+            if (e.key === "Escape") {
+                e.preventDefault()
+                router.back()
+            }
+        }
+
+        window.addEventListener("keydown", navigateBack)
+
+        return () => {
+            window.removeEventListener("keydown", navigateBack)
+        }
+    }, [router])
 
     useEffect(() => {
         if (session && session.user.role !== "Admin") router.back()
@@ -33,24 +47,23 @@ export default function Settings() {
 
     return (
         <div className="Page">
-            <Header />
-            <div className="grow flex flex-col items-center gap-8 p-32">
+            <div className="grow flex flex-col gap-8 p-16 items-center">
                 <h1 className="text-2xl font-medium px-6">Settings</h1>
-                <div className="w-fit bg-foreground flex gap-2 p-2 rounded-lg">
+                <div className="w-fit bg-background flex gap-2 p-2 rounded-lg">
                     <Button
-                        className={cn("p-2 rounded-lg", current === "Query" ? "bg-background" : "text-gray-500")}
+                        className={cn("p-2 rounded-lg", current === "Query" ? "bg-foreground" : "text-gray-500")}
                         label="Query Settings"
                         title="Manage query settings"
                         onClick={() => setCurrent("Query")}
                     />
                     <Button
-                        className={cn("p-2 rounded-lg", current === "DB" ? "bg-background" : "text-gray-500")}
+                        className={cn("p-2 rounded-lg", current === "DB" ? "bg-foreground" : "text-gray-500")}
                         label="DB Configuration"
                         title="Configure database settings"
                         onClick={() => setCurrent("DB")}
                     />
                     <Button
-                        className={cn("p-2 rounded-lg", current === "Users" ? "bg-background" : "text-gray-500")}
+                        className={cn("p-2 rounded-lg", current === "Users" ? "bg-foreground" : "text-gray-500")}
                         label="Users"
                         title="Manage users accounts"
                         onClick={() => setCurrent("Users")}

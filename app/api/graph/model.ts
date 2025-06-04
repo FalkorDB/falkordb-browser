@@ -5,7 +5,25 @@
 import { EdgeDataDefinition, NodeDataDefinition } from 'cytoscape';
 import { LinkObject, NodeObject } from 'react-force-graph-2d';
 
+export type HistoryQuery = {
+    queries: Query[]
+    query: string
+    currentQuery: string
+    counter: number
+}
+
+export type Query = {
+    text: string
+    metadata: string[]
+    explain: string[]
+    profile: string[]
+  }
+
 const getSchemaValue = (value: string): string[] => {
+    if (typeof value !== "string") {
+        return ["string", "", "false", "false"];
+    }
+    
     let unique, required, type, description
     if (value.includes("!")) {
         value = value.replace("!", "")
@@ -35,7 +53,6 @@ export type Node = NodeObject<{
     visible: boolean,
     expand: boolean,
     collapsed: boolean,
-    displayName: string,
     data: {
         [key: string]: any
     }
@@ -94,19 +111,20 @@ export const DEFAULT_COLORS = [
     "hsl(180, 66%, 70%)"
 ]
 
-export interface Category {
+export interface Category<T extends Node | Link> {
     index: number,
     name: string,
     show: boolean,
     textWidth?: number,
-    elements: (Node | Link)[]
+    elements: T[],
     textHeight?: number,
 }
 
 export interface ExtractedData {
     data: any[][],
     columns: string[],
-    categories: Map<string, Category>,
+    categories: Map<string, Category<Node>>,
+    labels: Map<string, Category<Link>>,
     nodes: Map<number, NodeDataDefinition>,
     edges: Map<number, EdgeDataDefinition>,
 }
@@ -120,17 +138,19 @@ export class Graph {
 
     private metadata: any[];
 
-    private categories: Category[];
+    private currentQuery: Query;
 
-    private labels: Category[];
+    private categories: Category<Node>[];
+
+    private labels: Category<Link>[];
 
     private elements: GraphData;
 
     private colorIndex: number = 0;
 
-    private categoriesMap: Map<string, Category>;
+    private categoriesMap: Map<string, Category<Node>>;
 
-    private labelsMap: Map<string, Category>;
+    private labelsMap: Map<string, Category<Link>>;
 
     private nodesMap: Map<number, Node>;
 
@@ -138,12 +158,13 @@ export class Graph {
 
     private COLORS_ORDER_VALUE: string[] = []
 
-    private constructor(id: string, categories: Category[], labels: Category[], elements: GraphData,
-        categoriesMap: Map<string, Category>, labelsMap: Map<string, Category>, nodesMap: Map<number, Node>, edgesMap: Map<number, Link>, colors?: string[]) {
+    private constructor(id: string, categories: Category<Node>[], labels: Category<Link>[], elements: GraphData,
+        categoriesMap: Map<string, Category<Node>>, labelsMap: Map<string, Category<Link>>, nodesMap: Map<number, Node>, edgesMap: Map<number, Link>, currentQuery?: Query, colors?: string[]) {
         this.id = id;
         this.columns = [];
         this.data = [];
         this.metadata = [];
+        this.currentQuery = currentQuery || { text: "", metadata: [], explain: [], profile: [] };
         this.categories = categories;
         this.labels = labels;
         this.elements = elements;
@@ -158,27 +179,35 @@ export class Graph {
         return this.id;
     }
 
-    get Categories(): Category[] {
+    get CurrentQuery(): Query {
+        return this.currentQuery;
+    }
+
+    set CurrentQuery(query: Query) {
+        this.currentQuery = query;
+    }
+
+    get Categories(): Category<Node>[] {
         return this.categories;
     }
 
-    set Categories(categories: Category[]) {
+    set Categories(categories: Category<Node>[]) {
         this.categories = categories;
     }
 
-    get CategoriesMap(): Map<string, Category> {
+    get CategoriesMap(): Map<string, Category<Node>> {
         return this.categoriesMap;
     }
 
-    get Labels(): Category[] {
+    get Labels(): Category<Link>[] {
         return this.labels;
     }
 
-    set Labels(labels: Category[]) {
+    set Labels(labels: Category<Link>[]) {
         this.labels = labels;
     }
 
-    get LabelsMap(): Map<string, Category> {
+    get LabelsMap(): Map<string, Category<Link>> {
         return this.labelsMap;
     }
 
@@ -226,12 +255,12 @@ export class Graph {
         return [...this.elements.nodes, ...this.elements.links]
     }
 
-    public static empty(graphName?: string, colors?: string[]): Graph {
-        return new Graph(graphName || "", [], [], { nodes: [], links: [] }, new Map<string, Category>(), new Map<string, Category>(), new Map<number, Node>(), new Map<number, Link>(), colors)
+    public static empty(graphName?: string, colors?: string[], currentQuery?: Query): Graph {
+        return new Graph(graphName || "", [], [], { nodes: [], links: [] }, new Map<string, Category<Node>>(), new Map<string, Category<Link>>(), new Map<number, Node>(), new Map<number, Link>(), currentQuery, colors)
     }
 
-    public static create(id: string, results: { data: Data, metadata: any[] }, isCollapsed: boolean, isSchema: boolean, colors?: string[],): Graph {
-        const graph = Graph.empty(undefined, colors)
+    public static create(id: string, results: { data: Data, metadata: any[] }, isCollapsed: boolean, isSchema: boolean, colors?: string[], currentQuery?: Query): Graph {
+        const graph = Graph.empty(undefined, colors, currentQuery)
         graph.extend(results, isCollapsed, isSchema)
         graph.id = id
         return graph
@@ -251,7 +280,6 @@ export class Graph {
                 visible: true,
                 expand: false,
                 collapsed,
-                displayName: "",
                 data: {}
             }
             Object.entries(cell.properties).forEach(([key, value]) => {
@@ -307,7 +335,6 @@ export class Graph {
                         expand: false,
                         collapsed,
                         visible: true,
-                        displayName: "",
                         data: {},
                     }
 
@@ -333,7 +360,7 @@ export class Graph {
                 let target = this.nodesMap.get(cell.destinationId)
 
                 if (!source || !target) {
-                    [category] = this.createCategory([""])
+                    [category] = this.createCategory([""],)
                 }
 
                 if (!source) {
@@ -344,7 +371,6 @@ export class Graph {
                         expand: false,
                         collapsed,
                         visible: true,
-                        displayName: "",
                         data: {},
                     }
 
@@ -362,13 +388,15 @@ export class Graph {
                         expand: false,
                         collapsed,
                         visible: true,
-                        displayName: "",
                         data: {},
                     }
 
                     category?.elements.push(target)
                     this.nodesMap.set(cell.destinationId, target)
                     this.elements.nodes.push(target)
+                    target.category.forEach(c => {
+                        this.categoriesMap.get(c)!.elements.push(target!)
+                    })
                 }
 
                 link = {
@@ -467,7 +495,7 @@ export class Graph {
         return newElements
     }
 
-    public createCategory(categories: string[], node?: Node): Category[] {
+    public createCategory(categories: string[], node?: Node): Category<Node>[] {
         return categories.map(category => {
             let c = this.categoriesMap.get(category)
 
@@ -486,7 +514,7 @@ export class Graph {
         })
     }
 
-    public createLabel(category: string): Category {
+    public createLabel(category: string): Category<Link> {
         let l = this.labelsMap.get(category)
 
         if (!l) {
@@ -501,7 +529,8 @@ export class Graph {
 
     public visibleLinks(visible: boolean) {
         this.elements.links.forEach(link => {
-            if (visible && (this.elements.nodes.map(n => n.id).includes(link.source.id) && link.source.visible) && (this.elements.nodes.map(n => n.id).includes(link.target.id) && link.target.visible)) {
+            
+            if (this.LabelsMap.get(link.label)!.show && visible && (this.elements.nodes.map(n => n.id).includes(link.source.id) && link.source.visible) && (this.elements.nodes.map(n => n.id).includes(link.target.id) && link.target.visible)) {
                 // eslint-disable-next-line no-param-reassign
                 link.visible = true
             }
@@ -513,19 +542,13 @@ export class Graph {
         })
     }
 
-    public removeLinks(ids: number[] = []) {
+    public removeLinks(ids: number[] = []): Category<Link>[] {
         const elements = this.elements.links.filter(link => ids.includes(link.source.id) || ids.includes(link.target.id))
 
         this.elements = {
             nodes: this.elements.nodes,
             links: this.elements.links.map(link => {
-                if (ids.length !== 0 && elements.includes(link)) {
-                    this.linksMap.delete(link.id)
-
-                    return undefined
-                }
-
-                if (this.elements.nodes.map(n => n.id).includes(link.source.id) && this.elements.nodes.map(n => n.id).includes(link.target.id)) {
+                if (ids.length !== 0 && !elements.includes(link) || this.elements.nodes.map(n => n.id).includes(link.source.id) && this.elements.nodes.map(n => n.id).includes(link.target.id)) {
                     return link
                 }
 
@@ -533,7 +556,7 @@ export class Graph {
 
                 if (category) {
                     category.elements = category.elements.filter(e => e.id !== link.id)
-                 
+
                     if (category.elements.length === 0) {
                         this.labels.splice(this.labels.findIndex(c => c.name === category.name), 1)
                         this.labelsMap.delete(category.name)
@@ -545,6 +568,8 @@ export class Graph {
                 return undefined
             }).filter(link => link !== undefined)
         }
+
+        return this.labels
     }
 
     public getCategoryColorValue(index: number) {
@@ -569,20 +594,36 @@ export class Graph {
 
             if (type) {
                 this.elements.nodes.splice(this.elements.nodes.findIndex(n => n.id === id), 1)
+                const category = this.categoriesMap.get(element.category[0])
+
+                if (category) {
+                    category.elements = category.elements.filter((e) => e.id !== id)
+                    if (category.elements.length === 0) {
+                        this.categories.splice(this.categories.findIndex(c => c.name === category.name), 1)
+                        this.categoriesMap.delete(category.name)
+                    }
+                }
             } else {
                 this.elements.links.splice(this.elements.links.findIndex(l => l.id === id), 1)
-            }
+                const category = this.labelsMap.get(element.label)
 
-            const category = type ? this.categoriesMap.get(element.category[0]) : this.labelsMap.get(element.label)
-
-            if (category) {
-                category.elements = category.elements.filter((e) => e.id !== id)
-                if (category.elements.length === 0) {
-                    this.categories.splice(this.categories.findIndex(c => c.name === category.name), 1)
-                    this.categoriesMap.delete(category.name)
+                if (category) {
+                    category.elements = category.elements.filter((e) => e.id !== id)
+                    if (category.elements.length === 0) {
+                        this.labels.splice(this.labels.findIndex(c => c.name === category.name), 1)
+                        this.labelsMap.delete(category.name)
+                    }
                 }
             }
         })
+
+        const nodes = elements.filter((n): n is Node => !("source" in n))
+        const links = elements.filter((l): l is Link => "source" in l)
+
+        this.elements = {
+            nodes: this.elements.nodes.filter(node => !nodes.some(n => n.id === node.id)),
+            links: this.elements.links.filter(link => !links.some(l => l.id === link.id))
+        }
 
         this.data = this.data.map(row => {
             const newRow = Object.entries(row).map(([key, cell]) => {
@@ -600,32 +641,77 @@ export class Graph {
         }).filter((row) => row !== undefined)
     }
 
-    public removeLabel(label: string, selectedElement: Node) {
-        this.Data = this.Data.map(row => Object.fromEntries(Object.entries(row).map(([key, cell]) => {
-            if (cell && typeof cell === "object" && cell.id === selectedElement.id && "labels" in cell) {
-                const newCell = { ...cell }
-                newCell.labels = newCell.labels.filter((l) => l !== label)
-                return [key, newCell]
+    public removeCategory(label: string, selectedElement: Node, updateData = true) {
+        if (updateData) {
+            this.Data = this.Data.map(row => Object.fromEntries(Object.entries(row).map(([key, cell]) => {
+                if (cell && typeof cell === "object" && cell.id === selectedElement.id && "labels" in cell) {
+                    const newCell = { ...cell }
+                    newCell.labels = newCell.labels.filter((l) => l !== label)
+                    return [key, newCell]
+                }
+                return [key, cell]
+            })))
+        }
+
+        const category = this.CategoriesMap.get(label)
+
+        if (category) {
+            category.elements = category.elements.filter((element) => element.id !== selectedElement.id)
+            if (category.elements.length === 0) {
+                this.Categories.splice(this.Categories.findIndex(c => c.name === category.name), 1)
+                this.CategoriesMap.delete(category.name)
             }
-            return [key, cell]
-        })))
+        }
+
+        selectedElement.category.splice(selectedElement.category.findIndex(l => l === label), 1)
+
+        if (selectedElement.category.length === 0) {
+            const [emptyCategory] = this.createCategory([""], selectedElement)
+            selectedElement.category.push(emptyCategory.name)
+            selectedElement.color = this.getCategoryColorValue(emptyCategory.index)
+        }
     }
 
-    public addLabel(label: string, selectedElement: Node) {
-        this.Data = this.Data.map(row => Object.fromEntries(Object.entries(row).map(([key, cell]) => {
-            if (cell && typeof cell === "object" && cell.id === selectedElement.id && "labels" in cell) {
-                const newCell = { ...cell }
-                newCell.labels.push(label)
-                return [key, newCell]
+    public addCategory(label: string, selectedElement: Node, updateData = true): Category<Node>[] {
+        const [category] = this.createCategory([label], selectedElement)
+
+        if (updateData) {
+            this.Data = this.Data.map(row => Object.fromEntries(Object.entries(row).map(([key, cell]) => {
+                if (cell && typeof cell === "object" && cell.id === selectedElement.id && "labels" in cell) {
+                    const newCell = { ...cell }
+                    newCell.labels.push(label)
+                    return [key, newCell]
+                }
+                return [key, cell]
+            })))
+        }
+
+        const emptyCategoryIndex = selectedElement.category.findIndex(c => c === "")
+
+        if (emptyCategoryIndex !== -1) {
+            this.removeCategory(selectedElement.category[emptyCategoryIndex], selectedElement)
+            selectedElement.category.splice(emptyCategoryIndex, 1)
+            selectedElement.color = this.getCategoryColorValue(category.index)
+
+            const emptyCategory = this.categoriesMap.get("")
+            if (emptyCategory) {
+                emptyCategory.elements = emptyCategory.elements.filter(e => e.id !== selectedElement.id)
+                if (emptyCategory.elements.length === 0) {
+                    this.categories.splice(this.categories.findIndex(c => c.name === emptyCategory.name), 1)
+                    this.categoriesMap.delete(emptyCategory.name)
+                }
             }
-            return [key, cell]
-        })))
+        }
+
+        selectedElement.category.push(label)
+
+        return this.categories
     }
 
-    public removeProperty(key: string, id: number) {
+    public removeProperty(key: string, id: number, type: boolean) {
         this.Data = this.Data.map(row => {
             const newRow = Object.entries(row).map(([k, cell]) => {
-                if (cell && typeof cell === "object" && cell.id === id) {
+                if (cell && typeof cell === "object" && cell.id === id && (type ? !("sourceId" in cell) : "sourceId" in cell)) {
                     delete cell.properties[key]
                     return [k, cell]
                 }
@@ -635,9 +721,9 @@ export class Graph {
         })
     }
 
-    public setProperty(key: string, val: string, id: number) {
+    public setProperty(key: string, val: string, id: number, type: boolean) {
         this.Data = this.Data.map(row => Object.fromEntries(Object.entries(row).map(([k, cell]) => {
-            if (cell && typeof cell === "object" && cell.id === id) {
+            if (cell && typeof cell === "object" && cell.id === id && (type ? !("sourceId" in cell) : "sourceId" in cell)) {
                 return [k, { ...cell, properties: { ...cell.properties, [key]: val } }]
             }
             return [k, cell]

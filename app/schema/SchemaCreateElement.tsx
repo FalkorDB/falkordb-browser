@@ -4,9 +4,10 @@
 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dispatch, SetStateAction, useContext, useState } from "react";
-import { ArrowRight, ArrowRightLeft, Check, ChevronRight, Pencil, Plus, Trash2, X } from "lucide-react";
+import { ArrowRight, ArrowRightLeft, Check, Pencil, Plus, Trash2, X } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/components/ui/use-toast";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import Button from "../components/ui/Button";
 import Combobox from "../components/ui/combobox";
 import { Node } from "../api/graph/model";
@@ -16,7 +17,7 @@ import { IndicatorContext } from "../components/provider";
 
 interface Props {
   onCreate: (element: [string, string[]][], label?: string[]) => Promise<boolean>
-  onExpand: () => void
+  setIsAdd: Dispatch<SetStateAction<boolean>>
   selectedNodes: [Node | undefined, Node | undefined]
   setSelectedNodes: Dispatch<SetStateAction<[Node | undefined, Node | undefined]>>
   type: boolean
@@ -28,20 +29,22 @@ export const OPTIONS = ["String", "Integer", "Float", "Geospatial", "Boolean"]
 
 export const getDefaultAttribute = (): [string, string[]] => ["", ["", "", "false", "false"]]
 
-export default function SchemaCreateElement({ onCreate, onExpand, selectedNodes, setSelectedNodes, type }: Props) {
+export default function SchemaCreateElement({ onCreate, setIsAdd, selectedNodes, setSelectedNodes, type }: Props) {
 
-  const [attributes, setAttributes] = useState<[string, string[]][]>([])
+  const { indicator } = useContext(IndicatorContext)
+
+  const { toast } = useToast()
+
   const [newAttribute, setNewAttribute] = useState<[string, string[]]>(getDefaultAttribute())
   const [attribute, setAttribute] = useState<[string, string[]]>(getDefaultAttribute())
-  const [label, setLabel] = useState<string[]>([])
-  const [newLabel, setNewLabel] = useState<string>("")
-  const [editable, setEditable] = useState<string>("")
-  const [hover, setHover] = useState<string>("")
-  const [isLoading, setIsLoading] = useState<boolean>(false)
+  const [attributes, setAttributes] = useState<[string, string[]][]>([])
   const [labelsHover, setLabelsHover] = useState<boolean>(false)
   const [isAddLabel, setIsAddLabel] = useState<boolean>(false)
-  const { toast } = useToast()
-  const { indicator } = useContext(IndicatorContext)
+  const [isLoading, setIsLoading] = useState<boolean>(false)
+  const [newLabel, setNewLabel] = useState<string>("")
+  const [editable, setEditable] = useState<string>("")
+  const [label, setLabel] = useState<string[]>([])
+  const [hover, setHover] = useState<string>("")
 
   const handleSetEditable = (att: [string, string[]] = getDefaultAttribute()) => {
     setAttribute(att)
@@ -124,7 +127,7 @@ export default function SchemaCreateElement({ onCreate, onExpand, selectedNodes,
           description: "You must type a label",
           variant: "destructive"
         })
-      
+
         return
       }
 
@@ -134,17 +137,17 @@ export default function SchemaCreateElement({ onCreate, onExpand, selectedNodes,
           description: "You must select two nodes to create a relation",
           variant: "destructive"
         })
-      
+
         return
       }
     }
-    
+
     try {
       setIsLoading(true)
       const ok = await onCreate(attributes, label)
-    
+
       if (!ok) return
-    
+
       setAttributes([])
       setAttribute(getDefaultAttribute())
       setLabel([])
@@ -192,95 +195,99 @@ export default function SchemaCreateElement({ onCreate, onExpand, selectedNodes,
     setAttribute(getDefaultAttribute())
     setEditable("")
     setIsAddLabel(false)
-    onExpand()
+    setIsAdd(false)
   }
 
   return (
     <div className="DataPanel">
-      <div className="w-full flex justify-between items-center p-4" id="headerDataPanel">
-        <div className="flex gap-4 items-center">
-          <Button
-            onClick={() => handleClose()}
-          >
-            <ChevronRight size={20} />
-          </Button>
-          <ul className="flex flex-wrap gap-4 min-w-[10%]" onMouseEnter={() => setLabelsHover(true)} onMouseLeave={() => setLabelsHover(false)}>
-            {label.map((l) => (
-              <li key={l} className="flex gap-2 px-2 py-1 bg-foreground rounded-full items-center">
-                <p>{l}</p>
+      <div className="relative w-full flex justify-between items-center p-6" id="headerDataPanel">
+        <Button
+          className="absolute top-2 right-2"
+          onClick={() => handleClose()}
+        >
+          <X size={15} />
+        </Button>
+        <ul className="flex flex-wrap gap-4 min-w-[10%]" onMouseEnter={() => setLabelsHover(true)} onMouseLeave={() => setLabelsHover(false)}>
+          {label.map((l) => (
+            <li key={l} className="flex gap-2 px-2 py-1 bg-background rounded-full items-center">
+              <p>{l}</p>
+              <Button
+                title="Remove"
+                onClick={() => handleRemoveLabel(l)}
+                data-testid={`removeLabelButton${l}`}
+              >
+                <X size={15} />
+              </Button>
+            </li>
+          ))}
+          <li className="h-8 flex flex-wrap gap-2">
+            {
+              (type ? (labelsHover || label.length === 0) : label.length === 0) && !isAddLabel &&
+              <Button
+                className="p-2 text-xs justify-center border border-background"
+                variant="Secondary"
+                label="Add"
+                title="Add a new label"
+                onClick={() => setIsAddLabel(true)}
+                data-testid="addNewLabelButton"
+              >
+                <Pencil size={15} />
+              </Button>
+            }
+            {
+              isAddLabel &&
+              <>
+                <Input
+                  ref={ref => ref?.focus()}
+                  className="max-w-[20dvw] h-full bg-background border-none text-white"
+                  value={newLabel}
+                  onChange={(e) => setNewLabel(e.target.value)}
+                  data-testid="newLabelInput"
+                  onKeyDown={(e) => {
+
+                    if (e.key === "Escape") {
+                      e.preventDefault()
+                      setIsAddLabel(false)
+                      setNewLabel("")
+                    }
+
+                    if (e.key !== "Enter") return
+
+                    e.preventDefault()
+                    handleAddLabel()
+                  }}
+                />
                 <Button
-                  title="Remove"
-                  onClick={() => handleRemoveLabel(l)}
+                  className="p-2 text-xs justify-center border border-background"
+                  variant="Secondary"
+                  label="Save"
+                  title="Save the new label"
+                  onClick={() => handleAddLabel()}
+                  data-testid="saveNewLabelButton"
+                >
+                  <Check size={15} />
+                </Button>
+                <Button
+                  className="p-2 text-xs justify-center border border-background"
+                  variant="Secondary"
+                  label="Cancel"
+                  title="Discard new label"
+                  onClick={() => {
+                    setIsAddLabel(false)
+                    setNewLabel("")
+                  }}
+                  data-testid="cancelNewLabelButton"
                 >
                   <X size={15} />
                 </Button>
-              </li>
-            ))}
-            <li className="h-8 flex flex-wrap gap-2">
-              {
-                (type ? (labelsHover || label.length === 0) && !isAddLabel : label.length < 1 && !isAddLabel) &&
-                <Button
-                  className="p-2 text-xs justify-center border border-foreground"
-                  variant="Secondary"
-                  label="Add"
-                  title="Add a new label"
-                  onClick={() => setIsAddLabel(true)}
-                >
-                  <Pencil size={15} />
-                </Button>
-              }
-              {
-                isAddLabel &&
-                <>
-                  <Input
-                    ref={ref => ref?.focus()}
-                    className="max-w-[20dvw] h-full bg-foreground border-none text-white"
-                    value={newLabel}
-                    onChange={(e) => setNewLabel(e.target.value)}
-                    onKeyDown={(e) => {
-
-                      if (e.key === "Escape") {
-                        e.preventDefault()
-                        setIsAddLabel(false)
-                        setNewLabel("")
-                      }
-
-                      if (e.key !== "Enter") return
-
-                      e.preventDefault()
-                      handleAddLabel()
-                    }}
-                  />
-                  <Button
-                    className="p-2 text-xs justify-center border border-foreground"
-                    variant="Secondary"
-                    label="Save"
-                    title="Save the new label"
-                    onClick={() => handleAddLabel()}
-                  >
-                    <Check size={15} />
-                  </Button>
-                  <Button
-                    className="p-2 text-xs justify-center border border-foreground"
-                    variant="Secondary"
-                    label="Cancel"
-                    title="Discard new label"
-                    onClick={() => {
-                      setIsAddLabel(false)
-                      setNewLabel("")
-                    }}
-                  >
-                    <X size={15} />
-                  </Button>
-                </>
-              }
-            </li>
-          </ul>
-        </div>
-        <p className="font-medium text-xl">{attributes.length}&ensp;Attributes</p>
+              </>
+            }
+          </li>
+        </ul>
+        <p className="font-medium text-xl" data-testid="DataPanelAttributesCount">{attributes.length}&ensp;Attributes</p>
       </div>
       <div className="w-full h-1 grow flex flex-col justify-between items-start font-medium">
-        <Table>
+        <Table data-testid="attributesTable">
           <TableHeader>
             <TableRow>
               <TableHead key="Key">Key</TableHead>
@@ -292,7 +299,7 @@ export default function SchemaCreateElement({ onCreate, onExpand, selectedNodes,
               <TableHead key="buttons" />
             </TableRow>
           </TableHeader>
-          <TableBody>
+          <TableBody data-testid="attributesTableBody">
             {
               attributes.length > 0 &&
               attributes.map(([key, val]) => (
@@ -323,7 +330,6 @@ export default function SchemaCreateElement({ onCreate, onExpand, selectedNodes,
                               return p
                             })}
                             inTable
-
                             label="Type"
                             selectedValue={attribute[1][0]}
                           />
@@ -376,6 +382,7 @@ export default function SchemaCreateElement({ onCreate, onExpand, selectedNodes,
                               className="p-2 justify-center border border-foreground rounded-lg"
                               label="Save"
                               title="Save the attribute changes"
+                              data-testid="saveAttributeButton"
                               onClick={(e) => {
                                 e.stopPropagation()
                                 handleSetAttribute(true)
@@ -387,6 +394,7 @@ export default function SchemaCreateElement({ onCreate, onExpand, selectedNodes,
                               className="p-2 justify-center border border-foreground rounded-lg"
                               label="Cancel"
                               title="Discard the attribute changes"
+                              data-testid="cancelAttributeButton"
                               onClick={(e) => {
                                 e.stopPropagation()
                                 handleSetEditable()
@@ -498,6 +506,7 @@ export default function SchemaCreateElement({ onCreate, onExpand, selectedNodes,
                     className="p-2 justify-center border border-foreground rounded-lg"
                     label="Add"
                     title="Add a new attribute"
+                    data-testid="addAttributeButton"
                     onClick={(e) => {
                       e.stopPropagation()
                       handleAddAttribute()
@@ -509,6 +518,7 @@ export default function SchemaCreateElement({ onCreate, onExpand, selectedNodes,
                     className="p-2 justify-center border border-foreground rounded-lg"
                     label="Cancel"
                     title="Discard the new attribute"
+                    data-testid="cancelNewAttributeButton"
                     onClick={(e) => {
                       e.stopPropagation()
                       setNewAttribute(getDefaultAttribute())
@@ -581,37 +591,53 @@ export default function SchemaCreateElement({ onCreate, onExpand, selectedNodes,
         </Table>
         {
           !type &&
-          <div className="w-full flex flex-col gap-4">
-            <div className="w-full flex justify-between p-8 items-center">
-              <div style={{ backgroundColor: selectedNodes[0]?.color }} className="flex h-16 w-16 rounded-full border-2 border-foreground justify-center items-center">
-                <p>{selectedNodes[0]?.category}</p>
+          <div className="w-full flex flex-col gap-2" id="relationSelection">
+            <div className="w-full flex justify-between p-4 items-center" data-testid="relationSelectionHeader">
+              <div style={{ backgroundColor: selectedNodes[0]?.color }} className="flex h-16 w-16 rounded-full border-2 border-background justify-center items-center overflow-hidden">
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <p className="truncate" data-testid="selectedNode1">{selectedNodes[0]?.category}</p>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>{selectedNodes[0]?.category}</p>
+                  </TooltipContent>
+                </Tooltip>
               </div>
-              <ArrowRight strokeWidth={1} size={40} />
-              <div style={{ backgroundColor: selectedNodes[1]?.color }} className="flex h-16 w-16 rounded-full border-2 border-foreground justify-center items-center">
-                <p>{selectedNodes[1]?.category}</p>
+              <ArrowRight strokeWidth={1} size={30} />
+              <div style={{ backgroundColor: selectedNodes[1]?.color }} className="flex h-16 w-16 rounded-full border-2 border-background justify-center items-center overflow-hidden">
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <p className="truncate" data-testid="selectedNode2">{selectedNodes[1]?.category}</p>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>{selectedNodes[1]?.category}</p>
+                  </TooltipContent>
+                </Tooltip>
               </div>
             </div>
             <div className="w-full flex justify-center gap-8">
               <Button
-                className="flex-col-reverse border border-[#232341]"
+                className="flex-col-reverse"
                 label="Clear"
                 title="Clear selected nodes for relation"
+                data-testid="clearSelectedNodesButton"
                 onClick={() => setSelectedNodes([undefined, undefined])}
               >
-                <Trash2 size={40} />
+                <Trash2 size={20} />
               </Button>
               <Button
-                className="flex-col-reverse border border-[#232341]"
+                className="flex-col-reverse"
                 label="Swap"
                 title="Swap the order of selected nodes"
+                data-testid="swapSelectedNodesButton"
                 onClick={() => setSelectedNodes(prev => [prev[1], prev[0]])}
               >
-                <ArrowRightLeft size={40} />
+                <ArrowRightLeft size={20} />
               </Button>
             </div>
           </div>
         }
-        <div className="p-8">
+        <div className="p-4">
           <form onSubmit={(e) => {
             e.preventDefault();
             handleOnCreate();
@@ -620,6 +646,7 @@ export default function SchemaCreateElement({ onCreate, onExpand, selectedNodes,
               indicator={indicator}
               label={`Create new ${type ? "node" : "edge"}`}
               title={`Add a new ${type ? "node" : "edge"} to the schema`}
+              data-testid="createElementButton"
               variant="Primary"
               onClick={(e) => {
                 e.preventDefault();

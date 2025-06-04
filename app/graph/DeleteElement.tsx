@@ -3,6 +3,8 @@
 "use client"
 
 import React, { useState, useContext } from "react";
+import { Trash2 } from "lucide-react";
+import { cn } from "@/lib/utils";
 import CloseDialog from "../components/CloseDialog";
 import DialogComponent from "../components/DialogComponent";
 import Button from "../components/ui/Button";
@@ -10,18 +12,29 @@ import { IndicatorContext } from "../components/provider";
 
 interface Props {
     onDeleteElement: () => Promise<void>
-    trigger: React.ReactNode
     open: boolean
     setOpen: (open: boolean) => void
     description: string
+    label?: "Graph" | "Schema"
+    trigger?: React.ReactNode
+    backgroundColor?: string
 }
 
 export default function DeleteElement({
     onDeleteElement,
-    trigger,
     open,
     setOpen,
     description,
+    backgroundColor,
+    label = "Graph",
+    trigger = <Button
+        data-testid={`deleteElement${label}`}
+        className={cn("pointer-events-auto", backgroundColor)}
+        variant="Delete"
+        title="Delete Element(s)"
+    >
+        <Trash2 size={20} />
+    </Button>,
 }: Props) {
 
     const { indicator } = useContext(IndicatorContext)
@@ -46,15 +59,17 @@ export default function DeleteElement({
         >
             <div className="flex justify-end gap-4">
                 <Button
+                    data-testid={`deleteElementConfirm${label}`}
                     indicator={indicator}
                     className="text-nowrap"
-                    variant="Primary"
+                    variant="Delete"
                     label="Delete"
                     title="Remove the selected element(s)"
                     onClick={handleDelete}
                     isLoading={isLoading}
                 />
                 <CloseDialog
+                    data-testid={`deleteElementCancel${label}`}
                     className="text-nowrap"
                     variant="Cancel"
                     label="Cancel"

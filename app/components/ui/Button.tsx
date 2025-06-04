@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils"
 import { Loader2 } from "lucide-react"
 import { forwardRef } from "react"
 
-export type Variant = "Large" | "Primary" | "Secondary" | "Cancel" | "button"
+export type Variant = "Large" | "Primary" | "Secondary" | "Cancel" | "Delete" | "button"
 
 /* eslint-disable react/require-default-props */
 export interface Props extends React.DetailedHTMLProps<React.ButtonHTMLAttributes<HTMLButtonElement>, HTMLButtonElement> {
@@ -16,6 +16,7 @@ export interface Props extends React.DetailedHTMLProps<React.ButtonHTMLAttribute
     children?: React.ReactNode
     isLoading?: boolean
     indicator?: "offline" | "online"
+    tooltipVariant?: Variant
 }
 
 const getClassName = (variant: Variant, disable: boolean | undefined, open: boolean | undefined, isLoading: boolean, classN: string | undefined) => {
@@ -31,24 +32,27 @@ const getClassName = (variant: Variant, disable: boolean | undefined, open: bool
     switch (variant) {
         case "Primary":
             className = cn(
-                "px-4 py-2 bg-primary",
+                "px-4 py-[10px] bg-primary",
                 !disable && "hover:bg-primary",
                 className
             )
             break
         case "Secondary":
-            className = cn("px-12 py-1 bg-transparent border-[3px] border-primary", className)
+            className = cn("px-12 py-2 bg-transparent border-2 border-primary", className)
             break
         case "Cancel":
-            className = cn("px-12 py-1 bg-transparent border-2 border-secondary", className)
+            className = cn("px-12 py-2 bg-transparent border-2 border-secondary", className)
+            break
+        case "Delete":
+            className = cn("px-12 py-2 bg-transparent border-2 border-red-500", className)
             break
         default:
     }
     return className
 }
 
-const Button = forwardRef<HTMLButtonElement, Props>(({ label, variant = "button", open, className, title, type = "button", disabled, children, isLoading = false, indicator, ...props }, ref) =>
-    (title || label || indicator === "offline") ? (
+const Button = forwardRef<HTMLButtonElement, Props>(({ label, variant = "button", open, className, title, type = "button", disabled, children, isLoading = false, indicator, tooltipVariant = variant, ...props }, ref) =>
+    title !== "" && (title || label || indicator === "offline") && variant !== "Cancel" ? (
         <Tooltip>
             <TooltipTrigger asChild>
                 <button
@@ -64,12 +68,17 @@ const Button = forwardRef<HTMLButtonElement, Props>(({ label, variant = "button"
                             <Loader2 className="animate-spin" />
                             : <>
                                 {children}
-                                {label}
+                                {
+                                    label &&
+                                    <p className="truncate">
+                                        {label}
+                                    </p>
+                                }
                             </>
                     }
                 </button>
             </TooltipTrigger>
-            <TooltipContent>
+            <TooltipContent className={cn(tooltipVariant === "Delete" && "bg-red-500 border-white text-white")}>
                 {
                     indicator === "offline" && "The FalkorDB server is offline"
                 }

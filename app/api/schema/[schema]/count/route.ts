@@ -9,21 +9,28 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         return session
     }
 
-    const { client } = session
-
     const { schema } = await params
     const schemaName = `${schema}_schema`
 
     try {
-        const graph = client.selectGraph(schemaName)
         const query = "MATCH (n) OPTIONAL MATCH (n)-[e]->() WITH count(n) as nodes, count(e) as edges RETURN nodes, edges"
-        const { data } = await graph.query(query)
 
-        if (!data) throw new Error("Something went wrong")
+        // Use relative URL to prevent SSRF vulnerability
+        const baseUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000'
+        const result = await fetch(`${baseUrl}/api/graph/${schemaName}/?query=${encodeURIComponent(query)}`, {
+            method: "GET",
+            headers: {
+                cookie: request.headers.get('cookie') || '',
+            }
+        })
 
-        const result = data.length === 0 ? { nodes: 0, edges: 0 } : data[0]
+        if (!result.ok) throw new Error("Something went wrong")
 
-        return NextResponse.json({ result }, { status: 200 })
+        const json = await result.json()
+
+        const data = typeof json.result === "number" ? json.result : { data: [json.result.data[0] || { nodes: 0, edges: 0 }] }
+
+        return NextResponse.json({ result: data }, { status: 200 })
     } catch (error) {
         console.log(error)
         return NextResponse.json({ error: (error as Error).message }, { status: 400 })

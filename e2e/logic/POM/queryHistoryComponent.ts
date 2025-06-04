@@ -1,98 +1,79 @@
 import { Locator } from "@playwright/test";
+import { interactWhenVisible, waitForElementToBeVisible } from "@/e2e/infra/utils";
 import GraphPage from "./graphPage";
-import { waitForElementToBeVisible } from "@/e2e/infra/utils";
 
 export default class QueryHistory extends GraphPage {
 
-    private get queryHistoryDialog(): Locator {
-        return this.page.locator("//div[contains(@id, 'queryHistory')]");
+    public get queryList(): Locator {
+        return this.page.getByTestId("queryList");
     }
 
-    private get queryHistory(): Locator {
-        return this.page.locator("//button[contains(text(), 'Query History')]");
+    public get queryHistoryButton(): Locator {
+        return this.page.getByTestId("queryHistory");
     }
 
-    private get queryInHistory(): (query: string) => Locator {
-        return (query: string) => this.page.locator(`//div[contains(@id, 'queryHistory')]//ul//li[${query}]`);
+    public selectQueryHistory(index: string): Locator {
+        return this.page.getByTestId(`queryHistory${index}`);
     }
 
-    private get selectQueryInHistoryBtn(): (query: string) => Locator {
-        return (query: string) => this.page.locator(`//div[contains(@id, 'queryHistory')]//ul//li[${query}]/button`);
-    }
-
-    private get runBtnInQueryHistory(): Locator {
-        return this.page.locator("//div[contains(@id, 'queryHistory')]//button[contains(text(), 'Run')]");
+    public get runQueryHistoryButton(): Locator {
+        return this.page.getByTestId("queryHistoryEditorRun");
     }
 
     private get queryHistoryTextarea(): Locator {
-        return this.page.locator("#queryHistoryEditor textarea");
+        return this.page.locator('[data-testid="queryList"] li');
     }
 
-    private get queryHistoryPanel(): Locator {
-        return this.page.locator("//div[@id='queryHistoryPanel']//ul");
+    public get searchQueryInput(): Locator {
+        return this.page.getByTestId("searchQuery");
     }
 
-    async clickOnQueryHistory(): Promise<void> {
-        const isVisible = await waitForElementToBeVisible(this.queryHistory);
-        if (!isVisible) throw new Error("query history button is not visible!");
-        await this.queryHistory.click();
+    public tabButton(buttonName: string): Locator {
+        return this.page.getByRole('button', { name: buttonName });
+    }
+    
+    async clickQueryHistoryButton(): Promise<void> {   
+        await interactWhenVisible(this.queryHistoryButton, (el) => el.click(), `query history button`);
     }
 
-    async selectQueryInHistory(query: string): Promise<void> {
-        await this.queryInHistory(query).click();
+    async clickSelectQueryInHistory(queryNumber: string): Promise<void> {           
+        await interactWhenVisible(this.selectQueryHistory(queryNumber), (el) => el.click(), `query history button`);
     }
 
-    async getQueryHistory(query: string): Promise<boolean> {
-        try {
-            return await this.queryInHistory(query).isVisible();
-        } catch (error) {
-            return false;
-        }
+    async clickRunInQueryHistory(): Promise<void> {   
+        await interactWhenVisible(this.runQueryHistoryButton, (el) => el.click(), `query history run button`);
     }
 
-    async clickOnRunBtnInQueryHistory(): Promise<void> {
-        await this.runBtnInQueryHistory.click();
+    async insertSearchQueryInput(searchInput: string): Promise<void> {   
+        await interactWhenVisible(this.searchQueryInput, (el) => el.fill(searchInput), `search query input`);
     }
 
-    async isQueryHistoryDialog(): Promise<boolean> {
-        return await this.queryHistoryDialog.isVisible();
+    async clickOnTabButton(button: string): Promise<void> {   
+        await interactWhenVisible(this.tabButton(button), (el) => el.click(), `tab button ${button}`);
     }
 
-    async ClickOnSelectQueryInHistoryBtn(queryNumber: string): Promise<void> {
-        await this.selectQueryInHistoryBtn(queryNumber).click();
-    }
-
-    async getSelectQueryInHistoryText(queryNumber: string): Promise<string | null> {
-        const text = await this.selectQueryInHistoryBtn(queryNumber).textContent();
-        return text;
+    async isQueryHistoryListVisible(): Promise<boolean> {
+        await waitForElementToBeVisible(this.queryList);
+        return await this.queryList.isVisible();
     }
 
     async runAQueryFromHistory(queryNumber: string): Promise<void> {
-        await this.clickOnQueryHistory();
-        await this.ClickOnSelectQueryInHistoryBtn(queryNumber);
-        await this.clickOnRunBtnInQueryHistory();
+        await this.clickQueryHistoryButton();
+        await this.clickSelectQueryInHistory(queryNumber);
+        await this.clickRunInQueryHistory();
         await this.waitForCanvasAnimationToEnd();
     }
 
-    async getQueryHistoryEditor(): Promise<string | null> {
-        await this.page.waitForTimeout(500);
-        return await this.queryHistoryTextarea.inputValue();
+    async getQueryHistory(queryNumber: string): Promise<boolean> {
+        await waitForElementToBeVisible(this.selectQueryHistory(queryNumber));
+        return await this.selectQueryHistory(queryNumber).isVisible();
     }
 
-    async getQueryHistoryPanel(): Promise<string[]> {
-        const rawText = await this.queryHistoryPanel.allTextContents();
-    
-        if (!rawText || rawText.length === 0) {
-            return [];
-        }
+    async selectQueryInHistory(queryNumber: string): Promise<void> {
+        await this.clickSelectQueryInHistory(queryNumber);
+    }
 
-        const formattedText = rawText[0]
-            .replace(/Query internal execution time:.*/, '')
-            .replace(/([a-z]+: \d+)/gi, '$1\n')
-            .split('\n')
-            .map(line => line.trim())
-            .filter(line => line.length > 0);
-    
-        return formattedText;
+    async getQueryHistoryEditorContent(): Promise<string[]> {
+        return await this.queryHistoryTextarea.allTextContents();
     }
 }
