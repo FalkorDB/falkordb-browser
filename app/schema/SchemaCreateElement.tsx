@@ -637,7 +637,7 @@ export default function SchemaCreateElement({ onCreate, setIsAdd, selectedNodes,
             </div>
           </div>
         }
-        <div className="p-8">
+        <div className="p-4">
           <form onSubmit={(e) => {
             e.preventDefault();
             handleOnCreate();
