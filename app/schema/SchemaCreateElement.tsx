@@ -603,7 +603,7 @@ export default function SchemaCreateElement({ onCreate, setIsAdd, selectedNodes,
                   </TooltipContent>
                 </Tooltip>
               </div>
-              <ArrowRight strokeWidth={1} size={40} />
+              <ArrowRight strokeWidth={1} size={30} />
               <div style={{ backgroundColor: selectedNodes[1]?.color }} className="flex h-16 w-16 rounded-full border-2 border-background justify-center items-center overflow-hidden">
                 <Tooltip>
                   <TooltipTrigger asChild>
@@ -623,7 +623,7 @@ export default function SchemaCreateElement({ onCreate, setIsAdd, selectedNodes,
                 data-testid="clearSelectedNodesButton"
                 onClick={() => setSelectedNodes([undefined, undefined])}
               >
-                <Trash2 size={40} />
+                <Trash2 size={20} />
               </Button>
               <Button
                 className="flex-col-reverse"
@@ -632,12 +632,12 @@ export default function SchemaCreateElement({ onCreate, setIsAdd, selectedNodes,
                 data-testid="swapSelectedNodesButton"
                 onClick={() => setSelectedNodes(prev => [prev[1], prev[0]])}
               >
-                <ArrowRightLeft size={40} />
+                <ArrowRightLeft size={20} />
               </Button>
             </div>
           </div>
         }
-        <div className="p-8">
+        <div className="p-4">
           <form onSubmit={(e) => {
             e.preventDefault();
             handleOnCreate();
