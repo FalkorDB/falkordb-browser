@@ -54,7 +54,7 @@
     }
 
     .DataPanel {
-        @apply z-10 absolute right-4 top-12 min-w-[30%] min-h-[80%] max-w-[50%] max-h-[85%] flex flex-col gap-4 bg-foreground border rounded-lg;
+        @apply z-10 absolute right-4 top-12 min-w-[30%] h-[60%] max-w-[50%] flex flex-col gap-4 bg-foreground border rounded-lg;
     }
 
     .Dropzone {
