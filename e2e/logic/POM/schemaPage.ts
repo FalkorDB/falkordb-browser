@@ -310,18 +310,19 @@ export default class SchemaPage extends GraphPage {
         await this.page.waitForTimeout(1500); // wait for the element to be deleted
     }
 
-    async selectTwoNodesForEdge(node1x: number, node1y: number, node2x: number, node2y: number): Promise<void> {
-        await this.elementClick(node1x, node1y);
+    async selectFirstTowNodes(): Promise<void> {
+        const nodes = await this.getNodesScreenPositions('schema');
+        await this.elementClick(nodes[0].screenX, nodes[0].screenY);
         await this.page.waitForTimeout(500);
-        await this.elementClick(node2x, node2y);
+        await this.elementClick(nodes[1].screenX, nodes[1].screenY);
     }
 
-    async addEdge(attributeRow: string, label: string, key: string, type: string, description: string, unique: boolean, required: boolean, node1x: number, node1y: number, node2x: number, node2y: number): Promise<void> {
+    async addEdge(attributeRow: string, label: string, key: string, type: string, description: string, unique: boolean, required: boolean): Promise<void> {
         await this.clickElementCanvasAdd();
         await this.clickElementCanvasAddEdge();
         await this.addLabelToNode(label);
         await this.addAttribute(attributeRow, key, type, description, unique, required);
-        await this.selectTwoNodesForEdge(node1x, node1y, node2x, node2y);
+        await this.selectFirstTowNodes();
         await this.clickCreateNewNodeButton();
         await this.waitForPageIdle();
         await this.page.waitForTimeout(1500); // wait for the edge to be created

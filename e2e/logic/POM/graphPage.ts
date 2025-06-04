@@ -314,19 +314,56 @@ export default class GraphPage extends Page {
         return count;
     }
 
-    async verifyGraphExists(graphName: string): Promise<boolean> {
+    async verifyGraphExists(graphName: string, apiCall?: any): Promise<boolean> {
+        if (apiCall) {
+            let attempts = 0;
+            const maxAttempts = 10;
+            while (attempts < maxAttempts) {
+                const graphs = await apiCall.getGraphs();
+                const graphExistsInAPI = graphs.opts.includes(graphName);
+                if (!graphExistsInAPI) {
+                    break;
+                }
+                
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                attempts++;
+            }
+        }
+        
         await this.clickSelect("Graph");
         await this.fillSearch(graphName);
-        await this.page.waitForTimeout(1000); // wait for the search results to be populated
-        const graphId = "0"; // always select the first result after search
-        const isVisible = await this.isVisibleSelectItem(graphId);
+        
+        // Wait longer and poll for the search results to be properly updated
+        let attempts = 0;
+        const maxAttempts = 5;
+        let isVisible = false;
+        
+        while (attempts < maxAttempts) {
+            await this.page.waitForTimeout(1000); // wait for the search results to be populated
+            const graphId = "0"; // always select the first result after search
+            isVisible = await this.isVisibleSelectItem(graphId);
+            
+            if (!isVisible) {
+                // If not visible, the graph is likely deleted, so break early
+                break;
+            }
+            
+            attempts++;
+            if (attempts < maxAttempts) {
+                // Clear and re-search to ensure fresh results
+                await this.fillSearch("");
+                await this.page.waitForTimeout(500);
+                await this.fillSearch(graphName);
+            }
+        }
+        
         return isVisible;
     }
 
     async addGraph(graphName: string): Promise<void> {
         await this.clickCreateGraph();
         await this.fillCreateGraphInput(graphName);
-        await this.page.waitForTimeout(500); // wait for the input to be filled
+        await this.page.waitForTimeout(1000); // wait for the input to be filled
         await this.clickConfirmCreateGraph();
         await this.isVisibleToast();
     }

@@ -46,10 +46,9 @@ test.describe('Graph Tests', () => {
         const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
         const graphName = getRandomString('graph');
         await graph.addGraph(graphName);
+        await apiCall.removeGraph(graphName);        
         await graph.refreshPage();
-        await apiCall.removeGraph(graphName);
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        expect(await graph.verifyGraphExists(graphName)).toBe(false);
+        expect(await graph.verifyGraphExists(graphName, apiCall)).toBe(false);
     });
 
     test(`@admin Create graph -> click the Export Data button -> verify the file has been successfully downloaded`, async () => {

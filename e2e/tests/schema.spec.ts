@@ -73,7 +73,7 @@ test.describe('Schema Tests', () => {
         await schema.selectSchemaByName(schemaName);
         const nodes = await schema.getNodesScreenPositions('schema');
         const attributeRow = "1"
-        await schema.addEdge(attributeRow, "knows", 'id', "Integer", "100", true, true, nodes[1].screenX, nodes[1].screenY, nodes[1].screenX, nodes[1].screenY);
+        await schema.addEdge(attributeRow, "knows", 'id', "Integer", "100", true, true);
         const labelContent = await schema.getLabelsButtonByNameContent("Schema", "RelationshipTypes", "knows");        
         expect(labelContent).toBe("knows");
         await apicalls.removeSchema(schemaName);
@@ -250,7 +250,7 @@ test.describe('Schema Tests', () => {
         const initialEdgesCount = parseInt(await schema.getEdgesCount() ?? "0", 10);
         const nodes = await schema.getNodesScreenPositions('schema');
         const attributeRow = "1"
-        await schema.addEdge(attributeRow, "knows", 'id', "Integer", "100", true, true, nodes[0].screenX, nodes[0].screenY, nodes[1].screenX, nodes[1].screenY);
+        await schema.addEdge(attributeRow, "knows", 'id', "Integer", "100", true, true);
         const finalEdgesCount = parseInt(await schema.getEdgesCount() ?? "0", 10);
         expect(finalEdgesCount).toBe(initialEdgesCount + 1);
         await apicalls.removeSchema(schemaName);
@@ -336,7 +336,7 @@ test.describe('Schema Tests', () => {
         const initialNodesCount = parseInt(await schema.getNodesCount() ?? "0", 10);
         const nodes = await schema.getNodesScreenPositions('schema');
         const attributeRow = "1"
-        await schema.addEdge(attributeRow, "knows", 'id', "Integer", "100", true, true, nodes[0].screenX, nodes[0].screenY, nodes[1].screenX, nodes[1].screenY);
+        await schema.addEdge(attributeRow, "knows", 'id', "Integer", "100", true, true);
         const finalNodesCount = parseInt(await schema.getNodesCount() ?? "0", 10);
         expect(finalNodesCount).toBe(initialNodesCount);
         await apicalls.removeSchema(schemaName);
