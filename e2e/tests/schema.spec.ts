@@ -244,7 +244,7 @@ test.describe('Schema Tests', () => {
 
     test(`@admin validate that adding a schema edge increases edge count`, async () => {
         const schemaName = getRandomString('schema');
-        await apicalls.runSchemaQuery(schemaName, 'CREATE (a:person1 {id: "1"}), (b:person2 {id: "2"}) RETURN a, b');
+        await apicalls.runSchemaQuery(schemaName, BATCH_CREATE_PERSONS);
         const schema = await browser.createNewPage(SchemaPage, urls.schemaUrl);
         await browser.setPageToFullScreen();
         await schema.selectSchemaByName(schemaName);
@@ -329,7 +329,7 @@ test.describe('Schema Tests', () => {
     test(`@admin validate that adding edge doesn't increases node count`, async () => {
         const schemaName = getRandomString('schema');
         await apicalls.addSchema(schemaName);
-        await apicalls.runSchemaQuery(schemaName, 'CREATE (a:person1 {id: "1"}), (b:person2 {id: "2"}) RETURN a, b');
+        await apicalls.runSchemaQuery(schemaName, BATCH_CREATE_PERSONS);
         const schema = await browser.createNewPage(SchemaPage, urls.schemaUrl);
         await browser.setPageToFullScreen();
         await schema.selectSchemaByName(schemaName);

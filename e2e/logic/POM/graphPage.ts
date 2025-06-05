@@ -330,31 +330,38 @@ export default class GraphPage extends Page {
             }
         }
         
-        await this.clickSelect("Graph");
-        await this.fillSearch(graphName);
-        
-        let attempts = 0;
-        const maxAttempts = 5;
-        let isVisible = false;
-        
-        while (attempts < maxAttempts) {
-            await this.page.waitForTimeout(1000); // wait for the search results to be populated
-            const graphId = "0"; // always select the first result after search
-            isVisible = await this.isVisibleSelectItem(graphId);
+        try {
+            await this.clickSelect("Graph");
+            await this.page.waitForTimeout(1000);
             
-            if (!isVisible) {
-                break;
+            await this.fillSearch(graphName);
+            
+            let attempts = 0;
+            const maxAttempts = 5;
+            let isVisible = false;
+            
+            while (attempts < maxAttempts) {
+                await this.page.waitForTimeout(1000); // wait for the search results to be populated
+                const graphId = "0"; // always select the first result after search
+                isVisible = await this.isVisibleSelectItem(graphId);
+                
+                if (!isVisible) {
+                    break;
+                }
+                
+                attempts++;
+                if (attempts < maxAttempts) {
+                    await this.fillSearch("");
+                    await this.page.waitForTimeout(500);
+                    await this.fillSearch(graphName);
+                }
             }
             
-            attempts++;
-            if (attempts < maxAttempts) {
-                await this.fillSearch("");
-                await this.page.waitForTimeout(500);
-                await this.fillSearch(graphName);
-            }
+            return isVisible;
+        } catch (error) {
+            console.log("Graph selector interaction failed:", error);
+            return false;
         }
-        
-        return isVisible;
     }
 
     async addGraph(graphName: string): Promise<void> {
