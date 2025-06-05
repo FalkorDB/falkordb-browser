@@ -175,6 +175,7 @@ export default function Page() {
                 chartRef={chartRef}
                 setIsAddEntity={setIsAddEntity}
                 setIsAddRelation={setIsAddRelation}
+                setGraph={setSchema}
             />
             <div className="h-1 grow p-12">
                 <SchemaView

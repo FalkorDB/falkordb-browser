@@ -36,11 +36,12 @@ interface Props {
     chartRef: GraphRef
     setIsAddEntity?: Dispatch<SetStateAction<boolean>>
     setIsAddRelation?: Dispatch<SetStateAction<boolean>>
+    setGraph: Dispatch<SetStateAction<Graph>>
 }
 
 const STEP = 8
 
-export default function Selector({ graph, options, setOptions, graphName, setGraphName, runQuery, historyQuery, setHistoryQuery, fetchCount, selectedElements, setSelectedElement, handleDeleteElement, chartRef, setIsAddEntity, setIsAddRelation }: Props) {
+export default function Selector({ graph, options, setOptions, graphName, setGraphName, runQuery, historyQuery, setHistoryQuery, fetchCount, selectedElements, setSelectedElement, handleDeleteElement, chartRef, setIsAddEntity, setIsAddRelation, setGraph }: Props) {
 
     const { indicator, setIndicator } = useContext(IndicatorContext)
 
@@ -58,26 +59,35 @@ export default function Selector({ graph, options, setOptions, graphName, setGra
     const type = runQuery && historyQuery && setHistoryQuery ? "Graph" : "Schema"
 
     useEffect(() => {
-        if (!currentQuery) {
+        if (!queriesOpen) return
+
+        if (!currentQuery || historyQuery?.query) {
             setTab("query")
-        } else if (currentQuery.profile) {
+        } else if (currentQuery.profile.length > 0) {
             setTab("profile")
-        } else if (currentQuery.metadata) {
+        } else if (currentQuery.metadata.length > 0) {
             setTab("metadata")
-        } else if (currentQuery.explain) {
+        } else if (currentQuery.explain.length > 0) {
             setTab("explain")
         }
-    }, [currentQuery, setTab])
+    }, [currentQuery, setTab, queriesOpen, historyQuery?.query])
+
+    // useEffect(() => {
+    //     if (!queriesOpen) {
+    //         monaco.editor.setTheme("editor-theme");
+    //     } else {
+    //         monaco.editor.setTheme("selector-theme");
+    //     }
+    // }, [queriesOpen]);
 
     const handleOnChange = useCallback((name: string) => {
         setGraphName(formatName(name))
     }, [setGraphName])
 
     const getOptions = useCallback(async () => {
-        const [opts, name] = await fetchOptions(type, toast, setIndicator, indicator)
+        const [opts] = await fetchOptions(type, toast, setIndicator, indicator)
         setOptions(opts)
-        handleOnChange(name)
-    }, [handleOnChange, setOptions, toast, setIndicator, indicator, type])
+    }, [setOptions, toast, setIndicator, indicator, type])
 
     const focusEditorAtEnd = () => {
         if (editorRef.current) {
@@ -142,6 +152,7 @@ export default function Selector({ graph, options, setOptions, graphName, setGra
                 onOpenChange={async (o) => {
                     if (o) await getOptions()
                 }}
+                setGraph={setGraph}
             />
             {
                 runQuery && historyQuery && setHistoryQuery ?
@@ -154,6 +165,7 @@ export default function Selector({ graph, options, setOptions, graphName, setGra
                                 runQuery={runQuery}
                                 historyQuery={historyQuery}
                                 setHistoryQuery={setHistoryQuery}
+                                editorKey={queriesOpen ? "selector-theme" : "editor-theme"}
                             />
                         </div>
                         <div className="h-full flex gap-2 p-2 border rounded-lg bg-foreground">
