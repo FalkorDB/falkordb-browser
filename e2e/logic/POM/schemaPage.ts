@@ -1,10 +1,8 @@
-import { interactWhenVisible, waitForElementToBeVisible, waitForElementToNotBeVisible } from "@/e2e/infra/utils";
-import Page from "./page";
+import { interactWhenVisible, waitForElementToNotBeVisible, waitForElementToBeVisible, delay, pollForElementContent } from "@/e2e/infra/utils";
 import GraphPage from "./graphPage";
 import { Locator } from "playwright";
 
 export default class SchemaPage extends GraphPage {
-
     // TABLE
     private get dataPanelTable(): Locator {
         return this.page.getByTestId("attributesTableBody");
@@ -15,11 +13,11 @@ export default class SchemaPage extends GraphPage {
     }
 
     //ADD ATTRIBUTES
-    private insertAttriubute(attriubuteRow: string, typeInput: string): Locator {
-        return this.dataPanelTable.locator(`tr:nth-of-type(${attriubuteRow})`).locator(`td:nth-of-type(${typeInput})`).locator("input");
+    private insertAttribute(attributeRow: string, typeInput: string): Locator {
+        return this.dataPanelTable.locator(`tr:nth-of-type(${attributeRow})`).locator(`td:nth-of-type(${typeInput})`).locator("input");
     }
 
-    private addAttriubuteButton(): Locator {
+    private addAttributeButton(): Locator {
         return this.page.getByTestId(`addAttributeButton`);
     }
 
@@ -85,6 +83,10 @@ export default class SchemaPage extends GraphPage {
         return this.page.getByTestId(`editAttributeButton`);
     }
 
+    private elementCanvasSuggestionsListSchemaFirstSuggestion(): Locator {
+        return this.page.getByTestId(`elementCanvasSuggestionsListSchema`).locator("button");
+    }
+
     async clickRemoveAttributeButton(): Promise<void> {
         await interactWhenVisible(this.removeAttributeButton(), (el) => el.click(), "Click Remove Attribute Button");
     }
@@ -94,17 +96,16 @@ export default class SchemaPage extends GraphPage {
     }
 
     async getContentDataPanelAttributesCount(): Promise<number> {
-        await this.page.waitForTimeout(500); // wait for the data panel to load
-        const content = await interactWhenVisible(this.dataPanelAttributesCount, (el) => el.textContent(), "Data Panel Attributes Count");
-        return parseInt(content ?? "0")
+        const content = await pollForElementContent(this.dataPanelAttributesCount, "Data Panel Attributes Count");
+        return parseInt(content ?? "0");
     }
 
     async getDataPanelNodeSelection(nodeId: string): Promise<string | null> {
         return await interactWhenVisible(this.dataPanelNodeSelection(nodeId), (el) => el.textContent(), "Data Panel Node Selection Count");
     }
 
-    private clickAttriubute(attriubuteRow: string, typeInput: string): Locator {
-        return this.dataPanelTable.locator(`tr:nth-of-type(${attriubuteRow})`).locator(`td:nth-of-type(${typeInput})`).locator("button");
+    private clickAttribute(attributeRow: string, typeInput: string): Locator {
+        return this.dataPanelTable.locator(`tr:nth-of-type(${attributeRow})`).locator(`td:nth-of-type(${typeInput})`).locator("button");
     }
 
     async clickElementCanvasAdd(): Promise<void> {
@@ -167,12 +168,12 @@ export default class SchemaPage extends GraphPage {
         await interactWhenVisible(this.tableRowInDataPanel(type), (el) => el.hover(), `Table Row in Data Panel ${type}`);
     }
 
-    async insertAttriubuteValue(attriubuteRow: string, typeInput: string, value: string): Promise<void> {
-        await interactWhenVisible(this.insertAttriubute(attriubuteRow, typeInput), (el) => el.fill(value), "Insert Attribute Value");
+    async insertAttributeValue(attributeRow: string, typeInput: string, value: string): Promise<void> {
+        await interactWhenVisible(this.insertAttribute(attributeRow, typeInput), (el) => el.fill(value), "Insert Attribute Value");
     }
 
-    async clickAttriubuteButton(attriubuteRow: string, typeInput: string): Promise<void> {
-        await interactWhenVisible(this.clickAttriubute(attriubuteRow, typeInput), (el) => el.click(), "Click Attribute Button");
+    async clickAttributeButton(attributeRow: string, typeInput: string): Promise<void> {
+        await interactWhenVisible(this.clickAttribute(attributeRow, typeInput), (el) => el.click(), "Click Attribute Button");
     }
 
     async clickCreateSchema(): Promise<void> {
@@ -188,11 +189,11 @@ export default class SchemaPage extends GraphPage {
     }
 
     async clickAddAttributeButton(): Promise<void> {
-        await interactWhenVisible(this.addAttriubuteButton(), (el) => el.click(), "Click Add Attribute Button");
+        await interactWhenVisible(this.addAttributeButton(), (el) => el.click(), "Click Add Attribute Button");
     }
 
     async clickCreateNewNodeButton(): Promise<void> {
-        await interactWhenVisible(this.createNewNodeButton(), (el) => el.click(), "Click Add Attribute Button");
+        await interactWhenVisible(this.createNewNodeButton(), (el) => el.click(), "Click Create New Node Button");
     }
 
     async clickEditButton(): Promise<void> {
@@ -207,6 +208,10 @@ export default class SchemaPage extends GraphPage {
         await interactWhenVisible(this.confirmRemoveAttributeButton(), (el) => el.click(), "Click Confirm Remove Attribute Button");
     }
 
+    async clickFirstElementSuggestionInSearch(): Promise<void> {
+        await interactWhenVisible(this.elementCanvasSuggestionsListSchemaFirstSuggestion(), (el) => el.click(), `Click First Element Suggestion in Search`);
+    }
+
     async modifySchemaName(oldName: string, newName: string): Promise<void> {
         await this.clickSelect("Schema");
         await this.clickManage();
@@ -214,7 +219,8 @@ export default class SchemaPage extends GraphPage {
         await this.clickEditButton();
         await this.fillInput("Schema", newName);
         await this.clickSaveButton("Schema");
-        await waitForElementToNotBeVisible(this.saveButton("Schema"));
+        await this.waitForPageIdle();
+        // await waitForElementToNotBeVisible(this.saveButton("Schema"));
     }
 
     async verifySchemaExists(schemaName: string): Promise<boolean> {
@@ -228,8 +234,9 @@ export default class SchemaPage extends GraphPage {
     async selectSchemaByName(schemaName: string): Promise<void> {
         await this.clickSelect("Schema");
         await this.fillSearch(schemaName);
-        await this.isVisibleSelectItem(schemaName);
+        await this.page.waitForTimeout(1000); // wait for the search results to load
         await this.clickSelectItem("0"); // selecting the first item in list after search
+        await this.waitForCanvasAnimationToEnd();
     }
 
     async addSchema(schemaName: string): Promise<void> {
@@ -254,27 +261,27 @@ export default class SchemaPage extends GraphPage {
         await this.clickSaveNewLabelButton();
     }
 
-    async selectAttriubuteType(attriubuteRow: string, type: string): Promise<void> {
-        await this.clickAttriubuteButton(attriubuteRow, "2"); //click type button
+    async selectAttributeType(attributeRow: string, type: string): Promise<void> {
+        await this.clickAttributeButton(attributeRow, "2"); //click type button
         await this.insertSeachType(type); //search for type
         await this.clickSelectTypeItem(type); //select type from list
     }
 
     async addAttribute(attributeRow: string, key: string, type: string, description: string, unique: boolean, required: boolean): Promise<void> {
-        await this.insertAttriubuteValue(attributeRow, "1", key); //key
-        await this.selectAttriubuteType(attributeRow, type); //type
-        await this.insertAttriubuteValue(attributeRow, "3", description); //description
-        unique ? await this.clickAttriubuteButton(attributeRow, "4") : null; //Enable Unique
-        required ? await this.clickAttriubuteButton(attributeRow, "5") : null; //Enable Required
+        await this.insertAttributeValue(attributeRow, "1", key); //key
+        await this.selectAttributeType(attributeRow, type); //type
+        await this.insertAttributeValue(attributeRow, "3", description); //description
+        unique ? await this.clickAttributeButton(attributeRow, "4") : null; //Enable Unique
+        required ? await this.clickAttributeButton(attributeRow, "5") : null; //Enable Required
         await this.clickAddAttributeButton();
     }
 
     async addValueToExistingElementDataPanel(attributeRow: string, key: string, type: string, description: string, unique: boolean, required: boolean): Promise<void> {
-        await this.insertAttriubuteValue(attributeRow, "1", key); //key
-        await this.selectAttriubuteType(attributeRow, type); //type
-        await this.insertAttriubuteValue(attributeRow, "3", description); //description
-        unique ? await this.clickAttriubuteButton(attributeRow, "4") : null; //Enable Unique
-        required ? await this.clickAttriubuteButton(attributeRow, "5") : null; //Enable Required
+        await this.insertAttributeValue(attributeRow, "1", key); //key
+        await this.selectAttributeType(attributeRow, type); //type
+        await this.insertAttributeValue(attributeRow, "3", description); //description
+        unique ? await this.clickAttributeButton(attributeRow, "4") : null; //Enable Unique
+        required ? await this.clickAttributeButton(attributeRow, "5") : null; //Enable Required
         await this.clickSaveAddValueButton();
     }
 
@@ -285,11 +292,12 @@ export default class SchemaPage extends GraphPage {
         await this.addAttribute(attributeRow, key, type, description, unique, required);
         await this.clickCreateNewNodeButton();
         await this.waitForPageIdle();
+        await this.page.waitForTimeout(1500); // wait for the element to be created
     }
 
     async searchElementInCanvasSelectFirst(name: string): Promise<void> {
         await this.fillElementCanvasSearch("Schema", name);
-        await this.clickElementCanvasSuggestionByName("Schema", "0"); // always select the first result
+        await this.clickFirstElementSuggestionInSearch();
     }
 
     async deleteSchemaElement(): Promise<void> {
@@ -297,22 +305,60 @@ export default class SchemaPage extends GraphPage {
         await this.clickConfirmDeleteElementSchema();
         await this.isVisibleToast();
         await this.waitForPageIdle();
+        await this.page.waitForTimeout(1500); // wait for the element to be deleted
     }
 
-    async selectTwoNodesForEdge(node1x: number, node1y: number, node2x: number, node2y: number): Promise<void> {
-        await this.elementClick(node1x, node1y);
-        await this.page.waitForTimeout(500);
-        await this.elementClick(node2x, node2y);
-    }
+    async selectTwoNodesByValidSelection(): Promise<void> {
+        const nodes = await this.getNodesScreenPositions('schema');
+        
+        if (nodes.length < 2) {
+            throw new Error("Need at least 2 nodes to create an edge");
+        }
 
-    async addEdge(attributeRow: string, label: string, key: string, type: string, description: string, unique: boolean, required: boolean, node1x: number, node1y: number, node2x: number, node2y: number): Promise<void> {
+        for (let i = 0; i < nodes.length - 1; i++) {
+            const first = nodes[i];
+            await this.elementClick(first.screenX, first.screenY);
+            await this.page.waitForTimeout(500);
+    
+            for (let j = i + 1; j < nodes.length; j++) {
+                const second = nodes[j];
+                await this.elementClick(second.screenX, second.screenY);
+                await this.page.waitForTimeout(500);
+    
+                try {
+                    const selectedNode1Locator = this.dataPanelNodeSelection('1');
+                    const selectedNode2Locator = this.dataPanelNodeSelection('2');
+                    
+                    const isNode1Visible = await selectedNode1Locator.isVisible();
+                    const isNode2Visible = await selectedNode2Locator.isVisible();
+                    
+                    if (isNode1Visible && isNode2Visible) {
+                        const node1Text = await this.getDataPanelNodeSelection('1');
+                        const node2Text = await this.getDataPanelNodeSelection('2');
+                        
+                        if (node1Text && node1Text.trim() !== '' && 
+                            node2Text && node2Text.trim() !== '') {
+                            return;
+                        }
+                    }
+                } catch (error) {
+                    console.log(`Selection attempt failed: ${error}`);
+                }
+            }
+        }
+    
+        throw new Error("Failed to select two valid nodes.");
+    }    
+
+    async addEdge(attributeRow: string, label: string, key: string, type: string, description: string, unique: boolean, required: boolean): Promise<void> {
         await this.clickElementCanvasAdd();
         await this.clickElementCanvasAddEdge();
         await this.addLabelToNode(label);
         await this.addAttribute(attributeRow, key, type, description, unique, required);
-        const check = await this.selectTwoNodesForEdge(node1x, node1y, node2x, node2y);
+        await this.selectTwoNodesByValidSelection();
         await this.clickCreateNewNodeButton();
         await this.waitForPageIdle();
+        await this.page.waitForTimeout(1500); // wait for the edge to be created
     }
 
     async exportSchema(schemaName: string): Promise<void> { // must check if its working
@@ -322,28 +368,17 @@ export default class SchemaPage extends GraphPage {
         await this.isVisibleToast();
     }
 
-    async swapNodesInAddEdgeDataPanel(node1: string, node2: string): Promise<void> {
-        // click add element button
-        // click add edge button from dropdown
-         // must make two clicks one for first node and one for second node
-         // then click swap nodes button
+    // async swapNodesInAddEdgeDataPanel(node1: string, node2: string): Promise<void> {}
 
-    }
-
-    async clearNodesInAddEdgeDataPanel(): Promise<void> {
-        //click add element button
-        // click add edge button from dropdown
-        // must make two clicks one for first node and one for second node
-        // then click clear nodes button
-    }
+    // async clearNodesInAddEdgeDataPanel(): Promise<void> {}
 
     async modifyAttributeValueByRow(attributeRow: string, type: string, description: string, unique: boolean, required: boolean): Promise<void> {
         await this.hoverTableRowInDataPanel(attributeRow);
         await this.clickEditAttributeButton();
-        await this.selectAttriubuteType(attributeRow, type); //type
-        await this.insertAttriubuteValue(attributeRow, "3", description); //description
-        unique ? await this.clickAttriubuteButton(attributeRow, "4") : null; //Enable Unique
-        required ? await this.clickAttriubuteButton(attributeRow, "5") : null; //Enable Required
+        await this.selectAttributeType(attributeRow, type); //type
+        await this.insertAttributeValue(attributeRow, "3", description); //description
+        unique ? await this.clickAttributeButton(attributeRow, "4") : null; //Enable Unique
+        required ? await this.clickAttributeButton(attributeRow, "5") : null; //Enable Required
     }
 
     async removeAttributeByRow(attributeRow: string): Promise<void> {
