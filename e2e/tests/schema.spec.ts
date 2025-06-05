@@ -71,9 +71,40 @@ test.describe('Schema Tests', () => {
         const schema = await browser.createNewPage(SchemaPage, urls.schemaUrl);
         await browser.setPageToFullScreen();
         await schema.selectSchemaByName(schemaName);
+        
+        // Wait for the canvas to be fully loaded and verify nodes are visible
+        await schema.waitForCanvasAnimationToEnd();
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        
+        // Verify we have the expected nodes before proceeding
+        const nodes = await schema.getNodesScreenPositions('schema');
+        console.log(`Found ${nodes.length} nodes before adding edge`);
+        expect(nodes.length).toBeGreaterThanOrEqual(2);
+        
         const attributeRow = "1"
         await schema.addEdge(attributeRow, "knows", 'id', "Integer", "100", true, true);
-        const labelContent = await schema.getLabelsButtonByNameContent("Schema", "RelationshipTypes", "knows");        
+        
+        // Wait for the UI to update after edge creation
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        
+        // Retry mechanism for getting the label content
+        let labelContent = null;
+        let attempts = 0;
+        const maxAttempts = 5;
+        
+        while (attempts < maxAttempts && !labelContent) {
+            try {
+                labelContent = await schema.getLabelsButtonByNameContent("Schema", "RelationshipTypes", "knows");
+                if (labelContent === "knows") {
+                    break;
+                }
+            } catch (error) {
+                console.log(`Attempt ${attempts + 1} failed to get label content: ${error}`);
+                await new Promise(resolve => setTimeout(resolve, 1000));
+            }
+            attempts++;
+        }
+        
         expect(labelContent).toBe("knows");
         await apicalls.removeSchema(schemaName);
     });

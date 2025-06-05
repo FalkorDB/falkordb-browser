@@ -311,21 +311,53 @@ export default class SchemaPage extends GraphPage {
     }
 
     async selectTowNodes(): Promise<void> {
+        // Wait for canvas to be fully loaded and nodes to be visible
+        await this.waitForCanvasAnimationToEnd();
+        await this.page.waitForTimeout(2000); // Give extra time for nodes to be rendered
+        
         const nodes = await this.getNodesScreenPositions('schema');
-        await this.elementClick(nodes[0].screenX, nodes[0].screenY);
+        
+        // Add debugging information
+        console.log(`Found ${nodes.length} nodes in schema canvas`);
+        if (nodes.length > 0) {
+            console.log('Node details:', nodes.map(n => ({ id: n.id, visible: n.visible, x: n.screenX, y: n.screenY })));
+        }
+        
+        // Ensure we have at least 2 visible nodes
+        const visibleNodes = nodes.filter(node => node.visible);
+        if (visibleNodes.length < 2) {
+            throw new Error(`Expected at least 2 visible nodes, but found ${visibleNodes.length}. Total nodes: ${nodes.length}`);
+        }
+        
+        // Click on the first two visible nodes
+        console.log(`Clicking on first node at (${visibleNodes[0].screenX}, ${visibleNodes[0].screenY})`);
+        await this.elementClick(visibleNodes[0].screenX, visibleNodes[0].screenY);
         await this.page.waitForTimeout(500);
-        await this.elementClick(nodes[0].screenX, nodes[0].screenY);
+        
+        console.log(`Clicking on second node at (${visibleNodes[1].screenX}, ${visibleNodes[1].screenY})`);
+        await this.elementClick(visibleNodes[1].screenX, visibleNodes[1].screenY);
+        await this.page.waitForTimeout(500);
     }
 
     async addEdge(attributeRow: string, label: string, key: string, type: string, description: string, unique: boolean, required: boolean): Promise<void> {
+        console.log(`Starting addEdge process with label: ${label}`);
+        
         await this.clickElementCanvasAdd();
         await this.clickElementCanvasAddEdge();
         await this.addLabelToNode(label);
         await this.addAttribute(attributeRow, key, type, description, unique, required);
+        
+        console.log('About to select two nodes for edge creation');
         await this.selectTowNodes();
+        
+        console.log('Creating the edge element');
         await this.clickCreateNewNodeButton();
         await this.waitForPageIdle();
         await this.page.waitForTimeout(1500); // wait for the edge to be created
+        
+        // Additional wait for UI to update after edge creation
+        await this.page.waitForTimeout(1000);
+        console.log('Edge creation process completed');
     }
 
     async exportSchema(schemaName: string): Promise<void> { // must check if its working
