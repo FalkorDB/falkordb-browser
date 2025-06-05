@@ -312,7 +312,7 @@ export default function SchemaDataPanel({ object, setObject, onDeleteElement, sc
                         <li key={l} className="flex gap-2 px-2 py-1 bg-background rounded-full items-center">
                             <p>{l}</p>
                             {
-                                session?.user?.role !== "Read-Only" &&
+                                type && session?.user?.role !== "Read-Only" &&
                                 <Button
                                     indicator={indicator}
                                     title="Remove"
