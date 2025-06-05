@@ -103,7 +103,7 @@
       "testQueries": [
         {
           "name": "batchCreatePersons",
-          "query": "UNWIND range(1, 10) AS i CREATE (p:Person {id: i, name: 'Person ' + toString(i)}) RETURN p;",
+          "query": "UNWIND range(1, 10) AS i CREATE (p:Person {id: i, name: 'Person' + toString(i)}) RETURN p",
           "reason": "Creates 10 Person nodes with sequential IDs and names using UNWIND.",
           "apiReq": "UNWIND%20range(1%2C%2010)%20AS%20i%20CREATE%20(p%3APerson%20%7Bid%3A%20i%2C%20name%3A%20%27Person%20%27%20%2B%20toString(i)%7D)%20RETURN%20p"
         },
