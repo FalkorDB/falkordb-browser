@@ -188,7 +188,7 @@ export default function GraphDataPanel({ object, setObject, onDeleteElement, set
                         >
                             <p>{l || "No Label"}</p>
                             {
-                                l && session?.user?.role !== "Read-Only" &&
+                                type && l && session?.user?.role !== "Read-Only" &&
                                 <RemoveLabel
                                     onRemoveLabel={handleRemoveLabel}
                                     selectedLabel={l}

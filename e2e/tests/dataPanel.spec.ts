@@ -348,7 +348,8 @@ test.describe('Data panel Tests', () => {
         await graph.searchElementInCanvas("Graph", "1");
         await graph.modifyAttribute("id", "10");
         const response = await apicalls.runQuery(graphName, "match (n) return n");
-        expect(response.result.data[1].n.properties.id).toBe('10')
+        expect(response.result.data.length).toBeGreaterThan(1);
+        expect(response.result.data[1].n.properties.id).toBe('10');
         await apicalls.removeGraph(graphName);
     });
 

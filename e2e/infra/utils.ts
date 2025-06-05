@@ -16,7 +16,7 @@ export function delay(ms: number) {
     return new Promise(resolve => { setTimeout(resolve, ms) });
 }
 
-export const waitForElementToBeVisible = async (locator: Locator, time = 1000, retry = 5): Promise<boolean> => {
+export const waitForElementToBeVisible = async (locator: Locator, time = 500, retry = 10): Promise<boolean> => {
     for (let i = 0; i < retry; i += 1) {
         try {
             if (await locator.isVisible()) {
@@ -30,7 +30,7 @@ export const waitForElementToBeVisible = async (locator: Locator, time = 1000, r
     return false;
 };
 
-export const waitForElementToNotBeVisible = async (locator: Locator, time = 1000, retry = 5): Promise<boolean> => {
+export const waitForElementToNotBeVisible = async (locator: Locator, time = 500, retry = 10): Promise<boolean> => {
     for (let i = 0; i < retry; i += 1) {
         try {
             if (!await locator.isVisible()) {
@@ -144,4 +144,34 @@ export async function interactWhenVisible<T>(element: Locator, action: (el: Loca
 export function inferLabelFromGraph(graph: string): string {
     if (graph.toLowerCase().includes('schema')) return 'Schema';
     return 'Graph';
+}
+
+export async function pollForElementContent(
+    element: Locator, 
+    elementName: string, 
+    maxRetries: number = 10, 
+    retryDelay: number = 500
+): Promise<string | null> {
+    const isVisible = await waitForElementToBeVisible(element);
+    if (!isVisible) {
+        throw new Error(`${elementName} element is not visible`);
+    }
+
+    for (let i = 0; i < maxRetries; i++) {
+        try {
+            const content = await element.textContent();
+            if (content !== null && content.trim() !== "") {
+                return content;
+            }
+        } catch (error) {
+            console.error(`Error getting ${elementName} on attempt ${i + 1}:`, error);
+        }
+    
+        if (i < maxRetries - 1) {
+            await delay(retryDelay);
+        }
+    }
+    
+    console.warn(`Failed to get ${elementName} after all retries, returning null`);
+    return null;
 }

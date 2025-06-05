@@ -55,7 +55,7 @@ test.describe("Query Settings", () => {
         const limit = -1;
         await querySettings.fillLimit(limit);
         const limitValue = await querySettings.getLimit();
-        expect(limitValue).toBe("∞");
+        expect(limitValue).toBe("300");
     });
 
     test(`@admin Validate that timeout can't be negative with the input`, async () => {
@@ -68,6 +68,7 @@ test.describe("Query Settings", () => {
 
     test(`@admin Validate that limit can't be negative with the decrease button`, async () => {
         const querySettings = await browser.createNewPage(QuerySettingsPage, urls.settingsUrl);
+        await querySettings.fillLimit(0);
         await querySettings.clickDecreaseLimit();
         const limitValue = await querySettings.getLimit();
         expect(limitValue).toBe("∞");
@@ -84,7 +85,7 @@ test.describe("Query Settings", () => {
         const querySettings = await browser.createNewPage(QuerySettingsPage, urls.settingsUrl);
         await querySettings.clickIncreaseLimit();
         const limitValue = await querySettings.getLimit();
-        expect(limitValue).toBe("1");
+        expect(limitValue).toBe("301");
     });
 
     test(`@admin Validate that timeout changed with the increase button`, async () => {
@@ -92,5 +93,20 @@ test.describe("Query Settings", () => {
         await querySettings.clickIncreaseTimeout();
         const timeoutValue = await querySettings.getTimeout();
         expect(timeoutValue).toBe("1");
+    });
+    
+    test(`@admin Validate that limit changed with the decrease button`, async () => {
+        const querySettings = await browser.createNewPage(QuerySettingsPage, urls.settingsUrl);
+        await querySettings.clickDecreaseLimit();
+        const limitValue = await querySettings.getLimit();
+        expect(limitValue).toBe("299");
+    });
+
+    test(`@admin Validate that timeout changed with the decrease button`, async () => {
+        const querySettings = await browser.createNewPage(QuerySettingsPage, urls.settingsUrl);
+        await querySettings.fillTimeout(1);
+        await querySettings.clickDecreaseTimeout();
+        const timeoutValue = await querySettings.getTimeout();
+        expect(timeoutValue).toBe("∞");
     });
 });

@@ -31,7 +31,7 @@ test.describe('Canvas Tests', () => {
             await graph.addGraph(graphName);
             await graph.insertQuery(BATCH_CREATE_PERSONS);
             await graph.clickRunQuery();
-            const searchQuery = `Person ${node}`;
+            const searchQuery = `Person${node}`;
             await graph.searchElementInCanvas("Graph", searchQuery);
             await graph.hoverAtCanvasCenter();
             expect(await graph.getNodeCanvasToolTip()).toBe(searchQuery);
