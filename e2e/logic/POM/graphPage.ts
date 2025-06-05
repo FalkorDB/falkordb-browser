@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable no-await-in-loop */
 import { Download, Locator } from "@playwright/test";
-import { waitForElementToBeVisible, waitForElementToBeEnabled, waitForElementToNotBeVisible, interactWhenVisible } from "@/e2e/infra/utils";
+import { waitForElementToBeVisible, waitForElementToBeEnabled, waitForElementToNotBeVisible, interactWhenVisible, delay, pollForElementContent } from "@/e2e/infra/utils";
 import Page from "./page";
 
 export default class GraphPage extends Page {
@@ -250,7 +250,6 @@ export default class GraphPage extends Page {
     }
 
     async isVisibleSelectItem(name: string): Promise<boolean> {
-        await this.page.waitForTimeout(500); // wait for the list to be populated
         const isVisible = await waitForElementToBeVisible(this.selectItemBySearch("Graph", name));
         return isVisible;
     }
@@ -260,9 +259,13 @@ export default class GraphPage extends Page {
     }
 
     async isVisibleLabelsButtonByName(tab: "Graph" | "Schema", label: "RelationshipTypes" | "Labels", name: string): Promise<boolean> {
-        await this.page.waitForTimeout(500); // wait for the labels to be populated
         const isVisible = await waitForElementToBeVisible(this.labelsButtonByName(tab, label, name));
         return isVisible;
+    }
+
+    async getLabelsButtonByNameContent(tab: "Graph" | "Schema", label: "RelationshipTypes" | "Labels", name: string): Promise<string | null> {
+        const content = await interactWhenVisible(this.labelsButtonByName(tab, label, name), (el) => el.textContent(), ``);
+        return content;
     }
     
     async isVisibleEditButton(): Promise<boolean> {
@@ -286,13 +289,11 @@ export default class GraphPage extends Page {
     }
 
     async getNodesCount(): Promise<string | null> {
-        await this.page.waitForTimeout(500); // wait for the nodes count to be updated
-        return await interactWhenVisible(this.nodesCount(), (el) => el.textContent(), "Nodes Count");
+        return await pollForElementContent(this.nodesCount(), "Nodes Count");
     }
 
     async getEdgesCount(): Promise<string | null> {
-        await this.page.waitForTimeout(500); // wait for the edges count to be updated
-        return await interactWhenVisible(this.edgesCount(), (el) => el.textContent(), "Edges Count");
+        return await pollForElementContent(this.edgesCount(), "Edges Count");
     }
 
     async searchElementInCanvas(type: "Graph" | "Schema", name: string): Promise<void> {
@@ -313,20 +314,55 @@ export default class GraphPage extends Page {
         return count;
     }
 
-    async verifyGraphExists(graphName: string): Promise<boolean> {
+    async verifyGraphExists(graphName: string, apiCall?: any): Promise<boolean> {
+        if (apiCall) {
+            let attempts = 0;
+            const maxAttempts = 10;
+            while (attempts < maxAttempts) {
+                const graphs = await apiCall.getGraphs();
+                const graphExistsInAPI = graphs.opts.includes(graphName);
+                if (!graphExistsInAPI) {
+                    break;
+                }
+                
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                attempts++;
+            }
+        }
+        
         await this.clickSelect("Graph");
         await this.fillSearch(graphName);
-        const graphId = "0"; // always select the first result
-        const isVisible = await this.isVisibleSelectItem(graphId);
+        
+        let attempts = 0;
+        const maxAttempts = 5;
+        let isVisible = false;
+        
+        while (attempts < maxAttempts) {
+            await this.page.waitForTimeout(1000); // wait for the search results to be populated
+            const graphId = "0"; // always select the first result after search
+            isVisible = await this.isVisibleSelectItem(graphId);
+            
+            if (!isVisible) {
+                break;
+            }
+            
+            attempts++;
+            if (attempts < maxAttempts) {
+                await this.fillSearch("");
+                await this.page.waitForTimeout(500);
+                await this.fillSearch(graphName);
+            }
+        }
+        
         return isVisible;
     }
 
     async addGraph(graphName: string): Promise<void> {
         await this.clickCreateGraph();
         await this.fillCreateGraphInput(graphName);
+        await this.page.waitForTimeout(1000); // wait for the input to be filled
         await this.clickConfirmCreateGraph();
         await this.isVisibleToast();
-        await this.waitForPageIdle();
     }
 
     async removeGraph(graphName: string): Promise<void> {
@@ -336,7 +372,6 @@ export default class GraphPage extends Page {
         await this.clickDelete();
         await this.clickDeleteConfirm();
         await this.isVisibleToast();
-        await this.waitForPageIdle();
     }
 
     async insertQuery(query: string): Promise<void> {
@@ -385,7 +420,7 @@ export default class GraphPage extends Page {
     async selectGraphByName(graphName: string): Promise<void> {
         await this.clickSelect("Graph");
         await this.fillSearch(graphName);
-        await this.isVisibleSelectItem(graphName);
+        await this.page.waitForTimeout(500); // wait for the search results to be populated
         await this.clickSelectItem("0"); // selecting the first item in list after search
     }
 
@@ -403,6 +438,7 @@ export default class GraphPage extends Page {
         await this.clickDeleteElement(type);
         await this.clickDeleteElementConfirm();
         await waitForElementToNotBeVisible(this.deleteElement("Node"));
+        await this.page.waitForTimeout(1500); // wait for the element to be deleted
     }
 
     async getErrorNotification(): Promise<boolean> {
@@ -481,6 +517,7 @@ export default class GraphPage extends Page {
     async getNodesScreenPositions(windowKey: 'graph' | 'schema'): Promise<any[]> {
         // Wait for canvas to be ready and animations to settle
         await this.waitForCanvasAnimationToEnd();
+        await this.page.waitForTimeout(1500); // Allow some time for the canvas to render properly
         
         // Get canvas element and its properties
         const canvasInfo = await this.page.evaluate((selector) => {

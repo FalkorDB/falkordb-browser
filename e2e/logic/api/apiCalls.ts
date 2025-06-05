@@ -135,13 +135,28 @@ export default class ApiCalls {
     }
 
     async getGraphCount(graph: string): Promise<GraphCountResponse> {
-        try {
-            const result = await getRequest(`${urls.api.graphUrl}${graph}/count`);
-            return await result.json();
-        } catch (error) {
-            throw new Error("Failed to get graph count.");
+        const maxRetries = 5;
+        const delayMs = 1000;
+    
+        for (let i = 0; i < maxRetries; i++) {
+            try {
+                const result = await getRequest(`${urls.api.graphUrl}${graph}/count`);
+                const json = await result.json();
+    
+                if (json?.result?.data?.[0]) {
+                    return json;
+                }
+            } catch (error) {
+                console.log(`Attempt ${i + 1} failed:`, error);
+                
+            }
+    
+            await new Promise((res) => setTimeout(res, delayMs));
         }
+    
+        throw new Error("Graph count data not available after retries.");
     }
+    
 
     async addGraphNodeLabel(graph: string, node: string, data: Record<string, string>): Promise<GraphNodeResponse> {
         try {
