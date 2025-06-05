@@ -61,8 +61,9 @@ export default function QuerySettings() {
                             id="decreaseTimeoutBtn"
                             className="p-2"
                             onClick={() => {
-                                setTimeout(prev => !prev ? prev : prev - 1)
-                                localStorage.setItem("timeout", (timeout - 1).toString())
+                                const newTimeout = !timeout ? timeout : timeout - 1
+                                setTimeout(newTimeout)
+                                localStorage.setItem("timeout", newTimeout.toString())
                             }}
                         >
                             <Minus />
@@ -117,8 +118,9 @@ export default function QuerySettings() {
                             id="decreaseLimitBtn"
                             className="p-2"
                             onClick={() => {
-                                setLimit(prev => !prev ? prev : prev - 1)
-                                localStorage.setItem("limit", (limit - 1).toString())
+                                const newLimit = !limit ? limit : limit - 1
+                                setLimit(newLimit)
+                                localStorage.setItem("limit", newLimit.toString())
                             }}
                         >
                             <Minus />
