@@ -49,7 +49,10 @@ test.describe('Graph Tests', () => {
         await graph.refreshPage();
         await apiCall.removeGraph(graphName);        
         await graph.refreshPage();
-        expect(await graph.verifyGraphExists(graphName, apiCall)).toBe(false);
+        const response = await apiCall.getGraphs();
+        expect(response.opts.includes(graphName)).toBe(false);
+        const graphExistsInUI = await graph.verifyGraphExists(graphName, apiCall);
+        expect(graphExistsInUI).toBe(false);
     });
 
     test(`@admin Create graph -> click the Export Data button -> verify the file has been successfully downloaded`, async () => {
