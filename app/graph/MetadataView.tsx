@@ -154,17 +154,15 @@ export default function MetadataView({ graphName, query, setQuery, fetchCount }:
 }) {
 
     return (
-        <div className={cn("h-full flex overflow-hidden border")}>
-            <div className="w-1 grow flex flex-col gap-4 border-r p-12 overflow-auto">
+        <div className={cn("h-full grid grid-cols-2 grid-rows-2 overflow-hidden border")}>
+            <div className="flex flex-col gap-4 border-r p-12 overflow-auto row-span-2">
                 <Profile graphName={graphName} query={query} setQuery={setQuery} fetchCount={fetchCount} />
             </div>
-            <div className="w-1 grow flex flex-col">
-                <div className="h-1 grow p-12 overflow-auto overflow-x-hidden border-b">
-                    <Metadata query={query} />
-                </div>
-                <div className="h-1 grow p-12 overflow-auto overflow-x-hidden">
-                    <Explain query={query} />
-                </div>
+            <div className="flex flex-col gap-4 p-12 overflow-auto overflow-x-hidden border-b">
+                <Metadata query={query} />
+            </div>
+            <div className="flex flex-col gap-4 p-12 overflow-auto overflow-x-hidden">
+                <Explain query={query} />
             </div>
         </div>
     )
