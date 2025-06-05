@@ -3,7 +3,7 @@
 'use client'
 
 import { useEffect, useState, useContext, Dispatch, SetStateAction, useRef, useCallback } from "react";
-import { cn, securedFetch, GraphRef } from "@/lib/utils";
+import { cn, GraphRef, fetchOptions, formatName } from "@/lib/utils";
 import { History, Info, Maximize2 } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import * as monaco from "monaco-editor";
@@ -29,7 +29,7 @@ interface Props {
     runQuery?: (query: string) => Promise<void>
     historyQuery?: HistoryQuery
     setHistoryQuery?: Dispatch<SetStateAction<HistoryQuery>>
-    fetchCount: () => void
+    fetchCount: () => Promise<void>
     selectedElements: (Node | Link)[]
     setSelectedElement: Dispatch<SetStateAction<Node | Link | undefined>>
     handleDeleteElement: () => Promise<void>
@@ -70,38 +70,14 @@ export default function Selector({ graph, options, setOptions, graphName, setGra
     }, [currentQuery, setTab])
 
     const handleOnChange = useCallback((name: string) => {
-        const formattedName = name === '""' ? "" : name
-        setGraphName(formattedName)
+        setGraphName(formatName(name))
     }, [setGraphName])
 
     const getOptions = useCallback(async () => {
-        if (indicator === "offline") return
-
-        const result = await securedFetch(`api/${type === "Graph" ? "graph" : "schema"}`, {
-            method: "GET"
-        }, toast, setIndicator)
-
-        if (!result.ok) return
-
-        const { opts } = (await result.json()) as { opts: string[] }
-
+        const [opts, name] = await fetchOptions(type, toast, setIndicator, indicator)
         setOptions(opts)
-
-        if (opts.length === 1) handleOnChange(opts[0])
-        if (opts.length === 0) handleOnChange("")
-    }, [handleOnChange, indicator, setIndicator, setOptions, toast, type])
-
-    useEffect(() => {
-        getOptions()
-    }, [getOptions])
-
-    useEffect(() => {
-        if (indicator === "online") getOptions()
-    }, [indicator, getOptions])
-
-    useEffect(() => {
-        getOptions()
-    }, [])
+        handleOnChange(name)
+    }, [handleOnChange, setOptions, toast, setIndicator, indicator, type])
 
     const focusEditorAtEnd = () => {
         if (editorRef.current) {
@@ -161,7 +137,7 @@ export default function Selector({ graph, options, setOptions, graphName, setGra
                 options={options}
                 setOptions={setOptions}
                 selectedValue={graphName}
-                setSelectedValue={setGraphName}
+                setSelectedValue={handleOnChange}
                 type={type}
                 onOpenChange={async (o) => {
                     if (o) await getOptions()

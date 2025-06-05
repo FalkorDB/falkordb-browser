@@ -1,56 +1,58 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 // eslint-disable-next-line import/prefer-default-export
 
-"use client"
+"use client";
 
-import { type ClassValue, clsx } from "clsx"
-import { twMerge } from "tailwind-merge"
-import { MutableRefObject } from "react"
-import { ForceGraphMethods } from "react-force-graph-2d"
-import { Node, Link, DataCell } from "@/app/api/graph/model"
+import { type ClassValue, clsx } from "clsx";
+import { twMerge } from "tailwind-merge";
+import { MutableRefObject } from "react";
+import { ForceGraphMethods } from "react-force-graph-2d";
+import { Node, Link, DataCell } from "@/app/api/graph/model";
 
 export const screenSize = {
   sm: 640,
   md: 768,
   lg: 1024,
   xl: 1280,
-  '2xl': 1536
-}
+  "2xl": 1536,
+};
 
-export type GraphRef = MutableRefObject<ForceGraphMethods<Node, Link> | undefined>
+export type GraphRef = MutableRefObject<
+  ForceGraphMethods<Node, Link> | undefined
+>;
 
 export type SelectCell = {
-  value: string,
-  type: "select",
-  options: string[],
-  selectType: "Role"
-  onChange: (value: string) => Promise<boolean>,
-}
+  value: string;
+  type: "select";
+  options: string[];
+  selectType: "Role";
+  onChange: (value: string) => Promise<boolean>;
+};
 
 export type ObjectCell = {
-  value: DataCell,
-  type: "object",
-}
+  value: DataCell;
+  type: "object";
+};
 
 export type TextCell = {
-  value: string,
-  type: "text",
-  onChange: (value: string) => Promise<boolean>,
-}
+  value: string;
+  type: "text";
+  onChange: (value: string) => Promise<boolean>;
+};
 
 export type ReadOnlyCell = {
-  value: string,
-  type: "readonly",
-}
+  value: string;
+  type: "readonly";
+};
 
-export type Cell = SelectCell | TextCell | ObjectCell | ReadOnlyCell
+export type Cell = SelectCell | TextCell | ObjectCell | ReadOnlyCell;
 export interface Row {
-  cells: Cell[]
-  checked?: boolean
+  cells: Cell[];
+  checked?: boolean;
 }
 
 export function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs))
+  return twMerge(clsx(inputs));
 }
 
 export async function securedFetch(
@@ -59,35 +61,36 @@ export async function securedFetch(
   toast?: any,
   setIndicator?: (indicator: "online" | "offline") => void
 ): Promise<Response> {
-  const response = await fetch(input, init)
-  const { status } = response
+  const response = await fetch(input, init);
+  const { status } = response;
   if (status >= 300) {
-    const err = await response.text()
+    const err = await response.text();
     if (toast) {
       toast({
         title: "Error",
         description: err,
-        variant: "destructive"
-      })
+        variant: "destructive",
+      });
     }
     if (status === 401 || status >= 500) {
       if (setIndicator) {
-        setIndicator("offline")
+        setIndicator("offline");
       }
     }
   }
-  return response
+  return response;
 }
 
 export function prepareArg(arg: string) {
-  return encodeURIComponent(arg.trim())
+  return encodeURIComponent(arg.trim());
 }
 
-export const defaultQuery = (q?: string) => q || "MATCH (n) OPTIONAL MATCH (n)-[e]-(m) return * LIMIT 100"
+export const defaultQuery = (q?: string) =>
+  q || "MATCH (n) OPTIONAL MATCH (n)-[e]-(m) return * LIMIT 100";
 
 export function rgbToHSL(hex: string): string {
   // Remove the # if present
-  const formattedHex = hex.replace(/^#/, '');
+  const formattedHex = hex.replace(/^#/, "");
 
   // Convert hex to RGB
   const r = parseInt(formattedHex.slice(0, 2), 16) / 255;
@@ -129,17 +132,23 @@ export function rgbToHSL(hex: string): string {
   return `hsl(${hDeg}, ${sPct}%, ${lPct}%)`;
 }
 
-export function handleZoomToFit(chartRef?: GraphRef, filter?: (node: Node) => boolean, paddingMultiplier = 1) {
-  const chart = chartRef?.current
+export function handleZoomToFit(
+  chartRef?: GraphRef,
+  filter?: (node: Node) => boolean,
+  paddingMultiplier = 1
+) {
+  const chart = chartRef?.current;
   if (chart) {
     // Get canvas dimensions
-    const canvas = document.querySelector('.force-graph-container canvas') as HTMLCanvasElement;
+    const canvas = document.querySelector(
+      ".force-graph-container canvas"
+    ) as HTMLCanvasElement;
     if (!canvas) return;
 
     // Calculate padding as 10% of the smallest canvas dimension, with minimum of 40px
     const minDimension = Math.min(canvas.width, canvas.height);
-    const padding = minDimension * 0.1
-    chart.zoomToFit(1000, padding * paddingMultiplier, filter)
+    const padding = minDimension * 0.1;
+    chart.zoomToFit(1000, padding * paddingMultiplier, filter);
   }
 }
 
@@ -151,18 +160,53 @@ export function createNestedObject(arr: string[]): object {
 }
 
 export function getMainReturnLimit(query: string) {
-  const match = query.match(/.*\bRETURN\b.*?(?:\bLIMIT\b\s*(\d+))?(?:\s*;?\s*$|\s*$)/i);
+  const match = query.match(
+    /.*\bRETURN\b.*?(?:\bLIMIT\b\s*(\d+))?(?:\s*;?\s*$|\s*$)/i
+  );
   return match && match[1];
 }
 
 export function getQueryWithLimit(query: string, limit: number) {
-  if (limit === 0) return query
+  if (limit === 0) return query;
 
-  const hasMainReturnLimit = getMainReturnLimit(query)
+  const hasMainReturnLimit = getMainReturnLimit(query);
 
   if (hasMainReturnLimit) {
-    return query
+    return query;
   }
 
-  return `${query} LIMIT ${limit}`
+  return `${query} LIMIT ${limit}`;
 }
+
+export async function fetchOptions(
+  type: "Graph" | "Schema",
+  toast: any,
+  setIndicator: (indicator: "online" | "offline") => void,
+  indicator: "online" | "offline"
+): Promise<[string[], string]> {
+  const response: [string[], string] = [[], ""];
+
+  if (indicator === "offline") return response;
+
+  const result = await securedFetch(
+    `api/${type === "Graph" ? "graph" : "schema"}`,
+    {
+      method: "GET",
+    },
+    toast,
+    setIndicator
+  );
+
+  if (!result.ok) return response;
+
+  const { opts } = (await result.json()) as { opts: string[] };
+
+  response[0] = opts;
+
+  if (opts.length === 1) [response[1]] = opts;
+
+  return response;
+}
+
+export const formatName = (newGraphName: string) =>
+  newGraphName === '""' ? "" : newGraphName;

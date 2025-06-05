@@ -5,15 +5,16 @@ import { getQueryWithLimit, prepareArg, securedFetch } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
 import dynamic from "next/dynamic";
 import { ForceGraphMethods } from "react-force-graph-2d";
-import { Category, Graph, GraphData, HistoryQuery, Link, Node } from "../api/graph/model";
+import { Category, Graph, GraphData, Link, Node } from "../api/graph/model";
 import Tutorial from "./Tutorial";
-import { GraphNameContext, GraphContext, IndicatorContext, LimitContext, TimeoutContext, GraphNamesContext } from "../components/provider";
+import { GraphNameContext, GraphContext, IndicatorContext, LimitContext, TimeoutContext, GraphNamesContext, HistoryQueryContext } from "../components/provider";
 
 const Selector = dynamic(() => import("./Selector"), { ssr: false })
 const GraphView = dynamic(() => import("./GraphView"), { ssr: false })
 
 export default function Page() {
     const { graphNames, setGraphNames } = useContext(GraphNamesContext)
+    const {historyQuery, setHistoryQuery} = useContext(HistoryQueryContext)
     const { setIndicator } = useContext(IndicatorContext);
     const { graph, setGraph } = useContext(GraphContext)
     const { graphName, setGraphName } = useContext(GraphNameContext)
@@ -29,12 +30,6 @@ export default function Page() {
     const [cooldownTicks, setCooldownTicks] = useState<number | undefined>(0)
     const [categories, setCategories] = useState<Category<Node>[]>([])
     const [data, setData] = useState<GraphData>({ ...graph.Elements })
-    const [historyQuery, setHistoryQuery] = useState<HistoryQuery>({
-        queries: [],
-        query: "",
-        currentQuery: "",
-        counter: 0
-    })
     const [labels, setLabels] = useState<Category<Link>[]>([])
     const [nodesCount, setNodesCount] = useState(0)
     const [edgesCount, setEdgesCount] = useState(0)
@@ -74,21 +69,12 @@ export default function Page() {
     }, [graphName, toast, setIndicator])
 
     useEffect(() => {
-        setHistoryQuery({
-            queries: JSON.parse(localStorage.getItem(`query history`) || "[]"),
-            query: "",
-            currentQuery: "",
-            counter: 0
-        })
-    }, [])
-
-    useEffect(() => {
         if (graphName !== graph.Id) {
             const colors = JSON.parse(localStorage.getItem(graphName) || "[]")
             setGraph(Graph.empty(graphName, colors))
         }
         fetchCount()
-    }, [graph.Id, graphName])
+    }, [fetchCount, graph.Id, graphName, setGraph])
 
     const run = async (q: string) => {
         if (!graphName) {
