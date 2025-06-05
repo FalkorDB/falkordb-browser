@@ -46,6 +46,7 @@ test.describe('Graph Tests', () => {
         const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
         const graphName = getRandomString('graph');
         await graph.addGraph(graphName);
+        await graph.refreshPage();
         await apiCall.removeGraph(graphName);        
         await graph.refreshPage();
         expect(await graph.verifyGraphExists(graphName, apiCall)).toBe(false);
