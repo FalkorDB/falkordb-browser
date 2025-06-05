@@ -297,9 +297,7 @@ export default class SchemaPage extends GraphPage {
 
     async searchElementInCanvasSelectFirst(name: string): Promise<void> {
         await this.fillElementCanvasSearch("Schema", name);
-        // Use first() to handle multiple elements with same test ID
         await this.clickFirstElementSuggestionInSearch();
-        // await this.page.getByTestId(`elementCanvasSuggestionSchema0`).first().click();
     }
 
     async deleteSchemaElement(): Promise<void> {
@@ -310,54 +308,57 @@ export default class SchemaPage extends GraphPage {
         await this.page.waitForTimeout(1500); // wait for the element to be deleted
     }
 
-    async selectTowNodes(): Promise<void> {
-        // Wait for canvas to be fully loaded and nodes to be visible
-        await this.waitForCanvasAnimationToEnd();
-        await this.page.waitForTimeout(2000); // Give extra time for nodes to be rendered
-        
+    async selectTwoNodesByValidSelection(): Promise<void> {
         const nodes = await this.getNodesScreenPositions('schema');
         
-        // Add debugging information
-        console.log(`Found ${nodes.length} nodes in schema canvas`);
-        if (nodes.length > 0) {
-            console.log('Node details:', nodes.map(n => ({ id: n.id, visible: n.visible, x: n.screenX, y: n.screenY })));
+        if (nodes.length < 2) {
+            throw new Error("Need at least 2 nodes to create an edge");
         }
-        
-        // Ensure we have at least 2 visible nodes
-        const visibleNodes = nodes.filter(node => node.visible);
-        if (visibleNodes.length < 2) {
-            throw new Error(`Expected at least 2 visible nodes, but found ${visibleNodes.length}. Total nodes: ${nodes.length}`);
+
+        for (let i = 0; i < nodes.length - 1; i++) {
+            const first = nodes[i];
+            await this.elementClick(first.screenX, first.screenY);
+            await this.page.waitForTimeout(500);
+    
+            for (let j = i + 1; j < nodes.length; j++) {
+                const second = nodes[j];
+                await this.elementClick(second.screenX, second.screenY);
+                await this.page.waitForTimeout(500);
+    
+                try {
+                    const selectedNode1Locator = this.dataPanelNodeSelection('1');
+                    const selectedNode2Locator = this.dataPanelNodeSelection('2');
+                    
+                    const isNode1Visible = await selectedNode1Locator.isVisible();
+                    const isNode2Visible = await selectedNode2Locator.isVisible();
+                    
+                    if (isNode1Visible && isNode2Visible) {
+                        const node1Text = await this.getDataPanelNodeSelection('1');
+                        const node2Text = await this.getDataPanelNodeSelection('2');
+                        
+                        if (node1Text && node1Text.trim() !== '' && 
+                            node2Text && node2Text.trim() !== '') {
+                            return;
+                        }
+                    }
+                } catch (error) {
+                    console.log(`Selection attempt failed: ${error}`);
+                }
+            }
         }
-        
-        // Click on the first two visible nodes
-        console.log(`Clicking on first node at (${visibleNodes[0].screenX}, ${visibleNodes[0].screenY})`);
-        await this.elementClick(visibleNodes[0].screenX, visibleNodes[0].screenY);
-        await this.page.waitForTimeout(500);
-        
-        console.log(`Clicking on second node at (${visibleNodes[1].screenX}, ${visibleNodes[1].screenY})`);
-        await this.elementClick(visibleNodes[1].screenX, visibleNodes[1].screenY);
-        await this.page.waitForTimeout(500);
-    }
+    
+        throw new Error("Failed to select two valid nodes.");
+    }    
 
     async addEdge(attributeRow: string, label: string, key: string, type: string, description: string, unique: boolean, required: boolean): Promise<void> {
-        console.log(`Starting addEdge process with label: ${label}`);
-        
         await this.clickElementCanvasAdd();
         await this.clickElementCanvasAddEdge();
         await this.addLabelToNode(label);
         await this.addAttribute(attributeRow, key, type, description, unique, required);
-        
-        console.log('About to select two nodes for edge creation');
-        await this.selectTowNodes();
-        
-        console.log('Creating the edge element');
+        await this.selectTwoNodesByValidSelection();
         await this.clickCreateNewNodeButton();
         await this.waitForPageIdle();
         await this.page.waitForTimeout(1500); // wait for the edge to be created
-        
-        // Additional wait for UI to update after edge creation
-        await this.page.waitForTimeout(1000);
-        console.log('Edge creation process completed');
     }
 
     async exportSchema(schemaName: string): Promise<void> { // must check if its working

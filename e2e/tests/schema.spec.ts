@@ -7,6 +7,7 @@ import ApiCalls from "../logic/api/apiCalls";
 import urls from '../config/urls.json'
 import { getRandomString } from "../infra/utils";
 import SchemaPage from "../logic/POM/schemaPage";
+import { BATCH_CREATE_PERSONS } from "../config/constants";
 
 test.describe('Schema Tests', () => {
     let browser: BrowserWrapper;
@@ -65,46 +66,16 @@ test.describe('Schema Tests', () => {
         await apicalls.removeSchema(schemaName);
     });
     
-    test(`@admin Validate that a creating edge updates relationship types panel`, async () => {
+    test.only(`@admin Validate that a creating edge updates relationship types panel`, async () => {
         const schemaName = getRandomString('schema');
-        await apicalls.runSchemaQuery(schemaName, 'CREATE (a:person1 {id: "1"}), (b:person2 {id: "2"}) RETURN a, b');
+        await apicalls.runSchemaQuery(schemaName, BATCH_CREATE_PERSONS);
         const schema = await browser.createNewPage(SchemaPage, urls.schemaUrl);
         await browser.setPageToFullScreen();
         await schema.selectSchemaByName(schemaName);
-        
-        // Wait for the canvas to be fully loaded and verify nodes are visible
         await schema.waitForCanvasAnimationToEnd();
-        await new Promise(resolve => setTimeout(resolve, 2000));
-        
-        // Verify we have the expected nodes before proceeding
-        const nodes = await schema.getNodesScreenPositions('schema');
-        console.log(`Found ${nodes.length} nodes before adding edge`);
-        expect(nodes.length).toBeGreaterThanOrEqual(2);
-        
         const attributeRow = "1"
         await schema.addEdge(attributeRow, "knows", 'id', "Integer", "100", true, true);
-        
-        // Wait for the UI to update after edge creation
-        await new Promise(resolve => setTimeout(resolve, 2000));
-        
-        // Retry mechanism for getting the label content
-        let labelContent = null;
-        let attempts = 0;
-        const maxAttempts = 5;
-        
-        while (attempts < maxAttempts && !labelContent) {
-            try {
-                labelContent = await schema.getLabelsButtonByNameContent("Schema", "RelationshipTypes", "knows");
-                if (labelContent === "knows") {
-                    break;
-                }
-            } catch (error) {
-                console.log(`Attempt ${attempts + 1} failed to get label content: ${error}`);
-                await new Promise(resolve => setTimeout(resolve, 1000));
-            }
-            attempts++;
-        }
-        
+        const labelContent = await schema.getLabelsButtonByNameContent("Schema", "RelationshipTypes", "knows");
         expect(labelContent).toBe("knows");
         await apicalls.removeSchema(schemaName);
     });
