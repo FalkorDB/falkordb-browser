@@ -66,7 +66,7 @@ test.describe('Schema Tests', () => {
         await apicalls.removeSchema(schemaName);
     });
     
-    test.only(`@admin Validate that a creating edge updates relationship types panel`, async () => {
+    test(`@admin Validate that a creating edge updates relationship types panel`, async () => {
         const schemaName = getRandomString('schema');
         await apicalls.runSchemaQuery(schemaName, BATCH_CREATE_PERSONS);
         const schema = await browser.createNewPage(SchemaPage, urls.schemaUrl);
