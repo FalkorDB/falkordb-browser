@@ -333,7 +333,6 @@ export default class GraphPage extends Page {
         await this.clickSelect("Graph");
         await this.fillSearch(graphName);
         
-        // Wait longer and poll for the search results to be properly updated
         let attempts = 0;
         const maxAttempts = 5;
         let isVisible = false;
@@ -344,13 +343,11 @@ export default class GraphPage extends Page {
             isVisible = await this.isVisibleSelectItem(graphId);
             
             if (!isVisible) {
-                // If not visible, the graph is likely deleted, so break early
                 break;
             }
             
             attempts++;
             if (attempts < maxAttempts) {
-                // Clear and re-search to ensure fresh results
                 await this.fillSearch("");
                 await this.page.waitForTimeout(500);
                 await this.fillSearch(graphName);

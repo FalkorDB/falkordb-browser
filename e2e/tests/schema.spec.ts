@@ -71,7 +71,6 @@ test.describe('Schema Tests', () => {
         const schema = await browser.createNewPage(SchemaPage, urls.schemaUrl);
         await browser.setPageToFullScreen();
         await schema.selectSchemaByName(schemaName);
-        const nodes = await schema.getNodesScreenPositions('schema');
         const attributeRow = "1"
         await schema.addEdge(attributeRow, "knows", 'id', "Integer", "100", true, true);
         const labelContent = await schema.getLabelsButtonByNameContent("Schema", "RelationshipTypes", "knows");        
@@ -248,7 +247,6 @@ test.describe('Schema Tests', () => {
         await browser.setPageToFullScreen();
         await schema.selectSchemaByName(schemaName);
         const initialEdgesCount = parseInt(await schema.getEdgesCount() ?? "0", 10);
-        const nodes = await schema.getNodesScreenPositions('schema');
         const attributeRow = "1"
         await schema.addEdge(attributeRow, "knows", 'id', "Integer", "100", true, true);
         const finalEdgesCount = parseInt(await schema.getEdgesCount() ?? "0", 10);
@@ -334,7 +332,6 @@ test.describe('Schema Tests', () => {
         await browser.setPageToFullScreen();
         await schema.selectSchemaByName(schemaName);
         const initialNodesCount = parseInt(await schema.getNodesCount() ?? "0", 10);
-        const nodes = await schema.getNodesScreenPositions('schema');
         const attributeRow = "1"
         await schema.addEdge(attributeRow, "knows", 'id', "Integer", "100", true, true);
         const finalNodesCount = parseInt(await schema.getNodesCount() ?? "0", 10);

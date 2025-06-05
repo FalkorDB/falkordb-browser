@@ -310,11 +310,11 @@ export default class SchemaPage extends GraphPage {
         await this.page.waitForTimeout(1500); // wait for the element to be deleted
     }
 
-    async selectFirstTowNodes(): Promise<void> {
+    async selectTowNodes(): Promise<void> {
         const nodes = await this.getNodesScreenPositions('schema');
         await this.elementClick(nodes[0].screenX, nodes[0].screenY);
         await this.page.waitForTimeout(500);
-        await this.elementClick(nodes[1].screenX, nodes[1].screenY);
+        await this.elementClick(nodes[0].screenX, nodes[0].screenY);
     }
 
     async addEdge(attributeRow: string, label: string, key: string, type: string, description: string, unique: boolean, required: boolean): Promise<void> {
@@ -322,7 +322,7 @@ export default class SchemaPage extends GraphPage {
         await this.clickElementCanvasAddEdge();
         await this.addLabelToNode(label);
         await this.addAttribute(attributeRow, key, type, description, unique, required);
-        await this.selectFirstTowNodes();
+        await this.selectTowNodes();
         await this.clickCreateNewNodeButton();
         await this.waitForPageIdle();
         await this.page.waitForTimeout(1500); // wait for the edge to be created
