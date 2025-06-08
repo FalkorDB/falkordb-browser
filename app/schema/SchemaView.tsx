@@ -18,7 +18,7 @@ const ForceGraph = dynamic(() => import("../components/ForceGraph"), { ssr: fals
 
 /* eslint-disable react/require-default-props */
 interface Props {
-    fetchCount?: () => void
+    fetchCount?: (graphName: string) => Promise<void>
     edgesCount: number
     nodesCount: number
     selectedElement: Node | Link | undefined
@@ -126,7 +126,7 @@ export default function SchemaView({
 
             if (isAddEntity) {
                 const { category } = schema.extendNode(json.result.data[0].n, false, true)!
-                setCategories(prev => [...prev, ...category.map(c => schema.CategoriesMap.get(c)!)])
+                setCategories(prev => [...prev, ...category.filter(c => !prev.some(p => p.name === c)).map(c => schema.CategoriesMap.get(c)!)])
                 setIsAddEntity(false)
             } else {
                 const { label } = schema.extendEdge(json.result.data[0].e, false, true)!
@@ -134,7 +134,7 @@ export default function SchemaView({
                 setIsAddRelation(false)
             }
 
-            if (fetchCount) fetchCount()
+            if (fetchCount) fetchCount(schema.Id)
 
             setSelectedElement(undefined)
         }

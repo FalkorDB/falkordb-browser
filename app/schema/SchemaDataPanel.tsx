@@ -270,6 +270,15 @@ export default function SchemaDataPanel({ object, setObject, onDeleteElement, sc
     const handleRemoveLabel = async (removeLabel: string) => {
         const node = object as Node
 
+        if (removeLabel === "") {
+            toast({
+                title: "Error",
+                description: "You cannot remove the default label",
+                variant: "destructive"
+            })
+            return
+        }
+
         try {
             setIsRemoveLabelLoading(true)
             const result = await securedFetch(`api/schema/${prepareArg(schema.Id)}/${prepareArg(object.id.toString())}/label`, {

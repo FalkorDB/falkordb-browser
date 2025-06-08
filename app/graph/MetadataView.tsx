@@ -11,7 +11,7 @@ export function Profile({ graphName, query, setQuery, fetchCount }: {
     graphName: string,
     query: Query,
     setQuery: (q: Query) => void,
-    fetchCount: () => void
+    fetchCount: () => Promise<void>
 }) {
     const { indicator, setIndicator } = useContext(IndicatorContext)
     const { toast } = useToast()
@@ -150,7 +150,7 @@ export default function MetadataView({ graphName, query, setQuery, fetchCount }:
     graphName: string,
     query: Query,
     setQuery: (q: Query) => void,
-    fetchCount: () => void,
+    fetchCount: () => Promise<void>,
 }) {
 
     return (
