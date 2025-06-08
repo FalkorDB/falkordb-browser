@@ -92,6 +92,15 @@ export default function GraphDataPanel({ object, setObject, onDeleteElement, set
     const handleRemoveLabel = async (removeLabel: string) => {
         const node = object as Node
 
+        if (removeLabel === "") {
+            toast({
+                title: "Error",
+                description: "You cannot remove the default label",
+                variant: "destructive"
+            })
+            return false
+        }
+
         const result = await securedFetch(`api/graph/${prepareArg(graph.Id)}/${node.id}/label`, {
             method: "DELETE",
             body: JSON.stringify({

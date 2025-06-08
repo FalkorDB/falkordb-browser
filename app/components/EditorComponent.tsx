@@ -48,6 +48,7 @@ interface Props {
     setMaximize: Dispatch<SetStateAction<boolean>>
     runQuery: (query: string) => Promise<void>
     setHistoryQuery: Dispatch<SetStateAction<HistoryQuery>>
+    editorKey: string
 }
 
 const monacoOptions: monaco.editor.IStandaloneEditorConstructionOptions = {
@@ -222,7 +223,7 @@ const LINE_HEIGHT = 36
 
 const PLACEHOLDER = "Type your query here to start"
 
-export default function EditorComponent({ graph, historyQuery, maximize, setMaximize, runQuery, setHistoryQuery }: Props) {
+export default function EditorComponent({ graph, historyQuery, maximize, setMaximize, runQuery, setHistoryQuery, editorKey }: Props) {
 
     const { indicator, setIndicator } = useContext(IndicatorContext)
 
@@ -613,6 +614,7 @@ export default function EditorComponent({ graph, historyQuery, maximize, setMaxi
             <div className="h-full w-1 grow flex rounded-lg overflow-hidden">
                 <div ref={containerRef} className="h-full relative grow w-1" data-testid="editorContainer">
                     <Editor
+                        key={editorKey}
                         height={editorHeight}
                         language="custom-language"
                         options={{

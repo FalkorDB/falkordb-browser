@@ -30,7 +30,7 @@ interface Props {
     setSelectedElements: Dispatch<SetStateAction<(Node | Link)[]>>
     nodesCount: number
     edgesCount: number
-    fetchCount: () => void
+    fetchCount: () => Promise<void>
     handleCooldown: (ticks?: number) => void
     cooldownTicks: number | undefined
     chartRef: GraphRef
