@@ -129,7 +129,7 @@ function GraphView({
 
     return (
         <Tabs value={tabsValue} onValueChange={setTabsValue} className="h-full w-full relative border rounded-lg overflow-hidden">
-            <div className="absolute bottom-4 inset-x-12 pointer-events-none z-10 flex gap-4 justify-between items-center">
+            <div className="absolute bottom-4 inset-x-12 pointer-events-none z-10 flex gap-4 justify-between items-end">
                 <GraphDetails
                     graph={graph}
                     tabsValue={tabsValue}
