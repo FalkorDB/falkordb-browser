@@ -275,7 +275,7 @@ export default function Selector({ graph, options, setOptions, graphName, setGra
                                                 />
                                             </TabsContent>
                                             <TabsContent className="w-full h-1 grow bg-background rounded-lg p-8" value="profile">
-                                                <div className="h-full w-full overflow-hidden flex flex-col">
+                                                <div className="h-full w-full overflow-hidden flex flex-col gap-4">
                                                     <Profile
                                                         graphName={graphName}
                                                         query={currentQuery!}
@@ -292,14 +292,14 @@ export default function Selector({ graph, options, setOptions, graphName, setGra
                                                 </div>
                                             </TabsContent>
                                             <TabsContent className="w-full h-1 grow bg-background rounded-lg p-8" value="metadata">
-                                                <div className="h-full w-full overflow-hidden flex flex-col">
+                                                <div className="h-full w-full overflow-hidden flex flex-col gap-4">
                                                     <Metadata
                                                         query={currentQuery!}
                                                     />
                                                 </div>
                                             </TabsContent>
                                             <TabsContent className="w-full h-1 grow bg-background rounded-lg p-8" value="explain">
-                                                <div className="h-full w-full overflow-hidden flex flex-col">
+                                                <div className="h-full w-full overflow-hidden flex flex-col gap-4">
                                                     <Explain
                                                         query={currentQuery!}
                                                     />
