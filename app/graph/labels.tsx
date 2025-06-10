@@ -8,7 +8,7 @@ interface Props<T extends Category<Node> | Category<Link>> {
     graph: Graph,
     categories: T[],
     onClick: (category: T) => void,
-    label: "RelationshipTypes" | "Labels",
+    label: "Relationships" | "Labels",
     type: "Schema" | "Graph",
     className?: string,
 }

@@ -218,7 +218,7 @@ function GraphView({
                     </div>
                     {
                         (labels.length > 0 || categories.length > 0) &&
-                        <Labels graph={graph} categories={labels} onClick={onLabelClick} label="RelationshipTypes" type="Graph" />
+                        <Labels graph={graph} categories={labels} onClick={onLabelClick} label="Relationships" type="Graph" />
                     }
                 </div>
                 {
