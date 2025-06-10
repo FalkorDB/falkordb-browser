@@ -68,7 +68,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
         } else {
           toast({
             title: "Error",
-            description: result.text(),
+            description: await result.text(),
             variant: "destructive",
           })
         }
