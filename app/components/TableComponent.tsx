@@ -10,7 +10,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { JSONTree } from "react-json-tree"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Cell, cn, Row } from "@/lib/utils";
-import { useCallback, useContext, useEffect, useState } from "react";
+import { useCallback, useContext, useEffect, useRef, useState } from "react";
 import { CheckCircle, Pencil, XCircle } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import Button from "./ui/Button";
@@ -30,13 +30,22 @@ interface Props {
 
 export default function TableComponent({ headers, rows, label, entityName, children, setRows, className }: Props) {
 
+    const { indicator } = useContext(IndicatorContext)
+
+    const searchRef = useRef<HTMLInputElement>(null)
+
     const [search, setSearch] = useState<string>("")
     const [editable, setEditable] = useState<string>("")
     const [hover, setHover] = useState<string>("")
     const [newValue, setNewValue] = useState<string>("")
     const [filteredRows, setFilteredRows] = useState<Row[]>(rows)
     const [isLoading, setIsLoading] = useState<boolean>(false)
-    const { indicator } = useContext(IndicatorContext)
+
+    useEffect(() => {
+        if (searchRef.current) {
+            searchRef.current.focus()
+        }
+    }, [])
 
     const handleSearchFilter = useCallback((cell: Cell): boolean => {
         if (!cell.value) return false;
@@ -80,7 +89,7 @@ export default function TableComponent({ headers, rows, label, entityName, child
                 {children}
                 <Input
                     data-testid={`searchInput${label}`}
-                    ref={ref => ref?.focus()}
+                    ref={searchRef}
                     variant="primary"
                     className="grow"
                     value={search}
