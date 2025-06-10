@@ -319,7 +319,7 @@ export class Graph {
             }
         }
 
-        return undefined
+        return currentNode
     }
 
     public extendEdge(cell: LinkCell, collapsed: boolean, isSchema: boolean) {
@@ -430,7 +430,7 @@ export class Graph {
             return link
         }
 
-        return undefined
+        return currentEdge
     }
 
     public extend(results: { data: Data, metadata: any[] }, collapsed = false, isSchema = false): (Node | Link)[] {

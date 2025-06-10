@@ -1,6 +1,7 @@
 import { useToast } from "@/components/ui/use-toast";
 import { prepareArg, securedFetch, Row } from "@/lib/utils";
 import React, { useContext, useState } from "react";
+import { Graph } from "@/app/api/graph/model";
 import DialogComponent from "../DialogComponent";
 import Button from "../ui/Button";
 import CloseDialog from "../CloseDialog";
@@ -12,7 +13,8 @@ interface Props {
   handleSetRows: (rows: string[]) => void
   setOpenMenage: (openMenage: boolean) => void
   selectedValue: string
-  setSelectedValue: (selectedValue: string) => void
+  setGraphName: (graphName: string) => void
+  setGraph: (graph: Graph) => void
 }
 
 export default function DeleteGraph({
@@ -21,7 +23,8 @@ export default function DeleteGraph({
   handleSetRows,
   setOpenMenage,
   selectedValue,
-  setSelectedValue
+  setGraphName,
+  setGraph
 }: Props) {
 
   const [open, setOpen] = useState(false)
@@ -45,20 +48,23 @@ export default function DeleteGraph({
 
         })).then(newGraphNames => [newGraphNames.filter(n => n !== ""), deleteGraphNames.filter(n => !newGraphNames.includes(n))])
 
-      const newGraphNames = graphNames.filter(n => !failedDeletedGraphs.includes(n))
-      
+      const newGraphNames = graphNames.filter(n => !successDeletedGraphs.includes(n))
+
       setGraphNames(newGraphNames)
 
-      if (successDeletedGraphs.includes(selectedValue) && setSelectedValue) setSelectedValue(successDeletedGraphs.length > 0 ? newGraphNames[successDeletedGraphs.length - 1] : "")
+      if (successDeletedGraphs.includes(selectedValue)) {
+        setGraphName(successDeletedGraphs.length > 0 ? newGraphNames[successDeletedGraphs.length - 1] : "")
+        setGraph(Graph.empty())
+      }
 
-      setOpen(false)
-      setOpenMenage(false)
       handleSetRows(successDeletedGraphs)
       toast({
         title: "Graph(s) deleted successfully",
         description: successDeletedGraphs.length > 0 && `The graph(s) ${successDeletedGraphs.join(", ")} have been deleted successfully${failedDeletedGraphs.length > 0 && `The graph(s) ${failedDeletedGraphs.join(", ")} have not been deleted`}`,
       })
     } finally {
+      setOpen(false)
+      setOpenMenage(false)
       setIsLoading(false)
     }
   }

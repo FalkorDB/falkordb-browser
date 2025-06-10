@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useContext, useState, useRef } from "react";
+import { useContext, useState, useRef, useCallback, useEffect } from "react";
 import { prepareArg, securedFetch } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
 import dynamic from "next/dynamic";
@@ -15,11 +15,11 @@ export default function Page() {
 
     const { schemaNames, setSchemaNames } = useContext(SchemaNamesContext)
     const { schemaName, setSchemaName } = useContext(SchemaNameContext)
-    const { indicator, setIndicator } = useContext(IndicatorContext)
+    const { setIndicator } = useContext(IndicatorContext)
     const { schema, setSchema } = useContext(SchemaContext)
-    
+
     const { toast } = useToast()
-    
+
     const [selectedElement, setSelectedElement] = useState<Node | Link | undefined>()
     const [selectedElements, setSelectedElements] = useState<(Node | Link)[]>([])
     const [cooldownTicks, setCooldownTicks] = useState<number | undefined>(0)
@@ -31,7 +31,7 @@ export default function Page() {
     const [edgesCount, setEdgesCount] = useState<number>(0)
     const [nodesCount, setNodesCount] = useState<number>(0)
     const [isAddEntity, setIsAddEntity] = useState(false)
-    
+
     const fetchCount = useCallback(async () => {
         const result = await securedFetch(`api/schema/${prepareArg(schemaName)}/count`, {
             method: "GET"
@@ -57,7 +57,7 @@ export default function Page() {
 
         setEdgesCount(json.edges)
         setNodesCount(json.nodes)
-    }, [schemaName, toast, setIndicator])
+    }, [toast, setIndicator, schemaName])
 
     const handleCooldown = (ticks?: number) => {
         setCooldownTicks(ticks)
@@ -71,28 +71,31 @@ export default function Page() {
         }
     }
 
+    const fetchSchema = useCallback(async () => {
+        const result = await securedFetch(`/api/schema/${prepareArg(schemaName)}`, {
+            method: "GET"
+        }, toast, setIndicator)
+        if (!result.ok) return
+        const json = await result.json()
+        const colors = localStorage.getItem(schemaName)?.split(/[[\]",]/).filter(c => c)
+        const schemaGraph = Graph.create(schemaName, json.result, false, true, 0, colors)
+        setSchema(schemaGraph)
+        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+        // @ts-ignore
+        window.schema = schemaGraph
+
+        fetchCount()
+
+        handleCooldown()
+    }, [fetchCount, setIndicator, setSchema, toast, schemaName])
+
     useEffect(() => {
-        if (!schemaName || indicator === "offline") return
-        const run = async () => {
-            const result = await securedFetch(`/api/schema/${prepareArg(schemaName)}`, {
-                method: "GET"
-            }, toast, setIndicator)
-            if (!result.ok) return
-            const json = await result.json()
-            const colors = localStorage.getItem(schemaName)?.split(/[[\]",]/).filter(c => c)
-            const schemaGraph = Graph.create(schemaName, json.result, false, true, 0, colors)
-            setSchema(schemaGraph)
-            // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-            // @ts-ignore
-            window.schema = schemaGraph
-
+        if (schema.Id || !schemaName) {
             fetchCount()
-
-            handleCooldown()
+            return
         }
-        run()
-    }, [fetchCount, schemaName, toast, setIndicator, indicator, setSchema])
-
+        fetchSchema()
+    }, [schemaName, fetchSchema, schema.Id, fetchCount])
 
     const handleDeleteElement = async () => {
         const stateSelectedElements = Object.values(selectedElements)
@@ -172,6 +175,7 @@ export default function Page() {
                 chartRef={chartRef}
                 setIsAddEntity={setIsAddEntity}
                 setIsAddRelation={setIsAddRelation}
+                setGraph={setSchema}
             />
             <div className="h-1 grow p-12">
                 <SchemaView

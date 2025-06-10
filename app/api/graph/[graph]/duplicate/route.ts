@@ -1,11 +1,10 @@
-import { NextRequest, NextResponse } from "next/server";
-import { getClient } from "../../auth/[...nextauth]/options";
-import { ROLE } from "../model";
+import { getClient } from "@/app/api/auth/[...nextauth]/options";
+import { NextResponse, NextRequest } from "next/server";
 
 // eslint-disable-next-line import/prefer-default-export
 export async function PATCH(
-  req: NextRequest,
-  { params }: { params: Promise<{ user: string }> }
+  request: NextRequest,
+  { params }: { params: Promise<{ graph: string }> }
 ) {
   try {
     const session = await getClient();
@@ -15,14 +14,15 @@ export async function PATCH(
     }
 
     const { client } = session;
+    const { graph: graphId } = await params;
+    const sourceName = request.nextUrl.searchParams.get("sourceName");
 
-    const { user: username } = await params;
-    const role = ROLE.get(req.nextUrl.searchParams.get("role") || "");
     try {
-      if (!role) throw new Error("Role is missing");
+      if (!sourceName) throw new Error("Missing parameter sourceName");
 
-      await (await client.connection).aclSetUser(username, role);
-      return NextResponse.json({ message: "User created" }, { status: 200 });
+      const result = await client.selectGraph(sourceName).copy(graphId);
+
+      return NextResponse.json({ result });
     } catch (error) {
       console.error(error);
       return NextResponse.json(
