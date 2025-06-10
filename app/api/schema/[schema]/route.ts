@@ -96,38 +96,31 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ schema: string }> }
 ) {
+  const session = await getClient();
+
+  if (session instanceof NextResponse) {
+    return session;
+  }
+
+  const { client } = session;
+
+  const { schema } = await params;
+  const schemaName = `${schema}_schema`;
+
   try {
-    const session = await getClient();
+    const graph = client.selectGraph(schemaName);
 
-    if (session instanceof NextResponse) {
-      return session;
-    }
+    await graph.delete();
 
-    const { client } = session;
-
-    const { schema } = await params;
-    const schemaName = `${schema}_schema`;
-
-    try {
-      const graph = client.selectGraph(schemaName);
-
-      await graph.delete();
-
-      return NextResponse.json(
-        { message: `${schemaName} schema deleted` },
-        { status: 200 }
-      );
-    } catch (error) {
-      console.error(error);
-      return NextResponse.json(
-        { error: (error as Error).message },
-        { status: 400 }
-      );
-    }
-  } catch (err) {
     return NextResponse.json(
-      { message: (err as Error).message },
-      { status: 500 }
+      { message: `${schemaName} schema deleted` },
+      { status: 200 }
+    );
+  } catch (error) {
+    console.error(error);
+    return NextResponse.json(
+      { error: (error as Error).message },
+      { status: 400 }
     );
   }
 }
@@ -136,41 +129,33 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ schema: string }> }
 ) {
+  const session = await getClient();
+  if (session instanceof NextResponse) {
+    return session;
+  }
+
+  const { client } = session;
+
+  const { schema } = await params;
+  const schemaName = `${schema}_schema`;
+  const source = request.nextUrl.searchParams.get("sourceName");
+
   try {
-    const session = await getClient();
+    if (!source) throw new Error("Missing parameter sourceName");
 
-    if (session instanceof NextResponse) {
-      return session;
-    }
+    const sourceName = `${source}_schema`;
+    const data = await (
+      await client.connection
+    ).renameNX(sourceName, schemaName);
 
-    const { client } = session;
+    if (!data) throw new Error(`${schema} already exists`);
 
-    const { schema } = await params;
-    const schemaName = `${schema}_schema`;
-    const source = request.nextUrl.searchParams.get("sourceName");
-
-    try {
-      if (!source) throw new Error("Missing parameter sourceName");
-
-      const sourceName = `${source}_schema`;
-      const data = await (
-        await client.connection
-      ).renameNX(sourceName, schemaName);
-
-      if (!data) throw new Error(`${schema} already exists`);
-
-      return NextResponse.json({ data });
-    } catch (err: unknown) {
-      console.error(err);
-      return NextResponse.json(
-        { message: (err as Error).message },
-        { status: 400 }
-      );
-    }
-  } catch (err) {
+    return NextResponse.json({ data });
+  } catch (err: unknown) {
+    console.error(err);
     return NextResponse.json(
       { message: (err as Error).message },
-      { status: 500 }
+      { status: 400 }
     );
   }
 }

@@ -75,7 +75,7 @@ test.describe('Schema Tests', () => {
         await schema.waitForCanvasAnimationToEnd();
         const attributeRow = "1"
         await schema.addEdge(attributeRow, "knows", 'id', "Integer", "100", true, true);
-        const labelContent = await schema.getLabelsButtonByNameContent("Schema", "Relationships", "knows");
+        const labelContent = await schema.getLabelsButtonByNameContent("Schema", "RelationshipTypes", "knows");
         expect(labelContent).toBe("knows");
         await apicalls.removeSchema(schemaName);
     });
@@ -98,9 +98,10 @@ test.describe('Schema Tests', () => {
         const schema = await browser.createNewPage(SchemaPage, urls.schemaUrl);
         await browser.setPageToFullScreen();
         await schema.selectSchemaByName(schemaName);
+        const links1 = await schema.getLinksScreenPositions('schema');
         await schema.searchElementInCanvasSelectFirst("knows");
         await schema.deleteSchemaElement();;
-        expect(await schema.isVisibleLabelsButtonByName("Schema", "Relationships", "knows")).toBeFalsy();
+        expect(await schema.isVisibleLabelsButtonByName("Schema", "RelationshipTypes", "knows")).toBeFalsy();
         await apicalls.removeSchema(schemaName);
     });
 
@@ -125,10 +126,10 @@ test.describe('Schema Tests', () => {
         const schema = await browser.createNewPage(SchemaPage, urls.schemaUrl);
         await browser.setPageToFullScreen();
         await schema.selectSchemaByName(schemaName);
-        await schema.clickLabelsButtonByLabel("Schema", "Relationships", "knows");
+        await schema.clickLabelsButtonByLabel("Schema", "RelationshipTypes", "knows");
         const links1 = await schema.getLinksScreenPositions('schema');
         expect(links1[0].visible).toBeFalsy();
-        await schema.clickLabelsButtonByLabel("Schema", "Relationships", "knows");
+        await schema.clickLabelsButtonByLabel("Schema", "RelationshipTypes", "knows");
         const links2 = await schema.getLinksScreenPositions('schema');
         expect(links2[0].visible).toBeTruthy();
         await apicalls.removeSchema(schemaName);

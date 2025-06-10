@@ -20,25 +20,22 @@ export async function POST(
     const { type, label, attributes, selectedNodes } = await request.json();
 
     try {
-      if (type === undefined) throw new Error("Type is required");
-
+      if (type ? !label : !label[0]) throw new Error("Label is required");
+      if (!type && (!selectedNodes || selectedNodes.length !== 2))
+        throw new Error("Selected nodes are required");
       if (!attributes) throw new Error("Attributes are required");
-
-      if (type) {
-        if (!label[0]) throw new Error("Label is required");
-      } else {
-        if (!label) throw new Error("Label is required");
-
-        if (!selectedNodes || selectedNodes.length !== 2)
-          throw new Error("Selected nodes are required");
+      if (type === undefined) {
+        throw new Error("Type is required");
+      } else if (!type && !selectedNodes) {
+        throw new Error("Selected nodes are required");
       }
 
-      const formattedAttributes = formatAttributes(attributes);
+      const formateAttributes = formatAttributes(attributes);
       const graph = client.selectGraph(schemaName);
       const query = type
         ? `CREATE (n${label.length > 0 ? `:${label.join(":")}` : ""}${
-            formattedAttributes?.length > 0
-              ? ` {${formattedAttributes
+            formateAttributes?.length > 0
+              ? ` {${formateAttributes
                   .map(([k, v]) => `${k}: "${v}"`)
                   .join(",")}}`
               : ""
@@ -46,8 +43,8 @@ export async function POST(
         : `MATCH (a), (b) WHERE ID(a) = ${selectedNodes[0].id} AND ID(b) = ${
             selectedNodes[1].id
           } CREATE (a)-[e:${label[0]}${
-            formattedAttributes?.length > 0
-              ? ` {${formattedAttributes
+            formateAttributes?.length > 0
+              ? ` {${formateAttributes
                   .map(([k, v]) => `${k}: "${v}"`)
                   .join(",")}}`
               : ""
