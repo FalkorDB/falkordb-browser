@@ -142,8 +142,8 @@ export default class Page extends BasePage {
     }
 
     // LABELS
-    public get labelsButtonByName(): (type: Type, label: "Relationships" | "Labels", name: string) => Locator {
-        return (type: Type, label: "Relationships" | "Labels", name: string) => this.page.getByTestId(`${type}${label}Button${name}`);
+    public get labelsButtonByName(): (type: Type, label: "RelationshipTypes" | "Labels", name: string) => Locator {
+        return (type: Type, label: "RelationshipTypes" | "Labels", name: string) => this.page.getByTestId(`${type}${label}Button${name}`);
     }
 
     // CANVAS CONTROLS
