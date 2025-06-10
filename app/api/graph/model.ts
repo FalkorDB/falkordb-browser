@@ -140,6 +140,8 @@ export class Graph {
 
     private currentQuery: Query;
 
+    private currentLimit: number;
+
     private categories: Category<Node>[];
 
     private labels: Category<Link>[];
@@ -159,7 +161,7 @@ export class Graph {
     private COLORS_ORDER_VALUE: string[] = []
 
     private constructor(id: string, categories: Category<Node>[], labels: Category<Link>[], elements: GraphData,
-        categoriesMap: Map<string, Category<Node>>, labelsMap: Map<string, Category<Link>>, nodesMap: Map<number, Node>, edgesMap: Map<number, Link>, currentQuery?: Query, colors?: string[]) {
+        categoriesMap: Map<string, Category<Node>>, labelsMap: Map<string, Category<Link>>, nodesMap: Map<number, Node>, edgesMap: Map<number, Link>, currentQuery?: Query, colors?: string[], currentLimit?: number) {
         this.id = id;
         this.columns = [];
         this.data = [];
@@ -172,6 +174,7 @@ export class Graph {
         this.labelsMap = labelsMap;
         this.nodesMap = nodesMap;
         this.linksMap = edgesMap;
+        this.currentLimit = currentLimit || 0;
         this.COLORS_ORDER_VALUE = [...(colors && colors.length > 0 ? colors : DEFAULT_COLORS)]
     }
 
@@ -185,6 +188,10 @@ export class Graph {
 
     set CurrentQuery(query: Query) {
         this.currentQuery = query;
+    }
+
+    get CurrentLimit(): number {
+        return this.currentLimit;
     }
 
     get Categories(): Category<Node>[] {
@@ -255,12 +262,12 @@ export class Graph {
         return [...this.elements.nodes, ...this.elements.links]
     }
 
-    public static empty(graphName?: string, colors?: string[], currentQuery?: Query): Graph {
-        return new Graph(graphName || "", [], [], { nodes: [], links: [] }, new Map<string, Category<Node>>(), new Map<string, Category<Link>>(), new Map<number, Node>(), new Map<number, Link>(), currentQuery, colors)
+    public static empty(graphName?: string, colors?: string[], currentQuery?: Query, currentLimit?: number): Graph {
+        return new Graph(graphName || "", [], [], { nodes: [], links: [] }, new Map<string, Category<Node>>(), new Map<string, Category<Link>>(), new Map<number, Node>(), new Map<number, Link>(), currentQuery, colors, currentLimit)
     }
 
-    public static create(id: string, results: { data: Data, metadata: any[] }, isCollapsed: boolean, isSchema: boolean, colors?: string[], currentQuery?: Query): Graph {
-        const graph = Graph.empty(undefined, colors, currentQuery)
+    public static create(id: string, results: { data: Data, metadata: any[] }, isCollapsed: boolean, isSchema: boolean, currentLimit: number, colors?: string[], currentQuery?: Query): Graph {
+        const graph = Graph.empty(undefined, colors, currentQuery, currentLimit)
         graph.extend(results, isCollapsed, isSchema)
         graph.id = id
         return graph
