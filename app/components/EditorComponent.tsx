@@ -67,10 +67,10 @@ const monacoOptions: monaco.editor.IStandaloneEditorConstructionOptions = {
     links: false,
     minimap: { enabled: false },
     automaticLayout: true,
-    fontSize: 30,
+    fontSize: 24,
     fontWeight: "400",
     wordWrap: "off",
-    lineHeight: 36,
+    lineHeight: 32,
     lineNumbersMinChars: 2,
     overviewRulerLanes: 0,
     overviewRulerBorder: false,
@@ -219,7 +219,7 @@ const SUGGESTIONS: monaco.languages.CompletionItem[] = [
 ]
 
 const MAX_HEIGHT = 20
-const LINE_HEIGHT = 36
+const LINE_HEIGHT = 32
 
 const PLACEHOLDER = "Type your query here to start"
 
@@ -643,7 +643,7 @@ export default function EditorComponent({ graph, historyQuery, maximize, setMaxi
                             editorRef.current = e
                         }}
                     />
-                    <span ref={placeholderRef} className="w-full top-0 left-0 absolute pointer-events-none text-3xl truncate">
+                    <span ref={placeholderRef} className="w-full top-0 left-0 absolute pointer-events-none text-2xl truncate">
                         {PLACEHOLDER}
                     </span>
                 </div>

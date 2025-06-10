@@ -227,10 +227,10 @@ test.describe('Canvas Tests', () => {
         await graph.selectGraphByName(graphName);
         await graph.insertQuery(CREATE_QUERY);
         await graph.clickRunQuery();
-        await graph.clickLabelsButtonByLabel("Graph", "RelationshipTypes", "KNOWS");
+        await graph.clickLabelsButtonByLabel("Graph", "Relationships", "KNOWS");
         const links1 = await graph.getLinksScreenPositions('graph');
         expect(links1[0].visible).toBeFalsy();
-        await graph.clickLabelsButtonByLabel("Graph", "RelationshipTypes", "KNOWS");
+        await graph.clickLabelsButtonByLabel("Graph", "Relationships", "KNOWS");
         const links2 = await graph.getLinksScreenPositions('graph');
         expect(links2[0].visible).toBeTruthy();
         await apicalls.removeGraph(graphName);

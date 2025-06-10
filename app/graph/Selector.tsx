@@ -142,7 +142,7 @@ export default function Selector({ graph, options, setOptions, graphName, setGra
     }
 
     return (
-        <div className="z-20 absolute top-5 inset-x-24 h-[54px] flex flex-row gap-4 items-center">
+        <div className="z-20 absolute top-5 inset-x-24 h-[50px] flex flex-row gap-4 items-center">
             <SelectGraph
                 options={options}
                 setOptions={setOptions}

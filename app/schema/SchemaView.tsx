@@ -66,9 +66,9 @@ export default function SchemaView({
 }: Props) {
     const { setIndicator } = useContext(IndicatorContext)
     const { schema } = useContext(SchemaContext)
-    
+
     const { toast } = useToast()
-    
+
     const [selectedNodes, setSelectedNodes] = useState<[Node | undefined, Node | undefined]>([undefined, undefined]);
 
     useEffect(() => {
@@ -194,7 +194,7 @@ export default function SchemaView({
                         </div>
                         {
                             (labels.length > 0 || isAddRelation) &&
-                            <Labels graph={schema} type="Schema" className="right-2 text-end" label="RelationshipTypes" categories={labels} onClick={onLabelClick} />
+                            <Labels graph={schema} type="Schema" className="right-2 text-end" label="Relationships" categories={labels} onClick={onLabelClick} />
                         }
                     </div>
                 }
