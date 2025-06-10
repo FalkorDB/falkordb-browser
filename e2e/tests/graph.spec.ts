@@ -232,7 +232,7 @@ test.describe('Graph Tests', () => {
         await graph.selectGraphByName(graphName);
         await graph.insertQuery(CREATE_QUERY);
         await graph.clickRunQuery();
-        expect(await graph.isVisibleLabelsButtonByName("Graph", "RelationshipTypes", "KNOWS")).toBeTruthy();
+        expect(await graph.isVisibleLabelsButtonByName("Graph", "Relationships", "KNOWS")).toBeTruthy();
         await apiCall.removeGraph(graphName);
     });
 
