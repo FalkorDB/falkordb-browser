@@ -65,7 +65,7 @@ export default function View({ selectedValue }: {
     const { toast } = useToast()
 
     const handlePreferencesChange = (colors?: string[]) => {
-        setGraph(Graph.create(graph.Id, { data: graph.Data, metadata: graph.Metadata }, false, true, colors || colorsArr))
+        setGraph(Graph.create(graph.Id, { data: graph.Data, metadata: graph.Metadata }, false, true, graph.CurrentLimit, colors || colorsArr))
         if (colors) {
             localStorage.removeItem(graph.Id)
         } else {
