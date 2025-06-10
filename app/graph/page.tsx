@@ -155,7 +155,7 @@ export default function Page() {
             counter: 0
         }))
         localStorage.setItem("query history", JSON.stringify(queryArr))
-        const g = Graph.create(graphName, result, false, false, graph.Colors, newQuery)
+        const g = Graph.create(graphName, result, false, false, limit, graph.Colors, newQuery)
         setGraph(g)
         // eslint-disable-next-line @typescript-eslint/ban-ts-comment
         // @ts-ignore

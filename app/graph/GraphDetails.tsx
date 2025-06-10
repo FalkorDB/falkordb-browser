@@ -19,20 +19,25 @@ export default function GraphDetails({
 
     return (
         <div className="w-1 grow flex flex-col gap-4">
-            {graph.Data.length === limit ?
-                <div className="flex gap-2 items-center text-orange-300">
-                    <Info />
-                    <p>
-                        Display limit hit at {graph.Data.length} rows.
-                    </p>
-                </div>
-                : graph.Data.length > limit &&
-                <div className="flex gap-2 items-center text-orange-300">
-                    <Info />
-                    <p>
-                        
-                    </p>
-                </div>
+            {
+                graph.CurrentLimit && graph.Data.length >= limit ?
+                    <div className="flex gap-2 items-center text-orange-300">
+                        <Info />
+                        <p>
+                            Data currently limited to {graph.Data.length} rows
+                        </p>
+                    </div>
+                    : null
+            }
+            {
+                graph.CurrentLimit && graph.CurrentLimit !== limit ?
+                    <div className="flex gap-2 items-center text-orange-300">
+                        <Info />
+                        <p>
+                            Rerun the query to apply the new limit.
+                        </p>
+                    </div>
+                    : null
             }
             <div className="flex gap-4 overflow-hidden">
                 {
