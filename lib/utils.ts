@@ -143,10 +143,13 @@ export function handleZoomToFit(
     const canvas = document.querySelector(
       ".force-graph-container canvas"
     ) as HTMLCanvasElement;
+
     if (!canvas) return;
 
-    // Calculate padding as 10% of the smallest canvas dimension, with minimum of 40px
-    const minDimension = Math.min(canvas.width, canvas.height);
+    const rect = canvas.getBoundingClientRect();
+
+    // Calculate padding as 10% of the smallest canvas dimension
+    const minDimension = Math.min(rect.width, rect.height);
     const padding = minDimension * 0.1;
     chart.zoomToFit(1000, padding * paddingMultiplier, filter);
   }
