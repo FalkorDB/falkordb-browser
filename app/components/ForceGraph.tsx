@@ -257,7 +257,7 @@ export default function ForceGraph({
                     ctx.fillStyle = 'black';
                     ctx.textAlign = 'center';
                     ctx.textBaseline = 'middle';
-                    ctx.font = '3px Arial';
+                    ctx.font = '2px Arial';
                     const ellipsis = '...';
                     const ellipsisWidth = ctx.measureText(ellipsis).width;
                     const nodeSize = NODE_SIZE * 2 - PADDING;
