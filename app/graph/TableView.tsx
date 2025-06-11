@@ -31,6 +31,7 @@ export default function TableView() {
             className="p-12"
             headers={tableData.headers}
             rows={tableData.rows}
+            entityName="Element"
         />
     )
 }

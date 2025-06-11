@@ -22,7 +22,7 @@ interface Props {
     headers: string[],
     rows: Row[],
     label: "Graphs" | "Schemas" | "Configs" | "Users" | "TableView",
-    entityName?: "Graph" | "Schema" | "Config" | "User",
+    entityName: "Graph" | "Schema" | "Config" | "User" | "Element",
     children?: React.ReactNode,
     setRows?: (rows: Row[]) => void,
     className?: string
@@ -45,7 +45,7 @@ export default function TableComponent({ headers, rows, label, entityName, child
         if (searchRef.current) {
             searchRef.current.focus()
         }
-    }, [])
+    }, [filteredRows, filteredRows.length])
 
     const handleSearchFilter = useCallback((cell: Cell): boolean => {
         if (!cell.value) return false;

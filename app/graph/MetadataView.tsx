@@ -1,4 +1,4 @@
-import { cn, createNestedObject, prepareArg, securedFetch } from "@/lib/utils";
+import { createNestedObject, prepareArg, securedFetch } from "@/lib/utils";
 import { JSONTree } from "react-json-tree";
 import { useContext, useState } from "react";
 import { Info } from "lucide-react";
@@ -154,7 +154,7 @@ export default function MetadataView({ graphName, query, setQuery, fetchCount }:
 }) {
 
     return (
-        <div className={cn("h-full grid grid-cols-2 grid-rows-2 overflow-hidden border")}>
+        <div className="h-full grid grid-cols-2 grid-rows-2 overflow-hidden">
             <div className="flex flex-col gap-4 border-r p-12 overflow-auto row-span-2">
                 <Profile graphName={graphName} query={query} setQuery={setQuery} fetchCount={fetchCount} />
             </div>
