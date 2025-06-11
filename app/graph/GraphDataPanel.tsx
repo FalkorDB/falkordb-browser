@@ -5,7 +5,7 @@
 'use client'
 
 import { prepareArg, securedFetch } from "@/lib/utils";
-import { Dispatch, SetStateAction, useContext, useEffect, useRef, useState } from "react";
+import { Dispatch, SetStateAction, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { Pencil, X } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { useSession } from "next-auth/react";
@@ -40,6 +40,20 @@ export default function GraphDataPanel({ object, setObject, onDeleteElement, set
     const [labelsHover, setLabelsHover] = useState(false)
     const [label, setLabel] = useState<string[]>([]);
     const type = !("source" in object)
+
+    const onClose = useCallback((e: KeyboardEvent) => {
+        if (e.key === "Escape") {
+            setObject(undefined)
+        }
+    }, [setObject])
+
+    useEffect(() => {
+        window.addEventListener("keydown", onClose)
+
+        return () => {
+            window.removeEventListener("keydown", onClose)
+        }
+    }, [onClose])
 
     useEffect(() => {
         if (labelsListRef.current) {

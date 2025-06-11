@@ -48,6 +48,7 @@ export default function QuerySettings() {
 
                                 if (!value) {
                                     setTimeout(0)
+                                    localStorage.setItem("timeout", "0")
                                     return
                                 }
 
@@ -108,6 +109,7 @@ export default function QuerySettings() {
 
                                 if (!value) {
                                     setLimit(0)
+                                    localStorage.setItem("limit", "0")
                                     return
                                 }
 

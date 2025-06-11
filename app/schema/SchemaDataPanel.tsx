@@ -4,7 +4,7 @@
 "use client";
 
 import { Check, Pencil, PlusCircle, Trash2, X } from "lucide-react";
-import { SetStateAction, Dispatch, useContext, useEffect, useState } from "react";
+import { SetStateAction, Dispatch, useContext, useEffect, useState, useCallback } from "react";
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from "@/components/ui/use-toast";
 import { useSession } from "next-auth/react";
@@ -52,6 +52,20 @@ export default function SchemaDataPanel({ object, setObject, onDeleteElement, sc
     const [label, setLabel] = useState<string[]>([])
     const [hover, setHover] = useState<string>("")
     const type = !!object.category
+
+    const handleClose = useCallback((e: KeyboardEvent) => {
+        if (e.key === "Escape") {
+            setObject(undefined)
+        }
+    }, [setObject])
+
+    useEffect(() => {
+        window.addEventListener("keydown", handleClose)
+
+        return () => {
+            window.removeEventListener("keydown", handleClose)
+        }
+    }, [handleClose])
 
     useEffect(() => {
         setAttributes(Object.entries(object.data).filter(([key, val]) => !(key === "name" && Number(val) === object.id)).map(([key, val]) => [key, Array.isArray(val) ? val : (val as string).split(',')]))

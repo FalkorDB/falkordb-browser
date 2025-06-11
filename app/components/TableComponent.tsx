@@ -23,12 +23,13 @@ interface Props {
     rows: Row[],
     label: "Graphs" | "Schemas" | "Configs" | "Users" | "TableView",
     entityName: "Graph" | "Schema" | "Config" | "User" | "Element",
+    inputRef?: React.RefObject<HTMLInputElement>,
     children?: React.ReactNode,
     setRows?: (rows: Row[]) => void,
     className?: string
 }
 
-export default function TableComponent({ headers, rows, label, entityName, children, setRows, className }: Props) {
+export default function TableComponent({ headers, rows, label, entityName, inputRef, children, setRows, className }: Props) {
 
     const { indicator } = useContext(IndicatorContext)
 
@@ -46,6 +47,12 @@ export default function TableComponent({ headers, rows, label, entityName, child
             searchRef.current.focus()
         }
     }, [filteredRows, filteredRows.length])
+
+    useEffect(() => {
+        if (inputRef && inputRef.current && editable) {
+            inputRef.current.focus()
+        }
+    }, [inputRef, editable])
 
     const handleSearchFilter = useCallback((cell: Cell): boolean => {
         if (!cell.value) return false;
@@ -206,7 +213,7 @@ export default function TableComponent({ headers, rows, label, entityName, child
                                                                     : cell.type === "text" &&
                                                                     <Input
                                                                         data-testid={`input${label}`}
-                                                                        ref={ref => ref?.focus()}
+                                                                        ref={inputRef}
                                                                         variant="primary"
                                                                         className="grow"
                                                                         value={newValue}
@@ -214,6 +221,7 @@ export default function TableComponent({ headers, rows, label, entityName, child
                                                                         onKeyDown={async (e) => {
                                                                             if (e.key === "Escape") {
                                                                                 e.preventDefault()
+                                                                                e.stopPropagation()
                                                                                 handleSetEditable("", "")
                                                                             }
 

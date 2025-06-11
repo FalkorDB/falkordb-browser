@@ -3,7 +3,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Check, Pencil, Plus, Trash2, X } from "lucide-react"
 import { cn, prepareArg, securedFetch } from "@/lib/utils"
 import { toast } from "@/components/ui/use-toast"
-import { MutableRefObject, useContext, useEffect, useState } from "react"
+import { MutableRefObject, useContext, useEffect, useRef, useState } from "react"
 import { useSession } from "next-auth/react"
 import DeleteElement from "./DeleteElement"
 import Input from "../components/ui/Input"
@@ -24,6 +24,11 @@ interface Props {
 }
 
 export default function GraphDataTable({ graph, object, type, onDeleteElement, lastObjId, className }: Props) {
+
+    const setInputRef = useRef<HTMLInputElement>(null)
+    const addInputRef = useRef<HTMLInputElement>(null)
+    const scrollableContainerRef = useRef<HTMLDivElement>(null)
+
     const [hover, setHover] = useState<string>("")
     const [editable, setEditable] = useState<string>("")
     const [isAddValue, setIsAddValue] = useState<boolean>(false)
@@ -36,6 +41,29 @@ export default function GraphDataTable({ graph, object, type, onDeleteElement, l
     const { indicator, setIndicator } = useContext(IndicatorContext)
     const { data: session } = useSession()
     const [attributes, setAttributes] = useState<string[]>(Object.keys(object.data))
+
+    useEffect(() => {
+        if (setInputRef.current && editable) {
+            setInputRef.current.focus()
+        }
+    }, [editable])
+
+    useEffect(() => {
+        if (isAddValue) {
+            if (scrollableContainerRef.current) {
+                setTimeout(() => {
+                    scrollableContainerRef.current?.scrollTo({
+                        top: scrollableContainerRef.current.scrollHeight,
+                        behavior: "smooth"
+                    })
+                }, 0)
+            }
+
+            if (addInputRef.current) {
+                addInputRef.current.focus()
+            }
+        }
+    }, [isAddValue])
 
     useEffect(() => {
         if (lastObjId.current !== object.id) {
@@ -154,7 +182,7 @@ export default function GraphDataTable({ graph, object, type, onDeleteElement, l
             setIsAddValue(false)
             setNewKey("")
             setNewVal("")
-            return
+            e.stopPropagation()
         }
 
         if (e.key !== "Enter" || isAddLoading || indicator === "offline") return
@@ -166,6 +194,7 @@ export default function GraphDataTable({ graph, object, type, onDeleteElement, l
         if (e.key === "Escape") {
             handleSetEditable("", "")
             setNewKey("")
+            e.stopPropagation()
         }
 
         if (e.key !== "Enter" || isSetLoading || indicator === "offline") return
@@ -180,7 +209,7 @@ export default function GraphDataTable({ graph, object, type, onDeleteElement, l
 
     return (
         <div className={cn("flex flex-col bg-background rounded-lg overflow-hidden", className)}>
-            <Table parentClassName="grow">
+            <Table parentRef={scrollableContainerRef} parentClassName="grow">
                 <TableHeader>
                     <TableRow>
                         <TableHead className="w-6"><div className="h-12 w-6" /></TableHead>
@@ -277,6 +306,7 @@ export default function GraphDataTable({ graph, object, type, onDeleteElement, l
                                     {
                                         editable === key ?
                                             <Input
+                                                ref={setInputRef}
                                                 data-testid="DataPanelSetAttributeInput"
                                                 className="w-full"
                                                 value={newVal}
@@ -324,7 +354,7 @@ export default function GraphDataTable({ graph, object, type, onDeleteElement, l
                             <TableCell>
                                 <Input
                                     data-testid="DataPanelAddAttributeKey"
-                                    ref={ref => !newKey ? ref?.focus() : undefined}
+                                    ref={addInputRef}
                                     className="w-full"
                                     value={newKey}
                                     onChange={(e) => setNewKey(e.target.value)}
