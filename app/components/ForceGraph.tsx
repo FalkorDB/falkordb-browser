@@ -104,7 +104,7 @@ export default function ForceGraph({
         const centerForce = chartRef.current.d3Force('center');
 
         if (centerForce) {
-            centerForce.strength(0.05);
+            centerForce.strength(graph.Elements.links.length === 0 ? 1 : 0.05);
         }
 
         // Add charge force to repel nodes
@@ -113,7 +113,7 @@ export default function ForceGraph({
         if (chargeForce) {
             chargeForce.strength(-1)
         }
-    }, [chartRef, graph.Elements.nodes])
+    }, [chartRef, graph.Elements.links.length, graph.Elements.nodes.length])
 
     const onFetchNode = async (node: Node) => {
         const result = await securedFetch(`/api/graph/${graph.Id}/${node.id}`, {

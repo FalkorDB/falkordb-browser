@@ -5,7 +5,7 @@
 
 import { useState, useEffect, Dispatch, SetStateAction, useContext } from "react";
 import { GitGraph, Info, Table } from "lucide-react"
-import { GraphRef } from "@/lib/utils";
+import { cn, GraphRef } from "@/lib/utils";
 import dynamic from "next/dynamic";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { GraphContext } from "@/app/components/provider";
@@ -128,8 +128,8 @@ function GraphView({
     }
 
     return (
-        <Tabs value={tabsValue} onValueChange={setTabsValue} className="h-full w-full relative border rounded-lg overflow-hidden">
-            <div className="absolute bottom-4 inset-x-12 pointer-events-none z-10 flex gap-4 justify-between items-end">
+        <Tabs value={tabsValue} onValueChange={setTabsValue} className={cn("h-full w-full relative border rounded-lg overflow-hidden", tabsValue === "Table" && "flex flex-col-reverse")}>
+            <div className={cn("flex gap-4 justify-between items-end", tabsValue === "Table" ? "py-4 px-12" : "absolute bottom-4 inset-x-12 pointer-events-none z-10")}>
                 <GraphDetails
                     graph={graph}
                     tabsValue={tabsValue}
@@ -231,7 +231,7 @@ function GraphView({
                     />
                 }
             </TabsContent>
-            <TabsContent value="Table" className="h-full w-full mt-0 overflow-hidden">
+            <TabsContent value="Table" className="h-1 grow w-full mt-0 overflow-hidden">
                 <TableView />
             </TabsContent>
             <TabsContent value="Metadata" className="h-full w-full mt-0 overflow-hidden">

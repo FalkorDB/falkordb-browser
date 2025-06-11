@@ -18,52 +18,68 @@ export default function GraphDetails({
     const { limit } = useContext(LimitContext)
 
     return (
-        <div className="w-1 grow flex flex-col gap-4">
+        <div className="w-1 grow flex flex-col gap-4 p-1">
             {
-                graph.CurrentLimit && graph.Data.length >= limit ?
-                    <div className="flex gap-2 items-center text-orange-300">
-                        <Info />
-                        <p>
+                graph.CurrentLimit && graph.Data.length >= graph.CurrentLimit ?
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <div className="flex gap-2 items-center text-orange-300">
+                                <Info />
+                                <p className="truncate">
+                                    Data currently limited to {graph.Data.length} rows
+                                </p>
+                            </div>
+                        </TooltipTrigger>
+                        <TooltipContent>
                             Data currently limited to {graph.Data.length} rows
-                        </p>
-                    </div>
+                        </TooltipContent>
+                    </Tooltip>
                     : null
             }
             {
                 graph.CurrentLimit && graph.CurrentLimit !== limit ?
-                    <div className="flex gap-2 items-center text-orange-300">
-                        <Info />
-                        <p>
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <div className="flex gap-2 items-center text-orange-300">
+                                <Info />
+                                <p className="truncate">
+                                    Rerun the query to apply the new limit.
+                                </p>
+                            </div>
+                        </TooltipTrigger>
+                        <TooltipContent>
                             Rerun the query to apply the new limit.
-                        </p>
-                    </div>
+                        </TooltipContent>
+                    </Tooltip>
                     : null
             }
-            <div className="flex gap-4 overflow-hidden">
-                {
-                    graph.Id && tabsValue === "Graph" &&
-                    [["Nodes", nodesCount, "nodesCount"], ["Edges", edgesCount, "edgesCount"], ["GraphName", graph.Id, "graphName"]].map(([label, value, testId]) => (
-                        <div className="flex gap-2 overflow-hidden w-1 grow max-w-fit" key={label}>
-                            <p>
-                                {label}:
-                            </p>
-                            <Tooltip>
-                                <TooltipTrigger asChild>
-                                    <p
-                                        data-testid={testId}
-                                        className="Gradient bg-clip-text text-transparent truncate pointer-events-auto"
-                                    >
+            {
+                graph.Id && tabsValue === "Graph" &&
+                <div className="flex gap-4 overflow-hidden">
+                    {
+                        [["Nodes", nodesCount, "nodesCount"], ["Edges", edgesCount, "edgesCount"], ["GraphName", graph.Id, "graphName"]].map(([label, value, testId]) => (
+                            <div className="flex gap-2 overflow-hidden w-1 grow max-w-fit" key={label}>
+                                <p>
+                                    {label}:
+                                </p>
+                                <Tooltip>
+                                    <TooltipTrigger asChild>
+                                        <p
+                                            data-testid={testId}
+                                            className="Gradient bg-clip-text text-transparent truncate pointer-events-auto"
+                                        >
+                                            {value}
+                                        </p>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
                                         {value}
-                                    </p>
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                    {value}
-                                </TooltipContent>
-                            </Tooltip>
-                        </div>
-                    ))
-                }
-            </div >
+                                    </TooltipContent>
+                                </Tooltip>
+                            </div>
+                        ))
+                    }
+                </div >
+            }
         </div>
     )
 }
