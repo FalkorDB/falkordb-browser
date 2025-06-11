@@ -47,6 +47,7 @@ export default function Selector({ graph, options, setOptions, graphName, setGra
 
     const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null)
     const submitQuery = useRef<HTMLButtonElement>(null)
+    const searchQueryRef = useRef<HTMLInputElement>(null)
 
     const { toast } = useToast()
 
@@ -71,14 +72,6 @@ export default function Selector({ graph, options, setOptions, graphName, setGra
             setTab("explain")
         }
     }, [currentQuery, setTab, queriesOpen, historyQuery?.query])
-
-    // useEffect(() => {
-    //     if (!queriesOpen) {
-    //         monaco.editor.setTheme("editor-theme");
-    //     } else {
-    //         monaco.editor.setTheme("selector-theme");
-    //     }
-    // }, [queriesOpen]);
 
     const handleOnChange = useCallback((name: string) => {
         setGraphName(formatName(name))
@@ -111,6 +104,10 @@ export default function Selector({ graph, options, setOptions, graphName, setGra
         // eslint-disable-next-line no-bitwise
         e.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, () => {
             submitQuery.current?.click();
+        });
+
+        e.addCommand(monaco.KeyCode.Escape, () => {
+            searchQueryRef.current?.focus()
         });
 
         // eslint-disable-next-line no-bitwise
@@ -182,6 +179,11 @@ export default function Selector({ graph, options, setOptions, graphName, setGra
                                 <DialogComponent
                                     className="h-[90dvh] w-[90dvw]"
                                     open={queriesOpen}
+                                    onEscapeKeyDown={(e) => {
+                                        if (editorRef.current && editorRef.current.hasTextFocus()) {
+                                            e.preventDefault()
+                                        }
+                                    }}
                                     onOpenChange={(open) => {
                                         setQueriesOpen(open)
                                         if (open) {
@@ -213,7 +215,6 @@ export default function Selector({ graph, options, setOptions, graphName, setGra
                                                         counter: 0
                                                     }))
                                                 }
-                                                focusEditorAtEnd()
                                             }}
                                             dataTestId="queryHistory"
                                             list={historyQuery.queries.reverse()}
@@ -223,9 +224,12 @@ export default function Selector({ graph, options, setOptions, graphName, setGra
                                                     ...prev,
                                                     counter: historyQuery.queries.findIndex(q => q.text === counter) + 1
                                                 }))
-
+                                                
                                                 setTab("query")
+
+                                                focusEditorAtEnd()
                                             }}
+                                            searchRef={searchQueryRef}
                                         />
                                         <Tabs value={tab} onValueChange={setTab} className="w-[60%] flex flex-col gap-8 items-center">
                                             <TabsList className="bg-black h-fit w-fit p-2">

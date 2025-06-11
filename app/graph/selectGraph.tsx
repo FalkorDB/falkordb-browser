@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-use-before-define */
 
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { useContext, useEffect, useState } from "react";
+import { useContext, useEffect, useRef, useState } from "react";
 import { DialogHeader, DialogDescription, DialogTrigger, DialogTitle, DialogContent, Dialog } from "@/components/ui/dialog";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import { prepareArg, Row, securedFetch } from "@/lib/utils";
@@ -31,6 +31,8 @@ interface Props {
 export default function SelectGraph({ options, setOptions, selectedValue, setSelectedValue, type, onOpenChange, setGraph }: Props) {
 
     const { indicator, setIndicator } = useContext(IndicatorContext)
+
+    const searchRef = useRef<HTMLInputElement>(null)
 
     const { toast } = useToast()
     const { data: session } = useSession()
@@ -77,8 +79,11 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
     const handleOpenChange = async (o: boolean) => {
         setOpen(o)
         setIsLoading(true)
+
         try {
             await onOpenChange(o)
+
+            if (o && searchRef.current) searchRef.current.focus()
         } finally {
             setIsLoading(false)
         }
@@ -119,6 +124,7 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
                         afterSearchCallback={() => { }}
                         isSelected={(value) => selectedValue === value}
                         isLoading={isLoading}
+                        searchRef={searchRef}
                     />
                     <DialogTrigger asChild>
                         <Button

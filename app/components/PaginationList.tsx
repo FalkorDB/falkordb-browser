@@ -15,13 +15,16 @@ interface Props<T extends Item> {
     label: string
     afterSearchCallback: (newFilteredList: T[]) => void
     isSelected: (item: T) => boolean
+    searchRef: React.RefObject<HTMLInputElement>
     isLoading?: boolean
     className?: string
     children?: React.ReactNode
 }
 
-export default function PaginationList<T extends Item>({ list, step, onClick, dataTestId, afterSearchCallback, isSelected, label, isLoading, className, children }: Props<T>) {
+export default function PaginationList<T extends Item>({ list, step, onClick, dataTestId, afterSearchCallback, isSelected, label, isLoading, className, children, searchRef }: Props<T>) {
+
     const [filteredList, setFilteredList] = useState<T[]>([...list])
+    const [selectedIndex, setSelectedIndex] = useState<number>(0)
     const [stepCounter, setStepCounter] = useState(0)
     const [pageCount, setPageCount] = useState(0)
     const [search, setSearch] = useState("")
@@ -47,17 +50,41 @@ export default function PaginationList<T extends Item>({ list, step, onClick, da
         return () => {
             clearTimeout(timeout)
         }
-    }, [list, search])
+    }, [afterSearchCallback, list, search])
+
+    useEffect(() => {
+        setSelectedIndex(0)
+    }, [filteredList.length])
 
     return (
         <div className={cn("w-full flex flex-col gap-4 p-6", className)}>
             <div className="flex gap-2 items-center">
                 <Input
+                    ref={searchRef}
                     data-testid={`search${label.charAt(0).toUpperCase() + label.slice(1)}`}
                     className="w-full bg-foreground text-white"
                     value={search}
                     placeholder={`Search for a ${label}`}
                     onChange={(e) => setSearch(e.target.value)}
+                    onKeyDown={(e) => {
+                        if (e.key === "Escape") {
+                            e.preventDefault()
+                            setSearch("")
+                        }
+
+                        if (e.key === "ArrowUp") {
+                            e.preventDefault()
+                            setSelectedIndex(prev => prev ? prev - 1 : prev)
+                        } else if (e.key === "ArrowDown") {
+                            e.preventDefault()
+                            setSelectedIndex(prev => prev < filteredList.length - 1 ? prev + 1 : prev)
+                        }
+
+                        if (e.key === "Enter") {
+                            e.preventDefault()
+                            onClick(typeof filteredList[selectedIndex] === "string" ? filteredList[selectedIndex] : filteredList[selectedIndex].text)
+                        }
+                    }}
                 />
                 {isLoading && <Loader2 className="w-4 h-4 animate-spin duration-[infinite]" />}
             </div>
@@ -77,16 +104,22 @@ export default function PaginationList<T extends Item>({ list, step, onClick, da
                         return (
                             <li
                                 data-testid={`${dataTestId}${index}`}
-                                className={cn("border-b", !selected && "border-gray-500")}
+                                className={cn(
+                                    "border-b hover:text-white hover:border-white",
+                                    selected ? "text-primary border-primary" : "text-gray-500 border-gray-500",
+                                    selectedIndex === index && "text-white border-white"
+                                )}
                                 style={{ height: `${1 / step * 100}%` }}
                                 key={typeof item === "string" ? item : item.text}
                             >
                                 {
                                     onClick ?
                                         <Button
-                                            className={cn("w-full h-full text-xl text-center", !selected && "text-gray-500")}
+                                            className={cn("w-full h-full text-xl text-center")}
                                             label={typeof item === "string" ? item : item.text}
-                                            onClick={() => onClick(typeof item === "string" ? item : item.text)}
+                                            onClick={() => {
+                                                onClick(typeof item === "string" ? item : item.text)
+                                            }}
                                         />
                                         : <p className="w-full h-full text-xl text-center">{typeof item === "string" ? item : item.text}</p>
                                 }
@@ -135,5 +168,5 @@ export default function PaginationList<T extends Item>({ list, step, onClick, da
 PaginationList.defaultProps = {
     className: undefined,
     children: undefined,
-    isLoading: undefined
+    isLoading: undefined,
 }
