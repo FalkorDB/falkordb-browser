@@ -270,6 +270,15 @@ export default function SchemaDataPanel({ object, setObject, onDeleteElement, sc
     const handleRemoveLabel = async (removeLabel: string) => {
         const node = object as Node
 
+        if (removeLabel === "") {
+            toast({
+                title: "Error",
+                description: "You cannot remove the default label",
+                variant: "destructive"
+            })
+            return
+        }
+
         try {
             setIsRemoveLabelLoading(true)
             const result = await securedFetch(`api/schema/${prepareArg(schema.Id)}/${prepareArg(object.id.toString())}/label`, {
@@ -303,7 +312,7 @@ export default function SchemaDataPanel({ object, setObject, onDeleteElement, sc
                         <li key={l} className="flex gap-2 px-2 py-1 bg-background rounded-full items-center">
                             <p>{l}</p>
                             {
-                                session?.user?.role !== "Read-Only" &&
+                                type && session?.user?.role !== "Read-Only" &&
                                 <Button
                                     indicator={indicator}
                                     title="Remove"

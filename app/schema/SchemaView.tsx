@@ -18,7 +18,7 @@ const ForceGraph = dynamic(() => import("../components/ForceGraph"), { ssr: fals
 
 /* eslint-disable react/require-default-props */
 interface Props {
-    fetchCount?: () => void
+    fetchCount?: (graphName: string) => Promise<void>
     edgesCount: number
     nodesCount: number
     selectedElement: Node | Link | undefined
@@ -66,9 +66,9 @@ export default function SchemaView({
 }: Props) {
     const { setIndicator } = useContext(IndicatorContext)
     const { schema } = useContext(SchemaContext)
-    
+
     const { toast } = useToast()
-    
+
     const [selectedNodes, setSelectedNodes] = useState<[Node | undefined, Node | undefined]>([undefined, undefined]);
 
     useEffect(() => {
@@ -126,7 +126,7 @@ export default function SchemaView({
 
             if (isAddEntity) {
                 const { category } = schema.extendNode(json.result.data[0].n, false, true)!
-                setCategories(prev => [...prev, ...category.map(c => schema.CategoriesMap.get(c)!)])
+                setCategories(prev => [...prev, ...category.filter(c => !prev.some(p => p.name === c)).map(c => schema.CategoriesMap.get(c)!)])
                 setIsAddEntity(false)
             } else {
                 const { label } = schema.extendEdge(json.result.data[0].e, false, true)!
@@ -134,7 +134,7 @@ export default function SchemaView({
                 setIsAddRelation(false)
             }
 
-            if (fetchCount) fetchCount()
+            if (fetchCount) fetchCount(schema.Id)
 
             setSelectedElement(undefined)
         }
@@ -194,7 +194,7 @@ export default function SchemaView({
                         </div>
                         {
                             (labels.length > 0 || isAddRelation) &&
-                            <Labels graph={schema} type="Schema" className="right-2 text-end" label="RelationshipTypes" categories={labels} onClick={onLabelClick} />
+                            <Labels graph={schema} type="Schema" className="right-2 text-end" label="Relationships" categories={labels} onClick={onLabelClick} />
                         }
                     </div>
                 }

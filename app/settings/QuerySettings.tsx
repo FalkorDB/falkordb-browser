@@ -20,10 +20,10 @@ export default function QuerySettings() {
                             <TooltipTrigger>
                                 <Info size={16} />
                             </TooltipTrigger>
-                            <TooltipContent className="flex flex-col gap-2 items-center">
+                            <TooltipContent className="grid gap-2" style={{ gridTemplateColumns: 'fit-content auto' }}>
                                 <p>Shows a `Timed Out` error if the query takes longer than the timeout in seconds.</p>
-                                <a className="underline underline-offset-2" href="https://docs.falkordb.com/configuration.html#query-configurations" target="_blank" rel="noreferrer noreferrer">
-                                    Learn more
+                                <a className="col-span-2 flex justify-center" href="https://docs.falkordb.com/configuration.html#query-configurations" target="_blank" rel="noreferrer noreferrer">
+                                    <p className="underline underline-offset-2">Learn more</p>
                                 </a>
                             </TooltipContent>
                         </Tooltip>
@@ -61,8 +61,9 @@ export default function QuerySettings() {
                             id="decreaseTimeoutBtn"
                             className="p-2"
                             onClick={() => {
-                                setTimeout(prev => !prev ? prev : prev - 1)
-                                localStorage.setItem("timeout", (timeout - 1).toString())
+                                const newTimeout = !timeout ? timeout : timeout - 1
+                                setTimeout(newTimeout)
+                                localStorage.setItem("timeout", newTimeout.toString())
                             }}
                         >
                             <Minus />
@@ -76,10 +77,13 @@ export default function QuerySettings() {
                             <TooltipTrigger>
                                 <Info size={16} />
                             </TooltipTrigger>
-                            <TooltipContent className="flex flex-col gap-2 items-center">
+                            <TooltipContent
+                                className="grid gap-2"
+                                style={{ gridTemplateColumns: 'fit-content auto' }}
+                            >
                                 <p>Limits the number of rows returned by the query.</p>
-                                <a className="underline underline-offset-2" href="https://docs.falkordb.com/cypher/limit.html" target="_blank" rel="noreferrer noreferrer">
-                                    Learn more
+                                <a className="col-span-2 flex justify-center" href="https://docs.falkordb.com/cypher/limit.html" target="_blank" rel="noreferrer">
+                                    <p className="underline underline-offset-2">Learn more</p>
                                 </a>
                             </TooltipContent>
                         </Tooltip>
@@ -117,8 +121,9 @@ export default function QuerySettings() {
                             id="decreaseLimitBtn"
                             className="p-2"
                             onClick={() => {
-                                setLimit(prev => !prev ? prev : prev - 1)
-                                localStorage.setItem("limit", (limit - 1).toString())
+                                const newLimit = !limit ? limit : limit - 1
+                                setLimit(newLimit)
+                                localStorage.setItem("limit", newLimit.toString())
                             }}
                         >
                             <Minus />

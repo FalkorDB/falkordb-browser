@@ -3,7 +3,7 @@
 'use client'
 
 import { useEffect, useState, useContext, Dispatch, SetStateAction, useRef, useCallback } from "react";
-import { cn, securedFetch, GraphRef } from "@/lib/utils";
+import { cn, GraphRef, fetchOptions, formatName } from "@/lib/utils";
 import { History, Info, Maximize2 } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import * as monaco from "monaco-editor";
@@ -29,18 +29,19 @@ interface Props {
     runQuery?: (query: string) => Promise<void>
     historyQuery?: HistoryQuery
     setHistoryQuery?: Dispatch<SetStateAction<HistoryQuery>>
-    fetchCount: () => void
+    fetchCount: () => Promise<void>
     selectedElements: (Node | Link)[]
     setSelectedElement: Dispatch<SetStateAction<Node | Link | undefined>>
     handleDeleteElement: () => Promise<void>
     chartRef: GraphRef
     setIsAddEntity?: Dispatch<SetStateAction<boolean>>
     setIsAddRelation?: Dispatch<SetStateAction<boolean>>
+    setGraph: Dispatch<SetStateAction<Graph>>
 }
 
 const STEP = 8
 
-export default function Selector({ graph, options, setOptions, graphName, setGraphName, runQuery, historyQuery, setHistoryQuery, fetchCount, selectedElements, setSelectedElement, handleDeleteElement, chartRef, setIsAddEntity, setIsAddRelation }: Props) {
+export default function Selector({ graph, options, setOptions, graphName, setGraphName, runQuery, historyQuery, setHistoryQuery, fetchCount, selectedElements, setSelectedElement, handleDeleteElement, chartRef, setIsAddEntity, setIsAddRelation, setGraph }: Props) {
 
     const { indicator, setIndicator } = useContext(IndicatorContext)
 
@@ -58,50 +59,35 @@ export default function Selector({ graph, options, setOptions, graphName, setGra
     const type = runQuery && historyQuery && setHistoryQuery ? "Graph" : "Schema"
 
     useEffect(() => {
-        if (!currentQuery) {
+        if (!queriesOpen) return
+
+        if (!currentQuery || historyQuery?.query) {
             setTab("query")
-        } else if (currentQuery.profile) {
+        } else if (currentQuery.profile.length > 0) {
             setTab("profile")
-        } else if (currentQuery.metadata) {
+        } else if (currentQuery.metadata.length > 0) {
             setTab("metadata")
-        } else if (currentQuery.explain) {
+        } else if (currentQuery.explain.length > 0) {
             setTab("explain")
         }
-    }, [currentQuery, setTab])
+    }, [currentQuery, setTab, queriesOpen, historyQuery?.query])
+
+    // useEffect(() => {
+    //     if (!queriesOpen) {
+    //         monaco.editor.setTheme("editor-theme");
+    //     } else {
+    //         monaco.editor.setTheme("selector-theme");
+    //     }
+    // }, [queriesOpen]);
 
     const handleOnChange = useCallback((name: string) => {
-        const formattedName = name === '""' ? "" : name
-        setGraphName(formattedName)
+        setGraphName(formatName(name))
     }, [setGraphName])
 
     const getOptions = useCallback(async () => {
-        if (indicator === "offline") return
-
-        const result = await securedFetch(`api/${type === "Graph" ? "graph" : "schema"}`, {
-            method: "GET"
-        }, toast, setIndicator)
-
-        if (!result.ok) return
-
-        const { opts } = (await result.json()) as { opts: string[] }
-
+        const [opts] = await fetchOptions(type, toast, setIndicator, indicator)
         setOptions(opts)
-
-        if (opts.length === 1) handleOnChange(opts[0])
-        if (opts.length === 0) handleOnChange("")
-    }, [handleOnChange, indicator, setIndicator, setOptions, toast, type])
-
-    useEffect(() => {
-        getOptions()
-    }, [getOptions])
-
-    useEffect(() => {
-        if (indicator === "online") getOptions()
-    }, [indicator, getOptions])
-
-    useEffect(() => {
-        getOptions()
-    }, [])
+    }, [setOptions, toast, setIndicator, indicator, type])
 
     const focusEditorAtEnd = () => {
         if (editorRef.current) {
@@ -156,16 +142,17 @@ export default function Selector({ graph, options, setOptions, graphName, setGra
     }
 
     return (
-        <div className="z-20 absolute top-5 inset-x-24 h-[54px] flex flex-row gap-4 items-center">
+        <div className="z-20 absolute top-5 inset-x-24 h-[50px] flex flex-row gap-4 items-center">
             <SelectGraph
                 options={options}
                 setOptions={setOptions}
                 selectedValue={graphName}
-                setSelectedValue={setGraphName}
+                setSelectedValue={handleOnChange}
                 type={type}
                 onOpenChange={async (o) => {
                     if (o) await getOptions()
                 }}
+                setGraph={setGraph}
             />
             {
                 runQuery && historyQuery && setHistoryQuery ?
@@ -178,6 +165,7 @@ export default function Selector({ graph, options, setOptions, graphName, setGra
                                 runQuery={runQuery}
                                 historyQuery={historyQuery}
                                 setHistoryQuery={setHistoryQuery}
+                                editorKey={queriesOpen ? "selector-theme" : "editor-theme"}
                             />
                         </div>
                         <div className="h-full flex gap-2 p-2 border rounded-lg bg-foreground">
@@ -287,7 +275,7 @@ export default function Selector({ graph, options, setOptions, graphName, setGra
                                                 />
                                             </TabsContent>
                                             <TabsContent className="w-full h-1 grow bg-background rounded-lg p-8" value="profile">
-                                                <div className="h-full w-full overflow-hidden flex flex-col">
+                                                <div className="h-full w-full overflow-hidden flex flex-col gap-4">
                                                     <Profile
                                                         graphName={graphName}
                                                         query={currentQuery!}
@@ -304,14 +292,14 @@ export default function Selector({ graph, options, setOptions, graphName, setGra
                                                 </div>
                                             </TabsContent>
                                             <TabsContent className="w-full h-1 grow bg-background rounded-lg p-8" value="metadata">
-                                                <div className="h-full w-full overflow-hidden flex flex-col">
+                                                <div className="h-full w-full overflow-hidden flex flex-col gap-4">
                                                     <Metadata
                                                         query={currentQuery!}
                                                     />
                                                 </div>
                                             </TabsContent>
                                             <TabsContent className="w-full h-1 grow bg-background rounded-lg p-8" value="explain">
-                                                <div className="h-full w-full overflow-hidden flex flex-col">
+                                                <div className="h-full w-full overflow-hidden flex flex-col gap-4">
                                                     <Explain
                                                         query={currentQuery!}
                                                     />

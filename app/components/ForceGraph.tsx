@@ -104,7 +104,7 @@ export default function ForceGraph({
         const centerForce = chartRef.current.d3Force('center');
 
         if (centerForce) {
-            centerForce.strength(0.05);
+            centerForce.strength(graph.Elements.links.length === 0 ? 1 : 0.05);
         }
 
         // Add charge force to repel nodes
@@ -113,7 +113,7 @@ export default function ForceGraph({
         if (chargeForce) {
             chargeForce.strength(-1)
         }
-    }, [chartRef, graph.Elements.nodes])
+    }, [chartRef, graph.Elements.links.length, graph.Elements.nodes.length])
 
     const onFetchNode = async (node: Node) => {
         const result = await securedFetch(`/api/graph/${graph.Id}/${node.id}`, {
@@ -257,7 +257,7 @@ export default function ForceGraph({
                     ctx.fillStyle = 'black';
                     ctx.textAlign = 'center';
                     ctx.textBaseline = 'middle';
-                    ctx.font = '3px Arial';
+                    ctx.font = '2px Arial';
                     const ellipsis = '...';
                     const ellipsisWidth = ctx.measureText(ellipsis).width;
                     const nodeSize = NODE_SIZE * 2 - PADDING;

@@ -1,10 +1,10 @@
 import { getClient } from "@/app/api/auth/[...nextauth]/options";
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse, NextRequest } from "next/server";
 
 // eslint-disable-next-line import/prefer-default-export
-export async function GET(
-  req: NextRequest,
-  { params }: { params: Promise<{ graph: string }> }
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: Promise<{ schema: string }> }
 ) {
   try {
     const session = await getClient();
@@ -14,14 +14,15 @@ export async function GET(
     }
 
     const { client } = session;
-    const { graph: graphId } = await params;
-    const query = req.nextUrl.searchParams.get("query");
+    const { schema } = await params;
+    const schemaName = `${schema}_schema`;
+    const source = request.nextUrl.searchParams.get("sourceName");
 
     try {
-      if (!query) throw new Error("Missing parameter query");
+      if (!source) throw new Error("Missing parameter sourceName");
 
-      const graph = client.selectGraph(graphId);
-      const result = await graph.profile(query);
+      const sourceName = `${source}_schema`;
+      const result = await client.selectGraph(sourceName).copy(schemaName);
 
       return NextResponse.json({ result });
     } catch (error) {

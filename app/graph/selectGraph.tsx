@@ -16,6 +16,7 @@ import ExportGraph from "../components/ExportGraph";
 import DeleteGraph from "../components/graph/DeleteGraph";
 import CloseDialog from "../components/CloseDialog";
 import DuplicateGraph from "../components/graph/DuplicateGraph";
+import { Graph } from "../api/graph/model";
 
 interface Props {
     options: string[],
@@ -24,9 +25,10 @@ interface Props {
     setSelectedValue: (value: string) => void
     type: "Graph" | "Schema"
     onOpenChange: (open: boolean) => Promise<void>
+    setGraph: (graph: Graph) => void
 }
 
-export default function SelectGraph({ options, setOptions, selectedValue, setSelectedValue, type, onOpenChange }: Props) {
+export default function SelectGraph({ options, setOptions, selectedValue, setSelectedValue, type, onOpenChange, setGraph }: Props) {
 
     const { indicator, setIndicator } = useContext(IndicatorContext)
 
@@ -92,7 +94,7 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
             <DropdownMenu open={open} onOpenChange={handleOpenChange}>
                 <DropdownMenuTrigger disabled={options.length === 0 || indicator === "offline"} asChild>
                     <Button
-                        className="h-full w-[200px] text-3xl bg-foreground rounded-lg border p-2 justify-left disabled:text-gray-400 disabled:opacity-100"
+                        className="h-full w-[230px] text-2xl bg-foreground rounded-lg border p-2 justify-left disabled:text-gray-400 disabled:opacity-100"
                         label={selectedValue || `Select ${type}`}
                         title={options.length === 0 ? `There are no ${type}` : undefined}
                         indicator={indicator}
@@ -153,7 +155,8 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
                                 handleSetRows={handleSetRows}
                                 setOpenMenage={setOpenMenage}
                                 selectedValue={selectedValue}
-                                setSelectedValue={setSelectedValue}
+                                setGraphName={setSelectedValue}
+                                setGraph={setGraph}
                             />
                             <ExportGraph
                                 selectedValues={rows.filter(opt => opt.checked).map(opt => opt.cells[0].value as string)}

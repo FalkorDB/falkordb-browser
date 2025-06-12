@@ -31,12 +31,14 @@ test.describe('Graph Tests', () => {
         await apiCall.removeGraph(graphName);
     });
 
-    test.skip(`@admin Add graph via API -> remove graph via UI -> validate graph exists via API`, async () => {
+    test(`@admin Add graph via API -> remove graph via UI -> validate graph exists via API`, async () => {
         const graphName = getRandomString('graph');
         await apiCall.addGraph(graphName);
         const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
         await graph.removeGraph(graphName);
-        expect((await apiCall.getGraphs()).opts.includes(graphName)).toBe(false);
+        await graph.refreshPage();
+        const response = await apiCall.getGraphs();
+        expect(response.opts.includes(graphName)).toBe(false);
         await apiCall.removeGraph(graphName);
     });
 
@@ -44,9 +46,13 @@ test.describe('Graph Tests', () => {
         const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
         const graphName = getRandomString('graph');
         await graph.addGraph(graphName);
-        await apiCall.removeGraph(graphName);
         await graph.refreshPage();
-        expect(await graph.verifyGraphExists(graphName)).toBe(false);
+        await apiCall.removeGraph(graphName);        
+        await graph.refreshPage();
+        const response = await apiCall.getGraphs();
+        expect(response.opts.includes(graphName)).toBe(false);
+        const graphExistsInUI = await graph.verifyGraphExists(graphName, apiCall);
+        expect(graphExistsInUI).toBe(false);
     });
 
     test(`@admin Create graph -> click the Export Data button -> verify the file has been successfully downloaded`, async () => {
@@ -104,16 +110,15 @@ test.describe('Graph Tests', () => {
 
     test(`@admin Validate that modifying a graph name to an existing name is prevented`, async () => {
         const graphName1 = getRandomString('graph');
-        const graphName2 = getRandomString('graph');
         await apiCall.addGraph(graphName1);
+        const graphName2 = getRandomString('graph');
         await apiCall.addGraph(graphName2);
         const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
         await browser.setPageToFullScreen();
         await graph.modifyGraphName(graphName2, graphName1);
-        await graph.refreshPage();
-        expect(await graph.verifyGraphExists(graphName1)).toBe(true);
-        await graph.refreshPage();
-        expect(await graph.verifyGraphExists(graphName2)).toBe(true);
+        const graphs = await apiCall.getGraphs();
+        expect(graphs.opts.includes(graphName1)).toBeTruthy();
+        expect(graphs.opts.includes(graphName2)).toBeTruthy();
         await apiCall.removeGraph(graphName1);
         await apiCall.removeGraph(graphName2);
     });
@@ -227,7 +232,7 @@ test.describe('Graph Tests', () => {
         await graph.selectGraphByName(graphName);
         await graph.insertQuery(CREATE_QUERY);
         await graph.clickRunQuery();
-        expect(await graph.isVisibleLabelsButtonByName("Graph", "RelationshipTypes", "KNOWS")).toBeTruthy();
+        expect(await graph.isVisibleLabelsButtonByName("Graph", "Relationships", "KNOWS")).toBeTruthy();
         await apiCall.removeGraph(graphName);
     });
 
@@ -287,7 +292,7 @@ test.describe('Graph Tests', () => {
         });
     })
 
-    test.skip(`@admin run graph query via UI and validate node and edge count via API`, async () => {
+    test(`@admin run graph query via UI and validate node and edge count via API`, async () => {
         const graphName = getRandomString('graph');
         await apiCall.addGraph(graphName);
         const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
@@ -295,10 +300,11 @@ test.describe('Graph Tests', () => {
         await graph.selectGraphByName(graphName);
         await graph.insertQuery(CREATE_QUERY);
         await graph.clickRunQuery();
-        await graph.waitForPageIdle();
         const count = await apiCall.getGraphCount(graphName);
-        expect(count.result.data[0].edges).toBe(1);
-        expect(count.result.data[0].nodes).toBe(2);
+        const edgesCount = count.result.data[0].edges;
+        const nodesCount = count.result.data[0].nodes;
+        expect(edgesCount).toBe(1);
+        expect(nodesCount).toBe(2);
         await apiCall.removeGraph(graphName);
     });
 
