@@ -85,7 +85,7 @@ export function prepareArg(arg: string) {
   return encodeURIComponent(arg.trim());
 }
 
-export const defaultQuery = (q?: string) =>
+export const getDefaultQuery = (q?: string) =>
   q || "MATCH (n) OPTIONAL MATCH (n)-[e]-(m) return * LIMIT 100";
 
 export function rgbToHSL(hex: string): string {
