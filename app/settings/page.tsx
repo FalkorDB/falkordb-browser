@@ -1,34 +1,58 @@
 'use client'
 
-import { useEffect, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
+import { useToast } from "@/components/ui/use-toast"
 import Users from "./users/Users"
 import Configurations from "./Configurations"
 import Button from "../components/ui/Button"
 import QuerySettings from "./QuerySettings"
+import ToastButton from "../components/ToastButton"
 
 export default function Settings() {
 
     const [current, setCurrent] = useState<'Query' | 'DB' | 'Users'>('Query')
     const router = useRouter()
     const { data: session } = useSession()
+    const { toast } = useToast()
+    const [hasChanges, setHasChanges] = useState(false)
 
-    useEffect(() => {
-        const navigateBack = (e: KeyboardEvent) => {
-            if (e.key === "Escape") {
-                e.preventDefault()
+    const navigateBack = useCallback((e: KeyboardEvent) => {
+        if (e.key === "Escape") {
+            e.preventDefault()
+            if (current === "Query" && hasChanges) {
+                toast({
+                    title: "Query settings",
+                    description: "Are you sure you want to leave this page?\nYour changes will not be saved.",
+                    action: <ToastButton label="Leave" onClick={() => router.back()} showUndo={false} />,
+                })
+            } else {
                 router.back()
             }
         }
+    }, [router, current, toast, hasChanges])
 
+    useEffect(() => {
         window.addEventListener("keydown", navigateBack)
 
         return () => {
             window.removeEventListener("keydown", navigateBack)
         }
-    }, [router])
+    }, [navigateBack])
+
+    const handleSetCurrent = useCallback((tab: 'Query' | 'DB' | 'Users') => {
+        if (current === "Query" && hasChanges) {
+            toast({
+                title: "Query settings",
+                description: "Are you sure you want to leave this tab?\nYour changes will not be saved.",
+                action: <ToastButton label="Leave" onClick={() => setCurrent(tab)} showUndo={false} />,
+            })
+        } else {
+            setCurrent(tab)
+        }
+    }, [current, toast, hasChanges])
 
     useEffect(() => {
         if (session && session.user.role !== "Admin") router.back()
@@ -41,7 +65,7 @@ export default function Settings() {
             case 'DB':
                 return <Configurations />
             default:
-                return <QuerySettings />
+                return <QuerySettings setHasChanges={setHasChanges} />
         }
     }
 
@@ -54,19 +78,19 @@ export default function Settings() {
                         className={cn("p-2 rounded-lg", current === "Query" ? "bg-foreground" : "text-gray-500")}
                         label="Query Settings"
                         title="Manage query settings"
-                        onClick={() => setCurrent("Query")}
+                        onClick={() => handleSetCurrent("Query")}
                     />
                     <Button
                         className={cn("p-2 rounded-lg", current === "DB" ? "bg-foreground" : "text-gray-500")}
                         label="DB Configuration"
                         title="Configure database settings"
-                        onClick={() => setCurrent("DB")}
+                        onClick={() => handleSetCurrent("DB")}
                     />
                     <Button
                         className={cn("p-2 rounded-lg", current === "Users" ? "bg-foreground" : "text-gray-500")}
                         label="Users"
                         title="Manage users accounts"
-                        onClick={() => setCurrent("Users")}
+                        onClick={() => handleSetCurrent("Users")}
                     />
                 </div>
                 <div className="w-full h-1 grow px-6">
