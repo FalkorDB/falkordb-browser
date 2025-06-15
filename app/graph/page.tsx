@@ -7,7 +7,7 @@ import dynamic from "next/dynamic";
 import { ForceGraphMethods } from "react-force-graph-2d";
 import { Category, Graph, GraphData, Link, Node } from "../api/graph/model";
 import Tutorial from "./Tutorial";
-import { GraphNameContext, GraphContext, IndicatorContext, LimitContext, TimeoutContext, GraphNamesContext, HistoryQueryContext, RunDefaultQueryContext, DefaultQueryContext } from "../components/provider";
+import { GraphNameContext, GraphContext, IndicatorContext, LimitContext, TimeoutContext, GraphNamesContext, HistoryQueryContext, RunDefaultQueryContext, DefaultQueryContext, SaveContentContext } from "../components/provider";
 
 const Selector = dynamic(() => import("./Selector"), { ssr: false })
 const GraphView = dynamic(() => import("./GraphView"), { ssr: false })
@@ -22,6 +22,7 @@ export default function Page() {
     const { limit } = useContext(LimitContext);
     const { runDefaultQuery } = useContext(RunDefaultQueryContext)
     const { defaultQuery } = useContext(DefaultQueryContext)
+    const { saveContent } = useContext(SaveContentContext)
 
     const { toast } = useToast()
 
@@ -35,13 +36,6 @@ export default function Page() {
     const [labels, setLabels] = useState<Category<Link>[]>([])
     const [nodesCount, setNodesCount] = useState(0)
     const [edgesCount, setEdgesCount] = useState(0)
-    const [colors, setColors] = useState<string[]>([])
-
-    useEffect(() => {
-        if (JSON.stringify(graph.Colors) !== JSON.stringify(colors)) {
-            setColors(graph.Colors)
-        }
-    }, [colors, graph.Colors])
 
     useEffect(() => {
         setLabels([...graph.Labels])
@@ -77,8 +71,8 @@ export default function Page() {
         setNodesCount(json.nodes)
     }, [graphName, toast, setIndicator])
 
-    const run = useCallback(async (q: string) => {
-        if (!graphName) {
+    const run = useCallback(async (q: string, name: string) => {
+        if (!name) {
             toast({
                 title: "Error",
                 description: "Select a graph first",
@@ -87,7 +81,7 @@ export default function Page() {
             return null
         }
 
-        const result = await securedFetch(`api/graph/${prepareArg(graphName)}/?query=${prepareArg(getQueryWithLimit(q, limit))}&timeout=${timeout}`, {
+        const result = await securedFetch(`api/graph/${prepareArg(name)}/?query=${prepareArg(getQueryWithLimit(q, limit))}&timeout=${timeout}`, {
             method: "GET"
         }, toast, setIndicator)
 
@@ -97,7 +91,7 @@ export default function Page() {
 
         while (typeof json.result === "number") {
             // eslint-disable-next-line no-await-in-loop
-            const res = await securedFetch(`api/graph/${prepareArg(graphName)}/query/?id=${prepareArg(json.result.toString())}`, {
+            const res = await securedFetch(`api/graph/${prepareArg(name)}/query/?id=${prepareArg(json.result.toString())}`, {
                 method: "GET"
             }, toast, setIndicator)
 
@@ -110,7 +104,7 @@ export default function Page() {
         setSelectedElement(undefined)
 
         return json.result
-    }, [graphName, limit, timeout, toast, setIndicator])
+    }, [limit, timeout, toast, setIndicator])
 
     const handleCooldown = (ticks?: number) => {
         setCooldownTicks(ticks)
@@ -125,42 +119,73 @@ export default function Page() {
         }
     }
 
-    const runQuery = useCallback(async (q: string) => {
-        const result = await run(q)
+    const runQuery = useCallback(async (q: string, name?: string) => {
+        const n = name || graphName
+        const result = await run(q, n)
+ 
         if (!result) return
-        const explain = await securedFetch(`api/graph/${prepareArg(graphName)}/explain/?query=${prepareArg(q)}`, {
+ 
+        const explain = await securedFetch(`api/graph/${prepareArg(n)}/explain/?query=${prepareArg(q)}`, {
             method: "GET"
         }, toast, setIndicator)
+ 
         if (!explain.ok) return
+ 
         const explainJson = await explain.json()
         const newQuery = { text: q, metadata: result.metadata, explain: explainJson.result, profile: [] }
         const queryArr = historyQuery.queries.some(qu => qu.text === q) ? historyQuery.queries : [...historyQuery.queries, newQuery]
-        setHistoryQuery(prev => ({
+ 
+        setHistoryQuery(prev => historyQuery.counter === 0 ? {
+            queries: queryArr,
+            query: q,
+            currentQuery: q,
+            counter: 0
+        } : {
             ...prev,
             queries: queryArr,
             currentQuery: q,
             counter: 0
-        }))
-        localStorage.setItem("query history", JSON.stringify(queryArr))
-        const g = Graph.create(graphName, result, false, false, limit, colors, newQuery)
+        })
+ 
+        const g = Graph.create(n, result, false, false, limit, graph.Colors, newQuery)
+ 
         setGraph(g)
+        fetchCount()
+        handleCooldown()
+        localStorage.setItem("query history", JSON.stringify(queryArr))
+        localStorage.setItem("savedContent", JSON.stringify({ graphName: n, query: q }))
         // eslint-disable-next-line @typescript-eslint/ban-ts-comment
         // @ts-ignore
         window.graph = g
-        fetchCount()
-        handleCooldown()
-    }, [run, graphName, toast, setIndicator, historyQuery.queries, setHistoryQuery, limit, colors, setGraph, fetchCount])
+    }, [graphName, run, toast, setIndicator, historyQuery.queries, historyQuery.counter, setHistoryQuery, limit, graph.Colors, setGraph, fetchCount])
 
     useEffect(() => {
+        if (!graph.Id && saveContent) {
+            const content = localStorage.getItem("savedContent")
+
+            if (content) {
+                const { graphName: name, query } = JSON.parse(content)
+
+                setGraphName(name)
+                runQuery(query, name)
+            }
+            return
+        }
+
+        if (!graphName) return
+
         if (graphName !== graph.Id) {
+            if (runDefaultQuery) {
+                runQuery(defaultQuery)
+                return
+            }
+
             const colorsArr = JSON.parse(localStorage.getItem(graphName) || "[]")
             setGraph(Graph.empty(graphName, colorsArr))
         }
+
         fetchCount()
-        if (runDefaultQuery && graphName) {
-            runQuery(defaultQuery)
-        }
-    }, [fetchCount, graph.Id, graphName, setGraph, runDefaultQuery, runQuery, defaultQuery])
+    }, [fetchCount, graph.Id, graphName, setGraph, runDefaultQuery, defaultQuery, runQuery, saveContent, setGraphName])
 
     const handleDeleteElement = async () => {
         if (selectedElements.length === 0 && selectedElement) {

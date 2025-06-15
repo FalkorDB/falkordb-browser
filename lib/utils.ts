@@ -86,7 +86,7 @@ export function prepareArg(arg: string) {
 }
 
 export const getDefaultQuery = (q?: string) =>
-  q || "MATCH (n) OPTIONAL MATCH (n)-[e]-(m) return * LIMIT 100";
+  q || "MATCH (n) OPTIONAL MATCH (n)-[e]-(m) RETURN * LIMIT 100";
 
 export function rgbToHSL(hex: string): string {
   // Remove the # if present

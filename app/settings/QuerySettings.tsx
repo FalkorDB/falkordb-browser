@@ -4,7 +4,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { cn, getDefaultQuery } from "@/lib/utils"
 import { Checkbox } from "@/components/ui/checkbox"
 import { toast } from "@/components/ui/use-toast"
-import { DefaultQueryContext, LimitContext, RunDefaultQueryContext, TimeoutContext } from "../components/provider"
+import { DefaultQueryContext, LimitContext, RunDefaultQueryContext, SaveContentContext, TimeoutContext } from "../components/provider"
 import Button from "../components/ui/Button"
 import Input from "../components/ui/Input"
 
@@ -13,10 +13,13 @@ export default function QuerySettings({ setHasChanges }: { setHasChanges: (hasCh
     const { limit, setLimit } = useContext(LimitContext)
     const { defaultQuery, setDefaultQuery } = useContext(DefaultQueryContext)
     const { runDefaultQuery, setRunDefaultQuery } = useContext(RunDefaultQueryContext)
+    const { saveContent, setSaveContent } = useContext(SaveContentContext)
+
     const [newTimeout, setNewTimeout] = useState(0)
     const [newLimit, setNewLimit] = useState(0)
     const [newDefaultQuery, setNewDefaultQuery] = useState("")
     const [newRunDefaultQuery, setNewRunDefaultQuery] = useState(false)
+    const [newSaveContent, setNewSaveContent] = useState(false)
     const [isResetting, setIsResetting] = useState(false)
 
     useEffect(() => {
@@ -24,11 +27,12 @@ export default function QuerySettings({ setHasChanges }: { setHasChanges: (hasCh
         setNewRunDefaultQuery(localStorage.getItem("runDefaultQuery") === "true")
         setNewTimeout(parseInt(localStorage.getItem("timeout") ?? "0", 10))
         setNewLimit(parseInt(localStorage.getItem("limit") ?? "300", 10))
+        setNewSaveContent(localStorage.getItem("saveContent") === "true")
     }, [])
 
     useEffect(() => {
-        setHasChanges(newTimeout !== timeoutValue || newLimit !== limit || newDefaultQuery !== defaultQuery || newRunDefaultQuery !== runDefaultQuery)
-    }, [defaultQuery, limit, newDefaultQuery, newLimit, newRunDefaultQuery, newTimeout, runDefaultQuery, setHasChanges, timeoutValue])
+        setHasChanges(newSaveContent !== saveContent || newTimeout !== timeoutValue || newLimit !== limit || newDefaultQuery !== defaultQuery || newRunDefaultQuery !== runDefaultQuery)
+    }, [defaultQuery, limit, newDefaultQuery, newLimit, newRunDefaultQuery, newSaveContent, newTimeout, runDefaultQuery, saveContent, setHasChanges, timeoutValue])
 
 
     const saveSettings = () => {
@@ -37,12 +41,17 @@ export default function QuerySettings({ setHasChanges }: { setHasChanges: (hasCh
         localStorage.setItem("runDefaultQuery", newRunDefaultQuery.toString())
         localStorage.setItem("timeout", newTimeout.toString())
         localStorage.setItem("limit", newLimit.toString())
+        localStorage.setItem("saveContent", newSaveContent.toString())
 
         // Update context
         setDefaultQuery(newDefaultQuery)
         setRunDefaultQuery(newRunDefaultQuery)
         setTimeoutValue(newTimeout)
         setLimit(newLimit)
+        setSaveContent(newSaveContent)
+
+        // Reset has changes
+        setHasChanges(false)
 
         // Show success toast
         toast({
@@ -227,8 +236,39 @@ export default function QuerySettings({ setHasChanges }: { setHasChanges: (hasCh
                     <p>OFF</p>
                 </div>
             </div>
+            <div className="w-fit flex flex-col gap-6 p-4">
+                <div className="flex gap-2 items-center justify-center">
+                    <h2>Save content</h2>
+                    <Tooltip>
+                        <TooltipTrigger>
+                            <Info size={16} />
+                        </TooltipTrigger>
+                        <TooltipContent>
+                            <p>When enabled, the content of the query will be saved to use when you open the browser again.</p>
+                        </TooltipContent>
+                    </Tooltip>
+                </div>
+                <div className="flex gap-4">
+                    <div className="flex gap-2 items-center">
+                        <Checkbox
+                            className="w-6 h-6 rounded-full bg-foreground border-background data-[state=checked]:bg-background"
+                            checked={newSaveContent}
+                            onCheckedChange={() => setNewSaveContent(true)}
+                        />
+                        <p>ON</p>
+                    </div>
+                    <div className="flex gap-2 items-center">
+                        <Checkbox
+                            className="w-6 h-6 rounded-full bg-foreground border-background data-[state=checked]:bg-background"
+                            checked={!newSaveContent}
+                            onCheckedChange={() => setNewSaveContent(false)}
+                        />
+                        <p>OFF</p>
+                    </div>
+                </div>
+            </div>
             {
-                (newTimeout !== timeoutValue || newLimit !== limit || newDefaultQuery !== defaultQuery || newRunDefaultQuery !== runDefaultQuery) &&
+                (newSaveContent !== saveContent || newTimeout !== timeoutValue || newLimit !== limit || newDefaultQuery !== defaultQuery || newRunDefaultQuery !== runDefaultQuery) &&
                 <div className="flex gap-4">
                     <Button
                         variant="Secondary"
