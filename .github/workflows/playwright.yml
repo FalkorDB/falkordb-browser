@@ -6,13 +6,10 @@ on:
     branches: [ main, staging ]
   pull_request:
     branches: [ main, staging ]
-  workflow_run:
-    workflows:
-      - "FalkorDb/Falkordb: browser tests trigger on new tag release"
-    types:
-      - completed
-    repositories:
-      - FalkorDb/Falkordb
+  workflow_call:
+    secrets:
+      run-browser-tests:
+        required: true
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
