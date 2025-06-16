@@ -90,10 +90,13 @@ export default function Page() {
     }, [fetchCount, setIndicator, setSchema, toast, schemaName])
 
     useEffect(() => {
-        if (schema.Id || !schemaName) {
+        if (!schemaName) return
+        
+        if (schema.Id) {
             fetchCount()
             return
         }
+        
         fetchSchema()
     }, [schemaName, fetchSchema, schema.Id, fetchCount])
 
