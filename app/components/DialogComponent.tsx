@@ -32,7 +32,7 @@ export default function DialogComponent({
             <DialogTrigger asChild>
                 {trigger}
             </DialogTrigger>
-            <DialogContent className={cn("bg-foreground p-8 flex flex-col gap-8 rounded-lg border-none", className)} disableClose>
+            <DialogContent onEscapeKeyDown={(e) => e.stopPropagation()} className={cn("bg-foreground p-8 flex flex-col gap-8 rounded-lg border-none", className)} disableClose>
                 <DialogHeader className="flex-row justify-between items-center border-b border-secondary pb-4">
                     <DialogTitle className="text-2xl font-medium">{title}</DialogTitle>
                     <CloseDialog />

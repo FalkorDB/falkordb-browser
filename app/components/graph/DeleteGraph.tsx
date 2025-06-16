@@ -1,6 +1,6 @@
 import { useToast } from "@/components/ui/use-toast";
 import { prepareArg, securedFetch, Row } from "@/lib/utils";
-import React, { useContext, useState } from "react";
+import React, { useContext, useEffect, useState } from "react";
 import { Graph } from "@/app/api/graph/model";
 import DialogComponent from "../DialogComponent";
 import Button from "../ui/Button";
@@ -28,10 +28,17 @@ export default function DeleteGraph({
 }: Props) {
 
   const [open, setOpen] = useState(false)
+  const [closeManage, setCloseManage] = useState(false)
   const { toast } = useToast()
   const [isLoading, setIsLoading] = useState(false)
   const { indicator, setIndicator } = useContext(IndicatorContext)
   const { graphNames, setGraphNames } = useContext(GraphNamesContext)
+
+  useEffect(() => {
+    if (!open && closeManage) {
+      setOpenMenage(false)
+    }
+  }, [open, closeManage, setOpenMenage])
 
   const handleDelete = async (deleteGraphNames: string[]) => {
     setIsLoading(true)
@@ -63,9 +70,9 @@ export default function DeleteGraph({
         description: successDeletedGraphs.length > 0 && `The graph(s) ${successDeletedGraphs.join(", ")} have been deleted successfully${failedDeletedGraphs.length > 0 && `The graph(s) ${failedDeletedGraphs.join(", ")} have not been deleted`}`,
       })
     } finally {
-      setOpen(false)
-      setOpenMenage(false)
       setIsLoading(false)
+      setOpen(false)
+      setCloseManage(true)
     }
   }
 

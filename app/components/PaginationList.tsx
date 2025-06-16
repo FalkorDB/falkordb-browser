@@ -47,7 +47,7 @@ export default function PaginationList<T extends Item>({ list, step, onClick, da
         return () => {
             clearTimeout(timeout)
         }
-    }, [list, search])
+    }, [afterSearchCallback, list, search])
 
     return (
         <div className={cn("w-full flex flex-col gap-4 p-6", className)}>
@@ -135,5 +135,5 @@ export default function PaginationList<T extends Item>({ list, step, onClick, da
 PaginationList.defaultProps = {
     className: undefined,
     children: undefined,
-    isLoading: undefined
+    isLoading: undefined,
 }

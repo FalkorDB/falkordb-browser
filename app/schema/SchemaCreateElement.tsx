@@ -3,7 +3,7 @@
 'use client'
 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Dispatch, SetStateAction, useContext, useState } from "react";
+import { Dispatch, SetStateAction, useCallback, useContext, useEffect, useState } from "react";
 import { ArrowRight, ArrowRightLeft, Check, Pencil, Plus, Trash2, X } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/components/ui/use-toast";
@@ -45,6 +45,19 @@ export default function SchemaCreateElement({ onCreate, setIsAdd, selectedNodes,
   const [editable, setEditable] = useState<string>("")
   const [label, setLabel] = useState<string[]>([])
   const [hover, setHover] = useState<string>("")
+
+  const handleClose = useCallback((e: KeyboardEvent) => {
+    if (e.key === "Escape") {
+      setIsAdd(false)
+    }
+  }, [setIsAdd])
+
+  useEffect(() => {
+    window.addEventListener("keydown", handleClose)
+    return () => {
+      window.removeEventListener("keydown", handleClose)
+    }
+  }, [handleClose])
 
   const handleSetEditable = (att: [string, string[]] = getDefaultAttribute()) => {
     setAttribute(att)
@@ -186,7 +199,7 @@ export default function SchemaCreateElement({ onCreate, setIsAdd, selectedNodes,
     setIsAddLabel(false)
   }
 
-  const handleClose = () => {
+  const onClose = () => {
     setSelectedNodes([undefined, undefined])
     setAttributes([])
     setLabel([])
@@ -203,7 +216,7 @@ export default function SchemaCreateElement({ onCreate, setIsAdd, selectedNodes,
       <div className="relative w-full flex justify-between items-center p-6" id="headerDataPanel">
         <Button
           className="absolute top-2 right-2"
-          onClick={() => handleClose()}
+          onClick={() => onClose()}
         >
           <X size={15} />
         </Button>

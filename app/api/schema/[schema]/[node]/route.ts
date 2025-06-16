@@ -24,9 +24,7 @@ export async function POST(
 
       if (!attributes) throw new Error("Attributes are required");
 
-      if (type) {
-        if (!label[0]) throw new Error("Label is required");
-      } else {
+      if (!type) {
         if (!label) throw new Error("Label is required");
 
         if (!selectedNodes || selectedNodes.length !== 2)
