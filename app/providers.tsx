@@ -7,7 +7,7 @@ import { usePathname } from "next/navigation";
 import { fetchOptions, formatName, getDefaultQuery } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
 import LoginVerification from "./loginVerification";
-import { GraphContext, GraphNameContext, GraphNamesContext, IndicatorContext, LimitContext, HistoryQueryContext, SchemaContext, SchemaNameContext, SchemaNamesContext, TimeoutContext, RunDefaultQueryContext, DefaultQueryContext, SaveContentContext } from "./components/provider";
+import { GraphContext, GraphNameContext, GraphNamesContext, IndicatorContext, LimitContext, HistoryQueryContext, SchemaContext, SchemaNameContext, SchemaNamesContext, TimeoutContext, RunDefaultQueryContext, DefaultQueryContext, ContentPersistenceContext } from "./components/provider";
 import { Graph, HistoryQuery } from "./api/graph/model";
 import Header from "./components/Header";
 
@@ -30,7 +30,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
   const [graph, setGraph] = useState<Graph>(Graph.empty())
   const [schemaName, setSchemaName] = useState<string>("")
   const [graphName, setGraphName] = useState<string>("")
-  const [saveContent, setSaveContent] = useState(false)
+  const [contentPersistence, setContentPersistence] = useState(false)
   const [defaultQuery, setDefaultQuery] = useState("")
   const [timeout, setTimeout] = useState(0)
   const [limit, setLimit] = useState(0)
@@ -38,7 +38,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
   const runDefaultQueryContext = useMemo(() => ({ runDefaultQuery, setRunDefaultQuery }), [runDefaultQuery, setRunDefaultQuery])
   const historyQueryContext = useMemo(() => ({ historyQuery, setHistoryQuery }), [historyQuery, setHistoryQuery])
   const defaultQueryContext = useMemo(() => ({ defaultQuery, setDefaultQuery }), [defaultQuery, setDefaultQuery])
-  const saveContentContext = useMemo(() => ({ saveContent, setSaveContent }), [saveContent, setSaveContent])
+  const contentPersistenceContext = useMemo(() => ({ contentPersistence, setContentPersistence }), [contentPersistence, setContentPersistence])
   const schemaNamesContext = useMemo(() => ({ schemaNames, setSchemaNames }), [schemaNames, setSchemaNames])
   const graphNamesContext = useMemo(() => ({ graphNames, setGraphNames }), [graphNames, setGraphNames])
   const schemaNameContext = useMemo(() => ({ schemaName, setSchemaName }), [schemaName, setSchemaName])
@@ -60,7 +60,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
     setLimit(parseInt(localStorage.getItem("limit") || "300", 10))
     setDefaultQuery(getDefaultQuery(localStorage.getItem("defaultQuery") || undefined))
     setRunDefaultQuery(localStorage.getItem("runDefaultQuery") === "true")
-    setSaveContent(localStorage.getItem("saveContent") === "true")
+    setContentPersistence(localStorage.getItem("contentPersistence") === "true")
   }, [])
 
   const checkStatus = useCallback(async () => {
@@ -108,9 +108,9 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
     await Promise.all(([["Graph", setGraphNames, setGraphName], ["Schema", setSchemaNames, setSchemaName]] as ["Graph" | "Schema", Dispatch<SetStateAction<string[]>>, Dispatch<SetStateAction<string>>][]).map(async ([type, setOptions, setName]) => {
       const [opts, name] = await fetchOptions(type, toast, setIndicator, indicator)
       setOptions(opts)
-      if (!saveContent || type === "Schema") setName(formatName(name))
+      if (!contentPersistence || type === "Schema") setName(formatName(name))
     }))
-  }, [indicator, toast, saveContent, setGraphNames, setGraphName, setSchemaNames, setSchemaName, setIndicator])
+  }, [indicator, toast, contentPersistence, setGraphNames, setGraphName, setSchemaNames, setSchemaName, setIndicator])
 
   useEffect(() => {
     handleFetchOptions()
@@ -125,7 +125,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
               <DefaultQueryContext.Provider value={defaultQueryContext}>
                 <TimeoutContext.Provider value={timeoutContext}>
                   <LimitContext.Provider value={limitContext}>
-                    <SaveContentContext.Provider value={saveContentContext}>
+                    <ContentPersistenceContext.Provider value={contentPersistenceContext}>
                       <SchemaContext.Provider value={schemaContext}>
                         <SchemaNameContext.Provider value={schemaNameContext}>
                           <SchemaNamesContext.Provider value={schemaNamesContext}>
@@ -140,7 +140,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
                           </SchemaNamesContext.Provider>
                         </SchemaNameContext.Provider>
                       </SchemaContext.Provider>
-                    </SaveContentContext.Provider>
+                    </ContentPersistenceContext.Provider>
                   </LimitContext.Provider>
                 </TimeoutContext.Provider>
               </DefaultQueryContext.Provider>

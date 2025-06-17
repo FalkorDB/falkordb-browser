@@ -1,54 +1,57 @@
+"use client"
+
 import { useContext, useEffect, useState } from "react"
 import { Info, Minus, Plus, RotateCcw } from "lucide-react"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { cn, getDefaultQuery } from "@/lib/utils"
 import { Checkbox } from "@/components/ui/checkbox"
 import { toast } from "@/components/ui/use-toast"
-import { DefaultQueryContext, LimitContext, RunDefaultQueryContext, SaveContentContext, TimeoutContext } from "../components/provider"
+import { DefaultQueryContext, LimitContext, RunDefaultQueryContext, ContentPersistenceContext, TimeoutContext } from "../components/provider"
 import Button from "../components/ui/Button"
 import Input from "../components/ui/Input"
 
 export default function QuerySettings({ setHasChanges }: { setHasChanges: (hasChanges: boolean) => void }) {
+    const { contentPersistence, setContentPersistence } = useContext(ContentPersistenceContext)
     const { timeout: timeoutValue, setTimeout: setTimeoutValue } = useContext(TimeoutContext)
-    const { limit, setLimit } = useContext(LimitContext)
-    const { defaultQuery, setDefaultQuery } = useContext(DefaultQueryContext)
     const { runDefaultQuery, setRunDefaultQuery } = useContext(RunDefaultQueryContext)
-    const { saveContent, setSaveContent } = useContext(SaveContentContext)
+    const { defaultQuery, setDefaultQuery } = useContext(DefaultQueryContext)
+    const { limit, setLimit } = useContext(LimitContext)
 
+    const [newContentPersistence, setNewContentPersistence] = useState(false)
+    const [newRunDefaultQuery, setNewRunDefaultQuery] = useState(false)
+    const [newDefaultQuery, setNewDefaultQuery] = useState("")
+    const [isResetting, setIsResetting] = useState(false)
     const [newTimeout, setNewTimeout] = useState(0)
     const [newLimit, setNewLimit] = useState(0)
-    const [newDefaultQuery, setNewDefaultQuery] = useState("")
-    const [newRunDefaultQuery, setNewRunDefaultQuery] = useState(false)
-    const [newSaveContent, setNewSaveContent] = useState(false)
-    const [isResetting, setIsResetting] = useState(false)
 
     useEffect(() => {
-        setNewTimeout(parseInt(localStorage.getItem("timeout") || "0", 10))
-        setNewLimit(parseInt(localStorage.getItem("limit") || "300", 10))
-        setNewDefaultQuery(getDefaultQuery(localStorage.getItem("defaultQuery") || undefined))
-        setNewRunDefaultQuery(localStorage.getItem("runDefaultQuery") === "true")
-        setNewSaveContent(localStorage.getItem("saveContent") === "true")
-    }, [])
+        setNewContentPersistence(contentPersistence)
+        setNewRunDefaultQuery(runDefaultQuery)
+        setNewDefaultQuery(defaultQuery)
+        setNewTimeout(timeoutValue)
+        setNewLimit(limit)
+    }, [contentPersistence, runDefaultQuery, defaultQuery, timeoutValue, limit])
 
     useEffect(() => {
-        setHasChanges(newSaveContent !== saveContent || newTimeout !== timeoutValue || newLimit !== limit || newDefaultQuery !== defaultQuery || newRunDefaultQuery !== runDefaultQuery)
-    }, [defaultQuery, limit, newDefaultQuery, newLimit, newRunDefaultQuery, newSaveContent, newTimeout, runDefaultQuery, saveContent, setHasChanges, timeoutValue])
+        setHasChanges(newContentPersistence !== contentPersistence || newTimeout !== timeoutValue || newLimit !== limit || newDefaultQuery !== defaultQuery || newRunDefaultQuery !== runDefaultQuery)
+    }, [defaultQuery, limit, newDefaultQuery, newLimit, newRunDefaultQuery, newContentPersistence, newTimeout, runDefaultQuery, contentPersistence, setHasChanges, timeoutValue])
 
+    const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+        e.preventDefault()
 
-    const saveSettings = () => {
         // Save settings to local storage
-        localStorage.setItem("defaultQuery", newDefaultQuery)
         localStorage.setItem("runDefaultQuery", newRunDefaultQuery.toString())
+        localStorage.setItem("contentPersistence", newContentPersistence.toString())
         localStorage.setItem("timeout", newTimeout.toString())
+        localStorage.setItem("defaultQuery", newDefaultQuery)
         localStorage.setItem("limit", newLimit.toString())
-        localStorage.setItem("saveContent", newSaveContent.toString())
 
         // Update context
-        setDefaultQuery(newDefaultQuery)
+        setContentPersistence(newContentPersistence)
         setRunDefaultQuery(newRunDefaultQuery)
+        setDefaultQuery(newDefaultQuery)
         setTimeoutValue(newTimeout)
         setLimit(newLimit)
-        setSaveContent(newSaveContent)
 
         // Reset has changes
         setHasChanges(false)
@@ -59,15 +62,17 @@ export default function QuerySettings({ setHasChanges }: { setHasChanges: (hasCh
             description: "Your settings have been saved.",
         })
     }
-    const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
-        e.preventDefault()
-        saveSettings()
-    }
     return (
-        <form onSubmit={handleSubmit} className="h-full w-full flex flex-col gap-16 overflow-auto items-center">
-            <div className="w-fit flex flex-col gap-6 p-4">
+        <form onSubmit={handleSubmit} className="h-full w-full flex flex-col gap-16 overflow-y-auto px-[20%]">
+            <div className="flex flex-col gap-2 items-center">
+                <h1 className="text-2xl font-bold">Query Settings</h1>
+                <p className="text-sm text-muted-foreground">Configure your query execution settings</p>
+            </div>
+            <div className="flex flex-col gap-6 p-4 border rounded-lg">
+                <h2 className="text-lg font-bold">Query Execution</h2>
+                <p className="text-sm text-muted-foreground">Control how your queries are executed and their performance limits</p>
                 <div className="flex flex-col gap-2 items-center">
-                    <div className="flex gap-2 items-center">
+                    <div className="w-full flex gap-2 justify-start">
                         <h2>Timeout</h2>
                         <Tooltip>
                             <TooltipTrigger>
@@ -120,7 +125,7 @@ export default function QuerySettings({ setHasChanges }: { setHasChanges: (hasCh
                     </div>
                 </div>
                 <div className="flex flex-col items-center gap-2">
-                    <div className="flex gap-2 items-center">
+                    <div className="w-full flex gap-2 justify-start">
                         <h2>Limit</h2>
                         <Tooltip>
                             <TooltipTrigger>
@@ -176,115 +181,121 @@ export default function QuerySettings({ setHasChanges }: { setHasChanges: (hasCh
                     </div>
                 </div>
             </div>
-            <div className="w-fit flex flex-col gap-6 p-4">
-                <div className="flex gap-2 items-center justify-center">
-                    <h2>Default Query</h2>
-                    <Tooltip>
-                        <TooltipTrigger>
-                            <Info size={16} />
-                        </TooltipTrigger>
-                        <TooltipContent>
-                            <p>When enabled, the default query will be run when the graph is selected.</p>
-                        </TooltipContent>
-                    </Tooltip>
+            <div className="flex flex-col gap-6 p-4 border rounded-lg">
+                <div className="flex flex-col gap-2">
+                    <h2 className="text-lg font-bold">Default Query</h2>
+                    <p className="text-sm text-muted-foreground">When enabled, the default query will be run when the graph is selected.</p>
                 </div>
-                <div className="flex gap-4 items-center">
-                    <Checkbox
-                        className="w-6 h-6 rounded-full bg-foreground border-background data-[state=checked]:bg-background"
-                        checked={newRunDefaultQuery}
-                        onCheckedChange={() => setNewRunDefaultQuery(true)}
-                    />
-                    <p>ON</p>
-                    <Input
-                        className={cn("text-center bg-foreground text-white text-xl")}
-                        value={newDefaultQuery}
-                        onChange={(e) => setNewDefaultQuery(e.target.value)}
-                    />
-                    {
-                        (defaultQuery !== getDefaultQuery() || isResetting) &&
-                        <Button
-                            variant="Secondary"
-                            onClick={async () => {
-                                setIsResetting(true)
-                                try {
-                                    // add a delay to the reset to show the animation
-                                    await new Promise(resolve => { setTimeout(resolve, 1000) })
-                                    const q = getDefaultQuery()
-                                    setDefaultQuery(q)
-                                    setNewDefaultQuery(q)
-                                    localStorage.setItem("defaultQuery", q)
-                                    toast({
-                                        title: "Default query reset",
-                                        description: "Your default query has been reset.",
-                                    })
-                                } finally {
-                                    setIsResetting(false)
-                                }
-                            }}
-                            title="Reset"
-                        >
-                            <RotateCcw className={cn(isResetting && "animate-spin")} />
-                        </Button>
-                    }
-                </div>
-                <div className="flex items-center gap-4">
-                    <Checkbox
-                        className="w-6 h-6 rounded-full bg-foreground border-background data-[state=checked]:bg-background"
-                        checked={!newRunDefaultQuery}
-                        onCheckedChange={() => setNewRunDefaultQuery(false)}
-                    />
-                    <p>OFF</p>
-                </div>
-            </div>
-            <div className="w-fit flex flex-col gap-6 p-4">
-                <div className="flex gap-2 items-center justify-center">
-                    <h2>Save content</h2>
-                    <Tooltip>
-                        <TooltipTrigger>
-                            <Info size={16} />
-                        </TooltipTrigger>
-                        <TooltipContent>
-                            <p>When enabled, the content of the query will be saved to use when you open the browser again.</p>
-                        </TooltipContent>
-                    </Tooltip>
-                </div>
-                <div className="flex gap-4">
-                    <div className="flex gap-2 items-center">
+                <div className="flex flex-col gap-2">
+                    <h3 className="font-bold">AUTO-EXECUTE</h3>
+                    <div className="flex gap-4 items-center">
                         <Checkbox
+                            id="runDefaultQueryCheckboxOn"
                             className="w-6 h-6 rounded-full bg-foreground border-background data-[state=checked]:bg-background"
-                            checked={newSaveContent}
-                            onCheckedChange={() => setNewSaveContent(true)}
+                            checked={newRunDefaultQuery}
+                            onCheckedChange={() => setNewRunDefaultQuery(true)}
                         />
                         <p>ON</p>
-                    </div>
-                    <div className="flex gap-2 items-center">
                         <Checkbox
+                            id="runDefaultQueryCheckboxOff"
                             className="w-6 h-6 rounded-full bg-foreground border-background data-[state=checked]:bg-background"
-                            checked={!newSaveContent}
-                            onCheckedChange={() => setNewSaveContent(false)}
+                            checked={!newRunDefaultQuery}
+                            onCheckedChange={() => setNewRunDefaultQuery(false)}
                         />
                         <p>OFF</p>
                     </div>
                 </div>
+                <div className="flex flex-col gap-2">
+                    <h3 className="font-bold">DEFAULT QUERY</h3>
+                    <div className="flex gap-2 items-center">
+                        <p>Query:</p>
+                        <Input
+                            id="runDefaultQueryInput"
+                            className={cn("bg-foreground text-white text-xl w-1 grow")}
+                            value={newDefaultQuery}
+                            onChange={(e) => setNewDefaultQuery(e.target.value)}
+                        />
+                        {
+                            (defaultQuery !== getDefaultQuery() || isResetting) &&
+                            <Button
+                                id="runDefaultQueryResetBtn"
+                                variant="Secondary"
+                                onClick={async () => {
+                                    setIsResetting(true)
+                                    try {
+                                        // add a delay to the reset to show the animation
+                                        await new Promise(resolve => { setTimeout(resolve, 1000) })
+                                        const q = getDefaultQuery()
+                                        setDefaultQuery(q)
+                                        setNewDefaultQuery(q)
+                                        localStorage.setItem("defaultQuery", q)
+                                        toast({
+                                            title: "Default query reset",
+                                            description: "Your default query has been reset.",
+                                        })
+                                    } finally {
+                                        setIsResetting(false)
+                                    }
+                                }}
+                                title="Reset"
+                            >
+                                <RotateCcw className={cn(isResetting && "animate-spin")} />
+                            </Button>
+                        }
+                    </div>
+                </div>
+            </div>
+            <div className="flex flex-col gap-6 p-4 border rounded-lg">
+                <div className="flex flex-col gap-2">
+                    <h2 className="text-lg font-bold">Content Persistence</h2>
+                    <p className="text-sm text-muted-foreground">When enabled, the content is preserved for your next visit.</p>
+                </div>
+                <div className="flex flex-col gap-2">
+                    <p>AUTO-SAVE</p>
+                    <div className="flex gap-4">
+                        <div className="flex gap-2 items-center">
+                            <Checkbox
+                                id="contentPersistenceCheckboxOn"
+                                className="w-6 h-6 rounded-full bg-foreground border-background data-[state=checked]:bg-background"
+                                checked={newContentPersistence}
+                                onCheckedChange={() => setNewContentPersistence(true)}
+                            />
+                            <p>ON</p>
+                        </div>
+                        <div className="flex gap-2 items-center">
+                            <Checkbox
+                                id="contentPersistenceCheckboxOff"
+                                className="w-6 h-6 rounded-full bg-foreground border-background data-[state=checked]:bg-background"
+                                checked={!newContentPersistence}
+                                onCheckedChange={() => setNewContentPersistence(false)}
+                            />
+                            <p>OFF</p>
+                        </div>
+                    </div>
+                </div>
             </div>
             {
-                (newSaveContent !== saveContent || newTimeout !== timeoutValue || newLimit !== limit || newDefaultQuery !== defaultQuery || newRunDefaultQuery !== runDefaultQuery) &&
-                <div className="flex gap-4">
+                (newContentPersistence !== contentPersistence || newTimeout !== timeoutValue || newLimit !== limit || newDefaultQuery !== defaultQuery || newRunDefaultQuery !== runDefaultQuery) &&
+                <div className="bg-foreground flex gap-4 p-2 sticky bottom-0 justify-center">
                     <Button
+                        id="cancelQuerySettingsBtn"
                         variant="Secondary"
                         onClick={() => {
                             // Reset new settings to current settings
-                            setNewDefaultQuery(defaultQuery)
+                            setNewContentPersistence(contentPersistence)
                             setNewRunDefaultQuery(runDefaultQuery)
+                            setNewDefaultQuery(defaultQuery)
                             setNewTimeout(timeoutValue)
                             setNewLimit(limit)
-                        }}>
+                        }}
+                    >
                         <p>Cancel</p>
                     </Button>
                     <Button
+                        id="saveQuerySettingsBtn"
                         variant="Primary"
-                        data-testid="saveSettingsBtn"
-                        onClick={saveSettings}>
+                        type="submit"
+                    >
                         <p>Save</p>
                     </Button>
                 </div>
