@@ -7,7 +7,7 @@ import dynamic from "next/dynamic";
 import { ForceGraphMethods } from "react-force-graph-2d";
 import { Category, Graph, GraphData, Link, Node } from "../api/graph/model";
 import Tutorial from "./Tutorial";
-import { GraphNameContext, GraphContext, IndicatorContext, LimitContext, TimeoutContext, GraphNamesContext, HistoryQueryContext, RunDefaultQueryContext, DefaultQueryContext, SaveContentContext } from "../components/provider";
+import { GraphNameContext, GraphContext, IndicatorContext, LimitContext, TimeoutContext, GraphNamesContext, HistoryQueryContext, RunDefaultQueryContext, DefaultQueryContext, ContentPersistenceContext } from "../components/provider";
 
 const Selector = dynamic(() => import("./Selector"), { ssr: false })
 const GraphView = dynamic(() => import("./GraphView"), { ssr: false })
@@ -22,7 +22,7 @@ export default function Page() {
     const { limit } = useContext(LimitContext);
     const { runDefaultQuery } = useContext(RunDefaultQueryContext)
     const { defaultQuery } = useContext(DefaultQueryContext)
-    const { saveContent } = useContext(SaveContentContext)
+    const { contentPersistence } = useContext(ContentPersistenceContext)
 
     const { toast } = useToast()
 
@@ -160,7 +160,7 @@ export default function Page() {
     }, [graphName, run, toast, setIndicator, historyQuery.queries, historyQuery.counter, setHistoryQuery, limit, graph.Colors, setGraph, fetchCount])
 
     useEffect(() => {
-        if (!graph.Id && saveContent) {
+        if (!graph.Id && contentPersistence) {
             const content = localStorage.getItem("savedContent")
 
             if (content) {
@@ -185,7 +185,7 @@ export default function Page() {
         }
 
         fetchCount()
-    }, [fetchCount, graph.Id, graphName, setGraph, runDefaultQuery, defaultQuery, runQuery, saveContent, setGraphName])
+    }, [fetchCount, graph.Id, graphName, setGraph, runDefaultQuery, defaultQuery, runQuery, contentPersistence, setGraphName])
 
     const handleDeleteElement = async () => {
         if (selectedElements.length === 0 && selectedElement) {

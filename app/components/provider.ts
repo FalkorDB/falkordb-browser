@@ -2,7 +2,7 @@ import { createContext, Dispatch, SetStateAction } from "react";
 import { Graph, HistoryQuery } from "../api/graph/model";
 
 export const TimeoutContext = createContext<{ timeout: number, setTimeout: Dispatch<SetStateAction<number>> }>({ timeout: 0, setTimeout: () => {} })
-export const SaveContentContext = createContext<{ saveContent: boolean, setSaveContent: Dispatch<SetStateAction<boolean>> }>({ saveContent: false, setSaveContent: () => {} })
+export const ContentPersistenceContext = createContext<{ contentPersistence: boolean, setContentPersistence: Dispatch<SetStateAction<boolean>> }>({ contentPersistence: false, setContentPersistence: () => {} })
 export const DefaultQueryContext = createContext<{ defaultQuery: string, setDefaultQuery: Dispatch<SetStateAction<string>> }>({ defaultQuery: "", setDefaultQuery: () => {} })
 export const RunDefaultQueryContext = createContext<{ runDefaultQuery: boolean, setRunDefaultQuery: Dispatch<SetStateAction<boolean>> }>({ runDefaultQuery: false, setRunDefaultQuery: () => {} })
 export const HistoryQueryContext = createContext<{ historyQuery: HistoryQuery, setHistoryQuery: Dispatch<SetStateAction<HistoryQuery>> }>({ historyQuery: { queries: [], query: "", currentQuery: "", counter: 0 }, setHistoryQuery: () => {} })
