@@ -23,10 +23,10 @@ export default function QuerySettings({ setHasChanges }: { setHasChanges: (hasCh
     const [isResetting, setIsResetting] = useState(false)
 
     useEffect(() => {
-        setNewDefaultQuery(getDefaultQuery(localStorage.getItem("defaultQuery") ?? undefined))
+        setNewTimeout(parseInt(localStorage.getItem("timeout") || "0", 10))
+        setNewLimit(parseInt(localStorage.getItem("limit") || "300", 10))
+        setNewDefaultQuery(getDefaultQuery(localStorage.getItem("defaultQuery") || ""))
         setNewRunDefaultQuery(localStorage.getItem("runDefaultQuery") === "true")
-        setNewTimeout(parseInt(localStorage.getItem("timeout") ?? "0", 10))
-        setNewLimit(parseInt(localStorage.getItem("limit") ?? "300", 10))
         setNewSaveContent(localStorage.getItem("saveContent") === "true")
     }, [])
 
