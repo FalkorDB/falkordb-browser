@@ -25,9 +25,10 @@ test.describe("Query Settings", () => {
         const querySettings = await browser.createNewPage(QuerySettingsPage, urls.settingsUrl);
         const timeout = 1;
         await querySettings.fillTimeout(timeout);
+        await querySettings.clickSaveSettingsBtn();
         await querySettings.clickGraphsTabInHeader();
         await querySettings.selectGraphByName(graphName)
-        const query = `UNWIND range(1, 100000000) AS x RETURN count(x)`;
+        const query = `UNWIND range(1, 10000) AS x UNWIND range(1, 10000) AS y CREATE (n:TimeoutTest {x: x, y: y}) RETURN count(n)`;
         await querySettings.insertQuery(query);
         await querySettings.clickRunQuery(false);
         expect(await querySettings.getErrorNotification()).toBe(true);
@@ -40,6 +41,7 @@ test.describe("Query Settings", () => {
         const querySettings = await browser.createNewPage(QuerySettingsPage, urls.settingsUrl);
         const limit = 5;
         await querySettings.fillLimit(limit);
+        await querySettings.clickSaveSettingsBtn();
         await querySettings.clickGraphsTabInHeader();
         await querySettings.selectGraphByName(graphName);
         const query = `UNWIND range(1, 10) AS i CREATE (p:Person {id: i, name: 'Person ' + toString(i)}) RETURN p`;

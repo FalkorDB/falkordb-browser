@@ -283,6 +283,7 @@ export default function QuerySettings({ setHasChanges }: { setHasChanges: (hasCh
                     </Button>
                     <Button
                         variant="Primary"
+                        data-testid="saveSettingsBtn"
                         onClick={saveSettings}>
                         <p>Save</p>
                     </Button>

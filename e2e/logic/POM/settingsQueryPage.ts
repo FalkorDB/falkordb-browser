@@ -28,6 +28,10 @@ export default class SettingsQueryPage extends GraphPage {
         return this.page.locator("#decreaseTimeoutBtn");
     }
 
+    private get saveSettingsBtn(): Locator {
+        return this.page.getByTestId("saveSettingsBtn");
+    }
+
     async clickIncreaseLimit(): Promise<void> {
         await interactWhenVisible(this.increaseLimitBtn, el => el.click(), "increase Limit button");
     }
@@ -50,6 +54,10 @@ export default class SettingsQueryPage extends GraphPage {
 
     async fillLimitInput(input: string): Promise<void> {
         await interactWhenVisible(this.limitInput, el => el.fill(input), "limit input");
+    }
+
+    async clickSaveSettingsBtn(): Promise<void> {
+        await interactWhenVisible(this.saveSettingsBtn, el => el.click(), "save settings button");
     }
 
     async fillLimit(limit: number): Promise<void> {
