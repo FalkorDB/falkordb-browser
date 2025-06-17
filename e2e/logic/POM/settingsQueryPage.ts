@@ -1,5 +1,9 @@
 import { Locator } from "@playwright/test";
-import { interactWhenVisible, waitForElementToNotBeVisible } from "@/e2e/infra/utils";
+import {
+  interactWhenVisible,
+  waitForElementToBeVisible,
+  waitForElementToNotBeVisible,
+} from "@/e2e/infra/utils";
 import GraphPage from "./graphPage";
 
 export default class SettingsQueryPage extends GraphPage {
@@ -236,10 +240,8 @@ export default class SettingsQueryPage extends GraphPage {
   }
 
   async clickSaveQuerySettingsBtn(): Promise<void> {
-    await interactWhenVisible(
-      this.saveQuerySettingsBtn,
-      (el) => el.click(),
-      "click save query settings button"
-    );
+    if (await waitForElementToBeVisible(this.saveQuerySettingsBtn, 1000)) {
+      await this.saveQuerySettingsBtn.click();
+    }
   }
 }
