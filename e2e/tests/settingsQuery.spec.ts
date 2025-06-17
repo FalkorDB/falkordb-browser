@@ -230,7 +230,7 @@ test.describe("Query Settings", () => {
     await apiCall.removeGraph(graphName);
   });
 
-  test.only(`@admin Validate that content persistence is on and the content is saved`, async () => {
+  test(`@admin Validate that content persistence is on and the content is saved`, async () => {
     const graphName = getRandomString("settingsQuery");
     await apiCall.addGraph(graphName);
     const querySettings = await browser.createNewPage(
