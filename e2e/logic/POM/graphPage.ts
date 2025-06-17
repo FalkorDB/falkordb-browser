@@ -76,6 +76,18 @@ export default class GraphPage extends Page {
     );
   }
 
+  private get duplicateGraphBtn(): Locator {
+    return this.page.getByTestId("duplicateGraph");
+  }
+
+  private get duplicateGraphInput(): Locator {
+    return this.page.getByTestId("duplicateGraphInput");
+  }
+
+  private get duplicateGraphConfirm(): Locator {
+    return this.page.getByTestId("duplicateGraphConfirm");
+  }
+
   async getBoundingBoxCanvasElement(): Promise<null | {
     x: number;
     y: number;
@@ -402,6 +414,30 @@ export default class GraphPage extends Page {
     );
   }
 
+  async clickDuplicateGraphBtn(): Promise<void> {
+    await interactWhenVisible(
+      this.duplicateGraphBtn,
+      (el) => el.click(),
+      `Duplicate Graph Button`
+    );
+  }
+
+  async insertDuplicateGraphInput(input: string): Promise<void> {
+    await interactWhenVisible(
+      this.duplicateGraphInput,
+      (el) => el.fill(input),
+      `Insert Duplicate Graph Input`
+    );
+  }
+
+  async clickDuplicateGraphConfirm(): Promise<void> {
+    await interactWhenVisible(
+      this.duplicateGraphConfirm,
+      (el) => el.click(),
+      `Confirm Duplicate Graph`
+    );
+  }
+
   async clickSaveButton(type: "Graph" | "Schema"): Promise<void> {
     await interactWhenVisible(
       this.saveButton(type),
@@ -598,6 +634,15 @@ export default class GraphPage extends Page {
     if (waitForAnimation) {
       await this.waitForCanvasAnimationToEnd();
     }
+  }
+
+  async duplicateGraph(graphName: string): Promise<void> {
+    await this.clickSelect("Graph");
+    await this.clickManage();
+    await this.clickTableCheckboxByName(graphName);
+    await this.clickDuplicateGraphBtn();
+    await this.insertDuplicateGraphInput(graphName + " (copy)");
+    await this.clickDuplicateGraphConfirm();
   }
 
   async exportGraphByName(graphName: string): Promise<Download> {

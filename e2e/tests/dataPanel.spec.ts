@@ -461,4 +461,55 @@ test.describe('Data panel Tests', () => {
         await apicalls.removeGraph(graphName);
     })
 
+    test(`@readwrite Validate adding new attribute for edge via UI and validation via API`, async () => {
+        const graphName = getRandomString('datapanel');        
+        await apicalls.addGraph(graphName);
+        await apicalls.runQuery(graphName, CREATE_QUERY); // Creates nodes with relationship
+        const graph = await browser.createNewPage(DataPanel, urls.graphUrl);
+        await browser.setPageToFullScreen();
+        await graph.selectGraphByName(graphName);
+        await graph.insertQuery("MATCH ()-[r]->() RETURN r LIMIT 10");
+        await graph.clickRunQuery();
+        await graph.searchElementInCanvas("Graph", "knows");
+        await graph.addAttribute("since", "2023");
+        const response = await apicalls.runQuery(graphName, "MATCH ()-[r]->() RETURN r");
+        const relationship = response.result.data.find(item => 'since' in item.r.properties);
+        expect(relationship?.r.properties.since).toBe("2023");
+        await apicalls.removeGraph(graphName);
+    });
+
+    test(`@readwrite Validate remove attribute for edge via UI and validation via API`, async () => {
+        const graphName = getRandomString('datapanel');        
+        await apicalls.addGraph(graphName);
+        await apicalls.runQuery(graphName, 'CREATE (a:Person {name: "Alice"})-[r:KNOWS {name: "knows", since: 2020}]->(b:Person {name: "Bob"})');
+        const graph = await browser.createNewPage(DataPanel, urls.graphUrl);
+        await browser.setPageToFullScreen();
+        await graph.selectGraphByName(graphName);
+        await graph.insertQuery("MATCH ()-[r]->() RETURN r LIMIT 10");
+        await graph.clickRunQuery();
+        await graph.searchElementInCanvas("Graph", "knows");
+        await graph.removeAttribute("since");
+        const response = await apicalls.runQuery(graphName, "MATCH ()-[r]->() RETURN r");
+        const relationship = response.result.data.find(item => 'since' in item.r.properties);
+        expect(relationship?.r.properties.since).toBeUndefined();
+        await apicalls.removeGraph(graphName);
+    });
+
+    test(`@readwrite Validate modify attribute for edge via UI and validation via API`, async () => {
+        const graphName = getRandomString('datapanel');        
+        await apicalls.addGraph(graphName);
+        await apicalls.runQuery(graphName, 'CREATE (a:Person {name: "Alice"})-[r:KNOWS {name: "knows", since: 2020}]->(b:Person {name: "Bob"})');
+        const graph = await browser.createNewPage(DataPanel, urls.graphUrl);
+        await browser.setPageToFullScreen();
+        await graph.selectGraphByName(graphName);
+        await graph.insertQuery("MATCH ()-[r]->() RETURN r LIMIT 10");
+        await graph.clickRunQuery();
+        await graph.searchElementInCanvas("Graph", "knows");
+        await graph.setAttribute("since", "2025");
+        const response = await apicalls.runQuery(graphName, "MATCH ()-[r]->() RETURN r");
+        const relationship = response.result.data.find(item => 'since' in item.r.properties);
+        expect(relationship?.r.properties.since).toBe("2025");
+        await apicalls.removeGraph(graphName);
+    });
+
 })
