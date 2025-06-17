@@ -11,6 +11,20 @@ export const CREATE_TWO_NODES_QUERY = 'CREATE (a:person1 {name: "a"}), (b:person
 export const CREATE_NODE_QUERY = 'CREATE (a:person1 {name: "a"}) RETURN *'
 export const CREATE_QUERY = 'CREATE (a:person1 {name: "a"})-[c:KNOWS {name: "knows"}]->(b:person2) RETURN *'
 
+/**
+ * Initialize localStorage with default values required by the application
+ * This prevents initialization errors in CI environments
+ */
+export const initializeLocalStorage = () => {
+    return `
+        if (!localStorage.getItem("timeout")) localStorage.setItem("timeout", "0");
+        if (!localStorage.getItem("limit")) localStorage.setItem("limit", "300");
+        if (!localStorage.getItem("defaultQuery")) localStorage.setItem("defaultQuery", "");
+        if (!localStorage.getItem("runDefaultQuery")) localStorage.setItem("runDefaultQuery", "false");
+        if (!localStorage.getItem("saveContent")) localStorage.setItem("saveContent", "false");
+        if (!localStorage.getItem("query history")) localStorage.setItem("query history", "[]");
+    `;
+};
 
 export function delay(ms: number) {
     return new Promise(resolve => { setTimeout(resolve, ms) });
