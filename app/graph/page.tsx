@@ -168,8 +168,8 @@ export default function Page() {
 
                 setGraphName(name)
                 runQuery(query, name)
+                return
             }
-            return
         }
 
         if (!graphName) return
