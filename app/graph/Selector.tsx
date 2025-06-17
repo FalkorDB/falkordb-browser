@@ -15,7 +15,7 @@ import { IndicatorContext } from "../components/provider";
 import EditorComponent, { setTheme } from "../components/EditorComponent";
 import DialogComponent from "../components/DialogComponent";
 import Toolbar from "./toolbar";
-import { Node, Link, Graph, HistoryQuery } from "../api/graph/model";
+import { Node, Link, Graph, HistoryQuery, Query } from "../api/graph/model";
 import { Explain, Metadata, Profile } from "./MetadataView";
 import PaginationList from "../components/PaginationList";
 import SelectGraph from "./selectGraph";
@@ -54,33 +54,10 @@ export default function Selector({ graph, options, setOptions, graphName, setGra
     const [queriesOpen, setQueriesOpen] = useState(false)
     const [isLoading, setIsLoading] = useState(false)
     const [maximize, setMaximize] = useState(false)
-    const [tab, setTab] = useState("")
+    const [tab, setTab] = useState<keyof Query>("text")
 
-    const currentQuery = (historyQuery?.currentQuery === historyQuery?.query && historyQuery?.counter === 0 && graph.CurrentQuery) || historyQuery?.queries.find(q => q.text === historyQuery?.query)
+    const currentQuery = historyQuery?.currentQuery === historyQuery?.query && historyQuery?.counter === 0 && graph.CurrentQuery || historyQuery?.queries.find(q => q.text === historyQuery?.query)
     const type = runQuery && historyQuery && setHistoryQuery ? "Graph" : "Schema"
-
-    useEffect(() => {
-        if (!queriesOpen) return
-
-        if (!currentQuery || historyQuery?.query) {
-            setTab("query")
-        } else if (currentQuery.profile.length > 0) {
-            setTab("profile")
-        } else if (currentQuery.metadata.length > 0) {
-            setTab("metadata")
-        } else if (currentQuery.explain.length > 0) {
-            setTab("explain")
-        }
-    }, [currentQuery, setTab, queriesOpen, historyQuery?.query])
-
-    const handleOnChange = useCallback((name: string) => {
-        setGraphName(formatName(name))
-    }, [setGraphName])
-
-    const getOptions = useCallback(async () => {
-        const [opts] = await fetchOptions(type, toast, setIndicator, indicator)
-        setOptions(opts)
-    }, [setOptions, toast, setIndicator, indicator, type])
 
     const focusEditorAtEnd = () => {
         if (editorRef.current) {
@@ -97,6 +74,45 @@ export default function Selector({ graph, options, setOptions, graphName, setGra
             }
         }
     };
+
+    useEffect(() => {
+        const currentValue = currentQuery?.[tab]
+
+        if (!queriesOpen || (typeof currentValue === "string" && currentValue) || (Array.isArray(currentValue) && currentValue.length > 0) || tab === "profile") return
+
+        if (!currentQuery || currentQuery.text) {
+            setTab("text")
+            focusEditorAtEnd()
+            return
+        }
+
+        if (currentQuery.profile.length > 0) {
+            setTab("profile")
+        } else if (currentQuery.metadata.length > 0) {
+            setTab("metadata")
+        } else if (currentQuery.explain.length > 0) {
+            setTab("explain")
+        } else {
+            setTab("profile")
+        }
+
+        setTimeout(() => {
+            if (searchQueryRef.current) {
+                searchQueryRef.current.focus()
+            }
+        }, 100)
+
+    }, [currentQuery, setTab, queriesOpen, historyQuery?.query, tab])
+
+    const handleOnChange = useCallback((name: string) => {
+        setGraphName(formatName(name))
+    }, [setGraphName])
+
+    const getOptions = useCallback(async () => {
+        const [opts] = await fetchOptions(type, toast, setIndicator, indicator)
+        setOptions(opts)
+    }, [setOptions, toast, setIndicator, indicator, type])
+
 
     const handleEditorDidMount = (e: monaco.editor.IStandaloneCodeEditor) => {
         editorRef.current = e
@@ -137,6 +153,17 @@ export default function Selector({ graph, options, setOptions, graphName, setGra
             setIsLoading(false)
         }
     }
+
+    const afterSearchCallback = useCallback((newFilteredList: Query[]) => {
+        if (!historyQuery || !setHistoryQuery) return
+
+        if (newFilteredList.every(q => q.text !== historyQuery.query)) {
+            setHistoryQuery(prev => ({
+                ...prev,
+                counter: 0
+            }))
+        }
+    }, [historyQuery, setHistoryQuery])
 
     return (
         <div className="z-20 absolute top-5 inset-x-24 h-[50px] flex flex-row gap-4 items-center">
@@ -184,14 +211,7 @@ export default function Selector({ graph, options, setOptions, graphName, setGra
                                             e.preventDefault()
                                         }
                                     }}
-                                    onOpenChange={(open) => {
-                                        setQueriesOpen(open)
-                                        if (open) {
-                                            setTimeout(() => {
-                                                focusEditorAtEnd()
-                                            }, 100)
-                                        }
-                                    }}
+                                    onOpenChange={setQueriesOpen}
                                     trigger={
                                         <Button
                                             data-testid="queryHistory"
@@ -208,14 +228,7 @@ export default function Selector({ graph, options, setOptions, graphName, setGra
                                             label="Query"
                                             className="w-[40%] bg-background rounded-lg overflow-hidden"
                                             isSelected={(item) => historyQuery.queries.findIndex(q => q.text === item.text) + 1 === historyQuery.counter}
-                                            afterSearchCallback={(newFilteredList) => {
-                                                if (newFilteredList.every(q => q.text !== historyQuery.query)) {
-                                                    setHistoryQuery(prev => ({
-                                                        ...prev,
-                                                        counter: 0
-                                                    }))
-                                                }
-                                            }}
+                                            afterSearchCallback={afterSearchCallback}
                                             dataTestId="queryHistory"
                                             list={historyQuery.queries.reverse()}
                                             step={STEP}
@@ -224,21 +237,17 @@ export default function Selector({ graph, options, setOptions, graphName, setGra
                                                     ...prev,
                                                     counter: historyQuery.queries.findIndex(q => q.text === counter) + 1
                                                 }))
-                                                
-                                                setTab("query")
-
-                                                focusEditorAtEnd()
                                             }}
                                             searchRef={searchQueryRef}
                                         />
-                                        <Tabs value={tab} onValueChange={setTab} className="w-[60%] flex flex-col gap-8 items-center">
+                                        <Tabs value={tab} onValueChange={(value) => setTab(value as keyof Query)} className="w-[60%] flex flex-col gap-8 items-center">
                                             <TabsList className="bg-black h-fit w-fit p-2">
-                                                <TabsTrigger className={cn("!text-gray-500 data-[state=active]:!bg-background data-[state=active]:!text-white")} disabled={!historyQuery.query} value="query">Edit Query</TabsTrigger>
-                                                <TabsTrigger className={cn("!text-gray-500 data-[state=active]:!bg-background data-[state=active]:!text-white")} disabled={!currentQuery} value="profile">Profile</TabsTrigger>
-                                                <TabsTrigger className={cn("!text-gray-500 data-[state=active]:!bg-background data-[state=active]:!text-white")} disabled={!currentQuery} value="metadata">Metadata</TabsTrigger>
-                                                <TabsTrigger className={cn("!text-gray-500 data-[state=active]:!bg-background data-[state=active]:!text-white")} disabled={!currentQuery} value="explain">Explain</TabsTrigger>
+                                                <TabsTrigger className={cn("!text-gray-500 data-[state=active]:!bg-background data-[state=active]:!text-white")} disabled={!historyQuery.query} value="text">Edit Query</TabsTrigger>
+                                                <TabsTrigger className={cn("!text-gray-500 data-[state=active]:!bg-background data-[state=active]:!text-white")} value="profile">Profile</TabsTrigger>
+                                                <TabsTrigger className={cn("!text-gray-500 data-[state=active]:!bg-background data-[state=active]:!text-white")} disabled={currentQuery?.metadata.length === 0} value="metadata">Metadata</TabsTrigger>
+                                                <TabsTrigger className={cn("!text-gray-500 data-[state=active]:!bg-background data-[state=active]:!text-white")} disabled={currentQuery?.explain.length === 0} value="explain">Explain</TabsTrigger>
                                             </TabsList>
-                                            <TabsContent value="query" className="w-full h-1 grow bg-background rounded-lg p-2 py-4 relative">
+                                            <TabsContent value="text" className="w-full h-1 grow bg-background rounded-lg p-2 py-4 relative">
                                                 <Button
                                                     ref={submitQuery}
                                                     data-testid="queryHistoryEditorRun"
@@ -280,33 +289,42 @@ export default function Selector({ graph, options, setOptions, graphName, setGra
                                             </TabsContent>
                                             <TabsContent className="w-full h-1 grow bg-background rounded-lg p-8" value="profile">
                                                 <div className="h-full w-full overflow-hidden flex flex-col gap-4">
-                                                    <Profile
-                                                        graphName={graphName}
-                                                        query={currentQuery!}
-                                                        setQuery={({ profile, text }) => {
-                                                            const newQueries = historyQuery!.queries.map(q => q.text === text ? { ...q, profile } : q)
-                                                            localStorage.setItem("query history", JSON.stringify(newQueries))
-                                                            setHistoryQuery(prev => ({
-                                                                ...prev,
-                                                                queries: newQueries,
-                                                            }))
-                                                        }}
-                                                        fetchCount={fetchCount}
-                                                    />
+                                                    {
+                                                        currentQuery &&
+                                                        <Profile
+                                                            graphName={graphName}
+                                                            query={currentQuery}
+                                                            setQuery={({ profile, text }) => {
+                                                                const newQueries = historyQuery!.queries.map(q => q.text === text ? { ...q, profile } : q)
+                                                                localStorage.setItem("query history", JSON.stringify(newQueries))
+                                                                setHistoryQuery(prev => ({
+                                                                    ...prev,
+                                                                    queries: newQueries,
+                                                                }))
+                                                            }}
+                                                            fetchCount={fetchCount}
+                                                        />
+                                                    }
                                                 </div>
                                             </TabsContent>
                                             <TabsContent className="w-full h-1 grow bg-background rounded-lg p-8" value="metadata">
                                                 <div className="h-full w-full overflow-hidden flex flex-col gap-4">
-                                                    <Metadata
-                                                        query={currentQuery!}
-                                                    />
+                                                    {
+                                                        currentQuery &&
+                                                        <Metadata
+                                                            query={currentQuery}
+                                                        />
+                                                    }
                                                 </div>
                                             </TabsContent>
                                             <TabsContent className="w-full h-1 grow bg-background rounded-lg p-8" value="explain">
                                                 <div className="h-full w-full overflow-hidden flex flex-col gap-4">
-                                                    <Explain
-                                                        query={currentQuery!}
-                                                    />
+                                                    {
+                                                        currentQuery &&
+                                                        <Explain
+                                                            query={currentQuery}
+                                                        />
+                                                    }
                                                 </div>
                                             </TabsContent>
                                         </Tabs>
