@@ -4,7 +4,7 @@ import { SessionProvider, useSession } from "next-auth/react";
 import { ThemeProvider } from 'next-themes'
 import { Dispatch, SetStateAction, useCallback, useEffect, useMemo, useState } from "react";
 import { usePathname } from "next/navigation";
-import { fetchOptions, formatName } from "@/lib/utils";
+import { fetchOptions, formatName, getDefaultQuery } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
 import LoginVerification from "./loginVerification";
 import { GraphContext, GraphNameContext, GraphNamesContext, IndicatorContext, LimitContext, HistoryQueryContext, SchemaContext, SchemaNameContext, SchemaNamesContext, TimeoutContext, RunDefaultQueryContext, DefaultQueryContext, SaveContentContext } from "./components/provider";
@@ -58,7 +58,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
     })
     setTimeout(parseInt(localStorage.getItem("timeout") || "0", 10))
     setLimit(parseInt(localStorage.getItem("limit") || "300", 10))
-    setDefaultQuery(localStorage.getItem("defaultQuery") || "")
+    setDefaultQuery(getDefaultQuery(localStorage.getItem("defaultQuery") || undefined))
     setRunDefaultQuery(localStorage.getItem("runDefaultQuery") === "true")
     setSaveContent(localStorage.getItem("saveContent") === "true")
   }, [])

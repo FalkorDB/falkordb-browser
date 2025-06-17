@@ -25,7 +25,7 @@ export default function QuerySettings({ setHasChanges }: { setHasChanges: (hasCh
     useEffect(() => {
         setNewTimeout(parseInt(localStorage.getItem("timeout") || "0", 10))
         setNewLimit(parseInt(localStorage.getItem("limit") || "300", 10))
-        setNewDefaultQuery(getDefaultQuery(localStorage.getItem("defaultQuery") || ""))
+        setNewDefaultQuery(getDefaultQuery(localStorage.getItem("defaultQuery") || undefined))
         setNewRunDefaultQuery(localStorage.getItem("runDefaultQuery") === "true")
         setNewSaveContent(localStorage.getItem("saveContent") === "true")
     }, [])
