@@ -15,14 +15,23 @@ export type CACHE = {
 const connections = new Map<string, { client: FalkorDB, cache: Map<number, CACHE> }>();
 
 async function newClient(credentials: { host: string, port: string, password: string, username: string, tls: string, ca: string }, id: string): Promise<{ role: Role, client: FalkorDB, cache: Map<number, CACHE> }> {
+    // Validate TLS requirements
+    if (credentials.tls === "true") {
+        if (!credentials.ca || credentials.ca === "undefined" || credentials.ca.trim() === "") {
+            throw new Error("CA certificate is required for TLS connections");
+        }
+    }
+
     const connectionOptions: FalkorDBOptions = credentials.tls === "true" ?
         {
             socket: {
                 host: credentials.host ?? "localhost",
                 port: credentials.port ? parseInt(credentials.port, 10) : 6379,
-                tls: credentials.tls === "true",
+                tls: true,
                 checkServerIdentity: () => undefined,
-                ca: credentials.ca === "undefined" ? undefined : [Buffer.from(credentials.ca, "base64").toString("utf8")]
+                ca: credentials.ca ? [Buffer.from(credentials.ca, "base64").toString("utf8")] : undefined,
+                rejectUnauthorized: true, // Enable certificate validation
+                connectTimeout: 10000
             },
             password: credentials.password ?? undefined,
             username: credentials.username ?? undefined
@@ -31,6 +40,7 @@ async function newClient(credentials: { host: string, port: string, password: st
             socket: {
                 host: credentials.host || "localhost",
                 port: credentials.port ? parseInt(credentials.port, 10) : 6379,
+                connectTimeout: 10000
             },
             password: credentials.password ?? undefined,
             username: credentials.username ?? undefined
