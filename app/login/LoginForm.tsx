@@ -8,6 +8,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
 import FormComponent, { Field } from "../components/FormComponent";
 import Dropzone from "../components/ui/Dropzone";
+import { Check, Info } from "lucide-react";
 
 const DEFAULT_HOST = "localhost";
 const DEFAULT_PORT = "6379";
@@ -18,6 +19,7 @@ export default function LoginForm() {
   const [port, setPort] = useState("");
   const [TLS, setTLS] = useState(false);
   const [CA, setCA] = useState<string>();
+  const [uploadedFileName, setUploadedFileName] = useState<string>("");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<{
@@ -109,6 +111,15 @@ export default function LoginForm() {
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
 
+    // Validate TLS requirements on the frontend
+    if (TLS && (!CA || CA.trim() === "")) {
+      setError({
+        message: "CA certificate is required for TLS connections. Please upload a certificate.",
+        show: true
+      });
+      return;
+    }
+
     const params: SignInOptions = {
       redirect: false,
       host: host.trim(),
@@ -140,6 +151,11 @@ export default function LoginForm() {
 
     reader.onload = () => {
       setCA((reader.result as string).split(',').pop())
+      setUploadedFileName(acceptedFiles[0].name)
+      setError(prev => ({
+        ...prev,
+        show: false
+      }))
     }
 
     reader.readAsDataURL(acceptedFiles[0])
@@ -156,16 +172,74 @@ export default function LoginForm() {
             error={error}
             submitButtonLabel="Log in"
           >
-            <div className="flex gap-8">
-              <div className="flex gap-2">
+            <div className="flex flex-col gap-4">
+              <div className="flex gap-2 items-center">
                 <Checkbox
                   className={cn("w-6 h-6 rounded-lg", !TLS && "border-white")}
                   checked={TLS}
-                  onCheckedChange={(checked) => setTLS(checked as boolean)}
+                  onCheckedChange={(checked) => {
+                    setTLS(checked as boolean)
+                    if (!checked) {
+                      // Clear certificate when TLS is disabled
+                      setCA(undefined)
+                      setUploadedFileName("")
+                    }
+                  }}
+                  data-testid="tls-checkbox"
                 />
-                <p >TLS Secured Connection</p>
+                <p className="font-medium text-white">TLS Secured Connection</p>
               </div>
-              <Dropzone onFileDrop={onFileDrop} disabled={!TLS} />
+              
+              {/* Certificate Upload Section */}
+              {TLS && (
+                <div className="flex flex-col gap-3 p-4 bg-foreground border border-muted/20 rounded-lg transition-all duration-300 ease-in-out">
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 bg-primary rounded-full"></div>
+                    <label className="text-sm font-semibold text-muted">Certificate Authentication</label>
+                  </div>
+                  
+                  <div className="flex flex-col gap-2">
+                    {!uploadedFileName ? (
+                      // Upload State
+                      <div className="relative">
+                        <Dropzone onFileDrop={onFileDrop} disabled={!TLS} />
+                        <div className="mt-2 text-xs text-muted/70 flex items-center gap-1">
+                          <Info className="w-5 h-5" />
+                          Upload your CA certificate file
+                        </div>
+                      </div>
+                    ) : (
+                      // Success State
+                      <div className="flex items-center justify-between p-3 bg-primary/10 border border-primary/20 rounded-md transition-all duration-300 ease-in-out">
+                        <div className="flex items-center gap-3">
+                          <div className="flex-shrink-0">
+                            <div className="w-8 h-8 bg-primary/20 rounded-full flex items-center justify-center">
+                              <Check size={16} className="text-primary" />
+                            </div>
+                          </div>
+                          <div className="flex flex-col">
+                            <span className="text-sm font-medium text-white">Certificate Uploaded</span>
+                            <span className="text-xs text-muted truncate max-w-48">{uploadedFileName}</span>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setCA(undefined)
+                            setUploadedFileName("")
+                          }}
+                          className="flex-shrink-0 p-1 text-muted hover:text-white hover:bg-primary/20 rounded transition-colors duration-200"
+                          title="Remove certificate"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           </FormComponent>
         </div>
