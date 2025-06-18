@@ -18,6 +18,8 @@ export default function LoginForm() {
   const [port, setPort] = useState("");
   const [TLS, setTLS] = useState(false);
   const [CA, setCA] = useState<string>();
+  const [key, setKey] = useState<string>();
+  const [cert, setCert] = useState<string>();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<{
@@ -114,6 +116,8 @@ export default function LoginForm() {
       host: host.trim(),
       port: port.trim(),
       tls: TLS,
+      key,
+      cert,
       ca: CA
     };
     if (username) {
@@ -145,6 +149,26 @@ export default function LoginForm() {
     reader.readAsDataURL(acceptedFiles[0])
   }
 
+  const onFileDropMTLSKey = (acceptedFiles: File[]) => {
+    const reader = new FileReader()
+
+    reader.onload = () => {
+      setKey((reader.result as string).split(',').pop())
+    }
+
+    reader.readAsDataURL(acceptedFiles[0])
+  }
+
+  const onFileDropMTLSCert = (acceptedFiles: File[]) => {
+    const reader = new FileReader()
+
+    reader.onload = () => {
+      setCert((reader.result as string).split(',').pop())
+    }
+
+    reader.readAsDataURL(acceptedFiles[0])
+  }
+
   return (
     <div className="relative h-full w-full flex flex-col">
       <div className="grow flex items-center justify-center">
@@ -156,6 +180,7 @@ export default function LoginForm() {
             error={error}
             submitButtonLabel="Log in"
           >
+
             <div className="flex gap-8">
               <div className="flex gap-2">
                 <Checkbox
@@ -165,8 +190,11 @@ export default function LoginForm() {
                 />
                 <p >TLS Secured Connection</p>
               </div>
-              <Dropzone onFileDrop={onFileDrop} disabled={!TLS} />
+              <Dropzone onFileDrop={onFileDrop} message="CA Cert" disabled={!TLS} />
+              <Dropzone onFileDrop={onFileDropMTLSCert} message="mTLS cert" disabled={!TLS} />
+              <Dropzone onFileDrop={onFileDropMTLSKey} message="mTLS key" disabled={!TLS} />
             </div>
+
           </FormComponent>
         </div>
       </div>
