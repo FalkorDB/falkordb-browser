@@ -1,38 +1,36 @@
+
 'use client'
 
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useContext, useEffect, useState } from "react"
 import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
+import { getQuerySettingsNavigationToast } from "@/components/ui/toaster"
 import { useToast } from "@/components/ui/use-toast"
 import Users from "./users/Users"
 import Configurations from "./Configurations"
 import Button from "../components/ui/Button"
 import QuerySettings from "./QuerySettings"
-import ToastButton from "../components/ToastButton"
+import { QuerySettingsContext } from "../components/provider"
 
 export default function Settings() {
 
-    const [current, setCurrent] = useState<'Query' | 'DB' | 'Users'>('Query')
-    const router = useRouter()
+    const { hasChanges, saveSettings, resetSettings } = useContext(QuerySettingsContext)
+
     const { data: session } = useSession()
     const { toast } = useToast()
-    const [hasChanges, setHasChanges] = useState(false)
+    const router = useRouter()
+
+    const [current, setCurrent] = useState<'Query' | 'DB' | 'Users'>('Query')
+
 
     const navigateBack = useCallback((e: KeyboardEvent) => {
-        if (e.key === "Escape") {
+        if (e.key === "Escape" && current !== "Query") {
             e.preventDefault()
-            if (current === "Query" && hasChanges) {
-                toast({
-                    title: "Query settings",
-                    description: "Are you sure you want to leave this page?\nYour changes will not be saved.",
-                    action: <ToastButton label="Leave" onClick={() => router.back()} showUndo={false} />,
-                })
-            } else {
-                router.back()
-            }
+
+            router.back()
         }
-    }, [router, current, toast, hasChanges])
+    }, [current, router])
 
     useEffect(() => {
         window.addEventListener("keydown", navigateBack)
@@ -44,15 +42,14 @@ export default function Settings() {
 
     const handleSetCurrent = useCallback((tab: 'Query' | 'DB' | 'Users') => {
         if (current === "Query" && hasChanges) {
-            toast({
-                title: "Query settings",
-                description: "Are you sure you want to leave this tab?\nYour changes will not be saved.",
-                action: <ToastButton label="Leave" onClick={() => setCurrent(tab)} showUndo={false} />,
+            getQuerySettingsNavigationToast(toast, saveSettings, () => {
+                setCurrent(tab)
+                resetSettings()
             })
         } else {
             setCurrent(tab)
         }
-    }, [current, toast, hasChanges])
+    }, [current, hasChanges, resetSettings, saveSettings, toast])
 
     useEffect(() => {
         if (session && session.user.role !== "Admin") router.back()
@@ -65,7 +62,7 @@ export default function Settings() {
             case 'DB':
                 return <Configurations />
             default:
-                return <QuerySettings setHasChanges={setHasChanges} />
+                return <QuerySettings />
         }
     }
 

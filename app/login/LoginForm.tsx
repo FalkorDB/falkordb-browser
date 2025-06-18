@@ -5,7 +5,6 @@ import { FormEvent, useEffect, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Image from "next/image";
 import { Checkbox } from "@/components/ui/checkbox";
-import { cn } from "@/lib/utils";
 import FormComponent, { Field } from "../components/FormComponent";
 import Dropzone from "../components/ui/Dropzone";
 
@@ -159,7 +158,7 @@ export default function LoginForm() {
             <div className="flex gap-8">
               <div className="flex gap-2">
                 <Checkbox
-                  className={cn("w-6 h-6 rounded-lg", !TLS && "border-white")}
+                  className="w-6 h-6 rounded-full bg-foreground border-primary data-[state=checked]:bg-primary"
                   checked={TLS}
                   onCheckedChange={(checked) => setTLS(checked as boolean)}
                 />

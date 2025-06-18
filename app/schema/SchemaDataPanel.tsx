@@ -129,7 +129,12 @@ export default function SchemaDataPanel({ object, setObject, onDeleteElement, sc
                 toast({
                     title: "Success",
                     description: `Property set`,
-                    action: isUndo && oldAttribute ? <ToastButton onClick={() => handleSetAttribute(false, oldAttribute)} /> : undefined,
+                    action: isUndo && oldAttribute ?
+                        <ToastButton
+                            showUndo
+                            onClick={() => handleSetAttribute(false, oldAttribute)}
+                        />
+                        : undefined,
                 })
             }
 
@@ -170,7 +175,11 @@ export default function SchemaDataPanel({ object, setObject, onDeleteElement, sc
                 toast({
                     title: "Success",
                     description: "Attribute removed",
-                    action: att && <ToastButton onClick={() => handleAddAttribute(att)} />,
+                    action: att &&
+                        <ToastButton
+                            showUndo
+                            onClick={() => handleAddAttribute(att)}
+                        />,
                 })
                 setAttribute(getDefaultAttribute())
             }

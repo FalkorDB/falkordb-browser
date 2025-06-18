@@ -1,28 +1,71 @@
 "use client"
 
-import { useContext, useEffect, useState } from "react"
+import { useCallback, useContext, useEffect, useState } from "react"
 import { Info, Minus, Plus, RotateCcw } from "lucide-react"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { cn, getDefaultQuery } from "@/lib/utils"
+import { getQuerySettingsNavigationToast } from "@/components/ui/toaster"
 import { Checkbox } from "@/components/ui/checkbox"
 import { toast } from "@/components/ui/use-toast"
-import { DefaultQueryContext, LimitContext, RunDefaultQueryContext, ContentPersistenceContext, TimeoutContext } from "../components/provider"
+import { useRouter } from "next/navigation"
+import { QuerySettingsContext } from "../components/provider"
 import Button from "../components/ui/Button"
 import Input from "../components/ui/Input"
 
-export default function QuerySettings({ setHasChanges }: { setHasChanges: (hasChanges: boolean) => void }) {
-    const { contentPersistence, setContentPersistence } = useContext(ContentPersistenceContext)
-    const { timeout: timeoutValue, setTimeout: setTimeoutValue } = useContext(TimeoutContext)
-    const { runDefaultQuery, setRunDefaultQuery } = useContext(RunDefaultQueryContext)
-    const { defaultQuery, setDefaultQuery } = useContext(DefaultQueryContext)
-    const { limit, setLimit } = useContext(LimitContext)
+export default function QuerySettings() {
+    const {
+        newSettings: {
+            contentPersistenceSettings: { newContentPersistence, setNewContentPersistence },
+            runDefaultQuerySettings: { newRunDefaultQuery, setNewRunDefaultQuery },
+            defaultQuerySettings: { newDefaultQuery, setNewDefaultQuery },
+            timeoutSettings: { newTimeout, setNewTimeout },
+            limitSettings: { newLimit, setNewLimit },
+        },
+        settings: {
+            contentPersistenceSettings: { contentPersistence },
+            runDefaultQuerySettings: { runDefaultQuery },
+            defaultQuerySettings: { defaultQuery, setDefaultQuery },
+            timeoutSettings: { timeout: timeoutValue },
+            limitSettings: { limit },
+        },
+        hasChanges,
+        setHasChanges,
+        saveSettings,
+        resetSettings,
+    } = useContext(QuerySettingsContext)
 
-    const [newContentPersistence, setNewContentPersistence] = useState(false)
-    const [newRunDefaultQuery, setNewRunDefaultQuery] = useState(false)
-    const [newDefaultQuery, setNewDefaultQuery] = useState("")
+    const router = useRouter()
+
     const [isResetting, setIsResetting] = useState(false)
-    const [newTimeout, setNewTimeout] = useState(0)
-    const [newLimit, setNewLimit] = useState(0)
+
+    const handleSubmit = useCallback((e?: React.FormEvent<HTMLFormElement>) => {
+        e?.preventDefault()
+
+        saveSettings()
+    }, [saveSettings])
+
+    const navigateBack = useCallback((e: KeyboardEvent) => {
+        if (e.key === "Escape") {
+            e.preventDefault()
+
+            if (hasChanges) {
+                getQuerySettingsNavigationToast(toast, handleSubmit, () => {
+                    router.back()
+                    resetSettings()
+                })
+            } else {
+                router.back()
+            }
+        }
+    }, [router, hasChanges, handleSubmit, resetSettings])
+
+    useEffect(() => {
+        window.addEventListener("keydown", navigateBack)
+
+        return () => {
+            window.removeEventListener("keydown", navigateBack)
+        }
+    }, [hasChanges, navigateBack])
 
     useEffect(() => {
         setNewContentPersistence(contentPersistence)
@@ -30,38 +73,12 @@ export default function QuerySettings({ setHasChanges }: { setHasChanges: (hasCh
         setNewDefaultQuery(defaultQuery)
         setNewTimeout(timeoutValue)
         setNewLimit(limit)
-    }, [contentPersistence, runDefaultQuery, defaultQuery, timeoutValue, limit])
+    }, [contentPersistence, runDefaultQuery, defaultQuery, timeoutValue, limit, setNewContentPersistence, setNewRunDefaultQuery, setNewDefaultQuery, setNewTimeout, setNewLimit])
 
     useEffect(() => {
         setHasChanges(newContentPersistence !== contentPersistence || newTimeout !== timeoutValue || newLimit !== limit || newDefaultQuery !== defaultQuery || newRunDefaultQuery !== runDefaultQuery)
     }, [defaultQuery, limit, newDefaultQuery, newLimit, newRunDefaultQuery, newContentPersistence, newTimeout, runDefaultQuery, contentPersistence, setHasChanges, timeoutValue])
 
-    const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
-        e.preventDefault()
-
-        // Save settings to local storage
-        localStorage.setItem("runDefaultQuery", newRunDefaultQuery.toString())
-        localStorage.setItem("contentPersistence", newContentPersistence.toString())
-        localStorage.setItem("timeout", newTimeout.toString())
-        localStorage.setItem("defaultQuery", newDefaultQuery)
-        localStorage.setItem("limit", newLimit.toString())
-
-        // Update context
-        setContentPersistence(newContentPersistence)
-        setRunDefaultQuery(newRunDefaultQuery)
-        setDefaultQuery(newDefaultQuery)
-        setTimeoutValue(newTimeout)
-        setLimit(newLimit)
-
-        // Reset has changes
-        setHasChanges(false)
-
-        // Show success toast
-        toast({
-            title: "Settings saved",
-            description: "Your settings have been saved.",
-        })
-    }
     return (
         <form onSubmit={handleSubmit} className="h-full w-full flex flex-col gap-16 overflow-y-auto px-[20%]">
             <div className="flex flex-col gap-2 items-center">
@@ -182,41 +199,25 @@ export default function QuerySettings({ setHasChanges }: { setHasChanges: (hasCh
                 </div>
             </div>
             <div className="flex flex-col gap-6 p-4 border rounded-lg">
+                <p>On load graph do</p>
                 <div className="flex flex-col gap-2">
-                    <h2 className="text-lg font-bold">Default Query</h2>
-                    <p className="text-sm text-muted-foreground">When enabled, the default query will be run when the graph is selected.</p>
-                </div>
-                <div className="flex flex-col gap-2">
-                    <h3 className="font-bold">AUTO-EXECUTE</h3>
                     <div className="flex gap-4 items-center">
                         <Checkbox
                             id="runDefaultQueryCheckboxOn"
-                            className="w-6 h-6 rounded-full bg-foreground border-background data-[state=checked]:bg-background"
+                            className="w-6 h-6 rounded-full bg-foreground border-primary data-[state=checked]:bg-primary"
                             checked={newRunDefaultQuery}
                             onCheckedChange={() => setNewRunDefaultQuery(true)}
                         />
                         <p>ON</p>
-                        <Checkbox
-                            id="runDefaultQueryCheckboxOff"
-                            className="w-6 h-6 rounded-full bg-foreground border-background data-[state=checked]:bg-background"
-                            checked={!newRunDefaultQuery}
-                            onCheckedChange={() => setNewRunDefaultQuery(false)}
-                        />
-                        <p>OFF</p>
-                    </div>
-                </div>
-                <div className="flex flex-col gap-2">
-                    <h3 className="font-bold">DEFAULT QUERY</h3>
-                    <div className="flex gap-2 items-center">
-                        <p>Query:</p>
                         <Input
                             id="runDefaultQueryInput"
                             className={cn("bg-foreground text-white text-xl w-1 grow")}
                             value={newDefaultQuery}
                             onChange={(e) => setNewDefaultQuery(e.target.value)}
+                            disabled={!newRunDefaultQuery}
                         />
                         {
-                            (defaultQuery !== getDefaultQuery() || isResetting) &&
+                            ((defaultQuery !== getDefaultQuery() && newRunDefaultQuery) || isResetting) &&
                             <Button
                                 id="runDefaultQueryResetBtn"
                                 variant="Secondary"
@@ -243,6 +244,15 @@ export default function QuerySettings({ setHasChanges }: { setHasChanges: (hasCh
                             </Button>
                         }
                     </div>
+                    <div className="flex gap-4 items-center">
+                        <Checkbox
+                            id="runDefaultQueryCheckboxOff"
+                            className="w-6 h-6 rounded-full bg-foreground border-primary data-[state=checked]:bg-primary"
+                            checked={!newRunDefaultQuery}
+                            onCheckedChange={() => setNewRunDefaultQuery(false)}
+                        />
+                        <p>OFF</p>
+                    </div>
                 </div>
             </div>
             <div className="flex flex-col gap-6 p-4 border rounded-lg">
@@ -252,11 +262,11 @@ export default function QuerySettings({ setHasChanges }: { setHasChanges: (hasCh
                 </div>
                 <div className="flex flex-col gap-2">
                     <p>AUTO-SAVE</p>
-                    <div className="flex gap-4">
+                    <div className="flex flex-col gap-2">
                         <div className="flex gap-2 items-center">
                             <Checkbox
                                 id="contentPersistenceCheckboxOn"
-                                className="w-6 h-6 rounded-full bg-foreground border-background data-[state=checked]:bg-background"
+                                className="w-6 h-6 rounded-full bg-foreground border-primary data-[state=checked]:bg-primary"
                                 checked={newContentPersistence}
                                 onCheckedChange={() => setNewContentPersistence(true)}
                             />
@@ -265,7 +275,7 @@ export default function QuerySettings({ setHasChanges }: { setHasChanges: (hasCh
                         <div className="flex gap-2 items-center">
                             <Checkbox
                                 id="contentPersistenceCheckboxOff"
-                                className="w-6 h-6 rounded-full bg-foreground border-background data-[state=checked]:bg-background"
+                                className="w-6 h-6 rounded-full bg-foreground border-primary data-[state=checked]:bg-primary"
                                 checked={!newContentPersistence}
                                 onCheckedChange={() => setNewContentPersistence(false)}
                             />

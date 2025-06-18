@@ -2,19 +2,20 @@
 
 import { ToastAction } from "@/components/ui/toast";
 import { Undo } from "lucide-react";
-import Button from "./ui/Button";
+import Button, { Variant, Props as ButtonProps } from "./ui/Button";
 
-interface Props extends React.HTMLAttributes<HTMLButtonElement> {
+interface Props extends ButtonProps {
     onClick: () => void
     showUndo?: boolean
     label?: string
+    variant?: Variant
 }
 
-export default function ToastButton({ onClick, showUndo = true, label = "Undo", ...props }: Props) {
+export default function ToastButton({ onClick, showUndo, label = "Undo", variant, ...props }: Props) {
     return (
         <ToastAction altText={label} asChild>
             <Button
-                variant="button"
+                variant={variant}
                 onClick={onClick}
                 label={label}
                 {...props}
@@ -26,6 +27,7 @@ export default function ToastButton({ onClick, showUndo = true, label = "Undo", 
 }
 
 ToastButton.defaultProps = {
-    showUndo: true,
+    variant: undefined,
+    showUndo: undefined,
     label: "Undo",
 }

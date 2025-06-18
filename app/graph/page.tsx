@@ -7,23 +7,32 @@ import dynamic from "next/dynamic";
 import { ForceGraphMethods } from "react-force-graph-2d";
 import { Category, Graph, GraphData, Link, Node } from "../api/graph/model";
 import Tutorial from "./Tutorial";
-import { GraphNameContext, GraphContext, IndicatorContext, LimitContext, TimeoutContext, GraphNamesContext, HistoryQueryContext, RunDefaultQueryContext, DefaultQueryContext, ContentPersistenceContext } from "../components/provider";
+import { GraphContext, IndicatorContext, HistoryQueryContext, QuerySettingsContext } from "../components/provider";
 
 const Selector = dynamic(() => import("./Selector"), { ssr: false })
 const GraphView = dynamic(() => import("./GraphView"), { ssr: false })
 
 export default function Page() {
-    const { graphNames, setGraphNames } = useContext(GraphNamesContext)
     const { historyQuery, setHistoryQuery } = useContext(HistoryQueryContext)
     const { setIndicator } = useContext(IndicatorContext);
-    const { graph, setGraph } = useContext(GraphContext)
-    const { graphName, setGraphName } = useContext(GraphNameContext)
-    const { timeout } = useContext(TimeoutContext);
-    const { limit } = useContext(LimitContext);
-    const { runDefaultQuery } = useContext(RunDefaultQueryContext)
-    const { defaultQuery } = useContext(DefaultQueryContext)
-    const { contentPersistence } = useContext(ContentPersistenceContext)
+    const {
+        graph,
+        setGraph,
+        graphName,
+        setGraphName,
+        graphNames,
+        setGraphNames
+    } = useContext(GraphContext)
 
+    const {
+        settings: {
+            limitSettings: { limit },
+            timeoutSettings: { timeout },
+            runDefaultQuerySettings: { runDefaultQuery },
+            defaultQuerySettings: { defaultQuery },
+            contentPersistenceSettings: { contentPersistence },
+        }
+    } = useContext(QuerySettingsContext)
     const { toast } = useToast()
 
     const chartRef = useRef<ForceGraphMethods<Node, Link>>()
@@ -122,19 +131,19 @@ export default function Page() {
     const runQuery = useCallback(async (q: string, name?: string) => {
         const n = name || graphName
         const result = await run(q, n)
- 
+
         if (!result) return
- 
+
         const explain = await securedFetch(`api/graph/${prepareArg(n)}/explain/?query=${prepareArg(q)}`, {
             method: "GET"
         }, toast, setIndicator)
- 
+
         if (!explain.ok) return
- 
+
         const explainJson = await explain.json()
         const newQuery = { text: q, metadata: result.metadata, explain: explainJson.result, profile: [] }
         const queryArr = historyQuery.queries.some(qu => qu.text === q) ? historyQuery.queries : [...historyQuery.queries, newQuery]
- 
+
         setHistoryQuery(prev => historyQuery.counter === 0 ? {
             queries: queryArr,
             query: q,
@@ -146,9 +155,9 @@ export default function Page() {
             currentQuery: q,
             counter: 0
         })
- 
+
         const g = Graph.create(n, result, false, false, limit, graph.Colors, newQuery)
- 
+
         setGraph(g)
         fetchCount()
         handleCooldown()
@@ -160,17 +169,18 @@ export default function Page() {
     }, [graphName, run, toast, setIndicator, historyQuery.queries, historyQuery.counter, setHistoryQuery, limit, graph.Colors, setGraph, fetchCount])
 
     useEffect(() => {
-        if (!graph.Id && contentPersistence) {
-            const content = localStorage.getItem("savedContent")
+        const content = localStorage.getItem("savedContent")
 
-            if (content) {
-                const { graphName: name, query } = JSON.parse(content)
+        if (content) {
+            const { graphName: name, query } = JSON.parse(content)
 
+            if (!graph.Id && graphNames.includes(name) && contentPersistence) {
                 setGraphName(name)
                 runQuery(query, name)
                 return
             }
         }
+
 
         if (!graphName) return
 
@@ -185,7 +195,7 @@ export default function Page() {
         }
 
         fetchCount()
-    }, [fetchCount, graph.Id, graphName, setGraph, runDefaultQuery, defaultQuery, runQuery, contentPersistence, setGraphName])
+    }, [fetchCount, graph.Id, graphName, setGraph, runDefaultQuery, defaultQuery, runQuery, contentPersistence, setGraphName, graphNames])
 
     const handleDeleteElement = async () => {
         if (selectedElements.length === 0 && selectedElement) {

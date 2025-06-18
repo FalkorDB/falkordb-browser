@@ -100,7 +100,12 @@ export default function SchemaCreateElement({ onCreate, setIsAdd, selectedNodes,
     toast({
       title: "Success",
       description: "Attribute set",
-      action: isUndo ? <ToastButton onClick={() => handleSetAttribute(false, oldAttribute)} /> : undefined
+      action: isUndo ?
+        <ToastButton
+          showUndo
+          onClick={() => handleSetAttribute(false, oldAttribute)}
+        />
+        : undefined
     })
   }
 
@@ -429,7 +434,11 @@ export default function SchemaCreateElement({ onCreate, setIsAdd, selectedNodes,
                                 toast({
                                   title: "Success",
                                   description: "Attribute removed",
-                                  action: oldAttribute && <ToastButton onClick={() => handleAddAttribute(oldAttribute)} />
+                                  action: oldAttribute &&
+                                    <ToastButton
+                                      showUndo
+                                      onClick={() => handleAddAttribute(oldAttribute)}
+                                    />
                                 })
                               }}
                             >

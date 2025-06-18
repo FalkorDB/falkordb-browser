@@ -5,7 +5,7 @@ import { Graph } from "@/app/api/graph/model";
 import DialogComponent from "../DialogComponent";
 import Button from "../ui/Button";
 import CloseDialog from "../CloseDialog";
-import { GraphNamesContext, IndicatorContext } from "../provider";
+import { IndicatorContext } from "../provider";
 
 interface Props {
   type: "Schema" | "Graph"
@@ -15,6 +15,8 @@ interface Props {
   selectedValue: string
   setGraphName: (graphName: string) => void
   setGraph: (graph: Graph) => void
+  graphNames: string[]
+  setGraphNames: (graphNames: string[]) => void
 }
 
 export default function DeleteGraph({
@@ -24,7 +26,9 @@ export default function DeleteGraph({
   setOpenMenage,
   selectedValue,
   setGraphName,
-  setGraph
+  setGraph,
+  graphNames,
+  setGraphNames
 }: Props) {
 
   const [open, setOpen] = useState(false)
@@ -32,7 +36,6 @@ export default function DeleteGraph({
   const { toast } = useToast()
   const [isLoading, setIsLoading] = useState(false)
   const { indicator, setIndicator } = useContext(IndicatorContext)
-  const { graphNames, setGraphNames } = useContext(GraphNamesContext)
 
   useEffect(() => {
     if (!open && closeManage) {
