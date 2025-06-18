@@ -117,7 +117,7 @@ export default function PaginationList<T extends Item>({ list, step, onClick, da
                                 className={cn(
                                     "border-b",
                                     selected ? "text-primary border-primary" : "text-gray-500 border-gray-500",
-                                    hover && "text-white border-white"
+                                    hover && !selected && "text-white border-white"
                                 )}
                                 onMouseEnter={() => setHoverIndex(index)}
                                 onMouseLeave={() => searchRef.current !== document.activeElement && setHoverIndex(-1)}
