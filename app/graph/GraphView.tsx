@@ -70,6 +70,8 @@ function GraphView({
     }, [graph, graph.Categories, graph.Labels])
 
     useEffect(() => {
+        if ((tabsValue === "Graph" && graph.getElements().length !== 0) || (tabsValue === "Table" && graph.Data.length !== 0) || (tabsValue === "Metadata" && graph.CurrentQuery && graph.CurrentQuery.metadata.length > 0 && graph.Metadata.length > 0 && graph.CurrentQuery.explain.length > 0)) return
+
         let defaultChecked = "Graph"
         if (graph.getElements().length !== 0) {
             defaultChecked = "Graph"
