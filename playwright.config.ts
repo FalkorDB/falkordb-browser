@@ -86,6 +86,7 @@ export default defineConfig({
       },
       dependencies: ['setup'],
       grep: /@readonly/,
+      testIgnore: /.*tls\.spec\.ts$/,
     },
     {
       name: '[Read-Only] - Firefox',
@@ -95,6 +96,7 @@ export default defineConfig({
       },
       dependencies: ['setup'],
       grep: /@readonly/,
+      testIgnore: /.*tls\.spec\.ts$/,
     },
     {
       name: '[Admin: Serial Config - Chromium]',
@@ -115,7 +117,23 @@ export default defineConfig({
       grep: /@admin/,
       dependencies: ['setup'],
       testMatch: /.*(settingsConfig|settingsUsers)\.spec\.ts$/,
-    },  
+    },
+    {
+      name: '[Read-Only: TLS - Chromium]',
+      use: {
+        ...devices['Desktop Chrome'],
+      },
+      grep: /@readonly/,
+      testMatch: /.*(tls)\.spec\.ts$/,
+    },
+    {
+      name: '[Read-Only: TLS - Firefox]',
+      use: {
+        ...devices['Desktop Firefox'],
+      },
+      grep: /@readonly/,
+      testMatch: /.*(tls)\.spec\.ts$/,
+    }, 
 
     // {
     //   name: 'webkit',
