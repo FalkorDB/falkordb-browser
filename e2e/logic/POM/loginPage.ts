@@ -29,6 +29,23 @@ export default class LoginPage extends HeaderComponent {
         return this.page.locator("//div[p[text()=\"Don't show this again\"]]//button");
     }
 
+    // TLS locators
+    private get tlsCheckbox(): Locator {
+        return this.page.getByTestId("tls-checkbox");
+    }
+
+    private get uploadCertificateInput(): Locator {
+        return this.page.getByText("Upload Certificate");
+    }
+
+    private get certificateUploadedStatus(): Locator {
+        return this.page.getByTestId("certificate-uploaded-status");
+    }
+
+    private get removeCertificateBtn(): Locator {
+        return this.page.getByTestId("remove-certificate-btn");
+    }
+
     async clickConnect(): Promise<void> {
         await interactWhenVisible(this.connectBtn, el => el.click(), "connect button");
     }
@@ -53,6 +70,31 @@ export default class LoginPage extends HeaderComponent {
         await interactWhenVisible(this.dissmissDialogCheckbox, el => el.click(), "disable tutorial");
     }
 
+    // TLS methods
+    async clickEnableTLS(): Promise<void> {
+        await interactWhenVisible(this.tlsCheckbox, el => el.click(), "TLS checkbox");
+    }
+
+    async isTLSEnabled(): Promise<boolean> {
+        return await this.tlsCheckbox.getAttribute('data-state') === 'checked';
+    }
+
+    async clickUploadCA(): Promise<void> {
+        await interactWhenVisible(this.uploadCertificateInput, el => el.click(), "upload certificate input");
+    }
+
+    async clickRemoveCertificateBtn(): Promise<void> {
+        await interactWhenVisible(this.removeCertificateBtn, (el) => el.click(), "remove certificate button");
+    }
+
+    async isCertificateUploaded(): Promise<boolean> {
+        return await interactWhenVisible(this.certificateUploadedStatus, (el) => el.isVisible(), "certificate uploaded status");
+    }
+
+    async isCertificateRemoved(): Promise<boolean> {
+        return await this.certificateUploadedStatus.isHidden();
+    }
+
     async clickOnConnect(): Promise<void> {
         await this.clickConnect();
         await waitForURL(this.page, urls.graphUrl);
@@ -71,4 +113,14 @@ export default class LoginPage extends HeaderComponent {
         await this.page.mouse.click(10, 10);
     }
 
+    async uploadCertificate(filePath: string): Promise<void> {
+        const fileChooserPromise = this.page.waitForEvent('filechooser');
+        await this.clickUploadCA();
+        const fileChooser = await fileChooserPromise;
+        await fileChooser.setFiles(filePath);
+    }
+
+    async waitForSuccessfulLogin(Url: string): Promise<void> {
+        await this.page.waitForURL(Url, { timeout: 5000 });
+    }
 }
