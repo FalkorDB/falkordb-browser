@@ -14,13 +14,16 @@ export type CACHE = {
 
 const connections = new Map<string, { client: FalkorDB, cache: Map<number, CACHE> }>();
 
-async function newClient(credentials: { host: string, port: string, password: string, username: string, tls: string, ca: string }, id: string): Promise<{ role: Role, client: FalkorDB, cache: Map<number, CACHE> }> {
+async function newClient(credentials: { host: string, port: string, password: string, username: string, tls: string, ca: string, key: string, cert: string }, id: string): Promise<{ role: Role, client: FalkorDB, cache: Map<number, CACHE> }> {
     const connectionOptions: FalkorDBOptions = credentials.tls === "true" ?
         {
+
             socket: {
                 host: credentials.host ?? "localhost",
                 port: credentials.port ? parseInt(credentials.port, 10) : 6379,
                 tls: credentials.tls === "true",
+                key: credentials.key === "undefined" ? undefined : [Buffer.from(credentials.key, "base64").toString("utf8")],
+                cert: credentials.cert === "undefined" ? undefined : [Buffer.from(credentials.cert, "base64").toString("utf8")],
                 checkServerIdentity: () => undefined,
                 ca: credentials.ca === "undefined" ? undefined : [Buffer.from(credentials.ca, "base64").toString("utf8")]
             },
@@ -97,6 +100,8 @@ const authOptions: AuthOptions = {
                 username: { label: "Username", type: "text" },
                 password: { label: "Password", type: "password" },
                 tls: { label: "tls", type: "boolean" },
+                key: { label: "key", type: "string" },
+                cert: { label: "cert", type: "string" },
                 ca: { label: "ca", type: "string" }
             },
             async authorize(credentials) {
@@ -117,6 +122,8 @@ const authOptions: AuthOptions = {
                         password: credentials.password,
                         username: credentials.username,
                         tls: credentials.tls === "true",
+                        key: credentials.key,
+                        cert: credentials.cert,
                         ca: credentials.ca,
                         role
                     }
@@ -140,6 +147,8 @@ const authOptions: AuthOptions = {
                     username: user.username,
                     password: user.password,
                     tls: user.tls,
+                    key: user.key,
+                    cert: user.cert,
                     ca: user.ca,
                     role: user.role
                 };
@@ -158,6 +167,8 @@ const authOptions: AuthOptions = {
                         username: token.username as string,
                         password: token.password as string,
                         tls: token.tls as boolean,
+                        key: token.key,
+                        cert: token.cert,
                         ca: token.ca,
                         role: token.role as Role
                     },
@@ -186,7 +197,9 @@ export async function getClient() {
             username: user.username,
             password: user.password,
             tls: String(user.tls),
-            ca: user.ca
+            ca: user.ca,
+            key: user.key,
+            cert: user.cert
         }, user.id))
     }
 
