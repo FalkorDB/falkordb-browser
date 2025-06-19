@@ -164,18 +164,32 @@ jobs:
           EOF
       - name: Start FalkorDB with TLS
         run: |
+          echo "Starting FalkorDB with TLS configuration..."
           docker run --rm -d --name falkordb-tls -p 6379:6379 \
-            -v ./redis.conf:/var/lib/falkordb/data/redis.conf \
+            -v $(pwd)/redis.conf:/var/lib/falkordb/data/redis.conf \
             -e REDIS_ARGS="/var/lib/falkordb/data/redis.conf" \
-            -v ./tls:/var/lib/falkordb/tls \
+            -v $(pwd)/tls:/var/lib/falkordb/tls \
             falkordb/falkordb:latest
+          echo "Container started with ID: $(docker ps -q -f name=falkordb-tls)"
       - name: Wait for FalkorDB TLS to be ready
         run: |
-          echo "Waiting for FalkorDB TLS container to start..."
-          sleep 10
-          echo "Container logs:"
-          docker logs falkordb-tls
-          echo "FalkorDB TLS should be ready!"
+          echo "Checking if container is running..."
+          if docker ps | grep -q falkordb-tls; then
+            echo "Container is running"
+            sleep 10
+            echo "Container logs:"
+            docker logs falkordb-tls
+          else
+            echo "Container failed to start or exited. Checking all containers:"
+            docker ps -a
+            echo "Checking logs from exited container:"
+            docker logs falkordb-tls 2>/dev/null || echo "No logs available"
+            echo "Checking Redis config file:"
+            cat redis.conf
+            echo "Checking TLS directory:"
+            ls -la tls/
+            exit 1
+          fi
       - name: Run TLS tests
         run: |
           npm run build
