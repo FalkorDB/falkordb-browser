@@ -158,6 +158,14 @@ export default class GraphPage extends Page {
     );
   }
 
+  async getEditorInput(): Promise<string | null> {
+    return interactWhenVisible(
+      this.editorContainer,
+      (el) => el.getAttribute("value"),
+      "Editor Input"
+    );
+  }
+
   async clickCreateGraph(): Promise<void> {
     await interactWhenVisible(
       this.create("Graph"),
