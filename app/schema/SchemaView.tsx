@@ -130,7 +130,9 @@ export default function SchemaView({
                 setIsAddEntity(false)
             } else {
                 const { label } = schema.extendEdge(json.result.data[0].e, false, true)!
-                setLabels(prev => [...prev, schema.LabelsMap.get(label)!])
+                if (!labels.some(l => l.name === label)) {
+                    setLabels(prev => [...prev, schema.LabelsMap.get(label)!])
+                }
                 setIsAddRelation(false)
             }
 
@@ -208,6 +210,8 @@ export default function SchemaView({
                             selectedNodes={selectedNodes}
                             setSelectedNodes={setSelectedNodes}
                             type={isAddEntity}
+                            schema={schema}
+                            chartRef={chartRef}
                         />
                 }
             </div>

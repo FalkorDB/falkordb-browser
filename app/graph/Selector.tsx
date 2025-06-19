@@ -142,7 +142,7 @@ export default function Selector({ graph, options, setOptions, graphName, setGra
     }
 
     return (
-        <div className="z-20 absolute top-5 inset-x-24 h-[50px] flex flex-row gap-4 items-center">
+        <div className="z-20 absolute top-5 inset-x-24 flex flex-row gap-4 items-center h-[50px]">
             <SelectGraph
                 options={options}
                 setOptions={setOptions}
@@ -319,7 +319,7 @@ export default function Selector({ graph, options, setOptions, graphName, setGra
                             </Button>
                         </div>
                     </>
-                    : <div className="w-full h-[58px]">
+                    :
                         <Toolbar
                             graph={graph}
                             label={type}
@@ -331,7 +331,6 @@ export default function Selector({ graph, options, setOptions, graphName, setGra
                             chartRef={chartRef}
                             backgroundColor="bg-foreground"
                         />
-                    </div>
             }
         </div >
     )

@@ -7,11 +7,12 @@ import { Dispatch, SetStateAction, useCallback, useContext, useEffect, useState 
 import { ArrowRight, ArrowRightLeft, Check, Pencil, Plus, Trash2, X } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/components/ui/use-toast";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { GraphRef } from "@/lib/utils";
+import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import Button from "../components/ui/Button";
 import Combobox from "../components/ui/combobox";
-import { Node } from "../api/graph/model";
+import { Graph, Node } from "../api/graph/model";
 import Input from "../components/ui/Input";
 import ToastButton from "../components/ToastButton";
 import { IndicatorContext } from "../components/provider";
@@ -19,6 +20,7 @@ import PaginationList from "../components/PaginationList";
 import CloseDialog from "../components/CloseDialog";
 import AddLabel from "../graph/addLabel";
 import RemoveLabel from "../graph/RemoveLabel";
+import SearchElement from "../graph/SearchElement";
 
 interface Props {
   onCreate: (element: [string, string[]][], label?: string[]) => Promise<boolean>
@@ -26,6 +28,8 @@ interface Props {
   selectedNodes: [Node | undefined, Node | undefined]
   setSelectedNodes: Dispatch<SetStateAction<[Node | undefined, Node | undefined]>>
   type: boolean
+  schema: Graph
+  chartRef: GraphRef
 }
 
 export const ATTRIBUTES = ["Type", "Description", "Unique", "Required"]
@@ -34,7 +38,7 @@ export const OPTIONS = ["String", "Integer", "Float", "Geospatial", "Boolean"]
 
 export const getDefaultAttribute = (): [string, string[]] => ["", ["", "", "false", "false"]]
 
-export default function SchemaCreateElement({ onCreate, setIsAdd, selectedNodes, setSelectedNodes, type }: Props) {
+export default function SchemaCreateElement({ onCreate, setIsAdd, selectedNodes, setSelectedNodes, type, schema, chartRef }: Props) {
 
   const { indicator } = useContext(IndicatorContext)
 
@@ -216,10 +220,8 @@ export default function SchemaCreateElement({ onCreate, setIsAdd, selectedNodes,
     <Dialog open>
       <DialogContent className="flex flex-col bg-foreground w-[90%] h-[90%] rounded-lg border-none gap-8 p-8" disableClose>
         <DialogHeader className="flex-row justify-between items-center border-b pb-4">
-          <div className="flex flex-col gap-2 font-medium text-xl text-nowrap">
-            <DialogTitle>Create new {type ? "node" : "edge"}</DialogTitle>
-            <p data-testid="DataPanelAttributesCount">Attributes: <span className="Gradient text-transparent bg-clip-text">{attributes.length}</span></p>
-          </div>
+          <p data-testid="DataPanelAttributesCount">Attributes: <span className="Gradient text-transparent bg-clip-text">{attributes.length}</span></p>
+          <DialogTitle>Create New {type ? "Node" : "Edge"}</DialogTitle>
           <CloseDialog
             onClick={onClose}
           >
@@ -247,7 +249,7 @@ export default function SchemaCreateElement({ onCreate, setIsAdd, selectedNodes,
               <RemoveLabel onRemoveLabel={handleRemoveLabel} selectedLabel={selectedLabel} />
             </div>
           </div>
-          <div className="bg-background rounded-lg w-[60%] h-full flex flex-col justify-between items-start font-medium">
+          <div className="bg-background rounded-lg w-[60%] h-full flex flex-col gap-4 justify-between items-start font-medium">
             <Table parentClassName="grow" data-testid="attributesTable">
               <TableHeader>
                 <TableRow>
@@ -534,28 +536,37 @@ export default function SchemaCreateElement({ onCreate, setIsAdd, selectedNodes,
             </Table>
             {
               !type &&
-              <div className="w-full flex flex-col gap-2" id="relationSelection">
-                <div className="w-full flex justify-between p-4 items-center" data-testid="relationSelectionHeader">
-                  <div style={{ backgroundColor: selectedNodes[0]?.color }} className="flex h-16 w-16 rounded-full border-2 border-background justify-center items-center overflow-hidden">
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <p className="truncate" data-testid="selectedNode1">{selectedNodes[0]?.category}</p>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p>{selectedNodes[0]?.category}</p>
-                      </TooltipContent>
-                    </Tooltip>
+              <div className="w-full flex flex-col gap-4 p-4" id="relationSelection">
+                <div className="w-full flex justify-center gap-4 items-center" data-testid="relationSelectionHeader">
+                  <div className="w-1 grow flex flex-col gap-2 items-center">
+                    <SearchElement
+                      graph={schema}
+                      chartRef={chartRef}
+                      onSearchElement={(element) => setSelectedNodes([element as Node, selectedNodes[1]])}
+                      label="Schema"
+                      backgroundColor="bg-background"
+                      type="Node"
+                    />
+                    <p
+                      className="w-12 h-12 rounded-full overflow-hidden flex items-center justify-center text-white truncate border-white border-2"
+                      style={{ backgroundColor: selectedNodes[0]?.color }}>
+                      {selectedNodes[0]?.category}
+                    </p>
                   </div>
                   <ArrowRight strokeWidth={1} size={30} />
-                  <div style={{ backgroundColor: selectedNodes[1]?.color }} className="flex h-16 w-16 rounded-full border-2 border-background justify-center items-center overflow-hidden">
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <p className="truncate" data-testid="selectedNode2">{selectedNodes[1]?.category}</p>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p>{selectedNodes[1]?.category}</p>
-                      </TooltipContent>
-                    </Tooltip>
+                  <div className="w-1 grow flex flex-col gap-2 items-center">
+                    <SearchElement
+                      graph={schema}
+                      chartRef={chartRef}
+                      onSearchElement={(element) => setSelectedNodes([selectedNodes[0], element as Node])}
+                      label="Schema"
+                      backgroundColor="bg-background"
+                    />
+                    <p
+                      className="w-12 h-12 rounded-full overflow-hidden flex items-center justify-center text-white truncate border-white border-2"
+                      style={{ backgroundColor: selectedNodes[1]?.color }}>
+                      {selectedNodes[1]?.category}
+                    </p>
                   </div>
                 </div>
                 <div className="w-full flex justify-center gap-8">
@@ -601,6 +612,9 @@ export default function SchemaCreateElement({ onCreate, setIsAdd, selectedNodes,
             </div>
           </div>
         </div>
+        <VisuallyHidden>
+          <DialogDescription />
+        </VisuallyHidden>
       </DialogContent>
     </Dialog>
   )

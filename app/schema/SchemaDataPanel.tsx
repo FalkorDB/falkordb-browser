@@ -10,7 +10,8 @@ import { useToast } from "@/components/ui/use-toast";
 import { useSession } from "next-auth/react";
 import { Switch } from "@/components/ui/switch";
 import { prepareArg, securedFetch } from "@/lib/utils";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import Button from "../components/ui/Button";
 import { ATTRIBUTES, getDefaultAttribute, OPTIONS } from "./SchemaCreateElement";
 import Combobox from "../components/ui/combobox";
@@ -337,7 +338,7 @@ export default function SchemaDataPanel({ object, setObject, onDeleteElement, sc
                             <RemoveLabel onRemoveLabel={handleRemoveLabel} selectedLabel={selectedLabel} />
                         </div>
                     </div>
-                    <div className="h-full w-[60%] flex flex-col bg-background rounded-lg overflow-hidden">
+                    <div className="h-full w-[60%] flex flex-col gap-4 bg-background rounded-lg overflow-hidden">
                         <Table parentClassName="grow">
                             <TableHeader>
                                 <TableRow>
@@ -637,6 +638,9 @@ export default function SchemaDataPanel({ object, setObject, onDeleteElement, sc
                         }
                     </div>
                 </div>
+                <VisuallyHidden>
+                    <DialogDescription />
+                </VisuallyHidden>
             </DialogContent>
         </Dialog>
     )

@@ -243,6 +243,8 @@ export default function ForceGraph({
                         node.y = 0
                     }
 
+                    console.log("node:", "x:", node.x, "y:", node.y)
+
                     ctx.lineWidth = ((selectedElement && !("source" in selectedElement) && selectedElement.id === node.id)
                         || (hoverElement && !("source" in hoverElement) && hoverElement.id === node.id)
                         || (selectedElements.length > 0 && selectedElements.some(el => el.id === node.id && !("source" in el)))) ? 1 : 0.5
@@ -291,6 +293,8 @@ export default function ForceGraph({
                         end.x = 0
                         end.y = 0
                     }
+
+                    console.log("start:", "x:", start.x, "y:", start.y, "end:", "x:", end.x, "y:", end.y)
 
                     let textX;
                     let textY;

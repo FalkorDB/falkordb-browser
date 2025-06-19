@@ -208,7 +208,7 @@ export default function GraphDataTable({ graph, object, type, onDeleteElement, l
     }
 
     return (
-        <div className={cn("flex flex-col bg-background rounded-lg overflow-hidden", className)}>
+        <div className={cn("flex flex-col gap-4 bg-background rounded-lg overflow-hidden", className)}>
             <Table parentRef={scrollableContainerRef} parentClassName="grow">
                 <TableHeader>
                     <TableRow>

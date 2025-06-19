@@ -9,7 +9,8 @@ import { Dispatch, SetStateAction, useCallback, useContext, useEffect, useRef, u
 import { Pencil, X } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { useSession } from "next-auth/react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import Button from "../components/ui/Button";
 import { Category, Link, Node } from "../api/graph/model";
 import { IndicatorContext, GraphContext } from "../components/provider";
@@ -178,6 +179,9 @@ export default function GraphDataPanel({ object, setObject, onDeleteElement, set
                         lastObjId={lastObjId}
                     />
                 </div>
+                <VisuallyHidden>
+                    <DialogDescription />
+                </VisuallyHidden>
             </DialogContent>
         </Dialog>
     ) : (
