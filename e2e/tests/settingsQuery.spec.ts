@@ -1,11 +1,11 @@
 import { expect } from "@playwright/test";
 import test from "playwright/test";
+import { getDefaultQuery } from "@/lib/utils";
 import ApiCalls from "../logic/api/apiCalls";
 import BrowserWrapper from "../infra/ui/browserWrapper";
 import urls from "../config/urls.json";
 import QuerySettingsPage from "../logic/POM/settingsQueryPage";
 import { getRandomString } from "../infra/utils";
-import { getDefaultQuery } from "@/lib/utils";
 
 test.describe("Query Settings", () => {
   let browser: BrowserWrapper;
@@ -165,6 +165,7 @@ test.describe("Query Settings", () => {
       urls.settingsUrl
     );
     const defaultQuery = "MATCH (n) RETURN n";
+    await querySettings.checkRunDefaultQueryCheckboxOn();
     await querySettings.fillRunDefaultQueryInput(defaultQuery);
     await querySettings.clickSaveQuerySettingsBtn();
     await querySettings.refreshPage();
@@ -178,6 +179,7 @@ test.describe("Query Settings", () => {
       urls.settingsUrl
     );
     const defaultQuery = "MATCH (n) RETURN n";
+    await querySettings.checkRunDefaultQueryCheckboxOn();
     await querySettings.fillRunDefaultQueryInput(defaultQuery);
     await querySettings.clickSaveQuerySettingsBtn();
     await querySettings.refreshPage();
@@ -235,8 +237,8 @@ test.describe("Query Settings", () => {
       urls.settingsUrl
     );
     const defaultQuery = "MATCH (n) RETURN n";
-    await querySettings.fillRunDefaultQueryInput(defaultQuery);
     await querySettings.checkRunDefaultQueryCheckboxOn();
+    await querySettings.fillRunDefaultQueryInput(defaultQuery);
     await querySettings.clickSaveQuerySettingsBtn();
     await querySettings.clickGraphsTabInHeader();
     await querySettings.selectGraphByName(graphName);
