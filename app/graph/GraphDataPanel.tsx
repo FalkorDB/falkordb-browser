@@ -41,8 +41,8 @@ export default function GraphDataPanel({ object, setObject, onDeleteElement, set
     const [label, setLabel] = useState<string[]>([]);
     const type = !("source" in object)
 
-    const onClose = useCallback((e: KeyboardEvent) => {
-        if (e.key === "Escape") {
+    const onClose = useCallback((e?: KeyboardEvent) => {
+        if (!e || e.key === "Escape") {
             setObject(undefined)
         }
     }, [setObject])
@@ -143,7 +143,7 @@ export default function GraphDataPanel({ object, setObject, onDeleteElement, set
                         <p data-testid="DataPanelAttributesCount">Attributes: <span className="Gradient text-transparent bg-clip-text">{Object.keys(object.data).length}</span></p>
                     </div>
                     <Button
-                        onClick={() => setObject(undefined)}
+                        onClick={() => onClose()}
                     >
                         <X />
                     </Button>

@@ -1,5 +1,5 @@
 import { Plus } from "lucide-react";
-import { useState, useContext } from "react";
+import { useState, useContext, useEffect, useRef } from "react";
 import DialogComponent from "../components/DialogComponent";
 import Button from "../components/ui/Button";
 import Input from "../components/ui/Input";
@@ -24,13 +24,22 @@ export default function AddLabel({
 
     const { indicator } = useContext(IndicatorContext)
 
+    const inputRef = useRef<HTMLInputElement>(null)
+
     const [open, setOpen] = useState(false)
     const [label, setLabel] = useState("")
     const [isLoading, setIsLoading] = useState(false)
-
+    
+    useEffect(() => {
+        if (inputRef.current) {
+            console.log("focusing")
+            inputRef.current.focus()
+        }
+    }, [inputRef])
+    
     const handleAddLabel = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault()
-
+        
         setIsLoading(true)
         try {
             const success = await onAddLabel(label)
@@ -57,7 +66,7 @@ export default function AddLabel({
                 <Input
                     data-testid="addLabelInput"
                     variant="primary"
-                    ref={ref => ref?.focus()}
+                    ref={inputRef}
                     value={label}
                     onChange={(e) => setLabel(e.target.value)}
                 />
