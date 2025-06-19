@@ -171,7 +171,11 @@ jobs:
             falkordb/falkordb:latest
       - name: Wait for FalkorDB TLS to be ready
         run: |
-          timeout 30 bash -c 'until docker logs falkordb-tls 2>&1 | grep -q "Ready to accept connections tls"; do sleep 1; done'
+          echo "Waiting for FalkorDB TLS container to start..."
+          sleep 10
+          echo "Container logs:"
+          docker logs falkordb-tls
+          echo "FalkorDB TLS should be ready!"
       - name: Run TLS tests
         run: |
           npm run build
