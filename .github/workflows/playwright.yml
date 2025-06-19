@@ -131,19 +131,37 @@ jobs:
       - name: Setup TLS certificates
         run: |
           mkdir -p tls
-          # Generate TLS certificates using FalkorDB container
-          docker run --rm -e TLS=1 -v ./tls:/var/lib/falkordb/tls falkordb/falkordb:latest
+          cd tls
+          # Generate CA private key
+          openssl genrsa -out ca.key 4096
+          # Generate CA certificate (1 day expiration for CI security)
+          openssl req -x509 -new -nodes -key ca.key -sha256 -days 1 \
+            -subj '/O=FalkorDB-CI/CN=Test-CA' -out ca.crt
+          # Generate server private key
+          openssl genrsa -out redis.key 2048
+          # Generate server certificate signing request
+          openssl req -new -key redis.key \
+            -subj '/O=FalkorDB-CI/CN=localhost' -out redis.csr
+          # Generate server certificate signed by CA (1 day expiration)
+          openssl x509 -req -in redis.csr -CA ca.crt -CAkey ca.key \
+            -CAcreateserial -out redis.crt -days 1 -sha256
+          # Generate DH parameters (1024-bit for CI speed)
+          openssl dhparam -out redis.dh 1024
+          # Cleanup intermediate files
+          rm redis.csr ca.srl
+          cd ..
       - name: Create Redis TLS config
         run: |
-          echo "
+          cat > redis.conf << 'EOF'
           protected-mode no
           tls-port 6379
           port 0
           tls-cert-file /var/lib/falkordb/tls/redis.crt
           tls-key-file /var/lib/falkordb/tls/redis.key
           tls-ca-cert-file /var/lib/falkordb/tls/ca.crt
+          tls-dh-params-file /var/lib/falkordb/tls/redis.dh
           tls-auth-clients no
-          " > redis.conf
+          EOF
       - name: Start FalkorDB with TLS
         run: |
           docker run --rm -d --name falkordb-tls -p 6379:6379 \
