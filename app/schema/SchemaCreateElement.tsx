@@ -248,7 +248,7 @@ export default function SchemaCreateElement({ onCreate, setIsAdd, selectedNodes,
             </div>
           </div>
           <div className="bg-background rounded-lg w-[60%] h-full flex flex-col justify-between items-start font-medium">
-            <Table data-testid="attributesTable">
+            <Table parentClassName="grow" data-testid="attributesTable">
               <TableHeader>
                 <TableRow>
                   <TableHead key="buttons" />
@@ -265,7 +265,7 @@ export default function SchemaCreateElement({ onCreate, setIsAdd, selectedNodes,
                   attributes.length > 0 &&
                   attributes.map(([key, val]) => (
                     <TableRow
-                      className="cursor-pointer p-2 h-20"
+                      className="cursor-pointer p-2"
                       onClick={() => {
                         if (editable === key) return
                         handleSetEditable([key, [...val]])
@@ -277,7 +277,7 @@ export default function SchemaCreateElement({ onCreate, setIsAdd, selectedNodes,
                       tabIndex={0} // Added to make the row focusable
                     >
                       <TableCell>
-                        <div className="flex flex-col gap-2 h-11 justify-center">
+                        <div className="flex flex-col gap-2 h-[48px] w-5 justify-center">
                           {
                             editable === key ?
                               <>
@@ -395,7 +395,7 @@ export default function SchemaCreateElement({ onCreate, setIsAdd, selectedNodes,
                 }
                 <TableRow>
                   <TableCell>
-                    <div className="flex flex-col gap-2 h-11 justify-center">
+                    <div className="flex flex-col gap-2 h-[48px] w-5 justify-center">
                       <Button
                         title="Add a new attribute"
                         data-testid="addAttributeButton"
@@ -480,7 +480,7 @@ export default function SchemaCreateElement({ onCreate, setIsAdd, selectedNodes,
                 </TableRow>
                 <TableRow>
                   <TableCell>
-                    <div className="flex flex-col gap-2 h-11 justify-center">
+                    <div className="flex flex-col gap-2 h-[48px] w-5 justify-center">
                       <Button
                         disabled
                         title="Add a new attribute"

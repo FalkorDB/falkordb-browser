@@ -212,7 +212,7 @@ export default function GraphDataTable({ graph, object, type, onDeleteElement, l
             <Table parentRef={scrollableContainerRef} parentClassName="grow">
                 <TableHeader>
                     <TableRow>
-                        <TableHead className="w-6"><div className="h-12 w-6" /></TableHead>
+                        <TableHead key="buttons" />
                         <TableHead>Key</TableHead>
                         <TableHead>Value</TableHead>
                     </TableRow>
@@ -227,7 +227,7 @@ export default function GraphDataTable({ graph, object, type, onDeleteElement, l
                                 key={key}
                             >
                                 <TableCell>
-                                    <div className="h-12 w-6 flex flex-col items-center gap-2 justify-center">
+                                    <div className="flex flex-col gap-2 justify-center h-[48px] w-5">
                                         {
                                             session?.user?.role !== "Read-Only" && (
                                                 editable === key ?
@@ -328,7 +328,7 @@ export default function GraphDataTable({ graph, object, type, onDeleteElement, l
                     {
                         isAddValue &&
                         <TableRow>
-                            <TableCell className="flex flex-col items-center gap-2">
+                            <TableCell className="flex flex-col items-center gap-2 h-11">
                                 <Button
                                     data-testid="DataPanelAddAttributeConfirm"
                                     variant="button"
@@ -374,9 +374,9 @@ export default function GraphDataTable({ graph, object, type, onDeleteElement, l
                     }
                 </TableBody >
             </Table >
-            <div className="flex justify-between gap-4 p-4">
-                {
-                    session?.user?.role !== "Read-Only" &&
+            {
+                session?.user?.role !== "Read-Only" &&
+                <div className="flex justify-between gap-4 p-4">
                     <Button
                         disabled={attributes.some((key) => key === editable)}
                         variant="Primary"
@@ -387,9 +387,6 @@ export default function GraphDataTable({ graph, object, type, onDeleteElement, l
                     >
                         <Plus size={20} />
                     </Button>
-                }
-                {
-                    session?.user?.role !== "Read-Only" &&
                     <DeleteElement
                         description={`Are you sure you want to delete this ${type ? "Node" : "Relation"}?`}
                         open={deleteOpen}
@@ -403,8 +400,8 @@ export default function GraphDataTable({ graph, object, type, onDeleteElement, l
                             <Trash2 size={20} />
                         </Button>}
                     />
-                }
-            </div>
+                </div>
+            }
         </div>
     )
 }
