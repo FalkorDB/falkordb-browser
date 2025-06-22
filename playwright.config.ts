@@ -127,14 +127,14 @@ export default defineConfig({
       use: {
         ...devices['Desktop Chrome'],
       },
-      testMatch: /.*tls\.spec\.ts$/,
+      grep: /@tls/,
     },
     {
       name: '[TLS - Firefox]',
       use: {
         ...devices['Desktop Firefox'],
       },
-      testMatch: /.*tls\.spec\.ts$/,
+      grep: /@tls/,
     }, 
 
     // {

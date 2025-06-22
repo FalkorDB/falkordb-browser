@@ -3,7 +3,7 @@ import urls from '../config/urls.json'
 import BrowserWrapper from "../infra/ui/browserWrapper";
 import LoginPage from "../logic/POM/loginPage";
 
-test.describe(`TLS Login tests`, () => {
+test.describe(`@tls TLS Login tests`, () => {
     let browser: BrowserWrapper;
 
     test.beforeEach(async () => {

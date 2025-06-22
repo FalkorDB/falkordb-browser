@@ -39,7 +39,7 @@ jobs:
       - name: Run Playwright tests (shard 1 of 2)
         run: |
           npm run build
-          NEXTAUTH_SECRET=SECRET npm start & npx playwright test --grep-invert @config --shard=1/2 --reporter=dot,list
+          NEXTAUTH_SECRET=SECRET npm start & npx playwright test --grep-invert "@config|@tls" --shard=1/2 --reporter=dot,list
       - name: Upload artifacts
         if: always()
         uses: actions/upload-artifact@v4
@@ -71,7 +71,7 @@ jobs:
       - name: Run Playwright tests (shard 2 of 2)
         run: |
           npm run build
-          NEXTAUTH_SECRET=SECRET npm start & npx playwright test --grep-invert @config --shard=2/2 --reporter=dot,list
+          NEXTAUTH_SECRET=SECRET npm start & npx playwright test --grep-invert "@config|@tls" --shard=2/2 --reporter=dot,list
       - name: Upload artifacts
         if: always()
         uses: actions/upload-artifact@v4
