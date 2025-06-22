@@ -23,8 +23,8 @@ test.describe(`TLS Login tests`, () => {
         expect(await login.isTLSEnabled()).toBe(true);
         console.log('TLS enabled successfully');
         
-        // Use path.join to ensure cross-platform compatibility
-        const invalidCertPath = require('path').join(process.cwd(), 'tls', 'ca.key');
+        // Use client.crt as an "invalid" certificate - it's a real cert file but wrong for CA validation
+        const invalidCertPath = require('path').join(process.cwd(), 'tls', 'client.crt');
         console.log(`Using certificate path: ${invalidCertPath}`);
 
         // Upload certificate with error handling
