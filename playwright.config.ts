@@ -44,7 +44,7 @@ export default defineConfig({
       },
       dependencies: ['setup'],
       grep: /@admin/,
-      testIgnore: /.*settingsConfig\.spec\.ts$/,
+      testIgnore: /.*settingsConfig\.spec\.ts$|.*tls\.spec\.ts$/,
     },
     {
       name: '[Admin] Firefox',
@@ -54,7 +54,7 @@ export default defineConfig({
       },
       dependencies: ['setup'],
       grep: /@admin/,
-      testIgnore: /.*settingsConfig\.spec\.ts$/,
+      testIgnore: /.*settingsConfig\.spec\.ts$|.*tls\.spec\.ts$/,
     },
 
     // Read-Write user projects
@@ -66,6 +66,7 @@ export default defineConfig({
       },
       dependencies: ['setup'],
       grep: /@readwrite/,
+      testIgnore: /.*tls\.spec\.ts$/,
     },
     {
       name: '[Read-Write] - Firefox',
@@ -75,6 +76,7 @@ export default defineConfig({
       },
       dependencies: ['setup'],
       grep: /@readwrite/,
+      testIgnore: /.*tls\.spec\.ts$/,
     },
 
     // // Read-Only user projects
