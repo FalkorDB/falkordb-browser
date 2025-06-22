@@ -88,7 +88,14 @@ export default class LoginPage extends HeaderComponent {
     }
 
     async isCertificateUploaded(): Promise<boolean> {
-        return await interactWhenVisible(this.certificateUploadedStatus, (el) => el.isVisible(), "certificate uploaded status");
+        try {
+            // Wait for the certificate status to appear with a longer timeout
+            await this.certificateUploadedStatus.waitFor({ state: 'visible', timeout: 5000 });
+            return true;
+        } catch (error) {
+            console.log('Certificate uploaded status not visible within timeout');
+            return false;
+        }
     }
 
     async isCertificateRemoved(): Promise<boolean> {
@@ -114,7 +121,6 @@ export default class LoginPage extends HeaderComponent {
     }
 
     async uploadCertificate(filePath: string): Promise<void> {
-        // Add debugging for CI
         console.log(`Attempting to upload certificate from: ${filePath}`);
         
         // Check if file exists
@@ -122,14 +128,20 @@ export default class LoginPage extends HeaderComponent {
         if (!fs.existsSync(filePath)) {
             throw new Error(`Certificate file does not exist: ${filePath}`);
         }
+        console.log(`File exists at: ${filePath}`);
         
+        // Wait for and handle file chooser
         const fileChooserPromise = this.page.waitForEvent('filechooser');
+        console.log('Clicking upload certificate area...');
         await this.clickUploadCA();
+        console.log('Waiting for file chooser...');
         const fileChooser = await fileChooserPromise;
+        console.log('Setting file...');
         await fileChooser.setFiles(filePath);
+        console.log('File set, waiting for upload to process...');
         
-        // Wait a moment for the upload to process
-        await this.page.waitForTimeout(1000);
+        // Wait longer for the upload to process and UI to update
+        await this.page.waitForTimeout(2000);
         console.log(`Certificate upload completed for: ${filePath}`);
     }
 

@@ -17,14 +17,29 @@ test.describe(`TLS Login tests`, () => {
     test(`@readonly validate access is denied when using an invalid TLS certificate`, async () => {
         const login = await browser.createNewPage(LoginPage, urls.loginUrl);
         await browser.setPageToFullScreen();
+        
+        // Enable TLS first
         await login.clickEnableTLS();
         expect(await login.isTLSEnabled()).toBe(true);
+        console.log('TLS enabled successfully');
         
         // Use path.join to ensure cross-platform compatibility
         const invalidCertPath = require('path').join(process.cwd(), 'tls', 'ca.key');
+        console.log(`Using certificate path: ${invalidCertPath}`);
 
-        await login.uploadCertificate(invalidCertPath);
-        expect(await login.isCertificateUploaded()).toBe(true);
+        // Upload certificate with error handling
+        try {
+            await login.uploadCertificate(invalidCertPath);
+            console.log('Upload certificate completed, checking status...');
+            
+            // Check if certificate was uploaded
+            const isUploaded = await login.isCertificateUploaded();
+            console.log(`Certificate uploaded status: ${isUploaded}`);
+            expect(isUploaded).toBe(true);
+        } catch (error) {
+            console.error('Certificate upload failed:', error);
+            throw error;
+        }
     
         await login.clickConnect();
         expect(login.getCurrentURL()).not.toBe(urls.graphUrl);
