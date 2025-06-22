@@ -39,7 +39,7 @@ jobs:
       - name: Run Playwright tests (shard 1 of 2)
         run: |
           npm run build
-          NEXTAUTH_SECRET=SECRET npm start & npx playwright test --grep-invert @config --shard=1/2 --reporter=dot,list
+          NEXTAUTH_SECRET=SECRET npm start & npx playwright test --grep-invert "@config|@tls" --shard=1/2 --reporter=dot,list
       - name: Upload artifacts
         if: always()
         uses: actions/upload-artifact@v4
@@ -71,7 +71,7 @@ jobs:
       - name: Run Playwright tests (shard 2 of 2)
         run: |
           npm run build
-          NEXTAUTH_SECRET=SECRET npm start & npx playwright test --grep-invert @config --shard=2/2 --reporter=dot,list
+          NEXTAUTH_SECRET=SECRET npm start & npx playwright test --grep-invert "@config|@tls" --shard=2/2 --reporter=dot,list
       - name: Upload artifacts
         if: always()
         uses: actions/upload-artifact@v4
@@ -111,6 +111,96 @@ jobs:
         if: always()
         with:
           name: playwright-report-settings
+          path: playwright-report/
+          retention-days: 30
+
+  run-tls-tests:
+    name: Run TLS tests
+    timeout-minutes: 60
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+      - name: Install dependencies
+        run: npm ci
+      - name: Install Playwright Browsers
+        run: npx playwright install --with-deps
+      - name: Setup TLS certificates
+        run: |
+          mkdir -p tls
+          # Generate TLS certificates using FalkorDB container (exits after generation - this is expected)
+          docker run --rm -e TLS=1 -v $(pwd)/tls:/var/lib/falkordb/tls falkordb/falkordb:latest || echo "Certificate generation completed (container exit is expected)"
+          echo "Generated certificates:"
+          ls -la tls/
+      - name: Create Redis TLS config
+        run: |
+          cat > redis.conf << 'EOF'
+          protected-mode no
+          tls-port 6379
+          port 0
+          tls-cert-file /var/lib/falkordb/tls/redis.crt
+          tls-key-file /var/lib/falkordb/tls/redis.key
+          tls-ca-cert-file /var/lib/falkordb/tls/ca.crt
+          tls-auth-clients no
+          EOF
+      - name: Start FalkorDB with TLS
+        run: |
+          echo "Starting FalkorDB with TLS configuration..."
+          docker run --rm -d --name falkordb-tls -p 6379:6379 \
+            -v $(pwd)/redis.conf:/var/lib/falkordb/data/redis.conf \
+            -e REDIS_ARGS="/var/lib/falkordb/data/redis.conf" \
+            -v $(pwd)/tls:/var/lib/falkordb/tls \
+            falkordb/falkordb:latest
+          echo "Container started with ID: $(docker ps -q -f name=falkordb-tls)"
+      - name: Wait for FalkorDB TLS to be ready
+        run: |
+          echo "Waiting a moment for container to fully start..."
+          sleep 3
+          echo "Checking container status:"
+          docker ps -a --filter name=falkordb-tls
+          
+          if docker ps --filter name=falkordb-tls --filter status=running | grep -q falkordb-tls; then
+            echo "Container is running successfully"
+            sleep 10
+            echo "Container logs:"
+            docker logs falkordb-tls
+            echo "Checking if TLS port is available:"
+            docker exec falkordb-tls redis-cli --version || echo "Redis CLI not available"
+          else
+            echo "Container failed to start or exited. Full container details:"
+            docker ps -a --filter name=falkordb-tls
+            echo "Getting logs from container (even if exited):"
+            docker logs falkordb-tls 2>&1 || echo "No logs available"
+            echo "Checking if port 6379 is in use:"
+            netstat -ln | grep :6379 || echo "Port 6379 not in use"
+            echo "Checking Redis config file:"
+            cat redis.conf
+            echo "Checking TLS certificate files:"
+            ls -la tls/
+            echo "Testing certificate validity:"
+            openssl x509 -in tls/redis.crt -text -noout | head -10 || echo "Invalid certificate"
+            exit 1
+          fi
+      - name: Run TLS tests
+        run: |
+          npm run build
+          NEXTAUTH_SECRET=SECRET npm start & npx playwright test --workers=1 --reporter=dot,list --project="[TLS - Chromium]" --project="[TLS - Firefox]"
+      - name: Cleanup TLS certificates
+        if: always()
+        run: |
+          rm -rf tls/
+          rm -f redis.conf
+      - name: Stop FalkorDB TLS container
+        if: always()
+        run: docker stop falkordb-tls || true
+      - name: Upload artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-tls
           path: playwright-report/
           retention-days: 30
 

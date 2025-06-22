@@ -36,6 +36,8 @@ export default defineConfig({
   /* Configure projects for major browsers */
   projects: [
     {name: 'setup', testMatch: /.*\.setup\.ts/},
+    
+    // Regular projects for sharding (exclude TLS and settings)
     {
       name: '[Admin] Chromium',
       use: { 
@@ -44,7 +46,7 @@ export default defineConfig({
       },
       dependencies: ['setup'],
       grep: /@admin/,
-      testIgnore: /.*settingsConfig\.spec\.ts$/,
+      testIgnore: /.*settingsConfig\.spec\.ts$|.*tls\.spec\.ts$/,
     },
     {
       name: '[Admin] Firefox',
@@ -54,10 +56,8 @@ export default defineConfig({
       },
       dependencies: ['setup'],
       grep: /@admin/,
-      testIgnore: /.*settingsConfig\.spec\.ts$/,
+      testIgnore: /.*settingsConfig\.spec\.ts$|.*tls\.spec\.ts$/,
     },
-
-    // Read-Write user projects
     {
       name: '[Read-Write] - Chromium',
       use: { 
@@ -66,6 +66,7 @@ export default defineConfig({
       },
       dependencies: ['setup'],
       grep: /@readwrite/,
+      testIgnore: /.*tls\.spec\.ts$/,
     },
     {
       name: '[Read-Write] - Firefox',
@@ -75,9 +76,8 @@ export default defineConfig({
       },
       dependencies: ['setup'],
       grep: /@readwrite/,
+      testIgnore: /.*tls\.spec\.ts$/,
     },
-
-    // // Read-Only user projects
     {
       name: '[Read-Only] - Chromium',
       use: { 
@@ -86,6 +86,7 @@ export default defineConfig({
       },
       dependencies: ['setup'],
       grep: /@readonly/,
+      testIgnore: /.*tls\.spec\.ts$/,
     },
     {
       name: '[Read-Only] - Firefox',
@@ -95,27 +96,46 @@ export default defineConfig({
       },
       dependencies: ['setup'],
       grep: /@readonly/,
+      testIgnore: /.*tls\.spec\.ts$/,
     },
+
+    // Settings tests (run separately)
     {
-      name: '[Admin: Serial Config - Chromium]',
+      name: '[Admin: Settings - Chromium]',
       use: {
         ...devices['Desktop Chrome'],
         storageState: 'playwright/.auth/admin.json',
       },
-      grep: /@admin/,
+      grep: /@admin|@config/,
       dependencies: ['setup'],
       testMatch: /.*(settingsConfig|settingsUsers)\.spec\.ts$/,
     },
     {
-      name: '[Admin: Serial Config - Firefox]',
+      name: '[Admin: Settings - Firefox]',
       use: {
         ...devices['Desktop Firefox'],
         storageState: 'playwright/.auth/admin.json',
       },
-      grep: /@admin/,
+      grep: /@admin|@config/,
       dependencies: ['setup'],
       testMatch: /.*(settingsConfig|settingsUsers)\.spec\.ts$/,
-    },  
+    },
+
+    // TLS tests (run separately)
+    {
+      name: '[TLS - Chromium]',
+      use: {
+        ...devices['Desktop Chrome'],
+      },
+      grep: /@tls/,
+    },
+    {
+      name: '[TLS - Firefox]',
+      use: {
+        ...devices['Desktop Firefox'],
+      },
+      grep: /@tls/,
+    }, 
 
     // {
     //   name: 'webkit',
