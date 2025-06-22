@@ -89,11 +89,9 @@ export default class LoginPage extends HeaderComponent {
 
     async isCertificateUploaded(): Promise<boolean> {
         try {
-            // Wait for the certificate status to appear with a longer timeout
             await this.certificateUploadedStatus.waitFor({ state: 'visible', timeout: 5000 });
             return true;
         } catch (error) {
-            console.log('Certificate uploaded status not visible within timeout');
             return false;
         }
     }
@@ -121,36 +119,21 @@ export default class LoginPage extends HeaderComponent {
     }
 
     async uploadCertificate(filePath: string): Promise<void> {
-        console.log(`Attempting to upload certificate from: ${filePath}`);
-        
-        // Check if file exists
         const fs = require('fs');
         if (!fs.existsSync(filePath)) {
             throw new Error(`Certificate file does not exist: ${filePath}`);
         }
-        console.log(`File exists at: ${filePath}`);
         
-        // Wait for and handle file chooser
         const fileChooserPromise = this.page.waitForEvent('filechooser');
-        console.log('Clicking upload certificate area...');
         await this.clickUploadCA();
-        console.log('Waiting for file chooser...');
         const fileChooser = await fileChooserPromise;
-        console.log('Setting file...');
         await fileChooser.setFiles(filePath);
-        console.log('File set, waiting for upload to process...');
         
-        // Wait for the file to be processed and UI to update
-        // The FileReader.readAsDataURL() is async, so we need to wait for the upload status to appear
         try {
             await this.certificateUploadedStatus.waitFor({ state: 'visible', timeout: 10000 });
-            console.log(`Certificate upload UI updated successfully for: ${filePath}`);
         } catch (error) {
-            console.log(`Certificate upload UI did not update within timeout for: ${filePath}`);
-            // Don't throw here, let the test handle the validation
+            console.log("Certificate upload status not visible, it might be already uploaded or the upload failed.");
         }
-        
-        console.log(`Certificate upload completed for: ${filePath}`);
     }
 
     async waitForSuccessfulLogin(Url: string): Promise<void> {

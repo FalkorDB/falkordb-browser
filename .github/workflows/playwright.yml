@@ -187,7 +187,7 @@ jobs:
       - name: Run TLS tests
         run: |
           npm run build
-          NEXTAUTH_SECRET=SECRET npm start & npx playwright test tls.spec.ts --workers=1 --reporter=dot,list
+          NEXTAUTH_SECRET=SECRET npm start & npx playwright test --workers=1 --reporter=dot,list --project="[TLS - Chromium]" --project="[TLS - Firefox]"
       - name: Cleanup TLS certificates
         if: always()
         run: |
