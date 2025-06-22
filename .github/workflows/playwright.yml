@@ -131,25 +131,10 @@ jobs:
       - name: Setup TLS certificates
         run: |
           mkdir -p tls
-          cd tls
-          # Generate CA private key
-          openssl genrsa -out ca.key 4096
-          # Generate CA certificate (1 day expiration for CI security)
-          openssl req -x509 -new -nodes -key ca.key -sha256 -days 1 \
-            -subj '/O=FalkorDB-CI/CN=Test-CA' -out ca.crt
-          # Generate server private key
-          openssl genrsa -out redis.key 2048
-          # Generate server certificate signing request
-          openssl req -new -key redis.key \
-            -subj '/O=FalkorDB-CI/CN=localhost' -out redis.csr
-          # Generate server certificate signed by CA (1 day expiration)
-          openssl x509 -req -in redis.csr -CA ca.crt -CAkey ca.key \
-            -CAcreateserial -out redis.crt -days 1 -sha256
-          # Generate DH parameters (1024-bit for CI speed)
-          openssl dhparam -out redis.dh 1024
-          # Cleanup intermediate files
-          rm redis.csr ca.srl
-          cd ..
+          # Generate TLS certificates using FalkorDB container (exits after generation - this is expected)
+          docker run --rm -e TLS=1 -v $(pwd)/tls:/var/lib/falkordb/tls falkordb/falkordb:latest || echo "Certificate generation completed (container exit is expected)"
+          echo "Generated certificates:"
+          ls -la tls/
       - name: Create Redis TLS config
         run: |
           cat > redis.conf << 'EOF'
@@ -159,7 +144,6 @@ jobs:
           tls-cert-file /var/lib/falkordb/tls/redis.crt
           tls-key-file /var/lib/falkordb/tls/redis.key
           tls-ca-cert-file /var/lib/falkordb/tls/ca.crt
-          tls-dh-params-file /var/lib/falkordb/tls/redis.dh
           tls-auth-clients no
           EOF
       - name: Start FalkorDB with TLS
@@ -173,21 +157,31 @@ jobs:
           echo "Container started with ID: $(docker ps -q -f name=falkordb-tls)"
       - name: Wait for FalkorDB TLS to be ready
         run: |
-          echo "Checking if container is running..."
-          if docker ps | grep -q falkordb-tls; then
-            echo "Container is running"
+          echo "Waiting a moment for container to fully start..."
+          sleep 3
+          echo "Checking container status:"
+          docker ps -a --filter name=falkordb-tls
+          
+          if docker ps --filter name=falkordb-tls --filter status=running | grep -q falkordb-tls; then
+            echo "Container is running successfully"
             sleep 10
             echo "Container logs:"
             docker logs falkordb-tls
+            echo "Checking if TLS port is available:"
+            docker exec falkordb-tls redis-cli --version || echo "Redis CLI not available"
           else
-            echo "Container failed to start or exited. Checking all containers:"
-            docker ps -a
-            echo "Checking logs from exited container:"
-            docker logs falkordb-tls 2>/dev/null || echo "No logs available"
+            echo "Container failed to start or exited. Full container details:"
+            docker ps -a --filter name=falkordb-tls
+            echo "Getting logs from container (even if exited):"
+            docker logs falkordb-tls 2>&1 || echo "No logs available"
+            echo "Checking if port 6379 is in use:"
+            netstat -ln | grep :6379 || echo "Port 6379 not in use"
             echo "Checking Redis config file:"
             cat redis.conf
-            echo "Checking TLS directory:"
+            echo "Checking TLS certificate files:"
             ls -la tls/
+            echo "Testing certificate validity:"
+            openssl x509 -in tls/redis.crt -text -noout | head -10 || echo "Invalid certificate"
             exit 1
           fi
       - name: Run TLS tests
