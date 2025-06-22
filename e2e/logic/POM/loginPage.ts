@@ -140,8 +140,16 @@ export default class LoginPage extends HeaderComponent {
         await fileChooser.setFiles(filePath);
         console.log('File set, waiting for upload to process...');
         
-        // Wait longer for the upload to process and UI to update
-        await this.page.waitForTimeout(2000);
+        // Wait for the file to be processed and UI to update
+        // The FileReader.readAsDataURL() is async, so we need to wait for the upload status to appear
+        try {
+            await this.certificateUploadedStatus.waitFor({ state: 'visible', timeout: 10000 });
+            console.log(`Certificate upload UI updated successfully for: ${filePath}`);
+        } catch (error) {
+            console.log(`Certificate upload UI did not update within timeout for: ${filePath}`);
+            // Don't throw here, let the test handle the validation
+        }
+        
         console.log(`Certificate upload completed for: ${filePath}`);
     }
 
