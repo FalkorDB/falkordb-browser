@@ -520,7 +520,7 @@ test.describe("Data panel Tests", () => {
     await apicalls.removeGraph(graphName);
   });
 
-  test.only(`@readwrite delete node via API and validate node count via UI`, async () => {
+  test(`@readwrite delete node via API and validate node count via UI`, async () => {
     const graphName = getRandomString("graph");
     await apicalls.addGraph(graphName);
     const graph = await browser.createNewPage(DataPanel, urls.graphUrl);
