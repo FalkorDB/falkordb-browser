@@ -114,10 +114,23 @@ export default class LoginPage extends HeaderComponent {
     }
 
     async uploadCertificate(filePath: string): Promise<void> {
+        // Add debugging for CI
+        console.log(`Attempting to upload certificate from: ${filePath}`);
+        
+        // Check if file exists
+        const fs = require('fs');
+        if (!fs.existsSync(filePath)) {
+            throw new Error(`Certificate file does not exist: ${filePath}`);
+        }
+        
         const fileChooserPromise = this.page.waitForEvent('filechooser');
         await this.clickUploadCA();
         const fileChooser = await fileChooserPromise;
         await fileChooser.setFiles(filePath);
+        
+        // Wait a moment for the upload to process
+        await this.page.waitForTimeout(1000);
+        console.log(`Certificate upload completed for: ${filePath}`);
     }
 
     async waitForSuccessfulLogin(Url: string): Promise<void> {

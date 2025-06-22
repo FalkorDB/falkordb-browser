@@ -19,7 +19,9 @@ test.describe(`TLS Login tests`, () => {
         await browser.setPageToFullScreen();
         await login.clickEnableTLS();
         expect(await login.isTLSEnabled()).toBe(true);
-        const invalidCertPath = process.cwd() + '/tls/ca.key';
+        
+        // Use path.join to ensure cross-platform compatibility
+        const invalidCertPath = require('path').join(process.cwd(), 'tls', 'ca.key');
 
         await login.uploadCertificate(invalidCertPath);
         expect(await login.isCertificateUploaded()).toBe(true);
@@ -34,12 +36,15 @@ test.describe(`TLS Login tests`, () => {
         await login.clickEnableTLS();
         expect(await login.isTLSEnabled()).toBe(true);
         
-        const validCertPath = process.cwd() + '/tls/ca.crt';
+        // Use path.join to ensure cross-platform compatibility
+        const validCertPath = require('path').join(process.cwd(), 'tls', 'ca.crt');
         await login.uploadCertificate(validCertPath);
         expect(await login.isCertificateUploaded()).toBe(true);
         
         await login.clickConnect();
         await login.waitForSuccessfulLogin(urls.graphUrl);
+        
+        console.log('Current URL after connection attempt:', login.getCurrentURL());
         expect(login.getCurrentURL()).toBe(urls.graphUrl);
     });
 
@@ -49,7 +54,8 @@ test.describe(`TLS Login tests`, () => {
         await login.clickEnableTLS();
         expect(await login.isTLSEnabled()).toBe(true);
         
-        const validCertPath = process.cwd() + '/tls/ca.crt';
+        // Use path.join to ensure cross-platform compatibility
+        const validCertPath = require('path').join(process.cwd(), 'tls', 'ca.crt');
         await login.uploadCertificate(validCertPath);
         expect(await login.isCertificateUploaded()).toBe(true);
         await login.clickRemoveCertificateBtn();
