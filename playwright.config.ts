@@ -22,7 +22,7 @@ export default defineConfig({
   workers: process.env.CI ? 2 : undefined,
   /* Reporter to use. See https://playwright.dev/docs/test-reporters */
   reporter: [['html', { outputFolder: 'playwright-report' }]],
-  outputDir: 'playwright-report/artifacts',
+  outputDir: 'test-results',
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
   use: {
     /* Base URL to use in actions like `await page.goto('/')`. */
@@ -37,6 +37,24 @@ export default defineConfig({
   projects: [
     {name: 'setup', testMatch: /.*\.setup\.ts/},
     
+    // Cluster tests (new project for cluster functionality)
+    {
+      name: '[Cluster] - Chromium',
+      use: { 
+        ...devices['Desktop Chrome'],
+      },
+      grep: /@cluster/,
+      testMatch: /.*cluster\.spec\.ts$/,
+    },
+    {
+      name: '[Cluster] - Firefox',
+      use: { 
+        ...devices['Desktop Firefox'],
+      },
+      grep: /@cluster/,
+      testMatch: /.*cluster\.spec\.ts$/,
+    },
+    
     // Regular projects for sharding (exclude TLS and settings)
     {
       name: '[Admin] Chromium',
@@ -46,7 +64,7 @@ export default defineConfig({
       },
       dependencies: ['setup'],
       grep: /@admin/,
-      testIgnore: /.*settingsConfig\.spec\.ts$|.*tls\.spec\.ts$/,
+      testIgnore: /.*settingsConfig\.spec\.ts$|.*tls\.spec\.ts$|.*cluster\.spec\.ts$/,
     },
     {
       name: '[Admin] Firefox',
@@ -56,7 +74,7 @@ export default defineConfig({
       },
       dependencies: ['setup'],
       grep: /@admin/,
-      testIgnore: /.*settingsConfig\.spec\.ts$|.*tls\.spec\.ts$/,
+      testIgnore: /.*settingsConfig\.spec\.ts$|.*tls\.spec\.ts$|.*cluster\.spec\.ts$/,
     },
     {
       name: '[Read-Write] - Chromium',
@@ -66,7 +84,7 @@ export default defineConfig({
       },
       dependencies: ['setup'],
       grep: /@readwrite/,
-      testIgnore: /.*tls\.spec\.ts$/,
+      testIgnore: /.*tls\.spec\.ts$|.*cluster\.spec\.ts$/,
     },
     {
       name: '[Read-Write] - Firefox',
@@ -76,7 +94,7 @@ export default defineConfig({
       },
       dependencies: ['setup'],
       grep: /@readwrite/,
-      testIgnore: /.*tls\.spec\.ts$/,
+      testIgnore: /.*tls\.spec\.ts$|.*cluster\.spec\.ts$/,
     },
     {
       name: '[Read-Only] - Chromium',
@@ -86,7 +104,7 @@ export default defineConfig({
       },
       dependencies: ['setup'],
       grep: /@readonly/,
-      testIgnore: /.*tls\.spec\.ts$/,
+      testIgnore: /.*tls\.spec\.ts$|.*cluster\.spec\.ts$/,
     },
     {
       name: '[Read-Only] - Firefox',
@@ -96,7 +114,7 @@ export default defineConfig({
       },
       dependencies: ['setup'],
       grep: /@readonly/,
-      testIgnore: /.*tls\.spec\.ts$/,
+      testIgnore: /.*tls\.spec\.ts$|.*cluster\.spec\.ts$/,
     },
 
     // Settings tests (run separately)
