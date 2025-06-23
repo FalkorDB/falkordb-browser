@@ -45,7 +45,7 @@ export default function TableComponent({ headers, rows, label, entityName, child
         if (searchRef.current) {
             searchRef.current.focus()
         }
-    }, [filteredRows, filteredRows.length])
+    }, [])
 
     const handleSearchFilter = useCallback((cell: Cell): boolean => {
         if (!cell.value) return false;

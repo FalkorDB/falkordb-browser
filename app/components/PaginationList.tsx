@@ -76,14 +76,16 @@ export default function PaginationList<T extends Item>({ list, step, onClick, da
                             e.preventDefault()
                             setSearch("")
                         }
-
-                        if (e.key === "ArrowUp") {
+                        
+                        if (e.key === "ArrowUp" || (e.shiftKey && e.key === "Tab" && hoverIndex > 0)) {
                             e.preventDefault()
+
                             setHoverIndex(prev => prev ? prev - 1 : prev)
                         }
 
-                        if (e.key === "ArrowDown" || (e.key === "Tab" && hoverIndex < items.length - 1)) {
+                        if (e.key === "ArrowDown" || (!e.shiftKey && e.key === "Tab" && hoverIndex < items.length - 1)) {
                             e.preventDefault()
+
                             setHoverIndex(prev => prev < items.length - 1 ? prev + 1 : prev)
                         }
 
@@ -172,8 +174,8 @@ export default function PaginationList<T extends Item>({ list, step, onClick, da
                         ))
                 }
                 <li className="flex gap-4">
-                    <Button disabled={stepCounter > pageCount - 2} label=">" title="Next page" onClick={() => handleSetStepCounter(prev => prev < pageCount - 1 ? prev + 1 : prev)} />
                     <Button disabled={stepCounter > pageCount - 6} label=">>" title="Next 5 pages" onClick={() => handleSetStepCounter(prev => prev < pageCount - 5 ? prev + 5 : prev)} />
+                    <Button disabled={stepCounter > pageCount - 2} label=">" title="Next page" onClick={() => handleSetStepCounter(prev => prev < pageCount - 1 ? prev + 1 : prev)} />
                 </li>
             </ul>
         </div>

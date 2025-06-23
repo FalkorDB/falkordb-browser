@@ -75,34 +75,41 @@ export default function Selector({ graph, options, setOptions, graphName, setGra
         }
     };
 
+
+    const isTabEnabled = useCallback((tabName: keyof Query) => {
+        if (tabName === "text") return !!currentQuery?.text;
+        if (tabName === "metadata") return !!currentQuery && currentQuery.metadata.length > 0;
+        if (tabName === "explain") return !!currentQuery && currentQuery.explain.length > 0;
+        return true;
+    }, [currentQuery]);
+
     useEffect(() => {
-        const currentValue = currentQuery?.[tab]
+        if (queriesOpen && currentQuery && tab !== "profile") {
+            const currentValue = currentQuery?.[tab]
 
-        if (!queriesOpen || (typeof currentValue === "string" && currentValue) || (Array.isArray(currentValue) && currentValue.length > 0) || tab === "profile") return
+            if (!currentValue || currentValue.length === 0) {
+                const fallbackTab = (Object.keys(currentQuery) as (keyof Query)[]).find(isTabEnabled);
 
-        if (!currentQuery || currentQuery.text) {
-            setTab("text")
-            focusEditorAtEnd()
-            return
-        }
+                if (fallbackTab && fallbackTab !== tab) {
+                    setTab(fallbackTab);
 
-        if (currentQuery.profile.length > 0) {
-            setTab("profile")
-        } else if (currentQuery.metadata.length > 0) {
-            setTab("metadata")
-        } else if (currentQuery.explain.length > 0) {
-            setTab("explain")
-        } else {
-            setTab("profile")
-        }
+                    if (fallbackTab === "text") {
+                        focusEditorAtEnd()
+                    }
+                }
+            } else if (tab === "text") {
+                focusEditorAtEnd()
 
-        setTimeout(() => {
-            if (searchQueryRef.current) {
-                searchQueryRef.current.focus()
+                return
             }
-        }, 100)
 
-    }, [currentQuery, setTab, queriesOpen, historyQuery?.query, tab])
+            setTimeout(() => {
+                if (searchQueryRef.current) {
+                    searchQueryRef.current.focus()
+                }
+            }, 100)
+        }
+    }, [currentQuery, setTab, queriesOpen, historyQuery?.query, tab, isTabEnabled])
 
     const handleOnChange = useCallback((name: string) => {
         setGraphName(formatName(name))
@@ -206,6 +213,7 @@ export default function Selector({ graph, options, setOptions, graphName, setGra
                                 <DialogComponent
                                     className="h-[90dvh] w-[90dvw]"
                                     open={queriesOpen}
+                                    tabIndex={-1}
                                     onEscapeKeyDown={(e) => {
                                         if (editorRef.current && editorRef.current.hasTextFocus()) {
                                             e.preventDefault()
@@ -242,50 +250,55 @@ export default function Selector({ graph, options, setOptions, graphName, setGra
                                         />
                                         <Tabs value={tab} onValueChange={(value) => setTab(value as keyof Query)} className="w-[60%] flex flex-col gap-8 items-center">
                                             <TabsList className="bg-black h-fit w-fit p-2">
-                                                <TabsTrigger className={cn("!text-gray-500 data-[state=active]:!bg-background data-[state=active]:!text-white")} disabled={!historyQuery.query} value="text">Edit Query</TabsTrigger>
-                                                <TabsTrigger className={cn("!text-gray-500 data-[state=active]:!bg-background data-[state=active]:!text-white")} value="profile">Profile</TabsTrigger>
-                                                <TabsTrigger className={cn("!text-gray-500 data-[state=active]:!bg-background data-[state=active]:!text-white")} disabled={currentQuery?.metadata.length === 0} value="metadata">Metadata</TabsTrigger>
-                                                <TabsTrigger className={cn("!text-gray-500 data-[state=active]:!bg-background data-[state=active]:!text-white")} disabled={currentQuery?.explain.length === 0} value="explain">Explain</TabsTrigger>
+                                                <TabsTrigger className={cn("!text-gray-500 data-[state=active]:!bg-background data-[state=active]:!text-white")} disabled={!isTabEnabled("text")} value="text">Edit Query</TabsTrigger>
+                                                <TabsTrigger className={cn("!text-gray-500 data-[state=active]:!bg-background data-[state=active]:!text-white")} disabled={!isTabEnabled("profile")} value="profile">Profile</TabsTrigger>
+                                                <TabsTrigger className={cn("!text-gray-500 data-[state=active]:!bg-background data-[state=active]:!text-white")} disabled={!isTabEnabled("metadata")} value="metadata">Metadata</TabsTrigger>
+                                                <TabsTrigger className={cn("!text-gray-500 data-[state=active]:!bg-background data-[state=active]:!text-white")} disabled={!isTabEnabled("explain")} value="explain">Explain</TabsTrigger>
                                             </TabsList>
                                             <TabsContent value="text" className="w-full h-1 grow bg-background rounded-lg p-2 py-4 relative">
-                                                <Button
-                                                    ref={submitQuery}
-                                                    data-testid="queryHistoryEditorRun"
-                                                    className="z-10 absolute bottom-4 right-8 py-2 px-8"
-                                                    indicator={indicator}
-                                                    variant="Primary"
-                                                    label="Run"
-                                                    title="Press Enter to run the query"
-                                                    onClick={handleSubmit}
-                                                    isLoading={isLoading}
-                                                />
-                                                <Editor
-                                                    data-testid="queryHistoryEditor"
-                                                    width="100%"
-                                                    height="100%"
-                                                    language="cypher"
-                                                    theme="selector-theme"
-                                                    options={{
-                                                        lineHeight: 30,
-                                                        fontSize: 25,
-                                                        lineNumbersMinChars: 3,
-                                                        scrollbar: {
-                                                            horizontal: "hidden"
-                                                        },
-                                                        scrollBeyondLastLine: false,
-                                                        wordWrap: "on",
-                                                        renderWhitespace: "none"
-                                                    }}
-                                                    value={historyQuery.query}
-                                                    onChange={(value) => setHistoryQuery(prev => ({
-                                                        ...prev,
-                                                        query: value || ""
-                                                    }))}
-                                                    onMount={handleEditorDidMount}
-                                                    beforeMount={(m) => {
-                                                        setTheme(m, "selector-theme", "#242424")
-                                                    }}
-                                                />
+                                                {
+                                                    currentQuery &&
+                                                    <>
+                                                        <Button
+                                                            ref={submitQuery}
+                                                            data-testid="queryHistoryEditorRun"
+                                                            className="z-10 absolute bottom-4 right-8 py-2 px-8"
+                                                            indicator={indicator}
+                                                            variant="Primary"
+                                                            label="Run"
+                                                            title="Press Enter to run the query"
+                                                            onClick={handleSubmit}
+                                                            isLoading={isLoading}
+                                                        />
+                                                        <Editor
+                                                            data-testid="queryHistoryEditor"
+                                                            width="100%"
+                                                            height="100%"
+                                                            language="cypher"
+                                                            theme="selector-theme"
+                                                            options={{
+                                                                lineHeight: 30,
+                                                                fontSize: 25,
+                                                                lineNumbersMinChars: 3,
+                                                                scrollbar: {
+                                                                    horizontal: "hidden"
+                                                                },
+                                                                scrollBeyondLastLine: false,
+                                                                wordWrap: "on",
+                                                                renderWhitespace: "none"
+                                                            }}
+                                                            value={currentQuery.text}
+                                                            onChange={(value) => setHistoryQuery(prev => ({
+                                                                ...prev,
+                                                                query: value || ""
+                                                            }))}
+                                                            onMount={handleEditorDidMount}
+                                                            beforeMount={(m) => {
+                                                                setTheme(m, "selector-theme", "#242424")
+                                                            }}
+                                                        />
+                                                    </>
+                                                }
                                             </TabsContent>
                                             <TabsContent className="w-full h-1 grow bg-background rounded-lg p-8" value="profile">
                                                 <div className="h-full w-full overflow-hidden flex flex-col gap-4">
