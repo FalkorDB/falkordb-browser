@@ -218,42 +218,76 @@ jobs:
         run: npm ci
       - name: Install Playwright Browsers
         run: npx playwright install --with-deps
-      - name: Create cluster network
-        run: |
-          docker network create falkordb-cluster-network
       - name: Start FalkorDB cluster nodes
         run: |
           echo "Starting 3 FalkorDB cluster nodes..."
-          for i in {1..3}; do
-            docker run -d \
-              --name node$i \
-              --hostname node$i \
-              --network falkordb-cluster-network \
-              -p $((6379 + i)):$((6379 + i)) \
-              -e BROWSER=0 \
-              -e "FALKORDB_ARGS=--port $((6379 + i)) --cluster-enabled yes --cluster-announce-ip node$i --cluster-announce-port $((6379 + i))" \
-              falkordb/falkordb
-          done
+          
+          # Start node1 on port 6380
+          docker run -d \
+            --name node1 \
+            -p 6380:6379 \
+            -e BROWSER=0 \
+            -e "REDIS_ARGS=--protected-mode no" \
+            falkordb/falkordb
+          
+          # Start node2 on port 6381  
+          docker run -d \
+            --name node2 \
+            -p 6381:6379 \
+            -e BROWSER=0 \
+            -e "REDIS_ARGS=--protected-mode no" \
+            falkordb/falkordb
+          
+          # Start node3 on port 6382
+          docker run -d \
+            --name node3 \
+            -p 6382:6379 \
+            -e BROWSER=0 \
+            -e "REDIS_ARGS=--protected-mode no" \
+            falkordb/falkordb
+            
+          echo "All cluster nodes started"
       - name: Wait for cluster nodes to be ready
         run: |
-          echo "Waiting for cluster nodes to start..."
-          sleep 15
-          echo "Checking cluster node status:"
-          for i in {1..3}; do
-            port=$((6379 + i))
-            echo "Checking node$i on port $port..."
-            docker logs node$i | tail -5
-            # Test if port is accessible
-            nc -zv localhost $port || echo "Port $port not ready yet"
+          echo "Waiting for cluster nodes to initialize..."
+          sleep 30
+          
+          echo "Checking cluster node connectivity:"
+          
+          # Check each port with timeout and retry
+          for port in 6380 6381 6382; do
+            echo "Testing connection to localhost:$port..."
+            max_attempts=10
+            attempt=1
+            
+            while [ $attempt -le $max_attempts ]; do
+              if nc -zv localhost $port 2>/dev/null; then
+                echo "Port $port is accessible (attempt $attempt)"
+                break
+              else
+                echo "Port $port not ready yet (attempt $attempt/$max_attempts)"
+                if [ $attempt -eq $max_attempts ]; then
+                  echo "Port $port failed to become accessible after $max_attempts attempts"
+                  docker logs node$((port - 6379)) || echo "Failed to get logs for node$((port - 6379))"
+                  exit 1
+                fi
+                sleep 3
+              fi
+              attempt=$((attempt + 1))
+            done
           done
-          sleep 5
-      - name: Initialize cluster
-        run: |
-          echo "Initializing FalkorDB cluster..."
-          # Connect nodes to form cluster (if needed for FalkorDB)
-          docker exec node1 redis-cli --cluster create \
-            node1:6380 node2:6381 node3:6382 \
-            --cluster-replicas 0 --cluster-yes || echo "Cluster creation completed or not needed"
+          
+          echo "All cluster nodes are accessible!"
+          
+          # Show container status
+          echo "Container status:"
+          docker ps --filter "name=node[1-3]"
+          
+          # Show brief logs for each node
+          for i in {1..3}; do
+            echo "--- Node$i logs (last 5 lines) ---"
+            docker logs node$i 2>&1 | tail -5 || echo "No logs available for node$i"
+          done
       - name: Run cluster tests
         run: |
           npm run build
@@ -266,7 +300,6 @@ jobs:
             docker stop node$i || true
             docker rm node$i || true
           done
-          docker network rm falkordb-cluster-network || true
       - name: Upload artifacts
         if: always()
         uses: actions/upload-artifact@v4
