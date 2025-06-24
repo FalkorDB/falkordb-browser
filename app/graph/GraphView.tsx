@@ -21,6 +21,8 @@ import MetadataView from "./MetadataView";
 
 const ForceGraph = dynamic(() => import("../components/ForceGraph"), { ssr: false });
 
+type Tab = "Graph" | "Table" | "Metadata"
+
 interface Props {
     data: GraphData
     setData: Dispatch<SetStateAction<GraphData>>
@@ -61,7 +63,7 @@ function GraphView({
     categories
 }: Props) {
 
-    const [tabsValue, setTabsValue] = useState<string>("")
+    const [tabsValue, setTabsValue] = useState<Tab>("Graph")
     const { graph } = useContext(GraphContext)
 
     useEffect(() => {
@@ -69,20 +71,23 @@ function GraphView({
         setLabels([...graph.Labels])
     }, [graph, graph.Categories, graph.Labels])
 
-    useEffect(() => {
-        if ((tabsValue === "Graph" && graph.getElements().length !== 0) || (tabsValue === "Table" && graph.Data.length !== 0) || (tabsValue === "Metadata" && graph.CurrentQuery && graph.CurrentQuery.metadata.length > 0 && graph.Metadata.length > 0 && graph.CurrentQuery.explain.length > 0)) return
+    const isTabEnabled = (tab: Tab) => {
+        if (tab === "Graph") return graph.getElements().length !== 0
+        if (tab === "Table") return graph.Data.length !== 0
+        return graph.CurrentQuery && graph.CurrentQuery.metadata.length > 0 && graph.Metadata.length > 0 && graph.CurrentQuery.explain.length > 0
+    }
 
-        let defaultChecked = "Graph"
-        if (graph.getElements().length !== 0) {
-            defaultChecked = "Graph"
-        } else if (graph.Data.length !== 0) {
-            defaultChecked = "Table";
-        } else if (graph.CurrentQuery && graph.CurrentQuery.metadata.length > 0 && graph.Metadata.length > 0 && graph.CurrentQuery.explain.length > 0) {
-            defaultChecked = "Metadata";
-        }
+    useEffect(() => {
+        setData({ ...graph.Elements })
+
+        if (isTabEnabled(tabsValue)) return
+
+        let defaultChecked: Tab = "Graph"
+        if (graph.getElements().length !== 0) defaultChecked = "Graph"
+        else if (graph.Data.length !== 0) defaultChecked = "Table"
+        else if (graph.CurrentQuery && graph.CurrentQuery.metadata.length > 0 && graph.Metadata.length > 0 && graph.CurrentQuery.explain.length > 0) defaultChecked = "Metadata"
 
         setTabsValue(defaultChecked);
-        setData({ ...graph.Elements })
     }, [graph, graph.Id, graph.getElements().length, graph.Data.length])
 
     useEffect(() => {
@@ -130,7 +135,7 @@ function GraphView({
     }
 
     return (
-        <Tabs value={tabsValue} onValueChange={setTabsValue} className={cn("h-full w-full relative border rounded-lg overflow-hidden", tabsValue === "Table" && "flex flex-col-reverse")}>
+        <Tabs value={tabsValue} onValueChange={(value) => setTabsValue(value as Tab)} className={cn("h-full w-full relative border rounded-lg overflow-hidden", tabsValue === "Table" && "flex flex-col-reverse")}>
             <div className={cn("flex gap-4 justify-between items-end", tabsValue === "Table" ? "py-4 px-12" : "absolute bottom-4 inset-x-12 pointer-events-none z-10")}>
                 <GraphDetails
                     graph={graph}
