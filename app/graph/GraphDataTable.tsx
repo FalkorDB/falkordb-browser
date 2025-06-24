@@ -116,7 +116,12 @@ export default function GraphDataTable({ graph, object, type, onDeleteElement, l
                     title: "Success",
                     description: `Attribute ${actionType}`,
                     variant: "default",
-                    action: isUndo ? <ToastButton onClick={() => setProperty(key, value, false)} /> : undefined
+                    action: isUndo ?
+                        <ToastButton
+                            showUndo
+                            onClick={() => setProperty(key, value, false)}
+                        />
+                        : undefined
                 })
             }
 
@@ -166,7 +171,11 @@ export default function GraphDataTable({ graph, object, type, onDeleteElement, l
                 toast({
                     title: "Success",
                     description: "Attribute removed",
-                    action: <ToastButton onClick={() => handleAddValue(key, value)} />,
+                    action:
+                        <ToastButton
+                            showUndo
+                            onClick={() => setProperty(key, value, false)}
+                        />,
                     variant: "default"
                 })
             }

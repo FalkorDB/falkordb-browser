@@ -1,6 +1,7 @@
 import { chromium, Browser, BrowserContext, Page, firefox } from 'playwright';
 import BasePage from './basePage';
 import { test } from '@playwright/test';
+import { initializeLocalStorage } from '../utils';
 
 export default class BrowserWrapper {
 
@@ -20,6 +21,9 @@ export default class BrowserWrapper {
         }
         if (!this.page) {
             this.page = await this.context.newPage();
+            
+            // Initialize localStorage before any navigation
+            await this.page.addInitScript(initializeLocalStorage());
         }
         if (url) {
             await this.navigateTo(url)

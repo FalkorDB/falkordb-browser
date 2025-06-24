@@ -385,8 +385,7 @@ export default class SchemaPage extends GraphPage {
         await this.hoverTableRowInDataPanel(attributeRow);
         await this.clickRemoveAttributeButton();
         await this.clickConfirmRemoveAttributeButton();
-        await this.isVisibleToast();
-        await this.waitForPageIdle();
+        await waitForElementToNotBeVisible(this.confirmRemoveAttributeButton());
     }
 
 }

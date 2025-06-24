@@ -2,7 +2,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { useContext } from "react"
 import { Info } from "lucide-react"
 import { Graph } from "../api/graph/model"
-import { LimitContext } from "../components/provider"
+import { QuerySettingsContext } from "../components/provider"
 
 export default function GraphDetails({
     graph,
@@ -15,7 +15,11 @@ export default function GraphDetails({
     edgesCount: number,
     tabsValue?: string,
 }) {
-    const { limit } = useContext(LimitContext)
+    const {
+        settings: {
+            limitSettings: { limit },
+        }
+    } = useContext(QuerySettingsContext)
 
     return (
         <div className="w-1 grow flex flex-col gap-4 p-1">

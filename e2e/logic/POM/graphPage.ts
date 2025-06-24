@@ -170,6 +170,14 @@ export default class GraphPage extends Page {
     );
   }
 
+  async getEditorInput(): Promise<string | null> {
+    return interactWhenVisible(
+      this.editorContainer,
+      (el) => el.getAttribute("value"),
+      "Editor Input"
+    );
+  }
+
   async clickCreateGraph(): Promise<void> {
     await interactWhenVisible(
       this.create("Graph"),
@@ -351,8 +359,16 @@ export default class GraphPage extends Page {
     await interactWhenVisible(this.graphTab, (el) => el.click(), "Graph Tab");
   }
 
+  async getGraphTabEnabled(): Promise<boolean> {
+    return waitForElementToBeEnabled(this.graphTab);
+  }
+
   async clickTableTab(): Promise<void> {
     await interactWhenVisible(this.tableTab, (el) => el.click(), "Table Tab");
+  }
+
+  async getTableTabEnabled(): Promise<boolean> {
+    return waitForElementToBeEnabled(this.tableTab);
   }
 
   async clickMetadataTab(): Promise<void> {
@@ -361,6 +377,10 @@ export default class GraphPage extends Page {
       (el) => el.click(),
       "Metadata Tab"
     );
+  }
+
+  async getMetadataTabEnabled(): Promise<boolean> {
+    return waitForElementToBeEnabled(this.metadataTab);
   }
 
   async clickElementCanvasSuggestionByName(

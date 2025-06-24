@@ -42,6 +42,7 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
     const [openMenage, setOpenMenage] = useState(false)
     const [openDuplicate, setOpenDuplicate] = useState(false)
     const [isLoading, setIsLoading] = useState(false)
+    
     useEffect(() => {
         setOpen(false)
     }, [selectedValue])
@@ -170,6 +171,8 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
                                 setGraphName={setSelectedValue}
                                 setGraph={setGraph}
                                 setOpenMenage={setOpenMenage}
+                                graphNames={options}
+                                setGraphNames={setOptions}
                             />
                             <ExportGraph
                                 selectedValues={rows.filter(opt => opt.checked).map(opt => opt.cells[0].value as string)}
