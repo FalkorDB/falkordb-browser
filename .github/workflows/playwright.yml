@@ -39,7 +39,7 @@ jobs:
       - name: Run Playwright tests (shard 1 of 2)
         run: |
           npm run build
-          NEXTAUTH_SECRET=SECRET npm start & npx playwright test --grep-invert "@config|@tls" --shard=1/2 --reporter=dot,list
+          NEXTAUTH_SECRET=SECRET npm start & npx playwright test --grep-invert "@config|@tls|@cluster" --shard=1/2 --reporter=dot,list
       - name: Upload artifacts
         if: always()
         uses: actions/upload-artifact@v4
@@ -71,7 +71,7 @@ jobs:
       - name: Run Playwright tests (shard 2 of 2)
         run: |
           npm run build
-          NEXTAUTH_SECRET=SECRET npm start & npx playwright test --grep-invert "@config|@tls" --shard=2/2 --reporter=dot,list
+          NEXTAUTH_SECRET=SECRET npm start & npx playwright test --grep-invert "@config|@tls|@cluster" --shard=2/2 --reporter=dot,list
       - name: Upload artifacts
         if: always()
         uses: actions/upload-artifact@v4
@@ -201,6 +201,110 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: playwright-report-tls
+          path: playwright-report/
+          retention-days: 30
+
+  run-cluster-tests:
+    name: Run cluster tests
+    timeout-minutes: 60
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+      - name: Install dependencies
+        run: npm ci
+      - name: Install Playwright Browsers
+        run: npx playwright install --with-deps
+      - name: Start FalkorDB cluster nodes
+        run: |
+          echo "Starting 3 FalkorDB cluster nodes..."
+          
+          # Start node1 on port 6380
+          docker run -d \
+            --name node1 \
+            -p 6380:6379 \
+            -e BROWSER=0 \
+            -e "REDIS_ARGS=--protected-mode no" \
+            falkordb/falkordb
+          
+          # Start node2 on port 6381  
+          docker run -d \
+            --name node2 \
+            -p 6381:6379 \
+            -e BROWSER=0 \
+            -e "REDIS_ARGS=--protected-mode no" \
+            falkordb/falkordb
+          
+          # Start node3 on port 6382
+          docker run -d \
+            --name node3 \
+            -p 6382:6379 \
+            -e BROWSER=0 \
+            -e "REDIS_ARGS=--protected-mode no" \
+            falkordb/falkordb
+            
+          echo "All cluster nodes started"
+      - name: Wait for cluster nodes to be ready
+        run: |
+          echo "Waiting for cluster nodes to initialize..."
+          sleep 30
+          
+          echo "Checking cluster node connectivity:"
+          
+          # Check each port with timeout and retry
+          for port in 6380 6381 6382; do
+            echo "Testing connection to localhost:$port..."
+            max_attempts=10
+            attempt=1
+            
+            while [ $attempt -le $max_attempts ]; do
+              if nc -zv localhost $port 2>/dev/null; then
+                echo "Port $port is accessible (attempt $attempt)"
+                break
+              else
+                echo "Port $port not ready yet (attempt $attempt/$max_attempts)"
+                if [ $attempt -eq $max_attempts ]; then
+                  echo "Port $port failed to become accessible after $max_attempts attempts"
+                  docker logs node$((port - 6379)) || echo "Failed to get logs for node$((port - 6379))"
+                  exit 1
+                fi
+                sleep 3
+              fi
+              attempt=$((attempt + 1))
+            done
+          done
+          
+          echo "All cluster nodes are accessible!"
+          
+          # Show container status
+          echo "Container status:"
+          docker ps --filter "name=node[1-3]"
+          
+          # Show brief logs for each node
+          for i in {1..3}; do
+            echo "--- Node$i logs (last 5 lines) ---"
+            docker logs node$i 2>&1 | tail -5 || echo "No logs available for node$i"
+          done
+      - name: Run cluster tests
+        run: |
+          npm run build
+          NEXTAUTH_SECRET=SECRET npm start & npx playwright test --grep "@cluster" --reporter=dot,list
+      - name: Cleanup cluster
+        if: always()
+        run: |
+          echo "Stopping and removing cluster nodes..."
+          for i in {1..3}; do
+            docker stop node$i || true
+            docker rm node$i || true
+          done
+      - name: Upload artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-cluster
           path: playwright-report/
           retention-days: 30
 
