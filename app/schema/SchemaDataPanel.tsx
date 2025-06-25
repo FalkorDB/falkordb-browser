@@ -334,7 +334,7 @@ export default function SchemaDataPanel({ object, setObject, onDeleteElement, sc
                             }}
                         />
                         <div className="flex gap-4 p-4 justify-between">
-                            <AddLabel onAddLabel={handleAddLabel} />
+                            <AddLabel disabled={!type && label.length === 1} onAddLabel={handleAddLabel} />
                             <RemoveLabel onRemoveLabel={handleRemoveLabel} selectedLabel={selectedLabel} />
                         </div>
                     </div>

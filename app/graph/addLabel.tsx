@@ -9,17 +9,20 @@ import { IndicatorContext } from "../components/provider";
 interface Props {
     trigger?: React.ReactNode
     onAddLabel: (label: string) => Promise<boolean>
+    disabled?: boolean
 }
 
 export default function AddLabel({
+    disabled = false,
     trigger = <Button
+        disabled={disabled}
         variant="Primary"
         label="Add Label"
         title=""
     >
         <Plus />
     </Button>,
-    onAddLabel
+    onAddLabel,
 }: Props) {
 
     const { indicator } = useContext(IndicatorContext)
@@ -29,17 +32,16 @@ export default function AddLabel({
     const [open, setOpen] = useState(false)
     const [label, setLabel] = useState("")
     const [isLoading, setIsLoading] = useState(false)
-    
+
     useEffect(() => {
         if (inputRef.current) {
-            console.log("focusing")
             inputRef.current.focus()
         }
     }, [inputRef])
-    
+
     const handleAddLabel = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault()
-        
+
         setIsLoading(true)
         try {
             const success = await onAddLabel(label)
@@ -93,5 +95,6 @@ export default function AddLabel({
 }
 
 AddLabel.defaultProps = {
-    trigger: undefined
+    trigger: undefined,
+    disabled: undefined
 }

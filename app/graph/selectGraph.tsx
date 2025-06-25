@@ -163,13 +163,12 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
                         session?.user?.role !== "Read-Only" &&
                         <>
                             <DeleteGraph
-                                type={type}
                                 rows={rows}
+                                type={type}
+                                setGraph={setGraph}
                                 handleSetRows={handleSetRows}
                                 selectedValue={selectedValue}
                                 setGraphName={setSelectedValue}
-                                setGraph={setGraph}
-                                setOpenMenage={setOpenMenage}
                             />
                             <ExportGraph
                                 selectedValues={rows.filter(opt => opt.checked).map(opt => opt.cells[0].value as string)}

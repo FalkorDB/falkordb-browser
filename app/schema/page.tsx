@@ -91,13 +91,11 @@ export default function Page() {
 
     useEffect(() => {
         if (!schemaName) return
-        
         if (schema.Id) {
             fetchCount()
-            return
+        } else {
+            fetchSchema()
         }
-        
-        fetchSchema()
     }, [schemaName, fetchSchema, schema.Id, fetchCount])
 
     const handleDeleteElement = async () => {

@@ -1,17 +1,16 @@
 import { useToast } from "@/components/ui/use-toast";
 import { prepareArg, securedFetch, Row } from "@/lib/utils";
-import React, { useContext, useEffect, useState } from "react";
+import React, { useContext, useState } from "react";
 import { Graph } from "@/app/api/graph/model";
 import DialogComponent from "../DialogComponent";
 import Button from "../ui/Button";
 import CloseDialog from "../CloseDialog";
-import { GraphNamesContext, IndicatorContext } from "../provider";
+import { IndicatorContext } from "../provider";
 
 interface Props {
   type: "Schema" | "Graph"
   rows: Row[]
   handleSetRows: (rows: string[]) => void
-  setOpenMenage: (openMenage: boolean) => void
   selectedValue: string
   setGraphName: (graphName: string) => void
   setGraph: (graph: Graph) => void
@@ -21,24 +20,15 @@ export default function DeleteGraph({
   type,
   rows,
   handleSetRows,
-  setOpenMenage,
   selectedValue,
   setGraphName,
-  setGraph
+  setGraph,
 }: Props) {
 
   const [open, setOpen] = useState(false)
-  const [closeManage, setCloseManage] = useState(false)
   const { toast } = useToast()
   const [isLoading, setIsLoading] = useState(false)
   const { indicator, setIndicator } = useContext(IndicatorContext)
-  const { graphNames, setGraphNames } = useContext(GraphNamesContext)
-
-  useEffect(() => {
-    if (!open && closeManage) {
-      setOpenMenage(false)
-    }
-  }, [open, closeManage, setOpenMenage])
 
   const handleDelete = async (deleteGraphNames: string[]) => {
     setIsLoading(true)
@@ -55,24 +45,22 @@ export default function DeleteGraph({
 
         })).then(newGraphNames => [newGraphNames.filter(n => n !== ""), deleteGraphNames.filter(n => !newGraphNames.includes(n))])
 
-      const newGraphNames = graphNames.filter(n => !successDeletedGraphs.includes(n))
-
-      setGraphNames(newGraphNames)
-
+      const newGraphNames = rows.map(n => n.cells[0].value as string).filter(n => !successDeletedGraphs.includes(n))
+   
       if (successDeletedGraphs.includes(selectedValue)) {
         setGraphName(successDeletedGraphs.length > 0 ? newGraphNames[successDeletedGraphs.length - 1] : "")
         setGraph(Graph.empty())
       }
-
-      handleSetRows(successDeletedGraphs)
+      
+      handleSetRows(newGraphNames)
+      setOpen(false)
+   
       toast({
         title: "Graph(s) deleted successfully",
         description: successDeletedGraphs.length > 0 && `The graph(s) ${successDeletedGraphs.join(", ")} have been deleted successfully${failedDeletedGraphs.length > 0 && `The graph(s) ${failedDeletedGraphs.join(", ")} have not been deleted`}`,
       })
     } finally {
       setIsLoading(false)
-      setOpen(false)
-      setCloseManage(true)
     }
   }
 
