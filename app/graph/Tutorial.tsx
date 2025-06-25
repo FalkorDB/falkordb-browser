@@ -5,15 +5,14 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import { useSession } from "next-auth/react";
 import CreateGraph from "../components/CreateGraph";
-import { GraphNameContext, GraphNamesContext } from "../components/provider";
+import { GraphContext } from "../components/provider";
 import Button from "../components/ui/Button";
 
 export default function Tutorial() {
 
     const [open, setOpen] = useState<boolean>(false)
     const [showAgain, setShowAgain] = useState<boolean>(false)
-    const { setGraphName: onSetGraphName } = useContext(GraphNameContext)
-    const { graphNames } = useContext(GraphNamesContext)
+    const { setGraphName: onSetGraphName, graphNames } = useContext(GraphContext)
     const { data: session } = useSession()
 
     useEffect(() => {
@@ -62,7 +61,7 @@ export default function Tutorial() {
                                                 variant="Primary"
                                             >
                                                 Create new graph
-                                            </Button> 
+                                            </Button>
                                         }
                                         label="Tutorial"
                                         graphNames={graphNames}
@@ -78,6 +77,7 @@ export default function Tutorial() {
                 </div>
                 <div className="flex justify-end gap-4 items-center p-8">
                     <Checkbox
+                        className="w-6 h-6 rounded-full bg-background border-primary data-[state=checked]:bg-primary"
                         checked={showAgain}
                         onCheckedChange={(checked) => setShowAgain(checked as boolean)}
                     />

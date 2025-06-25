@@ -232,7 +232,7 @@ export default class DataPanel extends GraphPage {
     }
 
     async getAttributeValueByName(attribute: string): Promise<string | null> {
-        return await interactWhenVisible(this.attributeValue(attribute), (el) => el.textContent(), "Data Panel Delete Attribute Cancel");
+        return interactWhenVisible(this.attributeValue(attribute), (el) => el.textContent(), "Data Panel Delete Attribute Cancel");
     }
 
     async getAttributeValue(key: string): Promise<string | null> {
@@ -245,7 +245,7 @@ export default class DataPanel extends GraphPage {
     }
 
     async isAttributeValueByNameVisible(attribute: string): Promise<boolean> {
-        return await this.attributeValue(attribute).isVisible();
+        return this.attributeValue(attribute).isVisible();
     }
 
     async closeDataPanel(): Promise<void> {

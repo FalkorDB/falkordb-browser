@@ -7,16 +7,21 @@ import dynamic from "next/dynamic";
 import { ForceGraphMethods } from "react-force-graph-2d";
 import SchemaView from "./SchemaView";
 import { Category, Graph, GraphData, Link, Node } from "../api/graph/model";
-import { IndicatorContext, SchemaContext, SchemaNameContext, SchemaNamesContext } from "../components/provider";
+import { IndicatorContext, SchemaContext } from "../components/provider";
 
 const Selector = dynamic(() => import("../graph/Selector"), { ssr: false })
 
 export default function Page() {
 
-    const { schemaNames, setSchemaNames } = useContext(SchemaNamesContext)
-    const { schemaName, setSchemaName } = useContext(SchemaNameContext)
     const { setIndicator } = useContext(IndicatorContext)
-    const { schema, setSchema } = useContext(SchemaContext)
+    const {
+        schema,
+        setSchema,
+        schemaName,
+        setSchemaName,
+        schemaNames,
+        setSchemaNames
+    } = useContext(SchemaContext)
 
     const { toast } = useToast()
 
@@ -90,10 +95,13 @@ export default function Page() {
     }, [fetchCount, setIndicator, setSchema, toast, schemaName])
 
     useEffect(() => {
-        if (schema.Id || !schemaName) {
+        if (!schemaName) return
+
+        if (schema.Id) {
             fetchCount()
             return
         }
+
         fetchSchema()
     }, [schemaName, fetchSchema, schema.Id, fetchCount])
 
