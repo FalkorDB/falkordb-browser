@@ -372,7 +372,7 @@ export default function ForceGraph({
                 nodeVisibility="visible"
                 linkVisibility="visible"
                 cooldownTicks={undefined}
-                cooldownTime={1000}
+                cooldownTime={300}
                 linkDirectionalArrowRelPos={1}
                 linkDirectionalArrowLength={(link) => link.source.id === link.target.id ? 0 : 2}
                 linkDirectionalArrowColor={(link) => link.color}
