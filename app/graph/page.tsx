@@ -39,7 +39,6 @@ export default function Page() {
 
     const [selectedElement, setSelectedElement] = useState<Node | Link | undefined>()
     const [selectedElements, setSelectedElements] = useState<(Node | Link)[]>([])
-    const [cooldownTicks, setCooldownTicks] = useState<number | undefined>(0)
     const [categories, setCategories] = useState<Category<Node>[]>([])
     const [data, setData] = useState<GraphData>({ ...graph.Elements })
     const [labels, setLabels] = useState<Category<Link>[]>([])
@@ -115,19 +114,6 @@ export default function Page() {
         return json.result
     }, [limit, timeout, toast, setIndicator])
 
-    const handleCooldown = (ticks?: number) => {
-        setCooldownTicks(ticks)
-
-        const canvas = document.querySelector('.force-graph-container canvas');
-        if (!canvas) return
-        if (ticks === 0) {
-            canvas.setAttribute('data-engine-status', 'stop')
-        } else {
-            canvas.setAttribute('data-engine-status', 'running')
-
-        }
-    }
-
     const runQuery = useCallback(async (q: string, name?: string) => {
         const n = name || graphName
         const result = await run(q, n)
@@ -160,7 +146,6 @@ export default function Page() {
 
         setGraph(g)
         fetchCount()
-        handleCooldown(10)
         localStorage.setItem("query history", JSON.stringify(queryArr))
         localStorage.setItem("savedContent", JSON.stringify({ graphName: n, query: q }))
         // eslint-disable-next-line @typescript-eslint/ban-ts-comment
@@ -244,19 +229,16 @@ export default function Page() {
         graph.removeElements(selectedElements)
 
         fetchCount()
+
         setSelectedElements([])
         setSelectedElement(undefined)
-
         setLabels(graph.removeLinks(selectedElements.map((element) => element.id)))
-
         setData({ ...graph.Elements })
+        
         toast({
             title: "Success",
             description: `${selectedElements.length > 1 ? "Elements" : "Element"} deleted`,
         })
-        handleCooldown()
-        setSelectedElement(undefined)
-        setSelectedElements([])
     }
 
     return (
@@ -286,8 +268,6 @@ export default function Page() {
                     setSelectedElements={setSelectedElements}
                     nodesCount={nodesCount}
                     edgesCount={edgesCount}
-                    handleCooldown={handleCooldown}
-                    cooldownTicks={cooldownTicks}
                     chartRef={chartRef}
                     data={data}
                     setData={setData}

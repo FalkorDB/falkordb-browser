@@ -2,11 +2,9 @@
 
 /* eslint-disable react/require-default-props */
 
-import { Pause, Play, Shrink, ZoomIn, ZoomOut } from "lucide-react";
+import { Shrink, ZoomIn, ZoomOut } from "lucide-react";
 import { useContext } from "react";
 import { handleZoomToFit, GraphRef } from "@/lib/utils";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { Switch } from "@/components/ui/switch";
 import Button from "../components/ui/Button";
 import { IndicatorContext } from "../components/provider";
 import { Graph } from "../api/graph/model";
@@ -15,8 +13,6 @@ interface Props {
     graph: Graph,
     disabled: boolean,
     chartRef: GraphRef,
-    handleCooldown: (ticks?: number) => void
-    cooldownTicks: number | undefined
     tabsValue?: string,
 }
 
@@ -24,8 +20,6 @@ export default function Controls({
     graph,
     disabled,
     chartRef,
-    handleCooldown,
-    cooldownTicks,
     tabsValue = "Graph",
 }: Props) {
 
@@ -48,27 +42,6 @@ export default function Controls({
             {
                 graph.getElements().length > 0 && tabsValue === "Graph" &&
                 <div className="flex items-center gap-4">
-                    <Tooltip>
-                        <TooltipTrigger asChild>
-                            {
-                                graph.getElements().length > 0 &&
-                                <div className="flex items-center gap-2">
-                                    {cooldownTicks === undefined ? <Play size={20} /> : <Pause size={20} />}
-                                    <Switch
-                                        data-testid="animationControl"
-                                        className="pointer-events-auto"
-                                        checked={cooldownTicks === undefined}
-                                        onCheckedChange={() => {
-                                            handleCooldown(cooldownTicks === undefined ? 0 : undefined)
-                                        }}
-                                    />
-                                </div>
-                            }
-                        </TooltipTrigger>
-                        <TooltipContent>
-                            <p>Animation Control</p>
-                        </TooltipContent>
-                    </Tooltip>
                     <Button
                         data-testid="zoomInControl"
                         className="text-nowrap"

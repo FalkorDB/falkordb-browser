@@ -33,8 +33,6 @@ interface Props {
     nodesCount: number
     edgesCount: number
     fetchCount: () => Promise<void>
-    handleCooldown: (ticks?: number) => void
-    cooldownTicks: number | undefined
     chartRef: GraphRef
     handleDeleteElement: () => Promise<void>
     setLabels: Dispatch<SetStateAction<Category<Link>[]>>
@@ -53,8 +51,6 @@ function GraphView({
     nodesCount,
     edgesCount,
     fetchCount,
-    handleCooldown,
-    cooldownTicks,
     chartRef,
     handleDeleteElement,
     setLabels,
@@ -89,12 +85,6 @@ function GraphView({
 
         setTabsValue(defaultChecked);
     }, [graph, graph.Id, graph.getElements().length, graph.Data.length])
-
-    useEffect(() => {
-        if (tabsValue === "Graph") {
-            handleCooldown()
-        }
-    }, [tabsValue])
 
     useEffect(() => {
         setSelectedElement(undefined)
@@ -189,8 +179,6 @@ function GraphView({
                     tabsValue={tabsValue}
                     chartRef={chartRef}
                     disabled={graph.getElements().length === 0}
-                    handleCooldown={handleCooldown}
-                    cooldownTicks={cooldownTicks}
                 />
             </div>
             <TabsContent value="Graph" className="h-full w-full mt-0 overflow-hidden">
@@ -203,8 +191,6 @@ function GraphView({
                     setSelectedElement={setSelectedElement}
                     selectedElements={selectedElements}
                     setSelectedElements={setSelectedElements}
-                    cooldownTicks={cooldownTicks}
-                    handleCooldown={handleCooldown}
                     setLabels={setLabels}
                 />
                 <div className="h-full z-10 absolute top-12 inset-x-12 pointer-events-none flex gap-8">

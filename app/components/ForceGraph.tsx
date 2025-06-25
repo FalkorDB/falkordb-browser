@@ -21,8 +21,6 @@ interface Props {
     setSelectedElement: (element: Node | Link | undefined) => void
     selectedElements: (Node | Link)[]
     setSelectedElements: Dispatch<SetStateAction<(Node | Link)[]>>
-    cooldownTicks: number | undefined
-    handleCooldown: (ticks?: number) => void
     type?: "schema" | "graph"
     isAddElement?: boolean
     setSelectedNodes?: Dispatch<SetStateAction<[Node | undefined, Node | undefined]>>
@@ -43,8 +41,6 @@ export default function ForceGraph({
     setSelectedElement,
     selectedElements,
     setSelectedElements,
-    cooldownTicks,
-    handleCooldown,
     type = "graph",
     isAddElement = false,
     setSelectedNodes,
@@ -179,7 +175,6 @@ export default function ForceGraph({
 
             node.expand = !node.expand
             setData({ ...graph.Elements })
-            handleCooldown()
         }
     }
 
@@ -371,15 +366,13 @@ export default function ForceGraph({
                 onBackgroundClick={handleUnselected}
                 onBackgroundRightClick={handleUnselected}
                 onEngineStop={() => {
-                    if (cooldownTicks === 0) return
-                    handleCooldown(0)
                     handleZoomToFit(chartRef, undefined, data.nodes.length < 2 ? 4 : undefined)
                 }}
                 linkCurvature="curve"
                 nodeVisibility="visible"
                 linkVisibility="visible"
-                cooldownTicks={cooldownTicks}
-                cooldownTime={6000}
+                cooldownTicks={undefined}
+                cooldownTime={1000}
                 linkDirectionalArrowRelPos={1}
                 linkDirectionalArrowLength={(link) => link.source.id === link.target.id ? 0 : 2}
                 linkDirectionalArrowColor={(link) => link.color}
