@@ -32,7 +32,7 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
 
     const { indicator, setIndicator } = useContext(IndicatorContext)
 
-    const searchRef = useRef<HTMLInputElement>(null)
+    const inputRef = useRef<HTMLInputElement>(null)
 
     const { toast } = useToast()
     const { data: session } = useSession()
@@ -42,7 +42,6 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
     const [openMenage, setOpenMenage] = useState(false)
     const [openDuplicate, setOpenDuplicate] = useState(false)
     const [isLoading, setIsLoading] = useState(false)
-    
     useEffect(() => {
         setOpen(false)
     }, [selectedValue])
@@ -79,11 +78,8 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
     const handleOpenChange = async (o: boolean) => {
         setOpen(o)
         setIsLoading(true)
-
         try {
             await onOpenChange(o)
-
-            if (o && searchRef.current) searchRef.current.focus()
         } finally {
             setIsLoading(false)
         }
@@ -126,7 +122,7 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
                         afterSearchCallback={() => { }}
                         isSelected={(value) => selectedValue === value}
                         isLoading={isLoading}
-                        searchRef={searchRef}
+                        searchRef={inputRef}
                     />
                     <DialogTrigger asChild>
                         <Button

@@ -31,7 +31,8 @@ export default function GraphDataPanel({ object, setObject, onDeleteElement, set
 
     const lastObjId = useRef<number | undefined>(undefined)
     const labelsListRef = useRef<HTMLUListElement>(null)
-
+    const searchRef = useRef<HTMLInputElement>(null)
+    
     const { toast } = useToast()
     const { data: session } = useSession()
 
@@ -163,6 +164,7 @@ export default function GraphDataPanel({ object, setObject, onDeleteElement, set
                                     setSelectedLabel("")
                                 }
                             }}
+                            searchRef={searchRef}
                         />
                         <div className="flex gap-4 p-4 justify-between">
                             <AddLabel onAddLabel={handleAddLabel} />
