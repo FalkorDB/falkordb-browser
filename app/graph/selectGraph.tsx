@@ -42,7 +42,6 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
     const [openMenage, setOpenMenage] = useState(false)
     const [openDuplicate, setOpenDuplicate] = useState(false)
     const [isLoading, setIsLoading] = useState(false)
-    
     useEffect(() => {
         setOpen(false)
     }, [selectedValue])
@@ -123,7 +122,7 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
                         afterSearchCallback={() => { }}
                         isSelected={(value) => selectedValue === value}
                         isLoading={isLoading}
-
+                        searchRef={inputRef}
                     />
                     <DialogTrigger asChild>
                         <Button

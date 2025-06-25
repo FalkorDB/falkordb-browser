@@ -46,7 +46,7 @@ export default function TableComponent({ headers, rows, label, entityName, input
         if (searchRef.current) {
             searchRef.current.focus()
         }
-    }, [filteredRows, filteredRows.length])
+    }, [])
 
     useEffect(() => {
         if (inputRef && inputRef.current && editable) {

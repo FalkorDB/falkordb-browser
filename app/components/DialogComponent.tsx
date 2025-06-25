@@ -5,50 +5,52 @@ import { cn } from "@/lib/utils";
 import { ReactNode } from "react";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { DialogContentProps } from "@radix-ui/react-dialog";
 import CloseDialog from "./CloseDialog";
 
-/* eslint-disable react/require-default-props */
-interface Props {
+interface Props extends DialogContentProps {
     children: React.ReactNode
     title: string
+    trigger: React.ReactNode
     open?: boolean
     onOpenChange?: (open: boolean) => void
-    trigger: React.ReactNode
     description?: ReactNode
     className?: string
 }
 
 export default function DialogComponent({
     children,
+    title,
+    trigger,
     open,
     onOpenChange,
-    trigger,
-    title,
     description,
     className,
+    ...props
 }: Props) {
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogTrigger asChild>
                 {trigger}
             </DialogTrigger>
-            <DialogContent onEscapeKeyDown={(e) => e.stopPropagation()} className={cn("bg-foreground p-8 flex flex-col gap-8 rounded-lg border-none", className)} disableClose>
+            {/* eslint-disable-next-line react/jsx-props-no-spreading */}
+            <DialogContent {...props} onEscapeKeyDown={(e) => e.stopPropagation()} className={cn("bg-foreground p-8 flex flex-col gap-8 rounded-lg border-none", className)} disableClose>
                 <DialogHeader className="flex-row justify-between items-center border-b border-secondary pb-4">
                     <DialogTitle className="text-2xl font-medium">{title}</DialogTitle>
                     <CloseDialog />
                 </DialogHeader>
                 {
                     description ?
-                    <Tooltip>
-                        <TooltipTrigger asChild>
-                            <DialogDescription className="p-4 truncate">
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <DialogDescription className="p-4 truncate">
+                                    {description}
+                                </DialogDescription>
+                            </TooltipTrigger>
+                            <TooltipContent>
                                 {description}
-                            </DialogDescription>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                            {description}
-                        </TooltipContent>
-                    </Tooltip>
+                            </TooltipContent>
+                        </Tooltip>
                         : <VisuallyHidden>
                             <DialogDescription />
                         </VisuallyHidden>
@@ -57,4 +59,11 @@ export default function DialogComponent({
             </DialogContent>
         </Dialog>
     )
+}
+
+DialogComponent.defaultProps = {
+    open: undefined,
+    onOpenChange: undefined,
+    description: undefined,
+    className: undefined
 }
