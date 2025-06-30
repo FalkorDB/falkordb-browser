@@ -11,6 +11,7 @@ import { useToast } from "@/components/ui/use-toast"
 import * as d3 from "d3"
 import { GraphData, Link, Node, Category, Graph } from "../api/graph/model"
 import { IndicatorContext } from "./provider"
+import Spinning from "./ui/spinning"
 
 interface Props {
     graph: Graph
@@ -29,9 +30,14 @@ interface Props {
     setIsAddEntity?: Dispatch<SetStateAction<boolean>>
     setIsAddRelation?: Dispatch<SetStateAction<boolean>>
     setLabels: Dispatch<SetStateAction<Category<Link>[]>>
+    parentHeight: number
+    parentWidth: number
+    setParentHeight: Dispatch<SetStateAction<number>>
+    setParentWidth: Dispatch<SetStateAction<number>>
+    loading: boolean
 }
 
-const NODE_SIZE = 6
+export const NODE_SIZE = 6
 const PADDING = 2;
 
 export default function ForceGraph({
@@ -50,7 +56,12 @@ export default function ForceGraph({
     setSelectedNodes,
     setIsAddEntity = () => { },
     setIsAddRelation = () => { },
-    setLabels
+    setLabels,
+    parentHeight,
+    parentWidth,
+    setParentHeight,
+    setParentWidth,
+    loading,
 }: Props) {
 
     const { indicator, setIndicator } = useContext(IndicatorContext)
@@ -61,8 +72,10 @@ export default function ForceGraph({
     const parentRef = useRef<HTMLDivElement>(null)
 
     const [hoverElement, setHoverElement] = useState<Node | Link | undefined>()
-    const [parentHeight, setParentHeight] = useState<number>(0)
-    const [parentWidth, setParentWidth] = useState<number>(0)
+
+    useEffect(() => {
+        handleZoomToFit(chartRef, undefined, data.nodes.length < 2 ? 4 : undefined)
+    }, [chartRef, data.nodes.length, data])
 
     useEffect(() => {
         const handleResize = () => {
@@ -83,7 +96,7 @@ export default function ForceGraph({
             window.removeEventListener('resize', handleResize)
             observer.disconnect()
         }
-    }, [parentRef])
+    }, [parentRef, setParentHeight, setParentWidth])
 
     useEffect(() => {
         if (!chartRef.current) return;
@@ -93,7 +106,7 @@ export default function ForceGraph({
 
         if (linkForce) {
             linkForce
-                .distance(() => 50)
+                .distance(50)
                 .strength(0.5);
         }
 
@@ -221,7 +234,11 @@ export default function ForceGraph({
         setSelectedElements([])
     }
 
-    return (
+    return loading ? (
+        <div className="bg-background w-full h-full flex items-center justify-center">
+            <Spinning />
+        </div>
+    ) : (
         <div ref={parentRef} className="w-full h-full relative">
             <ForceGraph2D
                 ref={chartRef}

@@ -3,10 +3,9 @@
 
 'use client'
 
-import { useState, useEffect, Dispatch, SetStateAction, useContext } from "react";
+import { useState, useEffect, Dispatch, SetStateAction, useContext, useRef } from "react";
 import { GitGraph, Info, Table } from "lucide-react"
 import { cn, GraphRef } from "@/lib/utils";
-import dynamic from "next/dynamic";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { GraphContext } from "@/app/components/provider";
 import { Category, GraphData, Link, Node } from "../api/graph/model";
@@ -18,8 +17,8 @@ import GraphDataPanel from "./GraphDataPanel";
 import GraphDetails from "./GraphDetails";
 import Labels from "./labels";
 import MetadataView from "./MetadataView";
+import ForceGraph, { NODE_SIZE } from "../components/ForceGraph";
 
-const ForceGraph = dynamic(() => import("../components/ForceGraph"), { ssr: false });
 
 type Tab = "Graph" | "Table" | "Metadata"
 
@@ -63,8 +62,14 @@ function GraphView({
     categories
 }: Props) {
 
-    const [tabsValue, setTabsValue] = useState<Tab>("Graph")
     const { graph } = useContext(GraphContext)
+
+    const workerRef = useRef<Worker>();
+
+    const [loading, setLoading] = useState<boolean>(false)
+    const [parentHeight, setParentHeight] = useState<number>(0)
+    const [parentWidth, setParentWidth] = useState<number>(0)
+    const [tabsValue, setTabsValue] = useState<Tab>("Graph")
 
     useEffect(() => {
         setCategories([...graph.Categories])
@@ -78,8 +83,43 @@ function GraphView({
     }
 
     useEffect(() => {
-        setData({ ...graph.Elements })
+        if (!workerRef.current) {
+            workerRef.current = new Worker(new URL('../components/forceSimulationWorker.js', import.meta.url));
+        }
 
+        return () => {
+            if (workerRef.current) {
+                workerRef.current.terminate()
+                workerRef.current = undefined
+            }
+        }
+    }, [])
+
+    useEffect(() => {
+        const worker = workerRef.current;
+
+        if (!graph.Elements.nodes.length || !worker) return;
+
+        setLoading(true)
+
+        worker.onmessage = (e) => {
+            console.log(e.data);
+            if (e.data.done) {
+                setData({ ...e.data })
+                setLoading(false)
+            }
+        }
+
+        worker.postMessage({
+            nodes: graph.Elements.nodes,
+            links: graph.Elements.links,
+            nodeSize: NODE_SIZE,
+            width: parentWidth,
+            height: parentHeight,
+        });
+    }, [graph, graph.Elements.nodes.length])
+
+    useEffect(() => {
         if (isTabEnabled(tabsValue)) return
 
         let defaultChecked: Tab = "Graph"
@@ -88,13 +128,8 @@ function GraphView({
         else if (graph.CurrentQuery && graph.CurrentQuery.metadata.length > 0 && graph.Metadata.length > 0 && graph.CurrentQuery.explain.length > 0) defaultChecked = "Metadata"
 
         setTabsValue(defaultChecked);
-    }, [graph, graph.Id, graph.getElements().length, graph.Data.length])
 
-    useEffect(() => {
-        if (tabsValue === "Graph") {
-            handleCooldown()
-        }
-    }, [tabsValue])
+    }, [graph, graph.Id, graph.getElements().length, graph.Data.length])
 
     useEffect(() => {
         setSelectedElement(undefined)
@@ -206,6 +241,11 @@ function GraphView({
                     cooldownTicks={cooldownTicks}
                     handleCooldown={handleCooldown}
                     setLabels={setLabels}
+                    parentHeight={parentHeight}
+                    parentWidth={parentWidth}
+                    setParentHeight={setParentHeight}
+                    setParentWidth={setParentWidth}
+                    loading={loading}
                 />
                 <div className="h-full z-10 absolute top-12 inset-x-12 pointer-events-none flex gap-8">
                     {

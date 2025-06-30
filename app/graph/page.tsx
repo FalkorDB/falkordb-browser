@@ -160,7 +160,6 @@ export default function Page() {
 
         setGraph(g)
         fetchCount()
-        handleCooldown()
         localStorage.setItem("query history", JSON.stringify(queryArr))
         localStorage.setItem("savedContent", JSON.stringify({ graphName: n, query: q }))
         // eslint-disable-next-line @typescript-eslint/ban-ts-comment

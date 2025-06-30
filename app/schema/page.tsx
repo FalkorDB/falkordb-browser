@@ -5,11 +5,11 @@ import { prepareArg, securedFetch } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
 import dynamic from "next/dynamic";
 import { ForceGraphMethods } from "react-force-graph-2d";
-import SchemaView from "./SchemaView";
 import { Category, Graph, GraphData, Link, Node } from "../api/graph/model";
 import { IndicatorContext, SchemaContext } from "../components/provider";
 
 const Selector = dynamic(() => import("../graph/Selector"), { ssr: false })
+const SchemaView = dynamic(() => import("./SchemaView"), { ssr: false })
 
 export default function Page() {
 

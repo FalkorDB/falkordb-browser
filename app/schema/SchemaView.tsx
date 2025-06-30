@@ -2,9 +2,8 @@
 
 'use client'
 
-import { useEffect, useState, useContext, Dispatch, SetStateAction } from "react"
+import { useEffect, useState, useContext, Dispatch, SetStateAction, useRef } from "react"
 import { GraphRef, prepareArg, securedFetch } from "@/lib/utils"
-import dynamic from "next/dynamic"
 import { useToast } from "@/components/ui/use-toast"
 import SchemaDataPanel from "./SchemaDataPanel"
 import Labels from "../graph/labels"
@@ -13,8 +12,7 @@ import CreateElement from "./SchemaCreateElement"
 import { IndicatorContext, SchemaContext } from "../components/provider"
 import Controls from "../graph/controls"
 import GraphDetails from "../graph/GraphDetails"
-
-const ForceGraph = dynamic(() => import("../components/ForceGraph"), { ssr: false })
+import ForceGraph, { NODE_SIZE } from "../components/ForceGraph"
 
 /* eslint-disable react/require-default-props */
 interface Props {
@@ -67,18 +65,54 @@ export default function SchemaView({
     const { setIndicator } = useContext(IndicatorContext)
     const { schema } = useContext(SchemaContext)
 
+    const workerRef = useRef<Worker>()
+
     const { toast } = useToast()
 
+    const [loading, setLoading] = useState(false)
     const [selectedNodes, setSelectedNodes] = useState<[Node | undefined, Node | undefined]>([undefined, undefined]);
+    const [parentWidth, setParentWidth] = useState(0)
+    const [parentHeight, setParentHeight] = useState(0)
 
     useEffect(() => {
-        setData({ ...schema.Elements })
-    }, [schema.Elements, schema.Id])
+        workerRef.current = new Worker(new URL("../components/forceSimulationWorker.js", import.meta.url))
+
+        return () => {
+            if (workerRef.current) {
+                workerRef.current.terminate()
+                workerRef.current = undefined
+            }
+        }
+    }, [])
+
+    useEffect(() => {
+        const worker = workerRef.current;
+
+        if (!schema.Elements.nodes.length || !worker) return;
+
+        setLoading(true)
+
+        worker.onmessage = (e) => {
+            if (e.data.done) {
+                setData({ ...e.data })
+                setLoading(false)
+            }
+        }
+
+        worker.postMessage({
+            nodes: schema.Elements.nodes,
+            links: schema.Elements.links,
+            nodeSize: NODE_SIZE,
+            width: parentWidth,
+            height: parentHeight,
+        });
+
+    }, [parentHeight, parentWidth, schema.Elements, schema.Id, setData])
 
     useEffect(() => {
         setCategories([...schema.Categories])
         setLabels([...schema.Labels])
-    }, [schema.Id, schema.Categories.length, schema.Labels.length])
+    }, [schema.Id, schema.Categories.length, schema.Labels.length, setCategories, schema.Categories, schema.Labels, setLabels])
 
     useEffect(() => {
         setSelectedElement(undefined)
@@ -181,6 +215,11 @@ export default function SchemaView({
                     cooldownTicks={cooldownTicks}
                     handleCooldown={handleCooldown}
                     setLabels={setLabels}
+                    parentHeight={parentHeight}
+                    parentWidth={parentWidth}
+                    setParentHeight={setParentHeight}
+                    setParentWidth={setParentWidth}
+                    loading={loading}
                 />
                 <div className="h-full z-10 absolute top-12 inset-x-12 pointer-events-none flex gap-8 justify-between">
                     {

@@ -20,6 +20,9 @@ interface Props {
     label: "Graph" | "Schema"
 }
 
+const ITEM_HEIGHT = 48
+const ITEMS_PER_PAGE = 30
+
 export default function Toolbar({
     graph,
     selectedElements,
@@ -32,14 +35,41 @@ export default function Toolbar({
     label
 }: Props) {
 
-    const suggestionRef = useRef<HTMLUListElement>(null)
+    const suggestionRef = useRef<HTMLDivElement>(null)
 
     const [suggestions, setSuggestions] = useState<(Node | Link)[]>([])
     const [suggestionIndex, setSuggestionIndex] = useState(0)
     const [searchElement, setSearchElement] = useState("")
     const [deleteOpen, setDeleteOpen] = useState(false)
     const [addOpen, setAddOpen] = useState(false)
+    const [scrollTop, setScrollTop] = useState(0)
+    const [startIndex, setStartIndex] = useState(0)
+    const [topFakeItemHeight, setTopFakeItemHeight] = useState(0)
+    const [bottomFakeItemHeight, setBottomFakeItemHeight] = useState(0)
+    const [visibleSuggestions, setVisibleSuggestions] = useState<(Node | Link)[]>([])
 
+    useEffect(() => {
+        const timeout = setTimeout(() => {
+            const newStartIndex = Math.max(0, Math.floor((scrollTop - (ITEM_HEIGHT * ITEMS_PER_PAGE)) / ITEM_HEIGHT))
+            const newEndIndex = Math.min(suggestions.length, Math.floor((scrollTop + (ITEM_HEIGHT * (ITEMS_PER_PAGE * 2))) / ITEM_HEIGHT))
+            const newTopFakeItemHeight = newStartIndex * ITEM_HEIGHT
+            const newBottomFakeItemHeight = (suggestions.length - newEndIndex) * ITEM_HEIGHT
+            const newVisibleSuggestions = suggestions.slice(newStartIndex, newEndIndex)
+
+            setStartIndex(newStartIndex)
+            setTopFakeItemHeight(newTopFakeItemHeight)
+            setBottomFakeItemHeight(newBottomFakeItemHeight)
+            setVisibleSuggestions(newVisibleSuggestions)
+        }, 100)
+
+        return () => {
+            clearTimeout(timeout)
+        }
+    }, [scrollTop, suggestions])
+
+    const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+        setScrollTop(e.currentTarget.scrollTop)
+    }
 
     const handleOnChange = useCallback(async () => {
         setSuggestionIndex(0)
@@ -75,9 +105,8 @@ export default function Toolbar({
     }
 
     const scrollToSuggestion = (index: number) => {
-        const suggestionElement = suggestionRef.current?.querySelector(`li:nth-child(${index + 1})`)
-        if (suggestionElement) {
-            suggestionRef.current?.scrollTo({ top: (suggestionElement.clientHeight + 8) * index, behavior: "smooth" })
+        if (suggestionRef.current) {
+            suggestionRef.current.scrollTo({ top: (ITEM_HEIGHT + 8) * index, behavior: "smooth" })
         }
     }
 
@@ -130,74 +159,82 @@ export default function Toolbar({
                 }
                 {
                     suggestions.length > 0 &&
-                    <ul
-                        data-testid={`elementCanvasSuggestionsList${label}`}
-                        ref={suggestionRef}
-                        className="max-h-[30dvh] overflow-auto absolute left-0 top-14 w-full border p-2 rounded-lg flex flex-col gap-2 bg-foreground"
-                        role="listbox"
-                        tabIndex={-1}
-                        onKeyDown={(e) => {
-                            if (e.key === 'Escape') {
-                                e.preventDefault()
-                                setSearchElement("")
-                            }
+                    <div onScroll={handleScroll} ref={suggestionRef} className="max-h-[30dvh] overflow-auto absolute left-0 top-14 w-full border p-2 rounded-lg bg-foreground">
+                        <ul
+                            data-testid={`elementCanvasSuggestionsList${label}`}
+                            className="flex flex-col gap-2"
+                            role="listbox"
+                            tabIndex={-1}
+                            style={{ height: `${suggestions.length * 48}px` }}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Escape') {
+                                    e.preventDefault()
+                                    setSearchElement("")
+                                }
 
-                            if (e.key === 'Enter' && suggestions[suggestionIndex]) {
-                                e.preventDefault()
-                                handleSearchElement(suggestions[suggestionIndex])
-                                setSearchElement("")
-                            }
+                                if (e.key === 'Enter' && suggestions[suggestionIndex]) {
+                                    e.preventDefault()
+                                    handleSearchElement(suggestions[suggestionIndex])
+                                    setSearchElement("")
+                                }
 
-                            if (e.key === 'ArrowDown') {
-                                e.preventDefault()
-                                const index = suggestionIndex === suggestions.length - 1 ? 0 : suggestionIndex + 1
-                                setSuggestionIndex(index)
-                                scrollToSuggestion(index)
-                            }
+                                if (e.key === 'ArrowDown') {
+                                    e.preventDefault()
+                                    const index = suggestionIndex === suggestions.length - 1 ? 0 : suggestionIndex + 1
+                                    setSuggestionIndex(index)
+                                    scrollToSuggestion(index)
 
-                            if (e.key === 'ArrowUp') {
-                                e.preventDefault()
-                                const index = suggestionIndex === 0 ? suggestions.length - 1 : suggestionIndex - 1
-                                setSuggestionIndex(index)
-                                scrollToSuggestion(index)
+                                }
+
+                                if (e.key === 'ArrowUp') {
+                                    e.preventDefault()
+                                    const index = suggestionIndex === 0 ? suggestions.length - 1 : suggestionIndex - 1
+                                    setSuggestionIndex(index)
+                                    scrollToSuggestion(index)
+                                }
+                            }}
+                        >
+                            <li style={{ height: `${topFakeItemHeight}px` }} />
+                            {
+                                visibleSuggestions.map((suggestion, index) => {
+                                    const actualIndex = index + startIndex
+
+                                    return (
+                                        <li key={actualIndex}>
+                                            <Tooltip>
+                                                <TooltipTrigger asChild>
+                                                    <Button
+                                                        role="option"
+                                                        aria-selected={actualIndex === suggestionIndex}
+                                                        data-testid={`elementCanvasSuggestion${label}${suggestion.data.name || suggestion.id}`}
+                                                        className={cn("w-full h-full p-2 rounded-lg flex gap-2", actualIndex === suggestionIndex ? "bg-gray-300" : "bg-gray-500")}
+                                                        onClick={() => handleSearchElement(suggestion)}
+                                                        onMouseEnter={() => setSuggestionIndex(actualIndex)}
+                                                    >
+                                                        <div
+                                                            className="rounded-full h-8 w-8 p-2 flex items-center justify-center"
+                                                            style={{ backgroundColor: suggestion.color }}
+                                                        >
+                                                            <p className="text-white text-sm font-bold truncate">{suggestion.label || suggestion.category}</p>
+                                                        </div>
+                                                        <div
+                                                            className={cn("w-1 grow text-center truncate", actualIndex === suggestionIndex ? "text-black" : "text-white")}
+                                                        >
+                                                            {suggestion.data.name || suggestion.id}
+                                                        </div>
+                                                    </Button>
+                                                </TooltipTrigger>
+                                                <TooltipContent>
+                                                    {suggestion.label || suggestion.category}
+                                                </TooltipContent>
+                                            </Tooltip>
+                                        </li>
+                                    )
+                                })
                             }
-                        }}
-                    >
-                        {
-                            suggestions.map((suggestion, index) =>
-                                // eslint-disable-next-line react/no-array-index-key
-                                <li key={index}>
-                                    <Tooltip>
-                                        <TooltipTrigger asChild>
-                                            <Button
-                                                role="option"
-                                                aria-selected={index === suggestionIndex}
-                                                data-testid={`elementCanvasSuggestion${label}${suggestion.data.name || suggestion.id}`}
-                                                className={cn("w-full h-full p-2 rounded-lg flex gap-2", index === suggestionIndex ? "bg-gray-300" : "bg-gray-500")}
-                                                onClick={() => handleSearchElement(suggestion)}
-                                                onMouseEnter={() => setSuggestionIndex(index)}
-                                            >
-                                                <div
-                                                    className="rounded-full h-8 w-8 p-2 flex items-center justify-center"
-                                                    style={{ backgroundColor: suggestion.color }}
-                                                >
-                                                    <p className="text-white text-sm font-bold truncate">{suggestion.label || suggestion.category}</p>
-                                                </div>
-                                                <div
-                                                    className={cn("w-1 grow text-center truncate", index === suggestionIndex ? "text-black" : "text-white")}
-                                                >
-                                                    {suggestion.data.name || suggestion.id}
-                                                </div>
-                                            </Button>
-                                        </TooltipTrigger>
-                                        <TooltipContent>
-                                            {suggestion.label || suggestion.category}
-                                        </TooltipContent>
-                                    </Tooltip>
-                                </li>
-                            )
-                        }
-                    </ul>
+                            <li style={{ height: `${bottomFakeItemHeight}px` }} />
+                        </ul>
+                    </div>
                 }
             </div>
             <div className={cn("flex gap-2", label === "Schema" && "h-full")}>
