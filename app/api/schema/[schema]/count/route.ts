@@ -38,8 +38,6 @@ export async function GET(
 
       const json = await result.json();
 
-      console.log(json.result.data[0] || { edges: 0, nodes: 0 })
-
       const data =
         typeof json.result === "number"
           ? json.result

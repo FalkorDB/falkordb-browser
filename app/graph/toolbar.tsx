@@ -73,7 +73,7 @@ export default function Toolbar({
                                         <PlusCircle size={20} />
                                     </Button>
                                 </DropdownMenuTrigger>
-                                <DropdownMenuContent>
+                                <DropdownMenuContent className="flex flex-col gap-2">
                                     <Button
                                         data-testid={`elementCanvasAddNode${label}`}
                                         className={cn("pointer-events-auto", backgroundColor)}

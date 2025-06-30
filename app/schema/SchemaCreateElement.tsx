@@ -221,7 +221,7 @@ export default function SchemaCreateElement({ onCreate, setIsAdd, selectedNodes,
       <DialogContent className="flex flex-col bg-foreground w-[90%] h-[90%] rounded-lg border-none gap-8 p-8" disableClose>
         <DialogHeader className="flex-row justify-between items-center border-b pb-4">
           <p data-testid="DataPanelAttributesCount">Attributes: <span className="Gradient text-transparent bg-clip-text">{attributes.length}</span></p>
-          <DialogTitle>Create New {type ? "Node" : "Edge"}</DialogTitle>
+          <DialogTitle className="text-2xl font-bold">CREATE NEW {type ? "NODE" : "EDGE"}</DialogTitle>
           <CloseDialog
             onClick={onClose}
           >

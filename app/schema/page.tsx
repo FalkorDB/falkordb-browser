@@ -91,7 +91,7 @@ export default function Page() {
 
     useEffect(() => {
         if (!schemaName) return
-        if (schema.Id) {
+        if (schema.Id === schemaName) {
             fetchCount()
         } else {
             fetchSchema()

@@ -1,5 +1,5 @@
-/* eslint-disable no-param-reassign */
 /* eslint-disable react-hooks/exhaustive-deps */
+/* eslint-disable no-param-reassign */
 
 'use client'
 
@@ -67,7 +67,7 @@ function GraphView({
     useEffect(() => {
         setCategories([...graph.Categories])
         setLabels([...graph.Labels])
-    }, [graph, graph.Categories, graph.Labels])
+    }, [graph, graph.Categories, graph.Labels, setCategories, setLabels])
 
     useEffect(() => {
         let defaultChecked = "Graph"
@@ -81,7 +81,7 @@ function GraphView({
 
         setTabsValue(defaultChecked);
         setData({ ...graph.Elements })
-    }, [graph, graph.Id, graph.getElements().length, graph.Data.length])
+    }, [graph, graph.Id, graph.getElements().length, graph.Data.length, setData])
 
     useEffect(() => {
         if (tabsValue === "Graph") {

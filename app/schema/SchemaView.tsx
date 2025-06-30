@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/exhaustive-deps */
 /* eslint-disable no-param-reassign */
 
 'use client'
@@ -73,17 +74,17 @@ export default function SchemaView({
 
     useEffect(() => {
         setData({ ...schema.Elements })
-    }, [schema.Elements, schema.Id])
+    }, [schema.Elements, schema.Id, setData, schema.getElements().length])
 
     useEffect(() => {
         setCategories([...schema.Categories])
         setLabels([...schema.Labels])
-    }, [schema.Id, schema.Categories.length, schema.Labels.length])
+    }, [schema.Id, schema.Categories.length, schema.Labels.length, setCategories, schema.Categories, schema.Labels, setLabels])
 
     useEffect(() => {
         setSelectedElement(undefined)
         setSelectedElements([])
-    }, [schema.Id])
+    }, [schema.Id, setSelectedElement, setSelectedElements])
 
     useEffect(() => {
         setSelectedNodes([undefined, undefined])
