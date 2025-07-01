@@ -3,7 +3,7 @@
 
 'use client'
 
-import { useState, useEffect, Dispatch, SetStateAction, useContext, useRef } from "react";
+import { useState, useEffect, Dispatch, SetStateAction, useContext } from "react";
 import { GitGraph, Info, Table } from "lucide-react"
 import { cn, GraphRef } from "@/lib/utils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -17,7 +17,7 @@ import GraphDataPanel from "./GraphDataPanel";
 import GraphDetails from "./GraphDetails";
 import Labels from "./labels";
 import MetadataView from "./MetadataView";
-import ForceGraph, { NODE_SIZE } from "../components/ForceGraph";
+import ForceGraph from "../components/ForceGraph";
 
 
 type Tab = "Graph" | "Table" | "Metadata"
@@ -64,12 +64,11 @@ function GraphView({
 
     const { graph } = useContext(GraphContext)
 
-    const workerRef = useRef<Worker>();
-
     const [loading, setLoading] = useState<boolean>(false)
     const [parentHeight, setParentHeight] = useState<number>(0)
     const [parentWidth, setParentWidth] = useState<number>(0)
     const [tabsValue, setTabsValue] = useState<Tab>("Graph")
+    const elementsLength = graph.getElements().length
 
     useEffect(() => {
         setCategories([...graph.Categories])
@@ -83,41 +82,11 @@ function GraphView({
     }
 
     useEffect(() => {
-        if (!workerRef.current) {
-            workerRef.current = new Worker(new URL('../components/forceSimulationWorker.js', import.meta.url));
-        }
-
-        return () => {
-            if (workerRef.current) {
-                workerRef.current.terminate()
-                workerRef.current = undefined
-            }
-        }
-    }, [])
-
-    useEffect(() => {
-        const worker = workerRef.current;
-
-        if (!graph.Elements.nodes.length || !worker) return;
+        if (!elementsLength) return;
 
         setLoading(true)
-
-        worker.onmessage = (e) => {
-            console.log(e.data);
-            if (e.data.done) {
-                setData({ ...e.data })
-                setLoading(false)
-            }
-        }
-
-        worker.postMessage({
-            nodes: graph.Elements.nodes,
-            links: graph.Elements.links,
-            nodeSize: NODE_SIZE,
-            width: parentWidth,
-            height: parentHeight,
-        });
-    }, [graph, graph.Elements.nodes.length])
+        setData({ ...graph.Elements })
+    }, [graph, elementsLength])
 
     useEffect(() => {
         if (isTabEnabled(tabsValue)) return
@@ -129,7 +98,7 @@ function GraphView({
 
         setTabsValue(defaultChecked);
 
-    }, [graph, graph.Id, graph.getElements().length, graph.Data.length])
+    }, [graph, graph.Id, elementsLength, graph.Data.length])
 
     useEffect(() => {
         setSelectedElement(undefined)
@@ -171,7 +140,7 @@ function GraphView({
 
     return (
         <Tabs value={tabsValue} onValueChange={(value) => setTabsValue(value as Tab)} className={cn("h-full w-full relative border rounded-lg overflow-hidden", tabsValue === "Table" && "flex flex-col-reverse")}>
-            <div className={cn("flex gap-4 justify-between items-end", tabsValue === "Table" ? "py-4 px-12" : "absolute bottom-4 inset-x-12 pointer-events-none z-10")}>
+            <div className={cn("flex gap-4 justify-between items-end", tabsValue === "Table" ? "py-4 px-12" : "absolute bottom-4 inset-x-12 pointer-events-none z-20")}>
                 <GraphDetails
                     graph={graph}
                     tabsValue={tabsValue}
@@ -246,6 +215,7 @@ function GraphView({
                     setParentHeight={setParentHeight}
                     setParentWidth={setParentWidth}
                     loading={loading}
+                    setLoading={setLoading}
                 />
                 <div className="h-full z-10 absolute top-12 inset-x-12 pointer-events-none flex gap-8">
                     {

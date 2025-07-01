@@ -165,6 +165,8 @@ export default function Page() {
         // eslint-disable-next-line @typescript-eslint/ban-ts-comment
         // @ts-ignore
         window.graph = g
+        
+        handleCooldown()
     }, [graphName, run, toast, setIndicator, historyQuery.queries, historyQuery.counter, setHistoryQuery, limit, graph.Colors, setGraph, fetchCount])
 
     useEffect(() => {
