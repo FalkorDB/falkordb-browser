@@ -1,9 +1,8 @@
 /* eslint-disable no-param-reassign */
-/* eslint-disable react-hooks/exhaustive-deps */
 
 'use client'
 
-import { useState, useEffect, Dispatch, SetStateAction, useContext } from "react";
+import { useState, useEffect, Dispatch, SetStateAction, useContext, useCallback } from "react";
 import { GitGraph, Info, Table } from "lucide-react"
 import { cn, GraphRef } from "@/lib/utils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -73,20 +72,20 @@ function GraphView({
     useEffect(() => {
         setCategories([...graph.Categories])
         setLabels([...graph.Labels])
-    }, [graph, graph.Categories, graph.Labels])
+    }, [graph, graph.Categories, graph.Labels, setCategories, setLabels])
 
-    const isTabEnabled = (tab: Tab) => {
+    const isTabEnabled = useCallback((tab: Tab) => {
         if (tab === "Graph") return graph.getElements().length !== 0
         if (tab === "Table") return graph.Data.length !== 0
         return graph.CurrentQuery && graph.CurrentQuery.metadata.length > 0 && graph.Metadata.length > 0 && graph.CurrentQuery.explain.length > 0
-    }
+    }, [graph])
 
     useEffect(() => {
         if (!elementsLength) return;
 
         setLoading(true)
         setData({ ...graph.Elements })
-    }, [graph, elementsLength])
+    }, [graph, elementsLength, setData])
 
     useEffect(() => {
         if (isTabEnabled(tabsValue)) return
@@ -98,12 +97,12 @@ function GraphView({
 
         setTabsValue(defaultChecked);
 
-    }, [graph, graph.Id, elementsLength, graph.Data.length])
+    }, [graph, graph.Id, elementsLength, graph.Data.length, isTabEnabled, tabsValue])
 
     useEffect(() => {
         setSelectedElement(undefined)
         setSelectedElements([])
-    }, [graph.Id])
+    }, [graph.Id, setSelectedElement, setSelectedElements])
 
     const onCategoryClick = (category: Category<Node>) => {
         category.show = !category.show
