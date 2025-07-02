@@ -130,7 +130,7 @@ test.describe('Graph Tests', () => {
         await browser.setPageToFullScreen();
         await graph.selectGraphByName(graphName);
         await graph.insertQuery(DEFAULT_CREATE_QUERY);
-        await graph.clickRunQuery(true);
+        await graph.clickRunQuery();
         const nodes = await graph.getNodesCount();
         const edges = await graph.getEdgesCount();
         expect(parseInt(nodes ?? "0", 10)).toBe(20);

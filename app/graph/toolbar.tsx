@@ -14,6 +14,7 @@ interface Props {
     setSelectedElement: Dispatch<SetStateAction<Node | Link | undefined>>
     handleDeleteElement: () => Promise<void>
     chartRef: GraphRef
+    isLoading: boolean
     setIsAddEntity?: Dispatch<SetStateAction<boolean>>
     setIsAddRelation?: Dispatch<SetStateAction<boolean>>
     backgroundColor?: string
@@ -30,10 +31,11 @@ export default function Toolbar({
     setSelectedElement,
     handleDeleteElement,
     chartRef,
+    isLoading,
     setIsAddEntity = undefined,
     setIsAddRelation = undefined,
     backgroundColor = undefined,
-    label
+    label,
 }: Props) {
 
     const suggestionRef = useRef<HTMLDivElement>(null)
@@ -117,7 +119,7 @@ export default function Toolbar({
         <div className="w-full h-full flex justify-between items-center">
             <div className={cn("relative pointer-events-auto", label === "Schema" && "h-full")}>
                 {
-                    graph.getElements().length > 0 &&
+                    graph.getElements().length > 0 && !isLoading &&
                     <Input
                         data-testid={`elementCanvasSearch${label}`}
                         className={cn("w-[30dvw] text-white border border-primary", label === "Schema" && "h-full", backgroundColor)}

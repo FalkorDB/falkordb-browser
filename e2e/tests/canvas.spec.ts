@@ -99,7 +99,7 @@ test.describe('Canvas Tests', () => {
         const graphName = getRandomString('canvas');
         await graph.addGraph(graphName);
         await graph.insertQuery(BATCH_CREATE_PERSONS);
-        await graph.clickRunQuery(true);
+        await graph.clickRunQuery();
         const initialGraph = await graph.getNodesScreenPositions('graph');
         const fromX = initialGraph[0].screenX;
         const fromY = initialGraph[0].screenY;
@@ -163,7 +163,7 @@ test.describe('Canvas Tests', () => {
         await browser.setPageToFullScreen();
         await graph.selectGraphByName(graphName);
         await graph.insertQuery(CREATE_TWO_NODES_QUERY);
-        await graph.clickRunQuery(true);
+        await graph.clickRunQuery();
         expect(await graph.getAnimationControl()).toBe(false);
         await graph.clickCenterControl();
         const initNodes = await graph.getNodesScreenPositions('graph');
@@ -186,7 +186,7 @@ test.describe('Canvas Tests', () => {
         await browser.setPageToFullScreen();
         await graph.selectGraphByName(graphName);
         await graph.insertQuery(CREATE_TWO_NODES_QUERY);
-        await graph.clickRunQuery(true);
+        await graph.clickRunQuery();
         const initNodes = await graph.getNodesScreenPositions('graph');
         await graph.clickAnimationControl();
         expect(await graph.getAnimationControl()).toBe(true);

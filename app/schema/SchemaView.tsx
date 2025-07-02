@@ -37,6 +37,8 @@ interface Props {
     setCategories: Dispatch<SetStateAction<Category<Node>[]>>
     labels: Category<Link>[]
     categories: Category<Node>[]
+    isLoading: boolean
+    setIsLoading: Dispatch<SetStateAction<boolean>>
 }
 
 export default function SchemaView({
@@ -60,14 +62,15 @@ export default function SchemaView({
     setLabels,
     setCategories,
     labels,
-    categories
+    categories,
+    isLoading,
+    setIsLoading
 }: Props) {
     const { setIndicator } = useContext(IndicatorContext)
     const { schema } = useContext(SchemaContext)
 
     const { toast } = useToast()
 
-    const [loading, setLoading] = useState(false)
     const [selectedNodes, setSelectedNodes] = useState<[Node | undefined, Node | undefined]>([undefined, undefined]);
     const [parentWidth, setParentWidth] = useState(0)
     const [parentHeight, setParentHeight] = useState(0)
@@ -76,9 +79,9 @@ export default function SchemaView({
     useEffect(() => {
         if (!elementsLength) return;
 
-        setLoading(true)
+        setIsLoading(true)
         setData({ ...schema.Elements })
-    }, [schema, elementsLength, setData])
+    }, [schema, elementsLength, setData, setIsLoading])
 
     useEffect(() => {
         setCategories([...schema.Categories])
@@ -167,6 +170,7 @@ export default function SchemaView({
                         chartRef={chartRef}
                         handleCooldown={handleCooldown}
                         cooldownTicks={cooldownTicks}
+                        isLoading={isLoading}
                     />
                 }
             </div>
@@ -190,19 +194,22 @@ export default function SchemaView({
                     parentWidth={parentWidth}
                     setParentHeight={setParentHeight}
                     setParentWidth={setParentWidth}
-                    loading={loading}
-                    setLoading={setLoading}
+                    loading={isLoading}
+                    setLoading={setIsLoading}
                 />
-                <div className="h-full z-10 absolute top-12 inset-x-12 pointer-events-none flex gap-8 justify-between">
-                    {
-                        (categories.length > 0) &&
-                        <Labels graph={schema} type="Schema" className="left-2" label="Labels" categories={categories} onClick={onCategoryClick} />
-                    }
-                    {
-                        (labels.length > 0) &&
-                        <Labels graph={schema} type="Schema" className="right-2 text-end" label="Relationships" categories={labels} onClick={onLabelClick} />
-                    }
-                </div>
+                {
+                    !isLoading &&
+                    <div className="h-full z-10 absolute top-12 inset-x-12 pointer-events-none flex gap-8 justify-between">
+                        {
+                            (categories.length > 0) &&
+                            <Labels graph={schema} type="Schema" className="left-2" label="Labels" categories={categories} onClick={onCategoryClick} />
+                        }
+                        {
+                            (labels.length > 0) &&
+                            <Labels graph={schema} type="Schema" className="right-2 text-end" label="Relationships" categories={labels} onClick={onLabelClick} />
+                        }
+                    </div>
+                }
                 {
                     selectedElement ?
                         <SchemaDataPanel

@@ -47,6 +47,14 @@ export default function Page() {
     const [edgesCount, setEdgesCount] = useState(0)
 
     useEffect(() => {
+        const canvas = document.querySelector('.force-graph-container canvas')
+        
+        if (!canvas) return
+        
+        canvas.setAttribute('data-engine-status', 'stop')
+    }, [])
+
+    useEffect(() => {
         setLabels([...graph.Labels])
         setCategories([...graph.Categories])
     }, [graph, graph.Labels.length, graph.Categories.length, graph.Labels, graph.Categories])
@@ -119,7 +127,9 @@ export default function Page() {
         setCooldownTicks(ticks)
 
         const canvas = document.querySelector('.force-graph-container canvas');
+        
         if (!canvas) return
+        
         if (ticks === 0) {
             canvas.setAttribute('data-engine-status', 'stop')
         } else {

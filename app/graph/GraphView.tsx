@@ -63,7 +63,7 @@ function GraphView({
 
     const { graph } = useContext(GraphContext)
 
-    const [loading, setLoading] = useState<boolean>(false)
+    const [isLoading, setIsLoading] = useState<boolean>(false)
     const [parentHeight, setParentHeight] = useState<number>(0)
     const [parentWidth, setParentWidth] = useState<number>(0)
     const [tabsValue, setTabsValue] = useState<Tab>("Graph")
@@ -83,7 +83,7 @@ function GraphView({
     useEffect(() => {
         if (!elementsLength) return;
 
-        setLoading(true)
+        setIsLoading(true)
         setData({ ...graph.Elements })
     }, [graph, elementsLength, setData])
 
@@ -194,6 +194,7 @@ function GraphView({
                     disabled={graph.getElements().length === 0}
                     handleCooldown={handleCooldown}
                     cooldownTicks={cooldownTicks}
+                    isLoading={isLoading}
                 />
             </div>
             <TabsContent value="Graph" className="h-full w-full mt-0 overflow-hidden">
@@ -213,30 +214,34 @@ function GraphView({
                     parentWidth={parentWidth}
                     setParentHeight={setParentHeight}
                     setParentWidth={setParentWidth}
-                    loading={loading}
-                    setLoading={setLoading}
+                    loading={isLoading}
+                    setLoading={setIsLoading}
                 />
-                <div className="h-full z-10 absolute top-12 inset-x-12 pointer-events-none flex gap-8">
-                    {
-                        (labels.length > 0 || categories.length > 0) &&
-                        <Labels graph={graph} categories={categories} onClick={onCategoryClick} label="Labels" type="Graph" />
-                    }
-                    <div className="w-1 grow h-fit">
-                        <Toolbar
-                            graph={graph}
-                            label="Graph"
-                            setSelectedElement={setSelectedElement}
-                            selectedElements={selectedElements}
-                            handleDeleteElement={handleDeleteElement}
-                            chartRef={chartRef}
-                            backgroundColor="bg-transparent"
-                        />
+                {
+                    !isLoading &&
+                    <div className="h-full z-10 absolute top-12 inset-x-12 pointer-events-none flex gap-8">
+                        {
+                            (labels.length > 0 || categories.length > 0) &&
+                            <Labels graph={graph} categories={categories} onClick={onCategoryClick} label="Labels" type="Graph" />
+                        }
+                        <div className="w-1 grow h-fit">
+                            <Toolbar
+                                graph={graph}
+                                label="Graph"
+                                setSelectedElement={setSelectedElement}
+                                selectedElements={selectedElements}
+                                handleDeleteElement={handleDeleteElement}
+                                chartRef={chartRef}
+                                isLoading={isLoading}
+                                backgroundColor="bg-transparent"
+                            />
+                        </div>
+                        {
+                            (labels.length > 0 || categories.length > 0) &&
+                            <Labels graph={graph} categories={labels} onClick={onLabelClick} label="Relationships" type="Graph" />
+                        }
                     </div>
-                    {
-                        (labels.length > 0 || categories.length > 0) &&
-                        <Labels graph={graph} categories={labels} onClick={onLabelClick} label="Relationships" type="Graph" />
-                    }
-                </div>
+                }
                 {
                     selectedElement &&
                     <GraphDataPanel
