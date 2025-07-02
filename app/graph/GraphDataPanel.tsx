@@ -32,7 +32,7 @@ export default function GraphDataPanel({ object, setObject, onDeleteElement, set
     const lastObjId = useRef<number | undefined>(undefined)
     const labelsListRef = useRef<HTMLUListElement>(null)
     const searchRef = useRef<HTMLInputElement>(null)
-    
+
     const { toast } = useToast()
     const { data: session } = useSession()
 
@@ -154,13 +154,14 @@ export default function GraphDataPanel({ object, setObject, onDeleteElement, set
                         <PaginationList
                             className="h-1 grow"
                             label="Label"
-                            list={label}
+                            list={label.map(value => ({ value }))}
+                            setList={(value) => setLabel(value.map((item) => item.value))}
                             step={12}
                             dataTestId="attributes"
                             onClick={(l) => selectedLabel === l ? setSelectedLabel("") : setSelectedLabel(l)}
                             isSelected={(item) => item === selectedLabel}
                             afterSearchCallback={(filteredList) => {
-                                if (!filteredList.includes(selectedLabel)) {
+                                if (!filteredList.some(({ value }) => value === selectedLabel)) {
                                     setSelectedLabel("")
                                 }
                             }}

@@ -1,11 +1,12 @@
 import { cn } from "@/lib/utils"
 import { useEffect, useState } from "react"
 import { Loader2 } from "lucide-react"
+import { Checkbox } from "@/components/ui/checkbox"
 import Button from "./ui/Button"
 import { Query } from "../api/graph/model"
 import Input from "./ui/Input"
 
-type Item = string | Query
+type Item = { value: string | Query, checked?: boolean }
 
 interface Props<T extends Item> {
     list: T[]
@@ -14,17 +15,18 @@ interface Props<T extends Item> {
     dataTestId: string
     label: string
     afterSearchCallback: (newFilteredList: T[]) => void
-    isSelected: (item: T) => boolean
+    isSelected: (item: T["value"]) => boolean
     searchRef: React.RefObject<HTMLInputElement>
+    setList?: (value: T[]) => void
     isLoading?: boolean
     className?: string
     children?: React.ReactNode
 }
 
-export default function PaginationList<T extends Item>({ list, step, onClick, dataTestId, afterSearchCallback, isSelected, label, isLoading, className, children, searchRef }: Props<T>) {
+export default function PaginationList<T extends Item>({ list, setList, step, onClick, dataTestId, afterSearchCallback, isSelected, label, isLoading, className, children, searchRef }: Props<T>) {
 
     const [filteredList, setFilteredList] = useState<T[]>([...list])
-    const [hoverIndex, setHoverIndex] = useState<number>(0)
+    const [hoverIndex, setHoverIndex] = useState<number>(-1)
     const [stepCounter, setStepCounter] = useState(0)
     const [pageCount, setPageCount] = useState(0)
     const [search, setSearch] = useState("")
@@ -41,9 +43,12 @@ export default function PaginationList<T extends Item>({ list, step, onClick, da
     }, [list, step])
 
     useEffect(() => {
+        setFilteredList(list)
+
         const timeout = setTimeout(() => {
-            const newFilteredList = list.filter((item) => !search || (typeof item === "string" ? item.toLowerCase().includes(search.toLowerCase()) : item.text.toLowerCase().includes(search.toLowerCase()))) || []
-            if (JSON.stringify(newFilteredList) !== JSON.stringify(filteredList)) {
+            const newFilteredList = list.filter(({ value }) => !search || (typeof value === "string" ? value.toLowerCase().includes(search.toLowerCase()) : value.text.toLowerCase().includes(search.toLowerCase()))) || []
+
+            if (filteredList.some((item) => item.value !== newFilteredList[newFilteredList.indexOf(item)].value)) {
                 setFilteredList([...newFilteredList])
                 afterSearchCallback([...newFilteredList])
                 setStepCounter(0)
@@ -76,7 +81,7 @@ export default function PaginationList<T extends Item>({ list, step, onClick, da
                             e.preventDefault()
                             setSearch("")
                         }
-                        
+
                         if (e.key === "ArrowUp" || (e.shiftKey && e.key === "Tab" && hoverIndex > 0)) {
                             e.preventDefault()
 
@@ -91,7 +96,7 @@ export default function PaginationList<T extends Item>({ list, step, onClick, da
 
                         if (e.key === "Enter") {
                             e.preventDefault()
-                            onClick(typeof items[hoverIndex] === "string" ? items[hoverIndex] : items[hoverIndex].text)
+                            onClick(typeof items[hoverIndex].value === "string" ? items[hoverIndex].value : items[hoverIndex].value.text)
                         }
                     }}
                     onFocus={() => setHoverIndex(0)}
@@ -101,8 +106,19 @@ export default function PaginationList<T extends Item>({ list, step, onClick, da
             </div>
             {
                 children &&
-                <div className="flex gap-2 items-center">
+                <div className="flex flex-wrap gap-2 items-center">
                     {children}
+                </div>
+            }
+            {
+                setList &&
+                <div className="flex gap-1 items-center">
+                    <p>Select all</p>
+                    <Checkbox
+                        checked={list.every(item => item.checked)}
+                        onCheckedChange={(c) => setList(list.map((item) => ({ ...item, checked: c })))
+                        }
+                    />
                 </div>
             }
             <ul
@@ -110,33 +126,47 @@ export default function PaginationList<T extends Item>({ list, step, onClick, da
                 className="h-1 grow flex flex-col p-2"
             >
                 {
-                    items.map((item, index) => {
-                        const selected = isSelected ? isSelected(item) : false
+                    items.map(({ value, checked }, index) => {
+                        const selected = isSelected ? isSelected(value) : false
                         const hover = hoverIndex === index
                         return (
                             <li
                                 data-testid={`${dataTestId}${index}`}
                                 className={cn(
-                                    "border-b",
+                                    "border-b flex flex-col gap-1 overflow-hidden justify-center",
                                     selected ? "text-primary border-primary" : "text-gray-500 border-gray-500",
                                     hover && !selected && "text-white border-white"
                                 )}
                                 onMouseEnter={() => setHoverIndex(index)}
                                 onMouseLeave={() => searchRef.current !== document.activeElement && setHoverIndex(-1)}
                                 style={{ height: `${1 / step * 100}%` }}
-                                key={typeof item === "string" ? item : item.text}
+                                key={typeof value === "string" ? value : value.text}
                             >
+                                <div className="flex gap-2 items-center">
+                                    {
+                                        typeof value !== "string" &&
+                                        <p className="text-sm text-gray-500">{value.timestamp.toLocaleString()}</p>
+                                    }
+                                    {
+                                        checked !== undefined && setList &&
+                                        <Checkbox
+                                            className="data-[state=checked]:text-white"
+                                            checked={checked}
+                                            onCheckedChange={(c) => setList(list.map((item, i) => i === index ? ({ ...item, checked: c }) : item))}
+                                        />
+                                    }
+                                </div>
                                 {
                                     onClick ?
                                         <Button
-                                            className={cn("w-full h-full text-xl text-center")}
-                                            label={typeof item === "string" ? item : item.text}
+                                            className={cn("w-full text-xl text-center")}
+                                            label={typeof value === "string" ? value : value.text}
                                             onClick={() => {
-                                                onClick(typeof item === "string" ? item : item.text)
+                                                onClick(typeof value === "string" ? value : value.text)
                                             }}
                                             tabIndex={-1}
                                         />
-                                        : <p className="w-full h-full text-xl text-center">{typeof item === "string" ? item : item.text}</p>
+                                        : <p className="w-full h-full text-xl text-center">{typeof value === "string" ? value : value.text}</p>
                                 }
                             </li>
                         )
@@ -186,4 +216,5 @@ PaginationList.defaultProps = {
     className: undefined,
     children: undefined,
     isLoading: undefined,
+    setList: undefined,
 }

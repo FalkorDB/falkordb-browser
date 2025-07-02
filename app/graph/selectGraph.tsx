@@ -42,10 +42,12 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
     const [openMenage, setOpenMenage] = useState(false)
     const [openDuplicate, setOpenDuplicate] = useState(false)
     const [isLoading, setIsLoading] = useState(false)
+    const [list, setList] = useState<{ value: string, checked: boolean }[]>([])
+    
     useEffect(() => {
         setOpen(false)
     }, [selectedValue])
-
+    
     const handleSetOption = async (option: string, optionName: string) => {
         const result = await securedFetch(`api/${type === "Graph" ? "graph" : "schema"}/${prepareArg(option)}/?sourceName=${prepareArg(optionName)}`, {
             method: "PATCH",
@@ -53,26 +55,27 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
                 "Content-Type": "application/json"
             },
         }, toast, setIndicator)
-
+        
         if (result.ok) {
-
+            
             const newOptions = options.map((opt) => opt === optionName ? option : opt)
             setOptions!(newOptions)
-
+            
             if (setSelectedValue && optionName === selectedValue) setSelectedValue(option)
-
-            handleSetRows(newOptions)
+                
+                handleSetRows(newOptions)
+            }
+            
+            return result.ok
         }
-
-        return result.ok
+        
+        const handleSetRows = (opts: string[]) => {
+            setRows(opts.map(opt => session?.user?.role === "Admin" ? ({ checked: false, name: opt, cells: [{ value: opt, onChange: (value: string) => handleSetOption(value, opt), type: "text" }] }) : ({ checked: false, name: opt, cells: [{ value: opt, type: "readonly" }] })))
     }
-
-    const handleSetRows = (opts: string[]) => {
-        setRows(opts.map(opt => session?.user?.role === "Admin" ? ({ checked: false, name: opt, cells: [{ value: opt, onChange: (value: string) => handleSetOption(value, opt), type: "text" }] }) : ({ checked: false, name: opt, cells: [{ value: opt, type: "readonly" }] })))
-    }
-
+    
     useEffect(() => {
         handleSetRows(options)
+        setList(options.map(opt => ({ value: opt, checked: false })))
     }, [options])
 
     const handleOpenChange = async (o: boolean) => {
@@ -114,7 +117,7 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
                 >
                     <PaginationList
                         className="h-1 grow p-0"
-                        list={options}
+                        list={list}
                         step={3}
                         onClick={handleClick}
                         dataTestId="selectGraph"

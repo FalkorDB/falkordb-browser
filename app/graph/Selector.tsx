@@ -54,10 +54,16 @@ export default function Selector({ graph, options, setOptions, graphName, setGra
     const [queriesOpen, setQueriesOpen] = useState(false)
     const [isLoading, setIsLoading] = useState(false)
     const [maximize, setMaximize] = useState(false)
-    const [tab, setTab] = useState<keyof Query>("text")
-
+    const [tab, setTab] = useState<"text" | "profile" | "metadata" | "explain">("text")
+    const [queries, setQueries] = useState<{ value: Query, checked: boolean }[]>([])
     const currentQuery = historyQuery?.currentQuery === historyQuery?.query && historyQuery?.counter === 0 && graph.CurrentQuery || historyQuery?.queries.find(q => q.text === historyQuery?.query)
     const type = runQuery && historyQuery && setHistoryQuery ? "Graph" : "Schema"
+
+    useEffect(() => {
+        if (historyQuery) {
+            setQueries(prev => historyQuery.queries.map((q, i) => ({ value: q, checked: prev[i]?.checked || false })))
+        }
+    }, [historyQuery])
 
     const focusEditorAtEnd = () => {
         if (editorRef.current) {
@@ -76,7 +82,7 @@ export default function Selector({ graph, options, setOptions, graphName, setGra
     };
 
 
-    const isTabEnabled = useCallback((tabName: keyof Query) => {
+    const isTabEnabled = useCallback((tabName: "text" | "profile" | "metadata" | "explain") => {
         if (tabName === "text") return !!currentQuery?.text;
         if (tabName === "metadata") return !!currentQuery && currentQuery.metadata.length > 0;
         if (tabName === "explain") return !!currentQuery && currentQuery.explain.length > 0;
@@ -88,7 +94,7 @@ export default function Selector({ graph, options, setOptions, graphName, setGra
             const currentValue = currentQuery?.[tab]
 
             if (!currentValue || currentValue.length === 0) {
-                const fallbackTab = (Object.keys(currentQuery) as (keyof Query)[]).find(isTabEnabled);
+                const fallbackTab = (Object.keys(currentQuery) as ("text" | "profile" | "metadata" | "explain")[]).find(isTabEnabled);
 
                 if (fallbackTab && fallbackTab !== tab) {
                     setTab(fallbackTab);
@@ -235,10 +241,11 @@ export default function Selector({ graph, options, setOptions, graphName, setGra
                                         <PaginationList
                                             label="Query"
                                             className="w-[40%] bg-background rounded-lg overflow-hidden"
-                                            isSelected={(item) => historyQuery.queries.findIndex(q => q.text === item.text) + 1 === historyQuery.counter}
-                                            afterSearchCallback={afterSearchCallback}
+                                            isSelected={(item) => historyQuery.queries.findIndex(q => q.text === (item as Query).text) + 1 === historyQuery.counter}
+                                            afterSearchCallback={(newFilteredList) => afterSearchCallback(newFilteredList.map(({ value }) => ({ value })) as unknown as Query[])}
                                             dataTestId="queryHistory"
-                                            list={historyQuery.queries.reverse()}
+                                            list={queries}
+                                            setList={setQueries}
                                             step={STEP}
                                             onClick={(counter) => {
                                                 setHistoryQuery(prev => ({
@@ -247,8 +254,21 @@ export default function Selector({ graph, options, setOptions, graphName, setGra
                                                 }))
                                             }}
                                             searchRef={searchQueryRef}
-                                        />
-                                        <Tabs value={tab} onValueChange={(value) => setTab(value as keyof Query)} className="w-[60%] flex flex-col gap-8 items-center">
+                                        >
+                                            <Button
+                                                label="Remove History"
+                                                variant="Delete"
+                                                onClick={() => {
+                                                    const newQueries = historyQuery.queries.filter((_q, i) => !queries[i].checked)
+                                                    localStorage.setItem("query history", JSON.stringify(newQueries))
+                                                    setHistoryQuery(prev => ({
+                                                        ...prev,
+                                                        queries: newQueries,
+                                                    }))
+                                                }}
+                                            />
+                                        </PaginationList>
+                                        <Tabs value={tab} onValueChange={(value) => setTab(value as "text" | "profile" | "metadata" | "explain")} className="w-[60%] flex flex-col gap-8 items-center">
                                             <TabsList className="bg-black h-fit w-fit p-2">
                                                 <TabsTrigger className={cn("!text-gray-500 data-[state=active]:!bg-background data-[state=active]:!text-white")} disabled={!isTabEnabled("text")} value="text">Edit Query</TabsTrigger>
                                                 <TabsTrigger className={cn("!text-gray-500 data-[state=active]:!bg-background data-[state=active]:!text-white")} disabled={!isTabEnabled("profile")} value="profile">Profile</TabsTrigger>

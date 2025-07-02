@@ -141,7 +141,7 @@ export default function Page() {
         if (!explain.ok) return
 
         const explainJson = await explain.json()
-        const newQuery = { text: q, metadata: result.metadata, explain: explainJson.result, profile: [] }
+        const newQuery = { text: q, metadata: result.metadata, explain: explainJson.result, profile: [], timestamp: new Date() }
         const queryArr = historyQuery.queries.some(qu => qu.text === q) ? historyQuery.queries : [...historyQuery.queries, newQuery]
 
         setHistoryQuery(prev => historyQuery.counter === 0 ? {
