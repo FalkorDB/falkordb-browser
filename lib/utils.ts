@@ -85,8 +85,8 @@ export function prepareArg(arg: string) {
   return encodeURIComponent(arg.trim());
 }
 
-export const defaultQuery = (q?: string) =>
-  q || "MATCH (n) OPTIONAL MATCH (n)-[e]-(m) return * LIMIT 100";
+export const getDefaultQuery = (q?: string) =>
+  q || "MATCH (n) OPTIONAL MATCH (n)-[e]-(m) RETURN * LIMIT 100";
 
 export function rgbToHSL(hex: string): string {
   // Remove the # if present
@@ -166,15 +166,18 @@ export function getMainReturnLimit(query: string) {
   const match = query.match(
     /.*\bRETURN\b.*?(?:\bLIMIT\b\s*(\d+))?(?:\s*;?\s*$|\s*$)/i
   );
-  return match && match[1];
+  return {
+    hasReturn: !!match,
+    hasLimit: !!match && !!match[1],
+  };
 }
 
 export function getQueryWithLimit(query: string, limit: number) {
   if (limit === 0) return query;
 
-  const hasMainReturnLimit = getMainReturnLimit(query);
+  const { hasLimit, hasReturn } = getMainReturnLimit(query);
 
-  if (hasMainReturnLimit) {
+  if (hasLimit || !hasReturn) {
     return query;
   }
 

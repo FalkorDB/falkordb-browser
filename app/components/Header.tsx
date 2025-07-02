@@ -3,9 +3,10 @@
 'use client'
 
 import { ArrowUpRight, LifeBuoy, LogOut, Settings } from "lucide-react";
-import { useContext } from "react";
+import { useCallback, useContext } from "react";
 import Image from "next/image";
 import { cn } from "@/lib/utils";
+import { getQuerySettingsNavigationToast } from "@/components/ui/toaster";
 import { useRouter, usePathname } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
 import pkg from '@/package.json';
@@ -14,9 +15,10 @@ import { Drawer, DrawerContent, DrawerDescription, DrawerTitle, DrawerTrigger } 
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import Link from "next/link";
+import { useToast } from "@/components/ui/use-toast";
 import Button from "./ui/Button";
 import CreateGraph from "./CreateGraph";
-import { IndicatorContext } from "./provider";
+import { IndicatorContext, QuerySettingsContext } from "./provider";
 
 interface Props {
     onSetGraphName: (newGraphName: string) => void
@@ -24,15 +26,28 @@ interface Props {
 }
 
 export default function Header({ onSetGraphName, graphNames }: Props) {
-    
+
     const { indicator } = useContext(IndicatorContext)
+    const { hasChanges, saveSettings, resetSettings } = useContext(QuerySettingsContext)
 
     const { data: session } = useSession()
     const pathname = usePathname()
     const router = useRouter()
-    
+    const { toast } = useToast()
+
     const type = pathname.includes("/schema") ? "Schema" : "Graph"
     const showCreate = (pathname.includes("/graph") || pathname.includes("/schema")) && session?.user?.role && session.user.role !== "Read-Only"
+
+    const navigateBack = useCallback(() => {
+        if (hasChanges) {
+            getQuerySettingsNavigationToast(toast, saveSettings, () => {
+                router.back()
+                resetSettings()
+            })
+        } else {
+            router.back()
+        }
+    }, [hasChanges, resetSettings, saveSettings, router, toast])
 
     return (
         <div className="bg-background py-5 px-2 flex flex-col justify-between items-center">
@@ -79,7 +94,7 @@ export default function Header({ onSetGraphName, graphNames }: Props) {
                         <Button
                             indicator={indicator}
                             title="Adjust application settings"
-                            onClick={() => pathname.includes("/settings") ? router.back() : router.push("/settings")}
+                            onClick={() => pathname.includes("/settings") ? navigateBack() : router.push("/settings")}
                         >
                             <Settings size={35} />
                         </Button>

@@ -7,20 +7,32 @@ import dynamic from "next/dynamic";
 import { ForceGraphMethods } from "react-force-graph-2d";
 import { Category, Graph, GraphData, Link, Node } from "../api/graph/model";
 import Tutorial from "./Tutorial";
-import { GraphNameContext, GraphContext, IndicatorContext, LimitContext, TimeoutContext, GraphNamesContext, HistoryQueryContext } from "../components/provider";
+import { GraphContext, IndicatorContext, HistoryQueryContext, QuerySettingsContext } from "../components/provider";
 
 const Selector = dynamic(() => import("./Selector"), { ssr: false })
 const GraphView = dynamic(() => import("./GraphView"), { ssr: false })
 
 export default function Page() {
-    const { graphNames, setGraphNames } = useContext(GraphNamesContext)
-    const {historyQuery, setHistoryQuery} = useContext(HistoryQueryContext)
+    const { historyQuery, setHistoryQuery } = useContext(HistoryQueryContext)
     const { setIndicator } = useContext(IndicatorContext);
-    const { graph, setGraph } = useContext(GraphContext)
-    const { graphName, setGraphName } = useContext(GraphNameContext)
-    const { timeout } = useContext(TimeoutContext);
-    const { limit } = useContext(LimitContext);
+    const {
+        graph,
+        setGraph,
+        graphName,
+        setGraphName,
+        graphNames,
+        setGraphNames
+    } = useContext(GraphContext)
 
+    const {
+        settings: {
+            limitSettings: { limit },
+            timeoutSettings: { timeout },
+            runDefaultQuerySettings: { runDefaultQuery },
+            defaultQuerySettings: { defaultQuery },
+            contentPersistenceSettings: { contentPersistence },
+        }
+    } = useContext(QuerySettingsContext)
     const { toast } = useToast()
 
     const chartRef = useRef<ForceGraphMethods<Node, Link>>()
@@ -49,7 +61,7 @@ export default function Page() {
         if (!result.ok) return
 
         let json = await result.json()
-        
+
         while (typeof json.result === "number") {
             // eslint-disable-next-line no-await-in-loop
             const res = await securedFetch(`api/graph/${prepareArg(graphName)}/query?id=${prepareArg(json.result.toString())}`, {
@@ -68,16 +80,8 @@ export default function Page() {
         setNodesCount(json.nodes)
     }, [graphName, toast, setIndicator])
 
-    useEffect(() => {
-        if (graphName !== graph.Id) {
-            const colors = JSON.parse(localStorage.getItem(graphName) || "[]")
-            setGraph(Graph.empty(graphName, colors))
-        }
-        fetchCount()
-    }, [fetchCount, graph.Id, graphName, setGraph])
-
-    const run = async (q: string) => {
-        if (!graphName) {
+    const run = useCallback(async (q: string, name: string) => {
+        if (!name) {
             toast({
                 title: "Error",
                 description: "Select a graph first",
@@ -109,7 +113,7 @@ export default function Page() {
         setSelectedElement(undefined)
 
         return json.result
-    }
+    }, [limit, timeout, toast, setIndicator])
 
     const handleCooldown = (ticks?: number) => {
         setCooldownTicks(ticks)
@@ -124,31 +128,74 @@ export default function Page() {
         }
     }
 
-    const runQuery = async (q: string) => {
-        const result = await run(q)
+    const runQuery = useCallback(async (q: string, name?: string) => {
+        const n = name || graphName
+        const result = await run(q, n)
+
         if (!result) return
+     
         const explain = await securedFetch(`api/graph/${prepareArg(graphName)}/explain?query=${prepareArg(q)}`, {
             method: "GET"
         }, toast, setIndicator)
+
         if (!explain.ok) return
+
         const explainJson = await explain.json()
         const newQuery = { text: q, metadata: result.metadata, explain: explainJson.result, profile: [] }
         const queryArr = historyQuery.queries.some(qu => qu.text === q) ? historyQuery.queries : [...historyQuery.queries, newQuery]
-        setHistoryQuery(prev => ({
+
+        setHistoryQuery(prev => historyQuery.counter === 0 ? {
+            queries: queryArr,
+            query: q,
+            currentQuery: q,
+            counter: 0
+        } : {
             ...prev,
             queries: queryArr,
             currentQuery: q,
             counter: 0
-        }))
-        localStorage.setItem("query history", JSON.stringify(queryArr))
-        const g = Graph.create(graphName, result, false, false, limit, graph.Colors, newQuery)
+        })
+
+        const g = Graph.create(n, result, false, false, limit, graph.Colors, newQuery)
+
         setGraph(g)
+        fetchCount()
+        handleCooldown()
+        localStorage.setItem("query history", JSON.stringify(queryArr))
+        localStorage.setItem("savedContent", JSON.stringify({ graphName: n, query: q }))
         // eslint-disable-next-line @typescript-eslint/ban-ts-comment
         // @ts-ignore
         window.graph = g
+    }, [graphName, run, toast, setIndicator, historyQuery.queries, historyQuery.counter, setHistoryQuery, limit, graph.Colors, setGraph, fetchCount])
+
+    useEffect(() => {
+        const content = localStorage.getItem("savedContent")
+
+        if (content) {
+            const { graphName: name, query } = JSON.parse(content)
+
+            if (!graph.Id && graphNames.includes(name) && contentPersistence) {
+                setGraphName(name)
+                runQuery(query, name)
+                return
+            }
+        }
+
+
+        if (!graphName) return
+
+        if (graphName !== graph.Id) {
+            if (runDefaultQuery) {
+                runQuery(defaultQuery)
+                return
+            }
+
+            const colorsArr = JSON.parse(localStorage.getItem(graphName) || "[]")
+            setGraph(Graph.empty(graphName, colorsArr))
+        }
+
         fetchCount()
-        handleCooldown()
-    }
+    }, [fetchCount, graph.Id, graphName, setGraph, runDefaultQuery, defaultQuery, runQuery, contentPersistence, setGraphName, graphNames])
 
     const handleDeleteElement = async () => {
         if (selectedElements.length === 0 && selectedElement) {

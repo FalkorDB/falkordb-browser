@@ -1,5 +1,6 @@
 "use client"
 
+import ToastButton from "@/app/components/ToastButton";
 import {
   Toast,
   ToastClose,
@@ -8,7 +9,32 @@ import {
   ToastTitle,
   ToastViewport,
 } from "@/components/ui/toast"
-import { useToast } from "@/components/ui/use-toast"
+import { useToast } from "@/components/ui/use-toast"  
+
+export const getQuerySettingsNavigationToast = (
+  toast: any,
+  saveCallback: () => void,
+  navigateBack: () => void
+) => {
+  toast({
+    title: "Query settings",
+    description:
+      "Are you sure you want to leave this page?\nYour changes will not be saved.",
+    action: (
+      <div className="flex flex-col gap-2">
+        <ToastButton variant="Secondary" label="Leave" onClick={navigateBack} />
+        <ToastButton
+          variant="Primary"
+          label="Leave & Save"
+          onClick={() => {
+            saveCallback();
+            navigateBack();
+          }}
+        />
+      </div>
+    ),
+  });
+};
 
 export function Toaster() {
   const { toasts } = useToast()

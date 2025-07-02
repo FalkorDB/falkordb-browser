@@ -29,6 +29,23 @@ export default class LoginPage extends HeaderComponent {
         return this.page.locator("//div[p[text()=\"Don't show this again\"]]//button");
     }
 
+    // TLS locators
+    private get tlsCheckbox(): Locator {
+        return this.page.getByTestId("tls-checkbox");
+    }
+
+    private get uploadCertificateInput(): Locator {
+        return this.page.getByText("Upload Certificate");
+    }
+
+    private get certificateUploadedStatus(): Locator {
+        return this.page.getByTestId("certificate-uploaded-status");
+    }
+
+    private get removeCertificateBtn(): Locator {
+        return this.page.getByTestId("remove-certificate-btn");
+    }
+
     async clickConnect(): Promise<void> {
         await interactWhenVisible(this.connectBtn, el => el.click(), "connect button");
     }
@@ -53,6 +70,36 @@ export default class LoginPage extends HeaderComponent {
         await interactWhenVisible(this.dissmissDialogCheckbox, el => el.click(), "disable tutorial");
     }
 
+    // TLS methods
+    async clickEnableTLS(): Promise<void> {
+        await interactWhenVisible(this.tlsCheckbox, el => el.click(), "TLS checkbox");
+    }
+
+    async isTLSEnabled(): Promise<boolean> {
+        return await this.tlsCheckbox.getAttribute('data-state') === 'checked';
+    }
+
+    async clickUploadCA(): Promise<void> {
+        await interactWhenVisible(this.uploadCertificateInput, el => el.click(), "upload certificate input");
+    }
+
+    async clickRemoveCertificateBtn(): Promise<void> {
+        await interactWhenVisible(this.removeCertificateBtn, (el) => el.click(), "remove certificate button");
+    }
+
+    async isCertificateUploaded(): Promise<boolean> {
+        try {
+            await this.certificateUploadedStatus.waitFor({ state: 'visible', timeout: 5000 });
+            return true;
+        } catch (error) {
+            return false;
+        }
+    }
+
+    async isCertificateRemoved(): Promise<boolean> {
+        return await this.certificateUploadedStatus.isHidden();
+    }
+
     async clickOnConnect(): Promise<void> {
         await this.clickConnect();
         await waitForURL(this.page, urls.graphUrl);
@@ -71,4 +118,25 @@ export default class LoginPage extends HeaderComponent {
         await this.page.mouse.click(10, 10);
     }
 
+    async uploadCertificate(filePath: string): Promise<void> {
+        const fs = require('fs');
+        if (!fs.existsSync(filePath)) {
+            throw new Error(`Certificate file does not exist: ${filePath}`);
+        }
+        
+        const fileChooserPromise = this.page.waitForEvent('filechooser');
+        await this.clickUploadCA();
+        const fileChooser = await fileChooserPromise;
+        await fileChooser.setFiles(filePath);
+        
+        try {
+            await this.certificateUploadedStatus.waitFor({ state: 'visible', timeout: 10000 });
+        } catch (error) {
+            console.log("Certificate upload status not visible, it might be already uploaded or the upload failed.");
+        }
+    }
+
+    async waitForSuccessfulLogin(Url: string): Promise<void> {
+        await this.page.waitForURL(Url, { timeout: 5000 });
+    }
 }

@@ -317,4 +317,24 @@ test.describe('Graph Tests', () => {
         await apiCall.removeGraph(graphName, "admin");
     });
 
+    test(`@admin Validate duplicate graph functionality via UI and verify via API`, async () => {
+        const graphName = getRandomString('graph');
+        await apiCall.addGraph(graphName);
+        await apiCall.runQuery(graphName, CREATE_QUERY);
+        const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+        await browser.setPageToFullScreen();
+        await graph.duplicateGraph(graphName);
+        const duplicatedGraphName = `${graphName} (copy)`;
+        
+        const response = await apiCall.getGraphs();
+        expect(response.opts.includes(duplicatedGraphName)).toBeTruthy();
+        
+        const originalCount = await apiCall.getGraphCount(graphName);
+        const duplicatedCount = await apiCall.getGraphCount(duplicatedGraphName);
+        expect(duplicatedCount.result.data[0].nodes).toBe(originalCount.result.data[0].nodes);
+        expect(duplicatedCount.result.data[0].edges).toBe(originalCount.result.data[0].edges);
+        await apiCall.removeGraph(graphName);
+        await apiCall.removeGraph(duplicatedGraphName);
+    });
+
 })

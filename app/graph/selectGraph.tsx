@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-use-before-define */
 
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { useContext, useEffect, useState } from "react";
+import { useContext, useEffect, useRef, useState } from "react";
 import { DialogHeader, DialogDescription, DialogTrigger, DialogTitle, DialogContent, Dialog } from "@/components/ui/dialog";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import { prepareArg, Row, securedFetch } from "@/lib/utils";
@@ -32,6 +32,8 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
 
     const { indicator, setIndicator } = useContext(IndicatorContext)
 
+    const inputRef = useRef<HTMLInputElement>(null)
+
     const { toast } = useToast()
     const { data: session } = useSession()
 
@@ -40,7 +42,6 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
     const [openMenage, setOpenMenage] = useState(false)
     const [openDuplicate, setOpenDuplicate] = useState(false)
     const [isLoading, setIsLoading] = useState(false)
-
     useEffect(() => {
         setOpen(false)
     }, [selectedValue])
@@ -108,7 +109,9 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
                         }
                     </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent className="h-[400px] w-[350px] mt-2 overflow-hidden border rounded-lg flex flex-col items-center p-8">
+                <DropdownMenuContent
+                    className="h-[400px] w-[350px] mt-2 overflow-hidden border rounded-lg flex flex-col items-center p-8"
+                >
                     <PaginationList
                         className="h-1 grow p-0"
                         list={options}
@@ -119,6 +122,7 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
                         afterSearchCallback={() => { }}
                         isSelected={(value) => selectedValue === value}
                         isLoading={isLoading}
+                        searchRef={inputRef}
                     />
                     <DialogTrigger asChild>
                         <Button
@@ -130,7 +134,15 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
                     </DialogTrigger>
                 </DropdownMenuContent>
             </DropdownMenu>
-            <DialogContent disableClose className="flex flex-col border-none rounded-lg max-w-none h-[90dvh]">
+            <DialogContent
+                onEscapeKeyDown={(e) => {
+                    if (inputRef.current === document.activeElement) {
+                        e.preventDefault()
+                    }
+                }}
+                disableClose
+                className="flex flex-col border-none rounded-lg max-w-none h-[90dvh]"
+            >
                 <DialogHeader className="flex-row justify-between items-center border-b border-secondary pb-4">
                     <DialogTitle className="text-2xl font-medium">Manage Graphs</DialogTitle>
                     <CloseDialog />
@@ -145,6 +157,7 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
                     headers={["Name"]}
                     rows={rows}
                     setRows={setRows}
+                    inputRef={inputRef}
                 >
                     {
                         session?.user?.role !== "Read-Only" &&
@@ -153,10 +166,12 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
                                 type={type}
                                 rows={rows}
                                 handleSetRows={handleSetRows}
-                                setOpenMenage={setOpenMenage}
                                 selectedValue={selectedValue}
                                 setGraphName={setSelectedValue}
                                 setGraph={setGraph}
+                                setOpenMenage={setOpenMenage}
+                                graphNames={options}
+                                setGraphNames={setOptions}
                             />
                             <ExportGraph
                                 selectedValues={rows.filter(opt => opt.checked).map(opt => opt.cells[0].value as string)}
