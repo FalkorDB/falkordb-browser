@@ -23,7 +23,7 @@ export async function GET(
       // Use relative URL to prevent SSRF vulnerability
       const baseUrl = process.env.NEXTAUTH_URL || "http://localhost:3000";
       const result = await fetch(
-        `${baseUrl}/api/graph/${schemaName}/?query=${encodeURIComponent(
+        `${baseUrl}/api/graph/${schemaName}?query=${encodeURIComponent(
           query
         )}`,
         {

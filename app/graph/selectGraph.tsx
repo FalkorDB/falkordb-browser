@@ -47,7 +47,7 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
     }, [selectedValue])
 
     const handleSetOption = async (option: string, optionName: string) => {
-        const result = await securedFetch(`api/${type === "Graph" ? "graph" : "schema"}/${prepareArg(option)}/?sourceName=${prepareArg(optionName)}`, {
+        const result = await securedFetch(`api/${type === "Graph" ? "graph" : "schema"}/${prepareArg(option)}?sourceName=${prepareArg(optionName)}`, {
             method: "PATCH",
             headers: {
                 "Content-Type": "application/json"
