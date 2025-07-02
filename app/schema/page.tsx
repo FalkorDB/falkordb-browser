@@ -43,7 +43,7 @@ export default function Page() {
 
         while (typeof json.result === "number") {
             // eslint-disable-next-line no-await-in-loop
-            const res = await securedFetch(`api/graph/${prepareArg(schemaName)}/query/?id=${prepareArg(json.result.toString())}`, {
+            const res = await securedFetch(`api/graph/${prepareArg(schemaName)}/query?id=${prepareArg(json.result.toString())}`, {
                 method: "GET"
             }, toast, setIndicator)
 
