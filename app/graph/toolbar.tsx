@@ -21,6 +21,7 @@ interface Props {
 }
 
 const ITEM_HEIGHT = 48
+const GAP = 8
 const ITEMS_PER_PAGE = 30
 
 export default function Toolbar({
@@ -49,22 +50,17 @@ export default function Toolbar({
     const [visibleSuggestions, setVisibleSuggestions] = useState<(Node | Link)[]>([])
 
     useEffect(() => {
-        const timeout = setTimeout(() => {
-            const newStartIndex = Math.max(0, Math.floor((scrollTop - (ITEM_HEIGHT * ITEMS_PER_PAGE)) / ITEM_HEIGHT))
-            const newEndIndex = Math.min(suggestions.length, Math.floor((scrollTop + (ITEM_HEIGHT * (ITEMS_PER_PAGE * 2))) / ITEM_HEIGHT))
-            const newTopFakeItemHeight = newStartIndex * ITEM_HEIGHT
-            const newBottomFakeItemHeight = (suggestions.length - newEndIndex) * ITEM_HEIGHT
-            const newVisibleSuggestions = suggestions.slice(newStartIndex, newEndIndex)
+        const newStartIndex = Math.max(0, Math.floor((scrollTop - ((ITEM_HEIGHT + GAP) * ITEMS_PER_PAGE)) / (ITEM_HEIGHT + GAP)))
+        const newEndIndex = Math.min(suggestions.length, Math.floor((scrollTop + ((ITEM_HEIGHT + GAP) * (ITEMS_PER_PAGE * 2))) / (ITEM_HEIGHT + GAP)))
+        const bottomCount = suggestions.length - newEndIndex
+        const newTopFakeItemHeight = newStartIndex > 0 ? (newStartIndex * ITEM_HEIGHT) + ((newStartIndex - 1) * GAP) : 0
+        const newBottomFakeItemHeight = bottomCount > 0 ? (bottomCount * ITEM_HEIGHT) + ((bottomCount - 1) * GAP) : 0
+        const newVisibleSuggestions = suggestions.slice(newStartIndex, newEndIndex)
 
-            setStartIndex(newStartIndex)
-            setTopFakeItemHeight(newTopFakeItemHeight)
-            setBottomFakeItemHeight(newBottomFakeItemHeight)
-            setVisibleSuggestions(newVisibleSuggestions)
-        }, 100)
-
-        return () => {
-            clearTimeout(timeout)
-        }
+        setStartIndex(newStartIndex)
+        setTopFakeItemHeight(newTopFakeItemHeight)
+        setBottomFakeItemHeight(newBottomFakeItemHeight)
+        setVisibleSuggestions(newVisibleSuggestions)
     }, [scrollTop, suggestions])
 
     const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
@@ -106,9 +102,16 @@ export default function Toolbar({
 
     const scrollToSuggestion = (index: number) => {
         if (suggestionRef.current) {
-            suggestionRef.current.scrollTo({ top: (ITEM_HEIGHT + 8) * index, behavior: "smooth" })
+            suggestionRef.current.scrollTo({ top: (ITEM_HEIGHT * index) + (index > 0 ? (index) * GAP : 0), behavior: "smooth" })
         }
     }
+
+    const stripSVG = encodeURIComponent(
+        `<svg width="100%" height="${ITEM_HEIGHT + GAP}" xmlns="http://www.w3.org/2000/svg">
+        <rect x="0" y="0" width="100%" height="${ITEM_HEIGHT}" rx="8" ry="8" fill="#6b7280"/>
+      </svg>`
+    );
+    const stripBackground = `url("data:image/svg+xml,${stripSVG}")`;
 
     return (
         <div className="w-full h-full flex justify-between items-center">
@@ -148,24 +151,22 @@ export default function Toolbar({
                             }
                         }}
                         onBlur={(e) => {
-                            if (suggestionRef.current?.contains(e.relatedTarget) || (e.target as HTMLElement) === suggestionRef.current) {
-                                return
-                            }
+                            if (suggestionRef.current?.contains(e.relatedTarget) || e.relatedTarget === suggestionRef.current) return
 
                             setSuggestions([])
-                        }}
+                        }
+                        }
                         onFocus={() => handleOnChange()}
                     />
                 }
                 {
                     suggestions.length > 0 &&
-                    <div onScroll={handleScroll} ref={suggestionRef} className="max-h-[30dvh] overflow-auto absolute left-0 top-14 w-full border p-2 rounded-lg bg-foreground">
+                    <div tabIndex={-1} onScroll={handleScroll} ref={suggestionRef} className="max-h-[30dvh] overflow-auto absolute left-0 top-14 w-full border p-2 rounded-lg bg-foreground">
                         <ul
                             data-testid={`elementCanvasSuggestionsList${label}`}
                             className="flex flex-col gap-2"
                             role="listbox"
                             tabIndex={-1}
-                            style={{ height: `${suggestions.length * 48}px` }}
                             onKeyDown={(e) => {
                                 if (e.key === 'Escape') {
                                     e.preventDefault()
@@ -194,7 +195,19 @@ export default function Toolbar({
                                 }
                             }}
                         >
-                            <li style={{ height: `${topFakeItemHeight}px` }} />
+                            {
+                                topFakeItemHeight > 0
+                                && <li
+                                    className="animate-pulse"
+                                    style={{
+                                        height: `${topFakeItemHeight}px`,
+                                        backgroundImage: stripBackground,
+                                        backgroundRepeat: 'repeat-y',
+                                        backgroundSize: `100% ${ITEM_HEIGHT + GAP}px`,
+                                        overflow: 'hidden'
+                                    }}
+                                />
+                            }
                             {
                                 visibleSuggestions.map((suggestion, index) => {
                                     const actualIndex = index + startIndex
@@ -232,7 +245,19 @@ export default function Toolbar({
                                     )
                                 })
                             }
-                            <li style={{ height: `${bottomFakeItemHeight}px` }} />
+                            {
+                                bottomFakeItemHeight > 0
+                                && <li
+                                    className="animate-pulse"
+                                    style={{
+                                        height: `${bottomFakeItemHeight}px`,
+                                        backgroundImage: stripBackground,
+                                        backgroundRepeat: 'repeat-y',
+                                        backgroundSize: `100% ${ITEM_HEIGHT + GAP}px`,
+                                        overflow: 'hidden'
+                                    }}
+                                />
+                            }
                         </ul>
                     </div>
                 }

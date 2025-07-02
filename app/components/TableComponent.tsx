@@ -36,6 +36,7 @@ export default function TableComponent({ headers, rows, label, entityName, input
     const { indicator } = useContext(IndicatorContext)
 
     const searchRef = useRef<HTMLInputElement>(null)
+    const headerRef = useRef<HTMLTableRowElement>(null)
     const tableRef = useRef<HTMLTableElement>(null)
 
     const [search, setSearch] = useState<string>("")
@@ -51,22 +52,16 @@ export default function TableComponent({ headers, rows, label, entityName, input
     const [visibleRows, setVisibleRows] = useState<Row[]>([])
 
     useEffect(() => {
-        const timeout = setTimeout(() => {
-            const newStartIndex = Math.max(0, Math.floor((scrollTop - (itemHeight * itemsPerPage)) / itemHeight))
-            const newEndIndex = Math.min(filteredRows.length, Math.floor((scrollTop + (itemHeight * (itemsPerPage * 2))) / itemHeight))
-            const newTopFakeRowHeight = newStartIndex * itemHeight
-            const newBottomFakeRowHeight = (filteredRows.length - newEndIndex) * itemHeight
-            const newVisibleRows = filteredRows.slice(newStartIndex, newEndIndex)
+        const newStartIndex = Math.max(0, Math.floor((scrollTop - (itemHeight * itemsPerPage)) / itemHeight))
+        const newEndIndex = Math.min(filteredRows.length, Math.floor((scrollTop + (itemHeight * (itemsPerPage * 2))) / itemHeight))
+        const newTopFakeRowHeight = newStartIndex * itemHeight
+        const newBottomFakeRowHeight = (filteredRows.length - newEndIndex) * itemHeight
+        const newVisibleRows = filteredRows.slice(newStartIndex, newEndIndex)
 
-            setStartIndex(newStartIndex)
-            setTopFakeRowHeight(newTopFakeRowHeight)
-            setBottomFakeRowHeight(newBottomFakeRowHeight)
-            setVisibleRows(newVisibleRows)
-        }, 100)
-
-        return () => {
-            clearTimeout(timeout)
-        }
+        setStartIndex(newStartIndex)
+        setTopFakeRowHeight(newTopFakeRowHeight)
+        setBottomFakeRowHeight(newBottomFakeRowHeight)
+        setVisibleRows(newVisibleRows)
     }, [scrollTop, itemHeight, itemsPerPage, filteredRows])
 
     useEffect(() => {
@@ -121,6 +116,14 @@ export default function TableComponent({ headers, rows, label, entityName, input
         setScrollTop((e.target as HTMLTableElement).scrollTop)
     }
 
+    const stripSVG = encodeURIComponent(
+        `<svg width='100%' height='${itemHeight}' xmlns='http://www.w3.org/2000/svg'>
+                <line x1='0' y1='${itemHeight - 1}' x2='100%' y2='${itemHeight - 1}' stroke='#e5e7eb' stroke-width='2'/>
+        </svg>`
+    );
+    const columnCount = setRows ? headers.length + 1 : headers.length;
+    const stripBackground = `url("data:image/svg+xml,${stripSVG}")`;
+
     return (
         <div className={cn("h-full w-full flex flex-col gap-4", className)}>
             <div className="flex gap-4">
@@ -147,7 +150,7 @@ export default function TableComponent({ headers, rows, label, entityName, input
             </div>
             <Table ref={tableRef} parentOnScroll={handleScroll} className="h-full overflow-hidden">
                 <TableHeader>
-                    <TableRow className="text-nowrap">
+                    <TableRow ref={headerRef} className="text-nowrap">
                         {
                             setRows ?
                                 <TableHead className="w-5 !pr-2" key={headers[0]}>
@@ -173,7 +176,24 @@ export default function TableComponent({ headers, rows, label, entityName, input
                     </TableRow>
                 </TableHeader>
                 <TableBody>
-                    <TableRow style={{ height: topFakeRowHeight }} />
+                    {
+                        topFakeRowHeight > 0 && (
+                            <tr className="fakeRow">
+                                {/* eslint-disable-next-line jsx-a11y/control-has-associated-label */}
+                                <td
+                                    className="animate-pulse"
+                                    style={{
+                                        height: `${topFakeRowHeight}px`,
+                                        backgroundImage: stripBackground,
+                                        backgroundRepeat: 'repeat-y',
+                                        backgroundSize: `100% ${itemHeight}px`,
+                                        overflow: 'hidden'
+                                    }}
+                                    colSpan={columnCount}
+                                />
+                            </tr>
+                        )
+                    }
                     {
                         visibleRows.map((row, index) => {
                             const actualIndex = startIndex + index;
@@ -339,7 +359,33 @@ export default function TableComponent({ headers, rows, label, entityName, input
                             )
                         })
                     }
-                    <TableRow style={{ height: bottomFakeRowHeight }} />
+                    {
+                        bottomFakeRowHeight > 0 && (
+                            <tr
+                                className="animate-pulse fakeRow"
+                                style={{
+                                    height: `${bottomFakeRowHeight}px`,
+                                    backgroundImage: stripBackground,
+                                    backgroundRepeat: 'repeat-y',
+                                    backgroundSize: `100% ${itemHeight}px`,
+                                    overflow: 'hidden'
+                                }}
+                            >
+                                {/* eslint-disable-next-line jsx-a11y/control-has-associated-label */}
+                                <td
+                                    className="animate-pulse"
+                                    style={{
+                                        height: `${bottomFakeRowHeight}px`,
+                                        backgroundImage: stripBackground,
+                                        backgroundRepeat: 'repeat-y',
+                                        backgroundSize: `100% ${itemHeight}px`,
+                                        overflow: 'hidden'
+                                    }}
+                                    colSpan={columnCount}
+                                />
+                            </tr>
+                        )
+                    }
                 </TableBody>
             </Table>
         </div>

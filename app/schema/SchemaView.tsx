@@ -153,7 +153,7 @@ export default function SchemaView({
 
     return (
         <div className="relative w-full h-full border rounded-lg overflow-hidden">
-            <div className="pointer-events-none absolute bottom-4 inset-x-12 z-10 flex items-center justify-between">
+            <div className="pointer-events-none absolute bottom-4 inset-x-12 z-20 flex items-center justify-between">
                 <GraphDetails
                     graph={schema}
                     nodesCount={nodesCount}

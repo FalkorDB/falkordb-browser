@@ -115,8 +115,6 @@ export default function ForceGraph({
         const linkDistance = Math.min(BASE_LINK_DISTANCE * Math.sqrt(nodeCount) / Math.sqrt(REFERENCE_NODE_COUNT), 120);
         const chargeStrength = Math.max(BASE_CHARGE_STRENGTH * Math.sqrt(nodeCount) / Math.sqrt(REFERENCE_NODE_COUNT), -80);
 
-        console.log(linkDistance, chargeStrength)
-
         // Adjust link force and length
         const linkForce = chartRef.current.d3Force('link');
         
@@ -418,6 +416,7 @@ export default function ForceGraph({
                 nodeVisibility="visible"
                 linkVisibility="visible"
                 cooldownTicks={cooldownTicks}
+                cooldownTime={6000}
                 linkDirectionalArrowRelPos={1}
                 linkDirectionalArrowLength={(link) => link.source.id === link.target.id ? 0 : 2}
                 linkDirectionalArrowColor={(link) => link.color}

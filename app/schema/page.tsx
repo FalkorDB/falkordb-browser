@@ -162,10 +162,10 @@ export default function Page() {
 
         if (fetchCount) fetchCount()
 
-        handleCooldown()
         setSelectedElement(undefined)
         setSelectedElements([])
         setData({ ...schema.Elements })
+        handleCooldown()
     }
 
     return (
