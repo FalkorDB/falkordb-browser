@@ -121,7 +121,7 @@ export default class ApiCalls {
                     throw new Error(`Query polling exceeded ${MAX_POLLS} attempts`);
                 }
                 const jobId = json.result;
-                result = await getRequest(`${urls.api.graphUrl}${graphName}/query/?id=${jobId}`, headers);
+                result = await getRequest(`${urls.api.graphUrl}${graphName}/query?id=${jobId}`, headers);
                 rawText = await result.text();
                 json = JSON.parse(rawText);
             }
@@ -281,7 +281,7 @@ export default class ApiCalls {
                 }
                 const jobId = json.result;
                 await new Promise(r => { setTimeout(r, 500) }); // Wait before polling again
-                result = await getRequest(`${urls.api.graphUrl + schemaName}_schema/query/?id=${jobId}`);
+                result = await getRequest(`${urls.api.graphUrl + schemaName}_schema/query?id=${jobId}`);
                 json = await result.json();
             }
 
