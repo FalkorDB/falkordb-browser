@@ -14,13 +14,24 @@ export type CACHE = {
 
 class ConnectionMap<K, V> extends Map<K, V> {
   set(key: K, value: V) {
-    console.log("Setting connection:", key, value);
+    console.log("Map:", this);
+    console.log("Setting:", key, value);
     console.trace();
     return super.set(key, value);
   }
+
+  get(key: K): V | undefined {
+    console.log("Map:", this);
+    console.log("Getting:", key);
+    console.trace();
+    return super.get(key);
+  }
 }
 
-const connections = new ConnectionMap<string, { client: FalkorDB; cache: ConnectionMap<number, CACHE> }>();
+const connections = new ConnectionMap<
+  string,
+  { client: FalkorDB; cache: ConnectionMap<number, CACHE> }
+>();
 
 async function newClient(
   credentials: {
