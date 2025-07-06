@@ -14,16 +14,19 @@ export type CACHE = {
 
 class ConnectionMap<K, V> extends Map<K, V> {
   set(key: K, value: V) {
-    console.log("Map:", this);
-    console.log("Setting:", key, value);
-    console.trace();
+    console.log("========== Process ID ==========", process.pid);
+    console.log("========== This ==========", this);
+    console.log("========== Setting ==========", key, value);
+    console.log("========== Trace ==========");
+    
     return super.set(key, value);
   }
-
+  
   get(key: K): V | undefined {
-    console.log("Map:", this);
-    console.log("Getting:", key);
-    console.trace();
+    console.log("========== Process ID ==========", process.pid);
+    console.log("========== This ==========", this);
+    console.log("========== Getting ==========", key);
+    console.log("========== Trace ==========");
     return super.get(key);
   }
 }
