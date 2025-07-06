@@ -12,7 +12,9 @@ export async function GET(request: NextRequest) {
       return session;
     }
 
-    const { cache } = session;
+    const {
+      user: { cache },
+    } = session;
 
     const resultId = request.nextUrl.searchParams.get("id");
 

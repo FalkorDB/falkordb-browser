@@ -12,6 +12,7 @@ declare module "next-auth" {
         ca: string;
         username: string;
         password: string;
+        cache: Map<number, CACHE>;
     }
 
     interface Session {

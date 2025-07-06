@@ -151,11 +151,13 @@ export async function GET(
       return session;
     }
 
-    const { client, user, cache } = session;
+    const {
+      client,
+      user: { cache, role },
+    } = session;
     const { graph: graphId } = await params;
     const query = request.nextUrl.searchParams.get("query");
     const timeout = request.nextUrl.searchParams.get("timeout");
-    const { role } = user;
 
     try {
       if (!query) throw new Error("Missing parameter query");

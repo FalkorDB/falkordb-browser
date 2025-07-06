@@ -12,29 +12,7 @@ export type CACHE = {
   result: GraphReply<unknown> | Error | undefined;
 };
 
-class ConnectionMap<K, V> extends Map<K, V> {
-  set(key: K, value: V) {
-    console.log("========== Process ID ==========", process.pid);
-    console.log("========== This ==========", this);
-    console.log("========== Setting ==========", key, value);
-    console.log("========== Trace ==========");
-    
-    return super.set(key, value);
-  }
-  
-  get(key: K): V | undefined {
-    console.log("========== Process ID ==========", process.pid);
-    console.log("========== This ==========", this);
-    console.log("========== Getting ==========", key);
-    console.log("========== Trace ==========");
-    return super.get(key);
-  }
-}
-
-const connections = new ConnectionMap<
-  string,
-  { client: FalkorDB; cache: ConnectionMap<number, CACHE> }
->();
+const connections = new Map<string, FalkorDB>();
 
 async function newClient(
   credentials: {
@@ -46,7 +24,7 @@ async function newClient(
     ca: string;
   },
   id: string
-): Promise<{ role: Role; client: FalkorDB; cache: Map<number, CACHE> }> {
+): Promise<{ role: Role; client: FalkorDB }> {
   const connectionOptions: FalkorDBOptions =
     credentials.tls === "true"
       ? {
@@ -75,7 +53,7 @@ async function newClient(
   const client = await FalkorDB.connect(connectionOptions);
 
   // Save connection in connections map for later use
-  connections.set(id, { client, cache: new ConnectionMap<number, CACHE>() });
+  connections.set(id, client);
 
   client.on("error", (err) => {
     // Close coonection on error and remove from connections map
@@ -83,7 +61,7 @@ async function newClient(
     const connection = connections.get(id);
     if (connection) {
       connections.delete(id);
-      connection.client.close().catch((e) => {
+      connection.close().catch((e) => {
         console.warn("FalkorDB Client Disconnect Error", e);
       });
     }
@@ -91,11 +69,10 @@ async function newClient(
 
   // Verify connection and Role
   const connection = await client.connection;
-  const cache = new Map<number, CACHE>();
 
   try {
     await connection.aclGetUser(credentials.username || "default");
-    return { role: "Admin", client, cache };
+    return { role: "Admin", client };
   } catch (err) {
     if (
       err instanceof ErrorReply &&
@@ -110,13 +87,13 @@ async function newClient(
   } catch (err) {
     if ((err as Error).message.includes("permissions")) {
       console.debug(err);
-      return { role: "Read-Only", client, cache };
+      return { role: "Read-Only", client };
     }
     console.debug(err);
-    return { role: "Read-Write", client, cache };
+    return { role: "Read-Write", client };
   }
 
-  return { role: "Admin", client, cache };
+  return { role: "Admin", client };
 }
 
 function generateTimeUUID() {
@@ -156,6 +133,7 @@ const authOptions: AuthOptions = {
             tls: credentials.tls === "true",
             ca: credentials.ca,
             role,
+            cache: new Map<number, CACHE>(),
           };
           return res;
         } catch (err) {
@@ -178,8 +156,13 @@ const authOptions: AuthOptions = {
           tls: user.tls,
           ca: user.ca,
           role: user.role,
+          cache:
+            user.cache instanceof Map
+              ? Object.fromEntries(user.cache)
+              : user.cache || {},
         };
       }
+
       return token;
     },
     async session({ session, token }) {
@@ -196,6 +179,7 @@ const authOptions: AuthOptions = {
             tls: token.tls as boolean,
             ca: token.ca,
             role: token.role as Role,
+            cache: token.cache || {},
           },
         };
       }
@@ -207,16 +191,26 @@ const authOptions: AuthOptions = {
 export async function getClient() {
   const session = await getServerSession(authOptions);
   const id = session?.user?.id;
+
   if (!id) {
     return NextResponse.json({ message: "Not authenticated" }, { status: 401 });
   }
 
   const { user } = session;
-  let connection = connections.get(user.id);
+
+  // Reconstruct cache as a Map - convert string keys to numbers
+  user.cache = new Map<number, CACHE>(
+    Object.entries(user.cache || {}).map(([key, value]) => [
+      parseInt(key, 10),
+      value,
+    ])
+  );
+
+  let connection = connections.get(id);
 
   // If client is not found, create a new one
   if (!connection) {
-    connection = await newClient(
+    const { client } = await newClient(
       {
         host: user.host,
         port: user.port.toString() ?? "6379",
@@ -227,15 +221,17 @@ export async function getClient() {
       },
       user.id
     );
+
+    connection = client;
   }
 
-  const { client, cache } = connection;
+  const client = connection;
 
   if (!client) {
     return NextResponse.json({ message: "Not authenticated" }, { status: 401 });
   }
 
-  return { client, user, cache };
+  return { client, user };
 }
 
 export default authOptions;
