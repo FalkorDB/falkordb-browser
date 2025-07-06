@@ -54,6 +54,9 @@ export default function Page() {
     const fetchCount = useCallback(async () => {
         if (!graphName) return
 
+        console.log("fetching:", graphName);
+        console.trace()
+
         const result = await securedFetch(`api/graph/${prepareArg(graphName)}/count`, {
             method: "GET"
         }, toast, setIndicator)
@@ -63,6 +66,8 @@ export default function Page() {
         let json = await result.json()
 
         while (typeof json.result === "number") {
+            console.log("trying to get result:", json.result);
+
             // eslint-disable-next-line no-await-in-loop
             const res = await securedFetch(`api/graph/${prepareArg(graphName)}/query?id=${prepareArg(json.result.toString())}`, {
                 method: "GET"
@@ -72,6 +77,10 @@ export default function Page() {
 
             // eslint-disable-next-line no-await-in-loop
             json = await res.json()
+
+            if (typeof json.result !== "number") {
+                console.log("got result", json.result);
+            }
         }
 
         [json] = json.result.data
