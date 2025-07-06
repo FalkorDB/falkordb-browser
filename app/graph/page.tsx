@@ -54,10 +54,6 @@ export default function Page() {
     const fetchCount = useCallback(async () => {
         if (!graphName) return
 
-        console.time("fetchCount")
-        console.log("fetching:", graphName);
-        console.trace()
-
         const result = await securedFetch(`api/graph/${prepareArg(graphName)}/count`, {
             method: "GET"
         }, toast, setIndicator)
@@ -199,7 +195,7 @@ export default function Page() {
         }
 
         fetchCount()
-    }, [fetchCount, graph.Id, graphName, setGraph, runDefaultQuery, defaultQuery, runQuery, contentPersistence, setGraphName, graphNames])
+    }, [fetchCount, graph.Id, graphName, setGraph, runDefaultQuery, defaultQuery, contentPersistence, setGraphName, graphNames])
 
     const handleDeleteElement = async () => {
         if (selectedElements.length === 0 && selectedElement) {
