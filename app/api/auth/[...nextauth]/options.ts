@@ -4,9 +4,10 @@ import CredentialsProvider from "next-auth/providers/credentials";
 import { AuthOptions, Role, User, getServerSession } from "next-auth";
 import { NextResponse } from "next/server";
 import { FalkorDBOptions } from "falkordb/dist/src/falkordb";
-import { createClient, ErrorReply } from "@redis/client";
+import { createClient } from "@redis/client";
 import { v4 as uuidv4 } from "uuid";
 import { GraphReply } from "falkordb/dist/src/graph";
+import { ErrorReply } from "redis";
 
 export type Response = GraphReply<unknown> | Error | null;
 
@@ -114,11 +115,8 @@ async function newClient(
     await connection.aclGetUser(credentials.username || "default");
     return { role: "Admin", client };
   } catch (err) {
-    if (
-      err instanceof ErrorReply &&
-      (err as ErrorReply).message.startsWith("NOPERM")
-    ) {
-      console.debug(err);
+    if (err instanceof ErrorReply && err.message.startsWith("NOPERM")) {
+      console.debug("user is not admin", err);
     } else throw err;
   }
 
@@ -126,10 +124,10 @@ async function newClient(
     await connection.sendCommand(["GRAPH.QUERY"]);
   } catch (err) {
     if ((err as Error).message.includes("permissions")) {
-      console.debug(err);
+      console.debug("user is read-only", err);
       return { role: "Read-Only", client };
     }
-    console.debug(err);
+    console.debug("user is read-write", err);
     return { role: "Read-Write", client };
   }
 

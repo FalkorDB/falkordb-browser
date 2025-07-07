@@ -1,3 +1,5 @@
+/* eslint-disable no-await-in-loop */
+
 'use client'
 
 import { useCallback, useContext, useEffect, useRef, useState } from "react";
@@ -63,6 +65,9 @@ export default function Page() {
         let json = await result.json()
 
         while (typeof json.result === "number") {
+
+            await new Promise(resolve => { setTimeout(resolve, 1000) })
+
             // eslint-disable-next-line no-await-in-loop
             const res = await securedFetch(`api/graph/${prepareArg(graphName)}/query?id=${prepareArg(json.result.toString())}`, {
                 method: "GET"
