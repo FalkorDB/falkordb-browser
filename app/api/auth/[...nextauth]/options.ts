@@ -15,7 +15,7 @@ const redisClient = createClient({
   url: process.env.REDIS_URL,
 });
 redisClient.on("error", (err) => console.log("Redis Client Error", err));
-redisClient.connect();
+redisClient.connect().catch((err) => console.log("Redis Client Error", err));
 
 export class Cache {
   private userId: string;
@@ -33,7 +33,11 @@ export class Cache {
 
       if (!cache) return undefined;
 
-      this.cache[key] = JSON.parse(cache);
+      try {
+        this.cache[key] = JSON.parse(cache);
+      } catch (err) {
+        console.error("Cache parse error", err);
+      }
     }
 
     return this.cache[key];
@@ -42,14 +46,26 @@ export class Cache {
   async set(key: string, value: Response) {
     this.cache[key] = value;
     if (!redisClient) return;
-    await redisClient.hSet(`cache:${this.userId}`, key, JSON.stringify(value));
-    await redisClient.expire(`cache:${this.userId}`, 60 * 60);
+    try {
+      await redisClient.hSet(
+        `cache:${this.userId}`,
+        key,
+        JSON.stringify(value)
+      );
+      await redisClient.expire(`cache:${this.userId}`, 60 * 60);
+    } catch (err) {
+      console.error("Cache set error", err);
+    }
   }
 
   delete(key: string) {
     delete this.cache[key];
     if (!redisClient) return;
-    redisClient.hDel(`cache:${this.userId}`, key);
+    try {
+      redisClient.hDel(`cache:${this.userId}`, key);
+    } catch (err) {
+      console.error("Cache delete error", err);
+    }
   }
 }
 
