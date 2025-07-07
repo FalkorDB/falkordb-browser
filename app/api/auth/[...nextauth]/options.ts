@@ -280,7 +280,7 @@ export async function getClient() {
     return NextResponse.json({ message: "Not authenticated" }, { status: 401 });
   }
 
-  const cache = redisClient
+  const cache = await redisClient
     .ping()
     .then(() => new RedisCache(id))
     .catch(() => new InMemoryCache(user.cache));

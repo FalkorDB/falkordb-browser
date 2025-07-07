@@ -14,6 +14,8 @@ import { GraphContext, IndicatorContext, HistoryQueryContext, QuerySettingsConte
 const Selector = dynamic(() => import("./Selector"), { ssr: false })
 const GraphView = dynamic(() => import("./GraphView"), { ssr: false })
 
+export const DELAY = 1000
+
 export default function Page() {
     const { historyQuery, setHistoryQuery } = useContext(HistoryQueryContext)
     const { setIndicator } = useContext(IndicatorContext);
@@ -66,7 +68,7 @@ export default function Page() {
 
         while (typeof json.result === "number") {
 
-            await new Promise(resolve => { setTimeout(resolve, 1000) })
+            await new Promise(resolve => { setTimeout(resolve, DELAY) })
 
             // eslint-disable-next-line no-await-in-loop
             const res = await securedFetch(`api/graph/${prepareArg(graphName)}/query?id=${prepareArg(json.result.toString())}`, {
@@ -104,6 +106,8 @@ export default function Page() {
         let json = await result.json()
 
         while (typeof json.result === "number") {
+            await new Promise(resolve => { setTimeout(resolve, DELAY) })
+
             // eslint-disable-next-line no-await-in-loop
             const res = await securedFetch(`api/graph/${prepareArg(name)}/query?id=${prepareArg(json.result.toString())}`, {
                 method: "GET"

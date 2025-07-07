@@ -10,6 +10,7 @@ import { ForceGraphMethods } from "react-force-graph-2d";
 import SchemaView from "./SchemaView";
 import { Category, Graph, GraphData, Link, Node } from "../api/graph/model";
 import { IndicatorContext, SchemaContext } from "../components/provider";
+import { DELAY } from "../graph/page";
 
 const Selector = dynamic(() => import("../graph/Selector"), { ssr: false })
 
@@ -49,7 +50,7 @@ export default function Page() {
         let json = await result.json()
 
         while (typeof json.result === "number") {
-            await new Promise(resolve => { setTimeout(resolve, 1000) })
+            await new Promise(resolve => { setTimeout(resolve, DELAY) })
 
             // eslint-disable-next-line no-await-in-loop
             const res = await securedFetch(`api/graph/${prepareArg(schemaName)}/query?id=${prepareArg(json.result.toString())}`, {
