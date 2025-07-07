@@ -43,7 +43,7 @@ export class Cache {
     this.cache[key] = value;
     if (!redisClient) return;
     await redisClient.hSet(`cache:${this.userId}`, key, JSON.stringify(value));
-    await redisClient.expire(`cache:${this.userId}`, 60 * 60 * 24 * 30);
+    await redisClient.expire(`cache:${this.userId}`, 60 * 60);
   }
 
   delete(key: string) {
