@@ -1,3 +1,4 @@
+/* eslint-disable max-classes-per-file */
 /* eslint-disable no-param-reassign */
 import { FalkorDB } from "falkordb";
 import CredentialsProvider from "next-auth/providers/credentials";
@@ -9,43 +10,50 @@ import { v4 as uuidv4 } from "uuid";
 import { GraphReply } from "falkordb/dist/src/graph";
 import { ErrorReply } from "redis";
 
-export type Response = GraphReply<unknown> | Error | null;
-
 const redisClient = createClient({
   url: process.env.REDIS_URL,
 });
 redisClient.on("error", (err) => console.log("Redis Client Error", err));
 redisClient.connect().catch((err) => console.log("Redis Client Error", err));
 
-export class Cache {
-  private userId: string;
+export type Response = GraphReply<unknown> | Error | null;
 
+export class InMemoryCache {
   private cache: { [key: string]: Response };
 
-  constructor(userId: string, cache: { [key: string]: Response }) {
-    this.userId = userId;
+  constructor(cache: { [key: string]: Response }) {
     this.cache = cache;
   }
 
   async get(key: string): Promise<Response | undefined> {
-    if (redisClient) {
-      const cache = await redisClient.hGet(`cache:${this.userId}`, key);
-
-      if (!cache) return undefined;
-
-      try {
-        this.cache[key] = JSON.parse(cache);
-      } catch (err) {
-        console.error("Cache parse error", err);
-      }
-    }
-
     return this.cache[key];
   }
 
   async set(key: string, value: Response) {
     this.cache[key] = value;
-    if (!redisClient) return;
+  }
+
+  delete(key: string) {
+    delete this.cache[key];
+  }
+}
+
+export class RedisCache {
+  private userId: string;
+
+  constructor(userId: string) {
+    this.userId = userId;
+  }
+
+  async get(key: string): Promise<Response | undefined> {
+    const cache = await redisClient.hGet(`cache:${this.userId}`, key);
+
+    if (!cache) return undefined;
+
+    return JSON.parse(cache);
+  }
+
+  async set(key: string, value: Response) {
     try {
       await redisClient.hSet(
         `cache:${this.userId}`,
@@ -59,8 +67,6 @@ export class Cache {
   }
 
   delete(key: string) {
-    delete this.cache[key];
-    if (!redisClient) return;
     try {
       redisClient.hDel(`cache:${this.userId}`, key);
     } catch (err) {
@@ -274,7 +280,10 @@ export async function getClient() {
     return NextResponse.json({ message: "Not authenticated" }, { status: 401 });
   }
 
-  const cache = new Cache(id, user.cache);
+  const cache = redisClient
+    .ping()
+    .then(() => new RedisCache(id))
+    .catch(() => new InMemoryCache(user.cache));
 
   return { client, user, cache };
 }
