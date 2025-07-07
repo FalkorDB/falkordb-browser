@@ -153,7 +153,8 @@ export async function GET(
 
     const {
       client,
-      user: { cache, role },
+      cache,
+      user: { role },
     } = session;
     const { graph: graphId } = await params;
     const query = request.nextUrl.searchParams.get("query");
@@ -171,7 +172,7 @@ export async function GET(
 
           // Set a timeout to resolve the result if it takes too long
           const timeoutHook = setTimeout(() => {
-            cache.set(id, { callback: undefined, result: undefined });
+            cache.set(id.toString(), null);
             resolve(id);
           }, INITIAL);
 
@@ -183,31 +184,25 @@ export async function GET(
               : graph.query(query, { TIMEOUT: timeoutNumber });
 
           res
-            .then((r) => {
+            .then(async (r) => {
               if (!r) throw new Error("Something went wrong");
 
+              const cached = await cache.get(id.toString());
+
               // If the result is already in the cache, save it
-              const cached = cache.get(id);
-              if (cached) {
-                cached.result = r;
-                if (typeof cached.callback === "function") {
-                  cached.callback();
-                }
-                return;
+              if (typeof cached !== "undefined") {
+                cache.set(id.toString(), r);
               }
 
               clearTimeout(timeoutHook);
               resolve(r);
             })
-            .catch((error) => {
+            .catch(async (error) => {
+              const cached = await cache.get(id.toString());
+
               // If the error is already in the cache, save it
-              const cached = cache.get(id);
-              if (cached) {
-                cached.result = error as Error;
-                if (typeof cached.callback === "function") {
-                  cached.callback();
-                }
-                return;
+              if (typeof cached !== "undefined") {
+                cache.set(id.toString(), error as Error);
               }
 
               clearTimeout(timeoutHook);

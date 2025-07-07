@@ -1,16 +1,56 @@
+/* eslint-disable no-param-reassign */
 import { FalkorDB } from "falkordb";
 import CredentialsProvider from "next-auth/providers/credentials";
 import { AuthOptions, Role, User, getServerSession } from "next-auth";
 import { NextResponse } from "next/server";
 import { FalkorDBOptions } from "falkordb/dist/src/falkordb";
-import { ErrorReply } from "redis";
+import { createClient, ErrorReply } from "@redis/client";
 import { v4 as uuidv4 } from "uuid";
 import { GraphReply } from "falkordb/dist/src/graph";
 
-export type CACHE = {
-  callback: (() => void) | undefined;
-  result: GraphReply<unknown> | Error | undefined;
-};
+export type Response = GraphReply<unknown> | Error | null;
+
+const redisClient = createClient({
+  url: process.env.REDIS_URL,
+});
+redisClient.on("error", (err) => console.log("Redis Client Error", err));
+redisClient.connect();
+
+export class Cache {
+  private userId: string;
+
+  private cache: { [key: string]: Response };
+
+  constructor(userId: string, cache: { [key: string]: Response }) {
+    this.userId = userId;
+    this.cache = cache;
+  }
+
+  async get(key: string): Promise<Response | undefined> {
+    if (redisClient) {
+      const cache = await redisClient.hGet(`cache:${this.userId}`, key);
+
+      if (!cache) return undefined;
+
+      this.cache[key] = JSON.parse(cache);
+    }
+
+    return this.cache[key];
+  }
+
+  async set(key: string, value: Response) {
+    this.cache[key] = value;
+    if (!redisClient) return;
+    await redisClient.hSet(`cache:${this.userId}`, key, JSON.stringify(value));
+    await redisClient.expire(`cache:${this.userId}`, 60 * 60 * 24 * 30);
+  }
+
+  delete(key: string) {
+    delete this.cache[key];
+    if (!redisClient) return;
+    redisClient.hDel(`cache:${this.userId}`, key);
+  }
+}
 
 const connections = new Map<string, FalkorDB>();
 
@@ -133,7 +173,7 @@ const authOptions: AuthOptions = {
             tls: credentials.tls === "true",
             ca: credentials.ca,
             role,
-            cache: new Map<number, CACHE>(),
+            cache: {},
           };
           return res;
         } catch (err) {
@@ -156,10 +196,7 @@ const authOptions: AuthOptions = {
           tls: user.tls,
           ca: user.ca,
           role: user.role,
-          cache:
-            user.cache instanceof Map
-              ? Object.fromEntries(user.cache)
-              : user.cache || {},
+          cache: user.cache,
         };
       }
 
@@ -179,7 +216,7 @@ const authOptions: AuthOptions = {
             tls: token.tls as boolean,
             ca: token.ca,
             role: token.role as Role,
-            cache: token.cache || {},
+            cache: token.cache,
           },
         };
       }
@@ -197,14 +234,6 @@ export async function getClient() {
   }
 
   const { user } = session;
-
-  // Reconstruct cache as a Map - convert string keys to numbers
-  user.cache = new Map<number, CACHE>(
-    Object.entries(user.cache || {}).map(([key, value]) => [
-      parseInt(key, 10),
-      value,
-    ])
-  );
 
   let connection = connections.get(id);
 
@@ -231,7 +260,9 @@ export async function getClient() {
     return NextResponse.json({ message: "Not authenticated" }, { status: 401 });
   }
 
-  return { client, user };
+  const cache = new Cache(id, user.cache);
+
+  return { client, user, cache };
 }
 
 export default authOptions;
