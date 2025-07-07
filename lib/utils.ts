@@ -51,6 +51,8 @@ export interface Row {
   checked?: boolean;
 }
 
+export const PULLING_DELAY = 1000
+
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
