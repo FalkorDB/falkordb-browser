@@ -71,7 +71,7 @@ test.describe('Graph Tests', () => {
             const graphName = getRandomString('graph');
             await graph.addGraph(graphName);
             await graph.insertQuery(query.query);
-            await graph.clickRunQuery();
+            await graph.clickRunQuery(false);
             expect(await graph.getErrorNotification()).toBe(true);
             await apiCall.removeGraph(graphName);
         });
@@ -253,7 +253,7 @@ test.describe('Graph Tests', () => {
             await browser.setPageToFullScreen();
             await graph.selectGraphByName(graphName);
             await graph.insertQuery(query);
-            await graph.clickRunQuery();
+            await graph.clickRunQuery(false);
             expect(await graph.getErrorNotification()).toBeTruthy();
             await apiCall.removeGraph(graphName, "admin");
         });
