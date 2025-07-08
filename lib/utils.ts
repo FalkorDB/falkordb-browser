@@ -51,10 +51,52 @@ export interface Row {
   checked?: boolean;
 }
 
-export const PULLING_DELAY = 1000
-
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
+}
+
+export async function getSSEGraphResult(
+  url: string,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  toast: any,
+  setIndicator: (indicator: "online" | "offline") => void
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+): Promise<any> {
+  return new Promise((resolve, reject) => {
+    let handled = false;
+
+    const evtSource = new EventSource(url);
+    evtSource.addEventListener("result", (event: MessageEvent) => {
+      const result = JSON.parse(event.data);
+      evtSource.close();
+      resolve(result);
+    });
+
+    evtSource.addEventListener("error", (event: MessageEvent) => {
+      handled = true;
+      const { message, status } = JSON.parse(event.data);
+
+      evtSource.close();
+      toast({ title: "Error", description: message, variant: "destructive" });
+
+      if (status === 401 || status >= 500) setIndicator("offline");
+
+      reject();
+    });
+
+    evtSource.onerror = () => {
+      if (handled) return;
+
+      evtSource.close();
+      toast({
+        title: "Error",
+        description: "Network or server error",
+        variant: "destructive",
+      });
+      setIndicator("offline");
+      reject();
+    };
+  });
 }
 
 export async function securedFetch(

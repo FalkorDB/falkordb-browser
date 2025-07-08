@@ -5,75 +5,8 @@ import CredentialsProvider from "next-auth/providers/credentials";
 import { AuthOptions, Role, User, getServerSession } from "next-auth";
 import { NextResponse } from "next/server";
 import { FalkorDBOptions } from "falkordb/dist/src/falkordb";
-import { createClient } from "@redis/client";
 import { v4 as uuidv4 } from "uuid";
-import { GraphReply } from "falkordb/dist/src/graph";
 import { ErrorReply } from "redis";
-
-const redisClient = createClient({
-  url: process.env.REDIS_URL,
-});
-redisClient.on("error", (err) => console.log("Redis Client Error", err));
-redisClient.connect().catch((err) => console.log("Redis Client Error", err));
-
-export type Response = GraphReply<unknown> | Error | null;
-
-export class InMemoryCache {
-  private cache: { [key: string]: Response };
-
-  constructor(cache: { [key: string]: Response }) {
-    this.cache = cache;
-  }
-
-  async get(key: string): Promise<Response | undefined> {
-    return this.cache[key];
-  }
-
-  async set(key: string, value: Response) {
-    this.cache[key] = value;
-  }
-
-  delete(key: string) {
-    delete this.cache[key];
-  }
-}
-
-export class RedisCache {
-  private userId: string;
-
-  constructor(userId: string) {
-    this.userId = userId;
-  }
-
-  async get(key: string): Promise<Response | undefined> {
-    const cache = await redisClient.hGet(`cache:${this.userId}`, key);
-
-    if (!cache) return undefined;
-
-    return JSON.parse(cache);
-  }
-
-  async set(key: string, value: Response) {
-    try {
-      await redisClient.hSet(
-        `cache:${this.userId}`,
-        key,
-        JSON.stringify(value)
-      );
-      await redisClient.expire(`cache:${this.userId}`, 60 * 60);
-    } catch (err) {
-      console.error("Cache set error", err);
-    }
-  }
-
-  delete(key: string) {
-    try {
-      redisClient.hDel(`cache:${this.userId}`, key);
-    } catch (err) {
-      console.error("Cache delete error", err);
-    }
-  }
-}
 
 const connections = new Map<string, FalkorDB>();
 
@@ -193,7 +126,6 @@ const authOptions: AuthOptions = {
             tls: credentials.tls === "true",
             ca: credentials.ca,
             role,
-            cache: {},
           };
           return res;
         } catch (err) {
@@ -216,7 +148,6 @@ const authOptions: AuthOptions = {
           tls: user.tls,
           ca: user.ca,
           role: user.role,
-          cache: user.cache,
         };
       }
 
@@ -236,7 +167,6 @@ const authOptions: AuthOptions = {
             tls: token.tls as boolean,
             ca: token.ca,
             role: token.role as Role,
-            cache: token.cache,
           },
         };
       }
@@ -280,12 +210,7 @@ export async function getClient() {
     return NextResponse.json({ message: "Not authenticated" }, { status: 401 });
   }
 
-  const cache = await redisClient
-    .ping()
-    .then(() => new RedisCache(id))
-    .catch(() => new InMemoryCache(user.cache));
-
-  return { client, user, cache };
+  return { client, user };
 }
 
 export default authOptions;

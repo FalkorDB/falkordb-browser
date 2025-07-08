@@ -1,9 +1,7 @@
-/* eslint-disable no-await-in-loop */
-
 'use client'
 
 import { useContext, useState, useRef, useCallback, useEffect } from "react";
-import { prepareArg, PULLING_DELAY, securedFetch } from "@/lib/utils";
+import { getSSEGraphResult, prepareArg, securedFetch } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
 import dynamic from "next/dynamic";
 import { ForceGraphMethods } from "react-force-graph-2d";
@@ -40,32 +38,12 @@ export default function Page() {
     const [isAddEntity, setIsAddEntity] = useState(false)
 
     const fetchCount = useCallback(async () => {
-        const result = await securedFetch(`api/schema/${prepareArg(schemaName)}/count`, {
-            method: "GET"
-        }, toast, setIndicator)
+        const result = await getSSEGraphResult(`api/schema/${prepareArg(schemaName)}/count`, toast, setIndicator)
 
-        if (!result.ok) return
+        const { edges, nodes } = result
 
-        let json = await result.json()
-
-        while (typeof json.result === "number") {
-            await new Promise(resolve => { setTimeout(resolve, PULLING_DELAY) })
-
-            // eslint-disable-next-line no-await-in-loop
-            const res = await securedFetch(`api/graph/${prepareArg(schemaName)}/query?id=${prepareArg(json.result.toString())}`, {
-                method: "GET"
-            }, toast, setIndicator)
-
-            if (!res.ok) return
-
-            // eslint-disable-next-line no-await-in-loop
-            json = await res.json()
-        }
-
-        [json] = json.result.data
-
-        setEdgesCount(json.edges)
-        setNodesCount(json.nodes)
+        setEdgesCount(edges || 0)
+        setNodesCount(nodes || 0)
     }, [toast, setIndicator, schemaName])
 
     const handleCooldown = (ticks?: number) => {

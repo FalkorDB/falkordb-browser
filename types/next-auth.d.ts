@@ -1,5 +1,4 @@
 import { DefaultUser } from "next-auth";
-import { Response } from "app/api/auth/[...nextauth]/options";
 
 declare module "next-auth" {
   type Role = "Admin" | "Read-Write" | "Read-Only";
@@ -12,7 +11,6 @@ declare module "next-auth" {
     ca: string;
     username: string;
     password: string;
-    cache: { [key: string]: Response };
   }
 
   interface Session {
