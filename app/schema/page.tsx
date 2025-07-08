@@ -40,7 +40,7 @@ export default function Page() {
     const fetchCount = useCallback(async () => {
         const result = await getSSEGraphResult(`api/schema/${prepareArg(schemaName)}/count`, toast, setIndicator)
 
-        const { edges, nodes } = result
+        const { edges, nodes } = result.data[0]
 
         setEdgesCount(edges || 0)
         setNodesCount(nodes || 0)

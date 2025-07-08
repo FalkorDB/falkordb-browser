@@ -55,8 +55,8 @@ export default function Page() {
         if (!graphName) return
 
         const result = await getSSEGraphResult(`api/graph/${prepareArg(graphName)}/count`, toast, setIndicator);
-
-        const { nodes, edges } = result.data
+        
+        const { nodes, edges } = result.data[0]
 
         setEdgesCount(edges || 0)
         setNodesCount(nodes || 0)
