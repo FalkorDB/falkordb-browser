@@ -137,7 +137,7 @@ export async function GET(
     const session = await getClient();
 
     if (session instanceof NextResponse) {
-      return session;
+      throw new Error(await session.text());
     }
 
     const { client, user } = session;

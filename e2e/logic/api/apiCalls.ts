@@ -4,6 +4,7 @@
 
 import { getAdminToken } from "@/e2e/infra/utils";
 import { APIRequestContext } from "playwright";
+import { EventSource } from "eventsource";
 import {
   deleteRequest,
   getRequest,
@@ -29,6 +30,56 @@ import { SchemaListResponse } from "./responses/getSchemaResponse";
 import { GraphCountResponse } from "./responses/graphCountResponse";
 import { GraphNodeResponse } from "./responses/graphNodeResponse";
 import { GraphAttributeResponse } from "./responses/graphAttributeResponse";
+
+export async function getSSEGraphResult(
+  url: string,
+  headers?: Record<string, string>
+): Promise<any> {
+  try {
+    return await new Promise((resolve, reject) => {
+      let handled = false;
+
+      // Configure EventSource with custom fetch for headers support
+      const eventSourceInit: any = {};
+      const finalUrl = url;
+
+      // If we have headers (which contains cookies for admin auth), use custom fetch
+      if (headers && headers.Cookie) {
+        eventSourceInit.fetch = (input: string, init?: RequestInit) =>
+          fetch(input, {
+            ...init,
+            headers: {
+              ...init?.headers,
+              ...headers,
+            },
+          });
+      }
+
+      const evtSource = new EventSource(finalUrl, eventSourceInit);
+
+      evtSource.addEventListener("result", (event: MessageEvent) => {
+        const result = JSON.parse(event.data);
+        evtSource.close();
+        resolve(result);
+      });
+
+      evtSource.addEventListener("error", (event: MessageEvent) => {
+        handled = true;
+        const { message } = JSON.parse(event.data);
+        evtSource.close();
+        reject(message);
+      });
+
+      evtSource.onerror = () => {
+        if (handled) return;
+        evtSource.close();
+        reject(new Error("Network or server error"));
+      };
+    });
+  } catch (error) {
+    throw new Error(`Failed to run query. \n Error: ${error}`);
+  }
+}
 
 export default class ApiCalls {
   async login(
@@ -159,37 +210,14 @@ export default class ApiCalls {
   async runQuery(
     graphName: string,
     query: string,
-    role?: string
+    role = "admin"
   ): Promise<RunQueryResponse> {
     try {
       const headers = role === "admin" ? await getAdminToken() : undefined;
-
-      let result = await getRequest(
-        `${urls.api.graphUrl}${graphName}?query=${encodeURIComponent(query)}`,
-        headers
-      );
-      let rawText = await result.text();
-
-      let json = JSON.parse(rawText);
-
-      // Poll if response contains a numeric result (job ID)
-      const MAX_POLLS = 10;
-      let polls = 0;
-      while (typeof json.result === "number") {
-        polls += 1;
-        if (polls > MAX_POLLS) {
-          throw new Error(`Query polling exceeded ${MAX_POLLS} attempts`);
-        }
-        const jobId = json.result;
-        result = await getRequest(
-          `${urls.api.graphUrl}${graphName}/query?id=${jobId}`,
-          headers
-        );
-        rawText = await result.text();
-        json = JSON.parse(rawText);
-      }
-
-      return json;
+      const url = `${urls.api.graphUrl}${graphName}?query=${encodeURIComponent(
+        query
+      )}`;
+      return await getSSEGraphResult(url, headers);
     } catch (error) {
       console.error(error);
       throw new Error(
@@ -394,9 +422,7 @@ export default class ApiCalls {
 
   async addSchema(schemaName: string): Promise<AddSchemaResponse> {
     try {
-      const result = await postRequest(
-        `${urls.api.schemaUrl + schemaName}`
-      );
+      const result = await postRequest(`${urls.api.schemaUrl + schemaName}`);
       return await result.json();
     } catch (error) {
       throw new Error(
@@ -418,39 +444,19 @@ export default class ApiCalls {
 
   async runSchemaQuery(
     schemaName: string,
-    schema: string
+    schema: string,
+    role = "admin"
   ): Promise<AddSchemaResponse> {
     try {
-      let result = await getRequest(
-        `${urls.api.graphUrl + schemaName}_schema?query=${encodeURIComponent(
-          schema
-        )}`
-      );
-      let json = await result.json();
-
-      const MAX_POLLS = 10;
-      let polls = 0;
-
-      while (typeof json.result === "number") {
-        polls += 1;
-        if (polls > MAX_POLLS) {
-          throw new Error(`Schema polling exceeded ${MAX_POLLS} attempts`);
-        }
-        const jobId = json.result;
-        await new Promise((r) => {
-          setTimeout(r, 500);
-        }); // Wait before polling again
-        result = await getRequest(
-          `${urls.api.graphUrl + schemaName}_schema/query?id=${jobId}`
-        );
-        json = await result.json();
-      }
-
-      return json;
+      const headers = role === "admin" ? await getAdminToken() : undefined;
+      const url = `${
+        urls.api.graphUrl + schemaName
+      }_schema?query=${encodeURIComponent(schema)}`;
+      return await getSSEGraphResult(url, headers);
     } catch (error) {
       console.error(error);
       throw new Error(
-        `Failed to add schema. \n Error: ${(error as Error).message}`
+        `Failed to run schema query. \n Error: ${(error as Error).message}`
       );
     }
   }

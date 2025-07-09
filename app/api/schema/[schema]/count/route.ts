@@ -31,14 +31,7 @@ export async function GET(
 
       if (!result.ok) throw new Error("Something went wrong");
 
-      const json = await result.json();
-
-      const data =
-        typeof json.result === "number"
-          ? json.result
-          : { data: [json.result.data[0] || { nodes: 0, edges: 0 }] };
-
-      return NextResponse.json({ result: data }, { status: 200 });
+      return NextResponse.json({ result }, { status: 200 });
     } catch (error) {
       console.error(error);
       return NextResponse.json(
