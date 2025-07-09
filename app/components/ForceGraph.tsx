@@ -82,6 +82,14 @@ export default function ForceGraph({
     const [hoverElement, setHoverElement] = useState<Node | Link | undefined>()
 
     useEffect(() => {
+        const canvas = document.querySelector('.force-graph-container canvas')
+
+        if (!canvas) return
+
+        canvas.setAttribute('data-engine-status', 'stop')
+    }, [])
+
+    useEffect(() => {
         handleZoomToFit(chartRef, undefined, data.nodes.length < 2 ? 4 : undefined)
     }, [chartRef, data.nodes.length, data])
 

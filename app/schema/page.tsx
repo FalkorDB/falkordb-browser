@@ -38,14 +38,6 @@ export default function Page() {
     const [isAddEntity, setIsAddEntity] = useState(false)
     const [isCanvasLoading, setIsCanvasLoading] = useState(false)
 
-    useEffect(() => {
-        const canvas = document.querySelector('.force-graph-container canvas')
-
-        if (!canvas) return
-
-        canvas.setAttribute('data-engine-status', 'stop')
-    }, [])
-
     const fetchCount = useCallback(async () => {
         const result = await securedFetch(`api/schema/${prepareArg(schemaName)}/count`, {
             method: "GET"
