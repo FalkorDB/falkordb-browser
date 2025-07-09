@@ -100,7 +100,10 @@ export default function Page() {
 
         fetchCount()
 
-        handleCooldown()
+        if (schemaGraph.Elements.nodes.length > 0) {
+            handleCooldown()
+        }
+        
     }, [fetchCount, setIndicator, setSchema, toast, schemaName])
 
     useEffect(() => {
