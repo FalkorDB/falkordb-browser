@@ -34,14 +34,15 @@ interface Props {
     setSelectedElement: Dispatch<SetStateAction<Node | Link | undefined>>
     handleDeleteElement: () => Promise<void>
     chartRef: GraphRef
+    setGraph: Dispatch<SetStateAction<Graph>>
     setIsAddEntity?: Dispatch<SetStateAction<boolean>>
     setIsAddRelation?: Dispatch<SetStateAction<boolean>>
-    setGraph: Dispatch<SetStateAction<Graph>>
+    isLoading?: boolean
 }
 
 const STEP = 8
 
-export default function Selector({ graph, options, setOptions, graphName, setGraphName, runQuery, historyQuery, setHistoryQuery, fetchCount, selectedElements, setSelectedElement, handleDeleteElement, chartRef, setIsAddEntity, setIsAddRelation, setGraph }: Props) {
+export default function Selector({ graph, options, setOptions, graphName, setGraphName, runQuery, historyQuery, setHistoryQuery, fetchCount, selectedElements, setSelectedElement, handleDeleteElement, chartRef, setIsAddEntity, setIsAddRelation, setGraph, isLoading: isCanvasLoading }: Props) {
 
     const { indicator, setIndicator } = useContext(IndicatorContext)
 
@@ -364,6 +365,7 @@ export default function Selector({ graph, options, setOptions, graphName, setGra
                             setIsAddEntity={setIsAddEntity}
                             setIsAddRelation={setIsAddRelation}
                             chartRef={chartRef}
+                            isLoading={!!isCanvasLoading}
                             backgroundColor="bg-foreground"
                         />
                     </div>
@@ -378,4 +380,5 @@ Selector.defaultProps = {
     setHistoryQuery: undefined,
     setIsAddEntity: undefined,
     setIsAddRelation: undefined,
+    isLoading: false,
 }

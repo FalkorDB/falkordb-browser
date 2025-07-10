@@ -648,7 +648,7 @@ export default class GraphPage extends Page {
     await this.page.keyboard.type(query);
   }
 
-  async clickRunQuery(waitForAnimation = false): Promise<void> {
+  async clickRunQuery(waitForAnimation = true): Promise<void> {
     await this.clickEditorRun();
     await waitForElementToBeEnabled(this.editorRun);
     if (waitForAnimation) {
@@ -661,7 +661,7 @@ export default class GraphPage extends Page {
     await this.clickManage();
     await this.clickTableCheckboxByName(graphName);
     await this.clickDuplicateGraphBtn();
-    await this.insertDuplicateGraphInput(graphName + " (copy)");
+    await this.insertDuplicateGraphInput(`${graphName  } (copy)`);
     await this.clickDuplicateGraphConfirm();
   }
 

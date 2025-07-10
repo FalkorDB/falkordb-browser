@@ -4,7 +4,6 @@
 
 import { useEffect, useState, useContext, Dispatch, SetStateAction } from "react"
 import { GraphRef, prepareArg, securedFetch } from "@/lib/utils"
-import dynamic from "next/dynamic"
 import { useToast } from "@/components/ui/use-toast"
 import SchemaDataPanel from "./SchemaDataPanel"
 import Labels from "../graph/labels"
@@ -13,8 +12,7 @@ import CreateElement from "./SchemaCreateElement"
 import { IndicatorContext, SchemaContext } from "../components/provider"
 import Controls from "../graph/controls"
 import GraphDetails from "../graph/GraphDetails"
-
-const ForceGraph = dynamic(() => import("../components/ForceGraph"), { ssr: false })
+import ForceGraph from "../components/ForceGraph"
 
 /* eslint-disable react/require-default-props */
 interface Props {
@@ -39,6 +37,8 @@ interface Props {
     setCategories: Dispatch<SetStateAction<Category<Node>[]>>
     labels: Category<Link>[]
     categories: Category<Node>[]
+    isLoading: boolean
+    setIsLoading: Dispatch<SetStateAction<boolean>>
 }
 
 export default function SchemaView({
@@ -62,7 +62,9 @@ export default function SchemaView({
     setLabels,
     setCategories,
     labels,
-    categories
+    categories,
+    isLoading,
+    setIsLoading
 }: Props) {
     const { setIndicator } = useContext(IndicatorContext)
     const { schema } = useContext(SchemaContext)
@@ -70,15 +72,21 @@ export default function SchemaView({
     const { toast } = useToast()
 
     const [selectedNodes, setSelectedNodes] = useState<[Node | undefined, Node | undefined]>([undefined, undefined]);
+    const [parentWidth, setParentWidth] = useState(0)
+    const [parentHeight, setParentHeight] = useState(0)
+    const elementsLength = schema.getElements().length
 
     useEffect(() => {
+        if (!elementsLength) return;
+
+        setIsLoading(true)
         setData({ ...schema.Elements })
-    }, [schema.Elements, schema.Id])
+    }, [schema, elementsLength, setData, setIsLoading])
 
     useEffect(() => {
         setCategories([...schema.Categories])
         setLabels([...schema.Labels])
-    }, [schema.Id, schema.Categories.length, schema.Labels.length])
+    }, [schema.Id, schema.Categories.length, schema.Labels.length, setCategories, schema.Categories, schema.Labels, setLabels])
 
     useEffect(() => {
         setSelectedElement(undefined)
@@ -148,7 +156,7 @@ export default function SchemaView({
 
     return (
         <div className="relative w-full h-full border rounded-lg overflow-hidden">
-            <div className="pointer-events-none absolute bottom-4 inset-x-12 z-10 flex items-center justify-between">
+            <div className="pointer-events-none absolute bottom-4 inset-x-12 z-20 flex items-center justify-between">
                 <GraphDetails
                     graph={schema}
                     nodesCount={nodesCount}
@@ -162,6 +170,7 @@ export default function SchemaView({
                         chartRef={chartRef}
                         handleCooldown={handleCooldown}
                         cooldownTicks={cooldownTicks}
+                        isLoading={isLoading}
                     />
                 }
             </div>
@@ -181,17 +190,26 @@ export default function SchemaView({
                     cooldownTicks={cooldownTicks}
                     handleCooldown={handleCooldown}
                     setLabels={setLabels}
+                    parentHeight={parentHeight}
+                    parentWidth={parentWidth}
+                    setParentHeight={setParentHeight}
+                    setParentWidth={setParentWidth}
+                    loading={isLoading}
+                    setLoading={setIsLoading}
                 />
-                <div className="h-full z-10 absolute top-12 inset-x-12 pointer-events-none flex gap-8 justify-between">
-                    {
-                        (categories.length > 0) &&
-                        <Labels graph={schema} type="Schema" className="left-2" label="Labels" categories={categories} onClick={onCategoryClick} />
-                    }
-                    {
-                        (labels.length > 0) &&
-                        <Labels graph={schema} type="Schema" className="right-2 text-end" label="Relationships" categories={labels} onClick={onLabelClick} />
-                    }
-                </div>
+                {
+                    !isLoading &&
+                    <div className="h-full z-10 absolute top-12 inset-x-12 pointer-events-none flex gap-8 justify-between">
+                        {
+                            (categories.length > 0) &&
+                            <Labels graph={schema} type="Schema" className="left-2" label="Labels" categories={categories} onClick={onCategoryClick} />
+                        }
+                        {
+                            (labels.length > 0) &&
+                            <Labels graph={schema} type="Schema" className="right-2 text-end" label="Relationships" categories={labels} onClick={onLabelClick} />
+                        }
+                    </div>
+                }
                 {
                     selectedElement ?
                         <SchemaDataPanel

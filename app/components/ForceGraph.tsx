@@ -11,6 +11,7 @@ import { useToast } from "@/components/ui/use-toast"
 import * as d3 from "d3"
 import { GraphData, Link, Node, Category, Graph } from "../api/graph/model"
 import { IndicatorContext } from "./provider"
+import Spinning from "./ui/spinning"
 
 interface Props {
     graph: Graph
@@ -29,10 +30,22 @@ interface Props {
     setIsAddEntity?: Dispatch<SetStateAction<boolean>>
     setIsAddRelation?: Dispatch<SetStateAction<boolean>>
     setLabels: Dispatch<SetStateAction<Category<Link>[]>>
+    parentHeight: number
+    parentWidth: number
+    setParentHeight: Dispatch<SetStateAction<number>>
+    setParentWidth: Dispatch<SetStateAction<number>>
+    loading: boolean
+    setLoading: Dispatch<SetStateAction<boolean>>
 }
 
 const NODE_SIZE = 6
 const PADDING = 2;
+
+const REFERENCE_NODE_COUNT = 2000;
+const BASE_LINK_DISTANCE = 20;
+const BASE_LINK_STRENGTH = 0.5;
+const BASE_CHARGE_STRENGTH = -1;
+const BASE_CENTER_STRENGTH = 0.1;
 
 export default function ForceGraph({
     graph,
@@ -50,7 +63,13 @@ export default function ForceGraph({
     setSelectedNodes,
     setIsAddEntity = () => { },
     setIsAddRelation = () => { },
-    setLabels
+    setLabels,
+    parentHeight,
+    parentWidth,
+    setParentHeight,
+    setParentWidth,
+    loading,
+    setLoading,
 }: Props) {
 
     const { indicator, setIndicator } = useContext(IndicatorContext)
@@ -61,8 +80,18 @@ export default function ForceGraph({
     const parentRef = useRef<HTMLDivElement>(null)
 
     const [hoverElement, setHoverElement] = useState<Node | Link | undefined>()
-    const [parentHeight, setParentHeight] = useState<number>(0)
-    const [parentWidth, setParentWidth] = useState<number>(0)
+
+    useEffect(() => {
+        const canvas = document.querySelector('.force-graph-container canvas')
+
+        if (!canvas) return
+
+        canvas.setAttribute('data-engine-status', 'stop')
+    }, [])
+
+    useEffect(() => {
+        handleZoomToFit(chartRef, undefined, data.nodes.length < 2 ? 4 : undefined)
+    }, [chartRef, data.nodes.length, data])
 
     useEffect(() => {
         const handleResize = () => {
@@ -83,18 +112,24 @@ export default function ForceGraph({
             window.removeEventListener('resize', handleResize)
             observer.disconnect()
         }
-    }, [parentRef])
+    }, [parentRef, setParentHeight, setParentWidth])
 
     useEffect(() => {
         if (!chartRef.current) return;
 
+        const nodeCount = graph.Elements.nodes.length;
+
+        // Use Math.min/Math.max for capping
+        const linkDistance = Math.min(BASE_LINK_DISTANCE * Math.sqrt(nodeCount) / Math.sqrt(REFERENCE_NODE_COUNT), 120);
+        const chargeStrength = Math.max(BASE_CHARGE_STRENGTH * Math.sqrt(nodeCount) / Math.sqrt(REFERENCE_NODE_COUNT), -80);
+
         // Adjust link force and length
         const linkForce = chartRef.current.d3Force('link');
-
+        
         if (linkForce) {
             linkForce
-                .distance(() => 50)
-                .strength(0.5);
+                .distance(linkDistance)
+                .strength(BASE_LINK_STRENGTH);
         }
 
         // Add collision force to prevent node overlap
@@ -102,17 +137,20 @@ export default function ForceGraph({
 
         // Center force to keep graph centered
         const centerForce = chartRef.current.d3Force('center');
-
+        
         if (centerForce) {
-            centerForce.strength(graph.Elements.links.length === 0 ? 1 : 0.05);
+            centerForce.strength(BASE_CENTER_STRENGTH);
         }
 
         // Add charge force to repel nodes
         const chargeForce = chartRef.current.d3Force('charge');
-
+        
         if (chargeForce) {
-            chargeForce.strength(-1)
+            chargeForce.strength(chargeStrength);
         }
+
+        // Reheat the simulation
+        chartRef.current.d3ReheatSimulation();
     }, [chartRef, graph.Elements.links.length, graph.Elements.nodes.length])
 
     const onFetchNode = async (node: Node) => {
@@ -223,6 +261,12 @@ export default function ForceGraph({
 
     return (
         <div ref={parentRef} className="w-full h-full relative">
+            {
+                loading &&
+                <div className="absolute inset-x-0 inset-y-0 bg-background flex items-center justify-center z-10">
+                    <Spinning />
+                </div>
+            }
             <ForceGraph2D
                 ref={chartRef}
                 backgroundColor="#242424"
@@ -374,6 +418,7 @@ export default function ForceGraph({
                     if (cooldownTicks === 0) return
                     handleCooldown(0)
                     handleZoomToFit(chartRef, undefined, data.nodes.length < 2 ? 4 : undefined)
+                    setLoading(false)
                 }}
                 linkCurvature="curve"
                 nodeVisibility="visible"

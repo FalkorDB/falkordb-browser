@@ -1,12 +1,10 @@
 /* eslint-disable no-param-reassign */
-/* eslint-disable react-hooks/exhaustive-deps */
 
 'use client'
 
-import { useState, useEffect, Dispatch, SetStateAction, useContext } from "react";
+import { useState, useEffect, Dispatch, SetStateAction, useContext, useCallback } from "react";
 import { GitGraph, Info, Table } from "lucide-react"
 import { cn, GraphRef } from "@/lib/utils";
-import dynamic from "next/dynamic";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { GraphContext } from "@/app/components/provider";
 import { Category, GraphData, Link, Node } from "../api/graph/model";
@@ -18,8 +16,8 @@ import GraphDataPanel from "./GraphDataPanel";
 import GraphDetails from "./GraphDetails";
 import Labels from "./labels";
 import MetadataView from "./MetadataView";
+import ForceGraph from "../components/ForceGraph";
 
-const ForceGraph = dynamic(() => import("../components/ForceGraph"), { ssr: false });
 
 type Tab = "Graph" | "Table" | "Metadata"
 
@@ -63,23 +61,33 @@ function GraphView({
     categories
 }: Props) {
 
-    const [tabsValue, setTabsValue] = useState<Tab>("Graph")
     const { graph } = useContext(GraphContext)
+
+    const [isLoading, setIsLoading] = useState<boolean>(false)
+    const [parentHeight, setParentHeight] = useState<number>(0)
+    const [parentWidth, setParentWidth] = useState<number>(0)
+    const [tabsValue, setTabsValue] = useState<Tab>("Graph")
+    const elementsLength = graph.getElements().length
 
     useEffect(() => {
         setCategories([...graph.Categories])
         setLabels([...graph.Labels])
-    }, [graph, graph.Categories, graph.Labels])
+    }, [graph, graph.Categories, graph.Labels, setCategories, setLabels])
 
-    const isTabEnabled = (tab: Tab) => {
+    const isTabEnabled = useCallback((tab: Tab) => {
         if (tab === "Graph") return graph.getElements().length !== 0
         if (tab === "Table") return graph.Data.length !== 0
         return graph.CurrentQuery && graph.CurrentQuery.metadata.length > 0 && graph.Metadata.length > 0 && graph.CurrentQuery.explain.length > 0
-    }
+    }, [graph])
 
     useEffect(() => {
-        setData({ ...graph.Elements })
+        if (!elementsLength) return;
 
+        setIsLoading(true)
+        setData({ ...graph.Elements })
+    }, [graph, elementsLength, setData])
+
+    useEffect(() => {
         if (isTabEnabled(tabsValue)) return
 
         let defaultChecked: Tab = "Graph"
@@ -88,18 +96,13 @@ function GraphView({
         else if (graph.CurrentQuery && graph.CurrentQuery.metadata.length > 0 && graph.Metadata.length > 0 && graph.CurrentQuery.explain.length > 0) defaultChecked = "Metadata"
 
         setTabsValue(defaultChecked);
-    }, [graph, graph.Id, graph.getElements().length, graph.Data.length])
 
-    useEffect(() => {
-        if (tabsValue === "Graph") {
-            handleCooldown()
-        }
-    }, [tabsValue])
+    }, [graph, graph.Id, elementsLength, graph.Data.length, isTabEnabled, tabsValue])
 
     useEffect(() => {
         setSelectedElement(undefined)
         setSelectedElements([])
-    }, [graph.Id])
+    }, [graph.Id, setSelectedElement, setSelectedElements])
 
     const onCategoryClick = (category: Category<Node>) => {
         category.show = !category.show
@@ -136,7 +139,7 @@ function GraphView({
 
     return (
         <Tabs value={tabsValue} onValueChange={(value) => setTabsValue(value as Tab)} className={cn("h-full w-full relative border rounded-lg overflow-hidden", tabsValue === "Table" && "flex flex-col-reverse")}>
-            <div className={cn("flex gap-4 justify-between items-end", tabsValue === "Table" ? "py-4 px-12" : "absolute bottom-4 inset-x-12 pointer-events-none z-10")}>
+            <div className={cn("flex gap-4 justify-between items-end", tabsValue === "Table" ? "py-4 px-12" : "absolute bottom-4 inset-x-12 pointer-events-none z-20")}>
                 <GraphDetails
                     graph={graph}
                     tabsValue={tabsValue}
@@ -191,6 +194,7 @@ function GraphView({
                     disabled={graph.getElements().length === 0}
                     handleCooldown={handleCooldown}
                     cooldownTicks={cooldownTicks}
+                    isLoading={isLoading}
                 />
             </div>
             <TabsContent value="Graph" className="h-full w-full mt-0 overflow-hidden">
@@ -206,28 +210,38 @@ function GraphView({
                     cooldownTicks={cooldownTicks}
                     handleCooldown={handleCooldown}
                     setLabels={setLabels}
+                    parentHeight={parentHeight}
+                    parentWidth={parentWidth}
+                    setParentHeight={setParentHeight}
+                    setParentWidth={setParentWidth}
+                    loading={isLoading}
+                    setLoading={setIsLoading}
                 />
-                <div className="h-full z-10 absolute top-12 inset-x-12 pointer-events-none flex gap-8">
-                    {
-                        (labels.length > 0 || categories.length > 0) &&
-                        <Labels graph={graph} categories={categories} onClick={onCategoryClick} label="Labels" type="Graph" />
-                    }
-                    <div className="w-1 grow h-fit">
-                        <Toolbar
-                            graph={graph}
-                            label="Graph"
-                            setSelectedElement={setSelectedElement}
-                            selectedElements={selectedElements}
-                            handleDeleteElement={handleDeleteElement}
-                            chartRef={chartRef}
-                            backgroundColor="bg-transparent"
-                        />
+                {
+                    !isLoading &&
+                    <div className="h-full z-10 absolute top-12 inset-x-12 pointer-events-none flex gap-8">
+                        {
+                            (labels.length > 0 || categories.length > 0) &&
+                            <Labels graph={graph} categories={categories} onClick={onCategoryClick} label="Labels" type="Graph" />
+                        }
+                        <div className="w-1 grow h-fit">
+                            <Toolbar
+                                graph={graph}
+                                label="Graph"
+                                setSelectedElement={setSelectedElement}
+                                selectedElements={selectedElements}
+                                handleDeleteElement={handleDeleteElement}
+                                chartRef={chartRef}
+                                isLoading={isLoading}
+                                backgroundColor="bg-transparent"
+                            />
+                        </div>
+                        {
+                            (labels.length > 0 || categories.length > 0) &&
+                            <Labels graph={graph} categories={labels} onClick={onLabelClick} label="Relationships" type="Graph" />
+                        }
                     </div>
-                    {
-                        (labels.length > 0 || categories.length > 0) &&
-                        <Labels graph={graph} categories={labels} onClick={onLabelClick} label="Relationships" type="Graph" />
-                    }
-                </div>
+                }
                 {
                     selectedElement &&
                     <GraphDataPanel
