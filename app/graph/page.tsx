@@ -88,7 +88,9 @@ export default function Page() {
         setCooldownTicks(ticks)
 
         const canvas = document.querySelector('.force-graph-container canvas');
+        
         if (!canvas) return
+        
         if (ticks === 0) {
             canvas.setAttribute('data-engine-status', 'stop')
         } else {
@@ -129,12 +131,13 @@ export default function Page() {
 
         setGraph(g)
         fetchCount()
-        handleCooldown()
         localStorage.setItem("query history", JSON.stringify(queryArr))
         localStorage.setItem("savedContent", JSON.stringify({ graphName: n, query: q }))
         // eslint-disable-next-line @typescript-eslint/ban-ts-comment
         // @ts-ignore
         window.graph = g
+        
+        handleCooldown()
     }, [graphName, run, toast, setIndicator, historyQuery.queries, historyQuery.counter, setHistoryQuery, limit, graph.Colors, setGraph, fetchCount])
 
     useEffect(() => {

@@ -40,7 +40,7 @@ test.describe('Query history Tests', () => {
         await browser.setPageToFullScreen();
         await graph.selectGraphByName(graphName);
         await graph.insertQuery("CREATE (n:Person { name: 'Alice' }) RETURN n");
-        await graph.clickRunQuery(true);
+        await graph.clickRunQuery();
         await graph.runAQueryFromHistory("0");
         const searchQuery = `Alice`;
         await graph.searchElementInCanvas("Graph", searchQuery);

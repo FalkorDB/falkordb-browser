@@ -1,6 +1,7 @@
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { useContext } from "react"
 import { Info } from "lucide-react"
+import { cn } from "@/lib/utils"
 import { Graph } from "../api/graph/model"
 import { QuerySettingsContext } from "../components/provider"
 
@@ -70,7 +71,7 @@ export default function GraphDetails({
                                     <TooltipTrigger asChild>
                                         <p
                                             data-testid={testId}
-                                            className="Gradient bg-clip-text text-transparent truncate pointer-events-auto"
+                                            className={cn("truncate pointer-events-auto", label === "GraphName" && "Gradient bg-clip-text text-transparent")}
                                         >
                                             {value}
                                         </p>

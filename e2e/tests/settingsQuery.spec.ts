@@ -264,7 +264,7 @@ test.describe("Query Settings", () => {
     await querySettings.selectGraphByName(graphName);
     const query = "MATCH (n) RETURN n";
     await querySettings.insertQuery(query);
-    await querySettings.clickRunQuery();
+    await querySettings.clickRunQuery(false);
     await querySettings.refreshPage();
     const tabEnabled =
       (await querySettings.getGraphTabEnabled()) ||

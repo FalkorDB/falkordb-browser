@@ -648,7 +648,7 @@ export default class GraphPage extends Page {
     await this.page.keyboard.type(query);
   }
 
-  async clickRunQuery(waitForAnimation = false): Promise<void> {
+  async clickRunQuery(waitForAnimation = true): Promise<void> {
     await this.clickEditorRun();
     await waitForElementToBeEnabled(this.editorRun);
     if (waitForAnimation) {

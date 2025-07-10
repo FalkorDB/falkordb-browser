@@ -5,11 +5,11 @@ import { getSSEGraphResult, prepareArg, securedFetch } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
 import dynamic from "next/dynamic";
 import { ForceGraphMethods } from "react-force-graph-2d";
-import SchemaView from "./SchemaView";
 import { Category, Graph, GraphData, Link, Node } from "../api/graph/model";
 import { IndicatorContext, SchemaContext } from "../components/provider";
 
 const Selector = dynamic(() => import("../graph/Selector"), { ssr: false })
+const SchemaView = dynamic(() => import("./SchemaView"), { ssr: false })
 
 export default function Page() {
 
@@ -36,6 +36,7 @@ export default function Page() {
     const [edgesCount, setEdgesCount] = useState<number>(0)
     const [nodesCount, setNodesCount] = useState<number>(0)
     const [isAddEntity, setIsAddEntity] = useState(false)
+    const [isCanvasLoading, setIsCanvasLoading] = useState(false)
 
     const fetchCount = useCallback(async () => {
         const result = await getSSEGraphResult(`api/schema/${prepareArg(schemaName)}/count`, toast, setIndicator)
@@ -146,10 +147,10 @@ export default function Page() {
 
         if (fetchCount) fetchCount()
 
-        handleCooldown()
         setSelectedElement(undefined)
         setSelectedElements([])
         setData({ ...schema.Elements })
+        handleCooldown()
     }
 
     return (
@@ -168,6 +169,7 @@ export default function Page() {
                 setIsAddEntity={setIsAddEntity}
                 setIsAddRelation={setIsAddRelation}
                 setGraph={setSchema}
+                isLoading={isCanvasLoading}
             />
             <div className="h-1 grow p-12">
                 <SchemaView
@@ -192,6 +194,8 @@ export default function Page() {
                     setCategories={setCategories}
                     labels={labels}
                     categories={categories}
+                    isLoading={isCanvasLoading}
+                    setIsLoading={setIsCanvasLoading}
                 />
             </div>
             <div className="h-4 w-full Gradient" />

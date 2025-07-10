@@ -18,6 +18,7 @@ interface Props {
     handleCooldown: (ticks?: number) => void
     cooldownTicks: number | undefined
     tabsValue?: string,
+    isLoading: boolean
 }
 
 export default function Controls({
@@ -27,6 +28,7 @@ export default function Controls({
     handleCooldown,
     cooldownTicks,
     tabsValue = "Graph",
+    isLoading,
 }: Props) {
 
     const { indicator } = useContext(IndicatorContext)
@@ -46,7 +48,7 @@ export default function Controls({
     return (
         <div className="w-1 grow bg-transparent flex items-center justify-end gap-6 p-1 pointer-events-auto">
             {
-                graph.getElements().length > 0 && tabsValue === "Graph" &&
+                graph.getElements().length > 0 && tabsValue === "Graph" && !isLoading &&
                 <div className="flex items-center gap-4">
                     <Tooltip>
                         <TooltipTrigger asChild>

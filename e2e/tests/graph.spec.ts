@@ -68,18 +68,18 @@ test.describe("Graph Tests", () => {
     expect(fs.existsSync(downloadPath)).toBe(true);
     await apiCall.removeGraph(graphName);
   });
-
+   
   queryData.queries[0].failedQueries.forEach((query) => {
-    test(`@admin Validate failure & error message when user runs an invalid queries: ${query.name}`, async () => {
-      const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
-      const graphName = getRandomString("graph");
-      await graph.addGraph(graphName);
-      await graph.insertQuery(query.query);
-      await graph.clickRunQuery();
-      expect(await graph.getErrorNotification()).toBe(true);
-      await apiCall.removeGraph(graphName);
-    });
-  });
+       test(`@admin Validate failure & error message when user runs an invalid queries: ${query.name}`, async () => {
+           const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+           const graphName = getRandomString('graph');
+           await graph.addGraph(graphName);
+           await graph.insertQuery(query.query);
+           await graph.clickRunQuery(false);
+           expect(await graph.getErrorNotification()).toBe(true);
+           await apiCall.removeGraph(graphName);
+       });
+   })
 
   test(`@admin Validate that modifying the graph name updates it correctly`, async () => {
     const graphName = getRandomString("graph");
@@ -126,15 +126,15 @@ test.describe("Graph Tests", () => {
     await apiCall.removeGraph(graphName1);
     await apiCall.removeGraph(graphName2);
   });
-
+    
   test(`@readwrite Validate that running multiple queries updates the node and edge count correctly`, async () => {
-    const graphName = getRandomString("graph");
+    const graphName = getRandomString('graph');
     await apiCall.addGraph(graphName);
     const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
     await browser.setPageToFullScreen();
     await graph.selectGraphByName(graphName);
     await graph.insertQuery(DEFAULT_CREATE_QUERY);
-    await graph.clickRunQuery(true);
+    await graph.clickRunQuery();
     const nodes = await graph.getNodesCount();
     const edges = await graph.getEdgesCount();
     expect(parseInt(nodes ?? "0", 10)).toBe(20);
@@ -281,13 +281,13 @@ test.describe("Graph Tests", () => {
 
   invalidQueriesRO.forEach(({ query, description }) => {
     test(`@readonly Validate failure when RO user attempts to execute : ${description}`, async () => {
-      const graphName = getRandomString("graph");
+      const graphName = getRandomString('graph');
       await apiCall.addGraph(graphName, "admin");
       const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
       await browser.setPageToFullScreen();
       await graph.selectGraphByName(graphName);
       await graph.insertQuery(query);
-      await graph.clickRunQuery();
+      await graph.clickRunQuery(false);
       expect(await graph.getErrorNotification()).toBeTruthy();
       await apiCall.removeGraph(graphName, "admin");
     });

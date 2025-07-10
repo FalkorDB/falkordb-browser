@@ -67,7 +67,7 @@ test.describe("Data panel Tests", () => {
     await browser.setPageToFullScreen();
     await graph.selectGraphByName(graphName);
     await graph.insertQuery("MATCH (n) RETURN n Limit 10");
-    await graph.clickRunQuery(true);
+    await graph.clickRunQuery();
     await graph.searchElementInCanvas("Graph", "Alice");
     expect(await graph.getLabel("TestHeader")).toBe("TestHeader");
     await apicalls.removeGraph(graphName);
