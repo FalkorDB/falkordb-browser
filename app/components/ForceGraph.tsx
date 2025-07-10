@@ -65,6 +65,14 @@ export default function ForceGraph({
     const [parentWidth, setParentWidth] = useState<number>(0)
 
     useEffect(() => {
+        const canvas = document.querySelector('force-graph-container canvas')
+        if (!canvas) return
+
+        canvas.setAttribute('data-engine-status', 'stop')
+
+    }, [])
+
+    useEffect(() => {
         const handleResize = () => {
             if (!parentRef.current) return
             setParentWidth(parentRef.current.clientWidth)

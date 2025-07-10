@@ -661,8 +661,9 @@ export default class GraphPage extends Page {
     await this.clickManage();
     await this.clickTableCheckboxByName(graphName);
     await this.clickDuplicateGraphBtn();
-    await this.insertDuplicateGraphInput(graphName + " (copy)");
+    await this.insertDuplicateGraphInput(`${graphName} (copy)`);
     await this.clickDuplicateGraphConfirm();
+    await this.isVisibleToast();
   }
 
   async exportGraphByName(graphName: string): Promise<Download> {

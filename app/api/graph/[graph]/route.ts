@@ -143,16 +143,18 @@ export async function GET(
     const { client, user } = session;
     const { graph: graphId } = await params;
     const query = request.nextUrl.searchParams.get("query");
+    const timeout = Number(request.nextUrl.searchParams.get("timeout"));
 
     try {
       if (!query) throw new Error("Missing parameter query");
+      if (Number.isNaN(timeout)) throw new Error("Invalid parameter timeout");
 
       const graph = client.selectGraph(graphId);
 
       const result =
         user.role === "Read-Only"
-          ? await graph.roQuery(query, { TIMEOUT: 0 })
-          : await graph.query(query, { TIMEOUT: 0 });
+          ? await graph.roQuery(query, { TIMEOUT: timeout })
+          : await graph.query(query, { TIMEOUT: timeout });
 
       if (!result) throw new Error("Something went wrong");
 

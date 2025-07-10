@@ -226,28 +226,23 @@ export default class ApiCalls {
     }
   }
 
-  async getGraphCount(graph: string): Promise<GraphCountResponse> {
-    const maxRetries = 5;
-    const delayMs = 1000;
+  async getGraphCount(
+    graph: string,
+    role = "admin"
+  ): Promise<GraphCountResponse> {
+    try {
+      const headers = role === "admin" ? await getAdminToken() : undefined;
+      const result = await getSSEGraphResult(
+        `${urls.api.graphUrl}${graph}/count`,
+        headers
+      );
 
-    for (let i = 0; i < maxRetries; i += 1) {
-      try {
-        const result = await getRequest(`${urls.api.graphUrl}${graph}/count`);
-        const json = await result.json();
-
-        if (json?.result?.data?.[0]) {
-          return json;
-        }
-      } catch (error) {
-        console.log(`Attempt ${i + 1} failed:`, error);
-      }
-
-      await new Promise((res) => {
-        setTimeout(res, delayMs);
-      });
+      return { result };
+    } catch (error) {
+      throw new Error(
+        `Failed to get graph count. \n Error: ${(error as Error).message}`
+      );
     }
-
-    throw new Error(`Graph count data not available after retries.`);
   }
 
   async addGraphNodeLabel(
