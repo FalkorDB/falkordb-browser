@@ -91,7 +91,7 @@ function GraphView({
     }, [graph, graph.Id, graph.getElements().length, graph.Data.length])
 
     useEffect(() => {
-        if (tabsValue === "Graph") {
+        if (tabsValue === "Graph" && graph.Elements.nodes.length > 0) {
             handleCooldown()
         }
     }, [tabsValue])
