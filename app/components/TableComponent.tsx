@@ -10,7 +10,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { JSONTree } from "react-json-tree"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Cell, cn, Row } from "@/lib/utils";
-import { useCallback, useContext, useEffect, useRef, useState } from "react";
+import { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { CheckCircle, Pencil, XCircle } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import Button from "./ui/Button";
@@ -112,17 +112,17 @@ export default function TableComponent({ headers, rows, label, entityName, input
         setNewValue(value)
     }
 
-    const handleScroll = (e: React.UIEvent<HTMLTableElement>) => {
-        setScrollTop((e.target as HTMLTableElement).scrollTop)
+    const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+        setScrollTop((e.target as HTMLDivElement).scrollTop)
     }
 
-    const stripSVG = encodeURIComponent(
+    const stripSVG = useMemo(() => encodeURIComponent(
         `<svg width='100%' height='${itemHeight}' xmlns='http://www.w3.org/2000/svg'>
                 <line x1='0' y1='${itemHeight - 1}' x2='100%' y2='${itemHeight - 1}' stroke='#e5e7eb' stroke-width='2'/>
         </svg>`
-    );
+    ), [itemHeight])
+    const stripBackground = useMemo(() => `url("data:image/svg+xml,${stripSVG}")`, [stripSVG])
     const columnCount = setRows ? headers.length + 1 : headers.length;
-    const stripBackground = `url("data:image/svg+xml,${stripSVG}")`;
 
     return (
         <div className={cn("h-full w-full flex flex-col gap-4", className)}>
