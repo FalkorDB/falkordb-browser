@@ -47,7 +47,7 @@ test.describe("Data panel Tests", () => {
       graphName,
       FETCH_FIRST_TEN_NODES ?? ""
     );
-    const labels = response.result.data.map((item) => item.n.labels);
+    const labels = response.data.map((item) => item.n.labels);
     expect(labels.flat()).toContain("attributetest");
     await apicalls.removeGraph(graphName);
   });
@@ -91,7 +91,7 @@ test.describe("Data panel Tests", () => {
       graphName,
       FETCH_FIRST_TEN_NODES ?? ""
     );
-    const person = response.result.data.find(
+    const person = response.data.find(
       (item) => "age" in item.n.properties
     );
     expect(person?.n.properties.age).toBe("30");
@@ -133,7 +133,7 @@ test.describe("Data panel Tests", () => {
       graphName,
       FETCH_FIRST_TEN_NODES ?? ""
     );
-    const person = response.result.data.find(
+    const person = response.data.find(
       (item) => "age" in item.n.properties
     );
     expect(person?.n.properties.age).toBeUndefined();
@@ -179,7 +179,7 @@ test.describe("Data panel Tests", () => {
       graphName,
       FETCH_FIRST_TEN_NODES ?? ""
     );
-    const person = response.result.data.find(
+    const person = response.data.find(
       (item) => "age" in item.n.properties
     );
     expect(person?.n.properties.age).toBe("70");
@@ -225,7 +225,7 @@ test.describe("Data panel Tests", () => {
       graphName,
       FETCH_FIRST_TEN_NODES ?? ""
     );
-    expect(response.result.data.length).toBe(1);
+    expect(response.data.length).toBe(1);
     await apicalls.removeGraph(graphName);
   });
 
@@ -429,8 +429,8 @@ test.describe("Data panel Tests", () => {
     await graph.searchElementInCanvas("Graph", "1");
     await graph.modifyAttribute("id", "10");
     const response = await apicalls.runQuery(graphName, "match (n) return n");
-    expect(response.result.data.length).toBeGreaterThan(1);
-    expect(response.result.data[1].n.properties.id).toBe("10");
+    expect(response.data.length).toBeGreaterThan(1);
+    expect(response.data[1].n.properties.id).toBe("10");
     await apicalls.removeGraph(graphName);
   });
 
@@ -447,7 +447,7 @@ test.describe("Data panel Tests", () => {
     await graph.searchElementInCanvas("Graph", "Alice");
     await graph.removeAttribute("name");
     const response = await apicalls.runQuery(graphName, "match (n) return n");
-    expect(response.result.data[0].n.properties).not.toHaveProperty("name");
+    expect(response.data[0].n.properties).not.toHaveProperty("name");
     await apicalls.removeGraph(graphName);
   });
 

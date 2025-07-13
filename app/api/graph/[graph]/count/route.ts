@@ -6,11 +6,15 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ graph: string }> }
 ) {
+  const encoder = new TextEncoder();
+  const { readable, writable } = new TransformStream();
+  const writer = writable.getWriter();
+
   try {
     const session = await getClient();
 
     if (session instanceof NextResponse) {
-      return session;
+      throw new Error(await session.text());
     }
 
     try {
@@ -23,25 +27,42 @@ export async function GET(
 
       if (!result.ok) throw new Error("Something went wrong");
 
-      const json = await result.json();
-
-      const data =
-        typeof json.result === "number"
-          ? json.result
-          : { data: [json.result.data[0] || { edges: 0, nodes: 0 }] };
-
-      return NextResponse.json({ result: data }, { status: 200 });
+      return result
     } catch (error) {
       console.error(error);
-      return NextResponse.json(
-        { message: (error as Error).message },
-        { status: 400 }
+      writer.write(
+        encoder.encode(
+          `event: error\ndata: ${JSON.stringify({
+            message: (error as Error).message,
+            status: 400,
+          })}\n\n`
+        )
       );
+      writer.close();
     }
-  } catch (err) {
-    return NextResponse.json(
-      { message: (err as Error).message },
-      { status: 500 }
+  } catch (error) {
+    console.error(error);
+    writer.write(
+      encoder.encode(
+        `event: error\ndata: ${JSON.stringify({
+          message: (error as Error).message,
+          status: 500,
+        })}\n\n`
+      )
     );
+    writer.close();
   }
+
+  // Clean up if the client disconnects early
+  request.signal.addEventListener("abort", () => {
+    writer.close();
+  });
+
+  return new Response(readable, {
+    headers: {
+      "Content-Type": "text/event-stream",
+      "Cache-Control": "no-cache",
+      Connection: "keep-alive",
+    },
+  });
 }
