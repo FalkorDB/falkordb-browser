@@ -242,6 +242,8 @@ export default class SettingsQueryPage extends GraphPage {
   async clickSaveQuerySettingsBtn(): Promise<void> {
     if (await waitForElementToBeVisible(this.saveQuerySettingsBtn, 1000)) {
       await this.saveQuerySettingsBtn.click();
+    } else {
+      throw new Error("Save query settings button did not become visible within timeout");
     }
   }
 }
