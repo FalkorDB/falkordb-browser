@@ -66,7 +66,7 @@ test.describe('Cluster Functionality Tests', () => {
     });
 
     test.describe('Host and Port Field Validation', () => {
-        test.only('@cluster Host and port fields accept cluster node configurations', async () => {
+        test('@cluster Host and port fields accept cluster node configurations', async () => {
             const loginPage = await browser.createNewPage(LoginPage, urls.loginUrl);
             await browser.setPageToFullScreen();
             for (const node of CLUSTER_NODES) {
