@@ -95,7 +95,6 @@ test.describe("Graph Tests", () => {
 
   test(`@readonly Validate that the button for modifying a graph name is not visible for RO user`, async () => {
     const graphName = getRandomString("graph");
-    console.log("Graph name: ", graphName);
     await apiCall.addGraph(graphName);
     const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
     await browser.setPageToFullScreen();
@@ -297,11 +296,7 @@ test.describe("Graph Tests", () => {
   test(`@readonly Validate success when RO user attempts to execute ro-query`, async () => {
     const graphName = getRandomString("graph");
     await apiCall.addGraph(graphName);
-    const res = await apiCall.runQuery(graphName, CREATE_QUERY);
-    console.log(res);
-    
-    console.log(await apiCall.getGraphs());
-    
+    await apiCall.runQuery(graphName, CREATE_QUERY);
     const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
     await browser.setPageToFullScreen();
     await graph.selectGraphByName(graphName);
