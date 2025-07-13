@@ -36,6 +36,10 @@ export async function getSSEGraphResult(
   headers?: Record<string, string>
 ): Promise<any> {
   try {
+    // Always get the admin token and add it to headers
+    const adminHeaders = await getAdminToken();
+    const mergedHeaders = { ...adminHeaders, ...headers };
+
     return await new Promise((resolve, reject) => {
       let handled = false;
 
@@ -44,13 +48,13 @@ export async function getSSEGraphResult(
       const finalUrl = url;
 
       // If we have headers (which contains cookies for admin auth), use custom fetch
-      if (headers && headers.Cookie) {
+      if (mergedHeaders && mergedHeaders.Cookie) {
         eventSourceInit.fetch = (input: string, init?: RequestInit) =>
           fetch(input, {
             ...init,
             headers: {
               ...init?.headers,
-              ...headers,
+              ...mergedHeaders,
             },
           });
       }
@@ -117,12 +121,10 @@ export default class ApiCalls {
     }
   }
 
-  async addGraph(graphName: string, role?: string): Promise<AddGraphResponse> {
+  async addGraph(graphName: string): Promise<AddGraphResponse> {
     try {
-      const headers = role === "admin" ? await getAdminToken() : undefined;
-      const requestUrl = `${urls.api.graphUrl + graphName}`;
-      const result = await postRequest(requestUrl, headers);
-      const jsonResponse = await result.json();
+      const requestUrl = `${urls.api.graphUrl + graphName}?query=RETURN%201`;
+      const jsonResponse = await getSSEGraphResult(requestUrl);
       return jsonResponse;
     } catch (error) {
       throw new Error(
@@ -210,14 +212,12 @@ export default class ApiCalls {
   async runQuery(
     graphName: string,
     query: string,
-    role = "admin"
   ): Promise<RunQueryResponse> {
     try {
-      const headers = role === "admin" ? await getAdminToken() : undefined;
       const url = `${urls.api.graphUrl}${graphName}?query=${encodeURIComponent(
         query
       )}`;
-      return await getSSEGraphResult(url, headers);
+      return await getSSEGraphResult(url);
     } catch (error) {
       console.error(error);
       throw new Error(
@@ -228,13 +228,10 @@ export default class ApiCalls {
 
   async getGraphCount(
     graph: string,
-    role = "admin"
   ): Promise<GraphCountResponse> {
     try {
-      const headers = role === "admin" ? await getAdminToken() : undefined;
       const result = await getSSEGraphResult(
         `${urls.api.graphUrl}${graph}/count`,
-        headers
       );
 
       return { result };
@@ -440,14 +437,12 @@ export default class ApiCalls {
   async runSchemaQuery(
     schemaName: string,
     schema: string,
-    role = "admin"
   ): Promise<AddSchemaResponse> {
     try {
-      const headers = role === "admin" ? await getAdminToken() : undefined;
       const url = `${
         urls.api.graphUrl + schemaName
       }_schema?query=${encodeURIComponent(schema)}`;
-      return await getSSEGraphResult(url, headers);
+      return await getSSEGraphResult(url);
     } catch (error) {
       console.error(error);
       throw new Error(

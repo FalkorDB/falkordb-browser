@@ -95,7 +95,8 @@ test.describe("Graph Tests", () => {
 
   test(`@readonly Validate that the button for modifying a graph name is not visible for RO user`, async () => {
     const graphName = getRandomString("graph");
-    await apiCall.addGraph(graphName, "admin");
+    console.log("Graph name: ", graphName);
+    await apiCall.addGraph(graphName);
     const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
     await browser.setPageToFullScreen();
     expect(await graph.isModifyGraphNameButtonVisible(graphName)).toBe(false);
@@ -282,7 +283,7 @@ test.describe("Graph Tests", () => {
   invalidQueriesRO.forEach(({ query, description }) => {
     test(`@readonly Validate failure when RO user attempts to execute : ${description}`, async () => {
       const graphName = getRandomString('graph');
-      await apiCall.addGraph(graphName, "admin");
+      await apiCall.addGraph(graphName);
       const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
       await browser.setPageToFullScreen();
       await graph.selectGraphByName(graphName);
@@ -295,8 +296,12 @@ test.describe("Graph Tests", () => {
 
   test(`@readonly Validate success when RO user attempts to execute ro-query`, async () => {
     const graphName = getRandomString("graph");
-    await apiCall.addGraph(graphName, "admin");
-    await apiCall.runQuery(graphName, CREATE_QUERY, "admin");
+    await apiCall.addGraph(graphName);
+    const res = await apiCall.runQuery(graphName, CREATE_QUERY);
+    console.log(res);
+    
+    console.log(await apiCall.getGraphs());
+    
     const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
     await browser.setPageToFullScreen();
     await graph.selectGraphByName(graphName);
@@ -346,7 +351,7 @@ test.describe("Graph Tests", () => {
 
   test(`@readonly Validate that RO user can select graph`, async () => {
     const graphName = getRandomString("graph");
-    await apiCall.addGraph(graphName, "admin");
+    await apiCall.addGraph(graphName);
     const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
     await graph.selectGraphByName(graphName);
     expect(await graph.getErrorNotification()).toBeFalsy();
