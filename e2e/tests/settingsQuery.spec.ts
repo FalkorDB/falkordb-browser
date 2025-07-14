@@ -76,7 +76,7 @@ test.describe("Query Settings", () => {
   ];
 
   noLimitQueries.forEach((query) => {
-    test.only(`@admin Validate that limit was not added to the query: ${query}`, async () => {
+    test(`@admin Validate that limit was not added to the query: ${query}`, async () => {
       const graphName = getRandomString("settingsQuery");
       await apiCall.addGraph(graphName);
       const querySettings = await browser.createNewPage(
