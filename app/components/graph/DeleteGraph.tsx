@@ -40,6 +40,7 @@ export default function DeleteGraph({
   useEffect(() => {
     if (!open && closeManage) {
       setOpenMenage(false)
+      setCloseManage(false)
     }
   }, [open, closeManage, setOpenMenage])
 
