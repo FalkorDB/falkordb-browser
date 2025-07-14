@@ -39,24 +39,62 @@ test.describe("Query Settings", () => {
     await apiCall.removeGraph(graphName);
   });
 
-  test(`@admin Validate that running a query with limit returns limited results`, async () => {
-    const graphName = getRandomString("settingsQuery");
-    await apiCall.addGraph(graphName);
-    const querySettings = await browser.createNewPage(
-      QuerySettingsPage,
-      urls.settingsUrl
-    );
-    const limit = 5;
-    await querySettings.fillLimit(limit);
-    await querySettings.clickSaveQuerySettingsBtn();
-    await querySettings.clickGraphsTabInHeader();
-    await querySettings.selectGraphByName(graphName);
-    const query = `UNWIND range(1, 10) AS i CREATE (p:Person {id: i, name: 'Person ' + toString(i)}) RETURN p`;
-    await querySettings.insertQuery(query);
-    await querySettings.clickRunQuery();
-    const res = await querySettings.getNodesScreenPositions("graph");
-    expect(res.length).toBe(5);
-    await apiCall.removeGraph(graphName);
+  const limitQueries = [
+    `UNWIND range(1, 10) AS x CREATE (n) RETURN n`,
+    `UNWIND range(1, 10) AS x CREATE (n) RETURN n UNION UNWIND range(1, 10) AS x CREATE (n) RETURN n`,
+    `CALL { UNWIND range(1, 10) AS x CREATE (n) RETURN n UNION UNWIND range(1, 10) AS x CREATE (n) RETURN n } RETURN n`,
+  ];
+
+  limitQueries.forEach((query) => {
+    test(`@admin Validate that results are limited to the query: ${query}`, async () => {
+      const graphName = getRandomString("settingsQuery");
+      await apiCall.addGraph(graphName);
+      const querySettings = await browser.createNewPage(
+        QuerySettingsPage,
+        urls.settingsUrl
+      );
+      const limit = 5;
+      await querySettings.fillLimit(limit);
+      await querySettings.clickSaveQuerySettingsBtn();
+      await querySettings.clickGraphsTabInHeader();
+      await querySettings.selectGraphByName(graphName);
+      await querySettings.insertQuery(query);
+      await querySettings.clickRunQuery();
+      const res = await querySettings.getNodesScreenPositions("graph");
+      expect(res.length).toBe(5);
+      await apiCall.removeGraph(graphName);
+    });
+  });
+
+  const noLimitQueries = [
+    `CREATE (n)`,
+    `MATCH (n) RETURN n LIMIT 50`,
+    `MATCH (n) SET n.name = 'test'`,
+    `MERGE (n:Person {id: 1})`,
+    `MATCH (n) RETURN n UNION MATCH (n) RETURN n LIMIT 10`,
+    `CALL { MATCH (n) RETURN n UNION MATCH (n) RETURN n } RETURN n LIMIT 10`,
+  ];
+
+  noLimitQueries.forEach((query) => {
+    test(`@admin Validate that limit was not added to the query: ${query}`, async () => {
+      const graphName = getRandomString("settingsQuery");
+      await apiCall.addGraph(graphName);
+      const querySettings = await browser.createNewPage(
+        QuerySettingsPage,
+        urls.settingsUrl
+      );
+      const limit = 5;
+      await querySettings.fillLimit(limit);
+      await querySettings.clickSaveQuerySettingsBtn();
+      await querySettings.clickGraphsTabInHeader();
+      await querySettings.selectGraphByName(graphName);
+
+      await querySettings.insertQuery(query);
+      await querySettings.clickRunQuery(false);
+
+      expect(await querySettings.getErrorNotification()).toBe(false);
+      await apiCall.removeGraph(graphName);
+    });
   });
 
   test(`@admin Validate that limit can't be negative with the input`, async () => {
