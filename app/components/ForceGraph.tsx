@@ -94,6 +94,16 @@ export default function ForceGraph({
     }, [chartRef, data.nodes.length, data])
 
     useEffect(() => {
+        if (!parentRef.current) return;
+
+        const canvas = parentRef.current.querySelector('canvas') as HTMLCanvasElement;
+
+        if (!canvas) return;
+
+        canvas.setAttribute('data-engine-status', 'stop');
+    }, [parentRef.current])
+
+    useEffect(() => {
         const handleResize = () => {
             if (!parentRef.current) return
             setParentWidth(parentRef.current.clientWidth)

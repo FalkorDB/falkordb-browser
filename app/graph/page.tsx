@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useContext, useEffect, useRef, useState } from "react";
-import { getQueryWithLimit, prepareArg, securedFetch } from "@/lib/utils";
+import { getQueryWithLimit, getSSEGraphResult, prepareArg, securedFetch } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
 import dynamic from "next/dynamic";
 import { ForceGraphMethods } from "react-force-graph-2d";
@@ -54,30 +54,12 @@ export default function Page() {
     const fetchCount = useCallback(async () => {
         if (!graphName) return
 
-        const result = await securedFetch(`api/graph/${prepareArg(graphName)}/count`, {
-            method: "GET"
-        }, toast, setIndicator)
+        const result = await getSSEGraphResult(`api/graph/${prepareArg(graphName)}/count`, toast, setIndicator);
+        
+        const { nodes, edges } = result.data[0]
 
-        if (!result.ok) return
-
-        let json = await result.json()
-
-        while (typeof json.result === "number") {
-            // eslint-disable-next-line no-await-in-loop
-            const res = await securedFetch(`api/graph/${prepareArg(graphName)}/query?id=${prepareArg(json.result.toString())}`, {
-                method: "GET"
-            }, toast, setIndicator)
-
-            if (!res.ok) return
-
-            // eslint-disable-next-line no-await-in-loop
-            json = await res.json()
-        }
-
-        [json] = json.result.data
-
-        setEdgesCount(json.edges)
-        setNodesCount(json.nodes)
+        setEdgesCount(edges || 0)
+        setNodesCount(nodes || 0)
     }, [graphName, toast, setIndicator])
 
     const run = useCallback(async (q: string, name: string) => {
@@ -90,29 +72,16 @@ export default function Page() {
             return null
         }
 
-        const result = await securedFetch(`api/graph/${prepareArg(name)}?query=${prepareArg(getQueryWithLimit(q, limit))}&timeout=${timeout}`, {
-            method: "GET"
-        }, toast, setIndicator)
+        try {
+            const url = `api/graph/${prepareArg(name)}?query=${prepareArg(getQueryWithLimit(q, limit))}&timeout=${timeout}`;
+            const result = await getSSEGraphResult(url, toast, setIndicator);
 
-        if (!result.ok) return null
+            setSelectedElement(undefined);
 
-        let json = await result.json()
-
-        while (typeof json.result === "number") {
-            // eslint-disable-next-line no-await-in-loop
-            const res = await securedFetch(`api/graph/${prepareArg(name)}/query?id=${prepareArg(json.result.toString())}`, {
-                method: "GET"
-            }, toast, setIndicator)
-
-            if (!res.ok) return null
-
-            // eslint-disable-next-line no-await-in-loop
-            json = await res.json()
+            return result;
+        } catch (error) {
+            return null;
         }
-
-        setSelectedElement(undefined)
-
-        return json.result
     }, [limit, timeout, toast, setIndicator])
 
     const handleCooldown = (ticks?: number) => {
@@ -198,7 +167,7 @@ export default function Page() {
         }
 
         fetchCount()
-    }, [fetchCount, graph.Id, graphName, setGraph, runDefaultQuery, defaultQuery, runQuery, contentPersistence, setGraphName, graphNames])
+    }, [fetchCount, graph.Id, graphName, setGraph, runDefaultQuery, defaultQuery, contentPersistence, setGraphName, graphNames])
 
     const handleDeleteElement = async () => {
         if (selectedElements.length === 0 && selectedElement) {

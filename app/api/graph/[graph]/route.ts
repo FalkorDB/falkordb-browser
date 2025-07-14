@@ -1,20 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getClient } from "@/app/api/auth/[...nextauth]/options";
-import { GraphReply } from "falkordb/dist/src/graph";
-
-const INITIAL = Number(process.env.INITIAL) || 0;
-
-// Generate a unique id for each request
-function* generateId(): Generator<number, number, number> {
-  let id = 0;
-  while (true) {
-    yield id;
-    id += 1;
-  }
-}
-
-// create a generator for the unique ids
-const idGenerator = generateId();
 
 export async function DELETE(
   request: NextRequest,
@@ -144,97 +129,74 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ graph: string }> }
 ) {
+  const encoder = new TextEncoder();
+  const { readable, writable } = new TransformStream();
+  const writer = writable.getWriter();
+
   try {
     const session = await getClient();
 
     if (session instanceof NextResponse) {
-      return session;
+      throw new Error(await session.text());
     }
 
-    const { client, user, cache } = session;
+    const { client, user } = session;
     const { graph: graphId } = await params;
     const query = request.nextUrl.searchParams.get("query");
-    const timeout = request.nextUrl.searchParams.get("timeout");
-    const { role } = user;
+    const timeout = Number(request.nextUrl.searchParams.get("timeout"));
 
     try {
       if (!query) throw new Error("Missing parameter query");
+      if (Number.isNaN(timeout)) throw new Error("Invalid parameter timeout");
 
       const graph = client.selectGraph(graphId);
 
-      // Create a promise to resolve the result
-      const result = await new Promise<GraphReply<unknown> | number>(
-        (resolve, reject) => {
-          const id = idGenerator.next().value;
+      const result =
+        user.role === "Read-Only"
+          ? await graph.roQuery(query, { TIMEOUT: timeout })
+          : await graph.query(query, { TIMEOUT: timeout });
 
-          // Set a timeout to resolve the result if it takes too long
-          const timeoutHook = setTimeout(() => {
-            cache.set(id, { callback: undefined, result: undefined });
-            resolve(id);
-          }, INITIAL);
-
-          const timeoutNumber =
-            timeout === "undefined" ? 0 : Number(timeout) * 1000;
-          const res =
-            role === "Read-Only"
-              ? graph.roQuery(query, { TIMEOUT: timeoutNumber })
-              : graph.query(query, { TIMEOUT: timeoutNumber });
-
-          res
-            .then((r) => {
-              if (!r) throw new Error("Something went wrong");
-
-              // If the result is already in the cache, save it
-              const cached = cache.get(id);
-              if (cached) {
-                cached.result = r;
-                if (typeof cached.callback === "function") {
-                  cached.callback();
-                }
-                return;
-              }
-
-              clearTimeout(timeoutHook);
-              resolve(r);
-            })
-            .catch((error) => {
-              // If the error is already in the cache, save it
-              const cached = cache.get(id);
-              if (cached) {
-                cached.result = error as Error;
-                if (typeof cached.callback === "function") {
-                  cached.callback();
-                }
-                return;
-              }
-
-              clearTimeout(timeoutHook);
-              reject(error);
-            });
-        }
-      );
-
-      // If the result is a number, return the id
-      if (typeof result === "number") {
-        return NextResponse.json({ result }, { status: 200 });
-      }
-
-      // If the result is does not exist, throw an error
       if (!result) throw new Error("Something went wrong");
 
-      // Return the result
-      return NextResponse.json({ result }, { status: 200 });
+      writer.write(
+        encoder.encode(`event: result\ndata: ${JSON.stringify(result)}\n\n`)
+      );
+      writer.close();
     } catch (error) {
       console.error(error);
-      return NextResponse.json(
-        { message: (error as Error).message },
-        { status: 400 }
+      writer.write(
+        encoder.encode(
+          `event: error\ndata: ${JSON.stringify({
+            message: (error as Error).message,
+            status: 400,
+          })}\n\n`
+        )
       );
+      writer.close();
     }
-  } catch (err) {
-    return NextResponse.json(
-      { message: (err as Error).message },
-      { status: 500 }
+  } catch (error) {
+    console.error(error);
+    writer.write(
+      encoder.encode(
+        `event: error\ndata: ${JSON.stringify({
+          message: (error as Error).message,
+          status: 500,
+        })}\n\n`
+      )
     );
+    writer.close();
   }
+
+  // Clean up if the client disconnects early
+  request.signal.addEventListener("abort", () => {
+    writer.close();
+  });
+
+  return new Response(readable, {
+    headers: {
+      "Content-Type": "text/event-stream",
+      "Cache-Control": "no-cache",
+      Connection: "keep-alive",
+    },
+  });
 }

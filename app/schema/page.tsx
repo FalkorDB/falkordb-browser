@@ -1,7 +1,7 @@
 'use client'
 
 import { useContext, useState, useRef, useCallback, useEffect } from "react";
-import { prepareArg, securedFetch } from "@/lib/utils";
+import { getSSEGraphResult, prepareArg, securedFetch } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
 import dynamic from "next/dynamic";
 import { ForceGraphMethods } from "react-force-graph-2d";
@@ -39,30 +39,12 @@ export default function Page() {
     const [isCanvasLoading, setIsCanvasLoading] = useState(false)
 
     const fetchCount = useCallback(async () => {
-        const result = await securedFetch(`api/schema/${prepareArg(schemaName)}/count`, {
-            method: "GET"
-        }, toast, setIndicator)
+        const result = await getSSEGraphResult(`api/schema/${prepareArg(schemaName)}/count`, toast, setIndicator)
 
-        if (!result.ok) return
+        const { edges, nodes } = result.data[0]
 
-        let json = await result.json()
-
-        while (typeof json.result === "number") {
-            // eslint-disable-next-line no-await-in-loop
-            const res = await securedFetch(`api/graph/${prepareArg(schemaName)}/query?id=${prepareArg(json.result.toString())}`, {
-                method: "GET"
-            }, toast, setIndicator)
-
-            if (!res.ok) return
-
-            // eslint-disable-next-line no-await-in-loop
-            json = await res.json()
-        }
-
-        [json] = json.result.data
-
-        setEdgesCount(json.edges)
-        setNodesCount(json.nodes)
+        setEdgesCount(edges || 0)
+        setNodesCount(nodes || 0)
     }, [toast, setIndicator, schemaName])
 
     const handleCooldown = (ticks?: number) => {
@@ -95,7 +77,6 @@ export default function Page() {
         if (schemaGraph.Elements.nodes.length > 0) {
             handleCooldown()
         }
-        
     }, [fetchCount, setIndicator, setSchema, toast, schemaName])
 
     useEffect(() => {

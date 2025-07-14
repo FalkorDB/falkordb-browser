@@ -95,8 +95,13 @@ function GraphView({
         else if (graph.Data.length !== 0) defaultChecked = "Table"
 
         setTabsValue(defaultChecked);
-
     }, [graph, graph.Id, elementsLength, graph.Data.length, isTabEnabled, tabsValue])
+
+    useEffect(() => {
+        if (tabsValue === "Graph" && graph.Elements.nodes.length > 0) {
+            handleCooldown()
+        }
+    }, [tabsValue])
 
     useEffect(() => {
         setSelectedElement(undefined)

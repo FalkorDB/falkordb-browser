@@ -1,6 +1,5 @@
 import { getClient } from "@/app/api/auth/[...nextauth]/options";
 import { NextRequest, NextResponse } from "next/server";
-import { commandOptions } from "redis";
 
 // eslint-disable-next-line import/prefer-default-export
 export async function GET(
@@ -20,7 +19,7 @@ export async function GET(
     try {
       const result = await (
         await client.connection
-      ).dump(commandOptions({ returnBuffers: true }), graphId);
+      ).dump(graphId);
 
       if (!result)
         throw new Error(`Failed to retrieve graph data for ID: ${graphId}`);
