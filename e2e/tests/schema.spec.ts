@@ -209,7 +209,7 @@ test.describe('Schema Tests', () => {
         const schemaName = getRandomString('schema');
         await schema.addSchema(schemaName);
         await schema.addSchema(schemaName);
-        expect(await schema.getErrorNotification()).toBe(true);
+        expect(await schema.getNotificationErrorToast()).toBe(true);
         await apicalls.removeSchema(schemaName);
     });
 

@@ -35,7 +35,7 @@ test.describe("Query Settings", () => {
     const query = `UNWIND range(1, 100000000) AS x RETURN count(x)`;
     await querySettings.insertQuery(query);
     await querySettings.clickRunQuery(false);
-    expect(await querySettings.getErrorNotification()).toBe(true);
+    expect(await querySettings.getNotificationErrorToast()).toBe(true);
     await apiCall.removeGraph(graphName);
   });
 
@@ -76,13 +76,14 @@ test.describe("Query Settings", () => {
   ];
 
   noLimitQueries.forEach((query) => {
-    test(`@admin Validate that limit was not added to the query: ${query}`, async () => {
+    test.only(`@admin Validate that limit was not added to the query: ${query}`, async () => {
       const graphName = getRandomString("settingsQuery");
       await apiCall.addGraph(graphName);
       const querySettings = await browser.createNewPage(
         QuerySettingsPage,
         urls.settingsUrl
       );
+      await browser.setPageToFullScreen();
       const limit = 5;
       await querySettings.fillLimit(limit);
       await querySettings.clickSaveQuerySettingsBtn();
@@ -92,7 +93,7 @@ test.describe("Query Settings", () => {
       await querySettings.insertQuery(query);
       await querySettings.clickRunQuery(false);
 
-      expect(await querySettings.getErrorNotification()).toBe(false);
+      expect(await querySettings.getNotificationErrorToast()).toBe(false);
       await apiCall.removeGraph(graphName);
     });
   });

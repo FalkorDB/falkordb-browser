@@ -531,6 +531,11 @@ export default class GraphPage extends Page {
     return isVisible;
   }
 
+  async isVisibleErrorToast(): Promise<boolean> {
+    const isVisible = await waitForElementToBeVisible(this.errorToast);
+    return isVisible;
+  }
+
   async isVisibleNodeCanvasToolTip(): Promise<boolean> {
     const isVisible = await waitForElementToBeVisible(this.nodeCanvasToolTip);
     return isVisible;
@@ -723,9 +728,15 @@ export default class GraphPage extends Page {
     await this.page.waitForTimeout(1500); // wait for the element to be deleted
   }
 
-  async getErrorNotification(): Promise<boolean> {
+  async getNotificationToast(): Promise<boolean> {
     await this.page.waitForTimeout(1000);
     const isVisible = await this.isVisibleToast();
+    return isVisible;
+  }
+
+  async getNotificationErrorToast(): Promise<boolean> {
+    await this.page.waitForTimeout(1000);
+    const isVisible = await this.isVisibleErrorToast();
     return isVisible;
   }
 

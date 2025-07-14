@@ -76,7 +76,7 @@ test.describe("Graph Tests", () => {
            await graph.addGraph(graphName);
            await graph.insertQuery(query.query);
            await graph.clickRunQuery(false);
-           expect(await graph.getErrorNotification()).toBe(true);
+           expect(await graph.getNotificationErrorToast()).toBe(true);
            await apiCall.removeGraph(graphName);
        });
    })
@@ -98,7 +98,7 @@ test.describe("Graph Tests", () => {
     await apiCall.addGraph(graphName);
     const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
     await browser.setPageToFullScreen();
-    expect(await graph.isModifyGraphNameButtonVisible(graphName)).toBe(false);
+    expect(await graph.isModifyGraphNameButtonVisible(graphName)).toBeFalsy();
     await apiCall.removeGraph(graphName, "admin");
   });
 
@@ -108,7 +108,7 @@ test.describe("Graph Tests", () => {
     const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
     await browser.setPageToFullScreen();
     await graph.addGraph(graphName);
-    expect(await graph.getErrorNotification()).toBe(true);
+    expect(await graph.getNotificationErrorToast()).toBeTruthy();
     await apiCall.removeGraph(graphName);
   });
 
@@ -288,7 +288,7 @@ test.describe("Graph Tests", () => {
       await graph.selectGraphByName(graphName);
       await graph.insertQuery(query);
       await graph.clickRunQuery(false);
-      expect(await graph.getErrorNotification()).toBeTruthy();
+      expect(await graph.getNotificationErrorToast()).toBeTruthy();
       await apiCall.removeGraph(graphName, "admin");
     });
   });
@@ -302,7 +302,7 @@ test.describe("Graph Tests", () => {
     await graph.selectGraphByName(graphName);
     await graph.insertQuery("MATCH (n)-[r]->(m) RETURN n, r, m LIMIT 10");
     await graph.clickRunQuery();
-    expect(await graph.getErrorNotification()).toBeFalsy();
+    expect(await graph.getNotificationErrorToast()).toBeFalsy();
     expect(
       await graph.isVisibleLabelsButtonByName("Graph", "Labels", "person1")
     ).toBeTruthy();
@@ -349,7 +349,7 @@ test.describe("Graph Tests", () => {
     await apiCall.addGraph(graphName);
     const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
     await graph.selectGraphByName(graphName);
-    expect(await graph.getErrorNotification()).toBeFalsy();
+    expect(await graph.getNotificationErrorToast()).toBeFalsy();
     await apiCall.removeGraph(graphName, "admin");
   });
 
