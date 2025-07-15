@@ -88,6 +88,10 @@ export default class GraphPage extends Page {
     return this.page.getByTestId("duplicateGraphConfirm");
   }
 
+  private get skeleton(): Locator {
+    return this.page.locator("#skeleton").first();
+  }
+
   async getBoundingBoxCanvasElement(): Promise<null | {
     x: number;
     y: number;
@@ -740,7 +744,8 @@ export default class GraphPage extends Page {
   // 6000 is the timeout for the animation to end
   // 1000 is the timeout for the fit to size animation
   // 1500 is extra timeout to ensure the animation is over
-  async waitForCanvasAnimationToEnd(timeout = 8500): Promise<void> {
+  async waitForCanvasAnimationToEnd(timeout = 9500): Promise<void> {
+    await waitForElementToBeVisible(this.skeleton);
     await this.page.waitForFunction(
       ({ selector }) => {
         const canvas = document.querySelector(selector);

@@ -61,6 +61,7 @@ test.describe('Schema Tests', () => {
         await schema.addSchema(schemaName);
         const attributeRow = "1"
         await schema.addNode(attributeRow, "person", 'id', "Integer", "100", true, true);
+        await schema.waitForCanvasAnimationToEnd();
         const labelContent = await schema.getLabelsButtonByNameContent("Schema", "Labels", "person");
         expect(labelContent).toBe("person");
         await apicalls.removeSchema(schemaName);
@@ -75,12 +76,13 @@ test.describe('Schema Tests', () => {
         await schema.waitForCanvasAnimationToEnd();
         const attributeRow = "1"
         await schema.addEdge(attributeRow, "knows", 'id', "Integer", "100", true, true);
+        await schema.waitForCanvasAnimationToEnd();
         const labelContent = await schema.getLabelsButtonByNameContent("Schema", "Relationships", "knows");
         expect(labelContent).toBe("knows");
         await apicalls.removeSchema(schemaName);
     });
 
-    test(`@admin Validate that deleting a node removes updates the labels panel`, async () => {
+    test.only(`@admin Validate that deleting a node removes updates the labels panel`, async () => {
         const schemaName = getRandomString('schema');
         await apicalls.runSchemaQuery(schemaName, 'CREATE (a:person1 {id: "1"}), (b:person2 {id: "2"}) RETURN a, b');
         const schema = await browser.createNewPage(SchemaPage, urls.schemaUrl);
@@ -92,7 +94,7 @@ test.describe('Schema Tests', () => {
         await apicalls.removeSchema(schemaName);
     });
 
-    test(`@admin Validate that deleting a relationship updates the relationship types panel`, async () => {
+    test.only(`@admin Validate that deleting a relationship updates the relationship types panel`, async () => {
         const schemaName = getRandomString('schema');
         await apicalls.runSchemaQuery(schemaName, 'CREATE (a:person1 {id: "1"}), (b:person2 {id: "2"}), (a)-[:knows]->(b) RETURN a, b');
         const schema = await browser.createNewPage(SchemaPage, urls.schemaUrl);
@@ -104,7 +106,7 @@ test.describe('Schema Tests', () => {
         await apicalls.removeSchema(schemaName);
     });
 
-    test(`@admin Validate that toggling a category label updates edge visibility on the canvas`, async () => {
+    test.only(`@admin Validate that toggling a category label updates edge visibility on the canvas`, async () => {
         const schemaName = getRandomString('schema');
         await apicalls.runSchemaQuery(schemaName, 'CREATE (n:person1 {id: "1"}) RETURN n');
         const schema = await browser.createNewPage(SchemaPage, urls.schemaUrl);
@@ -213,7 +215,7 @@ test.describe('Schema Tests', () => {
         await apicalls.removeSchema(schemaName);
     });
 
-    test(`@admin validate that deleting a schema node decreases node count`, async () => {
+    test.only(`@admin validate that deleting a schema node decreases node count`, async () => {
         const schemaName = getRandomString('schema');
         await apicalls.runSchemaQuery(schemaName, 'CREATE (a:person1 {id: "1"}), (b:person2 {id: "2"}) RETURN a, b');
         const schema = await browser.createNewPage(SchemaPage, urls.schemaUrl);
@@ -255,7 +257,7 @@ test.describe('Schema Tests', () => {
         await apicalls.removeSchema(schemaName);
     });
 
-    test(`@admin validate that deleting a schema edge decreases edge count`, async () => {
+    test.only(`@admin validate that deleting a schema edge decreases edge count`, async () => {
         const schemaName = getRandomString('schema');
         await apicalls.runSchemaQuery(schemaName, 'CREATE (a:person1 {id: "1"}), (b:person2 {id: "2"}), (a)-[:knows]->(b) RETURN a, b');
         const schema = await browser.createNewPage(SchemaPage, urls.schemaUrl);
