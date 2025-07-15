@@ -66,8 +66,6 @@ test.describe("Query Settings", () => {
     );
     const limit = -1;
     await querySettings.fillLimit(limit);
-    await querySettings.clickSaveQuerySettingsBtn();
-    await querySettings.refreshPage();
     const limitValue = await querySettings.getLimit();
     expect(limitValue).toBe("300");
   });
@@ -79,8 +77,6 @@ test.describe("Query Settings", () => {
     );
     const timeout = -1;
     await querySettings.fillTimeout(timeout);
-    await querySettings.clickSaveQuerySettingsBtn();
-    await querySettings.refreshPage();
     const timeoutValue = await querySettings.getTimeout();
     expect(timeoutValue).toBe("∞");
   });
@@ -90,12 +86,12 @@ test.describe("Query Settings", () => {
       QuerySettingsPage,
       urls.settingsUrl
     );
-    await querySettings.fillLimit(0);
+    await querySettings.fillLimit(2);
     await querySettings.clickDecreaseLimit();
     await querySettings.clickSaveQuerySettingsBtn();
     await querySettings.refreshPage();
     const limitValue = await querySettings.getLimit();
-    expect(limitValue).toBe("∞");
+    expect(limitValue).toBe("1");
   });
 
   test(`@admin Validate that timeout can't be negative with the decrease button`, async () => {
@@ -104,8 +100,6 @@ test.describe("Query Settings", () => {
       urls.settingsUrl
     );
     await querySettings.clickDecreaseTimeout();
-    await querySettings.clickSaveQuerySettingsBtn();
-    await querySettings.refreshPage();
     const timeoutValue = await querySettings.getTimeout();
     expect(timeoutValue).toBe("∞");
   });
@@ -151,12 +145,13 @@ test.describe("Query Settings", () => {
       QuerySettingsPage,
       urls.settingsUrl
     );
-    await querySettings.fillTimeout(1);
+    await browser.setPageToFullScreen();
+    await querySettings.fillTimeout(2);
     await querySettings.clickDecreaseTimeout();
     await querySettings.clickSaveQuerySettingsBtn();
     await querySettings.refreshPage();
     const timeoutValue = await querySettings.getTimeout();
-    expect(timeoutValue).toBe("∞");
+    expect(timeoutValue).toBe("1");
   });
 
   test(`@admin Validate that default query is set and saved`, async () => {

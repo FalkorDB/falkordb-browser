@@ -456,6 +456,10 @@ export default class GraphPage extends Page {
       (el) => el.click(),
       `Confirm Duplicate Graph`
     );
+    // Wait until the confirmation dialog disappears
+    await waitForElementToNotBeVisible(this.duplicateGraphConfirm);
+    // And wait for the success toast to show up
+    await this.isVisibleToast();
   }
 
   async clickSaveButton(type: "Graph" | "Schema"): Promise<void> {
