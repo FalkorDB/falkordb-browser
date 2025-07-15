@@ -7,6 +7,7 @@ import {
   interactWhenVisible,
   pollForElementContent,
   waitForElementToBeEnabledOrNotVisible,
+  waitForElementToBeEnabled,
 } from "@/e2e/infra/utils";
 import Page from "./page";
 
