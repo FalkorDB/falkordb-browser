@@ -545,6 +545,7 @@ export default class SchemaPage extends GraphPage {
     await this.selectTwoNodesByValidSelection();
     await this.clickCreateNewNodeButton();
     await waitForElementToNotBeVisible(this.createNewNodeButton())
+    await this.waitForCanvasAnimationToEnd();
   }
 
   async exportSchema(schemaName: string): Promise<void> {

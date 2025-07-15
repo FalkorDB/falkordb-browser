@@ -107,7 +107,7 @@ test.describe("Graph Tests", () => {
     await apiCall.addGraph(graphName);
     const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
     await browser.setPageToFullScreen();
-    await graph.addGraph(graphName);
+    await graph.addGraph(graphName, false);
     expect(await graph.getNotificationErrorToast()).toBeTruthy();
     await apiCall.removeGraph(graphName);
   });

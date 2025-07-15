@@ -73,10 +73,8 @@ test.describe('Schema Tests', () => {
         const schema = await browser.createNewPage(SchemaPage, urls.schemaUrl);
         await browser.setPageToFullScreen();
         await schema.selectSchemaByName(schemaName);
-        await schema.waitForCanvasAnimationToEnd();
         const attributeRow = "1"
         await schema.addEdge(attributeRow, "knows", 'id', "Integer", "100", true, true);
-        await schema.waitForCanvasAnimationToEnd();
         const labelContent = await schema.getLabelsButtonByNameContent("Schema", "Relationships", "knows");
         expect(labelContent).toBe("knows");
         await apicalls.removeSchema(schemaName);

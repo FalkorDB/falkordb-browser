@@ -639,12 +639,14 @@ export default class GraphPage extends Page {
     }
   }
 
-  async addGraph(graphName: string): Promise<void> {
+  async addGraph(graphName: string, waitForVisibility = true): Promise<void> {
     await this.clickCreateGraph();
     await this.fillCreateGraphInput(graphName);
     await this.page.waitForTimeout(1000); // wait for the input to be filled
     await this.clickConfirmCreateGraph();
-    await waitForElementToNotBeVisible(this.createConfirm("Graph"));
+    if (waitForVisibility) {
+      await waitForElementToNotBeVisible(this.createConfirm("Graph"));
+    }
   }
 
   async removeGraph(graphName: string): Promise<void> {
@@ -733,7 +735,7 @@ export default class GraphPage extends Page {
     await this.clickDeleteElement(type);
     await this.clickDeleteElementConfirm();
     await waitForElementToNotBeVisible(this.deleteElement("Node"));
-    await this.page.waitForTimeout(1500); // wait for the element to be deleted
+    await this.waitForCanvasAnimationToEnd();
   }
 
   async getNotificationToast(): Promise<boolean> {
