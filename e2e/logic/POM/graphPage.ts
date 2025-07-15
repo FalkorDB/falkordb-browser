@@ -1106,4 +1106,25 @@ export default class GraphPage extends Page {
     await this.page.mouse.click(x, y, { button: "right" });
     await this.page.waitForTimeout(500);
   }
+
+  async waitForScaleToStabilize(timeout = 5000, stableDelay = 100) {
+    let lastScale = await this.getCanvasScaling();
+    let stableCount = 0;
+    const start = Date.now();
+    while (Date.now() - start < timeout) {
+        await new Promise(res => setTimeout(res, stableDelay));
+        const currentScale = await this.getCanvasScaling();
+        if (
+            Math.abs(currentScale.scaleX - lastScale.scaleX) < 0.0001 &&
+            Math.abs(currentScale.scaleY - lastScale.scaleY) < 0.0001
+        ) {
+            stableCount++;
+            if (stableCount >= 2) return;
+        } else {
+            stableCount = 0;
+        }
+        lastScale = currentScale;
+    }
+    throw new Error('Scale did not stabilize in time');
+}
 }
