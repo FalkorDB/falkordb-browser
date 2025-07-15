@@ -204,12 +204,12 @@ test.describe('Schema Tests', () => {
     });
 
     test(`@admin Validate that attempting to duplicate a schema with the same name displays an error notification`, async () => {
+        const schemaName = getRandomString("graph");
+        await apicalls.addSchema(schemaName);  
         const schema = await browser.createNewPage(SchemaPage, urls.schemaUrl);
         await browser.setPageToFullScreen();
-        const schemaName = getRandomString('schema');
         await schema.addSchema(schemaName);
-        await schema.addSchema(schemaName);
-        expect(await schema.getNotificationErrorToast()).toBe(true);
+        expect(await schema.getNotificationErrorToast()).toBeTruthy();
         await apicalls.removeSchema(schemaName);
     });
 
@@ -374,15 +374,15 @@ test.describe('Schema Tests', () => {
     });
 
 
-    //add attribute value to existing edge
-    //remove attribute value to existing edge
-    //swap
-    //clear
-    //modify attribute value to existing node
-    //modify attribute valie to existing edge
+    // add attribute value to existing edge
+    // remove attribute value to existing edge
+    // swap
+    // clear
+    // modify attribute value to existing node
+    // modify attribute valie to existing edge
     // undo when removing update attriubute value
     // undo when deleting attriubute value
-    //modify label of existing node
-    //modify label of existing edge
+    // modify label of existing node
+    // modify label of existing edge
 
 })
