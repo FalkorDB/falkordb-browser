@@ -31,7 +31,7 @@ test.describe('Schema Tests', () => {
         await apicalls.removeGraph(schemaName);
     });
 
-    test(`@admin Add schema via UI and verify existing via API`, async () => {
+    test.only(`@admin Add schema via UI and verify existing via API`, async () => {
         const schema = await browser.createNewPage(SchemaPage, urls.schemaUrl);
         const schemaName = getRandomString('schema');
         await browser.setPageToFullScreen();

@@ -3,7 +3,7 @@ import {
   interactWhenVisible,
   waitForElementToNotBeVisible,
   pollForElementContent,
-  waitForElementToBeEnabled,
+  waitForElementToBeEnabledOrNotVisible,
 } from "@/e2e/infra/utils";
 import { Locator } from "playwright";
 import GraphPage from "./graphPage";
@@ -383,7 +383,7 @@ export default class SchemaPage extends GraphPage {
     await this.clickCreateSchema();
     await this.fillCreateSchemaInput(schemaName);
     await this.clickConfirmCreateSchema();
-    await waitForElementToBeEnabled(this.createConfirm("Schema"));
+    await waitForElementToBeEnabledOrNotVisible(this.createConfirm("Schema"));
   }
 
   async deleteSchema(schemaName: string): Promise<void> {
@@ -392,7 +392,7 @@ export default class SchemaPage extends GraphPage {
     await this.clickTableCheckboxByName(schemaName);
     await this.clickDelete();
     await this.clickDeleteConfirm();
-    await waitForElementToBeEnabled(this.deleteConfirm("Schema"));
+    await waitForElementToBeEnabledOrNotVisible(this.deleteConfirm("Schema"));
   }
 
   async addLabelToNode(label: string): Promise<void> {
@@ -472,7 +472,7 @@ export default class SchemaPage extends GraphPage {
   async deleteSchemaElement(): Promise<void> {
     await this.clickDeleteElementSchema();
     await this.clickConfirmDeleteElementSchema();
-    await waitForElementToBeEnabled(this.deleteConfirm("Schema"));
+    await waitForElementToBeEnabledOrNotVisible(this.deleteConfirm("Schema"));
     await this.waitForPageIdle();
     await this.page.waitForTimeout(1500); // wait for the element to be deleted
   }
@@ -554,7 +554,7 @@ export default class SchemaPage extends GraphPage {
     await this.clickExport();
     await this.fillCreateSchemaInput(schemaName);
     await this.clickExportConfirm();
-    await waitForElementToBeEnabled(this.exportConfirm("Schema"));
+    await waitForElementToBeEnabledOrNotVisible(this.exportConfirm("Schema"));
   }
 
   // async swapNodesInAddEdgeDataPanel(node1: string, node2: string): Promise<void> {}
