@@ -6,7 +6,6 @@ import {
   waitForElementToNotBeVisible,
   interactWhenVisible,
   pollForElementContent,
-  waitForElementToBeEnabledOrNotVisible,
   waitForElementToBeEnabled,
 } from "@/e2e/infra/utils";
 import Page from "./page";
@@ -360,16 +359,8 @@ export default class GraphPage extends Page {
     await interactWhenVisible(this.graphTab, (el) => el.click(), "Graph Tab");
   }
 
-  async getGraphTabEnabled(): Promise<boolean> {
-    return waitForElementToBeEnabledOrNotVisible(this.graphTab);
-  }
-
   async clickTableTab(): Promise<void> {
     await interactWhenVisible(this.tableTab, (el) => el.click(), "Table Tab");
-  }
-
-  async getTableTabEnabled(): Promise<boolean> {
-    return waitForElementToBeEnabledOrNotVisible(this.tableTab);
   }
 
   async clickMetadataTab(): Promise<void> {
@@ -378,10 +369,6 @@ export default class GraphPage extends Page {
       (el) => el.click(),
       "Metadata Tab"
     );
-  }
-
-  async getMetadataTabEnabled(): Promise<boolean> {
-    return waitForElementToBeEnabledOrNotVisible(this.metadataTab);
   }
 
   async clickElementCanvasSuggestionByName(
@@ -641,7 +628,7 @@ export default class GraphPage extends Page {
     await this.fillCreateGraphInput(graphName);
     await this.page.waitForTimeout(1000); // wait for the input to be filled
     await this.clickConfirmCreateGraph();
-    await waitForElementToBeEnabledOrNotVisible(this.createConfirm("Graph"));
+    await waitForElementToNotBeVisible(this.createConfirm("Graph"));
   }
 
   async removeGraph(graphName: string): Promise<void> {
@@ -650,7 +637,7 @@ export default class GraphPage extends Page {
     await this.clickTableCheckboxByName(graphName);
     await this.clickDelete();
     await this.clickDeleteConfirm();
-    await waitForElementToBeEnabledOrNotVisible(this.deleteConfirm("Graph"));
+    await waitForElementToNotBeVisible(this.deleteConfirm("Graph"));
   }
 
   async insertQuery(query: string): Promise<void> {
@@ -661,7 +648,7 @@ export default class GraphPage extends Page {
   async clickRunQuery(waitForAnimation = true): Promise<void> {
     await this.clickEditorRun();
     await waitForElementToBeEnabled(this.editorRun);
-    if (waitForAnimation && (await this.getGraphTabEnabled())) {
+    if (waitForAnimation) {
       await this.waitForCanvasAnimationToEnd();
     }
   }
@@ -673,7 +660,7 @@ export default class GraphPage extends Page {
     await this.clickDuplicateGraphBtn();
     await this.insertDuplicateGraphInput(`${graphName} (copy)`);
     await this.clickDuplicateGraphConfirm();
-    await waitForElementToBeEnabledOrNotVisible(this.deleteConfirm("Graph"));
+    await waitForElementToNotBeVisible(this.deleteConfirm("Graph"));
   }
 
   async exportGraphByName(graphName: string): Promise<Download> {

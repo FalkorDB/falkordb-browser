@@ -1,6 +1,5 @@
 
 import { expect, test } from "@playwright/test";
-import { BATCH_CREATE_PERSONS } from "@/e2e/config/constants";
 import BrowserWrapper from "../infra/ui/browserWrapper";
 import ApiCalls from "../logic/api/apiCalls";
 import urls from '../config/urls.json'

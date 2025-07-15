@@ -87,24 +87,6 @@ export const waitForElementToBeEnabled = async (
   return false;
 };
 
-export const waitForElementToBeEnabledOrNotVisible = async (
-  locator: Locator,
-  time = 500,
-  retry = 10
-): Promise<boolean> => {
-  for (let i = 0; i < retry; i += 1) {
-    try {
-      if (await locator.isEnabled() || !(await locator.isVisible())) {
-        return true;
-      }
-    } catch (error) {
-      console.error(`Error checking if element is enabled or not visible: ${error}`);
-    }
-    await delay(time);
-  }
-  return false;
-};
-
 export const waitForElementCount = async (
   locator: Locator,
   time = 500,

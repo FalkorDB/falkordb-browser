@@ -13,7 +13,6 @@ import {
   getRandomString,
 } from "../infra/utils";
 import { FETCH_FIRST_TEN_NODES } from "../config/constants";
-import SettingsQueryPage from "../logic/POM/settingsQueryPage";
 
 test.describe("Data panel Tests", () => {
   let browser: BrowserWrapper;
