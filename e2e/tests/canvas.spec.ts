@@ -77,7 +77,7 @@ test.describe('Canvas Tests', () => {
         await apicalls.removeGraph(graphName);
     });
 
-    test.only(`@admin Validate fit to size functionality upon clicking the fit to size button`, async () => {
+    test(`@admin Validate fit to size functionality upon clicking the fit to size button`, async () => {
         const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
         await browser.setPageToFullScreen();
         const graphName = getRandomString('canvas');
