@@ -55,7 +55,7 @@ export default function Page() {
         if (!graphName) return
 
         const result = await getSSEGraphResult(`api/graph/${prepareArg(graphName)}/count`, toast, setIndicator);
-        
+
         const { nodes, edges } = result.data[0]
 
         setEdgesCount(edges || 0)
@@ -88,9 +88,9 @@ export default function Page() {
         setCooldownTicks(ticks)
 
         const canvas = document.querySelector('.force-graph-container canvas');
-        
+
         if (!canvas) return
-        
+
         if (ticks === 0) {
             canvas.setAttribute('data-engine-status', 'stop')
         } else {
@@ -136,7 +136,7 @@ export default function Page() {
         // eslint-disable-next-line @typescript-eslint/ban-ts-comment
         // @ts-ignore
         window.graph = g
-        
+
         handleCooldown()
     }, [graphName, run, toast, setIndicator, historyQuery.queries, historyQuery.counter, setHistoryQuery, limit, graph.Colors, setGraph, fetchCount])
 

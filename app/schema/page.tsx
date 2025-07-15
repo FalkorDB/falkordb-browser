@@ -82,13 +82,8 @@ export default function Page() {
     useEffect(() => {
         if (!schemaName) return
 
-        if (schema.Id) {
-            fetchCount()
-            return
-        }
-
         fetchSchema()
-    }, [schemaName, fetchSchema, schema.Id, fetchCount])
+    }, [schemaName, fetchSchema])
 
     const handleDeleteElement = async () => {
         const stateSelectedElements = Object.values(selectedElements)
@@ -144,9 +139,7 @@ export default function Page() {
         }))
 
         setLabels(schema.removeLinks(selectedElements.map((element) => element.id)))
-
-        if (fetchCount) fetchCount()
-
+        fetchCount()
         setSelectedElement(undefined)
         setSelectedElements([])
         setData({ ...schema.Elements })
