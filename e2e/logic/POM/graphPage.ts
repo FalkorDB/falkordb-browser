@@ -655,7 +655,7 @@ export default class GraphPage extends Page {
   async clickRunQuery(waitForAnimation = true): Promise<void> {
     await this.clickEditorRun();
     await waitForElementToBeEnabled(this.editorRun);
-    if (waitForAnimation) {
+    if (waitForAnimation && (await this.getGraphTabEnabled())) {
       await this.waitForCanvasAnimationToEnd();
     }
   }
@@ -739,12 +739,9 @@ export default class GraphPage extends Page {
   }
 
   // 6000 is the timeout for the animation to end
-  // 1500 is the timeout for the fit to size animation
+  // 1000 is the timeout for the fit to size animation
   // 1500 is extra timeout to ensure the animation is over
-  async waitForCanvasAnimationToEnd(timeout = 7000): Promise<void> {
-    // Allow some time for the initial animation like fit-to-size
-    await this.page.waitForTimeout(1500);
-
+  async waitForCanvasAnimationToEnd(timeout = 8500): Promise<void> {
     await this.page.waitForFunction(
       ({ selector }) => {
         const canvas = document.querySelector(selector);

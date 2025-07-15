@@ -137,9 +137,7 @@ export default function Page() {
         // @ts-ignore
         window.graph = g
 
-        if (g.Elements.nodes.length > 0) {
-            handleCooldown()
-        }
+        handleCooldown()
     }, [graphName, run, toast, setIndicator, historyQuery.queries, historyQuery.counter, setHistoryQuery, limit, graph.Colors, setGraph, fetchCount])
 
     useEffect(() => {
