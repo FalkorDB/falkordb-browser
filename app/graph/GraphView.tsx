@@ -90,9 +90,9 @@ function GraphView({
     useEffect(() => {
         if (isTabEnabled(tabsValue)) return
 
-        let defaultChecked: Tab = "Metadata"
-        if (graph.getElements().length !== 0) defaultChecked = "Graph"
-        else if (graph.Data.length !== 0) defaultChecked = "Table"
+        let defaultChecked: Tab = "Graph"
+        if (graph.Data.length !== 0) defaultChecked = "Table"
+        if (graph.CurrentQuery && graph.CurrentQuery.metadata.length > 0 && graph.Metadata.length > 0 && graph.CurrentQuery.explain.length > 0) defaultChecked = "Metadata"
 
         setTabsValue(defaultChecked);
     }, [graph, graph.Id, elementsLength, graph.Data.length, isTabEnabled, tabsValue])
