@@ -9,7 +9,7 @@ import {
   ToastTitle,
   ToastViewport,
 } from "@/components/ui/toast"
-import { useToast } from "@/components/ui/use-toast"  
+import { useToast } from "@/components/ui/use-toast"
 
 export const getQuerySettingsNavigationToast = (
   toast: any,
@@ -43,7 +43,7 @@ export function Toaster() {
     <ToastProvider>
       {toasts.map(function ({ id, title, description, action, variant, ...props }) {
         return (
-          <Toast data-testid={variant === "destructive" ? "toast-destructive" : "toast"} key={id} {...props}>
+          <Toast data-testid={variant === "destructive" ? "toast-destructive" : "toast"} variant={variant} key={id} {...props}>
             <div className="grid gap-1">
               {title && <ToastTitle>{title}</ToastTitle>}
               {description && (
