@@ -72,6 +72,8 @@ test.describe('Cluster Functionality Tests', () => {
             for (const node of CLUSTER_NODES) {
                 await loginPage.fillHost(node.host);
                 await loginPage.fillPort(node.port);
+                expect(await loginPage.getHost()).toBe(node.host);
+                expect(await loginPage.getPort()).toBe(node.port);
                 await loginPage.fillHost('');
                 await loginPage.fillPort('');
             }

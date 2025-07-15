@@ -62,8 +62,16 @@ export default class LoginPage extends HeaderComponent {
         await interactWhenVisible(this.hostInput, el => el.fill(host), "host input");
     }
 
+    async getHost(): Promise<string | null> {
+        return interactWhenVisible(this.hostInput, el => el.inputValue(), "host input");
+    }
+
     async fillPort(port: string): Promise<void> {
         await interactWhenVisible(this.portInput, el => el.fill(port), "port input");
+    }
+
+    async getPort(): Promise<string | null> {
+        return interactWhenVisible(this.portInput, el => el.inputValue(), "port input");
     }
 
     async disableTutorial(): Promise<void> {
