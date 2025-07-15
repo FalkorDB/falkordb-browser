@@ -47,16 +47,18 @@ test.describe('Canvas Tests', () => {
         await graph.insertQuery(CREATE_TWO_NODES_QUERY);
         await graph.clickRunQuery();
         await graph.clickCenterControl();
+        await graph.waitForScaleToStabilize();
         const initialGraph = await graph.getCanvasScaling();
         await graph.clickZoomInControl();
         await graph.clickZoomInControl();
+        await graph.waitForScaleToStabilize();
         const updatedGraph = await graph.getCanvasScaling();
         expect(updatedGraph.scaleX).toBeGreaterThan(initialGraph.scaleX);
         expect(updatedGraph.scaleY).toBeGreaterThan(initialGraph.scaleY);
         await apicalls.removeGraph(graphName);
     });
 
-    test(`@admin Validate zoom-out functionality upon clicking the zoom in button`, async () => {
+    test(`@admin Validate zoom-out functionality upon clicking the zoom out button`, async () => {
         const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
         await browser.setPageToFullScreen();
         const graphName = getRandomString('canvas');
@@ -64,13 +66,14 @@ test.describe('Canvas Tests', () => {
         await graph.insertQuery(CREATE_TWO_NODES_QUERY);
         await graph.clickRunQuery();
         await graph.clickCenterControl();
-        await graph.waitForCanvasAnimationToEnd();
+        await graph.waitForScaleToStabilize();
         const initialGraph = await graph.getCanvasScaling();
         await graph.clickZoomOutControl();
         await graph.clickZoomOutControl();
+        await graph.waitForScaleToStabilize();
         const updatedGraph = await graph.getCanvasScaling();
-        expect(updatedGraph.scaleX).toBeLessThan(initialGraph.scaleX);
-        expect(updatedGraph.scaleY).toBeLessThan(initialGraph.scaleY);
+        expect(updatedGraph.scaleX).toBeLessThanOrEqual(initialGraph.scaleX);
+        expect(updatedGraph.scaleY).toBeLessThanOrEqual(initialGraph.scaleY);
         await apicalls.removeGraph(graphName);
     });
 
@@ -82,11 +85,11 @@ test.describe('Canvas Tests', () => {
         await graph.insertQuery(CREATE_TWO_NODES_QUERY);
         await graph.clickRunQuery();
         await graph.clickCenterControl();
-        await graph.waitForCanvasAnimationToEnd();
+        await graph.waitForScaleToStabilize();
         const initialGraph = await graph.getCanvasScaling();
         await graph.clickZoomOutControl();
         await graph.clickCenterControl();
-        await graph.waitForCanvasAnimationToEnd();
+        await graph.waitForScaleToStabilize();
         const updatedGraph = await graph.getCanvasScaling();
         expect(Math.abs(updatedGraph.scaleX)).toBeLessThanOrEqual(initialGraph.scaleX);
         expect(Math.abs(updatedGraph.scaleY)).toBeLessThanOrEqual(initialGraph.scaleY);

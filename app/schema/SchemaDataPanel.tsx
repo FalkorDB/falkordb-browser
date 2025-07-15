@@ -54,6 +54,8 @@ export default function SchemaDataPanel({ object, setObject, onDeleteElement, sc
     const type = !!object.category
 
     const handleClose = useCallback((e: KeyboardEvent) => {
+        if (e.defaultPrevented) return
+
         if (e.key === "Escape") {
             setObject(undefined)
         }

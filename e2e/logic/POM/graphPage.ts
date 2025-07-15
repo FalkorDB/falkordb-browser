@@ -659,8 +659,8 @@ export default class GraphPage extends Page {
 
   async clickRunQuery(waitForAnimation = true): Promise<void> {
     await this.clickEditorRun();
-    await waitForElementToBeEnabledOrNotVisible(this.editorRun);
-    if (waitForAnimation) {
+    await waitForElementToBeEnabled(this.editorRun);
+    if (waitForAnimation && (await this.getGraphTabEnabled())) {
       await this.waitForCanvasAnimationToEnd();
     }
   }
@@ -750,12 +750,9 @@ export default class GraphPage extends Page {
   }
 
   // 6000 is the timeout for the animation to end
-  // 1500 is the timeout for the fit to size animation
+  // 1000 is the timeout for the fit to size animation
   // 1500 is extra timeout to ensure the animation is over
-  async waitForCanvasAnimationToEnd(timeout = 7000): Promise<void> {
-    // Allow some time for the initial animation like fit-to-size
-    await this.page.waitForTimeout(1500);
-
+  async waitForCanvasAnimationToEnd(timeout = 8500): Promise<void> {
     await this.page.waitForFunction(
       ({ selector }) => {
         const canvas = document.querySelector(selector);
@@ -1120,4 +1117,25 @@ export default class GraphPage extends Page {
     await this.page.mouse.click(x, y, { button: "right" });
     await this.page.waitForTimeout(500);
   }
+
+  async waitForScaleToStabilize(timeout = 5000, stableDelay = 100) {
+    let lastScale = await this.getCanvasScaling();
+    let stableCount = 0;
+    const start = Date.now();
+    while (Date.now() - start < timeout) {
+        await new Promise(res => setTimeout(res, stableDelay));
+        const currentScale = await this.getCanvasScaling();
+        if (
+            Math.abs(currentScale.scaleX - lastScale.scaleX) < 0.0001 &&
+            Math.abs(currentScale.scaleY - lastScale.scaleY) < 0.0001
+        ) {
+            stableCount++;
+            if (stableCount >= 2) return;
+        } else {
+            stableCount = 0;
+        }
+        lastScale = currentScale;
+    }
+    throw new Error('Scale did not stabilize in time');
+}
 }
