@@ -363,8 +363,20 @@ export default class GraphPage extends Page {
     await interactWhenVisible(this.graphTab, (el) => el.click(), "Graph Tab");
   }
 
+  async getGraphTabEnabled(): Promise<boolean> {
+    return waitForElementToBeEnabled(this.graphTab);
+  }
+
   async clickTableTab(): Promise<void> {
     await interactWhenVisible(this.tableTab, (el) => el.click(), "Table Tab");
+  }
+
+  async getTableTabEnabled(): Promise<boolean> {
+    return waitForElementToBeEnabled(this.tableTab);
+  }
+
+  async getMetadataTabEnabled(): Promise<boolean> {
+    return waitForElementToBeEnabled(this.metadataTab);
   }
 
   async clickMetadataTab(): Promise<void> {

@@ -7,7 +7,7 @@ import urls from "../config/urls.json";
 import QuerySettingsPage from "../logic/POM/settingsQueryPage";
 import { getRandomString } from "../infra/utils";
 
-test.describe("Query Settings", () => {
+test.describe.serial("Query Settings", () => {
   let browser: BrowserWrapper;
   let apiCall: ApiCalls;
 
