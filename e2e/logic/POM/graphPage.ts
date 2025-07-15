@@ -640,7 +640,7 @@ export default class GraphPage extends Page {
     await this.fillCreateGraphInput(graphName);
     await this.page.waitForTimeout(1000); // wait for the input to be filled
     await this.clickConfirmCreateGraph();
-    await this.isVisibleToast();
+    await waitForElementToBeEnabled(this.createConfirm("Graph"));
   }
 
   async removeGraph(graphName: string): Promise<void> {
@@ -649,7 +649,7 @@ export default class GraphPage extends Page {
     await this.clickTableCheckboxByName(graphName);
     await this.clickDelete();
     await this.clickDeleteConfirm();
-    await this.isVisibleToast();
+    await waitForElementToBeEnabled(this.deleteConfirm("Graph"));
   }
 
   async insertQuery(query: string): Promise<void> {
@@ -672,7 +672,7 @@ export default class GraphPage extends Page {
     await this.clickDuplicateGraphBtn();
     await this.insertDuplicateGraphInput(`${graphName} (copy)`);
     await this.clickDuplicateGraphConfirm();
-    await this.isVisibleToast();
+    await waitForElementToBeEnabled(this.deleteConfirm("Graph"));
   }
 
   async exportGraphByName(graphName: string): Promise<Download> {
