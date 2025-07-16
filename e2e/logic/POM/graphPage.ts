@@ -755,10 +755,10 @@ export default class GraphPage extends Page {
     return status === "running";
   }
 
-  // 6000 is the timeout for the animation to end
+  // 2000 is the timeout for the animation to end
   // 1000 is the timeout for the fit to size animation
   // 1500 is extra timeout to ensure the animation is over
-  async waitForCanvasAnimationToEnd(timeout = 9500): Promise<void> {
+  async waitForCanvasAnimationToEnd(timeout = 4500): Promise<void> {
     await waitForElementToBeVisible(this.skeleton);
     await this.page.waitForFunction(
       ({ selector }) => {
@@ -1130,13 +1130,13 @@ export default class GraphPage extends Page {
     let stableCount = 0;
     const start = Date.now();
     while (Date.now() - start < timeout) {
-        await new Promise(res => setTimeout(res, stableDelay));
+        await new Promise(res => {setTimeout(res, stableDelay)});
         const currentScale = await this.getCanvasScaling();
         if (
             Math.abs(currentScale.scaleX - lastScale.scaleX) < 0.0001 &&
             Math.abs(currentScale.scaleY - lastScale.scaleY) < 0.0001
         ) {
-            stableCount++;
+            stableCount += 1;
             if (stableCount >= 2) return;
         } else {
             stableCount = 0;
