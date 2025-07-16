@@ -50,11 +50,12 @@ test.describe('Canvas Tests', () => {
         await graph.waitForScaleToStabilize();
         const initialGraph = await graph.getCanvasScaling();
         await graph.clickZoomInControl();
+        await graph.waitForScaleToStabilize();
         await graph.clickZoomInControl();
         await graph.waitForScaleToStabilize();
         const updatedGraph = await graph.getCanvasScaling();
-        expect(updatedGraph.scaleX - initialGraph.scaleX).toBeLessThanOrEqual(2);
-        expect(updatedGraph.scaleY - initialGraph.scaleY).toBeLessThanOrEqual(2);
+        expect(updatedGraph.scaleX - initialGraph.scaleX).toBeGreaterThanOrEqual(1);
+        expect(updatedGraph.scaleY - initialGraph.scaleY).toBeGreaterThanOrEqual(1);
         await apicalls.removeGraph(graphName);
     });
 
@@ -69,11 +70,13 @@ test.describe('Canvas Tests', () => {
         await graph.waitForScaleToStabilize();
         const initialGraph = await graph.getCanvasScaling();
         await graph.clickZoomOutControl();
+        await graph.waitForScaleToStabilize();
         await graph.clickZoomOutControl();
         await graph.waitForScaleToStabilize();
         const updatedGraph = await graph.getCanvasScaling();
-        expect(updatedGraph.scaleX - initialGraph.scaleX).toBeLessThanOrEqual(2);
-        expect(updatedGraph.scaleY - initialGraph.scaleY).toBeLessThanOrEqual(2);
+        expect(initialGraph.scaleX - updatedGraph.scaleX).toBeGreaterThanOrEqual(1);
+        expect(initialGraph.scaleY - updatedGraph.scaleY).toBeGreaterThanOrEqual(1);
+
         await apicalls.removeGraph(graphName);
     });
 
@@ -91,8 +94,8 @@ test.describe('Canvas Tests', () => {
         await graph.clickCenterControl();
         await graph.waitForScaleToStabilize();
         const updatedGraph = await graph.getCanvasScaling();
-        expect(updatedGraph.scaleX - initialGraph.scaleX).toBeLessThanOrEqual(2);
-        expect(updatedGraph.scaleY - initialGraph.scaleY).toBeLessThanOrEqual(2);
+        expect(updatedGraph.scaleX - initialGraph.scaleX).toBeLessThanOrEqual(1);
+        expect(updatedGraph.scaleY - initialGraph.scaleY).toBeLessThanOrEqual(1);
         await apicalls.removeGraph(graphName);
     });
 

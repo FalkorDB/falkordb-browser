@@ -1125,24 +1125,24 @@ export default class GraphPage extends Page {
     await this.page.waitForTimeout(500);
   }
 
-  async waitForScaleToStabilize(timeout = 5000, stableDelay = 100) {
+  async waitForScaleToStabilize(threshold = 0.01, stableCycles = 5, timeout = 3000) {
     let lastScale = await this.getCanvasScaling();
     let stableCount = 0;
     const start = Date.now();
     while (Date.now() - start < timeout) {
-        await new Promise(res => {setTimeout(res, stableDelay)});
+        await new Promise(res => {setTimeout(res, 100)});
         const currentScale = await this.getCanvasScaling();
         if (
-            Math.abs(currentScale.scaleX - lastScale.scaleX) < 0.0001 &&
-            Math.abs(currentScale.scaleY - lastScale.scaleY) < 0.0001
+            Math.abs(currentScale.scaleX - lastScale.scaleX) < threshold &&
+            Math.abs(currentScale.scaleY - lastScale.scaleY) < threshold
         ) {
             stableCount += 1;
-            if (stableCount >= 2) return;
+            if (stableCount >= stableCycles) return;
         } else {
             stableCount = 0;
         }
         lastScale = currentScale;
     }
-    throw new Error('Scale did not stabilize in time');
-}
+    throw new Error('Scale did not stabilize within timeout');
+  }
 }
