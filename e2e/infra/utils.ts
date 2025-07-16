@@ -80,7 +80,7 @@ export const waitForElementToBeEnabled = async (
         return true;
       }
     } catch (error) {
-      console.error(`Error checking element visibility: ${error}`);
+      console.error(`Error checking element enabled: ${error}`);
     }
     await delay(time);
   }

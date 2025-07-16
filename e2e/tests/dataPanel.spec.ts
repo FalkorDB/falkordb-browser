@@ -13,7 +13,6 @@ import {
   getRandomString,
 } from "../infra/utils";
 import { FETCH_FIRST_TEN_NODES } from "../config/constants";
-import SettingsQueryPage from "../logic/POM/settingsQueryPage";
 
 test.describe("Data panel Tests", () => {
   let browser: BrowserWrapper;
@@ -480,7 +479,7 @@ test.describe("Data panel Tests", () => {
     await graph.clickRunQuery();
     await graph.searchElementInCanvas("Graph", "Alice");
     await graph.addLabel("Person");
-    expect(await graph.getErrorNotification()).toBeTruthy();
+    expect(await graph.getNotificationErrorToast()).toBeTruthy();
     await apicalls.removeGraph(graphName);
   });
 

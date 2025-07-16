@@ -38,9 +38,9 @@ export default function CreateGraph({
 }: Props) {
 
     const { indicator, setIndicator } = useContext(IndicatorContext)
-    
+
     const { toast } = useToast()
-    
+
     const [isLoading, setIsLoading] = useState(false)
     const [graphName, setGraphName] = useState("")
     const [open, setOpen] = useState(false)

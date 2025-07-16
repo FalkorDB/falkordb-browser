@@ -206,26 +206,24 @@ export function createNestedObject(arr: string[]): object {
   return { [first]: createNestedObject(rest) };
 }
 
-export function getMainReturnLimit(query: string) {
-  const match = query.match(
-    /.*\bRETURN\b.*?(?:\bLIMIT\b\s*(\d+))?(?:\s*;?\s*$|\s*$)/i
-  );
-  return {
-    hasReturn: !!match,
-    hasLimit: !!match && !!match[1],
-  };
-}
-
 export function getQueryWithLimit(query: string, limit: number) {
   if (limit === 0) return query;
 
-  const { hasLimit, hasReturn } = getMainReturnLimit(query);
-
-  if (hasLimit || !hasReturn) {
-    return query;
+  if (query.includes("UNION")) {
+    if (!query.includes("CALL")) {
+      return `CALL { ${query} } RETURN * LIMIT ${limit}`;
+    }
+    
+    if (query.match(/\bCALL\s*\{.*?\}\s*RETURN\b(?!\s+.+?\s+\bLIMIT\b)/i)) {
+      return `${query} LIMIT ${limit}`;
+    }
   }
 
-  return `${query} LIMIT ${limit}`;
+  if (query.match(/\bRETURN\b(?!\s+.+?\s+\bLIMIT\b)/i)) {
+    return `${query} LIMIT ${limit}`;
+  }
+
+  return query;
 }
 
 export async function fetchOptions(

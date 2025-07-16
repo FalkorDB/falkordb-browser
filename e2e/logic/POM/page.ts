@@ -187,6 +187,10 @@ export default class Page extends BasePage {
         return this.page.getByTestId(`toast`);
     }
 
+    public get errorToast(): Locator {
+        return this.page.getByTestId(`toast-destructive`);
+    }
+
     public get toastUnDoButton(): Locator {
         return this.page.getByTestId('toast').getByRole('button', { name: 'Undo' });
     }

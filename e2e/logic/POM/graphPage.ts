@@ -3,10 +3,10 @@
 import { Download, Locator } from "@playwright/test";
 import {
   waitForElementToBeVisible,
-  waitForElementToBeEnabled,
   waitForElementToNotBeVisible,
   interactWhenVisible,
   pollForElementContent,
+  waitForElementToBeEnabled,
 } from "@/e2e/infra/utils";
 import Page from "./page";
 
@@ -86,6 +86,10 @@ export default class GraphPage extends Page {
 
   private get duplicateGraphConfirm(): Locator {
     return this.page.getByTestId("duplicateGraphConfirm");
+  }
+
+  private get skeleton(): Locator {
+    return this.page.locator("#skeleton").first();
   }
 
   async getBoundingBoxCanvasElement(): Promise<null | {
@@ -371,16 +375,16 @@ export default class GraphPage extends Page {
     return waitForElementToBeEnabled(this.tableTab);
   }
 
+  async getMetadataTabEnabled(): Promise<boolean> {
+    return waitForElementToBeEnabled(this.metadataTab);
+  }
+
   async clickMetadataTab(): Promise<void> {
     await interactWhenVisible(
       this.metadataTab,
       (el) => el.click(),
       "Metadata Tab"
     );
-  }
-
-  async getMetadataTabEnabled(): Promise<boolean> {
-    return waitForElementToBeEnabled(this.metadataTab);
   }
 
   async clickElementCanvasSuggestionByName(
@@ -535,6 +539,11 @@ export default class GraphPage extends Page {
     return isVisible;
   }
 
+  async isVisibleErrorToast(): Promise<boolean> {
+    const isVisible = await waitForElementToBeVisible(this.errorToast);
+    return isVisible;
+  }
+
   async isVisibleNodeCanvasToolTip(): Promise<boolean> {
     const isVisible = await waitForElementToBeVisible(this.nodeCanvasToolTip);
     return isVisible;
@@ -630,12 +639,14 @@ export default class GraphPage extends Page {
     }
   }
 
-  async addGraph(graphName: string): Promise<void> {
+  async addGraph(graphName: string, waitForVisibility = true): Promise<void> {
     await this.clickCreateGraph();
     await this.fillCreateGraphInput(graphName);
     await this.page.waitForTimeout(1000); // wait for the input to be filled
     await this.clickConfirmCreateGraph();
-    await this.isVisibleToast();
+    if (waitForVisibility) {
+      await waitForElementToNotBeVisible(this.createConfirm("Graph"));
+    }
   }
 
   async removeGraph(graphName: string): Promise<void> {
@@ -644,7 +655,7 @@ export default class GraphPage extends Page {
     await this.clickTableCheckboxByName(graphName);
     await this.clickDelete();
     await this.clickDeleteConfirm();
-    await this.isVisibleToast();
+    await waitForElementToNotBeVisible(this.deleteConfirm("Graph"));
   }
 
   async insertQuery(query: string): Promise<void> {
@@ -655,7 +666,7 @@ export default class GraphPage extends Page {
   async clickRunQuery(waitForAnimation = true): Promise<void> {
     await this.clickEditorRun();
     await waitForElementToBeEnabled(this.editorRun);
-    if (waitForAnimation && (await this.getGraphTabEnabled())) {
+    if (waitForAnimation) {
       await this.waitForCanvasAnimationToEnd();
     }
   }
@@ -667,7 +678,7 @@ export default class GraphPage extends Page {
     await this.clickDuplicateGraphBtn();
     await this.insertDuplicateGraphInput(`${graphName} (copy)`);
     await this.clickDuplicateGraphConfirm();
-    await this.isVisibleToast();
+    await waitForElementToNotBeVisible(this.deleteConfirm("Graph"));
   }
 
   async exportGraphByName(graphName: string): Promise<Download> {
@@ -724,12 +735,18 @@ export default class GraphPage extends Page {
     await this.clickDeleteElement(type);
     await this.clickDeleteElementConfirm();
     await waitForElementToNotBeVisible(this.deleteElement("Node"));
-    await this.page.waitForTimeout(1500); // wait for the element to be deleted
+    await this.waitForCanvasAnimationToEnd();
   }
 
-  async getErrorNotification(): Promise<boolean> {
+  async getNotificationToast(): Promise<boolean> {
     await this.page.waitForTimeout(1000);
     const isVisible = await this.isVisibleToast();
+    return isVisible;
+  }
+
+  async getNotificationErrorToast(): Promise<boolean> {
+    await this.page.waitForTimeout(1000);
+    const isVisible = await this.isVisibleErrorToast();
     return isVisible;
   }
 
@@ -741,7 +758,8 @@ export default class GraphPage extends Page {
   // 6000 is the timeout for the animation to end
   // 1000 is the timeout for the fit to size animation
   // 1500 is extra timeout to ensure the animation is over
-  async waitForCanvasAnimationToEnd(timeout = 8500): Promise<void> {
+  async waitForCanvasAnimationToEnd(timeout = 9500): Promise<void> {
+    await waitForElementToBeVisible(this.skeleton);
     await this.page.waitForFunction(
       ({ selector }) => {
         const canvas = document.querySelector(selector);
