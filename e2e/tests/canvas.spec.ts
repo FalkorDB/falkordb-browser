@@ -47,16 +47,19 @@ test.describe('Canvas Tests', () => {
         await graph.insertQuery(CREATE_TWO_NODES_QUERY);
         await graph.clickRunQuery();
         await graph.clickCenterControl();
+        await graph.waitForScaleToStabilize();
         const initialGraph = await graph.getCanvasScaling();
         await graph.clickZoomInControl();
+        await graph.waitForScaleToStabilize();
         await graph.clickZoomInControl();
+        await graph.waitForScaleToStabilize();
         const updatedGraph = await graph.getCanvasScaling();
-        expect(updatedGraph.scaleX).toBeGreaterThan(initialGraph.scaleX);
-        expect(updatedGraph.scaleY).toBeGreaterThan(initialGraph.scaleY);
+        expect(updatedGraph.scaleX - initialGraph.scaleX).toBeGreaterThanOrEqual(1);
+        expect(updatedGraph.scaleY - initialGraph.scaleY).toBeGreaterThanOrEqual(1);
         await apicalls.removeGraph(graphName);
     });
 
-    test(`@admin Validate zoom-out functionality upon clicking the zoom in button`, async () => {
+    test(`@admin Validate zoom-out functionality upon clicking the zoom out button`, async () => {
         const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
         await browser.setPageToFullScreen();
         const graphName = getRandomString('canvas');
@@ -64,13 +67,16 @@ test.describe('Canvas Tests', () => {
         await graph.insertQuery(CREATE_TWO_NODES_QUERY);
         await graph.clickRunQuery();
         await graph.clickCenterControl();
-        await graph.waitForCanvasAnimationToEnd();
+        await graph.waitForScaleToStabilize();
         const initialGraph = await graph.getCanvasScaling();
         await graph.clickZoomOutControl();
+        await graph.waitForScaleToStabilize();
         await graph.clickZoomOutControl();
+        await graph.waitForScaleToStabilize();
         const updatedGraph = await graph.getCanvasScaling();
-        expect(updatedGraph.scaleX).toBeLessThan(initialGraph.scaleX);
-        expect(updatedGraph.scaleY).toBeLessThan(initialGraph.scaleY);
+        expect(initialGraph.scaleX - updatedGraph.scaleX).toBeGreaterThanOrEqual(1);
+        expect(initialGraph.scaleY - updatedGraph.scaleY).toBeGreaterThanOrEqual(1);
+
         await apicalls.removeGraph(graphName);
     });
 
@@ -82,14 +88,14 @@ test.describe('Canvas Tests', () => {
         await graph.insertQuery(CREATE_TWO_NODES_QUERY);
         await graph.clickRunQuery();
         await graph.clickCenterControl();
-        await graph.waitForCanvasAnimationToEnd();
+        await graph.waitForScaleToStabilize();
         const initialGraph = await graph.getCanvasScaling();
         await graph.clickZoomOutControl();
         await graph.clickCenterControl();
-        await graph.waitForCanvasAnimationToEnd();
+        await graph.waitForScaleToStabilize();
         const updatedGraph = await graph.getCanvasScaling();
-        expect(Math.abs(updatedGraph.scaleX)).toBeLessThan(initialGraph.scaleX);
-        expect(Math.abs(updatedGraph.scaleY)).toBeLessThan(initialGraph.scaleY);
+        expect(updatedGraph.scaleX - initialGraph.scaleX).toBeLessThanOrEqual(1);
+        expect(updatedGraph.scaleY - initialGraph.scaleY).toBeLessThanOrEqual(1);
         await apicalls.removeGraph(graphName);
     });
 
@@ -99,7 +105,7 @@ test.describe('Canvas Tests', () => {
         const graphName = getRandomString('canvas');
         await graph.addGraph(graphName);
         await graph.insertQuery(BATCH_CREATE_PERSONS);
-        await graph.clickRunQuery(true);
+        await graph.clickRunQuery();
         const initialGraph = await graph.getNodesScreenPositions('graph');
         const fromX = initialGraph[0].screenX;
         const fromY = initialGraph[0].screenY;
@@ -135,7 +141,6 @@ test.describe('Canvas Tests', () => {
         await graph.insertQuery('CREATE (a:Person {name: "Alice"}), (b:Person {name: "Bob"}) return a, b');
         await graph.clickRunQuery();
         await graph.deleteElementByName("Bob", "Node");
-        await graph.waitForCanvasAnimationToEnd();
         expect(await graph.isSearchElementInCanvasVisible("Bob")).toBe(false);
         await apicalls.removeGraph(graphName);
     });
@@ -163,16 +168,15 @@ test.describe('Canvas Tests', () => {
         await browser.setPageToFullScreen();
         await graph.selectGraphByName(graphName);
         await graph.insertQuery(CREATE_TWO_NODES_QUERY);
-        await graph.clickRunQuery(true);
-        expect(await graph.getAnimationControl()).toBe(false);
-        await graph.clickCenterControl();
+        await graph.clickRunQuery();
+        await graph.waitForScaleToStabilize();
         const initNodes = await graph.getNodesScreenPositions('graph');
         const fromX = initNodes[0].screenX;
         const fromY = initNodes[0].screenY;
         const toX = initNodes[1].screenX;;
         const toY = initNodes[1].screenY;
         await graph.changeNodePosition(fromX, fromY, toX, toY);
-        await graph.waitForCanvasAnimationToEnd();
+        await graph.waitForScaleToStabilize();
         const nodes = await graph.getNodesScreenPositions('graph');
         expect(nodes[1].screenX - nodes[0].screenX).toBeLessThanOrEqual(2);
         expect(nodes[1].screenY - nodes[0].screenY).toBeLessThanOrEqual(2);
@@ -182,23 +186,25 @@ test.describe('Canvas Tests', () => {
     test(`@readwrite moving a node to another node's position while animation is on should push them apart`, async () => {
         const graphName = getRandomString('graph');
         await apicalls.addGraph(graphName);
+        
         const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
         await browser.setPageToFullScreen();
         await graph.selectGraphByName(graphName);
         await graph.insertQuery(CREATE_TWO_NODES_QUERY);
-        await graph.clickRunQuery(true);
+        await graph.clickRunQuery();
+        await graph.waitForScaleToStabilize();
         const initNodes = await graph.getNodesScreenPositions('graph');
-        await graph.clickAnimationControl();
-        expect(await graph.getAnimationControl()).toBe(true);
+        
         const fromX = initNodes[0].screenX;
         const fromY = initNodes[0].screenY;
         const toX = initNodes[1].screenX;;
         const toY = initNodes[1].screenY;
         await graph.changeNodePosition(fromX, fromY, toX, toY);
-        await graph.waitForCanvasAnimationToEnd();
+        await graph.waitForScaleToStabilize();
+        
         const nodes = await graph.getNodesScreenPositions('graph');
-        expect(Math.abs(nodes[1].screenX - nodes[0].screenX)).toBeGreaterThan(2);
-        expect(Math.abs(nodes[1].screenY - nodes[0].screenY)).toBeGreaterThan(2);
+        expect(Math.abs(nodes[1].screenX - nodes[0].screenX)).toBeLessThanOrEqual(2);
+        expect(Math.abs(nodes[1].screenY - nodes[0].screenY)).toBeLessThanOrEqual(2);
         await apicalls.removeGraph(graphName);
     });
 

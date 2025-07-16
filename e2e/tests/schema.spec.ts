@@ -61,6 +61,7 @@ test.describe('Schema Tests', () => {
         await schema.addSchema(schemaName);
         const attributeRow = "1"
         await schema.addNode(attributeRow, "person", 'id', "Integer", "100", true, true);
+        await schema.waitForCanvasAnimationToEnd();
         const labelContent = await schema.getLabelsButtonByNameContent("Schema", "Labels", "person");
         expect(labelContent).toBe("person");
         await apicalls.removeSchema(schemaName);
@@ -72,7 +73,6 @@ test.describe('Schema Tests', () => {
         const schema = await browser.createNewPage(SchemaPage, urls.schemaUrl);
         await browser.setPageToFullScreen();
         await schema.selectSchemaByName(schemaName);
-        await schema.waitForCanvasAnimationToEnd();
         const attributeRow = "1"
         await schema.addEdge(attributeRow, "knows", 'id', "Integer", "100", true, true);
         const labelContent = await schema.getLabelsButtonByNameContent("Schema", "Relationships", "knows");
@@ -204,12 +204,12 @@ test.describe('Schema Tests', () => {
     });
 
     test(`@admin Validate that attempting to duplicate a schema with the same name displays an error notification`, async () => {
+        const schemaName = getRandomString("graph");
+        await apicalls.addSchema(schemaName);  
         const schema = await browser.createNewPage(SchemaPage, urls.schemaUrl);
         await browser.setPageToFullScreen();
-        const schemaName = getRandomString('schema');
         await schema.addSchema(schemaName);
-        await schema.addSchema(schemaName);
-        expect(await schema.getErrorNotification()).toBe(true);
+        expect(await schema.getNotificationErrorToast()).toBeTruthy();
         await apicalls.removeSchema(schemaName);
     });
 
@@ -374,15 +374,15 @@ test.describe('Schema Tests', () => {
     });
 
 
-    //add attribute value to existing edge
-    //remove attribute value to existing edge
-    //swap
-    //clear
-    //modify attribute value to existing node
-    //modify attribute valie to existing edge
+    // add attribute value to existing edge
+    // remove attribute value to existing edge
+    // swap
+    // clear
+    // modify attribute value to existing node
+    // modify attribute valie to existing edge
     // undo when removing update attriubute value
     // undo when deleting attriubute value
-    //modify label of existing node
-    //modify label of existing edge
+    // modify label of existing node
+    // modify label of existing edge
 
 })

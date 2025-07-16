@@ -55,6 +55,50 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+export async function getSSEGraphResult(
+  url: string,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  toast: any,
+  setIndicator: (indicator: "online" | "offline") => void
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+): Promise<any> {
+  return new Promise((resolve, reject) => {
+    let handled = false;
+
+    const evtSource = new EventSource(url);
+    evtSource.addEventListener("result", (event: MessageEvent) => {
+      const result = JSON.parse(event.data);
+      evtSource.close();
+      resolve(result);
+    });
+
+    evtSource.addEventListener("error", (event: MessageEvent) => {
+      handled = true;
+      const { message, status } = JSON.parse(event.data);
+
+      evtSource.close();
+      toast({ title: "Error", description: message, variant: "destructive" });
+
+      if (status === 401 || status >= 500) setIndicator("offline");
+
+      reject();
+    });
+
+    evtSource.onerror = () => {
+      if (handled) return;
+
+      evtSource.close();
+      toast({
+        title: "Error",
+        description: "Network or server error",
+        variant: "destructive",
+      });
+      setIndicator("offline");
+      reject();
+    };
+  });
+}
+
 export async function securedFetch(
   input: string,
   init: RequestInit,
@@ -85,8 +129,8 @@ export function prepareArg(arg: string) {
   return encodeURIComponent(arg.trim());
 }
 
-export const defaultQuery = (q?: string) =>
-  q || "MATCH (n) OPTIONAL MATCH (n)-[e]-(m) return * LIMIT 100";
+export const getDefaultQuery = (q?: string) =>
+  q || "MATCH (n) OPTIONAL MATCH (n)-[e]-(m) RETURN * LIMIT 100";
 
 export function rgbToHSL(hex: string): string {
   // Remove the # if present
@@ -162,23 +206,24 @@ export function createNestedObject(arr: string[]): object {
   return { [first]: createNestedObject(rest) };
 }
 
-export function getMainReturnLimit(query: string) {
-  const match = query.match(
-    /.*\bRETURN\b.*?(?:\bLIMIT\b\s*(\d+))?(?:\s*;?\s*$|\s*$)/i
-  );
-  return match && match[1];
-}
-
 export function getQueryWithLimit(query: string, limit: number) {
   if (limit === 0) return query;
 
-  const hasMainReturnLimit = getMainReturnLimit(query);
-
-  if (hasMainReturnLimit) {
-    return query;
+  if (query.includes("UNION")) {
+    if (!query.includes("CALL")) {
+      return `CALL { ${query} } RETURN * LIMIT ${limit}`;
+    }
+    
+    if (query.match(/\bCALL\s*\{.*?\}\s*RETURN\b(?!\s+.+?\s+\bLIMIT\b)/i)) {
+      return `${query} LIMIT ${limit}`;
+    }
   }
 
-  return `${query} LIMIT ${limit}`;
+  if (query.match(/\bRETURN\b(?!\s+.+?\s+\bLIMIT\b)/i)) {
+    return `${query} LIMIT ${limit}`;
+  }
+
+  return query;
 }
 
 export async function fetchOptions(

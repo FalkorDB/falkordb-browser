@@ -2,7 +2,7 @@
   "name": "falkordb-browser",
   "author": "FalkorDB",
   "description": "FalkorDB Browser",
-  "version": "1.4.1",
+  "version": "1.4.2",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -33,6 +33,7 @@
     "@radix-ui/react-toast": "^1.2.6",
     "@radix-ui/react-tooltip": "^1.1.8",
     "@radix-ui/react-visually-hidden": "^1.1.1",
+    "@redis/client": "^5.5.6",
     "@types/d3": "^7.4.3",
     "@types/node-cache": "^4.2.5",
     "autoprefixer": "^10.4.20",
@@ -52,6 +53,7 @@
     "eslint-plugin-jsx-a11y": "^6.10.2",
     "eslint-plugin-react": "^7.37.4",
     "eslint-plugin-react-hooks": "^4.6.2",
+    "eventsource": "^4.0.0",
     "falkordb": "^6.2.7",
     "lodash": "^4.17.21",
     "lucide-react": "^0.475.0",
@@ -70,7 +72,7 @@
     "react-hook-form": "^7.54.2",
     "react-json-tree": "^0.19.0",
     "react-resizable-panels": "^1.0.10",
-    "redis": "^4.7.0",
+    "redis": "^4.7.1",
     "swr": "^2.3.2",
     "tailwind-merge": "^2.6.0",
     "tailwindcss": "^3.4.17",
@@ -82,7 +84,7 @@
     "@playwright/test": "^1.52.0",
     "@types/cytoscape-fcose": "^2.2.4",
     "@types/lodash": "^4.17.15",
-    "@types/node": "^20.17.17",
+    "@types/node": "^20.19.4",
     "@types/react": "^18.3.18",
     "@types/react-cytoscapejs": "^1.2.5",
     "@types/react-dom": "^18.3.5",
@@ -92,7 +94,7 @@
     "eslint": "^8.57.1",
     "eslint-config-airbnb-typescript": "^17.1.0",
     "eslint-config-next": "^15.1.7",
-    "typescript": "^5.7.3"
+    "typescript": "^5.8.3"
   },
   "overrides": {
     "react-json-view": {

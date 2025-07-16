@@ -1,6 +1,5 @@
 
 import { expect, test } from "@playwright/test";
-import { BATCH_CREATE_PERSONS } from "@/e2e/config/constants";
 import BrowserWrapper from "../infra/ui/browserWrapper";
 import ApiCalls from "../logic/api/apiCalls";
 import urls from '../config/urls.json'
@@ -40,7 +39,7 @@ test.describe('Query history Tests', () => {
         await browser.setPageToFullScreen();
         await graph.selectGraphByName(graphName);
         await graph.insertQuery("CREATE (n:Person { name: 'Alice' }) RETURN n");
-        await graph.clickRunQuery(true);
+        await graph.clickRunQuery();
         await graph.runAQueryFromHistory("0");
         const searchQuery = `Alice`;
         await graph.searchElementInCanvas("Graph", searchQuery);
