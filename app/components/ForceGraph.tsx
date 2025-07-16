@@ -428,13 +428,13 @@ export default function ForceGraph({
                     if (cooldownTicks === 0) return
                     handleCooldown(0)
                     handleZoomToFit(chartRef, undefined, data.nodes.length < 2 ? 4 : undefined)
-                    setLoading(false)
+                    setTimeout(() => setLoading(false), 1000);
                 }}
                 linkCurvature="curve"
                 nodeVisibility="visible"
                 linkVisibility="visible"
                 cooldownTicks={cooldownTicks}
-                cooldownTime={6000}
+                cooldownTime={2000}
                 linkDirectionalArrowRelPos={1}
                 linkDirectionalArrowLength={(link) => link.source.id === link.target.id ? 0 : 2}
                 linkDirectionalArrowColor={(link) => link.color}
