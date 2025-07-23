@@ -234,11 +234,14 @@ export default function ForceGraph({
     const handleHover = (element: Node | Link | null) => {
         setHoverElement(element === null ? undefined : element)
 
+        const canvas = document.querySelector('.force-graph-container canvas') as HTMLCanvasElement;
+
+        if (!canvas) return;
+
         if (element) {
-            const canvas = document.querySelector('.force-graph-container canvas') as HTMLCanvasElement;
-            if (canvas) {
-                canvas.style.cursor = 'pointer';
-            }
+            canvas.style.cursor = 'pointer';
+        } else {
+            canvas.style.cursor = 'default';
         }
     }
 
@@ -276,6 +279,10 @@ export default function ForceGraph({
         setSelectedElements([])
     }
 
+    const isLinkSelected = (link: Link) => (selectedElement && ("source" in selectedElement) && selectedElement.id === link.id
+        || hoverElement && ("source" in hoverElement) && hoverElement.id === link.id)
+        || (selectedElements.length > 0 && selectedElements.some(el => el.id === link.id && !("source" in el)))
+
     return (
         <div ref={parentRef} className="w-full h-full relative">
             {
@@ -299,9 +306,7 @@ export default function ForceGraph({
                     let length = 0;
 
                     if (link.source !== link.target) {
-                        length = (selectedElement && ("source" in selectedElement) && selectedElement.id === link.id
-                            || hoverElement && ("source" in hoverElement) && hoverElement.id === link.id)
-                            || (selectedElements.length > 0 && selectedElements.some(el => el.id === link.id && !("source" in el))) ? 4 : 2
+                        length = isLinkSelected(link) ? 4 : 2
                     }
 
                     return length;
@@ -375,16 +380,13 @@ export default function ForceGraph({
                         textY = start.y + radius * Math.sin(angleOffset);
                         angle = -angleOffset;
                     } else {
-                        const nodeRadius = NODE_SIZE;
-                        const arrowLength = (selectedElement && ("source" in selectedElement) && selectedElement.id === link.id
-                            || hoverElement && ("source" in hoverElement) && hoverElement.id === link.id)
-                            || (selectedElements.length > 0 && selectedElements.some(el => el.id === link.id && !("source" in el))) ? 8 : 4;
+                        const arrowLength = isLinkSelected(link) ? 8 : 4;
 
                         const dx = end.x - start.x;
                         const dy = end.y - start.y;
                         const len = Math.sqrt(dx * dx + dy * dy);
 
-                        const ratioStart = nodeRadius / len;
+                        const ratioStart = NODE_SIZE / len;
                         const ratioEnd = ratioStart + (arrowLength / 2) / len;
 
                         const sx = start.x + dx * ratioStart;
@@ -394,9 +396,7 @@ export default function ForceGraph({
 
                         ctx.save();
                         ctx.strokeStyle = link.color;
-                        ctx.lineWidth = (selectedElement && ("source" in selectedElement) && selectedElement.id === link.id
-                            || hoverElement && ("source" in hoverElement) && hoverElement.id === link.id)
-                            || (selectedElements.length > 0 && selectedElements.some(el => el.id === link.id && !("source" in el))) ? 0.5 : 0.25;
+                        ctx.lineWidth = isLinkSelected(link) ? 0.5 : 0.25;
                         ctx.beginPath();
                         ctx.moveTo(sx, sy);
                         ctx.lineTo(ex, ey);
