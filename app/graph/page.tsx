@@ -44,8 +44,8 @@ export default function Page() {
     const [categories, setCategories] = useState<Category<Node>[]>([])
     const [data, setData] = useState<GraphData>({ ...graph.Elements })
     const [labels, setLabels] = useState<Category<Link>[]>([])
-    const [nodesCount, setNodesCount] = useState(0)
-    const [edgesCount, setEdgesCount] = useState(0)
+    const [nodesCount, setNodesCount] = useState<number>()
+    const [edgesCount, setEdgesCount] = useState<number>()
 
     useEffect(() => {
         setLabels([...graph.Labels])
@@ -55,12 +55,15 @@ export default function Page() {
     const fetchCount = useCallback(async () => {
         if (!graphName) return
 
+        setEdgesCount(undefined)
+        setNodesCount(undefined)
+
         const result = await getSSEGraphResult(`api/graph/${prepareArg(graphName)}/count`, toast, setIndicator);
 
         const { nodes, edges } = result.data[0]
 
-        setEdgesCount(edges || 0)
-        setNodesCount(nodes || 0)
+        setEdgesCount(edges)
+        setNodesCount(nodes)
     }, [graphName, toast, setIndicator])
 
     const run = useCallback(async (q: string, name: string) => {
@@ -170,6 +173,8 @@ export default function Page() {
                 runQuery(defaultQuery)
                 return
             }
+
+            console.log("empty graph")
 
             const colorsArr = JSON.parse(localStorage.getItem(graphName) || "[]")
             setGraph(Graph.empty(graphName, colorsArr))
