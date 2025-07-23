@@ -166,19 +166,21 @@ export default function Page() {
             }
         }
 
-        if (!graphName) return
+        if (graphName) {
+            if (graphName !== graph.Id) {
+                if (runDefaultQuery) {
+                    runQuery(defaultQuery)
+                    return
+                }
 
-        if (graphName !== graph.Id) {
-            if (runDefaultQuery) {
-                runQuery(defaultQuery)
-                return
+                const colorsArr = JSON.parse(localStorage.getItem(graphName) || "[]")
+                setGraph(Graph.empty(graphName, colorsArr))
             }
 
-            const colorsArr = JSON.parse(localStorage.getItem(graphName) || "[]")
-            setGraph(Graph.empty(graphName, colorsArr))
+            fetchCount()
         }
 
-        fetchCount()
+        setIsQueryLoading(false)
     }, [fetchCount, graph.Id, graphName, setGraph, runDefaultQuery, defaultQuery, contentPersistence, setGraphName, graphNames])
 
     const handleDeleteElement = async () => {
