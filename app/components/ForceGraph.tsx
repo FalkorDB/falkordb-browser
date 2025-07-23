@@ -4,7 +4,7 @@
 
 "use client"
 
-import { Dispatch, SetStateAction, useContext, useEffect, useRef, useState } from "react"
+import { Dispatch, SetStateAction, useCallback, useContext, useEffect, useRef, useState } from "react"
 import ForceGraph2D from "react-force-graph-2d"
 import { securedFetch, GraphRef, handleZoomToFit } from "@/lib/utils"
 import { useToast } from "@/components/ui/use-toast"
@@ -279,9 +279,13 @@ export default function ForceGraph({
         setSelectedElements([])
     }
 
-    const isLinkSelected = (link: Link) => (selectedElement && ("source" in selectedElement) && selectedElement.id === link.id
-        || hoverElement && ("source" in hoverElement) && hoverElement.id === link.id)
-        || (selectedElements.length > 0 && selectedElements.some(el => el.id === link.id && !("source" in el)))
+    const isLinkSelected = useCallback(
+        (link: Link) =>
+            (selectedElement && ("source" in selectedElement) && selectedElement.id === link.id)
+            || (hoverElement && ("source" in hoverElement) && hoverElement.id === link.id)
+            || (selectedElements.length > 0 && selectedElements.some(el => el.id === link.id && ("source" in el))),
+        [selectedElement, hoverElement, selectedElements]
+    )
 
     return (
         <div ref={parentRef} className="w-full h-full relative">
@@ -320,9 +324,9 @@ export default function ForceGraph({
                         node.y = 0
                     }
 
-                    ctx.lineWidth = ((selectedElement && !("source" in selectedElement) && selectedElement.id === node.id)
+                    ctx.lineWidth = (selectedElement && !("source" in selectedElement) && selectedElement.id === node.id)
                         || (hoverElement && !("source" in hoverElement) && hoverElement.id === node.id)
-                        || (selectedElements.length > 0 && selectedElements.some(el => el.id === node.id && !("source" in el)))) ? 1 : 0.5
+                        || (selectedElements.length > 0 && selectedElements.some(el => el.id === node.id && !("source" in el))) ? 1 : 0.5
                     ctx.strokeStyle = 'white';
 
                     ctx.beginPath();
