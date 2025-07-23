@@ -80,8 +80,8 @@ export default function Toolbar({
         const elements = graph.getElements().filter(el =>
             Object.values(el.data).some(value => value.toString().toLowerCase().startsWith(searchElement.toLowerCase()))
             || el.id.toString().toLowerCase().includes(searchElement.toLowerCase())
-            || el.label && (el as Link).label.toLowerCase().includes(searchElement.toLowerCase())
-            || el.category && (el as Node).category.some(c => c.toLowerCase().includes(searchElement.toLowerCase()))
+            || el.relationship && (el as Link).relationship.toLowerCase().includes(searchElement.toLowerCase())
+            || el.labels && (el as Node).labels.some(c => c.toLowerCase().includes(searchElement.toLowerCase()))
         )
 
         setSuggestions(elements)
@@ -96,7 +96,7 @@ export default function Toolbar({
     }, [graph, handleOnChange, searchElement])
 
     const handleSearchElement = (element: Node | Link) => {
-        handleZoomToFit(chartRef, (node: Node) => element.category ? element.id === node.id : node.id === element.source.id || node.id === element.target.id, 4)
+        handleZoomToFit(chartRef, (node: Node) => element.labels ? element.id === node.id : node.id === element.source.id || node.id === element.target.id, 4)
         setSelectedElement(element)
         setSearchElement("")
         setSuggestions([])
@@ -230,7 +230,7 @@ export default function Toolbar({
                                                             className="rounded-full h-8 w-8 p-2 flex items-center justify-center"
                                                             style={{ backgroundColor: suggestion.color }}
                                                         >
-                                                            <p className="text-white text-sm font-bold truncate">{suggestion.label || suggestion.category}</p>
+                                                            <p className="text-white text-sm font-bold truncate">{("source" in suggestion) ? suggestion.relationship : suggestion.labels[0]}</p>
                                                         </div>
                                                         <div
                                                             className={cn("w-1 grow text-center truncate", actualIndex === suggestionIndex ? "text-black" : "text-white")}
@@ -240,7 +240,7 @@ export default function Toolbar({
                                                     </Button>
                                                 </TooltipTrigger>
                                                 <TooltipContent>
-                                                    {suggestion.label || suggestion.category}
+                                                    {("source" in suggestion) ? suggestion.relationship : suggestion.labels[0]}
                                                 </TooltipContent>
                                             </Tooltip>
                                         </li>

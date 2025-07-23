@@ -1,15 +1,14 @@
 import { useContext, useEffect, useState } from "react";
-import Button from "../components/ui/Button";
 import { securedFetch } from "@/lib/utils";
-import { IndicatorContext } from "../components/provider";
 import { useToast } from "@/components/ui/use-toast";
+import Button from "../components/ui/Button";
+import { IndicatorContext } from "../components/provider";
+import { Label, Relationship } from "../api/graph/model";
 
-export default function DatabaseInfo({ graph, nodesCount, edgesCount, runQuery }: { graph: string, nodesCount: number, edgesCount: number, runQuery: (query: string) => Promise<void> }) {
+export default function DatabaseInfo({ graph, nodesCount, edgesCount, labels, relationships, runQuery }: { graph: string, nodesCount: number, edgesCount: number, labels: Label[], relationships: Relationship[],  runQuery: (query: string) => Promise<void> }) {
     const { setIndicator } = useContext(IndicatorContext);
     const { toast } = useToast();
 
-    const [labels, setLabels] = useState<string[]>([]);
-    const [relationshipTypes, setRelationshipTypes] = useState<string[]>([]);
     const [propertyKeys, setPropertyKeys] = useState<string[]>([]);
     const [indexes, setIndexes] = useState<string[]>([]);
 
@@ -28,12 +27,9 @@ export default function DatabaseInfo({ graph, nodesCount, edgesCount, runQuery }
                 method: "POST",
             }, toast, setIndicator),
         ]).then(results => results.map(result => result.json())).then(async (results) => {
-            const [labels, relationshipTypes, propertyKeys, indexes] = await Promise.all(results);
-            console.log(labels, relationshipTypes, propertyKeys, indexes);
-            setLabels(labels);
-            setRelationshipTypes(relationshipTypes);
-            setPropertyKeys(propertyKeys);
-            setIndexes(indexes);
+            const [newPropertyKeys, newIndexes] = await Promise.all(results);
+            setPropertyKeys(newPropertyKeys);
+            setIndexes(newIndexes);
         });
     }, [graph]);
 
@@ -46,8 +42,8 @@ export default function DatabaseInfo({ graph, nodesCount, edgesCount, runQuery }
                     <h2>Labels ({labels.length})</h2>
                     <ul>
                         {labels.map((label) => (
-                            <li key={label}>
-                                <Button label={label} onClick={() => runQuery(`MATCH (n:${label}) RETURN n`)} />
+                            <li key={label.name}>
+                                <Button label={label.name} onClick={() => runQuery(`MATCH (n:${label.name}) RETURN n`)} />
                             </li>
                         ))}
                     </ul>
@@ -56,11 +52,11 @@ export default function DatabaseInfo({ graph, nodesCount, edgesCount, runQuery }
             <div>
                 <h2>Edges ({edgesCount})</h2>
                 <div>
-                    <h2>Relationship Types ({relationshipTypes.length})</h2>
+                    <h2>Relationships ({relationships.length})</h2>
                     <ul>
-                        {relationshipTypes.map((type) => (
-                            <li key={type}>
-                                <Button label={type} onClick={() => runQuery(`MATCH ()-[e:${type}]-() RETURN e`)} />
+                        {relationships.map((relationship) => (
+                            <li key={relationship.name}>
+                                <Button label={relationship.name} onClick={() => runQuery(`MATCH ()-[e:${relationship.name}]-() RETURN e`)} />
                             </li>
                         ))}
                     </ul>

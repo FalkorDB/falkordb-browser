@@ -5,7 +5,7 @@ import { getSSEGraphResult, prepareArg, securedFetch } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
 import dynamic from "next/dynamic";
 import { ForceGraphMethods } from "react-force-graph-2d";
-import { Category, Graph, GraphData, Link, Node } from "../api/graph/model";
+import { Label, Graph, GraphData, Link, Node, Relationship } from "../api/graph/model";
 import { IndicatorContext, SchemaContext } from "../components/provider";
 
 const Selector = dynamic(() => import("../graph/Selector"), { ssr: false })
@@ -28,9 +28,9 @@ export default function Page() {
     const [selectedElement, setSelectedElement] = useState<Node | Link | undefined>()
     const [selectedElements, setSelectedElements] = useState<(Node | Link)[]>([])
     const [cooldownTicks, setCooldownTicks] = useState<number | undefined>(0)
-    const [categories, setCategories] = useState<Category<Node>[]>([])
+    const [labels, setLabels] = useState<Label[]>([])
+    const [relationships, setRelationships] = useState<Relationship[]>([])
     const [data, setData] = useState<GraphData>(schema.Elements)
-    const [labels, setLabels] = useState<Category<Link>[]>([])
     const [isAddRelation, setIsAddRelation] = useState(false)
     const chartRef = useRef<ForceGraphMethods<Node, Link>>()
     const [edgesCount, setEdgesCount] = useState<number>(0)
@@ -54,8 +54,10 @@ export default function Page() {
         if (!canvas) return
         if (ticks === 0) {
             canvas.setAttribute('data-engine-status', 'stop')
+            setIsCanvasLoading(false)
         } else {
             canvas.setAttribute('data-engine-status', 'running')
+            setIsCanvasLoading(true)
         }
     }
 
@@ -112,33 +114,33 @@ export default function Page() {
             }
 
             if (type) {
-                element.category.forEach((category) => {
-                    const cat = schema.CategoriesMap.get(category)
+                element.labels.forEach((labelName) => {
+                    const label = schema.LabelsMap.get(labelName)
 
-                    if (cat) {
-                        cat.elements = cat.elements.filter(n => n.id !== id)
+                    if (label) {
+                        label.elements = label.elements.filter(n => n.id !== id)
 
-                        if (cat.elements.length === 0) {
-                            schema.Categories.splice(schema.Categories.findIndex(c => c.name === cat.name), 1)
-                            schema.CategoriesMap.delete(cat.name)
+                        if (label.elements.length === 0) {
+                            schema.Labels.splice(schema.Labels.findIndex(l => l.name === label.name), 1)
+                            schema.LabelsMap.delete(label.name)
                         }
                     }
                 })
             } else {
-                const cat = schema.LabelsMap.get(element.label)
+                const relation = schema.RelationshipsMap.get(element.relationship)
 
-                if (cat) {
-                    cat.elements = cat.elements.filter(n => n.id !== id)
+                if (relation) {
+                    relation.elements = relation.elements.filter(n => n.id !== id)
 
-                    if (cat.elements.length === 0) {
-                        schema.Labels.splice(schema.Labels.findIndex(c => c.name === cat.name), 1)
-                        schema.LabelsMap.delete(cat.name)
+                    if (relation.elements.length === 0) {
+                        schema.Relationships.splice(schema.Relationships.findIndex(r => r.name === relation.name), 1)
+                        schema.RelationshipsMap.delete(relation.name)
                     }
                 }
             }
         }))
 
-        setLabels(schema.removeLinks(selectedElements.map((element) => element.id)))
+        setRelationships(schema.removeLinks(selectedElements.map((element) => element.id)))
         fetchCount()
         setSelectedElement(undefined)
         setSelectedElements([])
@@ -184,11 +186,10 @@ export default function Page() {
                     setData={setData}
                     handleDeleteElement={handleDeleteElement}
                     setLabels={setLabels}
-                    setCategories={setCategories}
+                    setRelationships={setRelationships}
                     labels={labels}
-                    categories={categories}
+                    relationships={relationships}
                     isLoading={isCanvasLoading}
-                    setIsLoading={setIsCanvasLoading}
                 />
             </div>
             <div className="h-4 w-full Gradient" />

@@ -1,19 +1,19 @@
 import { useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import { ChevronDown, ChevronUp } from "lucide-react";
-import { Category, Graph, Link, Node } from "../api/graph/model";
+import { Label, Graph, Relationship } from "../api/graph/model";
 import Button from "../components/ui/Button";
 
-interface Props<T extends Category<Node> | Category<Link>> {
+interface Props<T extends Label | Relationship> {
     graph: Graph,
-    categories: T[],
-    onClick: (category: T) => void,
+    labels: T[],
+    onClick: (label: T) => void,
     label: "Relationships" | "Labels",
     type: "Schema" | "Graph",
     className?: string,
 }
 
-export default function Labels<T extends Category<Node> | Category<Link>>({ graph, categories, onClick, label, type, className = "" }: Props<T>) {
+export default function Labels<T extends Label | Relationship>({ graph, labels, onClick, label, type, className = "" }: Props<T>) {
 
     const listRef = useRef<HTMLUListElement>(null)
 
@@ -47,19 +47,19 @@ export default function Labels<T extends Category<Node> | Category<Link>>({ grap
                 }
                 <ul ref={listRef} className={cn("flex flex-col gap-4 w-full overflow-auto hide-scrollbar")}>
                     {
-                        categories.length > 0 &&
-                        categories.map((category) => (
-                            <li key={category.name}>
+                        labels.length > 0 &&
+                        labels.map((l) => (
+                            <li key={l.name}>
                                 <Button
-                                    data-testid={`${type}${label}Button${category.name}`}
-                                    className={cn("w-full pointer-events-auto", category.show ? "opacity-100" : "opacity-50")}
-                                    label={category.name}
+                                    data-testid={`${type}${l}Button${l.name}`}
+                                    className={cn("w-full pointer-events-auto", l.show ? "opacity-100" : "opacity-50")}
+                                    label={l.name}
                                     onClick={() => {
-                                        onClick(category)
+                                        onClick(l)
                                         setReload(prev => !prev)
                                     }}
                                 >
-                                    <div style={{ backgroundColor: graph.getCategoryColorValue(category.index) }} className={cn("min-w-6 min-h-6 rounded-full")} />
+                                    <div style={{ backgroundColor: graph.getCategoryColorValue(l.index) }} className={cn("min-w-6 min-h-6 rounded-full")} />
                                 </Button>
                             </li>
                         ))

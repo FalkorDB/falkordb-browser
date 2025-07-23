@@ -7,7 +7,7 @@ import { GitGraph, Info, Table } from "lucide-react"
 import { cn, GraphRef } from "@/lib/utils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { GraphContext } from "@/app/components/provider";
-import { Category, GraphData, Link, Node } from "../api/graph/model";
+import { Label, GraphData, Link, Node, Relationship } from "../api/graph/model";
 import Button from "../components/ui/Button";
 import TableView from "./TableView";
 import Toolbar from "./toolbar";
@@ -35,10 +35,11 @@ interface Props {
     cooldownTicks: number | undefined
     chartRef: GraphRef
     handleDeleteElement: () => Promise<void>
-    setLabels: Dispatch<SetStateAction<Category<Link>[]>>
-    setCategories: Dispatch<SetStateAction<Category<Node>[]>>
-    labels: Category<Link>[]
-    categories: Category<Node>[]
+    setLabels: Dispatch<SetStateAction<Label[]>>
+    setRelationships: Dispatch<SetStateAction<Relationship[]>>
+    labels: Label[]
+    relationships: Relationship[]
+    isLoading: boolean
 }
 
 function GraphView({
@@ -56,23 +57,23 @@ function GraphView({
     chartRef,
     handleDeleteElement,
     setLabels,
-    setCategories,
+    setRelationships,
     labels,
-    categories
+    relationships,
+    isLoading
 }: Props) {
 
     const { graph } = useContext(GraphContext)
 
-    const [isLoading, setIsLoading] = useState<boolean>(false)
     const [parentHeight, setParentHeight] = useState<number>(0)
     const [parentWidth, setParentWidth] = useState<number>(0)
     const [tabsValue, setTabsValue] = useState<Tab>("Graph")
     const elementsLength = graph.getElements().length
 
     useEffect(() => {
-        setCategories([...graph.Categories])
+        setRelationships([...graph.Relationships])
         setLabels([...graph.Labels])
-    }, [graph, graph.Categories, graph.Labels, setCategories, setLabels])
+    }, [graph, graph.Relationships, graph.Labels, setRelationships, setLabels])
 
     const isTabEnabled = useCallback((tab: Tab) => {
         if (tab === "Graph") return graph.getElements().length !== 0
@@ -83,7 +84,6 @@ function GraphView({
     useEffect(() => {
         if (!elementsLength) return;
 
-        setIsLoading(true)
         setData({ ...graph.Elements })
     }, [graph, elementsLength, setData])
 
@@ -109,36 +109,36 @@ function GraphView({
         setSelectedElements([])
     }, [graph.Id, setSelectedElement, setSelectedElements])
 
-    const onCategoryClick = (category: Category<Node>) => {
-        category.show = !category.show
+    const onLabelClick = (label: Label) => {
+        label.show = !label.show
 
-        category.elements.forEach((node) => {
-            if (node.category[0] !== category.name) return
-            if (category.show) {
+        label.elements.forEach((node) => {
+            if (node.labels[0] !== label.name) return
+            if (label.show) {
                 node.visible = true
             } else {
                 node.visible = false
             }
         })
 
-        graph.visibleLinks(category.show)
+        graph.visibleLinks(label.show)
 
-        graph.CategoriesMap.set(category.name, category)
+        graph.LabelsMap.set(label.name, label)
         setData({ ...graph.Elements })
     }
 
-    const onLabelClick = (label: Category<Link>) => {
-        label.show = !label.show
+    const onRelationshipClick = (relationship: Relationship) => {
+        relationship.show = !relationship.show
 
-        label.elements.filter((link) => link.source.visible && link.target.visible).forEach((link) => {
-            if (label.show) {
+        relationship.elements.filter((link) => link.source.visible && link.target.visible).forEach((link) => {
+            if (relationship.show) {
                 link.visible = true
             } else {
                 link.visible = false
             }
         })
 
-        graph.LabelsMap.set(label.name, label)
+        graph.RelationshipsMap.set(relationship.name, relationship)
         setData({ ...graph.Elements })
     }
 
@@ -214,20 +214,19 @@ function GraphView({
                     setSelectedElements={setSelectedElements}
                     cooldownTicks={cooldownTicks}
                     handleCooldown={handleCooldown}
-                    setLabels={setLabels}
+                    setRelationships={setRelationships}
                     parentHeight={parentHeight}
                     parentWidth={parentWidth}
                     setParentHeight={setParentHeight}
                     setParentWidth={setParentWidth}
                     loading={isLoading}
-                    setLoading={setIsLoading}
                 />
                 {
                     !isLoading &&
                     <div className="h-full z-10 absolute top-12 inset-x-12 pointer-events-none flex gap-8">
                         {
-                            (labels.length > 0 || categories.length > 0) &&
-                            <Labels graph={graph} categories={categories} onClick={onCategoryClick} label="Labels" type="Graph" />
+                            (labels.length > 0 || relationships.length > 0) &&
+                            <Labels graph={graph} labels={labels} onClick={onLabelClick} label="Labels" type="Graph" />
                         }
                         <div className="w-1 grow h-fit">
                             <Toolbar
@@ -242,8 +241,8 @@ function GraphView({
                             />
                         </div>
                         {
-                            (labels.length > 0 || categories.length > 0) &&
-                            <Labels graph={graph} categories={labels} onClick={onLabelClick} label="Relationships" type="Graph" />
+                            (labels.length > 0 || relationships.length > 0) &&
+                            <Labels graph={graph} labels={relationships} onClick={onRelationshipClick} label="Relationships" type="Graph" />
                         }
                     </div>
                 }
@@ -253,7 +252,7 @@ function GraphView({
                         object={selectedElement}
                         setObject={setSelectedElement}
                         onDeleteElement={handleDeleteElement}
-                        setCategories={setCategories}
+                        setLabels={setLabels}
                     />
                 }
             </TabsContent>

@@ -5,7 +5,7 @@ import { getQueryWithLimit, getSSEGraphResult, prepareArg, securedFetch } from "
 import { useToast } from "@/components/ui/use-toast";
 import dynamic from "next/dynamic";
 import { ForceGraphMethods } from "react-force-graph-2d";
-import { Category, Graph, GraphData, Link, Node } from "../api/graph/model";
+import { Label, Graph, GraphData, Link, Node, Relationship } from "../api/graph/model";
 import Tutorial from "./Tutorial";
 import { GraphContext, IndicatorContext, HistoryQueryContext, QuerySettingsContext } from "../components/provider";
 
@@ -40,16 +40,17 @@ export default function Page() {
     const [selectedElement, setSelectedElement] = useState<Node | Link | undefined>()
     const [selectedElements, setSelectedElements] = useState<(Node | Link)[]>([])
     const [cooldownTicks, setCooldownTicks] = useState<number | undefined>(0)
-    const [categories, setCategories] = useState<Category<Node>[]>([])
+    const [labels, setLabels] = useState<Label[]>([])
     const [data, setData] = useState<GraphData>({ ...graph.Elements })
-    const [labels, setLabels] = useState<Category<Link>[]>([])
+    const [relationships, setRelationships] = useState<Relationship[]>([])
     const [nodesCount, setNodesCount] = useState(0)
     const [edgesCount, setEdgesCount] = useState(0)
+    const [isLoading, setIsLoading] = useState<boolean>(false)
 
     useEffect(() => {
+        setRelationships([...graph.Relationships])
         setLabels([...graph.Labels])
-        setCategories([...graph.Categories])
-    }, [graph, graph.Labels.length, graph.Categories.length, graph.Labels, graph.Categories])
+    }, [graph, graph.Labels.length, graph.Relationships.length, graph.Labels, graph.Relationships])
 
     const fetchCount = useCallback(async () => {
         if (!graphName) return
@@ -93,9 +94,10 @@ export default function Page() {
 
         if (ticks === 0) {
             canvas.setAttribute('data-engine-status', 'stop')
+            setIsLoading(false)
         } else {
             canvas.setAttribute('data-engine-status', 'running')
-
+            setIsLoading(true)
         }
     }
 
@@ -179,7 +181,7 @@ export default function Page() {
         }
 
         await Promise.all(selectedElements.map(async (element) => {
-            const type = !element.source
+            const type = !("source" in element)
             const result = await securedFetch(`api/graph/${prepareArg(graph.Id)}/${prepareArg(element.id.toString())}`, {
                 method: "DELETE",
                 body: JSON.stringify({ type })
@@ -188,28 +190,28 @@ export default function Page() {
             if (!result.ok) return
 
             if (type) {
-                (element as Node).category.forEach((category) => {
-                    const cat = graph.CategoriesMap.get(category)
-                    if (cat) {
-                        cat.elements = cat.elements.filter((e) => e.id !== element.id)
-                        if (cat.elements.length === 0) {
-                            const index = graph.Categories.findIndex(c => c.name === cat.name)
+                (element as Node).labels.forEach((label) => {
+                    const l = graph.LabelsMap.get(label)
+                    if (l) {
+                        l.elements = l.elements.filter((e) => e.id !== element.id)
+                        if (l.elements.length === 0) {
+                            const index = graph.Labels.findIndex(c => c.name === l.name)
                             if (index !== -1) {
-                                graph.Categories.splice(index, 1)
-                                graph.CategoriesMap.delete(cat.name)
+                                graph.Labels.splice(index, 1)
+                                graph.LabelsMap.delete(l.name)
                             }
                         }
                     }
                 })
             } else {
-                const category = graph.LabelsMap.get((element as Link).label)
-                if (category) {
-                    category.elements = category.elements.filter((e) => e.id !== element.id)
-                    if (category.elements.length === 0) {
-                        const index = graph.Labels.findIndex(l => l.name === category.name)
+                const relation = graph.RelationshipsMap.get((element as Link).relationship)
+                if (relation) {
+                    relation.elements = relation.elements.filter((e) => e.id !== element.id)
+                    if (relation.elements.length === 0) {
+                        const index = graph.Relationships.findIndex(l => l.name === relation.name)
                         if (index !== -1) {
-                            graph.Labels.splice(index, 1)
-                            graph.LabelsMap.delete(category.name)
+                            graph.Relationships.splice(index, 1)
+                            graph.RelationshipsMap.delete(relation.name)
                         }
                     }
                 }
@@ -222,14 +224,13 @@ export default function Page() {
         setSelectedElements([])
         setSelectedElement(undefined)
 
-        setLabels(graph.removeLinks(selectedElements.map((element) => element.id)))
+        setRelationships(graph.removeLinks(selectedElements.map((element) => element.id)))
 
         setData({ ...graph.Elements })
         toast({
             title: "Success",
             description: `${selectedElements.length > 1 ? "Elements" : "Element"} deleted`,
         })
-        handleCooldown()
         setSelectedElement(undefined)
         setSelectedElements([])
     }
@@ -268,9 +269,10 @@ export default function Page() {
                     setData={setData}
                     handleDeleteElement={handleDeleteElement}
                     setLabels={setLabels}
-                    setCategories={setCategories}
+                    setRelationships={setRelationships}
                     labels={labels}
-                    categories={categories}
+                    relationships={relationships}
+                    isLoading={isLoading}
                 />
             </div>
             <Tutorial />

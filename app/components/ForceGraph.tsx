@@ -9,7 +9,7 @@ import ForceGraph2D from "react-force-graph-2d"
 import { securedFetch, GraphRef, handleZoomToFit } from "@/lib/utils"
 import { useToast } from "@/components/ui/use-toast"
 import * as d3 from "d3"
-import { GraphData, Link, Node, Category, Graph } from "../api/graph/model"
+import { GraphData, Link, Node, Relationship, Graph } from "../api/graph/model"
 import { IndicatorContext } from "./provider"
 import Spinning from "./ui/spinning"
 
@@ -29,13 +29,12 @@ interface Props {
     setSelectedNodes?: Dispatch<SetStateAction<[Node | undefined, Node | undefined]>>
     setIsAddEntity?: Dispatch<SetStateAction<boolean>>
     setIsAddRelation?: Dispatch<SetStateAction<boolean>>
-    setLabels: Dispatch<SetStateAction<Category<Link>[]>>
+    setRelationships: Dispatch<SetStateAction<Relationship[]>>
     parentHeight: number
     parentWidth: number
     setParentHeight: Dispatch<SetStateAction<number>>
     setParentWidth: Dispatch<SetStateAction<number>>
     loading: boolean
-    setLoading: Dispatch<SetStateAction<boolean>>
 }
 
 const NODE_SIZE = 6
@@ -63,13 +62,12 @@ export default function ForceGraph({
     setSelectedNodes,
     setIsAddEntity = () => { },
     setIsAddRelation = () => { },
-    setLabels,
+    setRelationships,
     parentHeight,
     parentWidth,
     setParentHeight,
     setParentWidth,
     loading,
-    setLoading,
 }: Props) {
 
     const { indicator, setIndicator } = useContext(IndicatorContext)
@@ -135,7 +133,7 @@ export default function ForceGraph({
 
         // Adjust link force and length
         const linkForce = chartRef.current.d3Force('link');
-        
+
         if (linkForce) {
             linkForce
                 .distance(linkDistance)
@@ -147,14 +145,14 @@ export default function ForceGraph({
 
         // Center force to keep graph centered
         const centerForce = chartRef.current.d3Force('center');
-        
+
         if (centerForce) {
             centerForce.strength(BASE_CENTER_STRENGTH);
         }
 
         // Add charge force to repel nodes
         const chargeForce = chartRef.current.d3Force('charge');
-        
+
         if (chargeForce) {
             chargeForce.strength(chargeStrength);
         }
@@ -210,7 +208,7 @@ export default function ForceGraph({
 
         deleteNeighbors(expandedNodes)
 
-        setLabels(graph.removeLinks(nodes.map(n => n.id)))
+        setRelationships(graph.removeLinks(nodes.map(n => n.id)))
     }
 
     const handleNodeClick = async (node: Node) => {
@@ -282,7 +280,8 @@ export default function ForceGraph({
                 backgroundColor="#242424"
                 width={parentWidth}
                 height={parentHeight}
-                nodeLabel={(node) => type === "graph" ? node.data.name || node.id.toString() : node.category[0]}
+                nodeLabel={(node) => type === "graph" ? node.data.name || node.id.toString() : node.labels[0]}
+                linkLabel={(link) => link.relationship}
                 graphData={data}
                 nodeRelSize={NODE_SIZE}
                 nodeCanvasObjectMode={() => 'after'}
@@ -381,16 +380,26 @@ export default function ForceGraph({
                         textX = rotatedX;
                         textY = rotatedY;
                     }
-
+                    
                     // Get text width
                     ctx.font = '2px Arial';
-                    const category = graph.LabelsMap.get(link.label)!
-                    let { textWidth, textHeight } = category
+
+                    let textWidth;
+                    let textHeight;
+                    const relationship = graph.RelationshipsMap.get(link.relationship)
+                    
+                    if (relationship) {
+                        ({ textWidth, textHeight } = relationship)
+                    }
+
                     if (!textWidth || !textHeight) {
-                        const { width, actualBoundingBoxAscent, actualBoundingBoxDescent } = ctx.measureText(link.label)
+                        const { width, actualBoundingBoxAscent, actualBoundingBoxDescent } = ctx.measureText(link.relationship)
+
                         textWidth = width
                         textHeight = actualBoundingBoxAscent + actualBoundingBoxDescent
-                        graph.LabelsMap.set(link.label, { ...category, textWidth, textHeight })
+                        if (relationship) {
+                            graph.RelationshipsMap.set(link.relationship, { ...relationship, textWidth, textHeight })
+                        }
                     }
 
                     // Save the current context state
@@ -412,7 +421,7 @@ export default function ForceGraph({
                     ctx.fillStyle = 'white';
                     ctx.textAlign = 'center';
                     ctx.textBaseline = 'middle';
-                    ctx.fillText(link.label, textX, textY);
+                    ctx.fillText(link.relationship, textX, textY);
 
                     // Restore the context to its original state
                     ctx.restore();
@@ -426,9 +435,9 @@ export default function ForceGraph({
                 onBackgroundRightClick={handleUnselected}
                 onEngineStop={() => {
                     if (cooldownTicks === 0) return
-                    handleCooldown(0)
+
                     handleZoomToFit(chartRef, undefined, data.nodes.length < 2 ? 4 : undefined)
-                    setTimeout(() => setLoading(false), 1000);
+                    setTimeout(() => handleCooldown(0), 1000)
                 }}
                 linkCurvature="curve"
                 nodeVisibility="visible"

@@ -13,7 +13,7 @@ import { prepareArg, securedFetch } from "@/lib/utils";
 import Button from "../components/ui/Button";
 import { ATTRIBUTES, getDefaultAttribute, OPTIONS } from "./SchemaCreateElement";
 import Combobox from "../components/ui/combobox";
-import { Category, Graph, Link, Node } from "../api/graph/model";
+import { Label, Graph, Link, Node } from "../api/graph/model";
 import Input from "../components/ui/Input";
 import ToastButton from "../components/ToastButton";
 import DeleteElement from "../graph/DeleteElement";
@@ -26,10 +26,10 @@ interface Props {
     setObject: Dispatch<SetStateAction<Node | Link | undefined>>
     onDeleteElement: () => Promise<void>;
     schema: Graph
-    setCategories: (categories: Category<Node>[]) => void
+    setLabels: (labels: Label[]) => void
 }
 
-export default function SchemaDataPanel({ object, setObject, onDeleteElement, schema, setCategories }: Props) {
+export default function SchemaDataPanel({ object, setObject, onDeleteElement, schema, setLabels }: Props) {
 
     const { indicator } = useContext(IndicatorContext)
 
@@ -51,7 +51,7 @@ export default function SchemaDataPanel({ object, setObject, onDeleteElement, sc
     const [newLabel, setNewLabel] = useState<string>("")
     const [label, setLabel] = useState<string[]>([])
     const [hover, setHover] = useState<string>("")
-    const type = !!object.category
+    const type = !("source" in object)
 
     const handleClose = useCallback((e: KeyboardEvent) => {
         if (e.defaultPrevented) return
@@ -71,7 +71,7 @@ export default function SchemaDataPanel({ object, setObject, onDeleteElement, sc
 
     useEffect(() => {
         setAttributes(Object.entries(object.data).filter(([key, val]) => !(key === "name" && Number(val) === object.id)).map(([key, val]) => [key, Array.isArray(val) ? val : (val as string).split(',')]))
-        setLabel("source" in object ? [object.label] : [...object.category])
+        setLabel("source" in object ? [object.relationship] : [...object.labels])
     }, [object])
 
     const handleSetEditable = ([key, val]: [string, string[]] = getDefaultAttribute()) => {
@@ -282,8 +282,8 @@ export default function SchemaDataPanel({ object, setObject, onDeleteElement, sc
             }, toast)
 
             if (result.ok) {
-                setCategories([...schema.addCategory(newLabel, node, false)])
-                setLabel([...node.category])
+                setLabels([...schema.addLabel(newLabel, node, false)])
+                setLabel([...node.labels])
                 setNewLabel("")
                 setLabelsEditable(false)
             }
@@ -312,9 +312,9 @@ export default function SchemaDataPanel({ object, setObject, onDeleteElement, sc
             }, toast)
 
             if (result.ok) {
-                schema.removeCategory(removeLabel, node, false)
-                setCategories([...schema.Categories])
-                setLabel([...node.category])
+                schema.removeLabel(removeLabel, node, false)
+                setLabels([...schema.Labels])
+                setLabel([...node.labels])
             }
         } finally {
             setIsRemoveLabelLoading(false)

@@ -7,7 +7,7 @@ import { GraphRef, prepareArg, securedFetch } from "@/lib/utils"
 import { useToast } from "@/components/ui/use-toast"
 import SchemaDataPanel from "./SchemaDataPanel"
 import Labels from "../graph/labels"
-import { Category, Link, Node, GraphData } from "../api/graph/model"
+import { Label, Link, Node, GraphData, Relationship } from "../api/graph/model"
 import CreateElement from "./SchemaCreateElement"
 import { IndicatorContext, SchemaContext } from "../components/provider"
 import Controls from "../graph/controls"
@@ -33,12 +33,11 @@ interface Props {
     data: GraphData
     setData: Dispatch<SetStateAction<GraphData>>
     handleDeleteElement: () => Promise<void>
-    setLabels: Dispatch<SetStateAction<Category<Link>[]>>
-    setCategories: Dispatch<SetStateAction<Category<Node>[]>>
-    labels: Category<Link>[]
-    categories: Category<Node>[]
+    setLabels: Dispatch<SetStateAction<Label[]>>
+    setRelationships: Dispatch<SetStateAction<Relationship[]>>
+    labels: Label[]
+    relationships: Relationship[]
     isLoading: boolean
-    setIsLoading: Dispatch<SetStateAction<boolean>>
 }
 
 export default function SchemaView({
@@ -60,11 +59,10 @@ export default function SchemaView({
     setData,
     handleDeleteElement,
     setLabels,
-    setCategories,
+    setRelationships,
     labels,
-    categories,
-    isLoading,
-    setIsLoading
+    relationships,
+    isLoading
 }: Props) {
     const { setIndicator } = useContext(IndicatorContext)
     const { schema } = useContext(SchemaContext)
@@ -79,14 +77,13 @@ export default function SchemaView({
     useEffect(() => {
         if (!elementsLength) return;
 
-        setIsLoading(true)
         setData({ ...schema.Elements })
-    }, [schema, elementsLength, setData, setIsLoading])
+    }, [schema, elementsLength, setData])
 
     useEffect(() => {
-        setCategories([...schema.Categories])
+        setRelationships([...schema.Relationships])
         setLabels([...schema.Labels])
-    }, [schema.Id, schema.Categories.length, schema.Labels.length, setCategories, schema.Categories, schema.Labels, setLabels])
+    }, [schema.Id, schema.Relationships.length, schema.Labels.length, setRelationships, schema.Relationships, schema.Labels, setLabels])
 
     useEffect(() => {
         setSelectedElement(undefined)
@@ -97,28 +94,28 @@ export default function SchemaView({
         setSelectedNodes([undefined, undefined])
     }, [isAddRelation])
 
-    const onCategoryClick = (category: Category<Node>) => {
-        category.show = !category.show
+    const onLabelClick = (label: Label) => {
+        label.show = !label.show
 
         schema.Elements.nodes.forEach((node) => {
-            if (node.category[0] !== category.name) return
-            node.visible = category.show
+            if (node.labels[0] !== label.name) return
+            node.visible = label.show
         })
 
-        schema.visibleLinks(category.show)
-        schema.CategoriesMap.set(category.name, category)
+        schema.visibleLinks(label.show)
+        schema.LabelsMap.set(label.name, label)
         setData({ ...schema.Elements })
     }
 
-    const onLabelClick = (label: Category<Link>) => {
+    const onRelationshipClick = (label: Relationship) => {
         label.show = !label.show
 
         schema.Elements.links.forEach((link) => {
-            if (link.label !== label.name) return
+            if (link.relationship !== label.name) return
             link.visible = label.show
         })
 
-        schema.LabelsMap.set(label.name, label)
+        schema.RelationshipsMap.set(label.name, label)
         setData({ ...schema.Elements })
     }
 
@@ -133,12 +130,12 @@ export default function SchemaView({
             const json = await result.json()
 
             if (isAddEntity) {
-                const { category } = schema.extendNode(json.result.data[0].n, false, true)!
-                setCategories(prev => [...prev, ...category.filter(c => !prev.some(p => p.name === c)).map(c => schema.CategoriesMap.get(c)!)])
+                const { labels: ls } = schema.extendNode(json.result.data[0].n, false, true)!
+                setLabels(prev => [...prev, ...ls.filter(c => !prev.some(p => p.name === c)).map(c => schema.LabelsMap.get(c)!)])
                 setIsAddEntity(false)
             } else {
-                const { label } = schema.extendEdge(json.result.data[0].e, false, true)!
-                setLabels(prev => [...prev, schema.LabelsMap.get(label)!])
+                const { relationship } = schema.extendEdge(json.result.data[0].e, false, true)!
+                setRelationships(prev => [...prev, schema.RelationshipsMap.get(relationship)!])
                 setIsAddRelation(false)
             }
 
@@ -189,24 +186,23 @@ export default function SchemaView({
                     setSelectedNodes={setSelectedNodes}
                     cooldownTicks={cooldownTicks}
                     handleCooldown={handleCooldown}
-                    setLabels={setLabels}
+                    setRelationships={setRelationships}
                     parentHeight={parentHeight}
                     parentWidth={parentWidth}
                     setParentHeight={setParentHeight}
                     setParentWidth={setParentWidth}
                     loading={isLoading}
-                    setLoading={setIsLoading}
                 />
                 {
                     !isLoading &&
                     <div className="h-full z-10 absolute top-12 inset-x-12 pointer-events-none flex gap-8 justify-between">
                         {
-                            (categories.length > 0) &&
-                            <Labels graph={schema} type="Schema" className="left-2" label="Labels" categories={categories} onClick={onCategoryClick} />
+                            (labels.length > 0) &&
+                            <Labels graph={schema} type="Schema" className="left-2" label="Labels" labels={labels} onClick={onLabelClick} />
                         }
                         {
-                            (labels.length > 0) &&
-                            <Labels graph={schema} type="Schema" className="right-2 text-end" label="Relationships" categories={labels} onClick={onLabelClick} />
+                            (relationships.length > 0) &&
+                            <Labels graph={schema} type="Schema" className="right-2 text-end" label="Relationships" labels={relationships} onClick={onRelationshipClick} />
                         }
                     </div>
                 }
@@ -217,7 +213,7 @@ export default function SchemaView({
                             setObject={setSelectedElement}
                             onDeleteElement={handleDeleteElement}
                             schema={schema}
-                            setCategories={setCategories}
+                            setLabels={setLabels}
                         />
                         : (isAddRelation || isAddEntity) &&
                         <CreateElement
