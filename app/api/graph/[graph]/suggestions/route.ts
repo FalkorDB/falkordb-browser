@@ -34,8 +34,6 @@ export async function GET(
             return "CALL db.labels() YIELD label as sug";
           case "(relationship type)":
             return "CALL db.relationshipTypes() YIELD relationshipType as sug";
-          case "(index)":
-            return "CALL db.indexes() YIELD label, properties as sug";
           default:
             throw new Error("Type is required");
         }
