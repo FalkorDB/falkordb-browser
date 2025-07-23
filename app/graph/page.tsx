@@ -174,8 +174,6 @@ export default function Page() {
                 return
             }
 
-            console.log("empty graph")
-
             const colorsArr = JSON.parse(localStorage.getItem(graphName) || "[]")
             setGraph(Graph.empty(graphName, colorsArr))
         }
