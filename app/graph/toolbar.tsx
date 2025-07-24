@@ -1,5 +1,5 @@
 import { PlusCircle } from "lucide-react"
-import { Dispatch, SetStateAction, useCallback, useEffect, useRef, useState } from "react"
+import { Dispatch, SetStateAction, useCallback, useContext, useEffect, useRef, useState } from "react"
 import { cn, GraphRef, handleZoomToFit } from "@/lib/utils"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
@@ -7,6 +7,7 @@ import { Graph, Link, Node } from "../api/graph/model"
 import Input from "../components/ui/Input"
 import Button from "../components/ui/Button"
 import DeleteElement from "./DeleteElement"
+import { GraphContext } from "../components/provider"
 
 interface Props {
     graph: Graph
@@ -14,11 +15,11 @@ interface Props {
     setSelectedElement: Dispatch<SetStateAction<Node | Link | undefined>>
     handleDeleteElement: () => Promise<void>
     chartRef: GraphRef
-    isLoading: boolean
+    label: "Graph" | "Schema"
     setIsAddEntity?: Dispatch<SetStateAction<boolean>>
     setIsAddRelation?: Dispatch<SetStateAction<boolean>>
     backgroundColor?: string
-    label: "Graph" | "Schema"
+    isLoadingSchema?: boolean
 }
 
 const ITEM_HEIGHT = 48
@@ -31,12 +32,14 @@ export default function Toolbar({
     setSelectedElement,
     handleDeleteElement,
     chartRef,
-    isLoading,
-    setIsAddEntity = undefined,
-    setIsAddRelation = undefined,
-    backgroundColor = undefined,
     label,
+    setIsAddEntity,
+    setIsAddRelation,
+    backgroundColor,
+    isLoadingSchema,
 }: Props) {
+
+    const { isLoading: isLoadingGraph } = useContext(GraphContext)
 
     const suggestionRef = useRef<HTMLDivElement>(null)
 
@@ -51,6 +54,8 @@ export default function Toolbar({
     const [bottomFakeItemHeight, setBottomFakeItemHeight] = useState(0)
     const [visibleSuggestions, setVisibleSuggestions] = useState<(Node | Link)[]>([])
 
+    const isLoading = isLoadingSchema || isLoadingGraph
+    
     useEffect(() => {
         const newStartIndex = Math.max(0, Math.floor((scrollTop - ((ITEM_HEIGHT + GAP) * ITEMS_PER_PAGE)) / (ITEM_HEIGHT + GAP)))
         const newEndIndex = Math.min(suggestions.length, Math.floor((scrollTop + ((ITEM_HEIGHT + GAP) * (ITEMS_PER_PAGE * 2))) / (ITEM_HEIGHT + GAP)))
@@ -334,5 +339,6 @@ export default function Toolbar({
 Toolbar.defaultProps = {
     setIsAddEntity: undefined,
     setIsAddRelation: undefined,
-    backgroundColor: undefined
+    backgroundColor: undefined,
+    isLoadingSchema: false,
 }

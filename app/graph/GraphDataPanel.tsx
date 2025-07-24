@@ -97,7 +97,7 @@ export default function GraphDataPanel({ object, setObject, onDeleteElement, set
 
         if (result.ok) {
             setLabels([...graph.addLabel(newLabel, node)])
-            setLabel([...node.category])
+            setLabel([...node.labels])
             return true
         }
 
@@ -126,7 +126,7 @@ export default function GraphDataPanel({ object, setObject, onDeleteElement, set
         if (result.ok) {
             graph.removeLabel(removeLabel, node)
             setLabels([...graph.Labels])
-            setLabel([...node.category])
+            setLabel([...node.labels])
             setShowAsDialog(false)
             return true
         }

@@ -20,7 +20,6 @@ export async function GET(
       | "(property key)"
       | "(label)"
       | "(relationship type)"
-      | "(index)"
       | undefined;
 
     try {
@@ -34,8 +33,6 @@ export async function GET(
             return "CALL db.labels() YIELD label as info";
           case "(relationship type)":
             return "CALL db.relationshipTypes() YIELD relationshipType as info";
-          case "(index)":
-            return "CALL db.indexes() YIELD label, properties as info";
           default:
             throw new Error("Type is required");
         }

@@ -65,6 +65,10 @@ type GraphContextType = {
   edgesCount: number;
   setEdgesCount: Dispatch<SetStateAction<number>>;
   runQuery: (query: string, name?: string) => Promise<void>;
+  fetchCount: () => Promise<void>;
+  handleCooldown: (ticks?: 0, isSetLoading?: boolean) => void;
+  cooldownTicks: number | undefined;
+  isLoading: boolean;
 };
 
 type SchemaContextType = {
@@ -131,6 +135,10 @@ export const GraphContext = createContext<GraphContextType>({
   edgesCount: 0,
   setEdgesCount: () => {},
   runQuery: async () => {},
+  fetchCount: async () => {},
+  handleCooldown: () => {},
+  cooldownTicks: undefined,
+  isLoading: false,
 });
 
 export const SchemaContext = createContext<SchemaContextType>({

@@ -33,32 +33,36 @@ export default function Page() {
     const [data, setData] = useState<GraphData>(schema.Elements)
     const [isAddRelation, setIsAddRelation] = useState(false)
     const chartRef = useRef<ForceGraphMethods<Node, Link>>()
-    const [edgesCount, setEdgesCount] = useState<number>(0)
-    const [nodesCount, setNodesCount] = useState<number>(0)
+    const [edgesCount, setEdgesCount] = useState<number | null>(null)
+    const [nodesCount, setNodesCount] = useState<number | null>(null)
     const [isAddEntity, setIsAddEntity] = useState(false)
     const [isCanvasLoading, setIsCanvasLoading] = useState(false)
 
     const fetchCount = useCallback(async () => {
+        setEdgesCount(null)
+        setNodesCount(null)
+
         const result = await getSSEGraphResult(`api/schema/${prepareArg(schemaName)}/count`, toast, setIndicator)
+
+        if (!result.data[0]) {
+            return
+        }
 
         const { edges, nodes } = result.data[0]
 
-        setEdgesCount(edges || 0)
-        setNodesCount(nodes || 0)
+        setEdgesCount(edges)
+        setNodesCount(nodes)
     }, [toast, setIndicator, schemaName])
 
-    const handleCooldown = (ticks?: number) => {
+    const handleCooldown = (ticks?: 0, isSetLoading = true) => {
         setCooldownTicks(ticks)
 
-        const canvas = document.querySelector('.force-graph-container canvas');
+        if (isSetLoading) setIsCanvasLoading(ticks !== 0)
+        const canvas = document.querySelector('.force-graph-container canvas')
+
         if (!canvas) return
-        if (ticks === 0) {
-            canvas.setAttribute('data-engine-status', 'stop')
-            setIsCanvasLoading(false)
-        } else {
-            canvas.setAttribute('data-engine-status', 'running')
-            setIsCanvasLoading(true)
-        }
+
+        canvas.setAttribute('data-engine-status', ticks === 0 ? 'stop' : 'running')
     }
 
     const fetchSchema = useCallback(async () => {

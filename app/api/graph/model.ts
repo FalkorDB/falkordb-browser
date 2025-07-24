@@ -339,7 +339,7 @@ export class Graph {
       const node: Node = {
         id: cell.id,
         labels: labels.map((l) => l.name),
-        color: this.getCategoryColorValue(labels[0].index),
+        color: this.getLabelColorValue(labels[0].index),
         visible: true,
         expand: false,
         collapsed,
@@ -360,7 +360,7 @@ export class Graph {
       // set values in a fake node
       currentNode.id = cell.id;
       currentNode.labels = labels.map((l) => l.name);
-      currentNode.color = this.getCategoryColorValue(labels[0].index);
+      currentNode.color = this.getLabelColorValue(labels[0].index);
       currentNode.expand = false;
       currentNode.collapsed = collapsed;
       Object.entries(cell.properties).forEach(([key, value]) => {
@@ -396,7 +396,7 @@ export class Graph {
           source = {
             id: cell.sourceId,
             labels: [label!.name],
-            color: this.getCategoryColorValue(label!.index),
+            color: this.getLabelColorValue(label!.index),
             expand: false,
             collapsed,
             visible: true,
@@ -413,7 +413,7 @@ export class Graph {
           source,
           target: source,
           relationship: cell.relationshipType,
-          color: this.getCategoryColorValue(relation.index),
+          color: this.getLabelColorValue(relation.index),
           expand: false,
           collapsed,
           visible: true,
@@ -432,7 +432,7 @@ export class Graph {
           source = {
             id: cell.sourceId,
             labels: [label!.name],
-            color: this.getCategoryColorValue(label!.index),
+            color: this.getLabelColorValue(label!.index),
             expand: false,
             collapsed,
             visible: true,
@@ -448,7 +448,7 @@ export class Graph {
           target = {
             id: cell.destinationId,
             labels: [label!.name],
-            color: this.getCategoryColorValue(label!.index),
+            color: this.getLabelColorValue(label!.index),
             expand: false,
             collapsed,
             visible: true,
@@ -468,7 +468,7 @@ export class Graph {
           source,
           target,
           relationship: cell.relationshipType,
-          color: this.getCategoryColorValue(relation.index),
+          color: this.getLabelColorValue(relation.index),
           expand: false,
           collapsed,
           visible: true,
@@ -681,7 +681,7 @@ export class Graph {
     return this.relationships;
   }
 
-  public getCategoryColorValue(index: number) {
+  public getLabelColorValue(index: number) {
     if (index < this.COLORS_ORDER_VALUE.length) {
       return this.COLORS_ORDER_VALUE[index];
     }
@@ -819,7 +819,7 @@ export class Graph {
     if (selectedElement.labels.length === 0) {
       const [emptyCategory] = this.createLabel([""], selectedElement);
       selectedElement.labels.push(emptyCategory.name);
-      selectedElement.color = this.getCategoryColorValue(emptyCategory.index);
+      selectedElement.color = this.getLabelColorValue(emptyCategory.index);
     }
   }
 
@@ -860,7 +860,7 @@ export class Graph {
         selectedElement
       );
       selectedElement.labels.splice(emptyCategoryIndex, 1);
-      selectedElement.color = this.getCategoryColorValue(category.index);
+      selectedElement.color = this.getLabelColorValue(category.index);
 
       const emptyCategory = this.labelsMap.get("");
       if (emptyCategory) {

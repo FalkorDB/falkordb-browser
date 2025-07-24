@@ -43,6 +43,8 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
   const [hasChanges, setHasChanges] = useState(false)
   const [nodesCount, setNodesCount] = useState(0)
   const [edgesCount, setEdgesCount] = useState(0)
+  const [isLoading, setIsLoading] = useState<boolean>(false)
+  const [cooldownTicks, setCooldownTicks] = useState<number | undefined>(0)
 
   const querySettingsContext = useMemo(() => ({
     newSettings: {
@@ -123,32 +125,21 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
     setNodesCount(nodes || 0);
   }, [graphName, toast, setIndicator, setEdgesCount, setNodesCount]);
 
-  const handleCooldown = useCallback((ticks: number | undefined) => {
+  const handleCooldown = useCallback((ticks?: 0, isSetLoading: boolean = true) => {
     if (typeof window !== 'undefined') {
+
+      setCooldownTicks(ticks)
+      if (isSetLoading) setIsLoading(ticks !== 0)
+
       const canvas = document.querySelector('.force-graph-container canvas');
 
-      if (canvas) {
-        if (ticks === 0) {
-          canvas.setAttribute('data-engine-status', 'stop');
-        } else {
-          canvas.setAttribute('data-engine-status', 'running');
-        }
-      }
+      if (canvas) canvas.setAttribute('data-engine-status', ticks === 0 ? 'stop' : 'running');
     }
-  }, []);
+  }, [setIsLoading, setCooldownTicks]);
 
   const runQuery = useCallback(async (q: string, name?: string): Promise<void> => {
     const n = name || graphName
-    
-    if (!n) {
-      toast({
-        title: "Error",
-        description: "Select a graph first",
-        variant: "destructive"
-      })
-      return;
-    }
-    
+
     setHistoryQuery(prev => historyQuery.counter === 0 ? {
       ...prev,
       query: q,
@@ -159,7 +150,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       currentQuery: q,
       counter: 0
     })
-    
+
     const url = `api/graph/${prepareArg(n)}?query=${prepareArg(getQueryWithLimit(q, limit))}&timeout=${timeout}`;
     const result = await getSSEGraphResult(url, toast, setIndicator);
 
@@ -184,7 +175,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
     fetchCount();
 
     if (g.Elements.nodes.length > 0) {
-      handleCooldown(0);
+      handleCooldown();
     }
 
     localStorage.setItem("query history", JSON.stringify(queryArr))
@@ -206,8 +197,12 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
     setNodesCount,
     edgesCount,
     setEdgesCount,
-    runQuery
-  }), [graph, setGraph, graphName, setGraphName, graphNames, setGraphNames, nodesCount, setNodesCount, edgesCount, setEdgesCount, runQuery])
+    runQuery,
+    fetchCount,
+    handleCooldown,
+    cooldownTicks,
+    isLoading,
+  }), [graph, setGraph, graphName, setGraphName, graphNames, setGraphNames, nodesCount, setNodesCount, edgesCount, setEdgesCount, runQuery, fetchCount, handleCooldown, cooldownTicks, isLoading])
 
   useEffect(() => {
     if (status !== "authenticated") return
@@ -292,9 +287,9 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
                 <IndicatorContext.Provider value={indicatorContext}>
                   <ResizablePanelGroup direction="horizontal">
                     <ResizablePanel defaultSize={0} className="min-w-fit">
-                      {pathname !== "/" && pathname !== "/login" && <Header graphNames={pathname.includes("/schema") ? schemaNames : graphNames} onSetGraphName={handleOnSetGraphName} />}
+                      {pathname !== "/" && pathname !== "/login" && <Header graphName={graphName} graphNames={pathname.includes("/schema") ? schemaNames : graphNames} onSetGraphName={handleOnSetGraphName} />}
                     </ResizablePanel>
-                    <ResizablePanel minSize={60}>
+                    <ResizablePanel defaultSize={100} minSize={60}>
                       {children}
                     </ResizablePanel>
                   </ResizablePanelGroup>

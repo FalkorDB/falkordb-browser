@@ -22,8 +22,6 @@ interface Props {
     setSelectedElement: (element: Node | Link | undefined) => void
     selectedElements: (Node | Link)[]
     setSelectedElements: Dispatch<SetStateAction<(Node | Link)[]>>
-    cooldownTicks: number | undefined
-    handleCooldown: (ticks?: number) => void
     type?: "schema" | "graph"
     isAddElement?: boolean
     setSelectedNodes?: Dispatch<SetStateAction<[Node | undefined, Node | undefined]>>
@@ -34,7 +32,9 @@ interface Props {
     parentWidth: number
     setParentHeight: Dispatch<SetStateAction<number>>
     setParentWidth: Dispatch<SetStateAction<number>>
-    loading: boolean
+    isLoading: boolean
+    handleCooldown: (ticks?: 0, isSetLoading?: boolean) => void
+    cooldownTicks: number | undefined
 }
 
 const NODE_SIZE = 6
@@ -55,8 +55,6 @@ export default function ForceGraph({
     setSelectedElement,
     selectedElements,
     setSelectedElements,
-    cooldownTicks,
-    handleCooldown,
     type = "graph",
     isAddElement = false,
     setSelectedNodes,
@@ -67,7 +65,9 @@ export default function ForceGraph({
     parentWidth,
     setParentHeight,
     setParentWidth,
-    loading,
+    isLoading,
+    handleCooldown,
+    cooldownTicks,
 }: Props) {
 
     const { indicator, setIndicator } = useContext(IndicatorContext)
@@ -225,7 +225,7 @@ export default function ForceGraph({
 
             node.expand = !node.expand
             setData({ ...graph.Elements })
-            handleCooldown()
+            handleCooldown(undefined, false)
         }
     }
 
@@ -270,7 +270,7 @@ export default function ForceGraph({
     return (
         <div ref={parentRef} className="w-full h-full relative">
             {
-                loading &&
+                isLoading &&
                 <div className="absolute inset-x-0 inset-y-0 bg-background flex items-center justify-center z-10">
                     <Spinning />
                 </div>
@@ -320,7 +320,7 @@ export default function ForceGraph({
                     if (type === "graph") {
                         name = node.data.name || node.id.toString()
                     } else {
-                        [name] = node.category
+                        [name] = node.labels
                     }
 
                     // truncate text if it's too long

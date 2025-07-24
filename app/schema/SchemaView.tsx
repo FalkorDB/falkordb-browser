@@ -17,8 +17,8 @@ import ForceGraph from "../components/ForceGraph"
 /* eslint-disable react/require-default-props */
 interface Props {
     fetchCount?: (graphName: string) => Promise<void>
-    edgesCount: number
-    nodesCount: number
+    edgesCount?: number | null
+    nodesCount?: number | null
     selectedElement: Node | Link | undefined
     setSelectedElement: Dispatch<SetStateAction<Node | Link | undefined>>
     selectedElements: (Node | Link)[]
@@ -29,7 +29,7 @@ interface Props {
     setIsAddEntity: Dispatch<SetStateAction<boolean>>
     chartRef: GraphRef
     cooldownTicks: number | undefined
-    handleCooldown: () => void
+    handleCooldown: (ticks?: 0, isSetLoading?: boolean) => void
     data: GraphData
     setData: Dispatch<SetStateAction<GraphData>>
     handleDeleteElement: () => Promise<void>
@@ -130,6 +130,7 @@ export default function SchemaView({
             const json = await result.json()
 
             if (isAddEntity) {
+                console.log(json.result.data[0].n)
                 const { labels: ls } = schema.extendNode(json.result.data[0].n, false, true)!
                 setLabels(prev => [...prev, ...ls.filter(c => !prev.some(p => p.name === c)).map(c => schema.LabelsMap.get(c)!)])
                 setIsAddEntity(false)
@@ -156,8 +157,8 @@ export default function SchemaView({
             <div className="pointer-events-none absolute bottom-4 inset-x-12 z-20 flex items-center justify-between">
                 <GraphDetails
                     graph={schema}
-                    nodesCount={nodesCount}
                     edgesCount={edgesCount}
+                    nodesCount={nodesCount}
                 />
                 {
                     schema.getElements().length > 0 &&
@@ -184,14 +185,14 @@ export default function SchemaView({
                     type="schema"
                     isAddElement={isAddRelation}
                     setSelectedNodes={setSelectedNodes}
-                    cooldownTicks={cooldownTicks}
+                    isLoading={isLoading}
                     handleCooldown={handleCooldown}
+                    cooldownTicks={cooldownTicks}
                     setRelationships={setRelationships}
                     parentHeight={parentHeight}
                     parentWidth={parentWidth}
                     setParentHeight={setParentHeight}
                     setParentWidth={setParentWidth}
-                    loading={isLoading}
                 />
                 {
                     !isLoading &&

@@ -59,7 +59,7 @@ export default function Labels<T extends Label | Relationship>({ graph, labels, 
                                         setReload(prev => !prev)
                                     }}
                                 >
-                                    <div style={{ backgroundColor: graph.getCategoryColorValue(l.index) }} className={cn("min-w-6 min-h-6 rounded-full")} />
+                                    <div style={{ backgroundColor: graph.getLabelColorValue(l.index) }} className={cn("min-w-6 min-h-6 rounded-full")} />
                                 </Button>
                             </li>
                         ))

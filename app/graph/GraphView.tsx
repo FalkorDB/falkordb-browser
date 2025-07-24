@@ -28,11 +28,6 @@ interface Props {
     setSelectedElement: Dispatch<SetStateAction<Node | Link | undefined>>
     selectedElements: (Node | Link)[]
     setSelectedElements: Dispatch<SetStateAction<(Node | Link)[]>>
-    nodesCount: number
-    edgesCount: number
-    fetchCount: () => Promise<void>
-    handleCooldown: (ticks?: number) => void
-    cooldownTicks: number | undefined
     chartRef: GraphRef
     handleDeleteElement: () => Promise<void>
     setLabels: Dispatch<SetStateAction<Label[]>>
@@ -40,6 +35,9 @@ interface Props {
     labels: Label[]
     relationships: Relationship[]
     isLoading: boolean
+    handleCooldown: (ticks?: 0, isSetLoading?: boolean) => void
+    cooldownTicks: number | undefined
+    fetchCount: () => Promise<void>
 }
 
 function GraphView({
@@ -49,22 +47,19 @@ function GraphView({
     setSelectedElement,
     selectedElements,
     setSelectedElements,
-    nodesCount,
-    edgesCount,
-    fetchCount,
-    handleCooldown,
-    cooldownTicks,
     chartRef,
     handleDeleteElement,
     setLabels,
     setRelationships,
     labels,
     relationships,
-    isLoading
+    isLoading,
+    handleCooldown,
+    cooldownTicks,
+    fetchCount,
 }: Props) {
 
     const { graph } = useContext(GraphContext)
-
     const [parentHeight, setParentHeight] = useState<number>(0)
     const [parentWidth, setParentWidth] = useState<number>(0)
     const [tabsValue, setTabsValue] = useState<Tab>("Graph")
@@ -147,9 +142,6 @@ function GraphView({
             <div className={cn("flex gap-4 justify-between items-end", tabsValue === "Table" ? "py-4 px-12" : "absolute bottom-4 inset-x-12 pointer-events-none z-20")}>
                 <GraphDetails
                     graph={graph}
-                    tabsValue={tabsValue}
-                    nodesCount={nodesCount}
-                    edgesCount={edgesCount}
                 />
                 <TabsList className="bg-transparent flex gap-2 pointer-events-auto">
                     <TabsTrigger
@@ -197,9 +189,9 @@ function GraphView({
                     tabsValue={tabsValue}
                     chartRef={chartRef}
                     disabled={graph.getElements().length === 0}
+                    isLoading={isLoading}
                     handleCooldown={handleCooldown}
                     cooldownTicks={cooldownTicks}
-                    isLoading={isLoading}
                 />
             </div>
             <TabsContent value="Graph" className="h-full w-full mt-0 overflow-hidden">
@@ -212,14 +204,14 @@ function GraphView({
                     setSelectedElement={setSelectedElement}
                     selectedElements={selectedElements}
                     setSelectedElements={setSelectedElements}
-                    cooldownTicks={cooldownTicks}
-                    handleCooldown={handleCooldown}
                     setRelationships={setRelationships}
                     parentHeight={parentHeight}
                     parentWidth={parentWidth}
                     setParentHeight={setParentHeight}
                     setParentWidth={setParentWidth}
-                    loading={isLoading}
+                    isLoading={isLoading}
+                    handleCooldown={handleCooldown}
+                    cooldownTicks={cooldownTicks}
                 />
                 {
                     !isLoading &&
@@ -236,7 +228,6 @@ function GraphView({
                                 selectedElements={selectedElements}
                                 handleDeleteElement={handleDeleteElement}
                                 chartRef={chartRef}
-                                isLoading={isLoading}
                                 backgroundColor="bg-transparent"
                             />
                         </div>

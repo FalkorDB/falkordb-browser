@@ -2,7 +2,7 @@
 
 'use client'
 
-import { ArrowUpRight, Info, LifeBuoy, LogOut, Settings } from "lucide-react";
+import { ArrowUpRight, Database, LifeBuoy, LogOut, Settings } from "lucide-react";
 import { useCallback, useContext, useState } from "react";
 import Image from "next/image";
 import { cn } from "@/lib/utils";
@@ -19,14 +19,21 @@ import { useToast } from "@/components/ui/use-toast";
 import Button from "./ui/Button";
 import CreateGraph from "./CreateGraph";
 import { IndicatorContext, QuerySettingsContext } from "./provider";
-import DatabaseInfo from "../graph/databaseInfo";
+import GraphInfo from "../graph/graphInfo";
 
 interface Props {
     onSetGraphName: (newGraphName: string) => void
     graphNames: string[]
+    graphName: string
 }
 
-export default function Header({ onSetGraphName, graphNames }: Props) {
+function getPathType(pathname: string): "Schema" | "Graph" | undefined {
+    if (pathname.includes("/schema")) return "Schema"
+    if (pathname.includes("/graph")) return "Graph"
+    return undefined
+}
+
+export default function Header({ onSetGraphName, graphNames, graphName }: Props) {
 
     const { indicator } = useContext(IndicatorContext)
     const { hasChanges, saveSettings, resetSettings } = useContext(QuerySettingsContext)
@@ -36,10 +43,11 @@ export default function Header({ onSetGraphName, graphNames }: Props) {
     const router = useRouter()
     const { toast } = useToast()
 
-    const [currentPanel, setCurrentPanel] = useState<"databaseInfo">()
+    const [currentPanel, setCurrentPanel] = useState<"graphInfo">()
 
-    const type = pathname.includes("/schema") ? "Schema" : "Graph"
-    const showCreate = (pathname.includes("/graph") || pathname.includes("/schema")) && session?.user?.role && session.user.role !== "Read-Only"
+    const type = getPathType(pathname)
+    const showCreate = type && session?.user?.role && session.user.role !== "Read-Only"
+    const showGraphInfo = currentPanel === "graphInfo" && type === "Graph" && graphName
 
     const navigateBack = useCallback(() => {
         if (hasChanges) {
@@ -77,7 +85,7 @@ export default function Header({ onSetGraphName, graphNames }: Props) {
                         <Button
                             label="GRAPHS"
                             title="View and manage your graphs"
-                            className={cn(pathname.includes("/graph") ? "text-primary" : "text-white")}
+                            className={cn(type === "Graph" ? "text-primary" : "text-white")}
                             onClick={() => router.push("/graph")}
                             data-testid="GraphsButton"
                         />
@@ -85,20 +93,24 @@ export default function Header({ onSetGraphName, graphNames }: Props) {
                         <Button
                             label="SCHEMAS"
                             title="View and manage your schemas"
-                            className={cn(pathname.includes("/schema") ? "text-primary" : "text-white")}
+                            className={cn(type === "Schema" ? "text-primary" : "text-white")}
                             onClick={() => router.push("/schema")}
                             data-testid="SchemasButton"
                         />
                     </div>
-                    <Button
-                        indicator={indicator}
-                        title="Database info"
-                        onClick={() => {
-                            setCurrentPanel(prev => prev === "databaseInfo" ? undefined : "databaseInfo")
-                        }}
-                    >
-                        <Info size={35} />
-                    </Button>
+                    {
+                        type === "Graph" &&
+                        <Button
+                            indicator={indicator}
+                            disabled={!graphName}
+                            title={!graphName ? "Select a graph to view graph info" : "Graph info"}
+                            onClick={() => {
+                                setCurrentPanel(prev => prev === "graphInfo" ? undefined : "graphInfo")
+                            }}
+                        >
+                            <Database size={35} />
+                        </Button>
+                    }
                 </div>
                 <div className="flex flex-col gap-6 items-center">
                     {
@@ -201,8 +213,10 @@ export default function Header({ onSetGraphName, graphNames }: Props) {
                 </div>
             </div>
             {
-                currentPanel === "databaseInfo" &&
-                <DatabaseInfo />
+                showGraphInfo &&
+                <GraphInfo onClose={() => {
+                    setCurrentPanel(undefined)
+                }} />
             }
         </div>
     )

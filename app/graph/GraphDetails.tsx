@@ -7,14 +7,12 @@ import { QuerySettingsContext } from "../components/provider"
 
 export default function GraphDetails({
     graph,
-    tabsValue = "Graph",
+    edgesCount,
     nodesCount,
-    edgesCount
 }: {
     graph: Graph,
-    nodesCount: number,
-    edgesCount: number,
-    tabsValue?: string,
+    edgesCount?: number | null
+    nodesCount?: number | null
 }) {
     const {
         settings: {
@@ -59,7 +57,7 @@ export default function GraphDetails({
                     : null
             }
             {
-                graph.Id && tabsValue === "Graph" &&
+                graph.Id && nodesCount !== undefined && edgesCount !== undefined &&
                 <div className="flex gap-4 overflow-hidden">
                     {
                         [["Nodes", nodesCount, "nodesCount"], ["Edges", edgesCount, "edgesCount"], ["GraphName", graph.Id, "graphName"]].map(([label, value, testId]) => (
@@ -90,5 +88,6 @@ export default function GraphDetails({
 }
 
 GraphDetails.defaultProps = {
-    tabsValue: "Graph",
+    edgesCount: undefined,
+    nodesCount: undefined,
 }

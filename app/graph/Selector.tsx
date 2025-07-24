@@ -29,7 +29,7 @@ interface Props {
     runQuery?: (query: string) => Promise<void>
     historyQuery?: HistoryQuery
     setHistoryQuery?: Dispatch<SetStateAction<HistoryQuery>>
-    fetchCount: () => Promise<void>
+    fetchCount?: () => Promise<void>
     selectedElements: (Node | Link)[]
     setSelectedElement: Dispatch<SetStateAction<Node | Link | undefined>>
     handleDeleteElement: () => Promise<void>
@@ -187,11 +187,12 @@ export default function Selector({ graph, options, setOptions, graphName, setGra
                 setGraph={setGraph}
             />
             {
-                runQuery && historyQuery && setHistoryQuery ?
+                runQuery && historyQuery && setHistoryQuery && fetchCount ?
                     <>
                         <div className="h-full w-1 grow relative overflow-visible">
                             <EditorComponent
                                 graph={graph}
+                                graphName={graphName}
                                 maximize={maximize}
                                 setMaximize={setMaximize}
                                 runQuery={runQuery}
@@ -365,7 +366,7 @@ export default function Selector({ graph, options, setOptions, graphName, setGra
                             setIsAddEntity={setIsAddEntity}
                             setIsAddRelation={setIsAddRelation}
                             chartRef={chartRef}
-                            isLoading={!!isCanvasLoading}
+                            isLoadingSchema={!!isCanvasLoading}
                             backgroundColor="bg-foreground"
                         />
                     </div>
@@ -381,4 +382,5 @@ Selector.defaultProps = {
     setIsAddEntity: undefined,
     setIsAddRelation: undefined,
     isLoading: false,
+    fetchCount: undefined,
 }
