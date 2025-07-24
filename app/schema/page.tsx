@@ -37,7 +37,7 @@ export default function Page() {
     const [nodesCount, setNodesCount] = useState<number>(0)
     const [isAddEntity, setIsAddEntity] = useState(false)
     const [isCanvasLoading, setIsCanvasLoading] = useState(false)
-
+    
     const fetchCount = useCallback(async () => {
         const result = await getSSEGraphResult(`api/schema/${prepareArg(schemaName)}/count`, toast, setIndicator)
 
@@ -162,7 +162,7 @@ export default function Page() {
                 setIsAddEntity={setIsAddEntity}
                 setIsAddRelation={setIsAddRelation}
                 setGraph={setSchema}
-                isLoading={isCanvasLoading}
+                isCanvasLoading={isCanvasLoading}
             />
             <div className="h-1 grow p-12">
                 <SchemaView

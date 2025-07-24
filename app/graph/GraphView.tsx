@@ -28,8 +28,8 @@ interface Props {
     setSelectedElement: Dispatch<SetStateAction<Node | Link | undefined>>
     selectedElements: (Node | Link)[]
     setSelectedElements: Dispatch<SetStateAction<(Node | Link)[]>>
-    nodesCount: number
-    edgesCount: number
+    nodesCount: number | undefined
+    edgesCount: number | undefined
     fetchCount: () => Promise<void>
     handleCooldown: (ticks?: number) => void
     cooldownTicks: number | undefined
@@ -81,14 +81,15 @@ function GraphView({
     }, [graph])
 
     useEffect(() => {
+        setData({ ...graph.Elements })
+
         if (!elementsLength) return;
 
         setIsLoading(true)
-        setData({ ...graph.Elements })
     }, [graph, elementsLength, setData])
 
     useEffect(() => {
-        if (isTabEnabled(tabsValue)) return
+        if (tabsValue !== "Metadata" && isTabEnabled(tabsValue)) return
 
         let defaultChecked: Tab = "Graph"
         if (graph.getElements().length !== 0) defaultChecked = "Graph"
@@ -96,7 +97,7 @@ function GraphView({
         else if (graph.CurrentQuery && graph.CurrentQuery.metadata.length > 0 && graph.Metadata.length > 0 && graph.CurrentQuery.explain.length > 0) defaultChecked = "Metadata"
 
         setTabsValue(defaultChecked);
-    }, [graph, graph.Id, elementsLength, graph.Data.length, isTabEnabled, tabsValue])
+    }, [graph, graph.Id, elementsLength, graph.Data.length, isTabEnabled])
 
     useEffect(() => {
         if (tabsValue === "Graph" && graph.Elements.nodes.length > 0) {

@@ -1,9 +1,9 @@
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { useContext } from "react"
-import { Info } from "lucide-react"
+import { Info, Loader2 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Graph } from "../api/graph/model"
-import { QuerySettingsContext } from "../components/provider"
+import { GraphContext, QuerySettingsContext } from "../components/provider"
 
 export default function GraphDetails({
     graph,
@@ -12,8 +12,8 @@ export default function GraphDetails({
     edgesCount
 }: {
     graph: Graph,
-    nodesCount: number,
-    edgesCount: number,
+    nodesCount: number | undefined,
+    edgesCount: number | undefined,
     tabsValue?: string,
 }) {
     const {
@@ -21,6 +21,7 @@ export default function GraphDetails({
             limitSettings: { limit },
         }
     } = useContext(QuerySettingsContext)
+    const { graphName } = useContext(GraphContext)
 
     return (
         <div className="w-1 grow flex flex-col gap-4 p-1">
@@ -59,27 +60,32 @@ export default function GraphDetails({
                     : null
             }
             {
-                graph.Id && tabsValue === "Graph" &&
+                graphName && tabsValue === "Graph" &&
                 <div className="flex gap-4 overflow-hidden">
                     {
-                        [["Nodes", nodesCount, "nodesCount"], ["Edges", edgesCount, "edgesCount"], ["GraphName", graph.Id, "graphName"]].map(([label, value, testId]) => (
+                        [["Nodes", nodesCount, "nodesCount"], ["Edges", edgesCount, "edgesCount"], ["GraphName", graphName, "graphName"]].map(([label, value, testId]) => (
                             <div className="flex gap-2 overflow-hidden w-1 grow max-w-fit" key={label}>
                                 <p>
                                     {label}:
                                 </p>
-                                <Tooltip>
-                                    <TooltipTrigger asChild>
-                                        <p
-                                            data-testid={testId}
-                                            className={cn("truncate pointer-events-auto", label === "GraphName" && "Gradient bg-clip-text text-transparent")}
-                                        >
-                                            {value}
-                                        </p>
-                                    </TooltipTrigger>
-                                    <TooltipContent>
-                                        {value}
-                                    </TooltipContent>
-                                </Tooltip>
+                                {
+                                    value !== undefined ?
+                                        <Tooltip>
+                                            <TooltipTrigger asChild>
+                                                <p
+                                                    data-testid={testId}
+                                                    className={cn("truncate pointer-events-auto", label === "GraphName" && "Gradient bg-clip-text text-transparent")}
+                                                >
+                                                    {value}
+                                                </p>
+                                            </TooltipTrigger>
+                                            <TooltipContent>
+                                                {value}
+                                            </TooltipContent>
+                                        </Tooltip>
+                                        :
+                                        <Loader2 className="animate-spin" />
+                                }
                             </div>
                         ))
                     }
