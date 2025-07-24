@@ -20,6 +20,7 @@ export async function GET(
       | "(property key)"
       | "(label)"
       | "(relationship type)"
+      | "(index)"
       | undefined;
 
     try {
