@@ -4,8 +4,9 @@ import { SessionProvider, useSession } from "next-auth/react";
 import { ThemeProvider } from 'next-themes'
 import { Dispatch, SetStateAction, useCallback, useEffect, useMemo, useState } from "react";
 import { usePathname } from "next/navigation";
-import { fetchOptions, formatName, getDefaultQuery } from "@/lib/utils";
+import { fetchOptions, formatName, getDefaultQuery, getQueryWithLimit, getSSEGraphResult, prepareArg, securedFetch } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
+import { ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import LoginVerification from "./loginVerification";
 import { Graph, HistoryQuery } from "./api/graph/model";
 import Header from "./components/Header";
@@ -40,6 +41,8 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
   const [newDefaultQuery, setNewDefaultQuery] = useState("")
   const [newContentPersistence, setNewContentPersistence] = useState(false)
   const [hasChanges, setHasChanges] = useState(false)
+  const [nodesCount, setNodesCount] = useState(0)
+  const [edgesCount, setEdgesCount] = useState(0)
 
   const querySettingsContext = useMemo(() => ({
     newSettings: {
@@ -111,14 +114,100 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
     setSchemaNames
   }), [schema, setSchema, schemaName, setSchemaName, schemaNames, setSchemaNames])
 
+  const fetchCount = useCallback(async () => {
+    if (!graphName) return;
+    const result = await getSSEGraphResult(`api/graph/${prepareArg(graphName)}/count`, toast, setIndicator);
+    if (!result || !result.data || !result.data[0]) return;
+    const { nodes, edges } = result.data[0];
+    setEdgesCount(edges || 0);
+    setNodesCount(nodes || 0);
+  }, [graphName, toast, setIndicator, setEdgesCount, setNodesCount]);
+
+  const handleCooldown = useCallback((ticks: number | undefined) => {
+    if (typeof window !== 'undefined') {
+      const canvas = document.querySelector('.force-graph-container canvas');
+
+      if (canvas) {
+        if (ticks === 0) {
+          canvas.setAttribute('data-engine-status', 'stop');
+        } else {
+          canvas.setAttribute('data-engine-status', 'running');
+        }
+      }
+    }
+  }, []);
+
+  const runQuery = useCallback(async (q: string, name?: string): Promise<void> => {
+    const n = name || graphName
+    
+    if (!n) {
+      toast({
+        title: "Error",
+        description: "Select a graph first",
+        variant: "destructive"
+      })
+      return;
+    }
+    
+    setHistoryQuery(prev => historyQuery.counter === 0 ? {
+      ...prev,
+      query: q,
+      currentQuery: q,
+      counter: 0
+    } : {
+      ...prev,
+      currentQuery: q,
+      counter: 0
+    })
+    
+    const url = `api/graph/${prepareArg(n)}?query=${prepareArg(getQueryWithLimit(q, limit))}&timeout=${timeout}`;
+    const result = await getSSEGraphResult(url, toast, setIndicator);
+
+    if (!result) return;
+
+    const explain = await securedFetch(`api/graph/${prepareArg(n)}/explain?query=${prepareArg(q)}`, {
+      method: "GET"
+    }, toast, setIndicator)
+
+    if (!explain.ok) return;
+
+    const explainJson = await explain.json()
+    const newQuery = { text: q, metadata: result.metadata, explain: explainJson.result, profile: [] }
+    const queryArr = historyQuery.queries.some(qu => qu.text === q) ? historyQuery.queries : [...historyQuery.queries, newQuery]
+    const g = Graph.create(n, result, false, false, limit, graph.Colors, newQuery)
+
+    setHistoryQuery(prev => ({
+      ...prev,
+      queries: queryArr
+    }))
+    setGraph(g)
+    fetchCount();
+
+    if (g.Elements.nodes.length > 0) {
+      handleCooldown(0);
+    }
+
+    localStorage.setItem("query history", JSON.stringify(queryArr))
+    localStorage.setItem("savedContent", JSON.stringify({ graphName: n, query: q }))
+    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+    // @ts-ignore
+    window.graph = g
+
+  }, [graphName, toast, setIndicator, historyQuery.queries, historyQuery.counter, setHistoryQuery, limit, graph.Colors, setGraph, fetchCount, handleCooldown]);
+
   const graphContext = useMemo(() => ({
     graph,
     setGraph,
     graphName,
     setGraphName,
     graphNames,
-    setGraphNames
-  }), [graph, setGraph, graphName, setGraphName, graphNames, setGraphNames])
+    setGraphNames,
+    nodesCount,
+    setNodesCount,
+    edgesCount,
+    setEdgesCount,
+    runQuery
+  }), [graph, setGraph, graphName, setGraphName, graphNames, setGraphNames, nodesCount, setNodesCount, edgesCount, setEdgesCount, runQuery])
 
   useEffect(() => {
     if (status !== "authenticated") return
@@ -201,8 +290,14 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
             <GraphContext.Provider value={graphContext}>
               <HistoryQueryContext.Provider value={historyQueryContext}>
                 <IndicatorContext.Provider value={indicatorContext}>
-                  {pathname !== "/" && pathname !== "/login" && <Header graphNames={pathname.includes("/schema") ? schemaNames : graphNames} onSetGraphName={handleOnSetGraphName} />}
-                  {children}
+                  <ResizablePanelGroup direction="horizontal">
+                    <ResizablePanel defaultSize={0} className="min-w-fit">
+                      {pathname !== "/" && pathname !== "/login" && <Header graphNames={pathname.includes("/schema") ? schemaNames : graphNames} onSetGraphName={handleOnSetGraphName} />}
+                    </ResizablePanel>
+                    <ResizablePanel minSize={60}>
+                      {children}
+                    </ResizablePanel>
+                  </ResizablePanelGroup>
                 </IndicatorContext.Provider>
               </HistoryQueryContext.Provider>
             </GraphContext.Provider>

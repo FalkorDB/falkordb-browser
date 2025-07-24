@@ -1,40 +1,49 @@
-import { useContext, useEffect, useState } from "react";
+import { useCallback, useContext, useEffect, useState } from "react";
 import { securedFetch } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
 import Button from "../components/ui/Button";
-import { IndicatorContext } from "../components/provider";
-import { Label, Relationship } from "../api/graph/model";
+import { GraphContext, IndicatorContext } from "../components/provider";
 
-export default function DatabaseInfo({ graph, nodesCount, edgesCount, labels, relationships, runQuery }: { graph: string, nodesCount: number, edgesCount: number, labels: Label[], relationships: Relationship[],  runQuery: (query: string) => Promise<void> }) {
+export default function DatabaseInfo() {
     const { setIndicator } = useContext(IndicatorContext);
+    const { graphName, nodesCount, edgesCount, runQuery } = useContext(GraphContext);
     const { toast } = useToast();
 
     const [propertyKeys, setPropertyKeys] = useState<string[]>([]);
     const [indexes, setIndexes] = useState<string[]>([]);
+    const [labels, setLabels] = useState<string[]>([]);
+    const [relationships, setRelationships] = useState<string[]>([]);
+
+    const fetchInfo = useCallback(async (type: string) => {
+        if (!graphName) return []
+        
+        const result = await securedFetch(`/api/graph/${graphName}/info?type=${type}`, {
+            method: "GET",
+        }, toast, setIndicator);
+
+        if (!result.ok) return []
+
+        const json = await result.json();
+
+        return json.result.data.map(({ info }: { info: string }) => info);
+    }, [graphName, setIndicator, toast]);
 
     useEffect(() => {
         Promise.all([
-            securedFetch(`/api/graph/${graph}/suggestions?type=(label)`, {
-                method: "POST",
-            }, toast, setIndicator),
-            securedFetch(`/api/graph/${graph}/suggestions?type=(relationship type)`, {
-                method: "POST",
-            }, toast, setIndicator),
-            securedFetch(`/api/graph/${graph}/suggestions?type=(property key)`, {
-                method: "POST",
-            }, toast, setIndicator),
-            securedFetch(`/api/graph/${graph}/suggestions?type=(index)`, {
-                method: "POST",
-            }, toast, setIndicator),
-        ]).then(results => results.map(result => result.json())).then(async (results) => {
-            const [newPropertyKeys, newIndexes] = await Promise.all(results);
+            fetchInfo("(label)"),
+            fetchInfo("(relationship type)"),
+            fetchInfo("(property key)"),
+            fetchInfo("(index)"),
+        ]).then(async ([newLabels, newRelationships, newPropertyKeys, newIndexes]) => {
+            setLabels(newLabels);
+            setRelationships(newRelationships);
             setPropertyKeys(newPropertyKeys);
             setIndexes(newIndexes);
         });
-    }, [graph]);
+    }, [fetchInfo]);
 
     return (
-        <div>
+        <div className="p-4">
             <h1>Database Information</h1>
             <div>
                 <h2>Nodes ({nodesCount})</h2>
@@ -42,8 +51,8 @@ export default function DatabaseInfo({ graph, nodesCount, edgesCount, labels, re
                     <h2>Labels ({labels.length})</h2>
                     <ul>
                         {labels.map((label) => (
-                            <li key={label.name}>
-                                <Button label={label.name} onClick={() => runQuery(`MATCH (n:${label.name}) RETURN n`)} />
+                            <li key={label}>
+                                <Button label={label} onClick={() => runQuery(`MATCH (n:${label}) RETURN n`)} />
                             </li>
                         ))}
                     </ul>
@@ -55,8 +64,8 @@ export default function DatabaseInfo({ graph, nodesCount, edgesCount, labels, re
                     <h2>Relationships ({relationships.length})</h2>
                     <ul>
                         {relationships.map((relationship) => (
-                            <li key={relationship.name}>
-                                <Button label={relationship.name} onClick={() => runQuery(`MATCH ()-[e:${relationship.name}]-() RETURN e`)} />
+                            <li key={relationship}>
+                                <Button label={relationship} onClick={() => runQuery(`MATCH ()-[e:${relationship}]-() RETURN e`)} />
                             </li>
                         ))}
                     </ul>

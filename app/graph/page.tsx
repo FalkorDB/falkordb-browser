@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useContext, useEffect, useRef, useState } from "react";
-import { getQueryWithLimit, getSSEGraphResult, prepareArg, securedFetch } from "@/lib/utils";
+import { getSSEGraphResult, prepareArg, securedFetch } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
 import dynamic from "next/dynamic";
 import { ForceGraphMethods } from "react-force-graph-2d";
@@ -21,13 +21,16 @@ export default function Page() {
         graphName,
         setGraphName,
         graphNames,
-        setGraphNames
+        setGraphNames,
+        nodesCount,
+        setNodesCount,
+        edgesCount,
+        setEdgesCount,
+        runQuery
     } = useContext(GraphContext)
 
     const {
         settings: {
-            limitSettings: { limit },
-            timeoutSettings: { timeout },
             runDefaultQuerySettings: { runDefaultQuery },
             defaultQuerySettings: { defaultQuery },
             contentPersistenceSettings: { contentPersistence },
@@ -43,8 +46,6 @@ export default function Page() {
     const [labels, setLabels] = useState<Label[]>([])
     const [data, setData] = useState<GraphData>({ ...graph.Elements })
     const [relationships, setRelationships] = useState<Relationship[]>([])
-    const [nodesCount, setNodesCount] = useState(0)
-    const [edgesCount, setEdgesCount] = useState(0)
     const [isLoading, setIsLoading] = useState<boolean>(false)
 
     useEffect(() => {
@@ -61,31 +62,9 @@ export default function Page() {
 
         setEdgesCount(edges || 0)
         setNodesCount(nodes || 0)
-    }, [graphName, toast, setIndicator])
+    }, [graphName, toast, setIndicator, setEdgesCount, setNodesCount])
 
-    const run = useCallback(async (q: string, name: string) => {
-        if (!name) {
-            toast({
-                title: "Error",
-                description: "Select a graph first",
-                variant: "destructive"
-            })
-            return null
-        }
-
-        try {
-            const url = `api/graph/${prepareArg(name)}?query=${prepareArg(getQueryWithLimit(q, limit))}&timeout=${timeout}`;
-            const result = await getSSEGraphResult(url, toast, setIndicator);
-
-            setSelectedElement(undefined);
-
-            return result;
-        } catch (error) {
-            return null;
-        }
-    }, [limit, timeout, toast, setIndicator])
-
-    const handleCooldown = (ticks?: number) => {
+    const handleCooldown = useCallback((ticks?: number) => {
         setCooldownTicks(ticks)
 
         const canvas = document.querySelector('.force-graph-container canvas');
@@ -99,51 +78,7 @@ export default function Page() {
             canvas.setAttribute('data-engine-status', 'running')
             setIsLoading(true)
         }
-    }
-
-    const runQuery = useCallback(async (q: string, name?: string) => {
-        const n = name || graphName
-        const result = await run(q, n)
-
-        if (!result) return
-
-        const explain = await securedFetch(`api/graph/${prepareArg(n)}/explain?query=${prepareArg(q)}`, {
-            method: "GET"
-        }, toast, setIndicator)
-
-        if (!explain.ok) return
-
-        const explainJson = await explain.json()
-        const newQuery = { text: q, metadata: result.metadata, explain: explainJson.result, profile: [] }
-        const queryArr = historyQuery.queries.some(qu => qu.text === q) ? historyQuery.queries : [...historyQuery.queries, newQuery]
-
-        setHistoryQuery(prev => historyQuery.counter === 0 ? {
-            queries: queryArr,
-            query: q,
-            currentQuery: q,
-            counter: 0
-        } : {
-            ...prev,
-            queries: queryArr,
-            currentQuery: q,
-            counter: 0
-        })
-
-        const g = Graph.create(n, result, false, false, limit, graph.Colors, newQuery)
-
-        setGraph(g)
-        fetchCount()
-        localStorage.setItem("query history", JSON.stringify(queryArr))
-        localStorage.setItem("savedContent", JSON.stringify({ graphName: n, query: q }))
-        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-        // @ts-ignore
-        window.graph = g
-
-        if (g.Elements.nodes.length > 0) {
-            handleCooldown()
-        }
-
-    }, [graphName, run, toast, setIndicator, historyQuery.queries, historyQuery.counter, setHistoryQuery, limit, graph.Colors, setGraph, fetchCount])
+    }, [setCooldownTicks, setIsLoading])
 
     useEffect(() => {
         const content = localStorage.getItem("savedContent")
@@ -151,7 +86,7 @@ export default function Page() {
         if (content) {
             const { graphName: name, query } = JSON.parse(content)
 
-            if (!graph.Id && graphNames.includes(name) && contentPersistence) {
+            if (!graph.Id && !graphName && graphNames.includes(name) && contentPersistence) {
                 setGraphName(name)
                 runQuery(query, name)
                 return

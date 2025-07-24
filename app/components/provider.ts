@@ -60,6 +60,11 @@ type GraphContextType = {
   setGraphName: Dispatch<SetStateAction<string>>;
   graphNames: string[];
   setGraphNames: Dispatch<SetStateAction<string[]>>;
+  nodesCount: number;
+  setNodesCount: Dispatch<SetStateAction<number>>;
+  edgesCount: number;
+  setEdgesCount: Dispatch<SetStateAction<number>>;
+  runQuery: (query: string, name?: string) => Promise<void>;
 };
 
 type SchemaContextType = {
@@ -121,6 +126,11 @@ export const GraphContext = createContext<GraphContextType>({
   setGraphName: () => {},
   graphNames: [],
   setGraphNames: () => {},
+  nodesCount: 0,
+  setNodesCount: () => {},
+  edgesCount: 0,
+  setEdgesCount: () => {},
+  runQuery: async () => {},
 });
 
 export const SchemaContext = createContext<SchemaContextType>({

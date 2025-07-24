@@ -27,15 +27,15 @@ export async function GET(
       const getQuery = () => {
         switch (type) {
           case "(function)":
-            return "CALL dbms.procedures() YIELD name as sug";
+            return "CALL dbms.procedures() YIELD name as info";
           case "(property key)":
-            return "CALL db.propertyKeys() YIELD propertyKey as sug";
+            return "CALL db.propertyKeys() YIELD propertyKey as info";
           case "(label)":
-            return "CALL db.labels() YIELD label as sug";
+            return "CALL db.labels() YIELD label as info";
           case "(relationship type)":
-            return "CALL db.relationshipTypes() YIELD relationshipType as sug";
+            return "CALL db.relationshipTypes() YIELD relationshipType as info";
           case "(index)":
-            return "CALL db.indexes() YIELD label, properties as sug";
+            return "CALL db.indexes() YIELD label, properties as info";
           default:
             throw new Error("Type is required");
         }

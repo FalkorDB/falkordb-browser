@@ -301,7 +301,7 @@ export default function EditorComponent({ graph, historyQuery, maximize, setMaxi
     const fetchSuggestions = async (detail: string): Promise<monaco.languages.CompletionItem[]> => {
         if (indicator === "offline") return []
 
-        const result = await securedFetch(`api/graph/${graphIdRef.current}/suggestions?type=${prepareArg(detail)}`, {
+        const result = await securedFetch(`api/graph/${graphIdRef.current}/info?type=${prepareArg(detail)}`, {
             method: 'GET',
         }, toast, setIndicator)
 
@@ -311,10 +311,10 @@ export default function EditorComponent({ graph, historyQuery, maximize, setMaxi
 
         if (json.result.data.length === 0) return []
 
-        return json.result.data.map(({ sug }: { sug: string }) => ({
+        return json.result.data.map(({ info }: { info: string }) => ({
             insertTextRules: detail === '(function)' ? monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet : undefined,
-            insertText: detail === '(function)' ? `${sug}(\${0})` : sug,
-            label: detail === '(function)' ? `${sug}()` : sug,
+            insertText: detail === '(function)' ? `${info}(\${0})` : info,
+            label: detail === '(function)' ? `${info}()` : info,
             kind: (() => {
                 switch (detail) {
                     case '(function)':
