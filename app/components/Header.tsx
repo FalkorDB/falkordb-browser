@@ -88,19 +88,14 @@ export default function Header({ onSetGraphName, graphNames }: Props) {
                 </div>
             </div>
             <div className="flex flex-col gap-6 items-center">
-                {
-                    session?.user?.role === "Admin" &&
-                    <>
-                        <Button
-                            indicator={indicator}
-                            title="Adjust application settings"
-                            onClick={() => pathname.includes("/settings") ? navigateBack() : router.push("/settings")}
-                        >
-                            <Settings size={35} />
-                        </Button>
-                        <div className="h-[1px] w-[80%] bg-white" />
-                    </>
-                }
+                <Button
+                    indicator={indicator}
+                    title="Adjust application settings"
+                    onClick={() => pathname.includes("/settings") ? navigateBack() : router.push("/settings")}
+                >
+                    <Settings size={35} />
+                </Button>
+                <div className="h-[1px] w-[80%] bg-white" />
                 <Drawer direction="right">
                     <DropdownMenu>
                         <DropdownMenuTrigger onClick={(e) => e.preventDefault()} className="flex gap-2">
