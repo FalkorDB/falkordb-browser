@@ -13,6 +13,8 @@ import Button from "../components/ui/Button"
 import BrowserSettings from "./browserSettings"
 import { QuerySettingsContext } from "../components/provider"
 
+type Tab = 'Browser' | 'DB' | 'Users'
+
 export default function Settings() {
 
     const { hasChanges, saveSettings, resetSettings } = useContext(QuerySettingsContext)
@@ -21,11 +23,11 @@ export default function Settings() {
     const { toast } = useToast()
     const router = useRouter()
 
-    const [current, setCurrent] = useState<'Browser' | 'Query' | 'DB' | 'Users'>('Browser')
+    const [current, setCurrent] = useState<Tab>('Browser')
 
 
     const navigateBack = useCallback((e: KeyboardEvent) => {
-        if (e.key === "Escape" && current !== "Query") {
+        if (e.key === "Escape" && current !== "Browser") {
             e.preventDefault()
 
             router.back()
@@ -40,8 +42,8 @@ export default function Settings() {
         }
     }, [navigateBack])
 
-    const handleSetCurrent = useCallback((tab: 'Browser' | 'DB' | 'Users') => {
-        if (current === "Query" && hasChanges) {
+    const handleSetCurrent = useCallback((tab: Tab) => {
+        if (current === "Browser" && hasChanges) {
             getQuerySettingsNavigationToast(toast, saveSettings, () => {
                 setCurrent(tab)
                 resetSettings()
