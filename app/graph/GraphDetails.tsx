@@ -3,15 +3,17 @@ import { useContext } from "react"
 import { Info, Loader2 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Graph } from "../api/graph/model"
-import { GraphContext, QuerySettingsContext } from "../components/provider"
+import { QuerySettingsContext } from "../components/provider"
 
 export default function GraphDetails({
     graph,
+    graphName,
     tabsValue = "Graph",
     nodesCount,
     edgesCount
 }: {
     graph: Graph,
+    graphName: string,
     nodesCount: number | undefined,
     edgesCount: number | undefined,
     tabsValue?: string,
@@ -21,7 +23,6 @@ export default function GraphDetails({
             limitSettings: { limit },
         }
     } = useContext(QuerySettingsContext)
-    const { graphName } = useContext(GraphContext)
 
     return (
         <div className="w-1 grow flex flex-col gap-4 p-1">

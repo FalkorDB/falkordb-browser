@@ -61,7 +61,7 @@ function GraphView({
     categories
 }: Props) {
 
-    const { graph } = useContext(GraphContext)
+    const { graph, graphName } = useContext(GraphContext)
 
     const [isLoading, setIsLoading] = useState<boolean>(false)
     const [parentHeight, setParentHeight] = useState<number>(0)
@@ -148,6 +148,7 @@ function GraphView({
             <div className={cn("flex gap-4 justify-between items-end", tabsValue === "Table" ? "py-4 px-12" : "absolute bottom-4 inset-x-12 pointer-events-none z-20")}>
                 <GraphDetails
                     graph={graph}
+                    graphName={graphName}
                     tabsValue={tabsValue}
                     nodesCount={nodesCount}
                     edgesCount={edgesCount}
