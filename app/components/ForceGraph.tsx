@@ -343,24 +343,28 @@ export default function ForceGraph({
                     ctx.textAlign = 'center';
                     ctx.textBaseline = 'middle';
                     ctx.font = '2px Arial';
-                    const ellipsis = '...';
-                    const ellipsisWidth = ctx.measureText(ellipsis).width;
-                    const nodeSize = NODE_SIZE * 2 - PADDING;
+                    let name = node.displayName
 
-                    let name
+                    if (!name) {
+                        const ellipsis = '...';
+                        const ellipsisWidth = ctx.measureText(ellipsis).width;
+                        const nodeSize = NODE_SIZE * 2 - PADDING;
 
-                    if (type === "graph") {
-                        name = node.data.name || node.id.toString()
-                    } else {
-                        [name] = node.labels
-                    }
-
-                    // truncate text if it's too long
-                    if (ctx.measureText(name).width > nodeSize) {
-                        while (name.length > 0 && ctx.measureText(name).width + ellipsisWidth > nodeSize) {
-                            name = name.slice(0, -1);
+                        if (type === "graph") {
+                            name = node.data.name || node.id.toString()
+                        } else {
+                            [name] = node.labels
                         }
-                        name += ellipsis;
+
+                        // truncate text if it's too long
+                        if (ctx.measureText(name).width > nodeSize) {
+                            while (name.length > 0 && ctx.measureText(name).width + ellipsisWidth > nodeSize) {
+                                name = name.slice(0, -1);
+                            }
+
+                            name += ellipsis;
+                            node.displayName = name;
+                        }
                     }
 
                     // add label
@@ -417,14 +421,14 @@ export default function ForceGraph({
                         if (angle > Math.PI / 2) angle = -(Math.PI - angle);
                         if (angle < -Math.PI / 2) angle = -(-Math.PI - angle);
                     }
-                    
+
                     // Get text width
                     ctx.font = '2px Arial';
 
                     let textWidth;
                     let textHeight;
                     const relationship = graph.RelationshipsMap.get(link.relationship)
-                    
+
                     if (relationship) {
                         ({ textWidth, textHeight } = relationship)
                     }
@@ -439,29 +443,27 @@ export default function ForceGraph({
                         }
                     }
 
-                    // Save the current context state
+                    // Use single save/restore for both background and text
+                    const padding = 0.5;
+                    
                     ctx.save();
-
-                    // Translate to text position, then rotate
                     ctx.translate(textX, textY);
                     ctx.rotate(angle);
-
-                    // Draw background and text at origin (since we translated)
+                    
+                    // Draw background rectangle (rotated)
                     ctx.fillStyle = '#242424';
-                    const padding = 0.5;
                     ctx.fillRect(
                         -textWidth / 2 - padding,
                         -textHeight / 2 - padding,
                         textWidth + padding * 2,
                         textHeight + padding * 2
                     );
-
+                    
+                    // Draw text
                     ctx.fillStyle = 'white';
                     ctx.textAlign = 'center';
                     ctx.textBaseline = 'middle';
-                    ctx.fillText(link.label, 0, 0);
-
-                    // Restore the context to its original state
+                    ctx.fillText(link.relationship, 0, 0);
                     ctx.restore();
                 }}
                 onNodeClick={indicator === "offline" ? undefined : handleNodeClick}
@@ -478,7 +480,7 @@ export default function ForceGraph({
                     console.time("zooming")
                     handleZoomToFit(chartRef, undefined, data.nodes.length < 2 ? 4 : undefined)
                     console.timeEnd("zooming")
-                    setTimeout(() => handleCooldown(0), 100)
+                    setTimeout(() => handleCooldown(0), 1000)
                 }}
                 linkCurvature="curve"
                 nodeVisibility="visible"
