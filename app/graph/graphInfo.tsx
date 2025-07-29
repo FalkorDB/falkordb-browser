@@ -41,7 +41,7 @@ export default function GraphInfo({ onClose }: { onClose: () => void }) {
     }, [fetchInfo, runQuery]);
 
     return (
-        <div className="relative p-6 flex flex-col gap-8">
+        <div className="relative p-6 flex flex-col gap-8 overflow-y-auto  max-w-[20dvw]">
             <Button
                 className="absolute top-2 right-2"
                 title="Close"
@@ -52,21 +52,20 @@ export default function GraphInfo({ onClose }: { onClose: () => void }) {
             <h1>Graph Information</h1>
             <div className="flex flex-col gap-2">
                 <h2>Nodes ({nodesCount})</h2>
-                <h2>Labels ({labels.length})</h2>
                 <ul className="flex flex-wrap gap-2 p-2">
-                    <li>
+                    <li className="max-w-full">
                         <Button
-                            className="h-6 w-6 rounded-full flex justify-center items-center bg-gray-500"
+                            className="h-6 w-full p-2 rounded-full flex justify-center items-center bg-gray-500"
                             label="*"
                             title="All labels"
                             onClick={() => runQuery(`MATCH (n) RETURN n`)}
                         />
                     </li>
                     {labels.map((label) => (
-                        <li key={label}>
+                        <li key={label} className="max-w-full">
                             <Button
                                 style={{ backgroundColor: graph.getLabelColorValue((graph.LabelsMap.get(label) || graph.createLabel([label])[0]).index) }}
-                                className="h-6 w-6 rounded-full flex justify-center items-center"
+                                className="h-6 w-full p-2 rounded-full flex justify-center items-center"
                                 label={label}
                                 onClick={() => runQuery(`MATCH (n:${label}) RETURN n`)}
                             />
@@ -76,21 +75,20 @@ export default function GraphInfo({ onClose }: { onClose: () => void }) {
             </div>
             <div className="flex flex-col gap-2">
                 <h2>Edges ({edgesCount})</h2>
-                <h2>Relationships ({relationships.length})</h2>
                 <ul className="flex flex-wrap gap-2 p-2">
-                    <li>
+                    <li className="max-w-full">
                         <Button
-                            className="h-6 w-6 rounded-full flex justify-center items-center bg-gray-500"
+                            className="h-6 w-full p-2 rounded-full flex justify-center items-center bg-gray-500"
                             label="*"
                             title="All relationships"
                             onClick={() => runQuery(`MATCH ()-[e]-() RETURN e`)}
                         />
                     </li>
                     {relationships.map((relationship) => (
-                        <li key={relationship}>
+                        <li key={relationship} className="max-w-full">
                             <Button
                                 style={{ backgroundColor: graph.getLabelColorValue((graph.RelationshipsMap.get(relationship) || graph.createRelationship(relationship)).index) }}
-                                className="h-6 w-6 rounded-full flex justify-center items-center"
+                                className="h-6 w-full p-2 rounded-full flex justify-center items-center"
                                 label={relationship}
                                 onClick={() => runQuery(`MATCH ()-[e:${relationship}]-() RETURN e`)}
                             />
@@ -102,9 +100,9 @@ export default function GraphInfo({ onClose }: { onClose: () => void }) {
                 <h2>Property Keys ({propertyKeys.length})</h2>
                 <ul className="flex flex-wrap gap-2 p-2">
                     {propertyKeys.map((key) => (
-                        <li key={key}>
+                        <li key={key} className="max-w-full">
                             <Button
-                                className="h-6 w-12 bg-gray-500 flex justify-center items-center"
+                                className="h-6 w-full p-2 bg-gray-500 flex justify-center items-center rounded-full"
                                 label={key}
                                 onClick={() => runQuery(
                                     `MATCH (e) WHERE e.${key} IS NOT NULL RETURN e

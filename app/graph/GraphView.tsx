@@ -78,7 +78,6 @@ function GraphView({
 
     useEffect(() => {
         if (!elementsLength) return;
-
         setData({ ...graph.Elements })
     }, [graph, elementsLength, setData])
 

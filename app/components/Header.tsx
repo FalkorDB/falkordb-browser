@@ -99,11 +99,10 @@ export default function Header({ onSetGraphName, graphNames, graphName }: Props)
                         />
                     </div>
                     {
-                        type === "Graph" &&
+                        type === "Graph" && graphName &&
                         <Button
                             indicator={indicator}
-                            disabled={!graphName}
-                            title={!graphName ? "Select a graph to view graph info" : "Graph info"}
+                            title="Graph info"
                             onClick={() => {
                                 setCurrentPanel(prev => prev === "graphInfo" ? undefined : "graphInfo")
                             }}

@@ -6,7 +6,7 @@ import { Dispatch, SetStateAction, useCallback, useEffect, useMemo, useState } f
 import { usePathname } from "next/navigation";
 import { fetchOptions, formatName, getDefaultQuery, getQueryWithLimit, getSSEGraphResult, prepareArg, securedFetch } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
-import { ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
+import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import LoginVerification from "./loginVerification";
 import { Graph, HistoryQuery } from "./api/graph/model";
 import Header from "./components/Header";
@@ -127,9 +127,15 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
 
   const handleCooldown = useCallback((ticks?: 0, isSetLoading: boolean = true) => {
     if (typeof window !== 'undefined') {
-
       setCooldownTicks(ticks)
-      if (isSetLoading) setIsLoading(ticks !== 0)
+      if (isSetLoading) {
+        setIsLoading(ticks !== 0)
+        if (ticks !== 0) {
+          console.time("cooldown")
+        } else {
+          console.timeEnd("cooldown")
+        }
+      }
 
       const canvas = document.querySelector('.force-graph-container canvas');
 
@@ -289,6 +295,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
                     <ResizablePanel defaultSize={0} className="min-w-fit">
                       {pathname !== "/" && pathname !== "/login" && <Header graphName={graphName} graphNames={pathname.includes("/schema") ? schemaNames : graphNames} onSetGraphName={handleOnSetGraphName} />}
                     </ResizablePanel>
+                    <ResizableHandle className="w-0 !cursor-default" disabled />
                     <ResizablePanel defaultSize={100} minSize={60}>
                       {children}
                     </ResizablePanel>

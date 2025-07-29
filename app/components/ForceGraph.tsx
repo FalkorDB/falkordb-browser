@@ -123,13 +123,17 @@ export default function ForceGraph({
     }, [parentRef, setParentHeight, setParentWidth])
 
     useEffect(() => {
+        console.time("engine");
+
         if (!chartRef.current) return;
 
-        const nodeCount = graph.Elements.nodes.length;
+        const nodeCount = data.nodes.length;
+
+        console.log(nodeCount);
 
         // Use Math.min/Math.max for capping
-        const linkDistance = Math.min(BASE_LINK_DISTANCE * Math.sqrt(nodeCount) / Math.sqrt(REFERENCE_NODE_COUNT), 120);
-        const chargeStrength = Math.max(BASE_CHARGE_STRENGTH * Math.sqrt(nodeCount) / Math.sqrt(REFERENCE_NODE_COUNT), -80);
+        const linkDistance = Math.max(Math.min(BASE_LINK_DISTANCE * Math.sqrt(nodeCount) / Math.sqrt(REFERENCE_NODE_COUNT), 120), 20);
+        const chargeStrength = Math.min(Math.max(BASE_CHARGE_STRENGTH * Math.sqrt(nodeCount) / Math.sqrt(REFERENCE_NODE_COUNT), -80), -1);
 
         // Adjust link force and length
         const linkForce = chartRef.current.d3Force('link');
@@ -141,7 +145,7 @@ export default function ForceGraph({
         }
 
         // Add collision force to prevent node overlap
-        chartRef.current.d3Force('collision', d3.forceCollide(NODE_SIZE * 2).strength(0.1));
+        chartRef.current.d3Force('collision', d3.forceCollide(NODE_SIZE * 2).strength(0.5));
 
         // Center force to keep graph centered
         const centerForce = chartRef.current.d3Force('center');
@@ -159,7 +163,7 @@ export default function ForceGraph({
 
         // Reheat the simulation
         chartRef.current.d3ReheatSimulation();
-    }, [chartRef, graph.Elements.links.length, graph.Elements.nodes.length])
+    }, [chartRef, graph.Elements.links.length, graph.Elements.nodes.length, graph])
 
     const onFetchNode = async (node: Node) => {
         const result = await securedFetch(`/api/graph/${graph.Id}/${node.id}`, {
@@ -483,17 +487,20 @@ export default function ForceGraph({
                 onLinkRightClick={handleRightClick}
                 onBackgroundClick={handleUnselected}
                 onBackgroundRightClick={handleUnselected}
-                onEngineStop={() => {
+                onEngineStop={async () => {
+                    console.timeEnd("engine")
                     if (cooldownTicks === 0) return
 
+                    console.time("zooming")
                     handleZoomToFit(chartRef, undefined, data.nodes.length < 2 ? 4 : undefined)
-                    setTimeout(() => handleCooldown(0), 1000)
+                    console.timeEnd("zooming")
+                    setTimeout(() => handleCooldown(0), 100)
                 }}
                 linkCurvature="curve"
                 nodeVisibility="visible"
                 linkVisibility="visible"
                 cooldownTicks={cooldownTicks}
-                cooldownTime={2000}
+                cooldownTime={1000}
             />
         </div>
     )
