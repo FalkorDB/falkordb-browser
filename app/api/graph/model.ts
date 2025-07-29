@@ -556,7 +556,7 @@ export class Graph {
           curve = Math.floor((index + 1) / 2);
         }
 
-        link.curve = curve * 0.1;
+        link.curve = curve * 0.2;
       });
 
     // remove empty category if there are no more empty nodes category
