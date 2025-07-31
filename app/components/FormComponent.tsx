@@ -3,7 +3,7 @@
 
 "use client"
 
-import { useEffect, useState } from "react"
+import { useState } from "react"
 import { EyeIcon, EyeOffIcon, InfoIcon } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
@@ -62,11 +62,6 @@ export default function FormComponent({ handleSubmit, fields, error = undefined,
     const [show, setShow] = useState<{ [key: string]: boolean }>({});
     const [errors, setErrors] = useState<{ [key: string]: boolean }>({});
     const [isLoading, setIsLoading] = useState(false);
-
-    useEffect(() => {
-        console.log(isLoading);
-        
-    },[isLoading]);
 
     const onHandleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault()
