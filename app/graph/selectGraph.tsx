@@ -95,7 +95,7 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
             <DropdownMenu open={open} onOpenChange={handleOpenChange}>
                 <DropdownMenuTrigger disabled={options.length === 0 || indicator === "offline"} asChild>
                     <Button
-                        className="h-full w-[230px] text-2xl bg-foreground rounded-lg border p-2 justify-left disabled:text-gray-400 disabled:opacity-100"
+                        className="h-full w-[230px] text-2xl bg-background rounded-lg border p-2 justify-left disabled:text-gray-400 disabled:opacity-100"
                         label={selectedValue || `Select ${type}`}
                         title={options.length === 0 ? `There are no ${type}` : undefined}
                         indicator={indicator}

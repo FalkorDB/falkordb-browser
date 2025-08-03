@@ -122,7 +122,7 @@ export default function Toolbar({
                     graph.getElements().length > 0 && !isLoading &&
                     <Input
                         data-testid={`elementCanvasSearch${label}`}
-                        className={cn("w-[30dvw] text-white border border-primary", label === "Schema" && "h-full", backgroundColor)}
+                        className={cn("w-[30dvw] text-foreground border border-primary", label === "Schema" && "h-full", backgroundColor)}
                         placeholder="Search for element in the graph"
                         value={searchElement}
                         onChange={(e) => setSearchElement(e.target.value)}

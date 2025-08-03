@@ -11,29 +11,37 @@ import { Minimize2, X } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { cn, prepareArg, securedFetch } from "@/lib/utils";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
+import { useTheme } from "next-themes";
 import Button from "./ui/Button";
 import CloseDialog from "./CloseDialog";
 import { IndicatorContext } from "./provider";
 import { Graph, HistoryQuery } from "../api/graph/model";
 
-export const setTheme = (monacoI: Monaco, themeName: string, backgroundColor: string) => {
+export const setTheme = (monacoI: Monaco, themeName: string, isDark: boolean) => {
+    const backgroundColor = isDark ? '#191919' : '#ffffff';
+    const foregroundColor = isDark ? '#ffffff' : '#000000';
+    
     monacoI.editor.defineTheme(themeName, {
-        base: 'vs-dark',
+        base: isDark ? 'vs-dark' : 'vs',
         inherit: true,
         rules: [
-            { token: 'keyword', foreground: '#99E4E5' },
-            { token: 'function', foreground: '#DCDCAA' },
-            { token: 'type', foreground: '#89D86D' },
-            { token: 'string', foreground: '#CE9178' },
-            { token: 'number', foreground: '#b5cea8' },
+            { token: 'keyword', foreground: isDark ? '#99E4E5' : '#0000FF' },
+            { token: 'function', foreground: isDark ? '#DCDCAA' : '#795E26' },
+            { token: 'type', foreground: isDark ? '#89D86D' : '#267F99' },
+            { token: 'string', foreground: isDark ? '#CE9178' : '#A31515' },
+            { token: 'number', foreground: isDark ? '#b5cea8' : '#098658' },
         ],
         colors: {
             'editor.background': backgroundColor,
-            'editor.foreground': '#ffffff',
-            'editorSuggestWidget.background': '#272745',
-            'editorSuggestWidget.foreground': '#FFFFFF',
-            'editorSuggestWidget.selectedBackground': '#57577B',
-            'editorSuggestWidget.hoverBackground': '#28283F',
+            'editor.foreground': foregroundColor,
+            'editor.lineHighlightBackground': isDark ? '#2A2A2A' : '#F7F7F7',
+            'editor.selectionBackground': isDark ? '#264F78' : '#ADD6FF',
+            'editor.inactiveSelectionBackground': isDark ? '#3A3D41' : '#E5EBF1',
+            'editorCursor.foreground': isDark ? '#AEAFAD' : '#000000',
+            'editorSuggestWidget.background': isDark ? '#272745' : '#F3F3F3',
+            'editorSuggestWidget.foreground': isDark ? '#FFFFFF' : '#000000',
+            'editorSuggestWidget.selectedBackground': isDark ? '#57577B' : '#0060C0',
+            'editorSuggestWidget.hoverBackground': isDark ? '#28283F' : '#F0F0F0',
             'focusBorder': '#00000000',
         },
     });
@@ -226,6 +234,7 @@ const PLACEHOLDER = "Type your query here to start"
 export default function EditorComponent({ graph, historyQuery, maximize, setMaximize, runQuery, setHistoryQuery, editorKey }: Props) {
 
     const { indicator, setIndicator } = useContext(IndicatorContext)
+    const { theme, resolvedTheme } = useTheme()
 
     const { toast } = useToast()
 
@@ -297,6 +306,14 @@ export default function EditorComponent({ graph, historyQuery, maximize, setMaxi
     useEffect(() => {
         setLineNumber(historyQuery.query.split("\n").length)
     }, [historyQuery.query])
+
+    // Update Monaco theme when theme changes
+    useEffect(() => {
+        if (monacoEditor) {
+            const isDark = resolvedTheme === 'dark';
+            setTheme(monacoEditor, editorKey, isDark)
+        }
+    }, [theme, resolvedTheme, monacoEditor, editorKey])
 
     const fetchSuggestions = async (detail: string): Promise<monaco.languages.CompletionItem[]> => {
         if (indicator === "offline") return []
@@ -448,7 +465,14 @@ export default function EditorComponent({ graph, historyQuery, maximize, setMaxi
             ignoreCase: true,
         })
 
-        setTheme(monacoI, "editor-theme", "#191919")
+        // Check theme and apply it - more explicit dark mode detection
+        const isDark = resolvedTheme === 'dark';
+
+        // Apply theme immediately and also with a small delay to ensure it takes effect
+        setTheme(monacoI, editorKey, isDark)
+        setTimeout(() => {
+            setTheme(monacoI, editorKey, isDark)
+        }, 100)
 
         monacoI.languages.setLanguageConfiguration('custom-language', {
             brackets: [
@@ -494,6 +518,12 @@ export default function EditorComponent({ graph, historyQuery, maximize, setMaxi
                 placeholderRef.current.style.display = hasContent ? 'none' : 'block';
             }
         };
+
+        // Ensure theme is applied after editor is mounted
+        if (monacoEditor) {
+            const isDark = resolvedTheme === 'dark';
+            setTheme(monacoEditor, editorKey, isDark);
+        }
 
         e.onDidFocusEditorText(() => {
             if (placeholderRef.current) {
@@ -610,7 +640,7 @@ export default function EditorComponent({ graph, historyQuery, maximize, setMaxi
     }
 
     return (
-        <div style={{ height: editorHeight + 18 }} className="absolute w-full flex items-start gap-8 border rounded-lg overflow-hidden bg-foreground p-2">
+        <div style={{ height: editorHeight + 18 }} className="absolute w-full flex items-start gap-8 border rounded-lg overflow-hidden bg-background p-2">
             <div className="h-full w-1 grow flex rounded-lg overflow-hidden">
                 <div ref={containerRef} className="h-full relative grow w-1" data-testid="editorContainer">
                     <Editor
@@ -636,14 +666,14 @@ export default function EditorComponent({ graph, historyQuery, maximize, setMaxi
                                 }))
                             }
                         }}
-                        theme="editor-theme"
+                        theme={editorKey}
                         beforeMount={handleEditorWillMount}
                         onMount={(e) => {
                             handleEditorDidMount(e)
                             editorRef.current = e
                         }}
                     />
-                    <span ref={placeholderRef} className="w-full top-0 left-0 absolute pointer-events-none text-2xl truncate">
+                    <span ref={placeholderRef} className="w-full top-0 left-0 absolute pointer-events-none text-2xl truncate text-muted-foreground">
                         {PLACEHOLDER}
                     </span>
                 </div>
@@ -722,7 +752,7 @@ export default function EditorComponent({ graph, historyQuery, maximize, setMaxi
                                 handleEditorDidMount(e)
                                 dialogEditorRef.current = e
                             }}
-                            theme="editor-theme"
+                            theme={editorKey}
                             options={{
                                 padding: {
                                     bottom: 10,

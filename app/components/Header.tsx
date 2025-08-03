@@ -16,6 +16,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import Link from "next/link";
 import { useToast } from "@/components/ui/use-toast";
+import ThemeToggle from "./ThemeToggle";
 import Button from "./ui/Button";
 import CreateGraph from "./CreateGraph";
 import { IndicatorContext, QuerySettingsContext } from "./provider";
@@ -50,7 +51,7 @@ export default function Header({ onSetGraphName, graphNames }: Props) {
     }, [hasChanges, resetSettings, saveSettings, router, toast])
 
     return (
-        <div className="bg-background py-5 px-2 flex flex-col justify-between items-center">
+        <div className="bg-sidebar py-5 px-2 flex flex-col justify-between items-center text-sidebar-foreground">
             <div className="flex flex-col gap-4 items-center">
                 <Link
                     className="rounded-full h-12 w-12 overflow-hidden"
@@ -73,21 +74,23 @@ export default function Header({ onSetGraphName, graphNames }: Props) {
                     <Button
                         label="GRAPHS"
                         title="View and manage your graphs"
-                        className={cn(pathname.includes("/graph") ? "text-primary" : "text-white")}
+                        className={cn(pathname.includes("/graph") ? "text-primary" : "text-foreground")}
                         onClick={() => router.push("/graph")}
                         data-testid="GraphsButton"
                     />
-                    <div className="h-[1px] w-[80%] bg-white rounded-lg" />
+                    <div className="h-[1px] w-[80%] bg-foreground/20 rounded-lg" />
                     <Button
                         label="SCHEMAS"
                         title="View and manage your schemas"
-                        className={cn(pathname.includes("/schema") ? "text-primary" : "text-white")}
+                        className={cn(pathname.includes("/schema") ? "text-primary" : "text-foreground")}
                         onClick={() => router.push("/schema")}
                         data-testid="SchemasButton"
                     />
                 </div>
             </div>
             <div className="flex flex-col gap-6 items-center">
+                <ThemeToggle />
+                <div className="h-[1px] w-[80%] bg-foreground/20" />
                 <Button
                     indicator={indicator}
                     title="Adjust application settings"
@@ -159,7 +162,7 @@ export default function Header({ onSetGraphName, graphNames }: Props) {
                 {
                     indicator === "offline" &&
                     <>
-                        <div className="h-0.5 w-[80%] bg-white" />
+                        <div className="h-0.5 w-[80%] bg-foreground/20" />
                         <div className="flex gap-2 rounded-lg p-2 border border-red-500">
                             <Tooltip>
                                 <TooltipTrigger asChild>
@@ -172,7 +175,7 @@ export default function Header({ onSetGraphName, graphNames }: Props) {
                         </div>
                     </>
                 }
-                <div className="h-[1px] w-[80%] bg-white" />
+                <div className="h-[1px] w-[80%] bg-foreground/20" />
                 <Button
                     title="Log Out"
                     data-testid="logoutButton"
