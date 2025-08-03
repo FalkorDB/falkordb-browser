@@ -67,7 +67,7 @@ export default function PaginationList<T extends Item>({ list, step, onClick, da
                 <Input
                     ref={searchRef}
                     data-testid={`search${label.charAt(0).toUpperCase() + label.slice(1)}`}
-                    className="w-full bg-foreground text-white"
+                    className="w-full bg-background text-white"
                     value={search}
                     placeholder={`Search for a ${label}`}
                     onChange={(e) => setSearch(e.target.value)}
@@ -163,7 +163,7 @@ export default function PaginationList<T extends Item>({ list, step, onClick, da
                         .map((index) => (
                             <li key={index}>
                                 <Button
-                                    className={cn(index === stepCounter ? "text-white" : "text-gray-500")}
+                                    className={cn(index === stepCounter ? "text-forground" : "text-gray-500")}
                                     label={`[${index + 1}]`}
                                     title={`Page ${index + 1}`}
                                     onClick={() => {

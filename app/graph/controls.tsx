@@ -58,7 +58,7 @@ export default function Controls({
                                     {cooldownTicks === undefined ? <Play size={20} /> : <Pause size={20} />}
                                     <Switch
                                         data-testid="animationControl"
-                                        className="pointer-events-auto"
+                                        className="pointer-events-auto data-[state=unchecked]:bg-foreground"
                                         checked={cooldownTicks === undefined}
                                         onCheckedChange={() => {
                                             handleCooldown(cooldownTicks === undefined ? 0 : undefined)

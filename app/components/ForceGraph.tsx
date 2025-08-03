@@ -80,10 +80,8 @@ export default function ForceGraph({
 
     // Pre-compute theme-dependent colors for performance
     const isLightTheme = resolvedTheme === 'light'
-    const nodeStrokeColor = isLightTheme ? '#000000' : '#ffffff'
-    const nodeFillColor = isLightTheme ? '#ffffff' : '#000000'
-    const labelBackgroundColor = isLightTheme ? 'white' : '#1a1a1a'
     const labelTextColor = isLightTheme ? '#000000' : '#ffffff'
+    const backgroundColor = isLightTheme ? '#fafafa': '#262626' 
 
     const lastClick = useRef<{ date: Date, name: string }>({ date: new Date(), name: "" })
     const parentRef = useRef<HTMLDivElement>(null)
@@ -288,7 +286,7 @@ export default function ForceGraph({
             }
             <ForceGraph2D
                 ref={chartRef}
-                backgroundColor="bg-background"
+                backgroundColor={backgroundColor}
                 width={parentWidth}
                 height={parentHeight}
                 nodeLabel={(node) => type === "graph" ? node.data.name || node.id.toString() : node.category[0]}
@@ -317,7 +315,7 @@ export default function ForceGraph({
                     ctx.fill();
 
 
-                    ctx.fillStyle = nodeFillColor;
+                    ctx.fillStyle = "black";
                     ctx.textAlign = 'center';
                     ctx.textBaseline = 'middle';
                     ctx.font = '2px Arial';
@@ -409,7 +407,7 @@ export default function ForceGraph({
                     ctx.rotate(angle);
 
                     // Draw background and text
-                    ctx.fillStyle = labelBackgroundColor;
+                    ctx.fillStyle = backgroundColor;
                     const padding = 0.5;
                     ctx.fillRect(
                         textX - textWidth / 2 - padding,
