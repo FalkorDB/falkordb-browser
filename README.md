@@ -49,7 +49,7 @@ docker run -p 3000:3000 -p 6379:6379 -it --rm falkordb/falkordb:latest
 
 Open [http://localhost:3000](http://localhost:3000) with your browser.
 
-> Note: if you want to run with a diffrent url you need to pass NEXTAUTHURL env variable
+> Note: to run the application with a different URL, set the NEXTAUTH_URL environment variable.
 
 ```
 docker run -p 3000:3000 -e "NEXTAUTHURL=https://www.yoururl.com" -p 6379:6379 -it --rm falkordb/falkordb:latest
