@@ -194,7 +194,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
   }, [handleFetchOptions, status])
 
   return (
-    <ThemeProvider attribute="class" enableSystem>
+    <ThemeProvider attribute="class" enableSystem defaultTheme="dark">
       <LoginVerification>
         <QuerySettingsContext.Provider value={querySettingsContext}>
           <SchemaContext.Provider value={schemaContext}>

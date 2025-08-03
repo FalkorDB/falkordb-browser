@@ -4,17 +4,70 @@
 
 @layer base {
     :root {
+        /* Light theme variables */
+        --background: 0 0% 100%;
+        --foreground: 0 0% 98%;
+        --primary: 243 91% 68%;
+        --primary-foreground: 0 0% 98%;
+        --secondary: 0 0% 96%;
+        --secondary-foreground: 0 0% 9%;
+        --destructive: 0 84% 60%;
+        --destructive-foreground: 0 0% 98%;
+        --muted: 0 0% 96%;
+        --muted-foreground: 0 0% 45%;
+        --accent: 0 0% 96%;
+        --accent-foreground: 0 0% 9%;
+        --popover: 0 0% 100%;
+        --popover-foreground: 0 0% 3.9%;
+        --border: 0 0% 89.8%;
+        --input: 0 0% 89.8%;
+        --ring: 243 91% 68%;
+        --card: 0 0% 100%;
+        --card-foreground: 0 0% 3.9%;
+        --radius: 0.5rem;
+        
+        /* Sidebar light theme */
+        --sidebar-background: 0 0% 98%;
+        --sidebar-foreground: 0 0% 9%;
+        --sidebar-primary: 243 91% 68%;
+        --sidebar-primary-foreground: 0 0% 98%;
+        --sidebar-accent: 0 0% 96%;
+        --sidebar-accent-foreground: 0 0% 9%;
+        --sidebar-border: 0 0% 89.8%;
+        --sidebar-ring: 243 91% 68%;
+    }
+
+    .dark {
+        /* Dark theme variables */
         --background: 0 0% 14%;
         --foreground: 0 0% 10%;
         --primary: 243 91% 68%;
-        --secondary: 39 33% 96%;
+        --primary-foreground: 0 0% 98%;
+        --secondary: 0 0% 14.9%;
+        --secondary-foreground: 0 0% 98%;
         --destructive: 0 84% 60%;
-        --accent: var(--background);
-        --popover: var(--foreground);
-        --popover-foreground: 0 0% 100%;
-        --radius: 0.5rem;
-        --input: var(--popover-foreground);
-        --muted: 0 0% 80%;
+        --destructive-foreground: 0 0% 98%;
+        --muted: 0 0% 14.9%;
+        --muted-foreground: 0 0% 63.9%;
+        --accent: 0 0% 14.9%;
+        --accent-foreground: 0 0% 98%;
+        --popover: 0 0% 3.9%;
+        --popover-foreground: 0 0% 98%;
+        --border: 0 0% 14.9%;
+        --input: 0 0% 14.9%;
+        --ring: 243 91% 68%;
+        --card: 0 0% 3.9%;
+        --card-foreground: 0 0% 98%;
+        
+        /* Sidebar dark theme */
+        --sidebar-background: 0 0% 10%;
+        --sidebar-foreground: 0 0% 98%;
+        --sidebar-primary: 243 91% 68%;
+        --sidebar-primary-foreground: 0 0% 98%;
+        --sidebar-accent: 0 0% 14.9%;
+        --sidebar-accent-foreground: 0 0% 98%;
+        --sidebar-border: 0 0% 14.9%;
+        --sidebar-ring: 243 91% 68%;
     }
 
     :focus-visible {
@@ -24,7 +77,7 @@
 
 @layer base {
     body {
-        @apply bg-background text-white;
+        @apply bg-background text-foreground;
     }
 }
 
@@ -37,7 +90,7 @@
     }
 
     .tabs-trigger {
-        @apply !p-2 rounded-lg data-[state=active]:!text-primary text-white !bg-transparent;
+        @apply !p-2 rounded-lg data-[state=active]:!text-primary text-foreground !bg-transparent;
     }
 
     .hide-scrollbar {
@@ -46,7 +99,7 @@
     }
 
     .Page {
-        @apply w-1 grow bg-foreground relative overflow-hidden flex flex-col;
+        @apply w-1 grow bg-background relative overflow-hidden flex flex-col;
     }
 
     .Gradient {
@@ -54,11 +107,11 @@
     }
 
     .DataPanel {
-        @apply z-10 absolute right-4 top-12 min-w-[30%] min-h-[60%] max-w-[50%] max-h-[85%] flex flex-col gap-4 bg-foreground border rounded-lg;
+        @apply z-10 absolute right-4 top-12 min-w-[30%] min-h-[60%] max-w-[50%] max-h-[85%] flex flex-col gap-4 bg-card border rounded-lg;
     }
 
     .Dropzone {
-        @apply flex grow shrink bg-background items-center justify-center;
+        @apply flex grow shrink bg-muted items-center justify-center;
     }
 }
 
