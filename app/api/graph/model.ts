@@ -108,15 +108,7 @@ export type DataRow = {
 
 export type Data = DataRow[];
 
-export const DEFAULT_COLORS = [
-  "hsl(246, 100%, 70%)",
-  "hsl(330, 100%, 70%)",
-  "hsl(20, 100%, 65%)",
-  "hsl(180, 66%, 70%)",
-];
-
 export interface Label {
-  index: number;
   name: string;
   show: boolean;
   textWidth?: number;
@@ -125,7 +117,6 @@ export interface Label {
 }
 
 export interface Relationship {
-  index: number;
   name: string;
   show: boolean;
   textWidth?: number;
@@ -160,8 +151,6 @@ export class Graph {
 
   private elements: GraphData;
 
-  private colorIndex: number = 0;
-
   private labelsMap: Map<string, Label>;
 
   private relationshipsMap: Map<string, Relationship>;
@@ -170,7 +159,6 @@ export class Graph {
 
   private linksMap: Map<number, Link>;
 
-  private COLORS_ORDER_VALUE: string[] = [];
 
   private constructor(
     id: string,
@@ -203,9 +191,6 @@ export class Graph {
     this.nodesMap = nodesMap;
     this.linksMap = edgesMap;
     this.currentLimit = currentLimit || 0;
-    this.COLORS_ORDER_VALUE = [
-      ...(colors && colors.length > 0 ? colors : DEFAULT_COLORS),
-    ];
   }
 
   get Id(): string {
@@ -280,14 +265,6 @@ export class Graph {
     return this.metadata;
   }
 
-  get Colors(): string[] {
-    return this.COLORS_ORDER_VALUE;
-  }
-
-  set Colors(colors: string[]) {
-    this.COLORS_ORDER_VALUE = colors;
-  }
-
   public getElements(): (Node | Link)[] {
     return [...this.elements.nodes, ...this.elements.links];
   }
@@ -340,7 +317,7 @@ export class Graph {
       const node: Node = {
         id: cell.id,
         labels: labels.map((l) => l.name),
-        color: this.getLabelColorValue(labels[0].index),
+        color:,
         visible: true,
         expand: false,
         collapsed,
@@ -362,7 +339,7 @@ export class Graph {
       // set values in a fake node
       currentNode.id = cell.id;
       currentNode.labels = labels.map((l) => l.name);
-      currentNode.color = this.getLabelColorValue(labels[0].index);
+      currentNode.color = ;
       currentNode.expand = false;
       currentNode.collapsed = collapsed;
       Object.entries(cell.properties).forEach(([key, value]) => {
@@ -398,7 +375,7 @@ export class Graph {
           source = {
             id: cell.sourceId,
             labels: [label!.name],
-            color: this.getLabelColorValue(label!.index),
+            color:,
             expand: false,
             collapsed,
             visible: true,
@@ -416,7 +393,7 @@ export class Graph {
           source,
           target: source,
           relationship: cell.relationshipType,
-          color: this.getLabelColorValue(relation.index),
+          color:,
           expand: false,
           collapsed,
           visible: true,
@@ -435,7 +412,7 @@ export class Graph {
           source = {
             id: cell.sourceId,
             labels: [label!.name],
-            color: this.getLabelColorValue(label!.index),
+            color:,
             expand: false,
             collapsed,
             visible: true,
@@ -452,7 +429,7 @@ export class Graph {
           target = {
             id: cell.destinationId,
             labels: [label!.name],
-            color: this.getLabelColorValue(label!.index),
+            color:,
             expand: false,
             collapsed,
             visible: true,
@@ -473,7 +450,7 @@ export class Graph {
           source,
           target,
           relationship: cell.relationshipType,
-          color: this.getLabelColorValue(relation.index),
+          color:,
           expand: false,
           collapsed,
           visible: true,
@@ -581,11 +558,9 @@ export class Graph {
       if (!c) {
         c = {
           name: label,
-          index: this.colorIndex,
           show: true,
           elements: [],
         };
-        this.colorIndex += 1;
         this.labelsMap.set(c.name, c);
         this.labels.push(c);
       }
@@ -604,11 +579,9 @@ export class Graph {
     if (!l) {
       l = {
         name: relationship,
-        index: this.colorIndex,
         show: true,
         elements: [],
       };
-      this.colorIndex += 1;
       this.relationshipsMap.set(l.name, l);
       this.relationships.push(l);
     }
@@ -684,24 +657,6 @@ export class Graph {
     };
 
     return this.relationships;
-  }
-
-  public getLabelColorValue(index: number) {
-    if (index < this.COLORS_ORDER_VALUE.length) {
-      return this.COLORS_ORDER_VALUE[index];
-    }
-
-    let newColor;
-    let i = index;
-    do {
-      newColor = `hsl(${
-        (i - Math.min(DEFAULT_COLORS.length, this.COLORS_ORDER_VALUE.length)) *
-        20
-      }, 100%, 70%)`;
-      i += 1;
-    } while (this.COLORS_ORDER_VALUE.includes(newColor));
-    this.COLORS_ORDER_VALUE.push(newColor);
-    return newColor;
   }
 
   public removeElements(elements: (Node | Link)[]) {
@@ -824,7 +779,7 @@ export class Graph {
     if (selectedElement.labels.length === 0) {
       const [emptyCategory] = this.createLabel([""], selectedElement);
       selectedElement.labels.push(emptyCategory.name);
-      selectedElement.color = this.getLabelColorValue(emptyCategory.index);
+      selectedElement.color = ;
     }
   }
 
@@ -865,7 +820,7 @@ export class Graph {
         selectedElement
       );
       selectedElement.labels.splice(emptyCategoryIndex, 1);
-      selectedElement.color = this.getLabelColorValue(category.index);
+      selectedElement.color = ;
 
       const emptyCategory = this.labelsMap.get("");
       if (emptyCategory) {
@@ -925,4 +880,39 @@ export class Graph {
       )
     );
   }
+}
+
+export class GraphInfo {
+  private colors: string[];
+  
+  private labels: string[];
+
+  private relationships: string[];
+
+  private properties: string[];
+
+  private constructor(colors: string[], labels: string[], relationships: string[], properties: string[]) {
+    this.colors = colors;
+    this.labels = labels;
+    this.relationships = relationships;
+    this.properties = properties;
+  }
+
+  get Colors(): string[] {
+    return this.colors;
+  }
+
+  get Labels(): string[] {
+    return this.labels;
+  }
+
+  get Relationships(): string[] {
+    return this.relationships;
+  }
+
+  get Properties(): string[] {
+    return this.properties;
+  }
+
+  
 }
