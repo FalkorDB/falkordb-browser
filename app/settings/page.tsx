@@ -10,8 +10,10 @@ import { useToast } from "@/components/ui/use-toast"
 import Users from "./users/Users"
 import Configurations from "./Configurations"
 import Button from "../components/ui/Button"
-import QuerySettings from "./QuerySettings"
+import BrowserSettings from "./browserSettings"
 import { QuerySettingsContext } from "../components/provider"
+
+type Tab = 'Browser' | 'DB' | 'Users'
 
 export default function Settings() {
 
@@ -21,11 +23,11 @@ export default function Settings() {
     const { toast } = useToast()
     const router = useRouter()
 
-    const [current, setCurrent] = useState<'Query' | 'DB' | 'Users'>('Query')
+    const [current, setCurrent] = useState<Tab>('Browser')
 
 
     const navigateBack = useCallback((e: KeyboardEvent) => {
-        if (e.key === "Escape" && current !== "Query") {
+        if (e.key === "Escape" && current !== "Browser") {
             e.preventDefault()
 
             router.back()
@@ -40,8 +42,8 @@ export default function Settings() {
         }
     }, [navigateBack])
 
-    const handleSetCurrent = useCallback((tab: 'Query' | 'DB' | 'Users') => {
-        if (current === "Query" && hasChanges) {
+    const handleSetCurrent = useCallback((tab: Tab) => {
+        if (current === "Browser" && hasChanges) {
             getQuerySettingsNavigationToast(toast, saveSettings, () => {
                 setCurrent(tab)
                 resetSettings()
@@ -51,10 +53,6 @@ export default function Settings() {
         }
     }, [current, hasChanges, resetSettings, saveSettings, toast])
 
-    useEffect(() => {
-        if (session && session.user.role !== "Admin") router.back()
-    }, [router, session])
-
     const getCurrentTab = () => {
         switch (current) {
             case 'Users':
@@ -62,7 +60,7 @@ export default function Settings() {
             case 'DB':
                 return <Configurations />
             default:
-                return <QuerySettings />
+                return <BrowserSettings />
         }
     }
 
@@ -73,23 +71,27 @@ export default function Settings() {
                     <h1 className="text-2xl font-medium px-6">Settings</h1>
                     <div className="w-fit bg-background flex gap-2 p-2 rounded-lg">
                         <Button
-                            className={cn("p-2 rounded-lg", current === "Query" ? "bg-foreground" : "text-gray-500")}
-                            label="Query Settings"
-                            title="Manage query settings"
-                            onClick={() => handleSetCurrent("Query")}
+                            className={cn("p-2 rounded-lg", current === "Browser" ? "bg-foreground" : "text-gray-500")}
+                            label="Browser Settings"
+                            title="Manage browser settings"
+                            onClick={() => handleSetCurrent("Browser")}
                         />
-                        <Button
-                            className={cn("p-2 rounded-lg", current === "DB" ? "bg-foreground" : "text-gray-500")}
-                            label="DB Configuration"
-                            title="Configure database settings"
-                            onClick={() => handleSetCurrent("DB")}
-                        />
-                        <Button
-                            className={cn("p-2 rounded-lg", current === "Users" ? "bg-foreground" : "text-gray-500")}
-                            label="Users"
-                            title="Manage users accounts"
-                            onClick={() => handleSetCurrent("Users")}
-                        />
+                        {
+                            session?.user?.role === "Admin" && <>
+                                <Button
+                                    className={cn("p-2 rounded-lg", current === "DB" ? "bg-foreground" : "text-gray-500")}
+                                    label="DB Configuration"
+                                    title="Configure database settings"
+                                    onClick={() => handleSetCurrent("DB")}
+                                />
+                                <Button
+                                    className={cn("p-2 rounded-lg", current === "Users" ? "bg-foreground" : "text-gray-500")}
+                                    label="Users"
+                                    title="Manage users accounts"
+                                    onClick={() => handleSetCurrent("Users")}
+                                />
+                            </>
+                        }
                     </div>
                 </div>
                 <div className="w-full h-1 grow p-6">
