@@ -472,9 +472,10 @@ export default function ForceGraph({
                 onBackgroundRightClick={handleUnselected}
                 onEngineStop={() => {
                     if (cooldownTicks === 0) return
+
                     handleCooldown(0)
                     handleZoomToFit(chartRef, undefined, data.nodes.length < 2 ? 4 : undefined)
-                    setTimeout(() => setLoading(false), 1000);
+                    setTimeout(() => setLoading(false), 500);
                 }}
                 linkCurvature="curve"
                 nodeVisibility="visible"
