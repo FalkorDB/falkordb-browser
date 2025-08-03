@@ -135,7 +135,7 @@ export default function ForceGraph({
 
         // Adjust link force and length
         const linkForce = chartRef.current.d3Force('link');
-        
+
         if (linkForce) {
             linkForce
                 .distance(linkDistance)
@@ -147,14 +147,14 @@ export default function ForceGraph({
 
         // Center force to keep graph centered
         const centerForce = chartRef.current.d3Force('center');
-        
+
         if (centerForce) {
             centerForce.strength(BASE_CENTER_STRENGTH);
         }
 
         // Add charge force to repel nodes
         const chargeForce = chartRef.current.d3Force('charge');
-        
+
         if (chargeForce) {
             chargeForce.strength(chargeStrength);
         }
@@ -269,6 +269,10 @@ export default function ForceGraph({
         setSelectedElements([])
     }
 
+    const isLinkSelected = (link: Link) => ((selectedElement && ("source" in selectedElement) && selectedElement.id === link.source.id)
+        || (hoverElement && ("source" in hoverElement) && hoverElement.id === link.source.id)
+        || (selectedElements.length > 0 && selectedElements.some(el => el.id === link.source.id && ("source" in el))))
+
     return (
         <div ref={parentRef} className="w-full h-full relative">
             {
@@ -334,7 +338,7 @@ export default function ForceGraph({
                         } else {
                             [name] = node.category
                         }
-                        
+
                         // truncate text if it's too long
                         if (ctx.measureText(name).width > nodeSize) {
                             while (name.length > 0 && ctx.measureText(name).width + ellipsisWidth > nodeSize) {
@@ -455,10 +459,6 @@ export default function ForceGraph({
                 linkVisibility="visible"
                 cooldownTicks={cooldownTicks}
                 cooldownTime={2000}
-                linkDirectionalArrowRelPos={1}
-                linkDirectionalArrowLength={(link) => link.source.id === link.target.id ? 0 : 2}
-                linkDirectionalArrowColor={(link) => link.color}
-                linkColor={(link) => link.color}
             />
         </div>
     )
