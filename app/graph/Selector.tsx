@@ -37,12 +37,13 @@ interface Props {
     setGraph: Dispatch<SetStateAction<Graph>>
     setIsAddEntity?: Dispatch<SetStateAction<boolean>>
     setIsAddRelation?: Dispatch<SetStateAction<boolean>>
-    isLoading?: boolean
+    isCanvasLoading?: boolean
+    isQueryLoading?: boolean
 }
 
 const STEP = 8
 
-export default function Selector({ graph, options, setOptions, graphName, setGraphName, runQuery, historyQuery, setHistoryQuery, fetchCount, selectedElements, setSelectedElement, handleDeleteElement, chartRef, setIsAddEntity, setIsAddRelation, setGraph, isLoading: isCanvasLoading }: Props) {
+export default function Selector({ graph, options, setOptions, graphName, setGraphName, runQuery, historyQuery, setHistoryQuery, fetchCount, selectedElements, setSelectedElement, handleDeleteElement, chartRef, setIsAddEntity, setIsAddRelation, setGraph, isCanvasLoading, isQueryLoading }: Props) {
 
     const { indicator, setIndicator } = useContext(IndicatorContext)
 
@@ -187,7 +188,7 @@ export default function Selector({ graph, options, setOptions, graphName, setGra
                 setGraph={setGraph}
             />
             {
-                runQuery && historyQuery && setHistoryQuery ?
+                runQuery && historyQuery && setHistoryQuery && isQueryLoading !== undefined ?
                     <>
                         <div className="h-full w-1 grow relative overflow-visible">
                             <EditorComponent
@@ -195,6 +196,7 @@ export default function Selector({ graph, options, setOptions, graphName, setGra
                                 maximize={maximize}
                                 setMaximize={setMaximize}
                                 runQuery={runQuery}
+                                isQueryLoading={isQueryLoading}
                                 historyQuery={historyQuery}
                                 setHistoryQuery={setHistoryQuery}
                                 editorKey={queriesOpen ? "selector-theme" : "editor-theme"}
@@ -380,5 +382,6 @@ Selector.defaultProps = {
     setHistoryQuery: undefined,
     setIsAddEntity: undefined,
     setIsAddRelation: undefined,
-    isLoading: false,
+    isQueryLoading: undefined,
+    isCanvasLoading: undefined,
 }
