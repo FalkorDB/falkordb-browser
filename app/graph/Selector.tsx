@@ -200,7 +200,7 @@ export default function Selector({ graph, options, setOptions, graphName, setGra
                                 editorKey={queriesOpen ? "selector-theme" : "editor-theme"}
                             />
                         </div>
-                        <div className="h-full flex gap-2 p-2 border rounded-lg bg-foreground">
+                        <div className="h-full flex gap-2 p-2 border rounded-lg bg-background">
                             <Tooltip>
                                 <TooltipTrigger className="cursor-default">
                                     <Info />

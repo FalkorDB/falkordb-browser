@@ -115,7 +115,7 @@ export default function QuerySettings() {
                         </Button>
                         <Input
                             id="timeoutInput"
-                            className={cn("text-center bg-foreground rounded-none border-y-0 text-white text-xl")}
+                            className={cn("text-center bg-background rounded-none border-y-0 text-white text-xl")}
                             value={newTimeout === 0 ? "∞" : newTimeout}
                             onChange={(e) => {
                                 const value = parseInt(e.target.value.replace('∞', ''), 10)
@@ -171,7 +171,7 @@ export default function QuerySettings() {
                         </Button>
                         <Input
                             id="limitInput"
-                            className={cn("text-center bg-foreground rounded-none border-y-0 text-white text-xl")}
+                            className={cn("text-center bg-background rounded-none border-y-0 text-white text-xl")}
                             value={newLimit === 0 ? "∞" : newLimit}
                             onChange={(e) => {
                                 const value = parseInt(e.target.value.replace('∞', ''), 10)
@@ -204,14 +204,14 @@ export default function QuerySettings() {
                     <div className="flex gap-4 items-center">
                         <Checkbox
                             id="runDefaultQueryCheckboxOn"
-                            className="w-6 h-6 rounded-full bg-foreground border-primary data-[state=checked]:bg-primary"
+                            className="w-6 h-6 rounded-full bg-background border-primary data-[state=checked]:bg-primary"
                             checked={newRunDefaultQuery}
                             onCheckedChange={() => setNewRunDefaultQuery(true)}
                         />
                         <p>ON</p>
                         <Input
                             id="runDefaultQueryInput"
-                            className={cn("bg-foreground text-white text-xl w-1 grow")}
+                            className={cn("bg-background text-white text-xl w-1 grow")}
                             value={newDefaultQuery}
                             onChange={(e) => setNewDefaultQuery(e.target.value)}
                             disabled={!newRunDefaultQuery}
@@ -247,7 +247,7 @@ export default function QuerySettings() {
                     <div className="flex gap-4 items-center">
                         <Checkbox
                             id="runDefaultQueryCheckboxOff"
-                            className="w-6 h-6 rounded-full bg-foreground border-primary data-[state=checked]:bg-primary"
+                            className="w-6 h-6 rounded-full bg-background border-primary data-[state=checked]:bg-primary"
                             checked={!newRunDefaultQuery}
                             onCheckedChange={() => setNewRunDefaultQuery(false)}
                         />
@@ -266,7 +266,7 @@ export default function QuerySettings() {
                         <div className="flex gap-2 items-center">
                             <Checkbox
                                 id="contentPersistenceCheckboxOn"
-                                className="w-6 h-6 rounded-full bg-foreground border-primary data-[state=checked]:bg-primary"
+                                className="w-6 h-6 rounded-full bg-background border-primary data-[state=checked]:bg-primary"
                                 checked={newContentPersistence}
                                 onCheckedChange={() => setNewContentPersistence(true)}
                             />
@@ -275,7 +275,7 @@ export default function QuerySettings() {
                         <div className="flex gap-2 items-center">
                             <Checkbox
                                 id="contentPersistenceCheckboxOff"
-                                className="w-6 h-6 rounded-full bg-foreground border-primary data-[state=checked]:bg-primary"
+                                className="w-6 h-6 rounded-full bg-background border-primary data-[state=checked]:bg-primary"
                                 checked={!newContentPersistence}
                                 onCheckedChange={() => setNewContentPersistence(false)}
                             />

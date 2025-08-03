@@ -9,6 +9,7 @@ import ForceGraph2D from "react-force-graph-2d"
 import { securedFetch, GraphRef, handleZoomToFit } from "@/lib/utils"
 import { useToast } from "@/components/ui/use-toast"
 import * as d3 from "d3"
+import { useTheme } from "next-themes"
 import { GraphData, Link, Node, Category, Graph } from "../api/graph/model"
 import { IndicatorContext } from "./provider"
 import Spinning from "./ui/spinning"
@@ -73,8 +74,16 @@ export default function ForceGraph({
 }: Props) {
 
     const { indicator, setIndicator } = useContext(IndicatorContext)
-
+    const { resolvedTheme } = useTheme()
+    
     const { toast } = useToast()
+
+    // Pre-compute theme-dependent colors for performance
+    const isLightTheme = resolvedTheme === 'light'
+    const nodeStrokeColor = isLightTheme ? '#000000' : '#ffffff'
+    const nodeFillColor = isLightTheme ? '#ffffff' : '#000000'
+    const labelBackgroundColor = isLightTheme ? 'white' : '#1a1a1a'
+    const labelTextColor = isLightTheme ? '#000000' : '#ffffff'
 
     const lastClick = useRef<{ date: Date, name: string }>({ date: new Date(), name: "" })
     const parentRef = useRef<HTMLDivElement>(null)
@@ -297,7 +306,7 @@ export default function ForceGraph({
             }
             <ForceGraph2D
                 ref={chartRef}
-                backgroundColor="#242424"
+                backgroundColor="bg-background"
                 width={parentWidth}
                 height={parentHeight}
                 nodeLabel={(node) => type === "graph" ? node.data.name || node.id.toString() : node.category[0]}
@@ -327,7 +336,7 @@ export default function ForceGraph({
                     ctx.lineWidth = (selectedElement && !("source" in selectedElement) && selectedElement.id === node.id)
                         || (hoverElement && !("source" in hoverElement) && hoverElement.id === node.id)
                         || (selectedElements.length > 0 && selectedElements.some(el => el.id === node.id && !("source" in el))) ? 1 : 0.5
-                    ctx.strokeStyle = 'white';
+                    ctx.strokeStyle = nodeStrokeColor;
 
                     ctx.beginPath();
                     ctx.arc(node.x, node.y, NODE_SIZE, 0, 2 * Math.PI, false);
@@ -335,7 +344,7 @@ export default function ForceGraph({
                     ctx.fill();
 
 
-                    ctx.fillStyle = 'black';
+                    ctx.fillStyle = nodeFillColor;
                     ctx.textAlign = 'center';
                     ctx.textBaseline = 'middle';
                     ctx.font = '2px Arial';
@@ -459,7 +468,7 @@ export default function ForceGraph({
                     ctx.rotate(angle);
 
                     // Draw background and text
-                    ctx.fillStyle = '#242424';
+                    ctx.fillStyle = labelBackgroundColor;
                     const padding = 0.5;
                     ctx.fillRect(
                         textX - textWidth / 2 - padding,
@@ -468,7 +477,7 @@ export default function ForceGraph({
                         textHeight + padding * 2
                     );
 
-                    ctx.fillStyle = 'white';
+                    ctx.fillStyle = labelTextColor;
                     ctx.textAlign = 'center';
                     ctx.textBaseline = 'middle';
                     ctx.fillText(link.label, textX, textY);

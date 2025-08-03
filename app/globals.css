@@ -6,7 +6,7 @@
     :root {
         /* Light theme variables */
         --background: 0 0% 100%;
-        --foreground: 0 0% 98%;
+        --foreground: 0 0% 9%;
         --primary: 243 91% 68%;
         --primary-foreground: 0 0% 98%;
         --secondary: 0 0% 96%;
@@ -39,8 +39,8 @@
 
     .dark {
         /* Dark theme variables */
-        --background: 0 0% 14%;
-        --foreground: 0 0% 10%;
+        --background: 0 0% 10%;
+        --foreground: 0 0% 98%;
         --primary: 243 91% 68%;
         --primary-foreground: 0 0% 98%;
         --secondary: 0 0% 14.9%;
@@ -60,7 +60,7 @@
         --card-foreground: 0 0% 98%;
         
         /* Sidebar dark theme */
-        --sidebar-background: 0 0% 10%;
+        --sidebar-background: 0 0% 14%;
         --sidebar-foreground: 0 0% 98%;
         --sidebar-primary: 243 91% 68%;
         --sidebar-primary-foreground: 0 0% 98%;

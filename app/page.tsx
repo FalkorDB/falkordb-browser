@@ -12,8 +12,8 @@ export default function Home() {
       <Spinning />
       </main>
       <div className="flex flex-col gap-8 justify-center items-center">
-        <p>Version: {`{${pkg.version}}`}</p>
-        <p className="text-sm">All Rights Reserved © 2024 - {new Date().getFullYear()} falkordb.com</p>
+        <p className="text-foreground">Version: {`{${pkg.version}}`}</p>
+        <p className="text-sm text-foreground">All Rights Reserved © 2024 - {new Date().getFullYear()} falkordb.com</p>
       </div>
       <div className="h-5 Gradient" />
     </div>
