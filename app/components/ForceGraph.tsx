@@ -4,7 +4,7 @@
 
 "use client"
 
-import { Dispatch, SetStateAction, useCallback, useContext, useEffect, useRef, useState } from "react"
+import { Dispatch, SetStateAction, useContext, useEffect, useRef, useState } from "react"
 import ForceGraph2D from "react-force-graph-2d"
 import { securedFetch, GraphRef, handleZoomToFit } from "@/lib/utils"
 import { useToast } from "@/components/ui/use-toast"
@@ -144,7 +144,7 @@ export default function ForceGraph({
 
         // Adjust link force and length
         const linkForce = chartRef.current.d3Force('link');
-
+        
         if (linkForce) {
             linkForce
                 .distance(linkDistance)
@@ -156,14 +156,14 @@ export default function ForceGraph({
 
         // Center force to keep graph centered
         const centerForce = chartRef.current.d3Force('center');
-
+        
         if (centerForce) {
             centerForce.strength(BASE_CENTER_STRENGTH);
         }
 
         // Add charge force to repel nodes
         const chargeForce = chartRef.current.d3Force('charge');
-
+        
         if (chargeForce) {
             chargeForce.strength(chargeStrength);
         }
@@ -242,16 +242,6 @@ export default function ForceGraph({
 
     const handleHover = (element: Node | Link | null) => {
         setHoverElement(element === null ? undefined : element)
-
-        const canvas = document.querySelector('.force-graph-container canvas') as HTMLCanvasElement;
-
-        if (!canvas) return;
-
-        if (element) {
-            canvas.style.cursor = 'pointer';
-        } else {
-            canvas.style.cursor = 'default';
-        }
     }
 
     const handleRightClick = (element: Node | Link, evt: MouseEvent) => {
@@ -288,14 +278,6 @@ export default function ForceGraph({
         setSelectedElements([])
     }
 
-    const isLinkSelected = useCallback(
-        (link: Link) =>
-            (selectedElement && ("source" in selectedElement) && selectedElement.id === link.id)
-            || (hoverElement && ("source" in hoverElement) && hoverElement.id === link.id)
-            || (selectedElements.length > 0 && selectedElements.some(el => el.id === link.id && ("source" in el))),
-        [selectedElement, hoverElement, selectedElements]
-    )
-
     return (
         <div ref={parentRef} className="w-full h-full relative">
             {
@@ -314,18 +296,9 @@ export default function ForceGraph({
                 nodeRelSize={NODE_SIZE}
                 nodeCanvasObjectMode={() => 'after'}
                 linkCanvasObjectMode={() => 'after'}
-                linkDirectionalArrowRelPos={1}
-                linkDirectionalArrowLength={(link) => {
-                    let length = 0;
-
-                    if (link.source !== link.target) {
-                        length = isLinkSelected(link) ? 4 : 2
-                    }
-
-                    return length;
-                }}
-                linkDirectionalArrowColor={(link) => link.color}
-                linkColor={() => "transparent"}
+                linkWidth={(link) => (selectedElement && ("source" in selectedElement) && selectedElement.id === link.id
+                    || hoverElement && ("source" in hoverElement) && hoverElement.id === link.id)
+                    || (selectedElements.length > 0 && selectedElements.some(el => el.id === link.id && !("source" in el))) ? 2 : 1}
                 nodeCanvasObject={(node, ctx) => {
 
                     if (!node.x || !node.y) {
@@ -333,10 +306,10 @@ export default function ForceGraph({
                         node.y = 0
                     }
 
-                    ctx.lineWidth = (selectedElement && !("source" in selectedElement) && selectedElement.id === node.id)
+                    ctx.lineWidth = ((selectedElement && !("source" in selectedElement) && selectedElement.id === node.id)
                         || (hoverElement && !("source" in hoverElement) && hoverElement.id === node.id)
-                        || (selectedElements.length > 0 && selectedElements.some(el => el.id === node.id && !("source" in el))) ? 1 : 0.5
-                    ctx.strokeStyle = nodeStrokeColor;
+                        || (selectedElements.length > 0 && selectedElements.some(el => el.id === node.id && !("source" in el)))) ? 1 : 0.5
+                    ctx.strokeStyle = 'selectedElements';
 
                     ctx.beginPath();
                     ctx.arc(node.x, node.y, NODE_SIZE, 0, 2 * Math.PI, false);
@@ -393,29 +366,6 @@ export default function ForceGraph({
                         textY = start.y + radius * Math.sin(angleOffset);
                         angle = -angleOffset;
                     } else {
-                        const arrowLength = isLinkSelected(link) ? 8 : 4;
-
-                        const dx = end.x - start.x;
-                        const dy = end.y - start.y;
-                        const len = Math.sqrt(dx * dx + dy * dy);
-
-                        const ratioStart = NODE_SIZE / len;
-                        const ratioEnd = ratioStart + (arrowLength / 2) / len;
-
-                        const sx = start.x + dx * ratioStart;
-                        const sy = start.y + dy * ratioStart;
-                        const ex = end.x - dx * ratioEnd;
-                        const ey = end.y - dy * ratioEnd;
-
-                        ctx.save();
-                        ctx.strokeStyle = link.color;
-                        ctx.lineWidth = isLinkSelected(link) ? 0.5 : 0.25;
-                        ctx.beginPath();
-                        ctx.moveTo(sx, sy);
-                        ctx.lineTo(ex, ey);
-                        ctx.stroke();
-                        ctx.restore();
-
                         const midX = (start.x + end.x) / 2;
                         const midY = (start.y + end.y) / 2;
                         const offset = link.curve / 2;
@@ -443,22 +393,13 @@ export default function ForceGraph({
 
                     // Get text width
                     ctx.font = '2px Arial';
-
-                    let textWidth
-                    let textHeight
-                    const category = graph.LabelsMap.get(link.label);
-
-                    if (category) {
-                        ({ textWidth, textHeight } = category);
-                    }
-
-                    if (textWidth === undefined || textHeight === undefined) {
+                    const category = graph.LabelsMap.get(link.label)!
+                    let { textWidth, textHeight } = category
+                    if (!textWidth || !textHeight) {
                         const { width, actualBoundingBoxAscent, actualBoundingBoxDescent } = ctx.measureText(link.label)
                         textWidth = width
                         textHeight = actualBoundingBoxAscent + actualBoundingBoxDescent
-                        if (category) {
-                            graph.LabelsMap.set(link.label, { ...category, textWidth, textHeight })
-                        }
+                        graph.LabelsMap.set(link.label, { ...category, textWidth, textHeight })
                     }
 
                     // Save the current context state
@@ -503,6 +444,10 @@ export default function ForceGraph({
                 linkVisibility="visible"
                 cooldownTicks={cooldownTicks}
                 cooldownTime={2000}
+                linkDirectionalArrowRelPos={1}
+                linkDirectionalArrowLength={(link) => link.source.id === link.target.id ? 0 : 2}
+                linkDirectionalArrowColor={(link) => link.color}
+                linkColor={(link) => link.color}
             />
         </div>
     )

@@ -12,7 +12,7 @@ import { QuerySettingsContext } from "../components/provider"
 import Button from "../components/ui/Button"
 import Input from "../components/ui/Input"
 
-export default function QuerySettings() {
+export default function QuerySettings({ handleSubmit }: { handleSubmit: (e?: React.FormEvent<HTMLFormElement>) => void }) {
     const {
         newSettings: {
             contentPersistenceSettings: { newContentPersistence, setNewContentPersistence },
@@ -30,19 +30,12 @@ export default function QuerySettings() {
         },
         hasChanges,
         setHasChanges,
-        saveSettings,
         resetSettings,
     } = useContext(QuerySettingsContext)
 
     const router = useRouter()
 
     const [isResetting, setIsResetting] = useState(false)
-
-    const handleSubmit = useCallback((e?: React.FormEvent<HTMLFormElement>) => {
-        e?.preventDefault()
-
-        saveSettings()
-    }, [saveSettings])
 
     const navigateBack = useCallback((e: KeyboardEvent) => {
         if (e.key === "Escape") {
@@ -80,7 +73,7 @@ export default function QuerySettings() {
     }, [defaultQuery, limit, newDefaultQuery, newLimit, newRunDefaultQuery, newContentPersistence, newTimeout, runDefaultQuery, contentPersistence, setHasChanges, timeoutValue])
 
     return (
-        <form onSubmit={handleSubmit} className="h-full w-full flex flex-col gap-16 overflow-y-auto px-[20%]">
+        <div className="flex flex-col gap-16">
             <div className="flex flex-col gap-2 items-center">
                 <h1 className="text-2xl font-bold">Query Settings</h1>
                 <p className="text-sm text-muted-foreground">Configure your query execution settings</p>
@@ -310,6 +303,6 @@ export default function QuerySettings() {
                     </Button>
                 </div>
             }
-        </form>
+        </div>
     )
 }
