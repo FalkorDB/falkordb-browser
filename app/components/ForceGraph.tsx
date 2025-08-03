@@ -143,7 +143,7 @@ export default function ForceGraph({
         }
 
         // Add collision force to prevent node overlap
-        chartRef.current.d3Force('collision', d3.forceCollide(NODE_SIZE * 2).strength(0.1));
+        chartRef.current.d3Force('collision', d3.forceCollide(NODE_SIZE * 2).strength(1));
 
         // Center force to keep graph centered
         const centerForce = chartRef.current.d3Force('center');
@@ -316,7 +316,8 @@ export default function ForceGraph({
                     return length;
                 }}
                 linkDirectionalArrowColor={(link) => link.color}
-                linkColor={() => "transparent"}
+                linkWidth={(link) => isLinkSelected(link) ? 2 : 1}
+                linkColor={(link) => link.color}
                 nodeCanvasObject={(node, ctx) => {
 
                     if (!node.x || !node.y) {
@@ -339,24 +340,27 @@ export default function ForceGraph({
                     ctx.textAlign = 'center';
                     ctx.textBaseline = 'middle';
                     ctx.font = '2px Arial';
-                    const ellipsis = '...';
-                    const ellipsisWidth = ctx.measureText(ellipsis).width;
-                    const nodeSize = NODE_SIZE * 2 - PADDING;
+                    let name = node.displayName
 
-                    let name
+                    if (!name) {
+                        const ellipsis = '...';
+                        const ellipsisWidth = ctx.measureText(ellipsis).width;
+                        const nodeSize = NODE_SIZE * 2 - PADDING;
 
-                    if (type === "graph") {
-                        name = node.data.name || node.id.toString()
-                    } else {
-                        [name] = node.category
-                    }
-
-                    // truncate text if it's too long
-                    if (ctx.measureText(name).width > nodeSize) {
-                        while (name.length > 0 && ctx.measureText(name).width + ellipsisWidth > nodeSize) {
-                            name = name.slice(0, -1);
+                        if (type === "graph") {
+                            name = node.data.name || node.id.toString()
+                        } else {
+                            [name] = node.category
                         }
-                        name += ellipsis;
+                        
+                        // truncate text if it's too long
+                        if (ctx.measureText(name).width > nodeSize) {
+                            while (name.length > 0 && ctx.measureText(name).width + ellipsisWidth > nodeSize) {
+                                name = name.slice(0, -1);
+                            }
+                        }
+
+                        node.displayName = name;
                     }
 
                     // add label
@@ -384,52 +388,34 @@ export default function ForceGraph({
                         textY = start.y + radius * Math.sin(angleOffset);
                         angle = -angleOffset;
                     } else {
-                        const arrowLength = isLinkSelected(link) ? 8 : 4;
-
+                        // Calculate the control point for the quadratic Bézier curve
                         const dx = end.x - start.x;
                         const dy = end.y - start.y;
-                        const len = Math.sqrt(dx * dx + dy * dy);
+                        const distance = Math.sqrt(dx * dx + dy * dy);
 
-                        const ratioStart = NODE_SIZE / len;
-                        const ratioEnd = ratioStart + (arrowLength / 2) / len;
+                        // Calculate perpendicular vector for curve offset
+                        const perpX = dy / distance;
+                        const perpY = -dx / distance;
 
-                        const sx = start.x + dx * ratioStart;
-                        const sy = start.y + dy * ratioStart;
-                        const ex = end.x - dx * ratioEnd;
-                        const ey = end.y - dy * ratioEnd;
+                        // Control point with larger offset to match the actual curve
+                        const curvature = link.curve || 0;
+                        const controlX = (start.x + end.x) / 2 + perpX * curvature * distance * 1.0;
+                        const controlY = (start.y + end.y) / 2 + perpY * curvature * distance * 1.0;
 
-                        ctx.save();
-                        ctx.strokeStyle = link.color;
-                        ctx.lineWidth = isLinkSelected(link) ? 0.5 : 0.25;
-                        ctx.beginPath();
-                        ctx.moveTo(sx, sy);
-                        ctx.lineTo(ex, ey);
-                        ctx.stroke();
-                        ctx.restore();
+                        // Calculate point on Bézier curve at t = 0.5 (midpoint)
+                        const t = 0.5;
+                        const oneMinusT = 1 - t;
+                        textX = oneMinusT * oneMinusT * start.x + 2 * oneMinusT * t * controlX + t * t * end.x;
+                        textY = oneMinusT * oneMinusT * start.y + 2 * oneMinusT * t * controlY + t * t * end.y;
 
-                        const midX = (start.x + end.x) / 2;
-                        const midY = (start.y + end.y) / 2;
-                        const offset = link.curve / 2;
-
-                        angle = Math.atan2(end.y - start.y, end.x - start.x);
+                        // Calculate tangent angle at t = 0.5
+                        const tangentX = 2 * oneMinusT * (controlX - start.x) + 2 * t * (end.x - controlX);
+                        const tangentY = 2 * oneMinusT * (controlY - start.y) + 2 * t * (end.y - controlY);
+                        angle = Math.atan2(tangentY, tangentX);
 
                         // maintain label vertical orientation for legibility
                         if (angle > Math.PI / 2) angle = -(Math.PI - angle);
                         if (angle < -Math.PI / 2) angle = -(-Math.PI - angle);
-
-                        // Calculate perpendicular offset
-                        const perpX = -Math.sin(angle) * offset;
-                        const perpY = Math.cos(angle) * offset;
-
-                        // Adjust position to compensate for rotation around origin
-                        const cos = Math.cos(angle);
-                        const sin = Math.sin(angle);
-                        textX = midX + perpX;
-                        textY = midY + perpY;
-                        const rotatedX = textX * cos + textY * sin;
-                        const rotatedY = -textX * sin + textY * cos;
-                        textX = rotatedX;
-                        textY = rotatedY;
                     }
 
                     // Get text width
@@ -452,22 +438,23 @@ export default function ForceGraph({
                         }
                     }
 
-                    // Save the current context state
-                    ctx.save();
+                    // Use single save/restore for both background and text
+                    const padding = 0.5;
 
-                    // Rotate
+                    ctx.save();
+                    ctx.translate(textX, textY);
                     ctx.rotate(angle);
 
-                    // Draw background and text
+                    // Draw background rectangle (rotated)
                     ctx.fillStyle = '#242424';
-                    const padding = 0.5;
                     ctx.fillRect(
-                        textX - textWidth / 2 - padding,
-                        textY - textHeight / 2 - padding,
+                        -textWidth / 2 - padding,
+                        -textHeight / 2 - padding,
                         textWidth + padding * 2,
                         textHeight + padding * 2
                     );
 
+                    // Draw text
                     ctx.fillStyle = 'white';
                     ctx.textAlign = 'center';
                     ctx.textBaseline = 'middle';
