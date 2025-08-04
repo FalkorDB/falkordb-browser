@@ -52,7 +52,7 @@ Open [http://localhost:3000](http://localhost:3000) with your browser.
 > Note: to run the application with a different URL, set the NEXTAUTH_URL environment variable.
 
 ```
-docker run -p 3000:3000 -e "NEXTAUTHURL=https://www.yoururl.com" -p 6379:6379 -it --rm falkordb/falkordb:latest
+docker run -p 3000:3000 -e "NEXTAUTH_URL=https://www.yoururl.com" -p 6379:6379 -it --rm falkordb/falkordb:latest
 ```
 
 > Note: Alternativly, you can run the browser from source and database using Docker
