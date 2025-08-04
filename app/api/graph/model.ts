@@ -53,6 +53,7 @@ export type Node = NodeObject<{
     visible: boolean,
     expand: boolean,
     collapsed: boolean,
+    displayName: string,
     data: {
         [key: string]: any
     }
@@ -287,6 +288,7 @@ export class Graph {
                 visible: true,
                 expand: false,
                 collapsed,
+                displayName: "",
                 data: {}
             }
             Object.entries(cell.properties).forEach(([key, value]) => {
@@ -342,6 +344,7 @@ export class Graph {
                         expand: false,
                         collapsed,
                         visible: true,
+                        displayName: "",
                         data: {},
                     }
 
@@ -378,6 +381,7 @@ export class Graph {
                         expand: false,
                         collapsed,
                         visible: true,
+                        displayName: "",
                         data: {},
                     }
 
@@ -395,6 +399,7 @@ export class Graph {
                         expand: false,
                         collapsed,
                         visible: true,
+                        displayName: "",
                         data: {},
                     }
 
