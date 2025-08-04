@@ -435,7 +435,7 @@ export default function ForceGraph({
                     ctx.fillStyle = 'white';
                     ctx.textAlign = 'center';
                     ctx.textBaseline = 'middle';
-                    ctx.fillText(link.label, textX, textY);
+                    ctx.fillText(link.label, 0, 0);
 
                     // Restore the context to its original state
                     ctx.restore();
