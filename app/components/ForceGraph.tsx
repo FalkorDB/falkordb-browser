@@ -41,6 +41,52 @@ interface Props {
 const NODE_SIZE = 6
 const PADDING = 2;
 
+/**
+ * Determines the display text for a node based on priority order:
+ * 1. name
+ * 2. title
+ * 3. label
+ * 4. id (property, not node.id)
+ * 5. Any other string property
+ * 6. Node ID (fallback if no properties exist)
+ */
+const getNodeDisplayText = (node: Node): string => {
+    const { data } = node;
+    
+    // Priority 1: name
+    if (data.name && typeof data.name === 'string' && data.name.trim().length > 0) {
+        return data.name;
+    }
+    
+    // Priority 2: title
+    if (data.title && typeof data.title === 'string' && data.title.trim().length > 0) {
+        return data.title;
+    }
+    
+    // Priority 3: label
+    if (data.label && typeof data.label === 'string' && data.label.trim().length > 0) {
+        return data.label;
+    }
+    
+    // Priority 4: id property (different from node.id)
+    if (data.id && typeof data.id === 'string' && data.id.trim().length > 0) {
+        return data.id;
+    }
+    
+    // Priority 5: Any other string property
+    const otherStringProperty = Object.entries(data).find(([key, value]) => 
+        key !== 'name' && key !== 'title' && key !== 'label' && key !== 'id' &&
+        typeof value === 'string' && value.trim().length > 0
+    );
+    
+    if (otherStringProperty) {
+        return otherStringProperty[1];
+    }
+    
+    // Priority 6: Node ID (fallback)
+    return node.id.toString();
+};
+
 const REFERENCE_NODE_COUNT = 2000;
 const BASE_LINK_DISTANCE = 20;
 const BASE_LINK_STRENGTH = 0.5;
@@ -216,9 +262,9 @@ export default function ForceGraph({
     const handleNodeClick = async (node: Node) => {
         const now = new Date()
         const { date, name } = lastClick.current
-        lastClick.current = { date: now, name: node.data.name || node.id.toString() }
+        lastClick.current = { date: now, name: getNodeDisplayText(node) }
 
-        if (now.getTime() - date.getTime() < 1000 && name === (node.data.name || node.id.toString())) {
+        if (now.getTime() - date.getTime() < 1000 && name === getNodeDisplayText(node)) {
             if (!node.expand) {
                 await onFetchNode(node)
             } else {
@@ -286,7 +332,7 @@ export default function ForceGraph({
                 backgroundColor="#242424"
                 width={parentWidth}
                 height={parentHeight}
-                nodeLabel={(node) => type === "graph" ? node.data.name || node.id.toString() : node.category[0]}
+                nodeLabel={(node) => type === "graph" ? getNodeDisplayText(node) : node.category[0]}
                 graphData={data}
                 nodeRelSize={NODE_SIZE}
                 nodeCanvasObjectMode={() => 'after'}
@@ -334,7 +380,7 @@ export default function ForceGraph({
                         const nodeSize = NODE_SIZE * 2 - PADDING;
 
                         if (type === "graph") {
-                            name = node.data.name || node.id.toString()
+                            name = getNodeDisplayText(node)
                         } else {
                             [name] = node.category
                         }
