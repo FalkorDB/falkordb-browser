@@ -1,15 +1,12 @@
 import { getClient } from "@/app/api/auth/[...nextauth]/options";
 import { NextResponse, NextRequest } from "next/server";
+import { GET as sendQuery } from "../route";
 
 // eslint-disable-next-line import/prefer-default-export
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ graph: string }> }
 ) {
-  const encoder = new TextEncoder();
-  const { readable, writable } = new TransformStream();
-  const writer = writable.getWriter();
-
   try {
     const session = await getClient();
 
@@ -17,89 +14,65 @@ export async function GET(
       throw new Error(await session.text());
     }
 
-    const { client, user } = session;
-    const { graph: graphId } = await params;
-    const timeout = Number(request.nextUrl.searchParams.get("timeout")) || 5000;
-
     try {
-      const graph = client.selectGraph(graphId);
+      // Use optimized single query that avoids cartesian product
+      // This counts nodes once, then separately counts edges
+      const query = "MATCH (n) WITH count(n) as nodes OPTIONAL MATCH ()-[e]->() RETURN nodes, count(e) as edges";
 
-      // Execute two separate queries for optimization
-      const nodeQuery = "MATCH (n) RETURN count(n) as nodes";
-      const edgeQuery = "MATCH ()-[e]->() RETURN count(e) as edges";
+      request.nextUrl.searchParams.set("query", query);
+      const result = await sendQuery(request, { params });
 
-      const nodeResult = user.role === "Read-Only"
-        ? await graph.roQuery(nodeQuery, { TIMEOUT: timeout })
-        : await graph.query(nodeQuery, { TIMEOUT: timeout });
+      if (!result.ok) throw new Error("Something went wrong");
 
-      let edgeResult;
-      try {
-        edgeResult = user.role === "Read-Only"
-          ? await graph.roQuery(edgeQuery, { TIMEOUT: timeout })
-          : await graph.query(edgeQuery, { TIMEOUT: timeout });
-      } catch (error) {
-        // If edge query fails (e.g., no edges), create a result with count 0
-        edgeResult = {
-          data: [{ edges: 0 }],
-          header: ["edges"],
-          metadata: {}
-        };
-      }
-
-      if (!nodeResult || !edgeResult) throw new Error("Something went wrong");
-
-      // Combine results to match expected format
-      const combinedResult = {
-        data: [{
-          nodes: nodeResult.data[0].nodes,
-          edges: edgeResult.data[0].edges
-        }],
-        header: ["nodes", "edges"],
-        metadata: {
-          query_internal_execution_time: (nodeResult.metadata?.query_internal_execution_time || 0) + 
-                                       (edgeResult.metadata?.query_internal_execution_time || 0)
-        }
-      };
-
-      writer.write(
-        encoder.encode(`event: result\ndata: ${JSON.stringify(combinedResult)}\n\n`)
-      );
-      writer.close();
+      return result;
     } catch (error) {
       console.error(error);
-      writer.write(
-        encoder.encode(
-          `event: error\ndata: ${JSON.stringify({
-            message: (error as Error).message,
-            status: 400,
-          })}\n\n`
-        )
-      );
-      writer.close();
+      const encoder = new TextEncoder();
+      const stream = new ReadableStream({
+        start(controller) {
+          controller.enqueue(
+            encoder.encode(
+              `event: error\ndata: ${JSON.stringify({
+                message: (error as Error).message,
+                status: 400,
+              })}\n\n`
+            )
+          );
+          controller.close();
+        }
+      });
+
+      return new Response(stream, {
+        headers: {
+          "Content-Type": "text/event-stream",
+          "Cache-Control": "no-cache",
+          Connection: "keep-alive",
+        },
+      });
     }
   } catch (error) {
     console.error(error);
-    writer.write(
-      encoder.encode(
-        `event: error\ndata: ${JSON.stringify({
-          message: (error as Error).message,
-          status: 500,
-        })}\n\n`
-      )
-    );
-    writer.close();
+    const encoder = new TextEncoder();
+    const stream = new ReadableStream({
+      start(controller) {
+        controller.enqueue(
+          encoder.encode(
+            `event: error\ndata: ${JSON.stringify({
+              message: (error as Error).message,
+              status: 500,
+            })}\n\n`
+          )
+        );
+        controller.close();
+      }
+    });
+
+    return new Response(stream, {
+      headers: {
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache",
+        Connection: "keep-alive",
+      },
+    });
   }
-
-  // Clean up if the client disconnects early
-  request.signal.addEventListener("abort", () => {
-    writer.close();
-  });
-
-  return new Response(readable, {
-    headers: {
-      "Content-Type": "text/event-stream",
-      "Cache-Control": "no-cache",
-      Connection: "keep-alive",
-    },
-  });
 }
