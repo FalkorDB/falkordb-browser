@@ -81,7 +81,7 @@
     "zod": "^3.24.2"
   },
   "devDependencies": {
-    "@playwright/test": "^1.52.0",
+    "@playwright/test": "^1.54.2",
     "@types/cytoscape-fcose": "^2.2.4",
     "@types/lodash": "^4.17.15",
     "@types/node": "^20.19.4",
