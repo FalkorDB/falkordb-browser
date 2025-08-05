@@ -23,7 +23,7 @@ export async function GET(
 
     try {
       const query =
-        "MATCH (n) OPTIONAL MATCH (n)-[e]->() WITH count(n) as nodes, count(e) as edges RETURN nodes, edges";
+        "MATCH (n) WITH count(n) as nodes MATCH ()-[e]->() WITH nodes, count(e) as edges RETURN nodes, edges";
 
       request.nextUrl.searchParams.set("query", query);
 
