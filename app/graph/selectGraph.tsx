@@ -16,6 +16,7 @@ import ExportGraph from "../components/ExportGraph";
 import DeleteGraph from "../components/graph/DeleteGraph";
 import CloseDialog from "../components/CloseDialog";
 import DuplicateGraph from "../components/graph/DuplicateGraph";
+import CreateGraph from "../components/CreateGraph";
 import { Graph } from "../api/graph/model";
 
 interface Props {
@@ -123,6 +124,22 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
                         isSelected={(value) => selectedValue === value}
                         isLoading={isLoading}
                         searchRef={inputRef}
+                    />
+                    <CreateGraph
+                        type={type}
+                        graphNames={options}
+                        onSetGraphName={(newGraphName) => {
+                            setSelectedValue(newGraphName);
+                            setOptions([...options, newGraphName]);
+                        }}
+                        trigger={
+                            <Button
+                                className="w-fit"
+                                variant="Primary"
+                                label={`Create ${type}`}
+                                data-testid={`create${type}FromSelector`}
+                            />
+                        }
                     />
                     <DialogTrigger asChild>
                         <Button
