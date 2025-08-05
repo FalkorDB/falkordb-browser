@@ -1,6 +1,6 @@
 import { getClient } from "@/app/api/auth/[...nextauth]/options";
 import { NextResponse, NextRequest } from "next/server";
-import { GET as sendQuery } from "../route";
+
 // eslint-disable-next-line import/prefer-default-export
 export async function GET(
   request: NextRequest,
@@ -17,17 +17,54 @@ export async function GET(
       throw new Error(await session.text());
     }
 
+    const { client, user } = session;
+    const { graph: graphId } = await params;
+    const timeout = Number(request.nextUrl.searchParams.get("timeout")) || 5000;
+
     try {
-      const query =
-        "MATCH (n) WITH count(n) as nodes MATCH ()-[e]->() WITH nodes, count(e) as edges RETURN nodes, edges";
+      const graph = client.selectGraph(graphId);
 
-      request.nextUrl.searchParams.set("query", query);
+      // Execute two separate queries for optimization
+      const nodeQuery = "MATCH (n) RETURN count(n) as nodes";
+      const edgeQuery = "MATCH ()-[e]->() RETURN count(e) as edges";
 
-      const result = await sendQuery(request, { params });
+      const nodeResult = user.role === "Read-Only"
+        ? await graph.roQuery(nodeQuery, { TIMEOUT: timeout })
+        : await graph.query(nodeQuery, { TIMEOUT: timeout });
 
-      if (!result.ok) throw new Error("Something went wrong");
+      let edgeResult;
+      try {
+        edgeResult = user.role === "Read-Only"
+          ? await graph.roQuery(edgeQuery, { TIMEOUT: timeout })
+          : await graph.query(edgeQuery, { TIMEOUT: timeout });
+      } catch (error) {
+        // If edge query fails (e.g., no edges), create a result with count 0
+        edgeResult = {
+          data: [{ edges: 0 }],
+          header: ["edges"],
+          metadata: {}
+        };
+      }
 
-      return result
+      if (!nodeResult || !edgeResult) throw new Error("Something went wrong");
+
+      // Combine results to match expected format
+      const combinedResult = {
+        data: [{
+          nodes: nodeResult.data[0].nodes,
+          edges: edgeResult.data[0].edges
+        }],
+        header: ["nodes", "edges"],
+        metadata: {
+          query_internal_execution_time: (nodeResult.metadata?.query_internal_execution_time || 0) + 
+                                       (edgeResult.metadata?.query_internal_execution_time || 0)
+        }
+      };
+
+      writer.write(
+        encoder.encode(`event: result\ndata: ${JSON.stringify(combinedResult)}\n\n`)
+      );
+      writer.close();
     } catch (error) {
       console.error(error);
       writer.write(
