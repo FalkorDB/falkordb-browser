@@ -6,6 +6,7 @@ import { useSearchParams, useRouter } from "next/navigation";
 import Image from "next/image";
 import { Check, Info } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
+import { useToast } from "@/components/ui/use-toast";
 import FormComponent, { Field } from "../components/FormComponent";
 import Dropzone from "../components/ui/Dropzone";
 
@@ -14,6 +15,7 @@ const DEFAULT_PORT = "6379";
 
 export default function LoginForm() {
   const router = useRouter();
+  const { toast } = useToast();
   const [host, setHost] = useState("");
   const [port, setPort] = useState("");
   const [TLS, setTLS] = useState(false);
@@ -150,6 +152,12 @@ export default function LoginForm() {
         ...prev,
         show: false
       }))
+      
+      // Show success toast notification
+      toast({
+        title: "Certificate uploaded successfully",
+        description: `${acceptedFiles[0].name} has been uploaded and is ready for use.`,
+      })
     }
 
     reader.readAsDataURL(acceptedFiles[0])
