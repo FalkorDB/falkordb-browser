@@ -1,9 +1,9 @@
+/* eslint-disable max-classes-per-file */
 /* eslint-disable one-var */
 /* eslint-disable no-param-reassign */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 import { LinkObject, NodeObject } from "react-force-graph-2d";
-import { EdgeDataDefinition, NodeDataDefinition } from "cytoscape";
 
 export type HistoryQuery = {
   queries: Query[];
@@ -115,32 +115,150 @@ export const DEFAULT_COLORS = [
   "hsl(180, 66%, 70%)",
 ];
 
-export interface Label {
-  index: number;
+export interface InfoLabel {
   name: string;
+  color: string;
   show: boolean;
-  textWidth?: number;
+}
+
+export interface Label extends InfoLabel {
   elements: Node[];
-  textHeight?: number;
-}
-
-export interface Relationship {
-  index: number;
-  name: string;
-  show: boolean;
   textWidth?: number;
-  elements: Link[];
   textHeight?: number;
 }
 
-export interface ExtractedData {
-  data: any[][];
-  columns: string[];
-  labels: Map<string, Label>;
-  relationships: Map<string, Relationship>;
-  nodes: Map<number, NodeDataDefinition>;
-  edges: Map<number, EdgeDataDefinition>;
+export interface InfoRelationship {
+  name: string;
+  color: string;
+  show: boolean;
 }
+
+export interface Relationship extends InfoRelationship {
+  elements: Link[];
+  textWidth?: number;
+  textHeight?: number;
+}
+
+const getLabelWithFewestElements = (labels: Label[]): Label =>
+  labels.reduce(
+    (prev, label) =>
+      label.elements.length < prev.elements.length ? label : prev,
+    labels[0]
+  );
+
+export class GraphInfo {
+  private propertyKeys: string[];
+
+  private labels: Map<string, InfoLabel>;
+
+  private relationships: Map<string, InfoRelationship>;
+
+  private colors: string[];
+
+  private colorsCounter: number = 0;
+
+  constructor(
+    propertyKeys: string[],
+    labels: Map<string, InfoLabel>,
+    relationships: Map<string, InfoRelationship>,
+    colors?: string[]
+  ) {
+    this.propertyKeys = propertyKeys;
+    this.labels = labels;
+    this.relationships = relationships;
+    this.colors = colors || DEFAULT_COLORS;
+  }
+
+  get PropertyKeys(): string[] {
+    return this.propertyKeys;
+  }
+
+  get Labels(): Map<string, InfoLabel> {
+    return this.labels;
+  }
+
+  get Relationships(): Map<string, InfoRelationship> {
+    return this.relationships;
+  }
+
+  get Colors(): string[] {
+    return this.colors;
+  }
+
+  public static empty(propertyKeys?: string[], colors?: string[]): GraphInfo {
+    return new GraphInfo(propertyKeys || [], new Map(), new Map(), colors);
+  }
+
+  public static create(
+    propertyKeys: string[],
+    labels: string[],
+    relationships: string[],
+    colors?: string[]
+  ): GraphInfo {
+    const graphInfo = GraphInfo.empty(propertyKeys, colors);
+
+    graphInfo.createLabel(labels);
+    relationships.forEach((relationship) =>
+      graphInfo.createRelationship(relationship)
+    );
+
+    return graphInfo;
+  }
+
+  public createLabel(labels: string[]): InfoLabel[] {
+    return labels.map((label) => {
+      let c = this.labels.get(label);
+
+      if (!c) {
+        c = {
+          name: label,
+          color: this.getLabelColorValue(this.colorsCounter),
+          show: true,
+        };
+
+        this.colorsCounter += 1;
+        this.labels.set(label, c);
+      }
+
+      return c;
+    });
+  }
+
+  public createRelationship(relationship: string): InfoRelationship {
+    let c = this.relationships.get(relationship);
+
+    if (!c) {
+      c = {
+        name: relationship,
+        color: this.getLabelColorValue(this.colorsCounter),
+        show: true,
+      };
+
+      this.colorsCounter += 1;
+      this.relationships.set(relationship, c);
+    }
+
+    return c;
+  }
+
+  public getLabelColorValue(index: number) {
+    if (index < this.colors.length) {
+      return this.colors[index];
+    }
+
+    let newColor;
+    let i = index;
+    do {
+      newColor = `hsl(${
+        (i - Math.min(DEFAULT_COLORS.length, this.colors.length)) * 20
+      }, 100%, 70%)`;
+      i += 1;
+    } while (this.colors.includes(newColor));
+    this.colors.push(newColor);
+    return newColor;
+  }
+}
+
 export class Graph {
   private id: string;
 
@@ -160,8 +278,6 @@ export class Graph {
 
   private elements: GraphData;
 
-  private colorIndex: number = 0;
-
   private labelsMap: Map<string, Label>;
 
   private relationshipsMap: Map<string, Relationship>;
@@ -170,7 +286,7 @@ export class Graph {
 
   private linksMap: Map<number, Link>;
 
-  private COLORS_ORDER_VALUE: string[] = [];
+  private graphInfo: GraphInfo;
 
   private constructor(
     id: string,
@@ -182,8 +298,8 @@ export class Graph {
     nodesMap: Map<number, Node>,
     edgesMap: Map<number, Link>,
     currentQuery?: Query,
-    colors?: string[],
-    currentLimit?: number
+    currentLimit?: number,
+    graphInfo?: GraphInfo
   ) {
     this.id = id;
     this.columns = [];
@@ -203,9 +319,7 @@ export class Graph {
     this.nodesMap = nodesMap;
     this.linksMap = edgesMap;
     this.currentLimit = currentLimit || 0;
-    this.COLORS_ORDER_VALUE = [
-      ...(colors && colors.length > 0 ? colors : DEFAULT_COLORS),
-    ];
+    this.graphInfo = graphInfo || GraphInfo.empty();
   }
 
   get Id(): string {
@@ -280,23 +394,15 @@ export class Graph {
     return this.metadata;
   }
 
-  get Colors(): string[] {
-    return this.COLORS_ORDER_VALUE;
-  }
-
-  set Colors(colors: string[]) {
-    this.COLORS_ORDER_VALUE = colors;
-  }
-
   public getElements(): (Node | Link)[] {
     return [...this.elements.nodes, ...this.elements.links];
   }
 
   public static empty(
     graphName?: string,
-    colors?: string[],
     currentQuery?: Query,
-    currentLimit?: number
+    currentLimit?: number,
+    graphInfo?: GraphInfo
   ): Graph {
     return new Graph(
       graphName || "",
@@ -308,8 +414,8 @@ export class Graph {
       new Map<number, Node>(),
       new Map<number, Link>(),
       currentQuery,
-      colors,
-      currentLimit
+      currentLimit,
+      graphInfo
     );
   }
 
@@ -319,28 +425,26 @@ export class Graph {
     isCollapsed: boolean,
     isSchema: boolean,
     currentLimit: number,
-    colors?: string[],
-    currentQuery?: Query
+    currentQuery?: Query,
+    graphInfo?: GraphInfo
   ): Graph {
-    const graph = Graph.empty(undefined, colors, currentQuery, currentLimit);
+    const graph = Graph.empty(undefined, currentQuery, currentLimit, graphInfo);
     graph.extend(results, isCollapsed, isSchema);
     graph.id = id;
     return graph;
   }
 
   public extendNode(cell: NodeCell, collapsed: boolean, isSchema: boolean) {
-    // check if category already exists in categories
     const labels = this.createLabel(
       cell.labels.length === 0 ? [""] : cell.labels
     );
-    // check if node already exists in nodes or fake node was created
     const currentNode = this.nodesMap.get(cell.id);
 
     if (!currentNode) {
       const node: Node = {
         id: cell.id,
         labels: labels.map((l) => l.name),
-        color: this.getLabelColorValue(labels[0].index),
+        color: getLabelWithFewestElements(labels).color,
         visible: true,
         expand: false,
         collapsed,
@@ -352,31 +456,39 @@ export class Graph {
       });
       this.nodesMap.set(cell.id, node);
       this.elements.nodes.push(node);
-      node.labels.forEach((c) => {
-        this.labelsMap.get(c)!.elements.push(node);
+      labels.forEach((l) => {
+        l.elements.push(node);
       });
       return node;
     }
 
     if (currentNode.labels[0] === "") {
-      // set values in a fake node
       currentNode.id = cell.id;
       currentNode.labels = labels.map((l) => l.name);
-      currentNode.color = this.getLabelColorValue(labels[0].index);
+      currentNode.color = getLabelWithFewestElements(labels).color;
       currentNode.expand = false;
       currentNode.collapsed = collapsed;
       Object.entries(cell.properties).forEach(([key, value]) => {
         currentNode.data[key] = isSchema ? getSchemaValue(value) : value;
       });
-      currentNode.labels.forEach((c) => {
-        this.labelsMap.get(c)!.elements.push(currentNode);
+      labels.forEach((l) => {
+        l.elements.push(currentNode);
       });
-      const label = this.labelsMap.get("");
-      if (label && !currentNode.labels.includes("")) {
-        label.elements = label.elements.filter(
-          (e) => e.id !== currentNode.id
+      const emptyCategory = this.labelsMap.get("");
+
+      if (emptyCategory) {
+        emptyCategory.elements.splice(
+          emptyCategory.elements.findIndex((e) => e.id === currentNode.id),
+          1
         );
+
+        if (emptyCategory.elements.length === 0) {
+          this.labels = this.labels.filter((c) => c.name !== "");
+          this.labelsMap.delete("");
+        }
       }
+
+      return currentNode;
     }
 
     return currentNode;
@@ -387,7 +499,7 @@ export class Graph {
     const currentEdge = this.linksMap.get(cell.id);
 
     if (!currentEdge) {
-      let label;
+      let label: Label;
       let link: Link;
 
       if (cell.sourceId === cell.destinationId) {
@@ -397,8 +509,8 @@ export class Graph {
           [label] = this.createLabel([""]);
           source = {
             id: cell.sourceId,
-            labels: [label!.name],
-            color: this.getLabelColorValue(label!.index),
+            labels: [label.name],
+            color: label.color,
             expand: false,
             collapsed,
             visible: true,
@@ -406,7 +518,7 @@ export class Graph {
             data: {},
           };
 
-          label?.elements.push(source);
+          label.elements.push(source);
           this.nodesMap.set(cell.sourceId, source);
           this.elements.nodes.push(source);
         }
@@ -416,7 +528,7 @@ export class Graph {
           source,
           target: source,
           relationship: cell.relationshipType,
-          color: this.getLabelColorValue(relation.index),
+          color: relation.color,
           expand: false,
           collapsed,
           visible: true,
@@ -435,7 +547,7 @@ export class Graph {
           source = {
             id: cell.sourceId,
             labels: [label!.name],
-            color: this.getLabelColorValue(label!.index),
+            color: label!.color,
             expand: false,
             collapsed,
             visible: true,
@@ -443,7 +555,7 @@ export class Graph {
             data: {},
           };
 
-          label?.elements.push(source);
+          label!.elements.push(source);
           this.nodesMap.set(cell.sourceId, source);
           this.elements.nodes.push(source);
         }
@@ -452,7 +564,7 @@ export class Graph {
           target = {
             id: cell.destinationId,
             labels: [label!.name],
-            color: this.getLabelColorValue(label!.index),
+            color: label!.color,
             expand: false,
             collapsed,
             visible: true,
@@ -460,12 +572,9 @@ export class Graph {
             data: {},
           };
 
-          label?.elements.push(target);
+          label!.elements.push(target);
           this.nodesMap.set(cell.destinationId, target);
           this.elements.nodes.push(target);
-          target.labels.forEach((c) => {
-            this.labelsMap.get(c)!.elements.push(target!);
-          });
         }
 
         link = {
@@ -473,7 +582,7 @@ export class Graph {
           source,
           target,
           relationship: cell.relationshipType,
-          color: this.getLabelColorValue(relation.index),
+          color: relation.color,
           expand: false,
           collapsed,
           visible: true,
@@ -488,7 +597,7 @@ export class Graph {
 
       this.linksMap.set(cell.id, link);
       this.elements.links.push(link);
-      this.relationshipsMap.get(link.relationship)?.elements.push(link);
+      relation.elements.push(link);
       return link;
     }
 
@@ -561,7 +670,7 @@ export class Graph {
           curve = Math.floor((index + 1) / 2);
         }
 
-        link.curve = curve * 0.2;
+        link.curve = curve * 0.4;
       });
 
     // remove empty category if there are no more empty nodes category
@@ -579,13 +688,13 @@ export class Graph {
       let c = this.labelsMap.get(label);
 
       if (!c) {
+        const [infoLabel] = this.graphInfo.createLabel([label]);
+        
         c = {
-          name: label,
-          index: this.colorIndex,
-          show: true,
+          ...infoLabel,
           elements: [],
         };
-        this.colorIndex += 1;
+        
         this.labelsMap.set(c.name, c);
         this.labels.push(c);
       }
@@ -602,13 +711,11 @@ export class Graph {
     let l = this.relationshipsMap.get(relationship);
 
     if (!l) {
+      const infoRelationship = this.graphInfo.createRelationship(relationship);
       l = {
-        name: relationship,
-        index: this.colorIndex,
-        show: true,
+        ...infoRelationship,
         elements: [],
       };
-      this.colorIndex += 1;
       this.relationshipsMap.set(l.name, l);
       this.relationships.push(l);
     }
@@ -684,24 +791,6 @@ export class Graph {
     };
 
     return this.relationships;
-  }
-
-  public getLabelColorValue(index: number) {
-    if (index < this.COLORS_ORDER_VALUE.length) {
-      return this.COLORS_ORDER_VALUE[index];
-    }
-
-    let newColor;
-    let i = index;
-    do {
-      newColor = `hsl(${
-        (i - Math.min(DEFAULT_COLORS.length, this.COLORS_ORDER_VALUE.length)) *
-        20
-      }, 100%, 70%)`;
-      i += 1;
-    } while (this.COLORS_ORDER_VALUE.includes(newColor));
-    this.COLORS_ORDER_VALUE.push(newColor);
-    return newColor;
   }
 
   public removeElements(elements: (Node | Link)[]) {
@@ -824,7 +913,7 @@ export class Graph {
     if (selectedElement.labels.length === 0) {
       const [emptyCategory] = this.createLabel([""], selectedElement);
       selectedElement.labels.push(emptyCategory.name);
-      selectedElement.color = this.getLabelColorValue(emptyCategory.index);
+      selectedElement.color = emptyCategory.color;
     }
   }
 
@@ -865,7 +954,7 @@ export class Graph {
         selectedElement
       );
       selectedElement.labels.splice(emptyCategoryIndex, 1);
-      selectedElement.color = this.getLabelColorValue(category.index);
+      selectedElement.color = category.color;
 
       const emptyCategory = this.labelsMap.get("");
       if (emptyCategory) {

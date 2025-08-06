@@ -1,11 +1,11 @@
 'use client'
 
-import { useContext, useEffect, useRef, useState } from "react";
+import { useCallback, useContext, useEffect, useRef, useState } from "react";
 import { prepareArg, securedFetch } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
 import dynamic from "next/dynamic";
 import { ForceGraphMethods } from "react-force-graph-2d";
-import { Label, Graph, GraphData, Link, Node, Relationship } from "../api/graph/model";
+import { Label, Graph, GraphData, Link, Node, Relationship, GraphInfo } from "../api/graph/model";
 import Tutorial from "./Tutorial";
 import { GraphContext, IndicatorContext, HistoryQueryContext, QuerySettingsContext } from "../components/provider";
 
@@ -18,6 +18,7 @@ export default function Page() {
     const {
         graph,
         setGraph,
+        setGraphInfo,
         graphName,
         setGraphName,
         graphNames,
@@ -46,6 +47,34 @@ export default function Page() {
     const [data, setData] = useState<GraphData>({ ...graph.Elements })
     const [relationships, setRelationships] = useState<Relationship[]>([])
 
+    const fetchInfo = useCallback(async (type: string) => {
+        if (!graphName) return []
+
+        const result = await securedFetch(`/api/graph/${graphName}/info?type=${type}`, {
+            method: "GET",
+        }, toast, setIndicator);
+
+        if (!result.ok) return []
+
+        const json = await result.json();
+
+        return json.result.data.map(({ info }: { info: string }) => info);
+    }, [graphName, setIndicator, toast]);
+
+    useEffect(() => {
+        if (!graphName) return
+        
+        Promise.all([
+            fetchInfo("(label)"),
+            fetchInfo("(relationship type)"),
+            fetchInfo("(property key)"),
+        ]).then(async ([newLabels, newRelationships, newPropertyKeys]) => {
+            const colorsArr = JSON.parse(localStorage.getItem(graphName) || "[]")
+            const graphInfo = GraphInfo.create(newPropertyKeys, newLabels, newRelationships, colorsArr)
+            setGraphInfo(graphInfo)
+        });
+    }, [fetchInfo, setGraphInfo, toast, setIndicator, graphName, graph.Labels.length, graph.Relationships.length])
+
     useEffect(() => {
         setRelationships([...graph.Relationships])
         setLabels([...graph.Labels])
@@ -73,8 +102,7 @@ export default function Page() {
                 return
             }
 
-            const colorsArr = JSON.parse(localStorage.getItem(graphName) || "[]")
-            setGraph(Graph.empty(graphName, colorsArr))
+            setGraph(Graph.empty(graphName))
         }
 
         fetchCount()

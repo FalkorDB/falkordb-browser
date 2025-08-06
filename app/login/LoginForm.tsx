@@ -110,14 +110,14 @@ export default function LoginForm() {
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
 
-    // Validate TLS requirements on the frontend
-    if (TLS && (!CA || CA.trim() === "")) {
-      setError({
-        message: "Certificate is required for TLS connections.",
-        show: true
-      });
-      return;
-    }
+    // // Validate TLS requirements on the frontend
+    // if (TLS && (!CA || CA.trim() === "")) {
+    //   setError({
+    //     message: "Certificate is required for TLS connections.",
+    //     show: true
+    //   });
+    //   return;
+    // }
 
     const params: SignInOptions = {
       redirect: false,

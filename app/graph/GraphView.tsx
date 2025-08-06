@@ -217,7 +217,7 @@ function GraphView({
                     <div className="h-full z-10 absolute top-12 inset-x-12 pointer-events-none flex gap-8">
                         {
                             (labels.length > 0 || relationships.length > 0) &&
-                            <Labels graph={graph} labels={labels} onClick={onLabelClick} label="Labels" type="Graph" />
+                            <Labels labels={labels} onClick={onLabelClick} label="Labels" type="Graph" />
                         }
                         <div className="w-1 grow h-fit">
                             <Toolbar
@@ -232,7 +232,7 @@ function GraphView({
                         </div>
                         {
                             (labels.length > 0 || relationships.length > 0) &&
-                            <Labels graph={graph} labels={relationships} onClick={onRelationshipClick} label="Relationships" type="Graph" />
+                            <Labels labels={relationships} onClick={onRelationshipClick} label="Relationships" type="Graph" />
                         }
                     </div>
                 }

@@ -123,13 +123,9 @@ export default function ForceGraph({
     }, [parentRef, setParentHeight, setParentWidth])
 
     useEffect(() => {
-        console.time("engine");
-
         if (!chartRef.current) return;
 
         const nodeCount = data.nodes.length;
-
-        console.log(nodeCount);
 
         // Use Math.min/Math.max for capping
         const linkDistance = Math.max(Math.min(BASE_LINK_DISTANCE * Math.sqrt(nodeCount) / Math.sqrt(REFERENCE_NODE_COUNT), 120), 20);
@@ -474,12 +470,9 @@ export default function ForceGraph({
                 onBackgroundClick={handleUnselected}
                 onBackgroundRightClick={handleUnselected}
                 onEngineStop={async () => {
-                    console.timeEnd("engine")
                     if (cooldownTicks === 0) return
 
-                    console.time("zooming")
                     handleZoomToFit(chartRef, undefined, data.nodes.length < 2 ? 4 : undefined)
-                    console.timeEnd("zooming")
                     setTimeout(() => handleCooldown(0), 1000)
                 }}
                 linkCurvature="curve"

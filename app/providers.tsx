@@ -8,7 +8,7 @@ import { fetchOptions, formatName, getDefaultQuery, getQueryWithLimit, getSSEGra
 import { useToast } from "@/components/ui/use-toast";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import LoginVerification from "./loginVerification";
-import { Graph, HistoryQuery } from "./api/graph/model";
+import { Graph, GraphInfo, HistoryQuery } from "./api/graph/model";
 import Header from "./components/Header";
 import { GraphContext, HistoryQueryContext, IndicatorContext, QuerySettingsContext, SchemaContext } from "./components/provider";
 
@@ -29,6 +29,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
   const [graphNames, setGraphNames] = useState<string[]>([])
   const [schema, setSchema] = useState<Graph>(Graph.empty())
   const [graph, setGraph] = useState<Graph>(Graph.empty())
+  const [graphInfo, setGraphInfo] = useState<GraphInfo>(GraphInfo.empty())
   const [schemaName, setSchemaName] = useState<string>("")
   const [graphName, setGraphName] = useState<string>("")
   const [contentPersistence, setContentPersistence] = useState(false)
@@ -128,13 +129,9 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
   const handleCooldown = useCallback((ticks?: 0, isSetLoading: boolean = true) => {
     if (typeof window !== 'undefined') {
       setCooldownTicks(ticks)
+      
       if (isSetLoading) {
         setIsLoading(ticks !== 0)
-        if (ticks !== 0) {
-          console.time("cooldown")
-        } else {
-          console.timeEnd("cooldown")
-        }
       }
 
       const canvas = document.querySelector('.force-graph-container canvas');
@@ -171,7 +168,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
     const explainJson = await explain.json()
     const newQuery = { text: q, metadata: result.metadata, explain: explainJson.result, profile: [] }
     const queryArr = historyQuery.queries.some(qu => qu.text === q) ? historyQuery.queries : [...historyQuery.queries, newQuery]
-    const g = Graph.create(n, result, false, false, limit, graph.Colors, newQuery)
+    const g = Graph.create(n, result, false, false, limit, newQuery, graphInfo)
 
     setHistoryQuery(prev => ({
       ...prev,
@@ -190,11 +187,13 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
     // @ts-ignore
     window.graph = g
 
-  }, [graphName, toast, setIndicator, historyQuery.queries, historyQuery.counter, setHistoryQuery, limit, graph.Colors, setGraph, fetchCount, handleCooldown]);
+  }, [graphName, toast, setIndicator, historyQuery.queries, historyQuery.counter, setHistoryQuery, limit, setGraph, fetchCount, handleCooldown]);
 
   const graphContext = useMemo(() => ({
     graph,
     setGraph,
+    graphInfo,
+    setGraphInfo,
     graphName,
     setGraphName,
     graphNames,

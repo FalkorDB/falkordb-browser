@@ -199,11 +199,11 @@ export default function SchemaView({
                     <div className="h-full z-10 absolute top-12 inset-x-12 pointer-events-none flex gap-8 justify-between">
                         {
                             (labels.length > 0) &&
-                            <Labels graph={schema} type="Schema" className="left-2" label="Labels" labels={labels} onClick={onLabelClick} />
+                            <Labels type="Schema" className="left-2" label="Labels" labels={labels} onClick={onLabelClick} />
                         }
                         {
                             (relationships.length > 0) &&
-                            <Labels graph={schema} type="Schema" className="right-2 text-end" label="Relationships" labels={relationships} onClick={onRelationshipClick} />
+                            <Labels type="Schema" className="right-2 text-end" label="Relationships" labels={relationships} onClick={onRelationshipClick} />
                         }
                     </div>
                 }

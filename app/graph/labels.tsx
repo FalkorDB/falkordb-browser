@@ -1,11 +1,10 @@
 import { useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import { ChevronDown, ChevronUp } from "lucide-react";
-import { Label, Graph, Relationship } from "../api/graph/model";
+import { Label, Relationship } from "../api/graph/model";
 import Button from "../components/ui/Button";
 
 interface Props<T extends Label | Relationship> {
-    graph: Graph,
     labels: T[],
     onClick: (label: T) => void,
     label: "Relationships" | "Labels",
@@ -13,7 +12,7 @@ interface Props<T extends Label | Relationship> {
     className?: string,
 }
 
-export default function Labels<T extends Label | Relationship>({ graph, labels, onClick, label, type, className = "" }: Props<T>) {
+export default function Labels<T extends Label | Relationship>({ labels, onClick, label, type, className = "" }: Props<T>) {
 
     const listRef = useRef<HTMLUListElement>(null)
 
@@ -59,7 +58,7 @@ export default function Labels<T extends Label | Relationship>({ graph, labels, 
                                         setReload(prev => !prev)
                                     }}
                                 >
-                                    <div style={{ backgroundColor: graph.getLabelColorValue(l.index) }} className={cn("min-w-6 min-h-6 rounded-full")} />
+                                    <div style={{ backgroundColor: l.color }} className={cn("min-w-6 min-h-6 rounded-full")} />
                                 </Button>
                             </li>
                         ))

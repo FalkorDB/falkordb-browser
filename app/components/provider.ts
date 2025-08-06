@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createContext, Dispatch, SetStateAction } from "react";
-import { Graph, HistoryQuery } from "../api/graph/model";
+import { Graph, GraphInfo, HistoryQuery } from "../api/graph/model";
 
 type QuerySettingsContextType = {
   newSettings: {
@@ -56,6 +56,8 @@ type QuerySettingsContextType = {
 type GraphContextType = {
   graph: Graph;
   setGraph: Dispatch<SetStateAction<Graph>>;
+  graphInfo: GraphInfo;
+  setGraphInfo: Dispatch<SetStateAction<GraphInfo>>;
   graphName: string;
   setGraphName: Dispatch<SetStateAction<string>>;
   graphNames: string[];
@@ -126,6 +128,8 @@ export const QuerySettingsContext = createContext<QuerySettingsContextType>({
 export const GraphContext = createContext<GraphContextType>({
   graph: Graph.empty(),
   setGraph: () => {},
+  graphInfo: GraphInfo.empty(),
+  setGraphInfo: () => {},
   graphName: "",
   setGraphName: () => {},
   graphNames: [],

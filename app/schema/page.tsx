@@ -71,8 +71,7 @@ export default function Page() {
         }, toast, setIndicator)
         if (!result.ok) return
         const json = await result.json()
-        const colors = localStorage.getItem(schemaName)?.split(/[[\]",]/).filter(c => c)
-        const schemaGraph = Graph.create(schemaName, json.result, false, true, 0, colors)
+        const schemaGraph = Graph.create(schemaName, json.result, false, true, 0)
         setSchema(schemaGraph)
         // eslint-disable-next-line @typescript-eslint/ban-ts-comment
         // @ts-ignore

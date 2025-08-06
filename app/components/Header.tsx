@@ -19,7 +19,7 @@ import { useToast } from "@/components/ui/use-toast";
 import Button from "./ui/Button";
 import CreateGraph from "./CreateGraph";
 import { IndicatorContext, QuerySettingsContext } from "./provider";
-import GraphInfo from "../graph/graphInfo";
+import GraphInfoPanel from "../graph/graphInfo";
 
 interface Props {
     onSetGraphName: (newGraphName: string) => void
@@ -213,7 +213,7 @@ export default function Header({ onSetGraphName, graphNames, graphName }: Props)
             </div>
             {
                 showGraphInfo &&
-                <GraphInfo onClose={() => {
+                <GraphInfoPanel onClose={() => {
                     setCurrentPanel(undefined)
                 }} />
             }
