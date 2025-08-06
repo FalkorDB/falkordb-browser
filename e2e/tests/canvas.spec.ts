@@ -262,7 +262,7 @@ test.describe('Canvas Tests', () => {
 
     const testLabels = ["Person", "Female"];
     testLabels.forEach(async (label) => {
-        test.only(`@admin Multi-labeled node remains visible when toggling ${label}`, async () => {
+        test(`@admin Multi-labeled node remains visible when toggling ${label}`, async () => {
             const graphName = getRandomString('graph');
             await apicalls.addGraph(graphName);
             const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
