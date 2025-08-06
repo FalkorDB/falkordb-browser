@@ -41,6 +41,14 @@ interface Props {
 const NODE_SIZE = 6
 const PADDING = 2;
 
+const DISPLAY_TEXT_PRIORITY = [
+    "name",
+    "title",
+    "label",
+    "id",
+    "displayName"
+]
+
 /**
  * Determines the display text for a node based on priority order:
  * 1. name
@@ -52,39 +60,19 @@ const PADDING = 2;
  */
 const getNodeDisplayText = (node: Node): string => {
     const { data } = node;
-    
-    // Priority 1: name
-    if (data.name && typeof data.name === 'string' && data.name.trim().length > 0) {
-        return data.name;
-    }
-    
-    // Priority 2: title
-    if (data.title && typeof data.title === 'string' && data.title.trim().length > 0) {
-        return data.title;
-    }
-    
-    // Priority 3: label
-    if (data.label && typeof data.label === 'string' && data.label.trim().length > 0) {
-        return data.label;
-    }
-    
-    // Priority 4: id property (different from node.id)
-    if (data.id && typeof data.id === 'string' && data.id.trim().length > 0) {
-        return data.id;
-    }
-    
-    // Priority 5: Any other string property
-    const otherStringProperty = Object.entries(data).find(([key, value]) => 
+
+    const displayText = DISPLAY_TEXT_PRIORITY.find(priority =>
+        data[priority] && typeof data[priority] === 'string' && data[priority].trim().length > 0
+    )
+
+    if (displayText) return data[displayText];
+
+    const otherStringProperty = Object.entries(data).find(([key, value]) =>
         key !== 'name' && key !== 'title' && key !== 'label' && key !== 'id' &&
         typeof value === 'string' && value.trim().length > 0
-    );
-    
-    if (otherStringProperty) {
-        return otherStringProperty[1];
-    }
-    
-    // Priority 6: Node ID (fallback)
-    return node.id.toString();
+    )
+
+    return otherStringProperty?.[1] || node.id.toString();
 };
 
 const REFERENCE_NODE_COUNT = 2000;
