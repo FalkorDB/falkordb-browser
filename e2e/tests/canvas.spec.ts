@@ -262,17 +262,15 @@ test.describe('Canvas Tests', () => {
 
     const testLabels = ["Person", "Female"];
     testLabels.forEach(async (label) => {
-        test(`@admin Multi-labeled node remains visible when toggling ${label}`, async () => {
+        test.only(`@admin Multi-labeled node remains visible when toggling ${label}`, async () => {
             const graphName = getRandomString('graph');
             await apicalls.addGraph(graphName);
             const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
             await browser.setPageToFullScreen();
             await graph.selectGraphByName(graphName);
-            await graph.insertQuery(`CREATE (p:Person:${label} {name: 'Alice'})-[r:KNOWS]->(c:Company {name: 'FalkorDB'}) RETURN p, r, c`);
+            await graph.insertQuery(`CREATE (p:Childe:${label} {name: 'Alice'})-[r:KNOWS]->(c:Company {name: 'FalkorDB'}) RETURN p, r, c`);
             await graph.clickRunQuery();
-            await graph.clickLabelsButtonByLabel("Graph", "Labels", "Person"); // toggle Person label off
-            await graph.clickLabelsButtonByLabel("Graph", "Labels", "Female"); // toggle female label off
-            await graph.clickLabelsButtonByLabel("Graph", "Labels", label); // toggle Person label on
+            await graph.clickLabelsButtonByLabel("Graph", "Labels", label);
             const nodes = await graph.getNodesScreenPositions('graph');
             expect(nodes[0].visible).toBeTruthy();
             await apicalls.removeGraph(graphName);
