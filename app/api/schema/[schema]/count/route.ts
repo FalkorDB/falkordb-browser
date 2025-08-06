@@ -1,5 +1,4 @@
 import { getClient } from "@/app/api/auth/[...nextauth]/options";
-import { GET as sendQuery } from "@/app/api/graph/[graph]/route";
 import { NextResponse, NextRequest } from "next/server";
 
 // eslint-disable-next-line import/prefer-default-export
@@ -14,25 +13,66 @@ export async function GET(
       throw new Error(await session.text());
     }
 
+    const { client, user } = session;
+
     const { schema } = await params;
     const schemaName = `${schema}_schema`;
 
     try {
-      // Use optimized single query that avoids cartesian product
-      // This counts nodes once, then separately counts edges
-      const query = "MATCH (n) WITH count(n) as nodes OPTIONAL MATCH ()-[e]->() RETURN nodes, count(e) as edges";
+      // Run two separate queries for optimal performance
+      const nodes_query = "MATCH (n) RETURN count(n)";
+      const edges_query = "MATCH ()-[e]->() RETURN count(e)";
 
-      request.nextUrl.searchParams.set("query", query);
+      const graph = client.selectGraph(schemaName);
 
-      const result = await sendQuery(request, {
-        params: new Promise((resolve) => {
-          resolve({ graph: schemaName });
-        }),
+      // Execute both queries
+      const nodesResult = user.role === "Read-Only" 
+        ? await graph.roQuery(nodes_query)
+        : await graph.query(nodes_query);
+      
+      const edgesResult = user.role === "Read-Only"
+        ? await graph.roQuery(edges_query) 
+        : await graph.query(edges_query);
+
+      if (!nodesResult || !edgesResult) {
+        throw new Error("Failed to execute count queries");
+      }
+
+      // Extract counts from results
+      const nodesCount = nodesResult.data[0]["count(n)"];
+      const edgesCount = edgesResult.data[0]["count(e)"];
+
+      // Create combined response
+      const combinedResult = {
+        data: [{
+          nodes: nodesCount,
+          edges: edgesCount
+        }],
+        metadata: {
+          resultSet: 1,
+          runTimeMs: (nodesResult.metadata?.runTimeMs || 0) + (edgesResult.metadata?.runTimeMs || 0)
+        }
+      };
+
+      const encoder = new TextEncoder();
+      const stream = new ReadableStream({
+        start(controller) {
+          controller.enqueue(
+            encoder.encode(
+              `event: result\ndata: ${JSON.stringify(combinedResult)}\n\n`
+            )
+          );
+          controller.close();
+        }
       });
 
-      if (!result.ok) throw new Error("Something went wrong");
-
-      return result;
+      return new Response(stream, {
+        headers: {
+          "Content-Type": "text/event-stream",
+          "Cache-Control": "no-cache",
+          Connection: "keep-alive",
+        },
+      });
     } catch (error) {
       console.error(error);
       const encoder = new TextEncoder();
