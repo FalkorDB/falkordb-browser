@@ -1,6 +1,11 @@
 import { getClient } from "@/app/api/auth/[...nextauth]/options";
 import { NextResponse, NextRequest } from "next/server";
-import { GET as sendQuery } from "../route";
+
+interface CountResult {
+  nodes?: number;
+  edges?: number;
+}
+
 // eslint-disable-next-line import/prefer-default-export
 export async function GET(
   request: NextRequest,
@@ -17,17 +22,49 @@ export async function GET(
       throw new Error(await session.text());
     }
 
+    const { client, user } = session;
+    const { graph: graphId } = await params;
+
     try {
-      const query =
-        "MATCH (n) OPTIONAL MATCH (n)-[e]->() WITH count(n) as nodes, count(e) as edges RETURN nodes, edges";
+      const graph = client.selectGraph(graphId);
 
-      request.nextUrl.searchParams.set("query", query);
+      // Execute two separate queries for accurate counts
+      const nodesQuery = "MATCH (n) RETURN count(n) as nodes";
+      const edgesQuery = "MATCH ()-[e]->() RETURN count(e) as edges";
 
-      const result = await sendQuery(request, { params });
+      // Execute nodes count query
+      const nodesResult = user.role === "Read-Only"
+        ? await graph.roQuery(nodesQuery)
+        : await graph.query(nodesQuery);
 
-      if (!result.ok) throw new Error("Something went wrong");
+      // Execute edges count query  
+      const edgesResult = user.role === "Read-Only"
+        ? await graph.roQuery(edgesQuery)
+        : await graph.query(edgesQuery);
 
-      return result
+      if (!nodesResult || !edgesResult) throw new Error("Something went wrong");
+
+      // Combine results into expected format
+      const nodes = (nodesResult.data && nodesResult.data[0] && (nodesResult.data[0] as CountResult).nodes) || 0;
+      const edges = (edgesResult.data && edgesResult.data[0] && (edgesResult.data[0] as CountResult).edges) || 0;
+
+      const combinedResult = {
+        ...nodesResult,
+        data: [{ nodes, edges }]
+      };
+
+      writer.write(
+        encoder.encode(`event: result\ndata: ${JSON.stringify(combinedResult)}\n\n`)
+      );
+      writer.close();
+
+      return new Response(readable, {
+        headers: {
+          "Content-Type": "text/event-stream",
+          "Cache-Control": "no-cache",
+          Connection: "keep-alive",
+        },
+      });
     } catch (error) {
       console.error(error);
       writer.write(
