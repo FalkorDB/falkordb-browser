@@ -269,9 +269,9 @@ export default function ForceGraph({
         setSelectedElements([])
     }
 
-    const isLinkSelected = (link: Link) => ((selectedElement && ("source" in selectedElement) && selectedElement.id === link.source.id)
-        || (hoverElement && ("source" in hoverElement) && hoverElement.id === link.source.id)
-        || (selectedElements.length > 0 && selectedElements.some(el => el.id === link.source.id && ("source" in el))))
+    const isLinkSelected = (link: Link) => ((selectedElement && ("source" in selectedElement) && selectedElement.id === link.id)
+        || (hoverElement && ("source" in hoverElement) && hoverElement.id === link.id)
+        || (selectedElements.length > 0 && selectedElements.some(el => el.id === link.id && ("source" in el))))
 
     return (
         <div ref={parentRef} className="w-full h-full relative">

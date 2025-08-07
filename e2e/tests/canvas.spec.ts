@@ -242,4 +242,110 @@ test.describe('Canvas Tests', () => {
         await apicalls.removeGraph(graphName);
     });
 
+    test(`@admin Validate label toggle does not hide multi-labeled node`, async () => {
+        const graphName = getRandomString('graph');
+        await apicalls.addGraph(graphName);
+        const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+        await browser.setPageToFullScreen();
+        await graph.selectGraphByName(graphName);
+        await graph.insertQuery("CREATE (p:Person:Female {name: 'Alice'})-[r:KNOWS]->(c:Company {name: 'FalkorDB'}) RETURN p, r, c");
+        await graph.clickRunQuery();
+        await graph.clickLabelsButtonByLabel("Graph", "Labels", "Person");
+        let nodes = await graph.getNodesScreenPositions('graph');
+        expect(nodes[0].visible).toBeTruthy();
+        
+        await graph.clickLabelsButtonByLabel("Graph", "Labels", "Female");
+        nodes = await graph.getNodesScreenPositions('graph');
+        expect(nodes[0].visible).toBeFalsy();
+        await apicalls.removeGraph(graphName);
+    });
+
+    const testLabels = ["Person", "Female"];
+    testLabels.forEach(async (label) => {
+        test(`@admin Multi-labeled node remains visible when toggling ${label}`, async () => {
+            const graphName = getRandomString('graph');
+            await apicalls.addGraph(graphName);
+            const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+            await browser.setPageToFullScreen();
+            await graph.selectGraphByName(graphName);
+            await graph.insertQuery(`CREATE (p:Childe:${label} {name: 'Alice'})-[r:KNOWS]->(c:Company {name: 'FalkorDB'}) RETURN p, r, c`);
+            await graph.clickRunQuery();
+            await graph.clickLabelsButtonByLabel("Graph", "Labels", label);
+            const nodes = await graph.getNodesScreenPositions('graph');
+            expect(nodes[0].visible).toBeTruthy();
+            await apicalls.removeGraph(graphName);
+        });
+    });
+
+    test(`@admin Validate initial visibility with overlapping and multi labels`, async () => {
+        const graphName = getRandomString('graph');
+        await apicalls.addGraph(graphName);
+        const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+        await browser.setPageToFullScreen();
+        await graph.selectGraphByName(graphName);
+        await graph.insertQuery(`CREATE (alice:Person:Female {name: 'Alice'}), (bob:Person:Male {name: 'Bob'}) RETURN alice, bob`);
+        await graph.clickRunQuery();
+      
+        await graph.clickLabelsButtonByLabel("Graph", "Labels", "Female");
+        const nodes = await graph.getNodesScreenPositions('graph');
+        // Alice has Female label, so should be visible
+        const aliceNode = nodes.find(n => n.data?.name === 'Alice');
+        expect(aliceNode.visible).toBeTruthy();
+        // Bob does not have Female label, so should still be visible
+        const bobNode = nodes.find(n => n.data?.name === 'Bob');
+        expect(bobNode.visible).toBeTruthy();
+        await apicalls.removeGraph(graphName);
+      });
+      
+      test(`@admin Validate progressive visibility changes when labels toggled off with overlapping and multi labels`, async () => {
+        const graphName = getRandomString('graph');
+        await apicalls.addGraph(graphName);
+        const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+        await browser.setPageToFullScreen();
+        await graph.selectGraphByName(graphName);
+        await graph.insertQuery(`CREATE (alice:Person:Female {name: 'Alice'}), (bob:Person:Male {name: 'Bob'}) RETURN alice, bob`);
+        await graph.clickRunQuery();
+      
+        await graph.clickLabelsButtonByLabel("Graph", "Labels", "Female");
+        // Toggle off 'Person' — now Alice should be hidden
+        await graph.clickLabelsButtonByLabel("Graph", "Labels", "Person");
+        let nodes = await graph.getNodesScreenPositions('graph');
+        expect(nodes.find(n => n.data?.name === 'Alice').visible).toBeFalsy();
+        // Bob should still be visible
+        expect(nodes.find(n => n.data?.name === 'Bob').visible).toBeTruthy();
+      
+        // Toggle 'Male' off — Alice should still be hidden and Bob should be hidden
+        await graph.clickLabelsButtonByLabel("Graph", "Labels", "Male");
+        nodes = await graph.getNodesScreenPositions('graph');
+        expect(nodes.find(n => n.data?.name === 'Alice').visible).toBeFalsy();
+        expect(nodes.find(n => n.data?.name === 'Bob').visible).toBeFalsy();
+        await apicalls.removeGraph(graphName);
+      });
+      
+      test(`@admin Validate progressive visibility restoration when labels toggled back on with overlapping and multi labels`, async () => {
+        const graphName = getRandomString('graph');
+        await apicalls.addGraph(graphName);
+        const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+        await browser.setPageToFullScreen();
+        await graph.selectGraphByName(graphName);
+        await graph.insertQuery(`CREATE (alice:Person:Female {name: 'Alice'}), (bob:Person:Male {name: 'Bob'}) RETURN alice, bob`);
+        await graph.clickRunQuery();
+      
+        await graph.clickLabelsButtonByLabel("Graph", "Labels", "Female");
+        await graph.clickLabelsButtonByLabel("Graph", "Labels", "Person");
+        await graph.clickLabelsButtonByLabel("Graph", "Labels", "Male");
+        // toggle female back on — Alice visible again
+        await graph.clickLabelsButtonByLabel("Graph", "Labels", "Female");
+        let nodes = await graph.getNodesScreenPositions('graph');
+        expect(nodes.find(n => n.data?.name === 'Alice').visible).toBeTruthy();
+        expect(nodes.find(n => n.data?.name === 'Bob').visible).toBeFalsy();
+      
+        // Toggle 'Male' back on — Alice should and bob should be visible
+        await graph.clickLabelsButtonByLabel("Graph", "Labels", "Male");
+        nodes = await graph.getNodesScreenPositions('graph');
+        expect(nodes.find(n => n.data?.name === 'Alice').visible).toBeTruthy();
+        expect(nodes.find(n => n.data?.name === 'Bob').visible).toBeTruthy();
+        await apicalls.removeGraph(graphName);
+    });
+
 })

@@ -114,12 +114,8 @@ function GraphView({
         category.show = !category.show
 
         category.elements.forEach((node) => {
-            if (node.category[0] !== category.name) return
-            if (category.show) {
-                node.visible = true
-            } else {
-                node.visible = false
-            }
+            if (!category.show && node.category.some(c => graph.CategoriesMap.get(c)?.show !== category.show)) return
+            node.visible = category.show
         })
 
         graph.visibleLinks(category.show)
@@ -132,11 +128,7 @@ function GraphView({
         label.show = !label.show
 
         label.elements.filter((link) => link.source.visible && link.target.visible).forEach((link) => {
-            if (label.show) {
-                link.visible = true
-            } else {
-                link.visible = false
-            }
+            link.visible = label.show
         })
 
         graph.LabelsMap.set(label.name, label)
