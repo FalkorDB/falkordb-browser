@@ -1,5 +1,4 @@
 import { getClient } from "@/app/api/auth/[...nextauth]/options";
-import { GET as sendQuery } from "@/app/api/graph/[graph]/route";
 import { NextResponse, NextRequest } from "next/server";
 
 // eslint-disable-next-line import/prefer-default-export
@@ -18,24 +17,45 @@ export async function GET(
       throw new Error(await session.text());
     }
 
+    const { client, user } = session;
     const { schema } = await params;
     const schemaName = `${schema}_schema`;
 
     try {
-      const query =
-        "MATCH (n) OPTIONAL MATCH (n)-[e]->() WITH count(n) as nodes, count(e) as edges RETURN nodes, edges";
+      const graph = client.selectGraph(schemaName);
 
-      request.nextUrl.searchParams.set("query", query);
+      // Execute two separate queries for accurate counts
+      const nodesQuery = "MATCH (n) RETURN count(n) as nodes";
+      const edgesQuery = "MATCH ()-[e]->() RETURN count(e) as edges";
 
-      const result = await sendQuery(request, {
-        params: new Promise((resolve) => {
-          resolve({ graph: schemaName });
-        }),
+      // Execute nodes count query
+      const nodesResult = user.role === "Read-Only"
+        ? await graph.roQuery(nodesQuery)
+        : await graph.query(nodesQuery);
+
+      // Execute edges count query  
+      const edgesResult = user.role === "Read-Only"
+        ? await graph.roQuery(edgesQuery)
+        : await graph.query(edgesQuery);
+
+      if (!nodesResult || !edgesResult) throw new Error("Something went wrong");
+
+      // Combine results into expected format
+      const nodes = (nodesResult.data && nodesResult.data[0] && (nodesResult.data[0] as { nodes: number }).nodes) || 0;
+      const edges = (edgesResult.data && edgesResult.data[0] && (edgesResult.data[0] as { edges: number }).edges) || 0;
+
+      writer.write(
+        encoder.encode(`event: result\ndata: ${JSON.stringify({ nodes, edges })}\n\n`)
+      );
+      writer.close();
+
+      return new Response(readable, {
+        headers: {
+          "Content-Type": "text/event-stream",
+          "Cache-Control": "no-cache",
+          Connection: "keep-alive",
+        },
       });
-
-      if (!result.ok) throw new Error("Something went wrong");
-
-      return result;
     } catch (error) {
       console.error(error);
       writer.write(
