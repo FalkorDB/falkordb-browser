@@ -1,11 +1,6 @@
 import { getClient } from "@/app/api/auth/[...nextauth]/options";
 import { NextResponse, NextRequest } from "next/server";
 
-interface CountResult {
-  nodes?: number;
-  edges?: number;
-}
-
 // eslint-disable-next-line import/prefer-default-export
 export async function GET(
   request: NextRequest,
@@ -45,16 +40,11 @@ export async function GET(
       if (!nodesResult || !edgesResult) throw new Error("Something went wrong");
 
       // Combine results into expected format
-      const nodes = (nodesResult.data && nodesResult.data[0] && (nodesResult.data[0] as CountResult).nodes) || 0;
-      const edges = (edgesResult.data && edgesResult.data[0] && (edgesResult.data[0] as CountResult).edges) || 0;
-
-      const combinedResult = {
-        ...nodesResult,
-        data: [{ nodes, edges }]
-      };
+      const nodes = (nodesResult.data && nodesResult.data[0] && (nodesResult.data[0] as { nodes: number }).nodes) || 0;
+      const edges = (edgesResult.data && edgesResult.data[0] && (edgesResult.data[0] as { edges: number }).edges) || 0;
 
       writer.write(
-        encoder.encode(`event: result\ndata: ${JSON.stringify(combinedResult)}\n\n`)
+        encoder.encode(`event: result\ndata: ${JSON.stringify({ nodes, edges })}\n\n`)
       );
       writer.close();
 
