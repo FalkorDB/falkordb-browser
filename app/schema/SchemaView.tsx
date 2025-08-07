@@ -65,7 +65,7 @@ export default function SchemaView({
     isLoading
 }: Props) {
     const { setIndicator } = useContext(IndicatorContext)
-    const { schema } = useContext(SchemaContext)
+    const { schema, schemaName } = useContext(SchemaContext)
 
     const { toast } = useToast()
 
@@ -157,8 +157,9 @@ export default function SchemaView({
             <div className="pointer-events-none absolute bottom-4 inset-x-12 z-20 flex items-center justify-between">
                 <GraphDetails
                     graph={schema}
-                    edgesCount={edgesCount}
+                    graphName={schemaName}
                     nodesCount={nodesCount}
+                    edgesCount={edgesCount}
                 />
                 {
                     schema.getElements().length > 0 &&

@@ -60,6 +60,7 @@ function GraphView({
 }: Props) {
 
     const { graph } = useContext(GraphContext)
+
     const [parentHeight, setParentHeight] = useState<number>(0)
     const [parentWidth, setParentWidth] = useState<number>(0)
     const [tabsValue, setTabsValue] = useState<Tab>("Graph")
@@ -77,12 +78,14 @@ function GraphView({
     }, [graph])
 
     useEffect(() => {
+        setData({ ...graph.Elements })
+
         if (!elementsLength) return;
         setData({ ...graph.Elements })
     }, [graph, elementsLength, setData])
 
     useEffect(() => {
-        if (isTabEnabled(tabsValue)) return
+        if (tabsValue !== "Metadata" && isTabEnabled(tabsValue)) return
 
         let defaultChecked: Tab = "Graph"
         if (graph.getElements().length !== 0) defaultChecked = "Graph"
@@ -90,7 +93,7 @@ function GraphView({
         else if (graph.CurrentQuery && graph.CurrentQuery.metadata.length > 0 && graph.Metadata.length > 0 && graph.CurrentQuery.explain.length > 0) defaultChecked = "Metadata"
 
         setTabsValue(defaultChecked);
-    }, [graph, graph.Id, elementsLength, graph.Data.length, isTabEnabled, tabsValue])
+    }, [graph, graph.Id, elementsLength, graph.Data.length, isTabEnabled])
 
     useEffect(() => {
         if (tabsValue === "Graph" && graph.Elements.nodes.length > 0) {
@@ -107,12 +110,8 @@ function GraphView({
         label.show = !label.show
 
         label.elements.forEach((node) => {
-            if (node.labels[0] !== label.name) return
-            if (label.show) {
-                node.visible = true
-            } else {
-                node.visible = false
-            }
+            if (!label.show && node.labels.some(c => graph.LabelsMap.get(c)?.show !== label.show)) return
+            node.visible = label.show
         })
 
         graph.visibleLinks(label.show)
@@ -125,11 +124,7 @@ function GraphView({
         relationship.show = !relationship.show
 
         relationship.elements.filter((link) => link.source.visible && link.target.visible).forEach((link) => {
-            if (relationship.show) {
-                link.visible = true
-            } else {
-                link.visible = false
-            }
+            link.visible = relationship.show
         })
 
         graph.RelationshipsMap.set(relationship.name, relationship)
@@ -141,6 +136,7 @@ function GraphView({
             <div className={cn("flex gap-4 justify-between items-end", tabsValue === "Table" ? "py-4 px-12" : "absolute bottom-4 inset-x-12 pointer-events-none z-20")}>
                 <GraphDetails
                     graph={graph}
+                    tabsValue={tabsValue}
                 />
                 <TabsList className="bg-transparent flex gap-2 pointer-events-auto">
                     <TabsTrigger

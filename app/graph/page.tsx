@@ -50,6 +50,7 @@ export default function Page() {
 
     const chartRef = useRef<ForceGraphMethods<Node, Link>>()
 
+    const [isQueryLoading, setIsQueryLoading] = useState(true)
     const [selectedElement, setSelectedElement] = useState<Node | Link | undefined>()
     const [selectedElements, setSelectedElements] = useState<(Node | Link)[]>([])
     const [labels, setLabels] = useState<Label[]>([])
@@ -90,31 +91,35 @@ export default function Page() {
     }, [graph, graph.Labels.length, graph.Relationships.length, graph.Labels, graph.Relationships])
 
     useEffect(() => {
-        const content = localStorage.getItem("savedContent")
+        if (contentPersistence) {
+            const content = localStorage.getItem("savedContent")
 
-        if (content) {
-            const { graphName: name, query } = JSON.parse(content)
+            if (content) {
+                const { graphName: name, query } = JSON.parse(content)
 
-            if (!graph.Id && !graphName && graphNames.includes(name) && contentPersistence) {
-                setGraphName(name)
-                runQuery(query, name)
-                return
+                if (!graph.Id && !graphName && graphNames.includes(name) && contentPersistence) {
+                    setGraphName(name)
+                    runQuery(query, name)
+                    return
+                }
             }
         }
 
+        if (graphName) {
+            if (graphName !== graph.Id) {
+                if (runDefaultQuery) {
+                    runQuery(defaultQuery)
+                    return
+                }
 
-        if (!graphName) return
-
-        if (graphName !== graph.Id) {
-            if (runDefaultQuery) {
-                runQuery(defaultQuery)
-                return
+                const colorsArr = JSON.parse(localStorage.getItem(graphName) || "[]")
+                setGraph(Graph.empty(graphName, colorsArr))
             }
 
             setGraph(Graph.empty(graphName))
         }
 
-        fetchCount()
+        setIsQueryLoading(false)
     }, [fetchCount, graph.Id, graphName, setGraph, runDefaultQuery, defaultQuery, contentPersistence, setGraphName, graphNames])
 
     const handleDeleteElement = async () => {
@@ -195,6 +200,7 @@ export default function Page() {
                 chartRef={chartRef}
                 setGraph={setGraph}
                 fetchCount={fetchCount}
+                isQueryLoading={isQueryLoading}
             />
             <div className="h-1 grow p-12">
                 <GraphView

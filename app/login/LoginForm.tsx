@@ -110,15 +110,6 @@ export default function LoginForm() {
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
 
-    // // Validate TLS requirements on the frontend
-    // if (TLS && (!CA || CA.trim() === "")) {
-    //   setError({
-    //     message: "Certificate is required for TLS connections.",
-    //     show: true
-    //   });
-    //   return;
-    // }
-
     const params: SignInOptions = {
       redirect: false,
       host: host.trim(),
@@ -149,6 +140,10 @@ export default function LoginForm() {
     const reader = new FileReader()
 
     reader.onload = () => {
+      setError(prev => ({
+        ...prev,
+        show: false
+      }))
       setCA((reader.result as string).split(',').pop())
       setUploadedFileName(acceptedFiles[0].name)
       setError(prev => ({
@@ -178,6 +173,10 @@ export default function LoginForm() {
                   checked={TLS}
                   onCheckedChange={(checked) => {
                     setTLS(checked as boolean)
+                    setError(prev => ({
+                      ...prev,
+                      show: false
+                    }))
                     if (!checked) {
                       // Clear certificate when TLS is disabled
                       setCA(undefined)
@@ -224,6 +223,10 @@ export default function LoginForm() {
                         <button
                           type="button"
                           onClick={() => {
+                            setError(prev => ({
+                              ...prev,
+                              show: false
+                            }))
                             setCA(undefined)
                             setUploadedFileName("")
                           }}

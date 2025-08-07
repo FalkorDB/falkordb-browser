@@ -37,7 +37,7 @@ export default function Page() {
     const [nodesCount, setNodesCount] = useState<number | null>(null)
     const [isAddEntity, setIsAddEntity] = useState(false)
     const [isCanvasLoading, setIsCanvasLoading] = useState(false)
-
+    
     const fetchCount = useCallback(async () => {
         setEdgesCount(null)
         setNodesCount(null)
@@ -159,7 +159,6 @@ export default function Page() {
                 setOptions={setSchemaNames}
                 graphName={schemaName}
                 setGraphName={setSchemaName}
-                fetchCount={fetchCount}
                 selectedElements={selectedElements}
                 setSelectedElement={setSelectedElement}
                 handleDeleteElement={handleDeleteElement}
@@ -167,7 +166,7 @@ export default function Page() {
                 setIsAddEntity={setIsAddEntity}
                 setIsAddRelation={setIsAddRelation}
                 setGraph={setSchema}
-                isLoading={isCanvasLoading}
+                isCanvasLoading={isCanvasLoading}
             />
             <div className="h-1 grow p-12">
                 <SchemaView
