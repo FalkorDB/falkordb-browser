@@ -328,7 +328,7 @@ test.describe("Graph Tests", () => {
     });
   });
 
-  test.only(`@admin run graph query via UI and validate node and edge count via API`, async () => {
+  test(`@admin run graph query via UI and validate node and edge count via API`, async () => {
     const graphName = getRandomString("graph");
     await apiCall.addGraph(graphName);
     const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
