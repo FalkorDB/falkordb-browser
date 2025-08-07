@@ -62,10 +62,10 @@ type GraphContextType = {
   setGraphName: Dispatch<SetStateAction<string>>;
   graphNames: string[];
   setGraphNames: Dispatch<SetStateAction<string[]>>;
-  nodesCount: number;
-  setNodesCount: Dispatch<SetStateAction<number>>;
-  edgesCount: number;
-  setEdgesCount: Dispatch<SetStateAction<number>>;
+  nodesCount: number | undefined;
+  setNodesCount: Dispatch<SetStateAction<number | undefined>>;
+  edgesCount: number | undefined;
+  setEdgesCount: Dispatch<SetStateAction<number | undefined>>;
   runQuery: (query: string, name?: string) => Promise<void>;
   fetchCount: () => Promise<void>;
   handleCooldown: (ticks?: 0, isSetLoading?: boolean) => void;
@@ -134,9 +134,9 @@ export const GraphContext = createContext<GraphContextType>({
   setGraphName: () => {},
   graphNames: [],
   setGraphNames: () => {},
-  nodesCount: 0,
+  nodesCount: undefined,
   setNodesCount: () => {},
-  edgesCount: 0,
+  edgesCount: undefined,
   setEdgesCount: () => {},
   runQuery: async () => {},
   fetchCount: async () => {},

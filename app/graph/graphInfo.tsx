@@ -1,5 +1,6 @@
 import { useContext } from "react";
-import { X } from "lucide-react";
+import { Loader2, X } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import Button from "../components/ui/Button";
 import { GraphContext } from "../components/provider";
 
@@ -17,7 +18,24 @@ export default function GraphInfoPanel({ onClose }: { onClose: () => void }) {
             </Button>
             <h1>Graph Information</h1>
             <div className="flex flex-col gap-2">
-                <h2>Nodes ({nodesCount})</h2>
+                <h2>Nodes {
+                    nodesCount !== undefined ?
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <p
+                                    data-testid="nodesCount"
+                                    className="truncate pointer-events-auto"
+                                >
+                                    {nodesCount}
+                                </p>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                                {nodesCount}
+                            </TooltipContent>
+                        </Tooltip>
+                        :
+                        <Loader2 className="animate-spin" />
+                }</h2>
                 <ul className="flex flex-wrap gap-2 p-2">
                     <li className="max-w-full">
                         <Button
@@ -40,7 +58,24 @@ export default function GraphInfoPanel({ onClose }: { onClose: () => void }) {
                 </ul>
             </div>
             <div className="flex flex-col gap-2">
-                <h2>Edges ({edgesCount})</h2>
+                <h2>Edges {
+                    edgesCount !== undefined ?
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <p
+                                    data-testid="edgesCount"
+                                    className="truncate pointer-events-auto"
+                                >
+                                    {edgesCount}
+                                </p>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                                {edgesCount}
+                            </TooltipContent>
+                        </Tooltip>
+                        :
+                        <Loader2 className="animate-spin" />
+                }</h2>
                 <ul className="flex flex-wrap gap-2 p-2">
                     <li className="max-w-full">
                         <Button

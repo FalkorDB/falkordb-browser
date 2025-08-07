@@ -42,8 +42,8 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
   const [newDefaultQuery, setNewDefaultQuery] = useState("")
   const [newContentPersistence, setNewContentPersistence] = useState(false)
   const [hasChanges, setHasChanges] = useState(false)
-  const [nodesCount, setNodesCount] = useState(0)
-  const [edgesCount, setEdgesCount] = useState(0)
+  const [nodesCount, setNodesCount] = useState<number>()
+  const [edgesCount, setEdgesCount] = useState<number>()
   const [isLoading, setIsLoading] = useState<boolean>(false)
   const [cooldownTicks, setCooldownTicks] = useState<number | undefined>(0)
 
@@ -119,11 +119,18 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
 
   const fetchCount = useCallback(async () => {
     if (!graphName) return;
+
+    setEdgesCount(undefined);
+    setNodesCount(undefined);
+
     const result = await getSSEGraphResult(`api/graph/${prepareArg(graphName)}/count`, toast, setIndicator);
+
     if (!result || !result.data || !result.data[0]) return;
+
     const { nodes, edges } = result.data[0];
-    setEdgesCount(edges || 0);
-    setNodesCount(nodes || 0);
+
+    setEdgesCount(edges);
+    setNodesCount(nodes);
   }, [graphName, toast, setIndicator, setEdgesCount, setNodesCount]);
 
   const handleCooldown = useCallback((ticks?: 0, isSetLoading: boolean = true) => {

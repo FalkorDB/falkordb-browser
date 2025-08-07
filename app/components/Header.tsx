@@ -43,7 +43,7 @@ export default function Header({ onSetGraphName, graphNames, graphName }: Props)
     const router = useRouter()
     const { toast } = useToast()
 
-    const [currentPanel, setCurrentPanel] = useState<"graphInfo">()
+    const [currentPanel, setCurrentPanel] = useState<"graphInfo" | undefined>("graphInfo")
 
     const type = getPathType(pathname)
     const showCreate = type && session?.user?.role && session.user.role !== "Read-Only"

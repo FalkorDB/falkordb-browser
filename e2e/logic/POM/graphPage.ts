@@ -491,10 +491,7 @@ export default class GraphPage extends Page {
   }
 
   async isVisibleSelectItem(name: string): Promise<boolean> {
-    const isVisible = await waitForElementToBeVisible(
-      this.selectItemBySearch("Graph", name)
-    );
-    return isVisible;
+    return waitForElementToBeVisible(this.selectItemBySearch("Graph", name));
   }
 
   async clickGraphsTabInHeader(): Promise<void> {
@@ -510,10 +507,7 @@ export default class GraphPage extends Page {
     label: "Relationships" | "Labels",
     name: string
   ): Promise<boolean> {
-    const isVisible = await waitForElementToBeVisible(
-      this.labelsButtonByName(tab, label, name)
-    );
-    return isVisible;
+    return waitForElementToBeVisible(this.labelsButtonByName(tab, label, name));
   }
 
   async getLabelsButtonByNameContent(
@@ -530,23 +524,19 @@ export default class GraphPage extends Page {
   }
 
   async isVisibleEditButton(): Promise<boolean> {
-    const isVisible = await waitForElementToBeVisible(this.editButton("Graph"));
-    return isVisible;
+    return waitForElementToBeVisible(this.editButton("Graph"));
   }
 
   async isVisibleToast(): Promise<boolean> {
-    const isVisible = await waitForElementToBeVisible(this.toast);
-    return isVisible;
+    return waitForElementToBeVisible(this.toast);
   }
 
   async isVisibleErrorToast(): Promise<boolean> {
-    const isVisible = await waitForElementToBeVisible(this.errorToast);
-    return isVisible;
+    return waitForElementToBeVisible(this.errorToast);
   }
 
   async isVisibleNodeCanvasToolTip(): Promise<boolean> {
-    const isVisible = await waitForElementToBeVisible(this.nodeCanvasToolTip);
-    return isVisible;
+    return waitForElementToBeVisible(this.nodeCanvasToolTip);
   }
 
   async getNodeCanvasToolTipContent(): Promise<string | null> {
@@ -1125,24 +1115,30 @@ export default class GraphPage extends Page {
     await this.page.waitForTimeout(500);
   }
 
-  async waitForScaleToStabilize(threshold = 0.01, stableCycles = 5, timeout = 3000) {
+  async waitForScaleToStabilize(
+    threshold = 0.01,
+    stableCycles = 5,
+    timeout = 3000
+  ) {
     let lastScale = await this.getCanvasScaling();
     let stableCount = 0;
     const start = Date.now();
     while (Date.now() - start < timeout) {
-        await new Promise(res => {setTimeout(res, 100)});
-        const currentScale = await this.getCanvasScaling();
-        if (
-            Math.abs(currentScale.scaleX - lastScale.scaleX) < threshold &&
-            Math.abs(currentScale.scaleY - lastScale.scaleY) < threshold
-        ) {
-            stableCount += 1;
-            if (stableCount >= stableCycles) return;
-        } else {
-            stableCount = 0;
-        }
-        lastScale = currentScale;
+      await new Promise((res) => {
+        setTimeout(res, 100);
+      });
+      const currentScale = await this.getCanvasScaling();
+      if (
+        Math.abs(currentScale.scaleX - lastScale.scaleX) < threshold &&
+        Math.abs(currentScale.scaleY - lastScale.scaleY) < threshold
+      ) {
+        stableCount += 1;
+        if (stableCount >= stableCycles) return;
+      } else {
+        stableCount = 0;
+      }
+      lastScale = currentScale;
     }
-    throw new Error('Scale did not stabilize within timeout');
+    throw new Error("Scale did not stabilize within timeout");
   }
 }
