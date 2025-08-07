@@ -50,7 +50,7 @@ export default function Labels<T extends Label | Relationship>({ labels, onClick
                         labels.map((l) => (
                             <li key={l.name}>
                                 <Button
-                                    data-testid={`${type}${l}Button${l.name}`}
+                                    data-testid={`${type}${label}Button${l.name}`}
                                     className={cn("w-full pointer-events-auto", l.show ? "opacity-100" : "opacity-50")}
                                     label={l.name}
                                     onClick={() => {
