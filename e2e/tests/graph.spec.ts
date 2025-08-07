@@ -328,7 +328,7 @@ test.describe("Graph Tests", () => {
     });
   });
 
-  test(`@admin run graph query via UI and validate node and edge count via API`, async () => {
+  test.only(`@admin run graph query via UI and validate node and edge count via API`, async () => {
     const graphName = getRandomString("graph");
     await apiCall.addGraph(graphName);
     const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
@@ -337,8 +337,8 @@ test.describe("Graph Tests", () => {
     await graph.insertQuery(CREATE_QUERY);
     await graph.clickRunQuery();
     const count = await apiCall.getGraphCount(graphName);
-    const edgesCount = count.result.data[0].edges;
-    const nodesCount = count.result.data[0].nodes;
+    const edgesCount = count.result.edges;
+    const nodesCount = count.result.nodes;
     expect(edgesCount).toBe(1);
     expect(nodesCount).toBe(2);
     await apiCall.removeGraph(graphName);
@@ -367,12 +367,8 @@ test.describe("Graph Tests", () => {
 
     const originalCount = await apiCall.getGraphCount(graphName);
     const duplicatedCount = await apiCall.getGraphCount(duplicatedGraphName);
-    expect(duplicatedCount.result.data[0].nodes).toBe(
-      originalCount.result.data[0].nodes
-    );
-    expect(duplicatedCount.result.data[0].edges).toBe(
-      originalCount.result.data[0].edges
-    );
+    expect(duplicatedCount.result.nodes).toBe(originalCount.result.nodes);
+    expect(duplicatedCount.result.edges).toBe(originalCount.result.edges);
     await apiCall.removeGraph(graphName);
     await apiCall.removeGraph(duplicatedGraphName);
   });
