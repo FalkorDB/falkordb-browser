@@ -258,7 +258,7 @@ export default function ForceGraph({
                 return
             }
         }
-
+        
         if (evt.ctrlKey) {
             if (selectedElements.includes(element)) {
                 setSelectedElements(selectedElements.filter((el) => el !== element))

@@ -185,6 +185,15 @@ export class GraphInfo {
     return this.colors;
   }
 
+  public clone(): GraphInfo {
+    return new GraphInfo(
+      [...this.propertyKeys],
+      new Map(this.labels),
+      new Map(this.relationships),
+      [...this.colors]
+    );
+  }
+
   public static empty(propertyKeys?: string[], colors?: string[]): GraphInfo {
     return new GraphInfo(propertyKeys || [], new Map(), new Map(), colors);
   }
@@ -216,8 +225,8 @@ export class GraphInfo {
           show: true,
         };
 
-        this.colorsCounter += 1;
         this.labels.set(label, c);
+        this.colorsCounter += 1;
       }
 
       return c;
@@ -392,6 +401,14 @@ export class Graph {
 
   get Metadata(): any[] {
     return this.metadata;
+  }
+
+  get GraphInfo(): GraphInfo {
+    return this.graphInfo;
+  }
+
+  set GraphInfo(graphInfo: GraphInfo) {
+    this.graphInfo = graphInfo;
   }
 
   public getElements(): (Node | Link)[] {
@@ -686,15 +703,14 @@ export class Graph {
   public createLabel(labels: string[], node?: Node): Label[] {
     return labels.map((label) => {
       let c = this.labelsMap.get(label);
-
       if (!c) {
         const [infoLabel] = this.graphInfo.createLabel([label]);
-        
+
         c = {
           ...infoLabel,
           elements: [],
         };
-        
+
         this.labelsMap.set(c.name, c);
         this.labels.push(c);
       }

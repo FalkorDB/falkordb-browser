@@ -47,7 +47,7 @@ export default function GraphInfoPanel({ onClose }: { onClose: () => void }) {
                             className="h-6 w-full p-2 rounded-full flex justify-center items-center bg-gray-500"
                             label="*"
                             title="All relationships"
-                            onClick={() => runQuery(`MATCH ()-[e]-() RETURN e`)}
+                            onClick={() => runQuery(`MATCH p=()-[]-() RETURN p`)}
                         />
                     </li>
                     {Array.from(graphInfo.Relationships.values()).map(({ name, color }) => (

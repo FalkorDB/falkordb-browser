@@ -129,7 +129,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
   const handleCooldown = useCallback((ticks?: 0, isSetLoading: boolean = true) => {
     if (typeof window !== 'undefined') {
       setCooldownTicks(ticks)
-      
+
       if (isSetLoading) {
         setIsLoading(ticks !== 0)
       }
@@ -187,7 +187,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
     // @ts-ignore
     window.graph = g
 
-  }, [graphName, toast, setIndicator, historyQuery.queries, historyQuery.counter, setHistoryQuery, limit, setGraph, fetchCount, handleCooldown]);
+  }, [graphName, limit, timeout, toast, historyQuery.queries, historyQuery.counter, graphInfo, fetchCount, handleCooldown]);
 
   const graphContext = useMemo(() => ({
     graph,
@@ -207,7 +207,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
     handleCooldown,
     cooldownTicks,
     isLoading,
-  }), [graph, setGraph, graphName, setGraphName, graphNames, setGraphNames, nodesCount, setNodesCount, edgesCount, setEdgesCount, runQuery, fetchCount, handleCooldown, cooldownTicks, isLoading])
+  }), [graph, graphInfo, graphName, graphNames, nodesCount, edgesCount, runQuery, fetchCount, handleCooldown, cooldownTicks, isLoading])
 
   useEffect(() => {
     if (status !== "authenticated") return

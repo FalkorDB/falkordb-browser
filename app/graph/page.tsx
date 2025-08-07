@@ -8,9 +8,18 @@ import { ForceGraphMethods } from "react-force-graph-2d";
 import { Label, Graph, GraphData, Link, Node, Relationship, GraphInfo } from "../api/graph/model";
 import Tutorial from "./Tutorial";
 import { GraphContext, IndicatorContext, HistoryQueryContext, QuerySettingsContext } from "../components/provider";
+import Spinning from "../components/ui/spinning";
 
-const Selector = dynamic(() => import("./Selector"), { ssr: false })
-const GraphView = dynamic(() => import("./GraphView"), { ssr: false })
+const Selector = dynamic(() => import("./Selector"), {
+    ssr: false,
+    loading: () => <div className="hidden" />
+})
+const GraphView = dynamic(() => import("./GraphView"), {
+    ssr: false,
+    loading: () => <div className="h-full w-full flex justify-center items-center">
+        <Spinning />
+    </div>
+})
 
 export default function Page() {
     const { historyQuery, setHistoryQuery } = useContext(HistoryQueryContext)
@@ -63,7 +72,7 @@ export default function Page() {
 
     useEffect(() => {
         if (!graphName) return
-        
+
         Promise.all([
             fetchInfo("(label)"),
             fetchInfo("(relationship type)"),
@@ -73,7 +82,7 @@ export default function Page() {
             const graphInfo = GraphInfo.create(newPropertyKeys, newLabels, newRelationships, colorsArr)
             setGraphInfo(graphInfo)
         });
-    }, [fetchInfo, setGraphInfo, toast, setIndicator, graphName, graph.Labels.length, graph.Relationships.length])
+    }, [fetchInfo, setGraphInfo, toast, setIndicator, graphName])
 
     useEffect(() => {
         setRelationships([...graph.Relationships])
