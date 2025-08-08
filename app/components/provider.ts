@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createContext, Dispatch, SetStateAction } from "react";
-import { Graph, HistoryQuery } from "../api/graph/model";
+import { Graph, GraphInfo, HistoryQuery } from "../api/graph/model";
 
 type QuerySettingsContextType = {
   newSettings: {
@@ -56,10 +56,21 @@ type QuerySettingsContextType = {
 type GraphContextType = {
   graph: Graph;
   setGraph: Dispatch<SetStateAction<Graph>>;
+  graphInfo: GraphInfo;
+  setGraphInfo: Dispatch<SetStateAction<GraphInfo>>;
   graphName: string;
   setGraphName: Dispatch<SetStateAction<string>>;
   graphNames: string[];
   setGraphNames: Dispatch<SetStateAction<string[]>>;
+  nodesCount: number | undefined;
+  setNodesCount: Dispatch<SetStateAction<number | undefined>>;
+  edgesCount: number | undefined;
+  setEdgesCount: Dispatch<SetStateAction<number | undefined>>;
+  runQuery: (query: string, name?: string) => Promise<void>;
+  fetchCount: () => Promise<void>;
+  handleCooldown: (ticks?: 0, isSetLoading?: boolean) => void;
+  cooldownTicks: number | undefined;
+  isLoading: boolean;
 };
 
 type SchemaContextType = {
@@ -117,10 +128,21 @@ export const QuerySettingsContext = createContext<QuerySettingsContextType>({
 export const GraphContext = createContext<GraphContextType>({
   graph: Graph.empty(),
   setGraph: () => {},
+  graphInfo: GraphInfo.empty(),
+  setGraphInfo: () => {},
   graphName: "",
   setGraphName: () => {},
   graphNames: [],
   setGraphNames: () => {},
+  nodesCount: undefined,
+  setNodesCount: () => {},
+  edgesCount: undefined,
+  setEdgesCount: () => {},
+  runQuery: async () => {},
+  fetchCount: async () => {},
+  handleCooldown: () => {},
+  cooldownTicks: undefined,
+  isLoading: false,
 });
 
 export const SchemaContext = createContext<SchemaContextType>({

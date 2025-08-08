@@ -15,20 +15,20 @@ interface Props {
     graph: Graph,
     disabled: boolean,
     chartRef: GraphRef,
-    handleCooldown: (ticks?: number) => void
-    cooldownTicks: number | undefined
     tabsValue?: string,
-    isLoading: boolean
+    isLoading: boolean,
+    handleCooldown: (ticks?: 0, isSetLoading?: boolean) => void,
+    cooldownTicks: number | undefined
 }
 
 export default function Controls({
     graph,
     disabled,
     chartRef,
-    handleCooldown,
-    cooldownTicks,
     tabsValue = "Graph",
     isLoading,
+    handleCooldown,
+    cooldownTicks,
 }: Props) {
 
     const { indicator } = useContext(IndicatorContext)
@@ -61,7 +61,7 @@ export default function Controls({
                                         className="pointer-events-auto"
                                         checked={cooldownTicks === undefined}
                                         onCheckedChange={() => {
-                                            handleCooldown(cooldownTicks === undefined ? 0 : undefined)
+                                            handleCooldown(cooldownTicks === undefined ? 0 : undefined, false)
                                         }}
                                     />
                                 </div>

@@ -620,10 +620,10 @@ export default function SchemaCreateElement({ onCreate, setIsAdd, selectedNodes,
               <div style={{ backgroundColor: selectedNodes[0]?.color }} className="flex h-16 w-16 rounded-full border-2 border-background justify-center items-center overflow-hidden">
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <p className="truncate" data-testid="selectedNode1">{selectedNodes[0]?.category}</p>
+                    <p className="truncate" data-testid="selectedNode1">{selectedNodes[0]?.labels[0]}</p>
                   </TooltipTrigger>
                   <TooltipContent>
-                    <p>{selectedNodes[0]?.category}</p>
+                    <p>{selectedNodes[0]?.labels[0]}</p>
                   </TooltipContent>
                 </Tooltip>
               </div>
@@ -631,10 +631,10 @@ export default function SchemaCreateElement({ onCreate, setIsAdd, selectedNodes,
               <div style={{ backgroundColor: selectedNodes[1]?.color }} className="flex h-16 w-16 rounded-full border-2 border-background justify-center items-center overflow-hidden">
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <p className="truncate" data-testid="selectedNode2">{selectedNodes[1]?.category}</p>
+                    <p className="truncate" data-testid="selectedNode2">{selectedNodes[1]?.labels[0]}</p>
                   </TooltipTrigger>
                   <TooltipContent>
-                    <p>{selectedNodes[1]?.category}</p>
+                    <p>{selectedNodes[1]?.labels[0]}</p>
                   </TooltipContent>
                 </Tooltip>
               </div>

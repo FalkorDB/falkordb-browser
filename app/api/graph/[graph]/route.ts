@@ -191,7 +191,7 @@ export async function GET(
   request.signal.addEventListener("abort", () => {
     writer.close();
   });
-
+  
   return new Response(readable, {
     headers: {
       "Content-Type": "text/event-stream",

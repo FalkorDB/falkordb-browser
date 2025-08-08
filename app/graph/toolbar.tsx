@@ -1,5 +1,5 @@
 import { PlusCircle } from "lucide-react"
-import { Dispatch, SetStateAction, useCallback, useEffect, useRef, useState } from "react"
+import { Dispatch, SetStateAction, useCallback, useContext, useEffect, useRef, useState } from "react"
 import { cn, GraphRef, handleZoomToFit } from "@/lib/utils"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
@@ -7,6 +7,7 @@ import { Graph, Link, Node } from "../api/graph/model"
 import Input from "../components/ui/Input"
 import Button from "../components/ui/Button"
 import DeleteElement from "./DeleteElement"
+import { GraphContext } from "../components/provider"
 
 interface Props {
     graph: Graph
@@ -14,11 +15,11 @@ interface Props {
     setSelectedElement: Dispatch<SetStateAction<Node | Link | undefined>>
     handleDeleteElement: () => Promise<void>
     chartRef: GraphRef
-    isLoading: boolean
+    label: "Graph" | "Schema"
     setIsAddEntity?: Dispatch<SetStateAction<boolean>>
     setIsAddRelation?: Dispatch<SetStateAction<boolean>>
     backgroundColor?: string
-    label: "Graph" | "Schema"
+    isLoadingSchema?: boolean
 }
 
 const ITEM_HEIGHT = 48
@@ -31,12 +32,14 @@ export default function Toolbar({
     setSelectedElement,
     handleDeleteElement,
     chartRef,
-    isLoading,
-    setIsAddEntity = undefined,
-    setIsAddRelation = undefined,
-    backgroundColor = undefined,
     label,
+    setIsAddEntity,
+    setIsAddRelation,
+    backgroundColor,
+    isLoadingSchema,
 }: Props) {
+
+    const { isLoading: isLoadingGraph } = useContext(GraphContext)
 
     const suggestionRef = useRef<HTMLDivElement>(null)
 
@@ -51,6 +54,8 @@ export default function Toolbar({
     const [bottomFakeItemHeight, setBottomFakeItemHeight] = useState(0)
     const [visibleSuggestions, setVisibleSuggestions] = useState<(Node | Link)[]>([])
 
+    const isLoading = isLoadingSchema || isLoadingGraph
+    
     useEffect(() => {
         const newStartIndex = Math.max(0, Math.floor((scrollTop - ((ITEM_HEIGHT + GAP) * ITEMS_PER_PAGE)) / (ITEM_HEIGHT + GAP)))
         const newEndIndex = Math.min(suggestions.length, Math.floor((scrollTop + ((ITEM_HEIGHT + GAP) * (ITEMS_PER_PAGE * 2))) / (ITEM_HEIGHT + GAP)))
@@ -80,8 +85,8 @@ export default function Toolbar({
         const elements = graph.getElements().filter(el =>
             Object.values(el.data).some(value => value.toString().toLowerCase().startsWith(searchElement.toLowerCase()))
             || el.id.toString().toLowerCase().includes(searchElement.toLowerCase())
-            || el.label && (el as Link).label.toLowerCase().includes(searchElement.toLowerCase())
-            || el.category && (el as Node).category.some(c => c.toLowerCase().includes(searchElement.toLowerCase()))
+            || el.relationship && (el as Link).relationship.toLowerCase().includes(searchElement.toLowerCase())
+            || el.labels && (el as Node).labels.some(c => c.toLowerCase().includes(searchElement.toLowerCase()))
         )
 
         setSuggestions(elements)
@@ -96,7 +101,7 @@ export default function Toolbar({
     }, [graph, handleOnChange, searchElement])
 
     const handleSearchElement = (element: Node | Link) => {
-        handleZoomToFit(chartRef, (node: Node) => element.category ? element.id === node.id : node.id === element.source.id || node.id === element.target.id, 4)
+        handleZoomToFit(chartRef, (node: Node) => element.labels ? element.id === node.id : node.id === element.source.id || node.id === element.target.id, 4)
         setSelectedElement(element)
         setSearchElement("")
         setSuggestions([])
@@ -230,7 +235,7 @@ export default function Toolbar({
                                                             className="rounded-full h-8 w-8 p-2 flex items-center justify-center"
                                                             style={{ backgroundColor: suggestion.color }}
                                                         >
-                                                            <p className="text-white text-sm font-bold truncate">{suggestion.label || suggestion.category}</p>
+                                                            <p className="text-white text-sm font-bold truncate">{("source" in suggestion) ? suggestion.relationship : suggestion.labels[0]}</p>
                                                         </div>
                                                         <div
                                                             className={cn("w-1 grow text-center truncate", actualIndex === suggestionIndex ? "text-black" : "text-white")}
@@ -240,7 +245,7 @@ export default function Toolbar({
                                                     </Button>
                                                 </TooltipTrigger>
                                                 <TooltipContent>
-                                                    {suggestion.label || suggestion.category}
+                                                    {("source" in suggestion) ? suggestion.relationship : suggestion.labels[0]}
                                                 </TooltipContent>
                                             </Tooltip>
                                         </li>
@@ -334,5 +339,6 @@ export default function Toolbar({
 Toolbar.defaultProps = {
     setIsAddEntity: undefined,
     setIsAddRelation: undefined,
-    backgroundColor: undefined
+    backgroundColor: undefined,
+    isLoadingSchema: false,
 }
