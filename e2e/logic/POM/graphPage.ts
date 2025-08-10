@@ -497,10 +497,6 @@ export default class GraphPage extends Page {
     return isVisible;
   }
 
-  async isVisibleEditorRun(): Promise<boolean> {
-    return waitForElementToBeVisible(this.editorRun);
-  }
-
   async clickGraphsTabInHeader(): Promise<void> {
     await interactWhenVisible(
       this.graphsTabInHeader,
@@ -1129,30 +1125,24 @@ export default class GraphPage extends Page {
     await this.page.waitForTimeout(500);
   }
 
-  async waitForScaleToStabilize(
-    threshold = 0.01,
-    stableCycles = 5,
-    timeout = 3000
-  ) {
+  async waitForScaleToStabilize(threshold = 0.01, stableCycles = 5, timeout = 3000) {
     let lastScale = await this.getCanvasScaling();
     let stableCount = 0;
     const start = Date.now();
     while (Date.now() - start < timeout) {
-      await new Promise((res) => {
-        setTimeout(res, 100);
-      });
-      const currentScale = await this.getCanvasScaling();
-      if (
-        Math.abs(currentScale.scaleX - lastScale.scaleX) < threshold &&
-        Math.abs(currentScale.scaleY - lastScale.scaleY) < threshold
-      ) {
-        stableCount += 1;
-        if (stableCount >= stableCycles) return;
-      } else {
-        stableCount = 0;
-      }
-      lastScale = currentScale;
+        await new Promise(res => {setTimeout(res, 100)});
+        const currentScale = await this.getCanvasScaling();
+        if (
+            Math.abs(currentScale.scaleX - lastScale.scaleX) < threshold &&
+            Math.abs(currentScale.scaleY - lastScale.scaleY) < threshold
+        ) {
+            stableCount += 1;
+            if (stableCount >= stableCycles) return;
+        } else {
+            stableCount = 0;
+        }
+        lastScale = currentScale;
     }
-    throw new Error("Scale did not stabilize within timeout");
+    throw new Error('Scale did not stabilize within timeout');
   }
 }
