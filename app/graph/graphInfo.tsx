@@ -36,7 +36,7 @@ export default function GraphInfoPanel({ onClose }: { onClose: () => void }) {
                                 </TooltipContent>
                             </Tooltip>
                             :
-                            <Loader2 className="animate-spin" />
+                            <Loader2 data-testid="nodesCountLoader" className="animate-spin" />
                     }</div>
                 <ul className="flex flex-wrap gap-2 p-2">
                     <li className="max-w-full">
@@ -78,7 +78,7 @@ export default function GraphInfoPanel({ onClose }: { onClose: () => void }) {
                                 </TooltipContent>
                             </Tooltip>
                             :
-                            <Loader2 className="animate-spin" />
+                            <Loader2 data-testid="edgesCountLoader" className="animate-spin" />
                     }</div>
                 <ul className="flex flex-wrap gap-2 p-2">
                     <li className="max-w-full">

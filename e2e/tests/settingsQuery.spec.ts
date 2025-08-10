@@ -263,7 +263,7 @@ test.describe.serial("Query Settings", () => {
     expect(contentPersistenceCheckboxOff).toBe(true);
   });
 
-  test.only(`@admin Validate that when run default query is on default query will run when graph is selected`, async () => {
+  test(`@admin Validate that when run default query is on default query will run when graph is selected`, async () => {
     const graphName = getRandomString("settingsQuery");
     await apiCall.addGraph(graphName);
     const querySettings = await browser.createNewPage(

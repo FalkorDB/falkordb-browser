@@ -553,11 +553,11 @@ export default class GraphPage extends Page {
   }
 
   async getNodesCount(): Promise<string | null> {
-    return pollForElementContent(this.nodesCount(), "Nodes Count");
+    return pollForElementContent(this.nodesCount(), "Nodes Count", this.nodesCountLoader());
   }
 
   async getEdgesCount(): Promise<string | null> {
-    return pollForElementContent(this.edgesCount(), "Edges Count");
+    return pollForElementContent(this.edgesCount(), "Edges Count", this.edgesCountLoader());
   }
 
   async searchElementInCanvas(
