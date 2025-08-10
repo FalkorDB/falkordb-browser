@@ -242,7 +242,7 @@ export default function Selector({ graph, options, setOptions, graphName, setGra
                                             isSelected={(item) => historyQuery.queries.findIndex(q => q.text === item.text) + 1 === historyQuery.counter}
                                             afterSearchCallback={afterSearchCallback}
                                             dataTestId="queryHistory"
-                                            list={historyQuery.queries.reverse()}
+                                            list={[...historyQuery.queries].reverse()}
                                             step={STEP}
                                             onClick={(counter) => {
                                                 setHistoryQuery(prev => ({

@@ -25,7 +25,7 @@ export default function Page() {
 
     const { toast } = useToast()
 
-    const [selectedElement, setSelectedElement] = useState<Node | Link | undefined>()
+    const [selectedElement, setSelectedElement] = useState<Node | Link>()
     const [selectedElements, setSelectedElements] = useState<(Node | Link)[]>([])
     const [cooldownTicks, setCooldownTicks] = useState<number | undefined>(0)
     const [labels, setLabels] = useState<Label[]>([])
