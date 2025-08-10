@@ -7,7 +7,7 @@ import { GitGraph, Info, Table } from "lucide-react"
 import { cn, GraphRef } from "@/lib/utils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { GraphContext } from "@/app/components/provider";
-import { Label, GraphData, Link, Node, Relationship } from "../api/graph/model";
+import { Label, GraphData, Link, Node, Relationship, HistoryQuery } from "../api/graph/model";
 import Button from "../components/ui/Button";
 import TableView from "./TableView";
 import Toolbar from "./toolbar";
@@ -38,6 +38,8 @@ interface Props {
     handleCooldown: (ticks?: 0, isSetLoading?: boolean) => void
     cooldownTicks: number | undefined
     fetchCount: () => Promise<void>
+    historyQuery: HistoryQuery
+    setHistoryQuery: Dispatch<SetStateAction<HistoryQuery>>
 }
 
 function GraphView({
@@ -57,6 +59,8 @@ function GraphView({
     handleCooldown,
     cooldownTicks,
     fetchCount,
+    historyQuery,
+    setHistoryQuery,
 }: Props) {
 
     const { graph } = useContext(GraphContext)
@@ -74,7 +78,7 @@ function GraphView({
     const isTabEnabled = useCallback((tab: Tab) => {
         if (tab === "Graph") return graph.getElements().length !== 0
         if (tab === "Table") return graph.Data.length !== 0
-        return graph.CurrentQuery && graph.CurrentQuery.metadata.length > 0 && graph.Metadata.length > 0 && graph.CurrentQuery.explain.length > 0
+        return historyQuery.currentQuery && historyQuery.currentQuery.metadata.length > 0 && graph.Metadata.length > 0 && historyQuery.currentQuery.explain.length > 0
     }, [graph])
 
     useEffect(() => {
@@ -90,7 +94,7 @@ function GraphView({
         let defaultChecked: Tab = "Graph"
         if (graph.getElements().length !== 0) defaultChecked = "Graph"
         else if (graph.Data.length !== 0) defaultChecked = "Table"
-        else if (graph.CurrentQuery && graph.CurrentQuery.metadata.length > 0 && graph.Metadata.length > 0 && graph.CurrentQuery.explain.length > 0) defaultChecked = "Metadata"
+        else if (historyQuery.currentQuery && historyQuery.currentQuery.metadata.length > 0 && graph.Metadata.length > 0 && historyQuery.currentQuery.explain.length > 0) defaultChecked = "Metadata"
 
         setTabsValue(defaultChecked);
     }, [graph, graph.Id, elementsLength, graph.Data.length, isTabEnabled])
@@ -171,7 +175,7 @@ function GraphView({
                         value="Metadata"
                     >
                         <Button
-                            disabled={!graph.CurrentQuery || graph.CurrentQuery.metadata.length === 0 || graph.CurrentQuery.explain.length === 0 || graph.Metadata.length === 0}
+                            disabled={!historyQuery.currentQuery || historyQuery.currentQuery.metadata.length === 0 || historyQuery.currentQuery.explain.length === 0 || graph.Metadata.length === 0}
                             className="tabs-trigger"
                             title="Metadata"
                         >
@@ -248,13 +252,25 @@ function GraphView({
             <TabsContent value="Metadata" className="h-full w-full mt-0 overflow-hidden">
                 <MetadataView
                     setQuery={({ profile }) => {
-                        graph.CurrentQuery = {
-                            ...graph.CurrentQuery,
-                            profile: profile || []
-                        }
+                        setHistoryQuery(prev => {
+                            const newQuery = {
+                                ...prev.currentQuery,
+                                profile: profile || []
+                            }
+
+                            graph.CurrentQuery = newQuery
+
+                            const newQueries = prev.queries.map(q => q.text === newQuery.text ? newQuery : q)
+
+                            return {
+                                ...prev,
+                                currentQuery: newQuery,
+                                queries: newQueries
+                            }
+                        })
                     }}
                     graphName={graph.Id}
-                    query={graph.CurrentQuery}
+                    query={historyQuery.currentQuery}
                     fetchCount={fetchCount}
                 />
             </TabsContent>

@@ -155,7 +155,7 @@ export const SchemaContext = createContext<SchemaContextType>({
 });
 
 export const HistoryQueryContext = createContext<HistoryQueryContextType>({
-  historyQuery: { queries: [], query: "", currentQuery: "", counter: 0 },
+  historyQuery: { queries: [], query: "", currentQuery: { text: "", metadata: [], explain: [], profile: [] }, counter: 0 },
   setHistoryQuery: () => {},
 });
 

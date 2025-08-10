@@ -20,7 +20,12 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
   const [historyQuery, setHistoryQuery] = useState<HistoryQuery>({
     queries: [],
     query: "",
-    currentQuery: "",
+    currentQuery: {
+      text: "",
+      metadata: [],
+      explain: [],
+      profile: [],
+    },
     counter: 0
   })
   const [indicator, setIndicator] = useState<"online" | "offline">("online")
@@ -150,17 +155,6 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
   const runQuery = useCallback(async (q: string, name?: string): Promise<void> => {
     const n = name || graphName
 
-    setHistoryQuery(prev => historyQuery.counter === 0 ? {
-      ...prev,
-      query: q,
-      currentQuery: q,
-      counter: 0
-    } : {
-      ...prev,
-      currentQuery: q,
-      counter: 0
-    })
-
     const url = `api/graph/${prepareArg(n)}?query=${prepareArg(getQueryWithLimit(q, limit))}&timeout=${timeout}`;
     const result = await getSSEGraphResult(url, toast, setIndicator);
 
@@ -174,13 +168,8 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
 
     const explainJson = await explain.json()
     const newQuery = { text: q, metadata: result.metadata, explain: explainJson.result, profile: [] }
-    const queryArr = historyQuery.queries.some(qu => qu.text === q) ? historyQuery.queries : [...historyQuery.queries, newQuery]
     const g = Graph.create(n, result, false, false, limit, newQuery, graphInfo)
-
-    setHistoryQuery(prev => ({
-      ...prev,
-      queries: queryArr
-    }))
+    g.setCurrentQuery(newQuery, setHistoryQuery)
     setGraph(g)
     fetchCount();
 
@@ -188,7 +177,6 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       handleCooldown();
     }
 
-    localStorage.setItem("query history", JSON.stringify(queryArr))
     localStorage.setItem("savedContent", JSON.stringify({ graphName: n, query: q }))
     // eslint-disable-next-line @typescript-eslint/ban-ts-comment
     // @ts-ignore
@@ -222,7 +210,12 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
     setHistoryQuery({
       queries: JSON.parse(localStorage.getItem(`query history`) || "[]"),
       query: "",
-      currentQuery: "",
+      currentQuery: {
+        text: "",
+        metadata: [],
+        explain: [],
+        profile: [],
+      },
       counter: 0
     })
     setTimeout(parseInt(localStorage.getItem("timeout") || "0", 10))

@@ -7,12 +7,16 @@ import dynamic from "next/dynamic";
 import { ForceGraphMethods } from "react-force-graph-2d";
 import { Label, Graph, GraphData, Link, Node, Relationship, GraphInfo } from "../api/graph/model";
 import Tutorial from "./Tutorial";
-import { GraphContext, IndicatorContext, HistoryQueryContext, QuerySettingsContext } from "../components/provider";
+import { GraphContext, HistoryQueryContext, IndicatorContext, QuerySettingsContext } from "../components/provider";
 import Spinning from "../components/ui/spinning";
 
 const Selector = dynamic(() => import("./Selector"), {
     ssr: false,
-    loading: () => <div className="hidden" />
+    loading: () => <div className="z-20 absolute top-5 inset-x-24 h-[50px] flex flex-row gap-4 items-center">
+        <div className="w-[230px] h-full animate-pulse rounded-md border border-gray-300 bg-background" />
+        <div className="w-1 grow h-full animate-pulse rounded-md border border-gray-300 bg-background" />
+        <div className="w-[120px] h-full animate-pulse rounded-md border border-gray-300 bg-background" />
+    </div>
 })
 const GraphView = dynamic(() => import("./GraphView"), {
     ssr: false,
@@ -105,15 +109,10 @@ export default function Page() {
             }
         }
 
-        if (graphName) {
-            if (graphName !== graph.Id) {
-                if (runDefaultQuery) {
-                    runQuery(defaultQuery)
-                    return
-                }
-
-                const colorsArr = JSON.parse(localStorage.getItem(graphName) || "[]")
-                setGraph(Graph.empty(graphName, colorsArr))
+        if (graphName && graphName !== graph.Id) {
+            if (runDefaultQuery) {
+                runQuery(defaultQuery)
+                return
             }
 
             setGraph(Graph.empty(graphName))
@@ -220,6 +219,8 @@ export default function Page() {
                     handleCooldown={handleCooldown}
                     cooldownTicks={cooldownTicks}
                     fetchCount={fetchCount}
+                    historyQuery={historyQuery}
+                    setHistoryQuery={setHistoryQuery}
                 />
             </div>
             <Tutorial />

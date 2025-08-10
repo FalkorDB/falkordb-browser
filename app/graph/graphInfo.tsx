@@ -18,24 +18,26 @@ export default function GraphInfoPanel({ onClose }: { onClose: () => void }) {
             </Button>
             <h1>Graph Information</h1>
             <div className="flex flex-col gap-2">
-                <h2>Nodes {
-                    nodesCount !== undefined ?
-                        <Tooltip>
-                            <TooltipTrigger asChild>
-                                <p
-                                    data-testid="nodesCount"
-                                    className="truncate pointer-events-auto"
-                                >
+                <div className="flex gap-2 items-center">
+                    <h2>Nodes</h2>
+                    {
+                        nodesCount !== undefined ?
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <p
+                                        data-testid="nodesCount"
+                                        className="truncate pointer-events-auto"
+                                    >
+                                        ({nodesCount})
+                                    </p>
+                                </TooltipTrigger>
+                                <TooltipContent>
                                     {nodesCount}
-                                </p>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                                {nodesCount}
-                            </TooltipContent>
-                        </Tooltip>
-                        :
-                        <Loader2 className="animate-spin" />
-                }</h2>
+                                </TooltipContent>
+                            </Tooltip>
+                            :
+                            <Loader2 className="animate-spin" />
+                    }</div>
                 <ul className="flex flex-wrap gap-2 p-2">
                     <li className="max-w-full">
                         <Button
@@ -58,24 +60,26 @@ export default function GraphInfoPanel({ onClose }: { onClose: () => void }) {
                 </ul>
             </div>
             <div className="flex flex-col gap-2">
-                <h2>Edges {
-                    edgesCount !== undefined ?
-                        <Tooltip>
-                            <TooltipTrigger asChild>
-                                <p
-                                    data-testid="edgesCount"
-                                    className="truncate pointer-events-auto"
-                                >
+                <div className="flex gap-2 items-center">
+                    <h2>Edges</h2>
+                    {
+                        edgesCount !== undefined ?
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <p
+                                        data-testid="edgesCount"
+                                        className="truncate pointer-events-auto"
+                                    >
+                                        ({edgesCount})
+                                    </p>
+                                </TooltipTrigger>
+                                <TooltipContent>
                                     {edgesCount}
-                                </p>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                                {edgesCount}
-                            </TooltipContent>
-                        </Tooltip>
-                        :
-                        <Loader2 className="animate-spin" />
-                }</h2>
+                                </TooltipContent>
+                            </Tooltip>
+                            :
+                            <Loader2 className="animate-spin" />
+                    }</div>
                 <ul className="flex flex-wrap gap-2 p-2">
                     <li className="max-w-full">
                         <Button
@@ -98,21 +102,41 @@ export default function GraphInfoPanel({ onClose }: { onClose: () => void }) {
                 </ul>
             </div>
             <div className="flex flex-col gap-2">
-                <h2>Property Keys ({graphInfo.PropertyKeys.length})</h2>
+                <div className="flex gap-2 items-center">
+                    <h2>Property Keys</h2>
+                    {
+                        graphInfo.PropertyKeys !== undefined ?
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <p
+                                        data-testid="propertyKeysCount"
+                                        className="truncate pointer-events-auto"
+                                    >
+                                        ({graphInfo.PropertyKeys.length})
+                                    </p>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                    {graphInfo.PropertyKeys.length}
+                                </TooltipContent>
+                            </Tooltip>
+                            :
+                            <Loader2 className="animate-spin" />
+                    }</div>
                 <ul className="flex flex-wrap gap-2 p-2">
-                    {graphInfo.PropertyKeys.map((key) => (
-                        <li key={key} className="max-w-full">
-                            <Button
-                                className="h-6 w-full p-2 bg-gray-500 flex justify-center items-center rounded-full"
-                                label={key}
-                                onClick={() => runQuery(
-                                    `MATCH (e) WHERE e.${key} IS NOT NULL RETURN e
+                    {
+                        graphInfo.PropertyKeys && graphInfo.PropertyKeys.map((key) => (
+                            <li key={key} className="max-w-full">
+                                <Button
+                                    className="h-6 w-full p-2 bg-gray-500 flex justify-center items-center rounded-full"
+                                    label={key}
+                                    onClick={() => runQuery(
+                                        `MATCH (e) WHERE e.${key} IS NOT NULL RETURN e
                                      UNION
                                      MATCH ()-[e]-() WHERE e.${key} IS NOT NULL RETURN e`
-                                )}
-                            />
-                        </li>
-                    ))}
+                                    )}
+                                />
+                            </li>
+                        ))}
                 </ul>
             </div>
         </div>

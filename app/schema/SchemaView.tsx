@@ -130,7 +130,6 @@ export default function SchemaView({
             const json = await result.json()
 
             if (isAddEntity) {
-                console.log(json.result.data[0].n)
                 const { labels: ls } = schema.extendNode(json.result.data[0].n, false, true)!
                 setLabels(prev => [...prev, ...ls.filter(c => !prev.some(p => p.name === c)).map(c => schema.LabelsMap.get(c)!)])
                 setIsAddEntity(false)

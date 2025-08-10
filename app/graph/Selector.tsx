@@ -15,7 +15,7 @@ import { IndicatorContext } from "../components/provider";
 import EditorComponent, { setTheme } from "../components/EditorComponent";
 import DialogComponent from "../components/DialogComponent";
 import Toolbar from "./toolbar";
-import { Node, Link, Graph, HistoryQuery, Query } from "../api/graph/model";
+import { Node, Link, Graph, Query, HistoryQuery } from "../api/graph/model";
 import { Explain, Metadata, Profile } from "./MetadataView";
 import PaginationList from "../components/PaginationList";
 import SelectGraph from "./selectGraph";
@@ -292,10 +292,18 @@ export default function Selector({ graph, options, setOptions, graphName, setGra
                                                                 renderWhitespace: "none"
                                                             }}
                                                             value={currentQuery.text}
-                                                            onChange={(value) => setHistoryQuery(prev => ({
-                                                                ...prev,
-                                                                query: value || ""
-                                                            }))}
+                                                            onChange={(value) => {
+                                                                setHistoryQuery(prev => ({
+                                                                    ...prev,
+                                                                    query: value || "",
+                                                                    currentQuery: historyQuery.counter ? {
+                                                                        ...prev.currentQuery
+                                                                    } : {
+                                                                        ...prev.currentQuery,
+                                                                        text: value || ""
+                                                                    }
+                                                                }))
+                                                            }}
                                                             onMount={handleEditorDidMount}
                                                             beforeMount={(m) => {
                                                                 setTheme(m, "selector-theme", "#242424")
@@ -311,13 +319,21 @@ export default function Selector({ graph, options, setOptions, graphName, setGra
                                                         <Profile
                                                             graphName={graphName}
                                                             query={currentQuery}
-                                                            setQuery={({ profile, text }) => {
-                                                                const newQueries = historyQuery!.queries.map(q => q.text === text ? { ...q, profile } : q)
-                                                                localStorage.setItem("query history", JSON.stringify(newQueries))
-                                                                setHistoryQuery(prev => ({
-                                                                    ...prev,
-                                                                    queries: newQueries,
-                                                                }))
+                                                            setQuery={({ profile }) => {
+                                                                setHistoryQuery(prev => {
+                                                                    const newQuery = {
+                                                                        ...prev.currentQuery,
+                                                                        profile: profile || []
+                                                                    }
+
+                                                                    const newQueries = prev.queries.map(q => q.text === newQuery.text ? newQuery : q)
+
+                                                                    return {
+                                                                        ...prev,
+                                                                        currentQuery: newQuery,
+                                                                        queries: newQueries
+                                                                    }
+                                                                })
                                                             }}
                                                             fetchCount={fetchCount}
                                                         />

@@ -494,6 +494,10 @@ export default class GraphPage extends Page {
     return waitForElementToBeVisible(this.selectItemBySearch("Graph", name));
   }
 
+  async isEnabledEditorRun(): Promise<boolean> {
+    return waitForElementToBeEnabled(this.editorRun);
+  }
+
   async clickGraphsTabInHeader(): Promise<void> {
     await interactWhenVisible(
       this.graphsTabInHeader,

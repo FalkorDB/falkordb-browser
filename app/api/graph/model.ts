@@ -3,12 +3,13 @@
 /* eslint-disable no-param-reassign */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
+import { Dispatch, SetStateAction } from "react";
 import { LinkObject, NodeObject } from "react-force-graph-2d";
 
 export type HistoryQuery = {
   queries: Query[];
+  currentQuery: Query;
   query: string;
-  currentQuery: string;
   counter: number;
 };
 
@@ -147,7 +148,7 @@ const getLabelWithFewestElements = (labels: Label[]): Label =>
   );
 
 export class GraphInfo {
-  private propertyKeys: string[];
+  private propertyKeys: string[] | undefined;
 
   private labels: Map<string, InfoLabel>;
 
@@ -158,7 +159,7 @@ export class GraphInfo {
   private colorsCounter: number = 0;
 
   constructor(
-    propertyKeys: string[],
+    propertyKeys: string[] | undefined,
     labels: Map<string, InfoLabel>,
     relationships: Map<string, InfoRelationship>,
     colors?: string[]
@@ -169,7 +170,7 @@ export class GraphInfo {
     this.colors = colors || DEFAULT_COLORS;
   }
 
-  get PropertyKeys(): string[] {
+  get PropertyKeys(): string[] | undefined {
     return this.propertyKeys;
   }
 
@@ -187,7 +188,7 @@ export class GraphInfo {
 
   public clone(): GraphInfo {
     return new GraphInfo(
-      [...this.propertyKeys],
+      this.propertyKeys,
       new Map(this.labels),
       new Map(this.relationships),
       [...this.colors]
@@ -341,6 +342,31 @@ export class Graph {
 
   set CurrentQuery(query: Query) {
     this.currentQuery = query;
+  }
+
+  public setCurrentQuery(
+    query: Query,
+    setHistoryQuery: Dispatch<SetStateAction<HistoryQuery>>
+  ) {
+    setHistoryQuery((prev) => {
+      this.currentQuery = query;
+      const newQueries = [
+        ...prev.queries.filter((q) => q.text !== query.text),
+        query,
+      ];
+      
+      localStorage.setItem(
+        "query history",
+        JSON.stringify(newQueries)
+      );
+      
+      return {
+        ...prev,
+        queries: newQueries,
+        currentQuery: query,
+        counter: 0,
+      };
+    });
   }
 
   get CurrentLimit(): number {

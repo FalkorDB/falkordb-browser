@@ -265,7 +265,7 @@ export default function EditorComponent({ graph, graphName, historyQuery, maximi
     useEffect(() => {
         setHistoryQuery(prev => ({
             ...prev,
-            query: historyQuery.counter ? historyQuery.queries[historyQuery.counter - 1].text : historyQuery.currentQuery
+            query: historyQuery.counter ? historyQuery.queries[historyQuery.counter - 1].text : historyQuery.currentQuery.text
         }))
     }, [historyQuery.counter])
 
@@ -637,7 +637,10 @@ export default function EditorComponent({ graph, graphName, historyQuery, maximi
                             if (!historyQuery.counter) {
                                 setHistoryQuery(prev => ({
                                     ...prev,
-                                    currentQuery: val || "",
+                                    currentQuery: {
+                                        ...prev.currentQuery,
+                                        text: val || "",
+                                    },
                                     query: val || "",
                                 }))
                             } else {
@@ -757,7 +760,10 @@ export default function EditorComponent({ graph, graphName, historyQuery, maximi
                                     setHistoryQuery(prev => ({
                                         ...prev,
                                         query: val || "",
-                                        currentQuery: val || ""
+                                        currentQuery: {
+                                            ...prev.currentQuery,
+                                            text: val || "",
+                                        },
                                     }))
                                 }
                             }}
