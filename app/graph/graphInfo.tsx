@@ -5,7 +5,7 @@ import Button from "../components/ui/Button";
 import { GraphContext } from "../components/provider";
 
 export default function GraphInfoPanel({ onClose }: { onClose: () => void }) {
-    const { graphInfo, nodesCount, edgesCount, runQuery } = useContext(GraphContext);
+    const { graphInfo, nodesCount, edgesCount, runQuery, graphName } = useContext(GraphContext);
 
     return (
         <div className="relative p-6 flex flex-col gap-8 overflow-y-auto  max-w-[20dvw]">
@@ -17,6 +17,12 @@ export default function GraphInfoPanel({ onClose }: { onClose: () => void }) {
                 <X className="h-4 w-4" />
             </Button>
             <h1>Graph Information</h1>
+            <div className="flex flex-col gap-2">
+                <div className="flex gap-2 items-center">
+                    <h2>Graph Name:</h2>
+                    <p>{graphName}</p>
+                </div>
+            </div>
             <div className="flex flex-col gap-2">
                 <div className="flex gap-2 items-center">
                     <h2>Nodes</h2>

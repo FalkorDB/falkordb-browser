@@ -130,9 +130,9 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
 
     const result = await getSSEGraphResult(`api/graph/${prepareArg(graphName)}/count`, toast, setIndicator);
 
-    if (!result || !result.data || !result.data[0]) return;
+    if (!result) return;
 
-    const { nodes, edges } = result.data[0];
+    const { nodes, edges } = result;
 
     setEdgesCount(edges);
     setNodesCount(nodes);
