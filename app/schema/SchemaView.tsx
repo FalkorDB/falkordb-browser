@@ -17,8 +17,8 @@ import ForceGraph from "../components/ForceGraph"
 /* eslint-disable react/require-default-props */
 interface Props {
     fetchCount?: (graphName: string) => Promise<void>
-    edgesCount: number
-    nodesCount: number
+    edgesCount?: number
+    nodesCount?: number
     selectedElement: Node | Link | undefined
     setSelectedElement: Dispatch<SetStateAction<Node | Link | undefined>>
     selectedElements: (Node | Link)[]
