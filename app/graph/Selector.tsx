@@ -58,7 +58,7 @@ export default function Selector({ graph, options, setOptions, graphName, setGra
     const [maximize, setMaximize] = useState(false)
     const [tab, setTab] = useState<keyof Query>("text")
 
-    const currentQuery = historyQuery?.currentQuery === historyQuery?.query && historyQuery?.counter === 0 && graph.CurrentQuery || historyQuery?.queries.find(q => q.text === historyQuery?.query)
+    const currentQuery = historyQuery?.currentQuery === historyQuery?.query && historyQuery?.counter === 0 ? historyQuery.currentQuery : historyQuery?.queries.find(q => q.text === historyQuery?.query)
     const type = runQuery && historyQuery && setHistoryQuery ? "Graph" : "Schema"
 
     const focusEditorAtEnd = () => {

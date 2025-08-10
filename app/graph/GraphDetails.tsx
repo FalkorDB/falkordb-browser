@@ -61,7 +61,7 @@ export default function GraphDetails({
                     : null
             }
             {
-                tabsValue === "Graph" && graphName !== undefined && nodesCount !== undefined && edgesCount !== undefined &&
+                graph.Id && tabsValue === "Graph" && graphName !== undefined && nodesCount !== undefined && edgesCount !== undefined &&
                 <div className="flex gap-4 overflow-hidden">
                     {
                         [["Nodes", nodesCount, "nodesCount"], ["Edges", edgesCount, "edgesCount"], ["GraphName", graphName, "graphName"]].map(([label, value, testId]) => (

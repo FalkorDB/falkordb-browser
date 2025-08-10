@@ -20,7 +20,14 @@ export default function GraphInfoPanel({ onClose }: { onClose: () => void }) {
             <div className="flex flex-col gap-2">
                 <div className="flex gap-2 items-center">
                     <h2>Graph Name:</h2>
-                    <p>{graphName}</p>
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <p className="truncate pointer-events-auto">{graphName}</p>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                            {graphName}
+                        </TooltipContent>
+                    </Tooltip>
                 </div>
             </div>
             <div className="flex flex-col gap-2">

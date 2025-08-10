@@ -258,9 +258,9 @@ function GraphView({
                                 profile: profile || []
                             }
 
-                            graph.CurrentQuery = newQuery
-
                             const newQueries = prev.queries.map(q => q.text === newQuery.text ? newQuery : q)
+                            
+                            localStorage.setItem("query history", JSON.stringify(newQueries))
 
                             return {
                                 ...prev,

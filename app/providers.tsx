@@ -169,7 +169,15 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
     const explainJson = await explain.json()
     const newQuery = { text: q, metadata: result.metadata, explain: explainJson.result, profile: [] }
     const g = Graph.create(n, result, false, false, limit, newQuery, graphInfo)
-    g.setCurrentQuery(newQuery, setHistoryQuery)
+    const newQueries = [...historyQuery.queries.filter(query => query.text !== newQuery.text), newQuery]
+    
+    setHistoryQuery(prev => ({
+      ...prev,
+      queries: newQueries,
+      currentQuery: newQuery,
+      query: q,
+      counter: 0
+    }))
     setGraph(g)
     fetchCount();
 
@@ -177,6 +185,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       handleCooldown();
     }
 
+    localStorage.setItem("query history", JSON.stringify(newQueries))
     localStorage.setItem("savedContent", JSON.stringify({ graphName: n, query: q }))
     // eslint-disable-next-line @typescript-eslint/ban-ts-comment
     // @ts-ignore
