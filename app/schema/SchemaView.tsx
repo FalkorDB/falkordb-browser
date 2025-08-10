@@ -14,7 +14,6 @@ import Controls from "../graph/controls"
 import GraphDetails from "../graph/GraphDetails"
 import ForceGraph from "../components/ForceGraph"
 
-/* eslint-disable react/require-default-props */
 interface Props {
     fetchCount?: (graphName: string) => Promise<void>
     edgesCount?: number | null
@@ -228,4 +227,10 @@ export default function SchemaView({
             </div>
         </div>
     )
+}
+
+SchemaView.defaultProps = {
+    fetchCount: undefined,
+    edgesCount: undefined,
+    nodesCount: undefined
 }

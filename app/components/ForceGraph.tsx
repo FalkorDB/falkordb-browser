@@ -319,7 +319,7 @@ export default function ForceGraph({
                 width={parentWidth}
                 height={parentHeight}
                 linkLabel={(link) => link.relationship}
-                nodeLabel={(node) => type === "graph" ? getNodeDisplayText(node) : node.category[0]}
+                nodeLabel={(node) => type === "graph" ? getNodeDisplayText(node) : node.labels[0]}
                 graphData={data}
                 nodeRelSize={NODE_SIZE}
                 nodeCanvasObjectMode={() => 'after'}
