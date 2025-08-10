@@ -37,14 +37,15 @@ export default function Page() {
 
     const chartRef = useRef<ForceGraphMethods<Node, Link>>()
 
+    const [isQueryLoading, setIsQueryLoading] = useState(true)
     const [selectedElement, setSelectedElement] = useState<Node | Link | undefined>()
     const [selectedElements, setSelectedElements] = useState<(Node | Link)[]>([])
     const [cooldownTicks, setCooldownTicks] = useState<number | undefined>(0)
     const [categories, setCategories] = useState<Category<Node>[]>([])
     const [data, setData] = useState<GraphData>({ ...graph.Elements })
     const [labels, setLabels] = useState<Category<Link>[]>([])
-    const [nodesCount, setNodesCount] = useState(0)
-    const [edgesCount, setEdgesCount] = useState(0)
+    const [nodesCount, setNodesCount] = useState<number>()
+    const [edgesCount, setEdgesCount] = useState<number>()
 
     useEffect(() => {
         setLabels([...graph.Labels])
@@ -54,12 +55,13 @@ export default function Page() {
     const fetchCount = useCallback(async () => {
         if (!graphName) return
 
-        const result = await getSSEGraphResult(`api/graph/${prepareArg(graphName)}/count`, toast, setIndicator);
+        setEdgesCount(undefined)
+        setNodesCount(undefined)
 
-        const { nodes, edges } = result.data[0]
+        const { nodes, edges } = await getSSEGraphResult(`api/graph/${prepareArg(graphName)}/count`, toast, setIndicator);
 
-        setEdgesCount(edges || 0)
-        setNodesCount(nodes || 0)
+        setEdgesCount(edges)
+        setNodesCount(nodes)
     }, [graphName, toast, setIndicator])
 
     const run = useCallback(async (q: string, name: string) => {
@@ -95,7 +97,6 @@ export default function Page() {
             canvas.setAttribute('data-engine-status', 'stop')
         } else {
             canvas.setAttribute('data-engine-status', 'running')
-
         }
     }
 
@@ -105,71 +106,79 @@ export default function Page() {
 
         if (!result) return
 
-        const explain = await securedFetch(`api/graph/${prepareArg(n)}/explain?query=${prepareArg(q)}`, {
-            method: "GET"
-        }, toast, setIndicator)
+        setIsQueryLoading(true)
 
-        if (!explain.ok) return
+        try {
+            const explain = await securedFetch(`api/graph/${prepareArg(n)}/explain?query=${prepareArg(q)}`, {
+                method: "GET"
+            }, toast, setIndicator)
 
-        const explainJson = await explain.json()
-        const newQuery = { text: q, metadata: result.metadata, explain: explainJson.result, profile: [] }
-        const queryArr = historyQuery.queries.some(qu => qu.text === q) ? historyQuery.queries : [...historyQuery.queries, newQuery]
+            if (!explain.ok) return
 
-        setHistoryQuery(prev => historyQuery.counter === 0 ? {
-            queries: queryArr,
-            query: q,
-            currentQuery: q,
-            counter: 0
-        } : {
-            ...prev,
-            queries: queryArr,
-            currentQuery: q,
-            counter: 0
-        })
+            const explainJson = await explain.json()
+            const newQuery = { text: q, metadata: result.metadata, explain: explainJson.result, profile: [] }
+            const queryArr = historyQuery.queries.some(qu => qu.text === q) ? historyQuery.queries : [...historyQuery.queries, newQuery]
 
-        const g = Graph.create(n, result, false, false, limit, graph.Colors, newQuery)
+            setHistoryQuery(prev => historyQuery.counter === 0 ? {
+                queries: queryArr,
+                query: q,
+                currentQuery: q,
+                counter: 0
+            } : {
+                ...prev,
+                queries: queryArr,
+                currentQuery: q,
+                counter: 0
+            })
 
-        setGraph(g)
-        fetchCount()
-        localStorage.setItem("query history", JSON.stringify(queryArr))
-        localStorage.setItem("savedContent", JSON.stringify({ graphName: n, query: q }))
-        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-        // @ts-ignore
-        window.graph = g
+            const g = Graph.create(n, result, false, false, limit, graph.Colors, newQuery)
 
-        if (g.Elements.nodes.length > 0) {
-            handleCooldown()
+            setGraph(g)
+            fetchCount()
+            localStorage.setItem("query history", JSON.stringify(queryArr))
+            localStorage.setItem("savedContent", JSON.stringify({ graphName: n, query: q }))
+            // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+            // @ts-ignore
+            window.graph = g
+
+            if (g.Elements.nodes.length > 0) {
+                handleCooldown()
+            }
+        } finally {
+            setIsQueryLoading(false)
         }
-
     }, [graphName, run, toast, setIndicator, historyQuery.queries, historyQuery.counter, setHistoryQuery, limit, graph.Colors, setGraph, fetchCount])
 
     useEffect(() => {
-        const content = localStorage.getItem("savedContent")
+        if (contentPersistence) {
+            const content = localStorage.getItem("savedContent")
 
-        if (content) {
-            const { graphName: name, query } = JSON.parse(content)
+            if (content) {
+                const { graphName: name, query } = JSON.parse(content)
 
-            if (!graph.Id && graphNames.includes(name) && contentPersistence) {
-                setGraphName(name)
-                runQuery(query, name)
-                return
+                if (!graph.Id && graphNames.includes(name)) {
+                    setGraphName(name)
+                    runQuery(query, name)
+                    return
+                }
             }
         }
 
+        if (graphName) {
+            if (graphName !== graph.Id) {
+                if (runDefaultQuery) {
+                    runQuery(defaultQuery)
+                    return
+                }
 
-        if (!graphName) return
-
-        if (graphName !== graph.Id) {
-            if (runDefaultQuery) {
-                runQuery(defaultQuery)
-                return
+                const colorsArr = JSON.parse(localStorage.getItem(graphName) || "[]")
+                setGraph(Graph.empty(graphName, colorsArr))
             }
 
-            const colorsArr = JSON.parse(localStorage.getItem(graphName) || "[]")
-            setGraph(Graph.empty(graphName, colorsArr))
+            fetchCount()
         }
 
-        fetchCount()
+        setIsQueryLoading(false)
     }, [fetchCount, graph.Id, graphName, setGraph, runDefaultQuery, defaultQuery, contentPersistence, setGraphName, graphNames])
 
     const handleDeleteElement = async () => {
@@ -251,6 +260,7 @@ export default function Page() {
                 handleDeleteElement={handleDeleteElement}
                 chartRef={chartRef}
                 setGraph={setGraph}
+                isQueryLoading={isQueryLoading}
             />
             <div className="h-1 grow p-12">
                 <GraphView

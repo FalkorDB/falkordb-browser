@@ -57,6 +57,7 @@ interface Props {
     runQuery: (query: string) => Promise<void>
     setHistoryQuery: Dispatch<SetStateAction<HistoryQuery>>
     editorKey: string
+    isQueryLoading: boolean
 }
 
 const monacoOptions: monaco.editor.IStandaloneEditorConstructionOptions = {
@@ -231,8 +232,7 @@ const LINE_HEIGHT = 32
 
 const PLACEHOLDER = "Type your query here to start"
 
-export default function EditorComponent({ graph, historyQuery, maximize, setMaximize, runQuery, setHistoryQuery, editorKey }: Props) {
-
+export default function EditorComponent({ graph, historyQuery, maximize, setMaximize, runQuery, setHistoryQuery, editorKey, isQueryLoading }: Props) {
     const { indicator, setIndicator } = useContext(IndicatorContext)
     const { theme, resolvedTheme } = useTheme()
 
@@ -248,7 +248,6 @@ export default function EditorComponent({ graph, historyQuery, maximize, setMaxi
 
     const [monacoEditor, setMonacoEditor] = useState<Monaco | null>(null)
     const [sugDisposed, setSugDisposed] = useState<monaco.IDisposable>()
-    const [isLoading, setIsLoading] = useState(false)
     const [lineNumber, setLineNumber] = useState(1)
     const [blur, setBlur] = useState(false)
 
@@ -427,12 +426,7 @@ export default function EditorComponent({ graph, historyQuery, maximize, setMaxi
     }, [monacoEditor, graphIdRef.current])
 
     const handleSubmit = async () => {
-        try {
-            setIsLoading(true)
-            await runQuery(historyQuery.query.trim())
-        } finally {
-            setIsLoading(false)
-        }
+        runQuery(historyQuery.query.trim())
     }
 
     const handleEditorWillMount = async (monacoI: Monaco) => {
@@ -701,7 +695,7 @@ export default function EditorComponent({ graph, historyQuery, maximize, setMaxi
                         label="RUN"
                         title="Press Enter to run the query"
                         onClick={handleSubmit}
-                        isLoading={isLoading}
+                        isLoading={isQueryLoading}
                     />
                 </div>
             </div>
@@ -742,7 +736,7 @@ export default function EditorComponent({ graph, historyQuery, maximize, setMaxi
                                     label="Run"
                                     title="Press Enter to run the query"
                                     onClick={handleSubmit}
-                                    isLoading={isLoading}
+                                    isLoading={isQueryLoading}
                                 />
                             </div>
                         </div>

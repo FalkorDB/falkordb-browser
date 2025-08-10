@@ -17,8 +17,8 @@ import ForceGraph from "../components/ForceGraph"
 /* eslint-disable react/require-default-props */
 interface Props {
     fetchCount?: (graphName: string) => Promise<void>
-    edgesCount: number
-    nodesCount: number
+    edgesCount?: number
+    nodesCount?: number
     selectedElement: Node | Link | undefined
     setSelectedElement: Dispatch<SetStateAction<Node | Link | undefined>>
     selectedElements: (Node | Link)[]
@@ -64,10 +64,10 @@ export default function SchemaView({
     labels,
     categories,
     isLoading,
-    setIsLoading
+    setIsLoading,
 }: Props) {
     const { setIndicator } = useContext(IndicatorContext)
-    const { schema } = useContext(SchemaContext)
+    const { schema, schemaName } = useContext(SchemaContext)
 
     const { toast } = useToast()
 
@@ -159,6 +159,7 @@ export default function SchemaView({
             <div className="pointer-events-none absolute bottom-4 inset-x-12 z-20 flex items-center justify-between">
                 <GraphDetails
                     graph={schema}
+                    graphName={schemaName}
                     nodesCount={nodesCount}
                     edgesCount={edgesCount}
                 />

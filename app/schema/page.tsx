@@ -25,7 +25,7 @@ export default function Page() {
 
     const { toast } = useToast()
 
-    const [selectedElement, setSelectedElement] = useState<Node | Link | undefined>()
+    const [selectedElement, setSelectedElement] = useState<Node | Link>()
     const [selectedElements, setSelectedElements] = useState<(Node | Link)[]>([])
     const [cooldownTicks, setCooldownTicks] = useState<number | undefined>(0)
     const [categories, setCategories] = useState<Category<Node>[]>([])
@@ -33,18 +33,16 @@ export default function Page() {
     const [labels, setLabels] = useState<Category<Link>[]>([])
     const [isAddRelation, setIsAddRelation] = useState(false)
     const chartRef = useRef<ForceGraphMethods<Node, Link>>()
-    const [edgesCount, setEdgesCount] = useState<number>(0)
-    const [nodesCount, setNodesCount] = useState<number>(0)
+    const [edgesCount, setEdgesCount] = useState<number>()
+    const [nodesCount, setNodesCount] = useState<number>()
     const [isAddEntity, setIsAddEntity] = useState(false)
     const [isCanvasLoading, setIsCanvasLoading] = useState(false)
-
+    
     const fetchCount = useCallback(async () => {
-        const result = await getSSEGraphResult(`api/schema/${prepareArg(schemaName)}/count`, toast, setIndicator)
+        const { edges, nodes } = await getSSEGraphResult(`api/schema/${prepareArg(schemaName)}/count`, toast, setIndicator)
 
-        const { edges, nodes } = result.data[0]
-
-        setEdgesCount(edges || 0)
-        setNodesCount(nodes || 0)
+        setEdgesCount(edges)
+        setNodesCount(nodes)
     }, [toast, setIndicator, schemaName])
 
     const handleCooldown = (ticks?: number) => {
@@ -162,7 +160,7 @@ export default function Page() {
                 setIsAddEntity={setIsAddEntity}
                 setIsAddRelation={setIsAddRelation}
                 setGraph={setSchema}
-                isLoading={isCanvasLoading}
+                isCanvasLoading={isCanvasLoading}
             />
             <div className="h-1 grow p-12">
                 <SchemaView

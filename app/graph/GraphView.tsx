@@ -28,8 +28,8 @@ interface Props {
     setSelectedElement: Dispatch<SetStateAction<Node | Link | undefined>>
     selectedElements: (Node | Link)[]
     setSelectedElements: Dispatch<SetStateAction<(Node | Link)[]>>
-    nodesCount: number
-    edgesCount: number
+    nodesCount: number | undefined
+    edgesCount: number | undefined
     fetchCount: () => Promise<void>
     handleCooldown: (ticks?: number) => void
     cooldownTicks: number | undefined
@@ -61,7 +61,7 @@ function GraphView({
     categories
 }: Props) {
 
-    const { graph } = useContext(GraphContext)
+    const { graph, graphName } = useContext(GraphContext)
 
     const [isLoading, setIsLoading] = useState<boolean>(false)
     const [parentHeight, setParentHeight] = useState<number>(0)
@@ -81,14 +81,15 @@ function GraphView({
     }, [graph])
 
     useEffect(() => {
+        setData({ ...graph.Elements })
+
         if (!elementsLength) return;
 
         setIsLoading(true)
-        setData({ ...graph.Elements })
     }, [graph, elementsLength, setData])
 
     useEffect(() => {
-        if (isTabEnabled(tabsValue)) return
+        if (tabsValue !== "Metadata" && isTabEnabled(tabsValue)) return
 
         let defaultChecked: Tab = "Graph"
         if (graph.getElements().length !== 0) defaultChecked = "Graph"
@@ -96,7 +97,7 @@ function GraphView({
         else if (graph.CurrentQuery && graph.CurrentQuery.metadata.length > 0 && graph.Metadata.length > 0 && graph.CurrentQuery.explain.length > 0) defaultChecked = "Metadata"
 
         setTabsValue(defaultChecked);
-    }, [graph, graph.Id, elementsLength, graph.Data.length, isTabEnabled, tabsValue])
+    }, [graph, graph.Id, elementsLength, graph.Data.length, isTabEnabled])
 
     useEffect(() => {
         if (tabsValue === "Graph" && graph.Elements.nodes.length > 0) {
@@ -113,12 +114,8 @@ function GraphView({
         category.show = !category.show
 
         category.elements.forEach((node) => {
-            if (node.category[0] !== category.name) return
-            if (category.show) {
-                node.visible = true
-            } else {
-                node.visible = false
-            }
+            if (!category.show && node.category.some(c => graph.CategoriesMap.get(c)?.show !== category.show)) return
+            node.visible = category.show
         })
 
         graph.visibleLinks(category.show)
@@ -131,11 +128,7 @@ function GraphView({
         label.show = !label.show
 
         label.elements.filter((link) => link.source.visible && link.target.visible).forEach((link) => {
-            if (label.show) {
-                link.visible = true
-            } else {
-                link.visible = false
-            }
+            link.visible = label.show
         })
 
         graph.LabelsMap.set(label.name, label)
@@ -147,6 +140,7 @@ function GraphView({
             <div className={cn("flex gap-4 justify-between items-end", tabsValue === "Table" ? "py-4 px-12" : "absolute bottom-4 inset-x-12 pointer-events-none z-20")}>
                 <GraphDetails
                     graph={graph}
+                    graphName={graphName}
                     tabsValue={tabsValue}
                     nodesCount={nodesCount}
                     edgesCount={edgesCount}
