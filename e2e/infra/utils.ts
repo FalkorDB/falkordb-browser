@@ -206,12 +206,16 @@ export function inferLabelFromGraph(graph: string): string {
 export async function pollForElementContent(
   element: Locator,
   elementName: string,
-  loader: Locator,
+  loader?: Locator,
   maxRetries: number = 10,
   retryDelay: number = 500
 ): Promise<string | null> {
-  await waitForElementToNotBeVisible(loader);
+  if (loader) {
+    await waitForElementToNotBeVisible(loader);
+  }
+  
   const isVisible = await waitForElementToBeVisible(element);
+  
   if (!isVisible) {
     throw new Error(`${elementName} element is not visible`);
   }
