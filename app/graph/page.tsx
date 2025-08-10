@@ -58,9 +58,7 @@ export default function Page() {
         setEdgesCount(undefined)
         setNodesCount(undefined)
 
-        const result = await getSSEGraphResult(`api/graph/${prepareArg(graphName)}/count`, toast, setIndicator);
-
-        const { nodes, edges } = result.data[0]
+        const { nodes, edges } = await getSSEGraphResult(`api/graph/${prepareArg(graphName)}/count`, toast, setIndicator);
 
         setEdgesCount(edges)
         setNodesCount(nodes)
@@ -119,7 +117,7 @@ export default function Page() {
 
             const explainJson = await explain.json()
             const newQuery = { text: q, metadata: result.metadata, explain: explainJson.result, profile: [] }
-            const queryArr = historyQuery.queries.some(qu => qu.text === q) ? historyQuery.queries : [...historyQuery.queries, newQuery]
+            const queryArr = [...historyQuery.queries.filter(query => query.text !== q), newQuery]
 
             setHistoryQuery(prev => historyQuery.counter === 0 ? {
                 queries: queryArr,

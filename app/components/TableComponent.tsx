@@ -159,8 +159,11 @@ export default function TableComponent({ headers, rows, label, entityName, input
                                         className="w-6 h-6 rounded-full bg-foreground border-primary data-[state=checked]:bg-primary"
                                         checked={rows.length > 0 && rows.every(row => row.checked)}
                                         onCheckedChange={() => {
-                                            const checked = !rows.every(row => row.checked)
-                                            setRows(rows.map(row => ({ ...row, checked })))
+                                            setRows(rows.map((row) => {
+                                                // eslint-disable-next-line no-param-reassign
+                                                row.checked = !rows.every(r => r.checked)
+                                                return row
+                                            }))
                                         }}
                                     />
                                 </TableHead>
@@ -213,7 +216,13 @@ export default function TableComponent({ headers, rows, label, entityName, input
                                                     data-testid={`tableCheckbox${label}${row.cells[0].value}`}
                                                     checked={row.checked}
                                                     onCheckedChange={() => {
-                                                        setRows(rows.map((r, k) => k === actualIndex ? ({ ...r, checked: !r.checked }) : r))
+                                                        setRows(rows.map((r, k) => {
+                                                            if (k === actualIndex) {
+                                                                // eslint-disable-next-line no-param-reassign
+                                                                r.checked = !r.checked
+                                                            }
+                                                            return r
+                                                        }))
                                                     }}
                                                 />
                                             </TableCell>
