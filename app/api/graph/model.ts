@@ -219,11 +219,11 @@ export class GraphInfo {
       let c = this.labels.get(label);
 
       if (!c) {
-        c = {
-          name: label,
-          color: this.getLabelColorValue(this.colorsCounter),
-          show: true,
-        };
+          c = {
+            name: label,
+            color: this.getLabelColorValue(this.colorsCounter),
+            show: true,
+          };
 
         this.labels.set(label, c);
         this.colorsCounter += 1;
@@ -233,18 +233,20 @@ export class GraphInfo {
     });
   }
 
-  public createRelationship(relationship: string): InfoRelationship {
+  public createRelationship(
+    relationship: string,
+  ): InfoRelationship {
     let c = this.relationships.get(relationship);
 
     if (!c) {
-      c = {
-        name: relationship,
-        color: this.getLabelColorValue(this.colorsCounter),
-        show: true,
-      };
+        c = {
+          name: relationship,
+          color: this.getLabelColorValue(this.colorsCounter),
+          show: true,
+        };
 
-      this.colorsCounter += 1;
       this.relationships.set(relationship, c);
+      this.colorsCounter += 1;
     }
 
     return c;
@@ -303,8 +305,7 @@ export class Graph {
     labelsMap: Map<string, Label>,
     relationshipsMap: Map<string, Relationship>,
     nodesMap: Map<number, Node>,
-    edgesMap: Map<number, Link>,
-    currentQuery?: Query,
+    linksMap: Map<number, Link>,
     currentLimit?: number,
     graphInfo?: GraphInfo
   ) {
@@ -318,7 +319,7 @@ export class Graph {
     this.labelsMap = labelsMap;
     this.relationshipsMap = relationshipsMap;
     this.nodesMap = nodesMap;
-    this.linksMap = edgesMap;
+    this.linksMap = linksMap;
     this.currentLimit = currentLimit || 0;
     this.graphInfo = graphInfo || GraphInfo.empty();
   }
@@ -359,7 +360,7 @@ export class Graph {
     return this.nodesMap;
   }
 
-  get EdgesMap(): Map<number, Link> {
+  get LinksMap(): Map<number, Link> {
     return this.linksMap;
   }
 
@@ -401,7 +402,6 @@ export class Graph {
 
   public static empty(
     graphName?: string,
-    currentQuery?: Query,
     currentLimit?: number,
     graphInfo?: GraphInfo
   ): Graph {
@@ -414,7 +414,6 @@ export class Graph {
       new Map<string, Relationship>(),
       new Map<number, Node>(),
       new Map<number, Link>(),
-      currentQuery,
       currentLimit,
       graphInfo
     );
@@ -426,10 +425,9 @@ export class Graph {
     isCollapsed: boolean,
     isSchema: boolean,
     currentLimit: number,
-    currentQuery?: Query,
     graphInfo?: GraphInfo
   ): Graph {
-    const graph = Graph.empty(undefined, currentQuery, currentLimit, graphInfo);
+    const graph = Graph.empty(undefined, currentLimit, graphInfo);
     graph.extend(results, isCollapsed, isSchema);
     graph.id = id;
     return graph;
@@ -687,6 +685,7 @@ export class Graph {
   public createLabel(labels: string[], node?: Node): Label[] {
     return labels.map((label) => {
       let c = this.labelsMap.get(label);
+
       if (!c) {
         const [infoLabel] = this.graphInfo.createLabel([label]);
 

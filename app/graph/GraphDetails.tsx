@@ -20,7 +20,7 @@ export default function GraphDetails({
 }) {
     const {
         settings: {
-            limitSettings: { limit },
+            limitSettings: { limit, lastLimit },
         }
     } = useContext(QuerySettingsContext)
 
@@ -44,7 +44,7 @@ export default function GraphDetails({
                     : null
             }
             {
-                graph.CurrentLimit && graph.CurrentLimit !== limit ?
+                graph.CurrentLimit && lastLimit !== limit ?
                     <Tooltip>
                         <TooltipTrigger asChild>
                             <div className="flex gap-2 items-center text-orange-300">

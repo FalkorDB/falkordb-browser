@@ -58,7 +58,7 @@ export default function Selector({ graph, options, setOptions, graphName, setGra
     const [maximize, setMaximize] = useState(false)
     const [tab, setTab] = useState<keyof Query>("text")
 
-    const currentQuery = historyQuery?.currentQuery === historyQuery?.query && historyQuery?.counter === 0 ? historyQuery.currentQuery : historyQuery?.queries.find(q => q.text === historyQuery?.query)
+    const currentQuery = historyQuery?.counter === 0 ? historyQuery.currentQuery : historyQuery?.queries[historyQuery.counter - 1]
     const type = runQuery && historyQuery && setHistoryQuery ? "Graph" : "Schema"
 
     const focusEditorAtEnd = () => {
@@ -86,30 +86,22 @@ export default function Selector({ graph, options, setOptions, graphName, setGra
     }, [currentQuery]);
 
     useEffect(() => {
-        if (queriesOpen && currentQuery && tab !== "profile") {
-            const currentValue = currentQuery?.[tab]
+        if (!queriesOpen || !currentQuery || tab === "profile") return
 
-            if (!currentValue || currentValue.length === 0) {
-                const fallbackTab = (Object.keys(currentQuery) as (keyof Query)[]).find(isTabEnabled);
+        const currentValue = currentQuery?.[tab]
 
-                if (fallbackTab && fallbackTab !== tab) {
-                    setTab(fallbackTab);
+        if (!currentValue || currentValue.length === 0) {
+            const fallbackTab = (Object.keys(currentQuery) as (keyof Query)[]).find(isTabEnabled);
 
-                    if (fallbackTab === "text") {
-                        focusEditorAtEnd()
-                    }
+            if (fallbackTab && fallbackTab !== tab) {
+                setTab(fallbackTab);
+
+                if (fallbackTab === "text" && !editorRef.current?.hasTextFocus()) {
+                    focusEditorAtEnd()
                 }
-            } else if (tab === "text") {
-                focusEditorAtEnd()
-
-                return
             }
-
-            setTimeout(() => {
-                if (searchQueryRef.current) {
-                    searchQueryRef.current.focus()
-                }
-            }, 100)
+        } else if (tab === "text" && !editorRef.current?.hasTextFocus()) {
+            focusEditorAtEnd()
         }
     }, [currentQuery, setTab, queriesOpen, historyQuery?.query, tab, isTabEnabled])
 
@@ -245,9 +237,10 @@ export default function Selector({ graph, options, setOptions, graphName, setGra
                                             list={[...historyQuery.queries].reverse()}
                                             step={STEP}
                                             onClick={(counter) => {
+                                                const index = historyQuery.queries.findIndex(q => q.text === counter) + 1
                                                 setHistoryQuery(prev => ({
                                                     ...prev,
-                                                    counter: historyQuery.queries.findIndex(q => q.text === counter) + 1
+                                                    counter: index === historyQuery.counter ? 0 : index
                                                 }))
                                             }}
                                             searchRef={searchQueryRef}
@@ -291,18 +284,20 @@ export default function Selector({ graph, options, setOptions, graphName, setGra
                                                                 wordWrap: "on",
                                                                 renderWhitespace: "none"
                                                             }}
-                                                            value={currentQuery.text}
+                                                            value={historyQuery.query}
                                                             onChange={(value) => {
-                                                                setHistoryQuery(prev => ({
-                                                                    ...prev,
-                                                                    query: value || "",
-                                                                    currentQuery: historyQuery.counter ? {
-                                                                        ...prev.currentQuery
-                                                                    } : {
-                                                                        ...prev.currentQuery,
-                                                                        text: value || ""
+                                                                setHistoryQuery(prev => {
+                                                                    const newHistoryQuery = {
+                                                                        ...prev,
+                                                                        query: value || "",
+                                                                        currentQuery: {
+                                                                            ...prev.currentQuery,
+                                                                            text: prev.counter ? prev.currentQuery.text : value || ""
+                                                                        }
                                                                     }
-                                                                }))
+
+                                                                    return newHistoryQuery
+                                                                })
                                                             }}
                                                             onMount={handleEditorDidMount}
                                                             beforeMount={(m) => {

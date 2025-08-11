@@ -143,9 +143,7 @@ export default function GraphInfoPanel({ onClose }: { onClose: () => void }) {
                                     className="h-6 w-full p-2 bg-gray-500 flex justify-center items-center rounded-full"
                                     label={key}
                                     onClick={() => runQuery(
-                                        `MATCH (e) WHERE e.${key} IS NOT NULL RETURN e
-                                     UNION
-                                     MATCH ()-[e]-() WHERE e.${key} IS NOT NULL RETURN e`
+                                        `MATCH (e) WHERE e.${key} IS NOT NULL RETURN e\nUNION\nMATCH ()-[e]-() WHERE e.${key} IS NOT NULL RETURN e`
                                     )}
                                 />
                             </li>

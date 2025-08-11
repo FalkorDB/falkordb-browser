@@ -124,7 +124,7 @@ export default function Page() {
                 schema.NodesMap.delete(id)
             } else {
                 schema.Elements.links.splice(schema.Elements.links.findIndex(link => link.id === element.id), 1)
-                schema.EdgesMap.delete(id)
+                schema.LinksMap.delete(id)
             }
 
             if (type) {

@@ -41,6 +41,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
   const [defaultQuery, setDefaultQuery] = useState("")
   const [timeout, setTimeout] = useState(0)
   const [limit, setLimit] = useState(0)
+  const [lastLimit, setLastLimit] = useState(0)
   const [newLimit, setNewLimit] = useState(0)
   const [newTimeout, setNewTimeout] = useState(0)
   const [newRunDefaultQuery, setNewRunDefaultQuery] = useState(false)
@@ -52,6 +53,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState<boolean>(false)
   const [cooldownTicks, setCooldownTicks] = useState<number | undefined>(0)
 
+
   const querySettingsContext = useMemo(() => ({
     newSettings: {
       limitSettings: { newLimit, setNewLimit },
@@ -61,7 +63,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       contentPersistenceSettings: { newContentPersistence, setNewContentPersistence },
     },
     settings: {
-      limitSettings: { limit, setLimit },
+      limitSettings: { limit, setLimit, lastLimit, setLastLimit },
       timeoutSettings: { timeout, setTimeout },
       runDefaultQuerySettings: { runDefaultQuery, setRunDefaultQuery },
       defaultQuerySettings: { defaultQuery, setDefaultQuery },
@@ -83,6 +85,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       setDefaultQuery(newDefaultQuery);
       setTimeout(newTimeout);
       setLimit(newLimit);
+      setLastLimit(limit);
 
       // Reset has changes
       setHasChanges(false);
@@ -101,7 +104,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       setNewLimit(limit)
       setHasChanges(false)
     }
-  }), [contentPersistence, defaultQuery, hasChanges, limit, newContentPersistence, newDefaultQuery, newLimit, newRunDefaultQuery, newTimeout, runDefaultQuery, timeout, toast])
+  }), [contentPersistence, defaultQuery, hasChanges, lastLimit, limit, newContentPersistence, newDefaultQuery, newLimit, newRunDefaultQuery, newTimeout, runDefaultQuery, timeout, toast])
 
   const historyQueryContext = useMemo(() => ({
     historyQuery,
@@ -155,12 +158,13 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
   const runQuery = useCallback(async (q: string, name?: string): Promise<void> => {
     const n = name || graphName
 
-    const url = `api/graph/${prepareArg(n)}?query=${prepareArg(getQueryWithLimit(q, limit))}&timeout=${timeout}`;
+    const [query, existingLimit] = getQueryWithLimit(q, limit)
+    const url = `api/graph/${prepareArg(n)}?query=${prepareArg(query)}&timeout=${timeout}`;
     const result = await getSSEGraphResult(url, toast, setIndicator);
 
     if (!result) return;
 
-    const explain = await securedFetch(`api/graph/${prepareArg(n)}/explain?query=${prepareArg(q)}`, {
+    const explain = await securedFetch(`api/graph/${prepareArg(n)}/explain?query=${prepareArg(query)}`, {
       method: "GET"
     }, toast, setIndicator)
 
@@ -168,9 +172,9 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
 
     const explainJson = await explain.json()
     const newQuery = { text: q, metadata: result.metadata, explain: explainJson.result, profile: [] }
-    const g = Graph.create(n, result, false, false, limit, newQuery, graphInfo)
-    const newQueries = [...historyQuery.queries.filter(query => query.text !== newQuery.text), newQuery]
-    
+    const g = Graph.create(n, result, false, false, existingLimit, graphInfo)
+    const newQueries = [...historyQuery.queries.filter(qu => qu.text !== newQuery.text), newQuery]
+
     setHistoryQuery(prev => ({
       ...prev,
       queries: newQueries,
@@ -180,6 +184,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
     }))
     setGraph(g)
     fetchCount();
+    setLastLimit(limit)
 
     if (g.Elements.nodes.length > 0) {
       handleCooldown();
@@ -191,7 +196,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
     // @ts-ignore
     window.graph = g
 
-  }, [graphName, limit, timeout, toast, historyQuery.queries, historyQuery.counter, graphInfo, fetchCount, handleCooldown]);
+  }, [graphName, limit, timeout, toast, historyQuery.queries, graphInfo, fetchCount, handleCooldown]);
 
   const graphContext = useMemo(() => ({
     graph,
@@ -228,7 +233,9 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       counter: 0
     })
     setTimeout(parseInt(localStorage.getItem("timeout") || "0", 10))
-    setLimit(parseInt(localStorage.getItem("limit") || "300", 10))
+    const l = parseInt(localStorage.getItem("limit") || "300", 10)
+    setLimit(l)
+    setLastLimit(l)
     setDefaultQuery(getDefaultQuery(localStorage.getItem("defaultQuery") || undefined))
     setRunDefaultQuery(localStorage.getItem("runDefaultQuery") !== "false")
     setContentPersistence(localStorage.getItem("contentPersistence") !== "false")
@@ -264,7 +271,6 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
     return () => clearInterval(interval)
   }, [checkStatus, status])
 
-
   const handleOnSetGraphName = (newGraphName: string) => {
     if (pathname.includes("/schema")) {
       setSchemaName(formatName(newGraphName))
@@ -286,9 +292,13 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
   }, [indicator, toast, contentPersistence, setGraphNames, setGraphName, setSchemaNames, setSchemaName, setIndicator])
 
   useEffect(() => {
-    if (status !== "authenticated") return
+    if (status !== "authenticated") return undefined
 
     handleFetchOptions()
+    
+    const interval = setInterval(handleFetchOptions, 30000)
+
+    return () => clearInterval(interval)
   }, [handleFetchOptions, status])
 
   return (

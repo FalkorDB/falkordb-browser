@@ -31,6 +31,7 @@ export default function Page() {
     const {
         graph,
         setGraph,
+        graphInfo,
         setGraphInfo,
         graphName,
         setGraphName,
@@ -84,8 +85,8 @@ export default function Page() {
             fetchInfo("(property key)"),
         ]).then(async ([newLabels, newRelationships, newPropertyKeys]) => {
             const colorsArr = JSON.parse(localStorage.getItem(graphName) || "[]")
-            const graphInfo = GraphInfo.create(newPropertyKeys, newLabels, newRelationships, colorsArr)
-            setGraphInfo(graphInfo)
+            const gi = GraphInfo.create(newPropertyKeys, newLabels, newRelationships, colorsArr)
+            setGraphInfo(gi)
         });
     }, [fetchInfo, setGraphInfo, toast, setIndicator, graphName])
 
@@ -95,6 +96,8 @@ export default function Page() {
     }, [graph, graph.Labels.length, graph.Relationships.length, graph.Labels, graph.Relationships])
 
     useEffect(() => {
+        if (!graphInfo) return
+
         if (contentPersistence) {
             const content = localStorage.getItem("savedContent")
 
@@ -119,7 +122,7 @@ export default function Page() {
         }
 
         setIsQueryLoading(false)
-    }, [fetchCount, graph.Id, graphName, setGraph, runDefaultQuery, defaultQuery, contentPersistence, setGraphName, graphNames])
+    }, [fetchCount, graph.Id, graphName, setGraph, runDefaultQuery, defaultQuery, contentPersistence, setGraphName, graphNames, graphInfo])
 
     const handleDeleteElement = async () => {
         if (selectedElements.length === 0 && selectedElement) {

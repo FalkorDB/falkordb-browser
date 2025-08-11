@@ -8,7 +8,7 @@ export default function Home() {
   return (
     <div className="h-full w-full bg-foreground flex flex-col gap-4">
       <main className="grow flex flex-col gap-10 items-center justify-center">
-      <Image style={{ width: 'auto', height: '100px' }} priority src="/BrowserLogo.svg" alt="FalkorDB Logo" width={0} height={0} />
+      <Image style={{ width: 'auto', height: '100px' }} priority src="/icons/BrowserLogo.svg" alt="FalkorDB Logo" width={0} height={0} />
       <Spinning />
       </main>
       <div className="flex flex-col gap-8 justify-center items-center">

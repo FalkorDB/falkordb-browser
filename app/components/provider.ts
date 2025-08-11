@@ -29,6 +29,8 @@ type QuerySettingsContextType = {
     limitSettings: {
       limit: number;
       setLimit: Dispatch<SetStateAction<number>>;
+      lastLimit: number;
+      setLastLimit: Dispatch<SetStateAction<number>>;
     };
     timeoutSettings: {
       timeout: number;
@@ -107,7 +109,7 @@ export const QuerySettingsContext = createContext<QuerySettingsContextType>({
     },
   },
   settings: {
-    limitSettings: { limit: 0, setLimit: () => {} },
+    limitSettings: { limit: 0, setLimit: () => {}, lastLimit: 0, setLastLimit: () => {} },
     timeoutSettings: { timeout: 0, setTimeout: () => {} },
     runDefaultQuerySettings: {
       runDefaultQuery: false,
