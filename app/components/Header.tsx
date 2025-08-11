@@ -81,6 +81,18 @@ export default function Header({ onSetGraphName, graphNames, graphName }: Props)
                             graphNames={graphNames}
                         />
                     }
+                    {
+                        type === "Graph" && graphName &&
+                        <Button
+                            indicator={indicator}
+                            title="Graph info"
+                            onClick={() => {
+                                setCurrentPanel(prev => prev === "graphInfo" ? undefined : "graphInfo")
+                            }}
+                        >
+                            <Database size={35} />
+                        </Button>
+                    }
                     <div className="flex flex-col gap-2 items-center">
                         <Button
                             label="GRAPHS"
@@ -98,18 +110,6 @@ export default function Header({ onSetGraphName, graphNames, graphName }: Props)
                             data-testid="SchemasButton"
                         />
                     </div>
-                    {
-                        type === "Graph" && graphName &&
-                        <Button
-                            indicator={indicator}
-                            title="Graph info"
-                            onClick={() => {
-                                setCurrentPanel(prev => prev === "graphInfo" ? undefined : "graphInfo")
-                            }}
-                        >
-                            <Database size={35} />
-                        </Button>
-                    }
                 </div>
                 <div className="flex flex-col gap-6 items-center">
                     {
