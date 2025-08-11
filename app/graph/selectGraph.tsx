@@ -7,7 +7,7 @@ import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import { prepareArg, Row, securedFetch } from "@/lib/utils";
 import { useSession } from "next-auth/react";
 import { useToast } from "@/components/ui/use-toast";
-import { ChevronDown, ChevronUp } from "lucide-react";
+import { ChevronDown, ChevronUp, PlusCircle, Settings } from "lucide-react";
 import Button from "../components/ui/Button";
 import { IndicatorContext } from "../components/provider";
 import PaginationList from "../components/PaginationList";
@@ -16,6 +16,7 @@ import ExportGraph from "../components/ExportGraph";
 import DeleteGraph from "../components/graph/DeleteGraph";
 import CloseDialog from "../components/CloseDialog";
 import DuplicateGraph from "../components/graph/DuplicateGraph";
+import CreateGraph from "../components/CreateGraph";
 import { Graph } from "../api/graph/model";
 
 interface Props {
@@ -110,7 +111,7 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
                     </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent
-                    className="h-[400px] w-[350px] mt-2 overflow-hidden border rounded-lg flex flex-col items-center p-8"
+                    className="h-[450px] w-[350px] mt-2 overflow-hidden border rounded-lg flex flex-col items-center p-8"
                 >
                     <PaginationList
                         className="h-1 grow p-0"
@@ -124,14 +125,35 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
                         isLoading={isLoading}
                         searchRef={inputRef}
                     />
-                    <DialogTrigger asChild>
-                        <Button
-                            className="w-fit"
-                            variant="Primary"
-                            label={`Manage ${type}s`}
-                            data-testid={`manage${type}s`}
+                    <div className="flex gap-2">
+                        <CreateGraph
+                            type={type}
+                            graphNames={options}
+                            onSetGraphName={(newGraphName) => {
+                                setSelectedValue(newGraphName);
+                                setOptions([...options, newGraphName]);
+                            }}
+                            trigger={
+                                <Button
+                                    className="w-fit"
+                                    variant="Primary"
+                                    label="Create"
+                                >
+                                    <PlusCircle size={20} />
+                                </Button>
+                            }
                         />
-                    </DialogTrigger>
+                        <DialogTrigger asChild>
+                            <Button
+                                className="w-fit"
+                                variant="Primary"
+                                label="Manage"
+                                data-testid={`manage${type}s`}
+                            >
+                                <Settings size={20} />
+                            </Button>
+                        </DialogTrigger>
+                    </div>
                 </DropdownMenuContent>
             </DropdownMenu>
             <DialogContent
