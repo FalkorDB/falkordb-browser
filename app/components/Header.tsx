@@ -3,7 +3,7 @@
 'use client'
 
 import { ArrowUpRight, LifeBuoy, LogOut, Settings } from "lucide-react";
-import { useCallback, useContext } from "react";
+import { useCallback, useContext, useState, useEffect } from "react";
 import Image from "next/image";
 import { cn } from "@/lib/utils";
 import { getQuerySettingsNavigationToast } from "@/components/ui/toaster";
@@ -19,6 +19,7 @@ import { useToast } from "@/components/ui/use-toast";
 import Button from "./ui/Button";
 import CreateGraph from "./CreateGraph";
 import { IndicatorContext, QuerySettingsContext } from "./provider";
+import ProductTour from "./ProductTour";
 
 interface Props {
     onSetGraphName: (newGraphName: string) => void
@@ -34,6 +35,20 @@ export default function Header({ onSetGraphName, graphNames }: Props) {
     const pathname = usePathname()
     const router = useRouter()
     const { toast } = useToast()
+    const [isTourOpen, setIsTourOpen] = useState(false)
+
+    // Offer tour to new users automatically
+    useEffect(() => {
+        const hasSeenTour = localStorage.getItem('falkordb-tour-completed');
+        if (!hasSeenTour && pathname.includes('/graph')) {
+            // Small delay to let the page load
+            const timer = setTimeout(() => {
+                setIsTourOpen(true);
+            }, 1000);
+            return () => clearTimeout(timer);
+        }
+        return undefined;
+    }, [pathname]);
 
     const type = pathname.includes("/schema") ? "Schema" : "Graph"
     const showCreate = (pathname.includes("/graph") || pathname.includes("/schema")) && session?.user?.role && session.user.role !== "Read-Only"
@@ -114,6 +129,25 @@ export default function Header({ onSetGraphName, graphNames }: Props) {
                                 </DropdownMenuItem>
                                 <DropdownMenuSeparator />
                                 <DropdownMenuItem className="focus:bg-transparent">
+                                    <Button
+                                        label="Product Tour"
+                                        title="Take a guided tour of the application"
+                                        onClick={() => setIsTourOpen(true)}
+                                    />
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem className="focus:bg-transparent">
+                                    <Button
+                                        label="Reset Tour"
+                                        title="Reset tour preferences and show tour again"
+                                        onClick={() => {
+                                            localStorage.removeItem('falkordb-tour-completed');
+                                            setIsTourOpen(true);
+                                        }}
+                                    />
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem className="focus:bg-transparent">
                                     <a className="flex gap-2 items-center" href="https://discord.com/invite/jyUgBweNQz" target="_blank" rel="noreferrer noreferrer">
                                         <Image style={{ width: 'auto', height: '14px' }} src="/icons/discord.svg" alt="" width={0} height={0} />
                                         <span>
@@ -181,6 +215,13 @@ export default function Header({ onSetGraphName, graphNames }: Props) {
                     <LogOut size={25} />
                 </Button>
             </div>
+            <ProductTour 
+                isOpen={isTourOpen} 
+                onClose={() => {
+                    setIsTourOpen(false);
+                    localStorage.setItem('falkordb-tour-completed', 'true');
+                }} 
+            />
         </div>
     )
 }
