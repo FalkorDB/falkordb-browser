@@ -1,3 +1,4 @@
+/* eslint-disable no-param-reassign */
 /* eslint-disable import/no-cycle */
 /* eslint-disable react/no-array-index-key */
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -46,7 +47,6 @@ export default function TableComponent({ headers, rows, label, entityName, input
     const [filteredRows, setFilteredRows] = useState<Row[]>(rows)
     const [isLoading, setIsLoading] = useState<boolean>(false)
     const [scrollTop, setScrollTop] = useState<number>(0)
-    const [startIndex, setStartIndex] = useState<number>(0)
     const [topFakeRowHeight, setTopFakeRowHeight] = useState<number>(0)
     const [bottomFakeRowHeight, setBottomFakeRowHeight] = useState<number>(0)
     const [visibleRows, setVisibleRows] = useState<Row[]>([])
@@ -58,7 +58,6 @@ export default function TableComponent({ headers, rows, label, entityName, input
         const newBottomFakeRowHeight = (filteredRows.length - newEndIndex) * itemHeight
         const newVisibleRows = filteredRows.slice(newStartIndex, newEndIndex)
 
-        setStartIndex(newStartIndex)
         setTopFakeRowHeight(newTopFakeRowHeight)
         setBottomFakeRowHeight(newBottomFakeRowHeight)
         setVisibleRows(newVisibleRows)
@@ -159,9 +158,9 @@ export default function TableComponent({ headers, rows, label, entityName, input
                                         className="w-6 h-6 rounded-full bg-foreground border-primary data-[state=checked]:bg-primary"
                                         checked={rows.length > 0 && rows.every(row => row.checked)}
                                         onCheckedChange={() => {
+                                            const checked = rows.every(row => row.checked)
                                             setRows(rows.map((row) => {
-                                                // eslint-disable-next-line no-param-reassign
-                                                row.checked = !rows.every(r => r.checked)
+                                                row.checked = !checked
                                                 return row
                                             }))
                                         }}
@@ -198,8 +197,8 @@ export default function TableComponent({ headers, rows, label, entityName, input
                         )
                     }
                     {
-                        visibleRows.map((row, index) => {
-                            const actualIndex = startIndex + index;
+                        visibleRows.map((row) => {
+                            const actualIndex = rows.findIndex(r => r.cells[0].value === row.cells[0].value)
                             return (
                                 <TableRow
                                     data-testid={`tableRow${label}${row.cells[0].value}`}
@@ -218,7 +217,6 @@ export default function TableComponent({ headers, rows, label, entityName, input
                                                     onCheckedChange={() => {
                                                         setRows(rows.map((r, k) => {
                                                             if (k === actualIndex) {
-                                                                // eslint-disable-next-line no-param-reassign
                                                                 r.checked = !r.checked
                                                             }
                                                             return r

@@ -9,13 +9,13 @@ export default function GraphDetails({
     graph,
     graphName,
     tabsValue = "Graph",
-    edgesCount,
-    nodesCount,
+    edgesCount = -1,
+    nodesCount = -1,
 }: {
     graph: Graph,
     graphName?: string,
-    nodesCount?: number | null,
-    edgesCount?: number | null,
+    nodesCount?: number,
+    edgesCount?: number,
     tabsValue?: string,
 }) {
     const {
@@ -61,7 +61,7 @@ export default function GraphDetails({
                     : null
             }
             {
-                graph.Id && tabsValue === "Graph" && graphName !== undefined && nodesCount !== undefined && edgesCount !== undefined &&
+                graph.Id && tabsValue === "Graph" && graphName !== undefined && nodesCount !== -1 && edgesCount !== -1 &&
                 <div className="flex gap-4 overflow-hidden">
                     {
                         [["Nodes", nodesCount, "nodesCount"], ["Edges", edgesCount, "edgesCount"], ["GraphName", graphName, "graphName"]].map(([label, value, testId]) => (
@@ -70,7 +70,7 @@ export default function GraphDetails({
                                     {label}:
                                 </p>
                                 {
-                                    value !== null ?
+                                    value !== undefined ?
                                         <Tooltip>
                                             <TooltipTrigger asChild>
                                                 <p
@@ -98,7 +98,7 @@ export default function GraphDetails({
 
 GraphDetails.defaultProps = {
     tabsValue: "Graph",
-    nodesCount: undefined,
-    edgesCount: undefined,
+    nodesCount: -1,
+    edgesCount: -1,
     graphName: undefined,
 }

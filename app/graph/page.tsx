@@ -87,6 +87,12 @@ export default function Page() {
             const colorsArr = JSON.parse(localStorage.getItem(graphName) || "[]")
             const gi = GraphInfo.create(newPropertyKeys, newLabels, newRelationships, colorsArr)
             setGraphInfo(gi)
+        }).catch((error) => {
+            toast({
+                title: "Error",
+                description: error.message || "Failed to fetch graph info",
+                variant: "destructive",
+            })
         });
     }, [fetchInfo, setGraphInfo, toast, setIndicator, graphName])
 

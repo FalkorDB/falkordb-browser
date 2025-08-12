@@ -16,8 +16,8 @@ import ForceGraph from "../components/ForceGraph"
 
 interface Props {
     fetchCount?: (graphName: string) => Promise<void>
-    edgesCount?: number | null
-    nodesCount?: number | null
+    edgesCount?: number
+    nodesCount?: number
     selectedElement: Node | Link | undefined
     setSelectedElement: Dispatch<SetStateAction<Node | Link | undefined>>
     selectedElements: (Node | Link)[]

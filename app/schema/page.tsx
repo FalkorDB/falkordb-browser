@@ -38,7 +38,7 @@ export default function Page() {
 
     const { toast } = useToast()
 
-    const [selectedElement, setSelectedElement] = useState<Node | Link>()
+    const [selectedElement, setSelectedElement] = useState<Node | Link | undefined>()
     const [selectedElements, setSelectedElements] = useState<(Node | Link)[]>([])
     const [cooldownTicks, setCooldownTicks] = useState<number | undefined>(0)
     const [labels, setLabels] = useState<Label[]>([])
@@ -46,14 +46,14 @@ export default function Page() {
     const [data, setData] = useState<GraphData>(schema.Elements)
     const [isAddRelation, setIsAddRelation] = useState(false)
     const chartRef = useRef<ForceGraphMethods<Node, Link>>()
-    const [edgesCount, setEdgesCount] = useState<number | null>(null)
-    const [nodesCount, setNodesCount] = useState<number | null>(null)
+    const [edgesCount, setEdgesCount] = useState<number | undefined>()
+    const [nodesCount, setNodesCount] = useState<number | undefined>()
     const [isAddEntity, setIsAddEntity] = useState(false)
     const [isCanvasLoading, setIsCanvasLoading] = useState(false)
 
     const fetchCount = useCallback(async () => {
-        setEdgesCount(null)
-        setNodesCount(null)
+        setEdgesCount(undefined)
+        setNodesCount(undefined)
 
         const result = await getSSEGraphResult(`api/schema/${prepareArg(schemaName)}/count`, toast, setIndicator)
 

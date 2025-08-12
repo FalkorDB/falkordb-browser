@@ -76,28 +76,25 @@ function GraphView({
     }, [graph, graph.Relationships, graph.Labels, setRelationships, setLabels])
 
     const isTabEnabled = useCallback((tab: Tab) => {
-        if (tab === "Graph") return graph.getElements().length !== 0
+        if (tab === "Graph") return elementsLength !== 0
         if (tab === "Table") return graph.Data.length !== 0
         return historyQuery.currentQuery && historyQuery.currentQuery.metadata.length > 0 && graph.Metadata.length > 0 && historyQuery.currentQuery.explain.length > 0
-    }, [graph])
+    }, [graph, elementsLength, historyQuery.currentQuery])
 
     useEffect(() => {
         setData({ ...graph.Elements })
-
-        if (!elementsLength) return;
-        setData({ ...graph.Elements })
-    }, [graph, elementsLength, setData])
+    }, [graph, setData])
 
     useEffect(() => {
         if (tabsValue !== "Metadata" && isTabEnabled(tabsValue)) return
 
         let defaultChecked: Tab = "Graph"
-        if (graph.getElements().length !== 0) defaultChecked = "Graph"
+        if (elementsLength !== 0) defaultChecked = "Graph"
         else if (graph.Data.length !== 0) defaultChecked = "Table"
         else if (historyQuery.currentQuery && historyQuery.currentQuery.metadata.length > 0 && graph.Metadata.length > 0 && historyQuery.currentQuery.explain.length > 0) defaultChecked = "Metadata"
 
         setTabsValue(defaultChecked);
-    }, [graph, graph.Id, elementsLength, graph.Data.length, isTabEnabled])
+    }, [graph, graph.Id, elementsLength, graph.Data.length, isTabEnabled, historyQuery.currentQuery])
 
     useEffect(() => {
         if (tabsValue === "Graph" && graph.Elements.nodes.length > 0) {
