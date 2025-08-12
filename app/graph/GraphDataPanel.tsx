@@ -9,9 +9,10 @@ import { Dispatch, SetStateAction, useCallback, useContext, useEffect, useRef, u
 import { Pencil, X } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { useSession } from "next-auth/react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import Button from "../components/ui/Button";
-import { Category, Link, Node } from "../api/graph/model";
+import { Label, Link, Node } from "../api/graph/model";
 import { IndicatorContext, GraphContext } from "../components/provider";
 import GraphDataTable from "./GraphDataTable";
 import PaginationList from "../components/PaginationList";
@@ -22,17 +23,17 @@ interface Props {
     object: Node | Link;
     setObject: Dispatch<SetStateAction<Node | Link | undefined>>;
     onDeleteElement: () => Promise<void>;
-    setCategories: Dispatch<SetStateAction<Category<Node>[]>>;
+    setLabels: Dispatch<SetStateAction<Label[]>>;
 }
 
-export default function GraphDataPanel({ object, setObject, onDeleteElement, setCategories }: Props) {
+export default function GraphDataPanel({ object, setObject, onDeleteElement, setLabels }: Props) {
     const { setIndicator } = useContext(IndicatorContext)
-    const { graph } = useContext(GraphContext)
+    const { graph, setGraphInfo } = useContext(GraphContext)
 
     const lastObjId = useRef<number | undefined>(undefined)
     const labelsListRef = useRef<HTMLUListElement>(null)
     const searchRef = useRef<HTMLInputElement>(null)
-    
+
     const { toast } = useToast()
     const { data: session } = useSession()
 
@@ -66,7 +67,7 @@ export default function GraphDataPanel({ object, setObject, onDeleteElement, set
         if (lastObjId.current !== object.id) {
             setLabelsHover(false)
         }
-        setLabel(type ? [...object.category.filter((c) => c !== "")] : [object.label]);
+        setLabel(type ? [...object.labels.filter((c) => c !== "")] : [object.relationship]);
         lastObjId.current = object.id
     }, [object, type]);
 
@@ -96,8 +97,11 @@ export default function GraphDataPanel({ object, setObject, onDeleteElement, set
         }, toast, setIndicator)
 
         if (result.ok) {
-            setCategories([...graph.addCategory(newLabel, node)])
-            setLabel([...node.category])
+            setLabels([...graph.addLabel(newLabel, node)])
+            setLabel([...node.labels])
+            const newGraphInfo = graph.GraphInfo.clone()
+            setGraphInfo(newGraphInfo)
+            graph.GraphInfo = newGraphInfo
             return true
         }
 
@@ -124,9 +128,12 @@ export default function GraphDataPanel({ object, setObject, onDeleteElement, set
         }, toast, setIndicator)
 
         if (result.ok) {
-            graph.removeCategory(removeLabel, node)
-            setCategories([...graph.Categories])
-            setLabel([...node.category])
+            graph.removeLabel(removeLabel, node)
+            setLabels([...graph.Labels])
+            setLabel([...node.labels])
+            const newGraphInfo = graph.GraphInfo.clone()
+            setGraphInfo(newGraphInfo)
+            graph.GraphInfo = newGraphInfo
             setShowAsDialog(false)
             return true
         }
@@ -148,6 +155,9 @@ export default function GraphDataPanel({ object, setObject, onDeleteElement, set
                     >
                         <X />
                     </Button>
+                    <VisuallyHidden>
+                        <DialogDescription />
+                    </VisuallyHidden>
                 </DialogHeader>
                 <div className="h-1 grow flex gap-8">
                     <div className="w-[40%] bg-background rounded-lg flex flex-col">

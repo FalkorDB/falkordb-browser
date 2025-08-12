@@ -9,7 +9,7 @@ import ForceGraph2D from "react-force-graph-2d"
 import { securedFetch, GraphRef, handleZoomToFit } from "@/lib/utils"
 import { useToast } from "@/components/ui/use-toast"
 import * as d3 from "d3"
-import { GraphData, Link, Node, Category, Graph } from "../api/graph/model"
+import { GraphData, Link, Node, Relationship, Graph } from "../api/graph/model"
 import { IndicatorContext } from "./provider"
 import Spinning from "./ui/spinning"
 
@@ -22,20 +22,19 @@ interface Props {
     setSelectedElement: (element: Node | Link | undefined) => void
     selectedElements: (Node | Link)[]
     setSelectedElements: Dispatch<SetStateAction<(Node | Link)[]>>
-    cooldownTicks: number | undefined
-    handleCooldown: (ticks?: number) => void
     type?: "schema" | "graph"
     isAddElement?: boolean
     setSelectedNodes?: Dispatch<SetStateAction<[Node | undefined, Node | undefined]>>
     setIsAddEntity?: Dispatch<SetStateAction<boolean>>
     setIsAddRelation?: Dispatch<SetStateAction<boolean>>
-    setLabels: Dispatch<SetStateAction<Category<Link>[]>>
+    setRelationships: Dispatch<SetStateAction<Relationship[]>>
     parentHeight: number
     parentWidth: number
     setParentHeight: Dispatch<SetStateAction<number>>
     setParentWidth: Dispatch<SetStateAction<number>>
-    loading: boolean
-    setLoading: Dispatch<SetStateAction<boolean>>
+    isLoading: boolean
+    handleCooldown: (ticks?: 0, isSetLoading?: boolean) => void
+    cooldownTicks: number | undefined
 }
 
 const NODE_SIZE = 6
@@ -90,20 +89,19 @@ export default function ForceGraph({
     setSelectedElement,
     selectedElements,
     setSelectedElements,
-    cooldownTicks,
-    handleCooldown,
     type = "graph",
     isAddElement = false,
     setSelectedNodes,
     setIsAddEntity = () => { },
     setIsAddRelation = () => { },
-    setLabels,
+    setRelationships,
     parentHeight,
     parentWidth,
     setParentHeight,
     setParentWidth,
-    loading,
-    setLoading,
+    isLoading,
+    handleCooldown,
+    cooldownTicks,
 }: Props) {
 
     const { indicator, setIndicator } = useContext(IndicatorContext)
@@ -161,11 +159,11 @@ export default function ForceGraph({
     useEffect(() => {
         if (!chartRef.current) return;
 
-        const nodeCount = graph.Elements.nodes.length;
+        const nodeCount = data.nodes.length;
 
         // Use Math.min/Math.max for capping
-        const linkDistance = Math.min(BASE_LINK_DISTANCE * Math.sqrt(nodeCount) / Math.sqrt(REFERENCE_NODE_COUNT), 120);
-        const chargeStrength = Math.max(BASE_CHARGE_STRENGTH * Math.sqrt(nodeCount) / Math.sqrt(REFERENCE_NODE_COUNT), -80);
+        const linkDistance = Math.max(Math.min(BASE_LINK_DISTANCE * Math.sqrt(nodeCount) / Math.sqrt(REFERENCE_NODE_COUNT), 120), 20);
+        const chargeStrength = Math.min(Math.max(BASE_CHARGE_STRENGTH * Math.sqrt(nodeCount) / Math.sqrt(REFERENCE_NODE_COUNT), -80), -1);
 
         // Adjust link force and length
         const linkForce = chartRef.current.d3Force('link');
@@ -195,7 +193,7 @@ export default function ForceGraph({
 
         // Reheat the simulation
         chartRef.current.d3ReheatSimulation();
-    }, [chartRef, graph.Elements.links.length, graph.Elements.nodes.length])
+    }, [chartRef, graph.Elements.links.length, graph.Elements.nodes.length, graph])
 
     const onFetchNode = async (node: Node) => {
         const result = await securedFetch(`/api/graph/${graph.Id}/${node.id}`, {
@@ -244,7 +242,7 @@ export default function ForceGraph({
 
         deleteNeighbors(expandedNodes)
 
-        setLabels(graph.removeLinks(nodes.map(n => n.id)))
+        setRelationships(graph.removeLinks(nodes.map(n => n.id)))
     }
 
     const handleNodeClick = async (node: Node) => {
@@ -261,7 +259,7 @@ export default function ForceGraph({
 
             node.expand = !node.expand
             setData({ ...graph.Elements })
-            handleCooldown()
+            handleCooldown(undefined, false)
         }
     }
 
@@ -284,7 +282,7 @@ export default function ForceGraph({
                 return
             }
         }
-
+        
         if (evt.ctrlKey) {
             if (selectedElements.includes(element)) {
                 setSelectedElements(selectedElements.filter((el) => el !== element))
@@ -310,7 +308,7 @@ export default function ForceGraph({
     return (
         <div ref={parentRef} className="w-full h-full relative">
             {
-                loading &&
+                isLoading &&
                 <div className="absolute inset-x-0 inset-y-0 bg-background flex items-center justify-center z-10">
                     <Spinning />
                 </div>
@@ -320,7 +318,8 @@ export default function ForceGraph({
                 backgroundColor="#242424"
                 width={parentWidth}
                 height={parentHeight}
-                nodeLabel={(node) => type === "graph" ? getNodeDisplayText(node) : node.category[0]}
+                linkLabel={(link) => link.relationship}
+                nodeLabel={(node) => type === "graph" ? getNodeDisplayText(node) : node.labels[0]}
                 graphData={data}
                 nodeRelSize={NODE_SIZE}
                 nodeCanvasObjectMode={() => 'after'}
@@ -370,7 +369,7 @@ export default function ForceGraph({
                         if (type === "graph") {
                             name = getNodeDisplayText(node)
                         } else {
-                            [name] = node.category
+                            [name] = node.labels
                         }
 
                         // truncate text if it's too long
@@ -378,9 +377,10 @@ export default function ForceGraph({
                             while (name.length > 0 && ctx.measureText(name).width + ellipsisWidth > nodeSize) {
                                 name = name.slice(0, -1);
                             }
-                        }
 
-                        node.displayName = name;
+                            name += ellipsis;
+                            node.displayName = name;
+                        }
                     }
 
                     // add label
@@ -412,22 +412,22 @@ export default function ForceGraph({
                         const dx = end.x - start.x;
                         const dy = end.y - start.y;
                         const distance = Math.sqrt(dx * dx + dy * dy);
-
+                        
                         // Calculate perpendicular vector for curve offset
                         const perpX = dy / distance;
                         const perpY = -dx / distance;
-
+                        
                         // Control point with larger offset to match the actual curve
                         const curvature = link.curve || 0;
                         const controlX = (start.x + end.x) / 2 + perpX * curvature * distance * 1.0;
                         const controlY = (start.y + end.y) / 2 + perpY * curvature * distance * 1.0;
-
+                        
                         // Calculate point on Bézier curve at t = 0.5 (midpoint)
                         const t = 0.5;
                         const oneMinusT = 1 - t;
                         textX = oneMinusT * oneMinusT * start.x + 2 * oneMinusT * t * controlX + t * t * end.x;
                         textY = oneMinusT * oneMinusT * start.y + 2 * oneMinusT * t * controlY + t * t * end.y;
-
+                        
                         // Calculate tangent angle at t = 0.5
                         const tangentX = 2 * oneMinusT * (controlX - start.x) + 2 * t * (end.x - controlX);
                         const tangentY = 2 * oneMinusT * (controlY - start.y) + 2 * t * (end.y - controlY);
@@ -440,22 +440,32 @@ export default function ForceGraph({
 
                     // Get text width
                     ctx.font = '2px Arial';
-                    const category = graph.LabelsMap.get(link.label)!
-                    let { textWidth, textHeight } = category
+
+                    let textWidth;
+                    let textHeight;
+                    const relationship = graph.RelationshipsMap.get(link.relationship)
+
+                    if (relationship) {
+                        ({ textWidth, textHeight } = relationship)
+                    }
+
                     if (!textWidth || !textHeight) {
-                        const { width, actualBoundingBoxAscent, actualBoundingBoxDescent } = ctx.measureText(link.label)
+                        const { width, actualBoundingBoxAscent, actualBoundingBoxDescent } = ctx.measureText(link.relationship)
+
                         textWidth = width
                         textHeight = actualBoundingBoxAscent + actualBoundingBoxDescent
-                        graph.LabelsMap.set(link.label, { ...category, textWidth, textHeight })
+                        if (relationship) {
+                            graph.RelationshipsMap.set(link.relationship, { ...relationship, textWidth, textHeight })
+                        }
                     }
 
                     // Use single save/restore for both background and text
                     const padding = 0.5;
-
+                    
                     ctx.save();
                     ctx.translate(textX, textY);
                     ctx.rotate(angle);
-
+                    
                     // Draw background rectangle (rotated)
                     ctx.fillStyle = '#242424';
                     ctx.fillRect(
@@ -464,14 +474,12 @@ export default function ForceGraph({
                         textWidth + padding * 2,
                         textHeight + padding * 2
                     );
-
+                    
                     // Draw text
                     ctx.fillStyle = 'white';
                     ctx.textAlign = 'center';
                     ctx.textBaseline = 'middle';
-                    ctx.fillText(link.label, 0, 0);
-
-                    // Restore the context to its original state
+                    ctx.fillText(link.relationship, 0, 0);
                     ctx.restore();
                 }}
                 onNodeClick={indicator === "offline" ? undefined : handleNodeClick}
@@ -481,18 +489,17 @@ export default function ForceGraph({
                 onLinkRightClick={handleRightClick}
                 onBackgroundClick={handleUnselected}
                 onBackgroundRightClick={handleUnselected}
-                onEngineStop={() => {
+                onEngineStop={async () => {
                     if (cooldownTicks === 0) return
 
-                    handleCooldown(0)
                     handleZoomToFit(chartRef, undefined, data.nodes.length < 2 ? 4 : undefined)
-                    setTimeout(() => setLoading(false), 500);
+                    setTimeout(() => handleCooldown(0), 1000)
                 }}
                 linkCurvature="curve"
                 nodeVisibility="visible"
                 linkVisibility="visible"
                 cooldownTicks={cooldownTicks}
-                cooldownTime={2000}
+                cooldownTime={1000}
             />
         </div>
     )

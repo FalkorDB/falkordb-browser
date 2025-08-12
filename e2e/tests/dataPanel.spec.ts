@@ -340,6 +340,7 @@ test.describe("Data panel Tests", () => {
     const graphName = getRandomString("DataPanel");
     await apicalls.addGraph(graphName);
     const dataPanel = await browser.createNewPage(DataPanel, urls.graphUrl);
+    await browser.setPageToFullScreen();
     await dataPanel.selectGraphByName(graphName);
     await dataPanel.insertQuery(CREATE_NODE_QUERY);
     await dataPanel.clickRunQuery();

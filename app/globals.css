@@ -46,7 +46,7 @@
     }
 
     .Page {
-        @apply w-1 grow bg-foreground relative overflow-hidden flex flex-col;
+        @apply h-full bg-foreground relative overflow-hidden flex flex-col;
     }
 
     .Gradient {
