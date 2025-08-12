@@ -20,6 +20,9 @@ import Button from "./ui/Button";
 import CreateGraph from "./CreateGraph";
 import { IndicatorContext, QuerySettingsContext } from "./provider";
 import GraphInfoPanel from "../graph/graphInfo";
+import Chat from "../graph/Chat";
+
+type Panel = "graphInfo" | "chat" | undefined
 
 interface Props {
     onSetGraphName: (newGraphName: string) => void
@@ -43,11 +46,10 @@ export default function Header({ onSetGraphName, graphNames, graphName }: Props)
     const router = useRouter()
     const { toast } = useToast()
 
-    const [currentPanel, setCurrentPanel] = useState<"graphInfo" | undefined>("graphInfo")
+    const [currentPanel, setCurrentPanel] = useState<Panel>("graphInfo")
 
     const type = getPathType(pathname)
     const showCreate = type && session?.user?.role && session.user.role !== "Read-Only"
-    const showGraphInfo = currentPanel === "graphInfo" && type === "Graph" && graphName
 
     const navigateBack = useCallback(() => {
         if (hasChanges) {
@@ -59,6 +61,25 @@ export default function Header({ onSetGraphName, graphNames, graphName }: Props)
             router.back()
         }
     }, [hasChanges, resetSettings, saveSettings, router, toast])
+
+    const handleSetCurrentPanel = useCallback((panel: Panel) => {
+        setCurrentPanel(prev => prev === panel ? undefined : panel)
+    }, [])
+
+    const handleClosePanel = useCallback(() => {
+        setCurrentPanel(undefined)
+    }, [])
+
+    const getCurrentPanel = useCallback(() => {
+        switch (currentPanel) {
+            case "graphInfo":
+                return <GraphInfoPanel onClose={handleClosePanel} />
+            case "chat":
+                return <Chat onClose={handleClosePanel} />
+            default:
+                return undefined
+        }
+    }, [currentPanel, handleClosePanel])
 
     return (
         <div className="bg-background h-full flex">
@@ -106,12 +127,22 @@ export default function Header({ onSetGraphName, graphNames, graphName }: Props)
                             <Button
                                 indicator={indicator}
                                 title="Graph info"
-                                onClick={() => {
-                                    setCurrentPanel(prev => prev === "graphInfo" ? undefined : "graphInfo")
-                                }}
+                                onClick={() => handleSetCurrentPanel("graphInfo")}
                             >
                                 <Database size={35} />
                             </Button>
+                        </>
+                    }
+                    {
+                        type === "Graph" && graphName &&
+                        <>
+                            <div className="h-[1px] w-[80%] bg-white rounded-lg" />
+                            <Button
+                                className="border-Gradient Gradient bg-clip-text text-transparent"
+                                indicator={indicator}
+                                label="CHAT"
+                                onClick={() => handleSetCurrentPanel("chat")}
+                            />
                         </>
                     }
                 </div>
@@ -215,12 +246,7 @@ export default function Header({ onSetGraphName, graphNames, graphName }: Props)
                     </Button>
                 </div>
             </div>
-            {
-                showGraphInfo &&
-                <GraphInfoPanel onClose={() => {
-                    setCurrentPanel(undefined)
-                }} />
-            }
+            {getCurrentPanel()}
         </div>
     )
 }
