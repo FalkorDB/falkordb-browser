@@ -138,7 +138,7 @@ export default function Header({ onSetGraphName, graphNames, graphName }: Props)
                             <DropdownMenuContent side="right" className="bg-background w-full p-4 ml-4">
                                 <DropdownMenuGroup className="h-full w-full flex flex-col gap-2 p-2">
                                     <DropdownMenuItem className="focus:bg-transparent">
-                                        <a className="flex gap-2 items-center" href="https://docs.falkordb.com/" target="_blank" rel="noreferrer noreferrer">
+                                        <a className="flex gap-2 items-center" href="https://docs.falkordb.com/" target="_blank" rel="noopener noreferrer">
                                             <span>
                                                 Documentation
                                             </span>
@@ -147,7 +147,7 @@ export default function Header({ onSetGraphName, graphNames, graphName }: Props)
                                     </DropdownMenuItem>
                                     <DropdownMenuSeparator />
                                     <DropdownMenuItem className="focus:bg-transparent">
-                                        <a className="flex gap-2 items-center" href="https://discord.com/invite/jyUgBweNQz" target="_blank" rel="noreferrer noreferrer">
+                                        <a className="flex gap-2 items-center" href="https://discord.com/invite/jyUgBweNQz" target="_blank" rel="noopener noreferrer">
                                             <Image style={{ width: 'auto', height: '14px' }} src="/icons/Discord.svg" alt="" width={0} height={0} />
                                             <span>
                                                 Get Support
@@ -174,7 +174,7 @@ export default function Header({ onSetGraphName, graphNames, graphName }: Props)
                             </VisuallyHidden>
                             <div className="h-full flex flex-col gap-8 max-w-[30rem] p-4">
                                 <div className="h-1 grow flex flex-col gap-8 items-center justify-center">
-                                    <Image style={{ width: 'auto', height: '50px' }} priority src="icons/ColorLogo.svg" alt="" width={0} height={0} />
+                                    <Image style={{ width: 'auto', height: '50px' }} priority src="/icons/ColorLogo.svg" alt="" width={0} height={0} />
                                     <h1 className="text-3xl font-bold">We Make AI Reliable</h1>
                                     <p className="text-xl text-center">
                                         Delivering a scalable,

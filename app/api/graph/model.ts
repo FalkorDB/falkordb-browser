@@ -648,7 +648,8 @@ export class Graph {
             (l.source.id === start.id && l.target.id === end.id) ||
             (l.target.id === start.id && l.source.id === end.id)
         );
-        const index = sameNodesLinks.findIndex((l) => l.id === link.id) || 0;
+        let index = sameNodesLinks.findIndex((l) => l.id === link.id);
+        index = index === -1 ? 0 : index;
         const even = index % 2 === 0;
         let curve;
 

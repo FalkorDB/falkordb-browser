@@ -44,14 +44,6 @@ export async function GET(
         encoder.encode(`event: result\ndata: ${JSON.stringify({ nodes, edges })}\n\n`)
       );
       writer.close();
-
-      return new Response(readable, {
-        headers: {
-          "Content-Type": "text/event-stream",
-          "Cache-Control": "no-cache",
-          Connection: "keep-alive",
-        },
-      });
     } catch (error) {
       console.error(error);
       writer.write(
