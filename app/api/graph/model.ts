@@ -166,7 +166,7 @@ export class GraphInfo {
     this.propertyKeys = propertyKeys;
     this.labels = labels;
     this.relationships = relationships;
-    this.colors = colors || DEFAULT_COLORS;
+    this.colors = [...(colors || DEFAULT_COLORS)];
   }
 
   get PropertyKeys(): string[] | undefined {
@@ -205,7 +205,6 @@ export class GraphInfo {
     colors?: string[]
   ): GraphInfo {
     const graphInfo = GraphInfo.empty(propertyKeys, colors);
-
     graphInfo.createLabel(labels);
     relationships.forEach((relationship) =>
       graphInfo.createRelationship(relationship)
@@ -260,7 +259,7 @@ export class GraphInfo {
     }, 100%, 70%)`;
 
     this.colors.push(newColor);
-    
+
     return newColor;
   }
 }
