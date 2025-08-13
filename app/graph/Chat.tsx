@@ -1,12 +1,15 @@
 import { cn } from "@/lib/utils"
-import { useState } from "react"
+import { useContext, useEffect, useState } from "react"
 import { CircleArrowUp, X } from "lucide-react"
 import { useToast } from "@/components/ui/use-toast"
 import Button from "../components/ui/Button"
 import Input from "../components/ui/Input"
+import { GraphContext, IndicatorContext } from "../components/provider"
+import { EventType } from "../api/chat/route"
 
 type Message = {
     role: "user" | "bot"
+    type: EventType
     content: string
 }
 
@@ -15,16 +18,77 @@ interface Props {
 }
 
 export default function Chat({ onClose }: Props) {
+    const { setIndicator } = useContext(IndicatorContext)
+    const { graphName } = useContext(GraphContext)
+
     const { toast } = useToast()
-    
+
     const [messages, setMessages] = useState<Message[]>([])
     const [newMessage, setNewMessage] = useState("")
 
+    useEffect(() => {
+        (async () => {
+            try {
+                const response = await fetch("/api/chat", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({
+                        messages,
+                        graphName,
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const reader = response.body?.getReader();
+                const decoder = new TextDecoder();
+
+                const processStream = async () => {
+                    if (!reader) return;
+
+                    const { done, value } = await reader.read();
+                    if (done) return;
+
+                    const chunk = decoder.decode(value, { stream: true });
+                    let isResult = false
+                    const lines = chunk.split('\n');
+                    lines.forEach(line => {
+                        if (!line.startsWith("event:")) {
+                            return
+                        }
+
+                        const eventType: EventType = line.split("event:")[1].split(" ")[0] as EventType
+                        const eventData = JSON.parse(line.split("data:")[1])
+
+                        isResult = eventType === "Result"
+
+                        setMessages(prev => [...prev, { role: "bot", type: eventType, content: eventData.Result }])
+                    });
+
+                    if (!isResult) {
+                        processStream();
+                    }
+                };
+
+                processStream();
+            } catch (error) {
+                toast({
+                    title: "Error",
+                    description: (error as Error).message,
+                    variant: "destructive",
+                })
+            }
+        })()
+    }, [setIndicator, toast])
 
     const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault()
 
-        if (newMessage.trim() === ""){
+        if (newMessage.trim() === "") {
             toast({
                 title: "Please enter a message",
                 description: "You cannot send an empty message",
@@ -32,10 +96,10 @@ export default function Chat({ onClose }: Props) {
             })
             return
         }
-        
-        setMessages(prev => [...prev, { role: "user", content: newMessage }])
 
-        
+        const newMessages = [...messages, { role: "user", type: "ModelOutputChunk", content: newMessage } as Message]
+        setMessages(newMessages)
+
 
         setNewMessage("")
     }

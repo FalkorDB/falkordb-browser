@@ -71,6 +71,8 @@ export default function Header({ onSetGraphName, graphNames, graphName }: Props)
     }, [])
 
     const getCurrentPanel = useCallback(() => {
+        if (!graphName) return undefined
+        
         switch (currentPanel) {
             case "graphInfo":
                 return <GraphInfoPanel onClose={handleClosePanel} />
@@ -79,7 +81,7 @@ export default function Header({ onSetGraphName, graphNames, graphName }: Props)
             default:
                 return undefined
         }
-    }, [currentPanel, handleClosePanel])
+    }, [currentPanel, graphName, handleClosePanel])
 
     return (
         <div className="bg-background h-full flex">
