@@ -85,44 +85,35 @@ export async function POST(request: NextRequest) {
 
                 const chunk = decoder.decode(value, { stream: true });
 
-                console.log("========");
-                console.log(chunk);
-                console.log("========");
-
-                const lines = chunk.split('\n');
+                const lines = chunk.split('\n').filter(line => line);
                 let isResult = false
+
+                
                 lines.forEach(line => {
-
-                    if (!line.startsWith("data:")) {
-                        return
-                    }
-
                     const data = JSON.parse(line.split("data:")[1])
                     const type: EventType = Object.keys(data)[0] as EventType
-
-                    if (type === "Result") {
-                        isResult = true
-                    }
-
-                    writer.write(encoder.encode(`event: ${type} data: ${JSON.stringify(data)}\n\n`))
+                    
+                    isResult = type === "Result"
+                    
+                    writer.write(encoder.encode(`event: ${type} data: ${data[type]}\n\n`))
                 })
 
                 if (!isResult) {
-                    return
+                    processStream();
+                } else {
+                    writer.close();
                 }
-
-                processStream();
             };
 
-            processStream();
+            processStream()
         } catch (error) {
             console.error(error)
-            writer.write(encoder.encode(`event: error data: ${JSON.stringify(error)}\n\n`))
+            writer.write(encoder.encode(`event: error status: ${400} data: ${JSON.stringify((error as Error).message)}\n\n`))
             writer.close()
         }
     } catch (error) {
         console.error(error)
-        writer.write(encoder.encode(`event: error data: ${JSON.stringify(error)}\n\n`))
+        writer.write(encoder.encode(`event: error status: ${500} data: ${JSON.stringify((error as Error).message)}\n\n`))
         writer.close()
     }
 

@@ -1,5 +1,5 @@
 import { cn } from "@/lib/utils"
-import { useContext, useEffect, useState } from "react"
+import { useContext, useState } from "react"
 import { CircleArrowUp, X } from "lucide-react"
 import { useToast } from "@/components/ui/use-toast"
 import Button from "../components/ui/Button"
@@ -7,11 +7,7 @@ import Input from "../components/ui/Input"
 import { GraphContext, IndicatorContext } from "../components/provider"
 import { EventType } from "../api/chat/route"
 
-type Message = {
-    role: "user" | "bot"
-    type: EventType
-    content: string
-}
+type Message = { role: "user" | "assistant"; content: string, type?: "Text" | "Result" | "Error" | "Status" | "CypherQuery" | "CypherResult" | "Schema" }
 
 interface Props {
     onClose: () => void
@@ -24,69 +20,27 @@ export default function Chat({ onClose }: Props) {
     const { toast } = useToast()
 
     const [messages, setMessages] = useState<Message[]>([])
-    const [newMessage, setNewMessage] = useState("")
+    const [newMessage, setNewMessage] = useState("how many friends does grace has ?")
+    const [isLoading, setIsLoading] = useState(false)
 
-    useEffect(() => {
-        (async () => {
-            try {
-                const response = await fetch("/api/chat", {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json",
-                    },
-                    body: JSON.stringify({
-                        messages,
-                        graphName,
-                    })
-                });
+    const scrollToBottom = () => {
+        const chatContainer = document.querySelector(".chat-container")
+        if (chatContainer) {
+            chatContainer.scrollTop = chatContainer.scrollHeight
+        }
+    }
 
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
+    const handleSubmit = async (e?: React.FormEvent<HTMLFormElement> | React.MouseEvent<HTMLButtonElement>) => {
+        e?.preventDefault()
 
-                const reader = response.body?.getReader();
-                const decoder = new TextDecoder();
-
-                const processStream = async () => {
-                    if (!reader) return;
-
-                    const { done, value } = await reader.read();
-                    if (done) return;
-
-                    const chunk = decoder.decode(value, { stream: true });
-                    let isResult = false
-                    const lines = chunk.split('\n');
-                    lines.forEach(line => {
-                        if (!line.startsWith("event:")) {
-                            return
-                        }
-
-                        const eventType: EventType = line.split("event:")[1].split(" ")[0] as EventType
-                        const eventData = JSON.parse(line.split("data:")[1])
-
-                        isResult = eventType === "Result"
-
-                        setMessages(prev => [...prev, { role: "bot", type: eventType, content: eventData.Result }])
-                    });
-
-                    if (!isResult) {
-                        processStream();
-                    }
-                };
-
-                processStream();
-            } catch (error) {
-                toast({
-                    title: "Error",
-                    description: (error as Error).message,
-                    variant: "destructive",
-                })
-            }
-        })()
-    }, [setIndicator, toast])
-
-    const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
-        e.preventDefault()
+        if (isLoading) {
+            toast({
+                title: "Please wait",
+                description: "You are already sending a message",
+                variant: "destructive",
+            })
+            return
+        }
 
         if (newMessage.trim() === "") {
             toast({
@@ -97,15 +51,121 @@ export default function Chat({ onClose }: Props) {
             return
         }
 
-        const newMessages = [...messages, { role: "user", type: "ModelOutputChunk", content: newMessage } as Message]
+        setIsLoading(true)
+
+        const newMessages = [...messages, { role: "user", type: "Text", content: newMessage } as const]
+
         setMessages(newMessages)
+        setTimeout(scrollToBottom, 0)
+        // setNewMessage("")
 
+        try {
+            const response = await fetch("/api/chat", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                    messages: newMessages,
+                    graphName,
+                })
+            });
 
-        setNewMessage("")
+            if (!response.ok) {
+                throw new Error(`Something went wrong`);
+            }
+
+            const reader = response.body?.getReader();
+            const decoder = new TextDecoder();
+
+            const processStream = async () => {
+                if (!reader) return;
+
+                const { done, value } = await reader.read();
+
+                if (done) return;
+
+                const chunk = decoder.decode(value, { stream: true });
+                const lines = chunk.split('\n').filter(line => line);
+                let isResult = false
+
+                lines.forEach(line => {
+                    const eventType: EventType | "error" = line.split("event:")[1].split(" ")[1] as EventType | "error"
+                    const eventData = line.split("data:")[1]
+
+                    switch (eventType) {
+                        case "Status":
+                        case "CypherQuery":
+                        case "Error":
+                        case "CypherResult":
+                        case "Schema":
+                            setMessages(prev => [
+                                ...prev,
+                                {
+                                    role: "assistant",
+                                    content: eventData,
+                                    type: eventType
+                                }
+                            ]);
+                            break;
+
+                        case "ModelOutputChunk":
+                            setMessages(prev => {
+                                const lastMessage = prev[prev.length - 1]
+
+                                if (lastMessage.role === "assistant" && lastMessage.type === "Result") {
+                                    lastMessage.content += eventData
+                                    return [...prev.slice(0, -1), lastMessage]
+                                }
+
+                                return [...prev, {
+                                    role: "assistant",
+                                    type: "Result",
+                                    content: eventData
+                                }]
+                            })
+                            break;
+
+                        case "Result":
+                            isResult = true
+                            break;
+                        case "error":
+                            // eslint-disable-next-line no-case-declarations
+                            const status = Number(line.split("status:")[1].split(" ")[0])
+
+                            if (status === 401 || status >= 500) setIndicator("offline")
+
+                            toast({
+                                title: "Error",
+                                description: eventData,
+                                variant: "destructive",
+                            })
+                            break;
+                        default:
+                            throw new Error(`Unknown event type: ${eventType}`)
+                    }
+                });
+
+                if (!isResult) {
+                    setTimeout(scrollToBottom, 0)
+                    await processStream();
+                } else {
+                    setIsLoading(false)
+                }
+            };
+
+            processStream();
+        } catch (error) {
+            toast({
+                title: "Error",
+                description: (error as Error).message,
+                variant: "destructive",
+            })
+        }
     }
 
     return (
-        <div className="relative h-full flex flex-col gap-4 items-center w-[20dvw]">
+        <div className="relative h-full flex flex-col gap-4 items-center w-[30dvw]">
             <Button
                 className="absolute top-2 right-2"
                 title="Close"
@@ -114,19 +174,28 @@ export default function Chat({ onClose }: Props) {
                 <X className="h-4 w-4" />
             </Button>
             <h1 className="mt-6">Chat</h1>
-            <ul className="w-full h-1 grow flex flex-col gap-2 overflow-y-auto p-6">
+            <ul className="w-full h-1 grow flex flex-col gap-2 overflow-x-hidden overflow-y-auto p-6 chat-container">
                 {
-                    messages.map((message, index) => (
-                        // eslint-disable-next-line react/no-array-index-key
-                        <li className={cn("w-full flex gap-1", message.role === "user" ? "justify-end" : "justify-start")} key={index}>
-                            <div className={cn("max-w-[80%] p-2 rounded-lg", message.role === "user" ? "bg-primary" : "bg-gray-500")}>
-                                <p className="text-wrap">{message.content}</p>
-                            </div>
-                            <div className={cn("h-10 w-10 rounded-full flex items-center justify-center", message.role === "user" ? "bg-primary" : "bg-gray-500")}>
-                                <p className="text-white text-sm">{message.role}</p>
-                            </div>
-                        </li>
-                    ))
+                    messages.map((message, index) => {
+                        const avatar = <div className={cn("h-10 w-10 rounded-full flex items-center justify-center", message.role === "user" ? "bg-primary" : "bg-gray-500 text-white")}>
+                            <p className="text-white text-sm truncate text-center">{message.role.charAt(0).toUpperCase()}</p>
+                        </div>
+                        const isUser = message.role === "user"
+                        return (
+                            // eslint-disable-next-line react/no-array-index-key
+                            <li className={cn("w-full flex gap-1", isUser ? "justify-end" : "justify-start")} key={index}>
+                                {
+                                    !isUser && avatar
+                                }
+                                <div className={cn(`max-w-[80%] p-2 rounded-lg`, isUser ? "bg-primary" : "bg-gray-500")}>
+                                    <p className="text-wrap whitespace-pre-wrap">{message.content}</p>
+                                </div>
+                                {
+                                    isUser && avatar
+                                }
+                            </li>
+                        )
+                    })
                 }
             </ul>
             <div className="w-full p-4">
@@ -140,7 +209,8 @@ export default function Chat({ onClose }: Props) {
                     <Button
                         disabled={newMessage.trim() === ""}
                         title={newMessage.trim() === "" ? "Please enter a message" : "Send"}
-                        type="submit"
+                        onClick={handleSubmit}
+                        isLoading={isLoading}
                     >
                         <CircleArrowUp />
                     </Button>
