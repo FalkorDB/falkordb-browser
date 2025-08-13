@@ -183,7 +183,7 @@ export default function Header({ onSetGraphName, graphNames, graphName }: Props)
                                     </p>
                                 </div>
                                 <div className="flex flex-col gap-8 items-center">
-                                    <p>Version: {`{${pkg.version}}`}</p>
+                                    <p>Version: {pkg.version}</p>
                                     <p className="text-sm text-nowrap">All Rights Reserved © 2024 - {new Date().getFullYear()} falkordb.com</p>
                                 </div>
                             </div>

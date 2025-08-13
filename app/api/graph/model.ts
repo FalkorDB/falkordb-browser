@@ -219,11 +219,11 @@ export class GraphInfo {
       let c = this.labels.get(label);
 
       if (!c) {
-          c = {
-            name: label,
-            color: this.getLabelColorValue(this.colorsCounter),
-            show: true,
-          };
+        c = {
+          name: label,
+          color: this.getLabelColorValue(this.colorsCounter),
+          show: true,
+        };
 
         this.labels.set(label, c);
         this.colorsCounter += 1;
@@ -233,17 +233,15 @@ export class GraphInfo {
     });
   }
 
-  public createRelationship(
-    relationship: string,
-  ): InfoRelationship {
+  public createRelationship(relationship: string): InfoRelationship {
     let c = this.relationships.get(relationship);
 
     if (!c) {
-        c = {
-          name: relationship,
-          color: this.getLabelColorValue(this.colorsCounter),
-          show: true,
-        };
+      c = {
+        name: relationship,
+        color: this.getLabelColorValue(this.colorsCounter),
+        show: true,
+      };
 
       this.relationships.set(relationship, c);
       this.colorsCounter += 1;
@@ -257,15 +255,12 @@ export class GraphInfo {
       return this.colors[index];
     }
 
-    let newColor;
-    let i = index;
-    do {
-      newColor = `hsl(${
-        (i - Math.min(DEFAULT_COLORS.length, this.colors.length)) * 20
-      }, 100%, 70%)`;
-      i += 1;
-    } while (this.colors.includes(newColor));
+    const newColor = `hsl(${
+      (index - Math.min(DEFAULT_COLORS.length, this.colors.length)) * 20
+    }, 100%, 70%)`;
+
     this.colors.push(newColor);
+    
     return newColor;
   }
 }
