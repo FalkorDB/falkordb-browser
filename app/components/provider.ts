@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createContext, Dispatch, SetStateAction } from "react";
-import { Graph, HistoryQuery } from "../api/graph/model";
+import { Graph, GraphInfo, HistoryQuery } from "../api/graph/model";
 
 type QuerySettingsContextType = {
   newSettings: {
@@ -29,6 +29,8 @@ type QuerySettingsContextType = {
     limitSettings: {
       limit: number;
       setLimit: Dispatch<SetStateAction<number>>;
+      lastLimit: number;
+      setLastLimit: Dispatch<SetStateAction<number>>;
     };
     timeoutSettings: {
       timeout: number;
@@ -56,10 +58,21 @@ type QuerySettingsContextType = {
 type GraphContextType = {
   graph: Graph;
   setGraph: Dispatch<SetStateAction<Graph>>;
+  graphInfo: GraphInfo;
+  setGraphInfo: Dispatch<SetStateAction<GraphInfo>>;
   graphName: string;
   setGraphName: Dispatch<SetStateAction<string>>;
   graphNames: string[];
   setGraphNames: Dispatch<SetStateAction<string[]>>;
+  nodesCount: number | undefined;
+  setNodesCount: Dispatch<SetStateAction<number | undefined>>;
+  edgesCount: number | undefined;
+  setEdgesCount: Dispatch<SetStateAction<number | undefined>>;
+  runQuery: (query: string, name?: string) => Promise<void>;
+  fetchCount: () => Promise<void>;
+  handleCooldown: (ticks?: 0, isSetLoading?: boolean) => void;
+  cooldownTicks: number | undefined;
+  isLoading: boolean;
 };
 
 type SchemaContextType = {
@@ -96,7 +109,7 @@ export const QuerySettingsContext = createContext<QuerySettingsContextType>({
     },
   },
   settings: {
-    limitSettings: { limit: 0, setLimit: () => {} },
+    limitSettings: { limit: 0, setLimit: () => {}, lastLimit: 0, setLastLimit: () => {} },
     timeoutSettings: { timeout: 0, setTimeout: () => {} },
     runDefaultQuerySettings: {
       runDefaultQuery: false,
@@ -117,10 +130,21 @@ export const QuerySettingsContext = createContext<QuerySettingsContextType>({
 export const GraphContext = createContext<GraphContextType>({
   graph: Graph.empty(),
   setGraph: () => {},
+  graphInfo: GraphInfo.empty(),
+  setGraphInfo: () => {},
   graphName: "",
   setGraphName: () => {},
   graphNames: [],
   setGraphNames: () => {},
+  nodesCount: undefined,
+  setNodesCount: () => {},
+  edgesCount: undefined,
+  setEdgesCount: () => {},
+  runQuery: async () => {},
+  fetchCount: async () => {},
+  handleCooldown: () => {},
+  cooldownTicks: undefined,
+  isLoading: false,
 });
 
 export const SchemaContext = createContext<SchemaContextType>({
@@ -133,7 +157,7 @@ export const SchemaContext = createContext<SchemaContextType>({
 });
 
 export const HistoryQueryContext = createContext<HistoryQueryContextType>({
-  historyQuery: { queries: [], query: "", currentQuery: "", counter: 0 },
+  historyQuery: { queries: [], query: "", currentQuery: { text: "", metadata: [], explain: [], profile: [] }, counter: 0 },
   setHistoryQuery: () => {},
 });
 

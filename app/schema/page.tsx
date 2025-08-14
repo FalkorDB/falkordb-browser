@@ -5,11 +5,24 @@ import { getSSEGraphResult, prepareArg, securedFetch } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
 import dynamic from "next/dynamic";
 import { ForceGraphMethods } from "react-force-graph-2d";
-import { Category, Graph, GraphData, Link, Node } from "../api/graph/model";
+import { Label, Graph, GraphData, Link, Node, Relationship } from "../api/graph/model";
 import { IndicatorContext, SchemaContext } from "../components/provider";
+import Spinning from "../components/ui/spinning";
 
-const Selector = dynamic(() => import("../graph/Selector"), { ssr: false })
-const SchemaView = dynamic(() => import("./SchemaView"), { ssr: false })
+const Selector = dynamic(() => import("../graph/Selector"), {
+    ssr: false,
+    loading: () => <div className="z-20 absolute top-5 inset-x-24 h-[50px] flex flex-row gap-4 items-center">
+        <div className="w-[230px] h-full animate-pulse rounded-md border border-gray-300 bg-background" />
+        <div className="w-1 grow h-full animate-pulse rounded-md border border-gray-300 bg-background" />
+        <div className="w-[233px] h-full animate-pulse rounded-md border border-gray-300 bg-background" />
+    </div>
+})
+const SchemaView = dynamic(() => import("./SchemaView"), {
+    ssr: false,
+    loading: () => <div className="h-full w-full flex items-center justify-center">
+        <Spinning />
+    </div>
+})
 
 export default function Page() {
 
@@ -28,35 +41,39 @@ export default function Page() {
     const [selectedElement, setSelectedElement] = useState<Node | Link | undefined>()
     const [selectedElements, setSelectedElements] = useState<(Node | Link)[]>([])
     const [cooldownTicks, setCooldownTicks] = useState<number | undefined>(0)
-    const [categories, setCategories] = useState<Category<Node>[]>([])
+    const [labels, setLabels] = useState<Label[]>([])
+    const [relationships, setRelationships] = useState<Relationship[]>([])
     const [data, setData] = useState<GraphData>(schema.Elements)
-    const [labels, setLabels] = useState<Category<Link>[]>([])
     const [isAddRelation, setIsAddRelation] = useState(false)
     const chartRef = useRef<ForceGraphMethods<Node, Link>>()
-    const [edgesCount, setEdgesCount] = useState<number>(0)
-    const [nodesCount, setNodesCount] = useState<number>(0)
+    const [edgesCount, setEdgesCount] = useState<number | undefined>()
+    const [nodesCount, setNodesCount] = useState<number | undefined>()
     const [isAddEntity, setIsAddEntity] = useState(false)
     const [isCanvasLoading, setIsCanvasLoading] = useState(false)
-    
+
     const fetchCount = useCallback(async () => {
+        setEdgesCount(undefined)
+        setNodesCount(undefined)
+
         const result = await getSSEGraphResult(`api/schema/${prepareArg(schemaName)}/count`, toast, setIndicator)
 
-        const { edges, nodes } = result.data[0]
+        if (!result) return
 
-        setEdgesCount(edges || 0)
-        setNodesCount(nodes || 0)
+        const { edges, nodes } = result
+
+        setEdgesCount(edges)
+        setNodesCount(nodes)
     }, [toast, setIndicator, schemaName])
 
-    const handleCooldown = (ticks?: number) => {
+    const handleCooldown = (ticks?: 0, isSetLoading = true) => {
         setCooldownTicks(ticks)
 
-        const canvas = document.querySelector('.force-graph-container canvas');
+        if (isSetLoading) setIsCanvasLoading(ticks !== 0)
+        const canvas = document.querySelector('.force-graph-container canvas')
+
         if (!canvas) return
-        if (ticks === 0) {
-            canvas.setAttribute('data-engine-status', 'stop')
-        } else {
-            canvas.setAttribute('data-engine-status', 'running')
-        }
+
+        canvas.setAttribute('data-engine-status', ticks === 0 ? 'stop' : 'running')
     }
 
     const fetchSchema = useCallback(async () => {
@@ -65,8 +82,7 @@ export default function Page() {
         }, toast, setIndicator)
         if (!result.ok) return
         const json = await result.json()
-        const colors = localStorage.getItem(schemaName)?.split(/[[\]",]/).filter(c => c)
-        const schemaGraph = Graph.create(schemaName, json.result, false, true, 0, colors)
+        const schemaGraph = Graph.create(schemaName, json.result, false, true, 0)
         setSchema(schemaGraph)
         // eslint-disable-next-line @typescript-eslint/ban-ts-comment
         // @ts-ignore
@@ -108,37 +124,37 @@ export default function Page() {
                 schema.NodesMap.delete(id)
             } else {
                 schema.Elements.links.splice(schema.Elements.links.findIndex(link => link.id === element.id), 1)
-                schema.EdgesMap.delete(id)
+                schema.LinksMap.delete(id)
             }
 
             if (type) {
-                element.category.forEach((category) => {
-                    const cat = schema.CategoriesMap.get(category)
+                element.labels.forEach((labelName) => {
+                    const label = schema.LabelsMap.get(labelName)
 
-                    if (cat) {
-                        cat.elements = cat.elements.filter(n => n.id !== id)
+                    if (label) {
+                        label.elements = label.elements.filter(n => n.id !== id)
 
-                        if (cat.elements.length === 0) {
-                            schema.Categories.splice(schema.Categories.findIndex(c => c.name === cat.name), 1)
-                            schema.CategoriesMap.delete(cat.name)
+                        if (label.elements.length === 0) {
+                            schema.Labels.splice(schema.Labels.findIndex(l => l.name === label.name), 1)
+                            schema.LabelsMap.delete(label.name)
                         }
                     }
                 })
             } else {
-                const cat = schema.LabelsMap.get(element.label)
+                const relation = schema.RelationshipsMap.get(element.relationship)
 
-                if (cat) {
-                    cat.elements = cat.elements.filter(n => n.id !== id)
+                if (relation) {
+                    relation.elements = relation.elements.filter(n => n.id !== id)
 
-                    if (cat.elements.length === 0) {
-                        schema.Labels.splice(schema.Labels.findIndex(c => c.name === cat.name), 1)
-                        schema.LabelsMap.delete(cat.name)
+                    if (relation.elements.length === 0) {
+                        schema.Relationships.splice(schema.Relationships.findIndex(r => r.name === relation.name), 1)
+                        schema.RelationshipsMap.delete(relation.name)
                     }
                 }
             }
         }))
 
-        setLabels(schema.removeLinks(selectedElements.map((element) => element.id)))
+        setRelationships(schema.removeLinks(selectedElements.map((element) => element.id)))
         fetchCount()
         setSelectedElement(undefined)
         setSelectedElements([])
@@ -154,7 +170,6 @@ export default function Page() {
                 setOptions={setSchemaNames}
                 graphName={schemaName}
                 setGraphName={setSchemaName}
-                fetchCount={fetchCount}
                 selectedElements={selectedElements}
                 setSelectedElement={setSelectedElement}
                 handleDeleteElement={handleDeleteElement}
@@ -184,11 +199,10 @@ export default function Page() {
                     setData={setData}
                     handleDeleteElement={handleDeleteElement}
                     setLabels={setLabels}
-                    setCategories={setCategories}
+                    setRelationships={setRelationships}
                     labels={labels}
-                    categories={categories}
+                    relationships={relationships}
                     isLoading={isCanvasLoading}
-                    setIsLoading={setIsCanvasLoading}
                 />
             </div>
             <div className="h-4 w-full Gradient" />

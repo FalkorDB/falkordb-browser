@@ -34,6 +34,7 @@ export default class TableView extends GraphPage {
     }
 
     public async getRowsCount(): Promise<number> {
+        await this.tableViewTabPanel.waitFor({ state: 'visible', timeout: 10000 });
         const rows = await this.tableViewTableRows.count();
         return rows;
     }

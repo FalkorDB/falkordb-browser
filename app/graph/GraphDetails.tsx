@@ -9,18 +9,18 @@ export default function GraphDetails({
     graph,
     graphName,
     tabsValue = "Graph",
-    nodesCount,
-    edgesCount
+    edgesCount = -1,
+    nodesCount = -1,
 }: {
     graph: Graph,
-    graphName: string,
-    nodesCount: number | undefined,
-    edgesCount: number | undefined,
+    graphName?: string,
+    nodesCount?: number,
+    edgesCount?: number,
     tabsValue?: string,
 }) {
     const {
         settings: {
-            limitSettings: { limit },
+            limitSettings: { limit, lastLimit },
         }
     } = useContext(QuerySettingsContext)
 
@@ -44,7 +44,7 @@ export default function GraphDetails({
                     : null
             }
             {
-                graph.CurrentLimit && graph.CurrentLimit !== limit ?
+                graph.CurrentLimit && lastLimit !== limit ?
                     <Tooltip>
                         <TooltipTrigger asChild>
                             <div className="flex gap-2 items-center text-orange-300">
@@ -61,7 +61,7 @@ export default function GraphDetails({
                     : null
             }
             {
-                graphName && tabsValue === "Graph" &&
+                graph.Id && tabsValue === "Graph" && graphName !== undefined && nodesCount !== -1 && edgesCount !== -1 &&
                 <div className="flex gap-4 overflow-hidden">
                     {
                         [["Nodes", nodesCount, "nodesCount"], ["Edges", edgesCount, "edgesCount"], ["GraphName", graphName, "graphName"]].map(([label, value, testId]) => (
@@ -98,4 +98,7 @@ export default function GraphDetails({
 
 GraphDetails.defaultProps = {
     tabsValue: "Graph",
+    nodesCount: -1,
+    edgesCount: -1,
+    graphName: undefined,
 }

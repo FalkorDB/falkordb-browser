@@ -276,11 +276,13 @@ test.describe.serial("Query Settings", () => {
     await querySettings.clickSaveQuerySettingsBtn();
     await querySettings.clickGraphsTabInHeader();
     await querySettings.selectGraphByName(graphName);
-    const tabEnabled =
-      (await querySettings.getGraphTabEnabled()) ||
-      (await querySettings.getTableTabEnabled()) ||
-      (await querySettings.getMetadataTabEnabled());
-    expect(tabEnabled).toBe(true);
+    await querySettings.isEnabledEditorRun();
+    const tabEnabled = await Promise.all([
+      querySettings.getMetadataTabEnabled(),
+      querySettings.getTableTabEnabled(),
+      querySettings.getGraphTabEnabled(),
+    ]);
+    expect(tabEnabled).toContain(true);
     await apiCall.removeGraph(graphName);
   });
 

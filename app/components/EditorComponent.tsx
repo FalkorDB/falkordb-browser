@@ -43,6 +43,7 @@ export const setTheme = (monacoI: Monaco, themeName: string, backgroundColor: st
 
 interface Props {
     graph: Graph
+    graphName: string
     historyQuery: HistoryQuery
     maximize: boolean
     setMaximize: Dispatch<SetStateAction<boolean>>
@@ -224,7 +225,7 @@ const LINE_HEIGHT = 32
 
 const PLACEHOLDER = "Type your query here to start"
 
-export default function EditorComponent({ graph, historyQuery, maximize, setMaximize, runQuery, setHistoryQuery, editorKey, isQueryLoading }: Props) {
+export default function EditorComponent({ graph, graphName, historyQuery, maximize, setMaximize, runQuery, setHistoryQuery, editorKey, isQueryLoading }: Props) {
     const { indicator, setIndicator } = useContext(IndicatorContext)
 
     const { toast } = useToast()
@@ -236,6 +237,8 @@ export default function EditorComponent({ graph, historyQuery, maximize, setMaxi
     const containerRef = useRef<HTMLDivElement>(null)
     const indicatorRef = useRef(indicator)
     const graphIdRef = useRef(graph.Id)
+    const graphNameRef = useRef(graphName)
+    const queryRef = useRef(historyQuery.query)
 
     const [monacoEditor, setMonacoEditor] = useState<Monaco | null>(null)
     const [sugDisposed, setSugDisposed] = useState<monaco.IDisposable>()
@@ -248,13 +251,21 @@ export default function EditorComponent({ graph, historyQuery, maximize, setMaxi
         [blur, lineNumber])
 
     useEffect(() => {
+        graphNameRef.current = graphName
+    }, [graphName])
+
+    useEffect(() => {
+        queryRef.current = historyQuery.query
+    }, [historyQuery.query])
+
+    useEffect(() => {
         indicatorRef.current = indicator
     }, [indicator])
 
     useEffect(() => {
         setHistoryQuery(prev => ({
             ...prev,
-            query: historyQuery.counter ? historyQuery.queries[historyQuery.counter - 1].text : historyQuery.currentQuery
+            query: historyQuery.counter ? historyQuery.queries[historyQuery.counter - 1].text : historyQuery.currentQuery.text
         }))
     }, [historyQuery.counter])
 
@@ -300,7 +311,7 @@ export default function EditorComponent({ graph, historyQuery, maximize, setMaxi
     const fetchSuggestions = async (detail: string): Promise<monaco.languages.CompletionItem[]> => {
         if (indicator === "offline") return []
 
-        const result = await securedFetch(`api/graph/${graphIdRef.current}/suggestions?type=${prepareArg(detail)}`, {
+        const result = await securedFetch(`api/graph/${graphIdRef.current}/info?type=${prepareArg(detail)}`, {
             method: 'GET',
         }, toast, setIndicator)
 
@@ -310,10 +321,10 @@ export default function EditorComponent({ graph, historyQuery, maximize, setMaxi
 
         if (json.result.data.length === 0) return []
 
-        return json.result.data.map(({ sug }: { sug: string }) => ({
+        return json.result.data.map(({ info }: { info: string }) => ({
             insertTextRules: detail === '(function)' ? monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet : undefined,
-            insertText: detail === '(function)' ? `${sug}(\${0})` : sug,
-            label: detail === '(function)' ? `${sug}()` : sug,
+            insertText: detail === '(function)' ? `${info}(\${0})` : info,
+            label: detail === '(function)' ? `${info}()` : info,
             kind: (() => {
                 switch (detail) {
                     case '(function)':
@@ -530,7 +541,7 @@ export default function EditorComponent({ graph, historyQuery, maximize, setMaxi
 
         // eslint-disable-next-line no-bitwise
         e.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, () => {
-            if (indicatorRef.current === "offline") return
+            if (indicatorRef.current === "offline" || !queryRef.current || !graphNameRef.current) return
             submitQuery.current?.click();
         });
 
@@ -541,7 +552,7 @@ export default function EditorComponent({ graph, historyQuery, maximize, setMaxi
             keybindings: [monaco.KeyCode.Enter],
             contextMenuOrder: 1.5,
             run: async () => {
-                if (indicatorRef.current === "offline") return
+                if (indicatorRef.current === "offline" || !queryRef.current || !graphNameRef.current) return
                 submitQuery.current?.click()
             },
             precondition: '!suggestWidgetVisible',
@@ -603,6 +614,12 @@ export default function EditorComponent({ graph, historyQuery, maximize, setMaxi
         e.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyF, () => { });
     }
 
+    const getLabel = () => {
+        if (!graphName) return "Select a graph first"
+        if (!historyQuery.query) return "You need to type a query first"
+        return "Press Enter to run the query"
+    }
+
     return (
         <div style={{ height: editorHeight + 18 }} className="absolute w-full flex items-start gap-8 border rounded-lg overflow-hidden bg-foreground p-2">
             <div className="h-full w-1 grow flex rounded-lg overflow-hidden">
@@ -620,7 +637,10 @@ export default function EditorComponent({ graph, historyQuery, maximize, setMaxi
                             if (!historyQuery.counter) {
                                 setHistoryQuery(prev => ({
                                     ...prev,
-                                    currentQuery: val || "",
+                                    currentQuery: {
+                                        ...prev.currentQuery,
+                                        text: val || "",
+                                    },
                                     query: val || "",
                                 }))
                             } else {
@@ -661,9 +681,10 @@ export default function EditorComponent({ graph, historyQuery, maximize, setMaxi
                         data-testid="editorRun"
                         ref={submitQuery}
                         indicator={indicator}
+                        disabled={!historyQuery.query || !graphName}
                         variant="Primary"
                         label="RUN"
-                        title="Press Enter to run the query"
+                        title={getLabel()}
                         onClick={handleSubmit}
                         isLoading={isQueryLoading}
                     />
@@ -702,9 +723,10 @@ export default function EditorComponent({ graph, historyQuery, maximize, setMaxi
                                     data-testid="editorRun"
                                     className="pointer-events-auto py-2 px-8"
                                     indicator={indicator}
+                                    disabled={!historyQuery.query || !graphName}
                                     variant="Primary"
-                                    label="Run"
-                                    title="Press Enter to run the query"
+                                    label="RUN"
+                                    title={getLabel()}
                                     onClick={handleSubmit}
                                     isLoading={isQueryLoading}
                                 />
@@ -738,7 +760,10 @@ export default function EditorComponent({ graph, historyQuery, maximize, setMaxi
                                     setHistoryQuery(prev => ({
                                         ...prev,
                                         query: val || "",
-                                        currentQuery: val || ""
+                                        currentQuery: {
+                                            ...prev.currentQuery,
+                                            text: val || "",
+                                        },
                                     }))
                                 }
                             }}

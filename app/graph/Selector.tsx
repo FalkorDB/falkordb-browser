@@ -15,7 +15,7 @@ import { IndicatorContext } from "../components/provider";
 import EditorComponent, { setTheme } from "../components/EditorComponent";
 import DialogComponent from "../components/DialogComponent";
 import Toolbar from "./toolbar";
-import { Node, Link, Graph, HistoryQuery, Query } from "../api/graph/model";
+import { Node, Link, Graph, Query, HistoryQuery } from "../api/graph/model";
 import { Explain, Metadata, Profile } from "./MetadataView";
 import PaginationList from "../components/PaginationList";
 import SelectGraph from "./selectGraph";
@@ -29,7 +29,7 @@ interface Props {
     runQuery?: (query: string) => Promise<void>
     historyQuery?: HistoryQuery
     setHistoryQuery?: Dispatch<SetStateAction<HistoryQuery>>
-    fetchCount: () => Promise<void>
+    fetchCount?: () => Promise<void>
     selectedElements: (Node | Link)[]
     setSelectedElement: Dispatch<SetStateAction<Node | Link | undefined>>
     handleDeleteElement: () => Promise<void>
@@ -58,7 +58,7 @@ export default function Selector({ graph, options, setOptions, graphName, setGra
     const [maximize, setMaximize] = useState(false)
     const [tab, setTab] = useState<keyof Query>("text")
 
-    const currentQuery = historyQuery?.currentQuery === historyQuery?.query && historyQuery?.counter === 0 && graph.CurrentQuery || historyQuery?.queries.find(q => q.text === historyQuery?.query)
+    const currentQuery = historyQuery?.counter === 0 ? historyQuery.currentQuery : historyQuery?.queries[historyQuery.counter - 1]
     const type = runQuery && historyQuery && setHistoryQuery ? "Graph" : "Schema"
 
     const focusEditorAtEnd = () => {
@@ -86,30 +86,22 @@ export default function Selector({ graph, options, setOptions, graphName, setGra
     }, [currentQuery]);
 
     useEffect(() => {
-        if (queriesOpen && currentQuery && tab !== "profile") {
-            const currentValue = currentQuery?.[tab]
+        if (!queriesOpen || !currentQuery || tab === "profile") return
 
-            if (!currentValue || currentValue.length === 0) {
-                const fallbackTab = (Object.keys(currentQuery) as (keyof Query)[]).find(isTabEnabled);
+        const currentValue = currentQuery?.[tab]
 
-                if (fallbackTab && fallbackTab !== tab) {
-                    setTab(fallbackTab);
+        if (!currentValue || currentValue.length === 0) {
+            const fallbackTab = (Object.keys(currentQuery) as (keyof Query)[]).find(isTabEnabled);
 
-                    if (fallbackTab === "text") {
-                        focusEditorAtEnd()
-                    }
+            if (fallbackTab && fallbackTab !== tab) {
+                setTab(fallbackTab);
+
+                if (fallbackTab === "text" && !editorRef.current?.hasTextFocus()) {
+                    focusEditorAtEnd()
                 }
-            } else if (tab === "text") {
-                focusEditorAtEnd()
-
-                return
             }
-
-            setTimeout(() => {
-                if (searchQueryRef.current) {
-                    searchQueryRef.current.focus()
-                }
-            }, 100)
+        } else if (tab === "text" && !editorRef.current?.hasTextFocus()) {
+            focusEditorAtEnd()
         }
     }, [currentQuery, setTab, queriesOpen, historyQuery?.query, tab, isTabEnabled])
 
@@ -188,11 +180,12 @@ export default function Selector({ graph, options, setOptions, graphName, setGra
                 setGraph={setGraph}
             />
             {
-                runQuery && historyQuery && setHistoryQuery && isQueryLoading !== undefined ?
+                runQuery && historyQuery && setHistoryQuery && fetchCount && isQueryLoading !== undefined ?
                     <>
                         <div className="h-full w-1 grow relative overflow-visible">
                             <EditorComponent
                                 graph={graph}
+                                graphName={graphName}
                                 maximize={maximize}
                                 setMaximize={setMaximize}
                                 runQuery={runQuery}
@@ -241,12 +234,13 @@ export default function Selector({ graph, options, setOptions, graphName, setGra
                                             isSelected={(item) => historyQuery.queries.findIndex(q => q.text === item.text) + 1 === historyQuery.counter}
                                             afterSearchCallback={afterSearchCallback}
                                             dataTestId="queryHistory"
-                                            list={historyQuery.queries.reverse()}
+                                            list={[...historyQuery.queries].reverse()}
                                             step={STEP}
                                             onClick={(counter) => {
+                                                const index = historyQuery.queries.findIndex(q => q.text === counter) + 1
                                                 setHistoryQuery(prev => ({
                                                     ...prev,
-                                                    counter: historyQuery.queries.findIndex(q => q.text === counter) + 1
+                                                    counter: index === historyQuery.counter ? 0 : index
                                                 }))
                                             }}
                                             searchRef={searchQueryRef}
@@ -290,11 +284,21 @@ export default function Selector({ graph, options, setOptions, graphName, setGra
                                                                 wordWrap: "on",
                                                                 renderWhitespace: "none"
                                                             }}
-                                                            value={currentQuery.text}
-                                                            onChange={(value) => setHistoryQuery(prev => ({
-                                                                ...prev,
-                                                                query: value || ""
-                                                            }))}
+                                                            value={historyQuery.query}
+                                                            onChange={(value) => {
+                                                                setHistoryQuery(prev => {
+                                                                    const newHistoryQuery = {
+                                                                        ...prev,
+                                                                        query: value || "",
+                                                                        currentQuery: {
+                                                                            ...prev.currentQuery,
+                                                                            text: prev.counter ? prev.currentQuery.text : value || ""
+                                                                        }
+                                                                    }
+
+                                                                    return newHistoryQuery
+                                                                })
+                                                            }}
                                                             onMount={handleEditorDidMount}
                                                             beforeMount={(m) => {
                                                                 setTheme(m, "selector-theme", "#242424")
@@ -310,13 +314,21 @@ export default function Selector({ graph, options, setOptions, graphName, setGra
                                                         <Profile
                                                             graphName={graphName}
                                                             query={currentQuery}
-                                                            setQuery={({ profile, text }) => {
-                                                                const newQueries = historyQuery!.queries.map(q => q.text === text ? { ...q, profile } : q)
-                                                                localStorage.setItem("query history", JSON.stringify(newQueries))
-                                                                setHistoryQuery(prev => ({
-                                                                    ...prev,
-                                                                    queries: newQueries,
-                                                                }))
+                                                            setQuery={({ profile }) => {
+                                                                setHistoryQuery(prev => {
+                                                                    const newQuery = {
+                                                                        ...prev.currentQuery,
+                                                                        profile: profile || []
+                                                                    }
+
+                                                                    const newQueries = prev.queries.map(q => q.text === newQuery.text ? newQuery : q)
+
+                                                                    return {
+                                                                        ...prev,
+                                                                        currentQuery: newQuery,
+                                                                        queries: newQueries
+                                                                    }
+                                                                })
                                                             }}
                                                             fetchCount={fetchCount}
                                                         />
@@ -367,7 +379,7 @@ export default function Selector({ graph, options, setOptions, graphName, setGra
                             setIsAddEntity={setIsAddEntity}
                             setIsAddRelation={setIsAddRelation}
                             chartRef={chartRef}
-                            isLoading={!!isCanvasLoading}
+                            isLoadingSchema={!!isCanvasLoading}
                             backgroundColor="bg-foreground"
                         />
                     </div>
@@ -382,6 +394,7 @@ Selector.defaultProps = {
     setHistoryQuery: undefined,
     setIsAddEntity: undefined,
     setIsAddRelation: undefined,
+    fetchCount: undefined,
     isQueryLoading: undefined,
     isCanvasLoading: undefined,
 }

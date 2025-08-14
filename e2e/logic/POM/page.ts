@@ -168,8 +168,16 @@ export default class Page extends BasePage {
         return () => this.page.getByTestId(`nodesCount`);
     }
 
+    public get nodesCountLoader(): () => Locator {
+        return () => this.page.getByTestId(`nodesCountLoader`);
+    }
+
     public get edgesCount(): () => Locator {
         return () => this.page.getByTestId(`edgesCount`);
+    }
+
+    public get edgesCountLoader(): () => Locator {
+        return () => this.page.getByTestId(`edgesCountLoader`);
     }
 
     // CANVAS TOOLTIP
