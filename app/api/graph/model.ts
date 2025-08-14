@@ -219,11 +219,11 @@ export class GraphInfo {
       let c = this.labels.get(label);
 
       if (!c) {
-          c = {
-            name: label,
-            color: this.getLabelColorValue(this.colorsCounter),
-            show: true,
-          };
+        c = {
+          name: label,
+          color: this.getLabelColorValue(this.colorsCounter),
+          show: true,
+        };
 
         this.labels.set(label, c);
         this.colorsCounter += 1;
@@ -233,17 +233,15 @@ export class GraphInfo {
     });
   }
 
-  public createRelationship(
-    relationship: string,
-  ): InfoRelationship {
+  public createRelationship(relationship: string): InfoRelationship {
     let c = this.relationships.get(relationship);
 
     if (!c) {
-        c = {
-          name: relationship,
-          color: this.getLabelColorValue(this.colorsCounter),
-          show: true,
-        };
+      c = {
+        name: relationship,
+        color: this.getLabelColorValue(this.colorsCounter),
+        show: true,
+      };
 
       this.relationships.set(relationship, c);
       this.colorsCounter += 1;
@@ -603,6 +601,30 @@ export class Graph {
     return currentEdge;
   }
 
+  public extendCell(
+    cell: any,
+    element: Node | Link | undefined,
+    collapsed: boolean,
+    isSchema: boolean,
+    newElements: (Node | Link)[]
+  ) {
+    if (cell.nodes) {
+      cell.nodes.forEach((node: any) => {
+        element = this.extendNode(node, collapsed, isSchema);
+      });
+      cell.edges.forEach((edge: any) => {
+        element = this.extendEdge(edge, collapsed, isSchema);
+      });
+    } else if (cell.relationshipType) {
+      element = this.extendEdge(cell, collapsed, isSchema);
+    } else if (cell.labels) {
+      element = this.extendNode(cell, collapsed, isSchema);
+    }
+    if (element) {
+      newElements.push(element);
+    }
+  }
+
   public extend(
     results: { data: Data; metadata: any[] },
     collapsed = false,
@@ -622,23 +644,13 @@ export class Graph {
     this.metadata = results.metadata;
     this.data.forEach((row: DataRow) => {
       Object.values(row).forEach((cell: any) => {
-        if (cell instanceof Object) {
-          let element: Node | Link | undefined;
-          if (cell.nodes) {
-            cell.nodes.forEach((node: any) => {
-              element = this.extendNode(node, collapsed, isSchema);
-            });
-            cell.edges.forEach((edge: any) => {
-              element = this.extendEdge(edge, collapsed, isSchema);
-            });
-          } else if (cell.relationshipType) {
-            element = this.extendEdge(cell, collapsed, isSchema);
-          } else if (cell.labels) {
-            element = this.extendNode(cell, collapsed, isSchema);
-          }
-          if (element) {
-            newElements.push(element);
-          }
+        let element: Node | Link | undefined;
+        if (Array.isArray(cell) && cell[0] instanceof Object) {
+          cell.forEach((c: any) => {
+            this.extendCell(c, element, collapsed, isSchema, newElements);
+          });
+        } else if (cell instanceof Object) {
+          this.extendCell(cell, element, collapsed, isSchema, newElements);
         }
       });
     });

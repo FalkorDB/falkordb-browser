@@ -15,7 +15,7 @@ interface Props {
 
 export default function Chat({ onClose }: Props) {
     const { setIndicator } = useContext(IndicatorContext)
-    const { graphName } = useContext(GraphContext)
+    const { graphName, runQuery } = useContext(GraphContext)
 
     const { toast } = useToast()
 
@@ -66,7 +66,10 @@ export default function Chat({ onClose }: Props) {
                     "Content-Type": "application/json",
                 },
                 body: JSON.stringify({
-                    messages: newMessages,
+                    messages: newMessages.filter(message => message.role === "user" || message.type === "Result").map(({ role, content }) => ({
+                        role,
+                        content
+                    })),
                     graphName,
                 })
             });
@@ -86,6 +89,7 @@ export default function Chat({ onClose }: Props) {
                 if (done) return;
 
                 const chunk = decoder.decode(value, { stream: true });
+
                 const lines = chunk.split('\n').filter(line => line);
                 let isResult = false
 
@@ -95,18 +99,41 @@ export default function Chat({ onClose }: Props) {
 
                     switch (eventType) {
                         case "Status":
-                        case "CypherQuery":
                         case "Error":
                         case "CypherResult":
+                            setMessages(prev => [
+                                ...prev,
+                                {
+                                    role: "assistant",
+                                    content: eventData.trim(),
+                                    type: eventType
+                                }
+                            ]);
+                            break;
+
                         case "Schema":
                             setMessages(prev => [
                                 ...prev,
                                 {
                                     role: "assistant",
-                                    content: eventData,
+                                    content: JSON.stringify(JSON.parse(eventData.trim()), null, 2),
                                     type: eventType
                                 }
                             ]);
+                            break;
+
+                        case "CypherQuery":
+                            setMessages(prev => [
+                                ...prev,
+                                {
+                                    role: "assistant",
+                                    content: eventData.trim(),
+                                    type: eventType
+                                }
+                            ]);
+
+                            runQuery(eventData)
+
                             break;
 
                         case "ModelOutputChunk":
@@ -114,14 +141,16 @@ export default function Chat({ onClose }: Props) {
                                 const lastMessage = prev[prev.length - 1]
 
                                 if (lastMessage.role === "assistant" && lastMessage.type === "Result") {
-                                    lastMessage.content += eventData
-                                    return [...prev.slice(0, -1), lastMessage]
+                                    return [...prev.slice(0, -1), {
+                                        ...lastMessage,
+                                        content: (lastMessage.content + eventData).trim()
+                                    }]
                                 }
 
                                 return [...prev, {
                                     role: "assistant",
                                     type: "Result",
-                                    content: eventData
+                                    content: eventData.trim()
                                 }]
                             })
                             break;
@@ -177,7 +206,7 @@ export default function Chat({ onClose }: Props) {
             <ul className="w-full h-1 grow flex flex-col gap-2 overflow-x-hidden overflow-y-auto p-6 chat-container">
                 {
                     messages.map((message, index) => {
-                        const avatar = <div className={cn("h-10 w-10 rounded-full flex items-center justify-center", message.role === "user" ? "bg-primary" : "bg-gray-500 text-white")}>
+                        const avatar = <div className={cn("h-8 w-8 rounded-full flex items-center justify-center", message.role === "user" ? "bg-primary" : "bg-gray-500 text-white")}>
                             <p className="text-white text-sm truncate text-center">{message.role.charAt(0).toUpperCase()}</p>
                         </div>
                         const isUser = message.role === "user"
