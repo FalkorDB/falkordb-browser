@@ -612,21 +612,17 @@ export class Graph {
     this.data.forEach((row: DataRow) => {
       Object.values(row).forEach((cell: any) => {
         if (cell instanceof Object) {
-          let element: Node | Link | undefined;
           if (cell.nodes) {
             cell.nodes.forEach((node: any) => {
-              element = this.extendNode(node, collapsed, isSchema);
+              newElements.push(this.extendNode(node, collapsed, isSchema));
             });
             cell.edges.forEach((edge: any) => {
-              element = this.extendEdge(edge, collapsed, isSchema);
+              newElements.push(this.extendEdge(edge, collapsed, isSchema));
             });
           } else if (cell.relationshipType) {
-            element = this.extendEdge(cell, collapsed, isSchema);
+            newElements.push(this.extendEdge(cell, collapsed, isSchema));
           } else if (cell.labels) {
-            element = this.extendNode(cell, collapsed, isSchema);
-          }
-          if (element) {
-            newElements.push(element);
+            newElements.push(this.extendNode(cell, collapsed, isSchema));
           }
         }
       });
@@ -669,9 +665,15 @@ export class Graph {
       this.labelsMap.delete("");
     }
 
-    newElements.filter((element): element is Node => !("source" in element)).forEach((node) => {
-      node.color = getLabelWithFewestElements(node.labels.map(label => this.labelsMap.get(label)).filter(label => !!label)).color;
-    });
+    newElements
+      .filter((element): element is Node => !("source" in element))
+      .forEach((node) => {
+        node.color = getLabelWithFewestElements(
+          node.labels
+            .map((label) => this.labelsMap.get(label))
+            .filter((label) => !!label)
+        ).color;
+      });
 
     return newElements;
   }
