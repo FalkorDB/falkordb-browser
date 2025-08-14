@@ -198,7 +198,7 @@ export default function TableComponent({ headers, rows, label, entityName, input
                     }
                     {
                         visibleRows.map((row) => {
-                            const actualIndex = rows.findIndex(r => r.cells[0].value === row.cells[0].value)
+                            const actualIndex = rows.findIndex(r => r === row)
                             return (
                                 <TableRow
                                     data-testid={`tableRow${label}${row.cells[0].value}`}

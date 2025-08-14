@@ -437,7 +437,7 @@ export class Graph {
       const node: Node = {
         id: cell.id,
         labels: labels.map((l) => l.name),
-        color: getLabelWithFewestElements(labels).color,
+        color: "",
         visible: true,
         expand: false,
         collapsed,
@@ -458,7 +458,7 @@ export class Graph {
     if (currentNode.labels[0] === "") {
       currentNode.id = cell.id;
       currentNode.labels = labels.map((l) => l.name);
-      currentNode.color = getLabelWithFewestElements(labels).color;
+      currentNode.color = "";
       currentNode.expand = false;
       currentNode.collapsed = collapsed;
       Object.entries(cell.properties).forEach(([key, value]) => {
@@ -474,11 +474,6 @@ export class Graph {
           emptyCategory.elements.findIndex((e) => e.id === currentNode.id),
           1
         );
-
-        if (emptyCategory.elements.length === 0) {
-          this.labels = this.labels.filter((c) => c.name !== "");
-          this.labelsMap.delete("");
-        }
       }
 
       return currentNode;
@@ -503,7 +498,7 @@ export class Graph {
           source = {
             id: cell.sourceId,
             labels: [label.name],
-            color: label.color,
+            color: "",
             expand: false,
             collapsed,
             visible: true,
@@ -540,7 +535,7 @@ export class Graph {
           source = {
             id: cell.sourceId,
             labels: [label!.name],
-            color: label!.color,
+            color: "",
             expand: false,
             collapsed,
             visible: true,
@@ -557,7 +552,7 @@ export class Graph {
           target = {
             id: cell.destinationId,
             labels: [label!.name],
-            color: label!.color,
+            color: "",
             expand: false,
             collapsed,
             visible: true,
@@ -673,6 +668,10 @@ export class Graph {
       this.labels = this.labels.filter((c) => c.name !== "");
       this.labelsMap.delete("");
     }
+
+    newElements.filter((element): element is Node => !("source" in element)).forEach((node) => {
+      node.color = getLabelWithFewestElements(node.labels.map(label => this.labelsMap.get(label)).filter(label => !!label)).color;
+    });
 
     return newElements;
   }
