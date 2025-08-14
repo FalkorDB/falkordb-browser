@@ -99,7 +99,6 @@ export default function Chat({ onClose }: Props) {
 
                     switch (eventType) {
                         case "Status":
-                        case "Error":
                         case "CypherResult":
                             setMessages(prev => [
                                 ...prev,
@@ -155,9 +154,22 @@ export default function Chat({ onClose }: Props) {
                             })
                             break;
 
+                        case "Error":
+                            setMessages(prev => [
+                                ...prev,
+                                {
+                                    role: "assistant",
+                                    content: eventData.trim(),
+                                    type: eventType
+                                }
+                            ]);
+                            isResult = true
+                            break;
+
                         case "Result":
                             isResult = true
                             break;
+
                         case "error":
                             // eslint-disable-next-line no-case-declarations
                             const status = Number(line.split("status:")[1].split(" ")[0])

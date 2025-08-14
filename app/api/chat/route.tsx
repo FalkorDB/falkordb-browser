@@ -93,7 +93,7 @@ export async function POST(request: NextRequest) {
                     const data = JSON.parse(line.split("data:")[1])
                     const type: EventType = Object.keys(data)[0] as EventType
                     
-                    isResult = type === "Result"
+                    isResult = type === "Result" || type === "Error"
                     
                     writer.write(encoder.encode(`event: ${type} data: ${data[type]}\n\n`))
                 })
