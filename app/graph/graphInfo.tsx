@@ -8,7 +8,7 @@ export default function GraphInfoPanel({ onClose }: { onClose: () => void }) {
     const { graphInfo, nodesCount, edgesCount, runQuery, graphName } = useContext(GraphContext);
 
     return (
-        <div className="relative p-6 flex flex-col gap-8 overflow-y-auto  max-w-[20dvw]">
+        <div className="relative p-6 flex flex-col gap-8 overflow-y-auto max-w-[20dvw]">
             <Button
                 className="absolute top-2 right-2"
                 title="Close"
@@ -54,7 +54,7 @@ export default function GraphInfoPanel({ onClose }: { onClose: () => void }) {
                 <ul className="flex flex-wrap gap-2 p-2">
                     <li className="max-w-full">
                         <Button
-                            className="h-6 w-full p-2 rounded-full flex justify-center items-center bg-gray-500"
+                            className="h-6 w-full p-2 rounded-full flex justify-center items-center bg-gray-400 text-black"
                             label="*"
                             title="All labels"
                             onClick={() => runQuery(`MATCH (n) RETURN n`)}
@@ -64,7 +64,7 @@ export default function GraphInfoPanel({ onClose }: { onClose: () => void }) {
                         <li key={name} className="max-w-full">
                             <Button
                                 style={{ backgroundColor: color }}
-                                className="h-6 w-full p-2 rounded-full flex justify-center items-center"
+                                className="h-6 w-full p-2 rounded-full flex justify-center items-center text-black"
                                 label={name}
                                 onClick={() => runQuery(`MATCH (n:${name}) RETURN n`)}
                             />
@@ -96,7 +96,7 @@ export default function GraphInfoPanel({ onClose }: { onClose: () => void }) {
                 <ul className="flex flex-wrap gap-2 p-2">
                     <li className="max-w-full">
                         <Button
-                            className="h-6 w-full p-2 rounded-full flex justify-center items-center bg-gray-500"
+                            className="h-6 w-full p-2 rounded-full flex justify-center items-center bg-gray-400 text-black"
                             label="*"
                             title="All relationships"
                             onClick={() => runQuery(`MATCH p=()-[]-() RETURN p`)}
@@ -106,7 +106,7 @@ export default function GraphInfoPanel({ onClose }: { onClose: () => void }) {
                         <li key={name} className="max-w-full">
                             <Button
                                 style={{ backgroundColor: color }}
-                                className="h-6 w-full p-2 rounded-full flex justify-center items-center"
+                                className="h-6 w-full p-2 rounded-full flex justify-center items-center text-black"
                                 label={name}
                                 onClick={() => runQuery(`MATCH p=()-[:${name}]-() RETURN p`)}
                             />
