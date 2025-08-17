@@ -12,7 +12,6 @@ import Button from "../components/ui/Button";
 import TableView from "./TableView";
 import Toolbar from "./toolbar";
 import Controls from "./controls";
-import GraphDataPanel from "./GraphDataPanel";
 import GraphDetails from "./GraphDetails";
 import Labels from "./labels";
 import MetadataView from "./MetadataView";
@@ -235,15 +234,6 @@ function GraphView({
                             <Labels labels={relationships} onClick={onRelationshipClick} label="Relationships" type="Graph" />
                         }
                     </div>
-                }
-                {
-                    selectedElement &&
-                    <GraphDataPanel
-                        object={selectedElement}
-                        setObject={setSelectedElement}
-                        onDeleteElement={handleDeleteElement}
-                        setLabels={setLabels}
-                    />
                 }
             </TabsContent>
             <TabsContent value="Table" className="h-1 grow w-full mt-0 overflow-hidden">

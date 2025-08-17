@@ -1,15 +1,15 @@
 /* eslint-disable @typescript-eslint/no-use-before-define */
 
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { useContext, useEffect, useRef, useState } from "react";
+import { useCallback, useContext, useEffect, useRef, useState } from "react";
 import { DialogHeader, DialogDescription, DialogTrigger, DialogTitle, DialogContent, Dialog } from "@/components/ui/dialog";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
-import { prepareArg, Row, securedFetch } from "@/lib/utils";
+import { fetchOptions, prepareArg, Row, securedFetch } from "@/lib/utils";
 import { useSession } from "next-auth/react";
 import { useToast } from "@/components/ui/use-toast";
 import { ChevronDown, ChevronUp, PlusCircle, Settings } from "lucide-react";
 import Button from "../components/ui/Button";
-import { IndicatorContext } from "../components/provider";
+import { IndicatorContext, QuerySettingsContext } from "../components/provider";
 import PaginationList from "../components/PaginationList";
 import TableComponent from "../components/TableComponent";
 import ExportGraph from "../components/ExportGraph";
@@ -25,13 +25,19 @@ interface Props {
     selectedValue: string
     setSelectedValue: (value: string) => void
     type: "Graph" | "Schema"
-    onOpenChange: (open: boolean) => Promise<void>
     setGraph: (graph: Graph) => void
 }
 
-export default function SelectGraph({ options, setOptions, selectedValue, setSelectedValue, type, onOpenChange, setGraph }: Props) {
+export default function SelectGraph({ options, setOptions, selectedValue, setSelectedValue, type, setGraph }: Props) {
 
     const { indicator, setIndicator } = useContext(IndicatorContext)
+    const {
+        settings: {
+            contentPersistenceSettings: {
+                contentPersistence
+            }
+        }
+    } = useContext(QuerySettingsContext)
 
     const inputRef = useRef<HTMLInputElement>(null)
 
@@ -46,6 +52,11 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
     useEffect(() => {
         setOpen(false)
     }, [selectedValue])
+
+    const getOptions = useCallback(async () =>
+        fetchOptions(type, toast, setIndicator, indicator, setSelectedValue, setOptions, contentPersistence)
+        , [type, toast, setIndicator, indicator, setOptions, setSelectedValue])
+
 
     const handleSetOption = async (option: string, optionName: string) => {
         const result = await securedFetch(`api/${type === "Graph" ? "graph" : "schema"}/${prepareArg(option)}?sourceName=${prepareArg(optionName)}`, {
@@ -78,9 +89,12 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
 
     const handleOpenChange = async (o: boolean) => {
         setOpen(o)
-        setIsLoading(true)
+
+        if (!o) return
+
         try {
-            await onOpenChange(o)
+            setIsLoading(true)
+            await getOptions()
         } finally {
             setIsLoading(false)
         }

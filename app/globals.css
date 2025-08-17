@@ -46,7 +46,7 @@
     }
 
     .Page {
-        @apply h-full bg-foreground relative overflow-hidden flex flex-col;
+        @apply w-full h-full bg-foreground relative overflow-hidden flex flex-col;
     }
 
     .Gradient {
@@ -54,6 +54,12 @@
     }
 
     .border-Gradient {
+        border: 2px solid;
+        border-image-source: linear-gradient(90deg, #EC806C 0%, #B66EBD 43.41%, #7568F2 100%);
+        border-image-slice: 1;
+    }
+
+    .border-bottom-Gradient {
         border-bottom: 2px solid;
         border-image-source: linear-gradient(90deg, #EC806C 0%, #B66EBD 43.41%, #7568F2 100%);
         border-image-slice: 1;

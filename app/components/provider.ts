@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createContext, Dispatch, SetStateAction } from "react";
+import { Panel } from "@/lib/utils";
 import { Graph, GraphInfo, HistoryQuery } from "../api/graph/model";
 
 type QuerySettingsContextType = {
@@ -94,6 +95,11 @@ type IndicatorContextType = {
   setIndicator: Dispatch<SetStateAction<"online" | "offline">>;
 };
 
+type PanelContextType = {
+  panel: Panel;
+  setPanel: Dispatch<SetStateAction<Panel>>;
+};
+
 export const QuerySettingsContext = createContext<QuerySettingsContextType>({
   newSettings: {
     limitSettings: { newLimit: 0, setNewLimit: () => {} },
@@ -164,4 +170,9 @@ export const HistoryQueryContext = createContext<HistoryQueryContextType>({
 export const IndicatorContext = createContext<IndicatorContextType>({
   indicator: "online",
   setIndicator: () => {},
+});
+
+export const PanelContext = createContext<PanelContextType>({
+  panel: undefined,
+  setPanel: () => {},
 });

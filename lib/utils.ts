@@ -21,6 +21,8 @@ export type GraphRef = MutableRefObject<
   ForceGraphMethods<Node, Link> | undefined
 >;
 
+export type Panel = "graphInfo" | "chat" | "data" | undefined;
+
 export type SelectCell = {
   value: string;
   type: "select";
@@ -206,10 +208,15 @@ export function createNestedObject(arr: string[]): object {
   return { [first]: createNestedObject(rest) };
 }
 
-export function getQueryWithLimit(query: string, limit: number): [string, number] {
+export function getQueryWithLimit(
+  query: string,
+  limit: number
+): [string, number] {
   let existingLimit = 0;
-  
-  const finalReturnMatch = query.match(/\bRETURN\b(?!\s+.+?\bCALL\b)[^;]*?\bLIMIT\s+(\d+)/);
+
+  const finalReturnMatch = query.match(
+    /\bRETURN\b(?!\s+.+?\bCALL\b)[^;]*?\bLIMIT\s+(\d+)/
+  );
   if (finalReturnMatch) {
     existingLimit = parseInt(finalReturnMatch[1], 10);
   }
@@ -220,7 +227,7 @@ export function getQueryWithLimit(query: string, limit: number): [string, number
     if (!query.includes("CALL")) {
       return [`CALL { ${query} } RETURN * LIMIT ${limit}`, limit];
     }
-    
+
     if (query.match(/\bCALL\s*\{.*?\}\s*RETURN\b(?!\s+.+?\s+\bLIMIT\b)/i)) {
       return [`${query} LIMIT ${limit}`, limit];
     }
@@ -233,15 +240,19 @@ export function getQueryWithLimit(query: string, limit: number): [string, number
   return [query, existingLimit];
 }
 
+export const formatName = (newGraphName: string) =>
+  newGraphName === '""' ? "" : newGraphName;
+
 export async function fetchOptions(
   type: "Graph" | "Schema",
   toast: any,
   setIndicator: (indicator: "online" | "offline") => void,
-  indicator: "online" | "offline"
-): Promise<[string[], string]> {
-  const response: [string[], string] = [[], ""];
-
-  if (indicator === "offline") return response;
+  indicator: "online" | "offline",
+  setSelectedValue: (value: string) => void,
+  setOptions: (options: string[]) => void,
+  contentPersistence: boolean
+) {
+  if (indicator === "offline") return;
 
   const result = await securedFetch(
     `api/${type === "Graph" ? "graph" : "schema"}`,
@@ -252,16 +263,16 @@ export async function fetchOptions(
     setIndicator
   );
 
-  if (!result.ok) return response;
+  if (!result.ok) return;
 
   const { opts } = (await result.json()) as { opts: string[] };
 
-  response[0] = opts;
+  setOptions(opts);
 
-  if (opts.length === 1) [response[1]] = opts;
-
-  return response;
+  if (
+    setSelectedValue &&
+    opts.length === 1 &&
+    (!contentPersistence || type === "Graph")
+  )
+    setSelectedValue(formatName(opts[0]));
 }
-
-export const formatName = (newGraphName: string) =>
-  newGraphName === '""' ? "" : newGraphName;

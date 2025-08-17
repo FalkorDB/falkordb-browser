@@ -8,7 +8,7 @@ export default function GraphInfoPanel({ onClose }: { onClose: () => void }) {
     const { graphInfo, nodesCount, edgesCount, runQuery, graphName } = useContext(GraphContext);
 
     return (
-        <div className="relative p-6 flex flex-col gap-8 overflow-y-auto max-w-[20dvw]">
+        <div className="w-full h-full relative p-6 flex flex-col gap-8 overflow-y-auto">
             <Button
                 className="absolute top-2 right-2"
                 title="Close"
@@ -64,7 +64,7 @@ export default function GraphInfoPanel({ onClose }: { onClose: () => void }) {
                         <li key={name} className="max-w-full">
                             <Button
                                 style={{ backgroundColor: color }}
-                                className="h-6 w-full p-2 rounded-full flex justify-center items-center"
+                                className="h-6 w-full p-2 rounded-full flex justify-center items-center text-black"
                                 label={name}
                                 onClick={() => runQuery(`MATCH (n:${name}) RETURN n`)}
                             />
@@ -106,7 +106,7 @@ export default function GraphInfoPanel({ onClose }: { onClose: () => void }) {
                         <li key={name} className="max-w-full">
                             <Button
                                 style={{ backgroundColor: color }}
-                                className="h-6 w-full p-2 rounded-full flex justify-center items-center"
+                                className="h-6 w-full p-2 rounded-full flex justify-center items-center text-black"
                                 label={name}
                                 onClick={() => runQuery(`MATCH p=()-[:${name}]-() RETURN p`)}
                             />

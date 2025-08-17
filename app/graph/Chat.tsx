@@ -206,7 +206,7 @@ export default function Chat({ onClose }: Props) {
     }
 
     return (
-        <div className="relative h-full flex flex-col gap-4 items-center w-[30dvw]">
+        <div className="relative h-full w-full flex flex-col gap-4 items-center border-Gradient rounded-lg">
             <Button
                 className="absolute top-2 right-2"
                 title="Close"

@@ -4,13 +4,12 @@ import { SessionProvider, useSession } from "next-auth/react";
 import { ThemeProvider } from 'next-themes'
 import { Dispatch, SetStateAction, useCallback, useEffect, useMemo, useState } from "react";
 import { usePathname } from "next/navigation";
-import { fetchOptions, formatName, getDefaultQuery, getQueryWithLimit, getSSEGraphResult, prepareArg, securedFetch } from "@/lib/utils";
+import { fetchOptions, formatName, getDefaultQuery, getQueryWithLimit, getSSEGraphResult, Panel, prepareArg, securedFetch } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
-import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import LoginVerification from "./loginVerification";
 import { Graph, GraphInfo, HistoryQuery } from "./api/graph/model";
 import Header from "./components/Header";
-import { GraphContext, HistoryQueryContext, IndicatorContext, QuerySettingsContext, SchemaContext } from "./components/provider";
+import { GraphContext, HistoryQueryContext, IndicatorContext, PanelContext, QuerySettingsContext, SchemaContext } from "./components/provider";
 
 function ProvidersWithSession({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
@@ -52,8 +51,8 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
   const [edgesCount, setEdgesCount] = useState<number>()
   const [isLoading, setIsLoading] = useState<boolean>(false)
   const [cooldownTicks, setCooldownTicks] = useState<number | undefined>(0)
-
-
+  const [panel, setPanel] = useState<Panel>()
+  
   const querySettingsContext = useMemo(() => ({
     newSettings: {
       limitSettings: { newLimit, setNewLimit },
@@ -115,6 +114,11 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
     indicator,
     setIndicator,
   }), [indicator, setIndicator])
+
+  const panelContext = useMemo(() => ({
+    panel,
+    setPanel,
+  }), [panel, setPanel])
 
   const schemaContext = useMemo(() => ({
     schema,
@@ -285,9 +289,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
     if (indicator === "offline") return
 
     await Promise.all(([["Graph", setGraphNames, setGraphName], ["Schema", setSchemaNames, setSchemaName]] as ["Graph" | "Schema", Dispatch<SetStateAction<string[]>>, Dispatch<SetStateAction<string>>][]).map(async ([type, setOptions, setName]) => {
-      const [opts, name] = await fetchOptions(type, toast, setIndicator, indicator)
-      setOptions(opts)
-      if (!contentPersistence || type === "Schema") setName(formatName(name))
+      await fetchOptions(type, toast, setIndicator, indicator, setName, setOptions, contentPersistence)
     }))
   }, [indicator, toast, contentPersistence, setGraphNames, setGraphName, setSchemaNames, setSchemaName, setIndicator])
 
@@ -295,7 +297,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
     if (status !== "authenticated") return undefined
 
     handleFetchOptions()
-    
+
     const interval = setInterval(handleFetchOptions, 30000)
 
     return () => clearInterval(interval)
@@ -309,15 +311,18 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
             <GraphContext.Provider value={graphContext}>
               <HistoryQueryContext.Provider value={historyQueryContext}>
                 <IndicatorContext.Provider value={indicatorContext}>
-                  <ResizablePanelGroup direction="horizontal">
-                    <ResizablePanel defaultSize={0} className="min-w-fit">
-                      {pathname !== "/" && pathname !== "/login" && <Header graphName={graphName} graphNames={pathname.includes("/schema") ? schemaNames : graphNames} onSetGraphName={handleOnSetGraphName} />}
-                    </ResizablePanel>
-                    <ResizableHandle className="w-0 !cursor-default" disabled />
-                    <ResizablePanel defaultSize={100} minSize={60}>
-                      {children}
-                    </ResizablePanel>
-                  </ResizablePanelGroup>
+                  <PanelContext.Provider value={panelContext}>
+                    {pathname !== "/" && pathname !== "/login" && <Header graphName={graphName} graphNames={pathname.includes("/schema") ? schemaNames : graphNames} onSetGraphName={handleOnSetGraphName} />}
+                    {
+                      (pathname === "/graph" || pathname === "/schema") ?
+                        <div className="h-full w-1 grow flex flex-col">
+                          {children}
+                          <div className="h-4 w-full Gradient" />
+                        </div>
+                        :
+                        children
+                    }
+                  </PanelContext.Provider>
                 </IndicatorContext.Provider>
               </HistoryQueryContext.Provider>
             </GraphContext.Provider>

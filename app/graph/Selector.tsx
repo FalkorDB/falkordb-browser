@@ -3,9 +3,8 @@
 'use client'
 
 import { useEffect, useState, useContext, Dispatch, SetStateAction, useRef, useCallback } from "react";
-import { cn, GraphRef, fetchOptions, formatName } from "@/lib/utils";
+import { cn, GraphRef, formatName } from "@/lib/utils";
 import { History, Info, Maximize2 } from "lucide-react";
-import { useToast } from "@/components/ui/use-toast";
 import * as monaco from "monaco-editor";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -45,13 +44,11 @@ const STEP = 8
 
 export default function Selector({ graph, options, setOptions, graphName, setGraphName, runQuery, historyQuery, setHistoryQuery, fetchCount, selectedElements, setSelectedElement, handleDeleteElement, chartRef, setIsAddEntity, setIsAddRelation, setGraph, isCanvasLoading, isQueryLoading }: Props) {
 
-    const { indicator, setIndicator } = useContext(IndicatorContext)
+    const { indicator } = useContext(IndicatorContext)
 
     const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null)
     const submitQuery = useRef<HTMLButtonElement>(null)
     const searchQueryRef = useRef<HTMLInputElement>(null)
-
-    const { toast } = useToast()
 
     const [queriesOpen, setQueriesOpen] = useState(false)
     const [isLoading, setIsLoading] = useState(false)
@@ -109,12 +106,6 @@ export default function Selector({ graph, options, setOptions, graphName, setGra
         setGraphName(formatName(name))
     }, [setGraphName])
 
-    const getOptions = useCallback(async () => {
-        const [opts] = await fetchOptions(type, toast, setIndicator, indicator)
-        setOptions(opts)
-    }, [setOptions, toast, setIndicator, indicator, type])
-
-
     const handleEditorDidMount = (e: monaco.editor.IStandaloneCodeEditor) => {
         editorRef.current = e
 
@@ -167,16 +158,13 @@ export default function Selector({ graph, options, setOptions, graphName, setGra
     }, [historyQuery, setHistoryQuery])
 
     return (
-        <div className="z-20 absolute top-5 inset-x-24 h-[50px] flex flex-row gap-4 items-center">
+        <div className="z-20 w-full h-[50px] flex flex-row gap-4 items-center">
             <SelectGraph
                 options={options}
                 setOptions={setOptions}
                 selectedValue={graphName}
                 setSelectedValue={handleOnChange}
                 type={type}
-                onOpenChange={async (o) => {
-                    if (o) await getOptions()
-                }}
                 setGraph={setGraph}
             />
             {
@@ -195,7 +183,7 @@ export default function Selector({ graph, options, setOptions, graphName, setGra
                                 editorKey={queriesOpen ? "selector-theme" : "editor-theme"}
                             />
                         </div>
-                        <div className="h-full flex gap-2 p-2 border rounded-lg bg-foreground">
+                        <div className="h-full w-[120px] flex gap-2 p-2 border rounded-lg bg-foreground">
                             <Tooltip>
                                 <TooltipTrigger className="cursor-default">
                                     <Info />
