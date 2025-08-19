@@ -45,6 +45,3 @@ next-env.d.ts
 /e2e/playwright/.auth
 /playwright
 /tls
-
-# Ignore .gitignore itself to prevent local changes from being committed
-.gitignore
