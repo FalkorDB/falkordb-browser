@@ -206,56 +206,58 @@ export default function Chat({ onClose }: Props) {
     }
 
     return (
-        <div className="relative h-full w-full flex flex-col gap-4 items-center border-Gradient rounded-lg">
-            <Button
-                className="absolute top-2 right-2"
-                title="Close"
-                onClick={onClose}
-            >
-                <X className="h-4 w-4" />
-            </Button>
-            <h1 className="mt-6">Chat</h1>
-            <ul className="w-full h-1 grow flex flex-col gap-2 overflow-x-hidden overflow-y-auto p-6 chat-container">
-                {
-                    messages.map((message, index) => {
-                        const avatar = <div className={cn("h-8 w-8 rounded-full flex items-center justify-center", message.role === "user" ? "bg-primary" : "bg-gray-500 text-white")}>
-                            <p className="text-white text-sm truncate text-center">{message.role.charAt(0).toUpperCase()}</p>
-                        </div>
-                        const isUser = message.role === "user"
-                        return (
-                            // eslint-disable-next-line react/no-array-index-key
-                            <li className={cn("w-full flex gap-1", isUser ? "justify-end" : "justify-start")} key={index}>
-                                {
-                                    !isUser && avatar
-                                }
-                                <div className={cn(`max-w-[80%] p-2 rounded-lg`, isUser ? "bg-primary" : "bg-gray-500")}>
-                                    <p className="text-wrap whitespace-pre-wrap">{message.content}</p>
-                                </div>
-                                {
-                                    isUser && avatar
-                                }
-                            </li>
-                        )
-                    })
-                }
-            </ul>
-            <div className="w-full p-4">
-                <form className="flex gap-2 border border-white p-2 rounded-lg w-full" onSubmit={handleSubmit}>
-                    <Input
-                        className="w-1 grow bg-transparent border-none text-white text-lg"
-                        placeholder="Type your message here..."
-                        value={newMessage}
-                        onChange={(e) => setNewMessage(e.target.value)}
-                    />
-                    <Button
-                        disabled={newMessage.trim() === ""}
-                        title={newMessage.trim() === "" ? "Please enter a message" : "Send"}
-                        onClick={handleSubmit}
-                        isLoading={isLoading}
-                    >
-                        <CircleArrowUp />
-                    </Button>
-                </form>
+        <div className="border-Gradient-rounded h-full w-full">
+            <div className="bg-background relative h-full w-full flex flex-col gap-4 items-center rounded-lg">
+                <Button
+                    className="absolute top-2 right-2"
+                    title="Close"
+                    onClick={onClose}
+                >
+                    <X className="h-4 w-4" />
+                </Button>
+                <h1 className="mt-6">Chat</h1>
+                <ul className="w-full h-1 grow flex flex-col gap-2 overflow-x-hidden overflow-y-auto p-6 chat-container">
+                    {
+                        messages.map((message, index) => {
+                            const avatar = <div className={cn("h-8 w-8 rounded-full flex items-center justify-center", message.role === "user" ? "bg-primary" : "bg-gray-500 text-white")}>
+                                <p className="text-white text-sm truncate text-center">{message.role.charAt(0).toUpperCase()}</p>
+                            </div>
+                            const isUser = message.role === "user"
+                            return (
+                                // eslint-disable-next-line react/no-array-index-key
+                                <li className={cn("w-full flex gap-1", isUser ? "justify-end" : "justify-start")} key={index}>
+                                    {
+                                        !isUser && avatar
+                                    }
+                                    <div className={cn(`max-w-[80%] p-2 rounded-lg`, isUser ? "bg-primary" : "bg-gray-500")}>
+                                        <p className="text-wrap whitespace-pre-wrap">{message.content}</p>
+                                    </div>
+                                    {
+                                        isUser && avatar
+                                    }
+                                </li>
+                            )
+                        })
+                    }
+                </ul>
+                <div className="w-full p-4">
+                    <form className="flex gap-2 border border-foreground p-2 rounded-lg w-full" onSubmit={handleSubmit}>
+                        <Input
+                            className="w-1 grow bg-transparent border-none text-foreground text-lg"
+                            placeholder="Type your message here..."
+                            value={newMessage}
+                            onChange={(e) => setNewMessage(e.target.value)}
+                        />
+                        <Button
+                            disabled={newMessage.trim() === ""}
+                            title={newMessage.trim() === "" ? "Please enter a message" : "Send"}
+                            onClick={handleSubmit}
+                            isLoading={isLoading}
+                        >
+                            <CircleArrowUp />
+                        </Button>
+                    </form>
+                </div>
             </div>
         </div>
     )

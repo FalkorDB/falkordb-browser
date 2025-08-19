@@ -34,11 +34,11 @@ export default function PaginationList<T extends Item>({ list, step, onClick, da
 
     useEffect(() => {
         setStepCounter(0)
-    }, [list])
+    }, [filteredList])
 
     useEffect(() => {
-        setPageCount(Math.ceil(list.length / step))
-    }, [list, step])
+        setPageCount(Math.ceil(filteredList.length / step))
+    }, [filteredList, step])
 
     useEffect(() => {
         const timeout = setTimeout(() => {
@@ -67,7 +67,7 @@ export default function PaginationList<T extends Item>({ list, step, onClick, da
                 <Input
                     ref={searchRef}
                     data-testid={`search${label.charAt(0).toUpperCase() + label.slice(1)}`}
-                    className="w-full bg-foreground text-white"
+                    className="w-full bg-background text-white"
                     value={search}
                     placeholder={`Search for a ${label}`}
                     onChange={(e) => setSearch(e.target.value)}
@@ -76,7 +76,7 @@ export default function PaginationList<T extends Item>({ list, step, onClick, da
                             e.preventDefault()
                             setSearch("")
                         }
-                        
+
                         if (e.key === "ArrowUp" || (e.shiftKey && e.key === "Tab" && hoverIndex > 0)) {
                             e.preventDefault()
 
@@ -118,8 +118,12 @@ export default function PaginationList<T extends Item>({ list, step, onClick, da
                                 data-testid={`${dataTestId}${index}`}
                                 className={cn(
                                     "border-b",
-                                    selected ? "text-primary border-primary" : "text-gray-500 border-gray-500",
-                                    hover && !selected && "text-white border-white"
+                                    // eslint-disable-next-line no-nested-ternary
+                                    selected
+                                        ? "text-primary border-primary"
+                                        : hover
+                                            ? "text-foreground border-foreground"
+                                            : "text-border border-border"
                                 )}
                                 onMouseEnter={() => setHoverIndex(index)}
                                 onMouseLeave={() => searchRef.current !== document.activeElement && setHoverIndex(-1)}

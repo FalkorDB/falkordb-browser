@@ -95,7 +95,7 @@ export default function FormComponent({ handleSubmit, fields, error = undefined,
                     return (
                         <div className="flex flex-col gap-2" key={field.label}>
                             <div className={cn(field.info && "flex gap-2 items-center")}>
-                                <label className={cn(errors[field.label] && "text-red-500")} htmlFor={field.label}>{field.required && <span>*</span>} {field.label}</label>
+                                <label className={cn(errors[field.label] && "text-destructive")} htmlFor={field.label}>{field.required && <span>*</span>} {field.label}</label>
                                 {
                                     field.info &&
                                     <Tooltip>
@@ -122,8 +122,8 @@ export default function FormComponent({ handleSubmit, fields, error = undefined,
                                     >
                                         {
                                             show[field.label] ?
-                                                <EyeIcon color="black" />
-                                                : <EyeOffIcon color="black" />
+                                                <EyeIcon className="text-foreground" />
+                                                : <EyeOffIcon className="text-foreground" />
                                         }
                                     </Button>
                                 }
@@ -162,7 +162,7 @@ export default function FormComponent({ handleSubmit, fields, error = undefined,
                                 <p className="text-sm text-gray-500">{field.description}</p>
                                 {
                                     field.errors && errors[field.label] ?
-                                        <p className="text-sm text-red-500">{field.errors.find((err) => err.condition(field.value))?.message}</p>
+                                        <p className="text-sm text-destructive">{field.errors.find((err) => err.condition(field.value))?.message}</p>
                                         : <p className="h-5" />
                                 }
                             </div>
@@ -171,7 +171,7 @@ export default function FormComponent({ handleSubmit, fields, error = undefined,
                 })
             }
             {children}
-            {error && <p className="text-sm text-red-500 h-5">{error.show ? error.message : ""}</p>}
+            {error && <p className="text-sm text-destructive h-5">{error.show ? error.message : ""}</p>}
             <div className="flex justify-end gap-2">
                 <Button
                     className="grow bg-primary p-4 rounded-lg flex justify-center items-center gap-2"

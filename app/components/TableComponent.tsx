@@ -131,7 +131,6 @@ export default function TableComponent({ headers, rows, label, entityName, input
                 <Input
                     data-testid={`searchInput${label}`}
                     ref={searchRef}
-                    variant="primary"
                     className="grow"
                     value={search}
                     type="text"
@@ -156,7 +155,7 @@ export default function TableComponent({ headers, rows, label, entityName, input
                                 <TableHead className="w-5 !pr-2" key={headers[0]}>
                                     <Checkbox
                                         data-testid={`tableCheckbox${label}`}
-                                        className="w-6 h-6 rounded-full bg-foreground border-primary data-[state=checked]:bg-primary"
+                                        className="w-6 h-6 rounded-full bg-background border-primary data-[state=checked]:bg-primary"
                                         checked={rows.length > 0 && rows.every(row => row.checked)}
                                         onCheckedChange={() => {
                                             setRows(rows.map((row) => {
@@ -212,7 +211,7 @@ export default function TableComponent({ headers, rows, label, entityName, input
                                         setRows ?
                                             <TableCell className="w-5 !pr-2">
                                                 <Checkbox
-                                                    className="w-6 h-6 rounded-full bg-foreground border-primary data-[state=checked]:bg-primary"
+                                                    className="w-6 h-6 rounded-full bg-background border-primary data-[state=checked]:bg-primary"
                                                     data-testid={`tableCheckbox${label}${row.cells[0].value}`}
                                                     checked={row.checked}
                                                     onCheckedChange={() => {
@@ -279,7 +278,6 @@ export default function TableComponent({ headers, rows, label, entityName, input
                                                                         <Input
                                                                             data-testid={`input${label}`}
                                                                             ref={inputRef}
-                                                                            variant="primary"
                                                                             className="grow"
                                                                             value={newValue}
                                                                             onChange={(e) => setNewValue(e.target.value)}

@@ -136,61 +136,93 @@ function GraphView({
 
     return (
         <Tabs value={tabsValue} onValueChange={(value) => setTabsValue(value as Tab)} className={cn("h-full w-full relative border rounded-lg overflow-hidden", tabsValue === "Table" && "flex flex-col-reverse")}>
-            <div className={cn("flex gap-4 justify-between items-end", tabsValue === "Table" ? "py-4 px-12" : "absolute bottom-4 inset-x-12 pointer-events-none z-20")}>
-                <GraphDetails
-                    graph={graph}
-                    tabsValue={tabsValue}
-                />
-                <TabsList className="bg-transparent flex gap-2 pointer-events-auto">
-                    <TabsTrigger
-                        data-testid="graphTab"
-                        asChild
-                        value="Graph"
-                    >
-                        <Button
-                            disabled={graph.getElements().length === 0}
-                            className="tabs-trigger"
-                            title="Graph"
-                        >
-                            <GitGraph />
-                        </Button>
-                    </TabsTrigger>
-                    <TabsTrigger
-                        data-testid="tableTab"
-                        asChild
-                        value="Table"
-                    >
-                        <Button
-                            disabled={graph.Data.length === 0}
-                            className="tabs-trigger"
-                            title="Table"
-                        >
-                            <Table />
-                        </Button>
-                    </TabsTrigger>
-                    <TabsTrigger
-                        data-testid="metadataTab"
-                        asChild
-                        value="Metadata"
-                    >
-                        <Button
-                            disabled={!historyQuery.currentQuery || historyQuery.currentQuery.metadata.length === 0 || historyQuery.currentQuery.explain.length === 0 || graph.Metadata.length === 0}
-                            className="tabs-trigger"
-                            title="Metadata"
-                        >
-                            <Info />
-                        </Button>
-                    </TabsTrigger>
-                </TabsList>
-                <Controls
-                    graph={graph}
-                    tabsValue={tabsValue}
-                    chartRef={chartRef}
-                    disabled={graph.getElements().length === 0}
-                    isLoading={isLoading}
-                    handleCooldown={handleCooldown}
-                    cooldownTicks={cooldownTicks}
-                />
+            <div className={cn("h-full w-full flex flex-col gap-4 absolute py-4 px-6 pointer-events-none z-20 justify-between")}>
+                <div className="h-1 grow flex flex-col gap-6">
+                    {
+                        !isLoading && tabsValue === "Graph" &&
+                        <>
+                            <Toolbar
+                                graph={graph}
+                                label="Graph"
+                                setSelectedElement={setSelectedElement}
+                                selectedElements={selectedElements}
+                                handleDeleteElement={handleDeleteElement}
+                                chartRef={chartRef}
+                                backgroundColor="bg-transparent"
+                            />
+                            {
+                                (labels.length > 0 || relationships.length > 0) &&
+                                <div className="w-fit flex flex-col h-full gap-4">
+                                    <Labels labels={labels} onClick={onLabelClick} label="Labels" type="Graph" />
+                                    <div className="h-1 bg-border rounded-full" />
+                                    <Labels labels={relationships} onClick={onRelationshipClick} label="Relationships" type="Graph" />
+                                </div>
+                            }
+                        </>
+                    }
+                </div>
+                <div className="flex flex-col gap-6">
+                    <GraphDetails
+                        graph={graph}
+                        tabsValue={tabsValue}
+                    />
+                    <div className="flex gap-2 items-center">
+                        <TabsList className="bg-transparent flex gap-2 pointer-events-auto">
+                            <TabsTrigger
+                                data-testid="graphTab"
+                                asChild
+                                value="Graph"
+                            >
+                                <Button
+                                    disabled={graph.getElements().length === 0}
+                                    className="tabs-trigger"
+                                    title="Graph"
+                                >
+                                    <GitGraph />
+                                </Button>
+                            </TabsTrigger>
+                            <TabsTrigger
+                                data-testid="tableTab"
+                                asChild
+                                value="Table"
+                            >
+                                <Button
+                                    disabled={graph.Data.length === 0}
+                                    className="tabs-trigger"
+                                    title="Table"
+                                >
+                                    <Table />
+                                </Button>
+                            </TabsTrigger>
+                            <TabsTrigger
+                                data-testid="metadataTab"
+                                asChild
+                                value="Metadata"
+                            >
+                                <Button
+                                    disabled={!historyQuery.currentQuery || historyQuery.currentQuery.metadata.length === 0 || historyQuery.currentQuery.explain.length === 0 || graph.Metadata.length === 0}
+                                    className="tabs-trigger"
+                                    title="Metadata"
+                                >
+                                    <Info />
+                                </Button>
+                            </TabsTrigger>
+                        </TabsList>
+                        {
+                            graph.getElements().length > 0 && tabsValue === "Graph" && !isLoading &&
+                            <>
+                                <div className="h-full w-1 bg-border rounded-full" />
+                                <Controls
+                                    graph={graph}
+                                    chartRef={chartRef}
+                                    disabled={graph.getElements().length === 0}
+                                    handleCooldown={handleCooldown}
+                                    cooldownTicks={cooldownTicks}
+                                />
+                            </>
+                        }
+                    </div>
+                </div>
             </div>
             <TabsContent value="Graph" className="h-full w-full mt-0 overflow-hidden">
                 <ForceGraph
@@ -211,30 +243,6 @@ function GraphView({
                     handleCooldown={handleCooldown}
                     cooldownTicks={cooldownTicks}
                 />
-                {
-                    !isLoading &&
-                    <div className="h-full z-10 absolute top-12 inset-x-12 pointer-events-none flex gap-8">
-                        {
-                            (labels.length > 0 || relationships.length > 0) &&
-                            <Labels labels={labels} onClick={onLabelClick} label="Labels" type="Graph" />
-                        }
-                        <div className="w-1 grow h-fit">
-                            <Toolbar
-                                graph={graph}
-                                label="Graph"
-                                setSelectedElement={setSelectedElement}
-                                selectedElements={selectedElements}
-                                handleDeleteElement={handleDeleteElement}
-                                chartRef={chartRef}
-                                backgroundColor="bg-transparent"
-                            />
-                        </div>
-                        {
-                            (labels.length > 0 || relationships.length > 0) &&
-                            <Labels labels={relationships} onClick={onRelationshipClick} label="Relationships" type="Graph" />
-                        }
-                    </div>
-                }
             </TabsContent>
             <TabsContent value="Table" className="h-1 grow w-full mt-0 overflow-hidden">
                 <TableView />
@@ -249,7 +257,7 @@ function GraphView({
                             }
 
                             const newQueries = prev.queries.map(q => q.text === newQuery.text ? newQuery : q)
-                            
+
                             localStorage.setItem("query history", JSON.stringify(newQueries))
 
                             return {

@@ -64,7 +64,7 @@ export default function Combobox({ disabled = false, inTable = false, label, opt
             {indicator !== "offline" && (options.length === 0 ? `There are no ${label}s` : selectedValue || `Select ${label}`)}
           </TooltipContent>
         </Tooltip>
-        <SelectContent className="min-w-52 max-h-[40dvh] bg-foreground">
+        <SelectContent className="min-w-52 max-h-[40dvh] bg-background">
           <div className="p-4 flex gap-2 items-center">
             <Input
               data-testid={`search${label}`}

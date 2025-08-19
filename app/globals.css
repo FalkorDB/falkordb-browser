@@ -4,27 +4,23 @@
 
 @layer base {
     :root {
-        --background: 0 0% 14%;
-        --foreground: 0 0% 10%;
-        --primary: 243 91% 68%;
-        --secondary: 39 33% 96%;
-        --destructive: 0 84% 60%;
+        --background: 0 0% 10%;
+        --foreground: 0 0% 100%;
+        --primary: 247 100% 70%;
+        --secondary: 0 0% 14.1%;
+        --destructive: 0 100% 66%;
         --accent: var(--background);
-        --popover: var(--foreground);
-        --popover-foreground: 0 0% 100%;
+        --popover: var(--background);
+        --popover-foreground: var(--foreground);
         --radius: 0.5rem;
-        --input: var(--popover-foreground);
+        --input: var(--background);
+        --text-muted-foreground: var(--foreground);
         --muted: 0 0% 80%;
+        --border: 0 0% 26%;
     }
 
     :focus-visible {
         @apply outline-none;
-    }
-}
-
-@layer base {
-    body {
-        @apply bg-background text-white;
     }
 }
 
@@ -46,7 +42,7 @@
     }
 
     .Page {
-        @apply w-full h-full bg-foreground relative overflow-hidden flex flex-col;
+        @apply w-full h-full bg-background relative overflow-hidden flex flex-col;
     }
 
     .Gradient {
@@ -59,14 +55,26 @@
         border-image-slice: 1;
     }
 
-    .border-bottom-Gradient {
-        border-bottom: 2px solid;
-        border-image-source: linear-gradient(90deg, #EC806C 0%, #B66EBD 43.41%, #7568F2 100%);
-        border-image-slice: 1;
+    .border-Gradient-rounded {
+        position: relative;
+        z-index: 1;
+        padding: 2px;
+    }
+
+    .border-Gradient-rounded::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: linear-gradient(90deg, #EC806C 0%, #B66EBD 43.41%, #7568F2 100%);
+        border-radius: 0.5rem;
+        z-index: -1;
     }
 
     .DataPanel {
-        @apply z-10 absolute right-4 top-12 min-w-[30%] min-h-[60%] max-w-[50%] max-h-[85%] flex flex-col gap-4 bg-foreground border rounded-lg;
+        @apply h-full w-full flex flex-col gap-4 bg-background border border-border rounded-lg;
     }
 
     .Dropzone {

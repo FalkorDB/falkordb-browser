@@ -183,7 +183,7 @@ export default function Selector({ graph, options, setOptions, graphName, setGra
                                 editorKey={queriesOpen ? "selector-theme" : "editor-theme"}
                             />
                         </div>
-                        <div className="h-full w-[120px] flex gap-2 p-2 border rounded-lg bg-foreground">
+                        <div className="h-full w-[120px] flex gap-2 p-2 border rounded-lg bg-background">
                             <Tooltip>
                                 <TooltipTrigger className="cursor-default">
                                     <Info />
@@ -218,7 +218,7 @@ export default function Selector({ graph, options, setOptions, graphName, setGra
                                     <div className="h-1 grow flex gap-8 p-8">
                                         <PaginationList
                                             label="Query"
-                                            className="w-[40%] bg-background rounded-lg overflow-hidden"
+                                            className="w-[40%] bg-secondary rounded-lg overflow-hidden"
                                             isSelected={(item) => historyQuery.queries.findIndex(q => q.text === item.text) + 1 === historyQuery.counter}
                                             afterSearchCallback={afterSearchCallback}
                                             dataTestId="queryHistory"
@@ -234,13 +234,13 @@ export default function Selector({ graph, options, setOptions, graphName, setGra
                                             searchRef={searchQueryRef}
                                         />
                                         <Tabs value={tab} onValueChange={(value) => setTab(value as keyof Query)} className="w-[60%] flex flex-col gap-8 items-center">
-                                            <TabsList className="bg-black h-fit w-fit p-2">
+                                            <TabsList className="bg-secondary h-fit w-fit p-2">
                                                 <TabsTrigger className={cn("!text-gray-500 data-[state=active]:!bg-background data-[state=active]:!text-white")} disabled={!isTabEnabled("text")} value="text">Edit Query</TabsTrigger>
                                                 <TabsTrigger className={cn("!text-gray-500 data-[state=active]:!bg-background data-[state=active]:!text-white")} disabled={!isTabEnabled("profile")} value="profile">Profile</TabsTrigger>
                                                 <TabsTrigger className={cn("!text-gray-500 data-[state=active]:!bg-background data-[state=active]:!text-white")} disabled={!isTabEnabled("metadata")} value="metadata">Metadata</TabsTrigger>
                                                 <TabsTrigger className={cn("!text-gray-500 data-[state=active]:!bg-background data-[state=active]:!text-white")} disabled={!isTabEnabled("explain")} value="explain">Explain</TabsTrigger>
                                             </TabsList>
-                                            <TabsContent value="text" className="w-full h-1 grow bg-background rounded-lg p-2 py-4 relative">
+                                            <TabsContent value="text" className="w-full h-1 grow bg-secondary rounded-lg p-2 py-4 relative">
                                                 {
                                                     currentQuery &&
                                                     <>
@@ -295,7 +295,7 @@ export default function Selector({ graph, options, setOptions, graphName, setGra
                                                     </>
                                                 }
                                             </TabsContent>
-                                            <TabsContent className="w-full h-1 grow bg-background rounded-lg p-8" value="profile">
+                                            <TabsContent className="w-full h-1 grow bg-secondary rounded-lg p-8" value="profile">
                                                 <div className="h-full w-full overflow-hidden flex flex-col gap-4">
                                                     {
                                                         currentQuery &&
@@ -323,7 +323,7 @@ export default function Selector({ graph, options, setOptions, graphName, setGra
                                                     }
                                                 </div>
                                             </TabsContent>
-                                            <TabsContent className="w-full h-1 grow bg-background rounded-lg p-8" value="metadata">
+                                            <TabsContent className="w-full h-1 grow bg-secondary rounded-lg p-8" value="metadata">
                                                 <div className="h-full w-full overflow-hidden flex flex-col gap-4">
                                                     {
                                                         currentQuery &&
@@ -333,7 +333,7 @@ export default function Selector({ graph, options, setOptions, graphName, setGra
                                                     }
                                                 </div>
                                             </TabsContent>
-                                            <TabsContent className="w-full h-1 grow bg-background rounded-lg p-8" value="explain">
+                                            <TabsContent className="w-full h-1 grow bg-secondary rounded-lg p-8" value="explain">
                                                 <div className="h-full w-full overflow-hidden flex flex-col gap-4">
                                                     {
                                                         currentQuery &&
@@ -368,7 +368,7 @@ export default function Selector({ graph, options, setOptions, graphName, setGra
                             setIsAddRelation={setIsAddRelation}
                             chartRef={chartRef}
                             isLoadingSchema={!!isCanvasLoading}
-                            backgroundColor="bg-foreground"
+                            backgroundColor="bg-background"
                         />
                     </div>
             }

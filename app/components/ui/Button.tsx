@@ -41,10 +41,10 @@ const getClassName = (variant: Variant, disable: boolean | undefined, open: bool
             className = cn("px-12 py-2 bg-transparent border-2 border-primary", className)
             break
         case "Cancel":
-            className = cn("px-12 py-2 bg-transparent border-2 border-secondary", className)
+            className = cn("px-12 py-2 bg-transparent border-2 border-border", className)
             break
         case "Delete":
-            className = cn("px-12 py-2 bg-transparent border-2 border-red-500", className)
+            className = cn("px-12 py-2 bg-transparent border-2 border-destructive", className)
             break
         default:
     }
@@ -78,7 +78,7 @@ const Button = forwardRef<HTMLButtonElement, Props>(({ label, variant = "button"
                     }
                 </button>
             </TooltipTrigger>
-            <TooltipContent className={cn(tooltipVariant === "Delete" && "bg-red-500 border-white text-white")}>
+            <TooltipContent className={cn(tooltipVariant === "Delete" && "bg-destructive border-destructive text-foreground")}>
                 {
                     indicator === "offline" && "The FalkorDB server is offline"
                 }

@@ -141,6 +141,8 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
 
     const { nodes, edges } = result;
 
+    console.log(nodes, edges)
+
     setEdgesCount(edges);
     setNodesCount(nodes);
   }, [graphName, toast, setIndicator, setEdgesCount, setNodesCount]);

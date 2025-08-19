@@ -24,10 +24,19 @@ export default function GraphDetails({
         }
     } = useContext(QuerySettingsContext)
 
+    // Check if any content should be displayed
+    const hasLimitWarning = graph.CurrentLimit && graph.Data.length >= graph.CurrentLimit
+    const hasLimitChangeWarning = graph.CurrentLimit && lastLimit !== limit
+    const hasGraphDetails = graph.Id && tabsValue === "Graph" && graphName !== undefined && nodesCount !== undefined && edgesCount !== undefined
+
+    if (!hasLimitWarning && !hasLimitChangeWarning && !hasGraphDetails) {
+        return null
+    }
+
     return (
-        <div className="w-1 grow flex flex-col gap-4 p-1">
+        <div className="flex flex-col gap-4 p-1">
             {
-                graph.CurrentLimit && graph.Data.length >= graph.CurrentLimit ?
+                hasLimitWarning ?
                     <Tooltip>
                         <TooltipTrigger asChild>
                             <div className="flex gap-2 items-center text-orange-300">
@@ -44,7 +53,7 @@ export default function GraphDetails({
                     : null
             }
             {
-                graph.CurrentLimit && lastLimit !== limit ?
+                hasLimitChangeWarning ?
                     <Tooltip>
                         <TooltipTrigger asChild>
                             <div className="flex gap-2 items-center text-orange-300">
@@ -61,7 +70,7 @@ export default function GraphDetails({
                     : null
             }
             {
-                graph.Id && tabsValue === "Graph" && graphName !== undefined && nodesCount !== undefined && edgesCount !== undefined &&
+                hasGraphDetails &&
                 <div className="flex gap-4 overflow-hidden">
                     {
                         [["Nodes", nodesCount, "nodesCount"], ["Edges", edgesCount, "edgesCount"], ["GraphName", graphName, "graphName"]].map(([label, value, testId]) => (

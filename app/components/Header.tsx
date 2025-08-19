@@ -62,7 +62,7 @@ export default function Header({ onSetGraphName, graphNames, graphName }: Props)
     }, [setPanel])
 
     return (
-        <div className="py-5 px-2 flex flex-col justify-between items-center border-r border-gray-400">
+        <div className="py-5 px-2 flex flex-col justify-between items-center border-r border-border">
             <div className="flex flex-col gap-6 items-center">
                 <Link
                     className="rounded-full h-12 w-12 overflow-hidden"
@@ -117,7 +117,7 @@ export default function Header({ onSetGraphName, graphNames, graphName }: Props)
                     <>
                         <div className="h-[1px] w-[80%] bg-white rounded-lg" />
                         <Button
-                            className="border-bottom-Gradient Gradient bg-clip-text text-transparent"
+                            className="Gradient bg-clip-text text-transparent font-semibold text-xl"
                             indicator={indicator}
                             label="CHAT"
                             onClick={() => handleSetCurrentPanel("chat")}
@@ -177,7 +177,7 @@ export default function Header({ onSetGraphName, graphNames, graphName }: Props)
                             </DropdownMenuGroup>
                         </DropdownMenuContent>
                     </DropdownMenu>
-                    <DrawerContent side="right" className="bg-popover-foreground gap-4 items-center text-foreground" id="about">
+                    <DrawerContent side="right" className="bg-background gap-4 items-center text-foreground" id="about">
                         <VisuallyHidden>
                             <DrawerTitle />
                             <DrawerDescription />
@@ -203,10 +203,10 @@ export default function Header({ onSetGraphName, graphNames, graphName }: Props)
                     indicator === "offline" &&
                     <>
                         <div className="h-0.5 w-[80%] bg-white" />
-                        <div className="flex gap-2 rounded-lg p-2 border border-red-500">
+                        <div className="flex gap-2 rounded-lg p-2 border border-destructive">
                             <Tooltip>
                                 <TooltipTrigger asChild>
-                                    <p className="text-red-500 text-xs">Offline</p>
+                                    <p className="text-destructive text-xs">Offline</p>
                                 </TooltipTrigger>
                                 <TooltipContent>
                                     <p>The FalkorDB server is offline</p>

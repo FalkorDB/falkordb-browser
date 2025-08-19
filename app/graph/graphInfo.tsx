@@ -8,7 +8,7 @@ export default function GraphInfoPanel({ onClose }: { onClose: () => void }) {
     const { graphInfo, nodesCount, edgesCount, runQuery, graphName } = useContext(GraphContext);
 
     return (
-        <div className="w-full h-full relative p-6 flex flex-col gap-8 overflow-y-auto">
+        <div className="w-full h-full relative p-6 flex flex-col gap-8 overflow-y-auto border rounded-lg">
             <Button
                 className="absolute top-2 right-2"
                 title="Close"

@@ -121,7 +121,7 @@ export default function Toolbar({
     const stripBackground = `url("data:image/svg+xml,${stripSVG}")`;
 
     return (
-        <div className="w-full h-full flex justify-between items-center">
+        <div className="w-full flex justify-between items-center">
             <div className={cn("relative pointer-events-auto", label === "Schema" && "h-full")}>
                 {
                     graph.getElements().length > 0 && !isLoading &&
@@ -168,7 +168,7 @@ export default function Toolbar({
                 }
                 {
                     suggestions.length > 0 &&
-                    <div tabIndex={-1} onScroll={handleScroll} ref={suggestionRef} className="max-h-[30dvh] overflow-auto absolute left-0 top-14 w-full border p-2 rounded-lg bg-foreground">
+                    <div tabIndex={-1} onScroll={handleScroll} ref={suggestionRef} className="max-h-[30dvh] overflow-auto absolute left-0 top-14 w-full border p-2 rounded-lg bg-background">
                         <ul
                             data-testid={`elementCanvasSuggestionsList${label}`}
                             className="flex flex-col gap-2"

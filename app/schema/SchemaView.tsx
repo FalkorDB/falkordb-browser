@@ -160,14 +160,13 @@ export default function SchemaView({
                     edgesCount={edgesCount}
                 />
                 {
-                    schema.getElements().length > 0 &&
+                    schema.getElements().length > 0 && !isLoading &&
                     <Controls
                         graph={schema}
                         disabled={!schema.Id}
                         chartRef={chartRef}
                         handleCooldown={handleCooldown}
                         cooldownTicks={cooldownTicks}
-                        isLoading={isLoading}
                     />
                 }
             </div>

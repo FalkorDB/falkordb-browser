@@ -119,6 +119,7 @@ export default function ForceGraph({
         if (!canvas) return
 
         canvas.setAttribute('data-engine-status', 'stop')
+        canvas.className += " bg-background"
     }, [])
 
     useEffect(() => {
@@ -282,7 +283,7 @@ export default function ForceGraph({
                 return
             }
         }
-        
+
         if (evt.ctrlKey) {
             if (selectedElements.includes(element)) {
                 setSelectedElements(selectedElements.filter((el) => el !== element))
@@ -315,7 +316,6 @@ export default function ForceGraph({
             }
             <ForceGraph2D
                 ref={chartRef}
-                backgroundColor="#242424"
                 width={parentWidth}
                 height={parentHeight}
                 linkLabel={(link) => link.relationship}
@@ -412,22 +412,22 @@ export default function ForceGraph({
                         const dx = end.x - start.x;
                         const dy = end.y - start.y;
                         const distance = Math.sqrt(dx * dx + dy * dy);
-                        
+
                         // Calculate perpendicular vector for curve offset
                         const perpX = dy / distance;
                         const perpY = -dx / distance;
-                        
+
                         // Control point with larger offset to match the actual curve
                         const curvature = link.curve || 0;
                         const controlX = (start.x + end.x) / 2 + perpX * curvature * distance * 1.0;
                         const controlY = (start.y + end.y) / 2 + perpY * curvature * distance * 1.0;
-                        
+
                         // Calculate point on Bézier curve at t = 0.5 (midpoint)
                         const t = 0.5;
                         const oneMinusT = 1 - t;
                         textX = oneMinusT * oneMinusT * start.x + 2 * oneMinusT * t * controlX + t * t * end.x;
                         textY = oneMinusT * oneMinusT * start.y + 2 * oneMinusT * t * controlY + t * t * end.y;
-                        
+
                         // Calculate tangent angle at t = 0.5
                         const tangentX = 2 * oneMinusT * (controlX - start.x) + 2 * t * (end.x - controlX);
                         const tangentY = 2 * oneMinusT * (controlY - start.y) + 2 * t * (end.y - controlY);
@@ -461,11 +461,11 @@ export default function ForceGraph({
 
                     // Use single save/restore for both background and text
                     const padding = 0.5;
-                    
+
                     ctx.save();
                     ctx.translate(textX, textY);
                     ctx.rotate(angle);
-                    
+
                     // Draw background rectangle (rotated)
                     ctx.fillStyle = '#242424';
                     ctx.fillRect(
@@ -474,7 +474,7 @@ export default function ForceGraph({
                         textWidth + padding * 2,
                         textHeight + padding * 2
                     );
-                    
+
                     // Draw text
                     ctx.fillStyle = 'white';
                     ctx.textAlign = 'center';

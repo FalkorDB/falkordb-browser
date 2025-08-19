@@ -621,7 +621,7 @@ export default function EditorComponent({ graph, graphName, historyQuery, maximi
     }
 
     return (
-        <div style={{ height: editorHeight + 18 }} className="absolute w-full flex items-start gap-8 border rounded-lg overflow-hidden bg-foreground p-2">
+        <div style={{ height: editorHeight + 18 }} className="absolute w-full flex items-start gap-8 border-2 border-border rounded-lg overflow-hidden bg-background p-2">
             <div className="h-full w-1 grow flex rounded-lg overflow-hidden">
                 <div ref={containerRef} className="h-full relative grow w-1" data-testid="editorContainer">
                     <Editor

@@ -60,6 +60,7 @@ export default function Page() {
     const { toast } = useToast()
 
     const chartRef = useRef<ForceGraphMethods<Node, Link>>()
+    const panelRef = useRef<ImperativePanelHandle>(null)
 
     const [isQueryLoading, setIsQueryLoading] = useState(true)
     const [selectedElement, setSelectedElement] = useState<Node | Link | undefined>()
@@ -67,8 +68,7 @@ export default function Page() {
     const [labels, setLabels] = useState<Label[]>([])
     const [data, setData] = useState<GraphData>({ ...graph.Elements })
     const [relationships, setRelationships] = useState<Relationship[]>([])
-
-    const panelRef = useRef<ImperativePanelHandle>(null)
+    const [isCollapsed, setIsCollapsed] = useState(false)
 
     const [panelSize, graphSize] = useMemo(() => {
         switch (panel) {
@@ -84,15 +84,22 @@ export default function Page() {
 
     useEffect(() => {
         const currentPanel = panelRef.current
-        if (!currentPanel || !panel) return
-        currentPanel.expand()
+        if (!currentPanel) return
+        if (panel) currentPanel.expand()
+        else currentPanel.collapse()
     }, [panel])
 
     useEffect(() => {
+        if ((!graphName && panel === "graphInfo") || (!selectedElement && panel === "data")) setPanel(undefined)
+    }, [selectedElement, setPanel, graphName, panel])
+
+    useEffect(() => {
         if (graphName) setPanel("graphInfo")
-        else if (selectedElement) setPanel("data")
-        else setPanel(undefined)
-    }, [graphName, selectedElement, setPanel])
+    }, [graphName, setPanel])
+
+    useEffect(() => {
+        if (selectedElement) setPanel("data")
+    }, [selectedElement, setPanel])
 
     const fetchInfo = useCallback(async (type: string) => {
         if (!graphName) return []
@@ -151,6 +158,7 @@ export default function Page() {
             }
 
             setGraph(Graph.empty(graphName))
+            fetchCount()
         }
 
         setIsQueryLoading(false)
@@ -224,15 +232,6 @@ export default function Page() {
     const getCurrentPanel = useCallback(() => {
         if (!graphName) return undefined
 
-        if (selectedElement) return (
-            <GraphDataPanel
-                object={selectedElement}
-                setObject={setSelectedElement}
-                onDeleteElement={handleDeleteElement}
-                setLabels={setLabels}
-            />
-        )
-
         switch (panel) {
             case "graphInfo":
                 return (
@@ -246,6 +245,13 @@ export default function Page() {
                         onClose={handleClosePanel}
                     />
                 )
+            case "data":
+                return selectedElement && <GraphDataPanel
+                    object={selectedElement}
+                    setObject={setSelectedElement}
+                    onDeleteElement={handleDeleteElement}
+                    setLabels={setLabels}
+                />
             default:
                 return undefined
         }
@@ -293,8 +299,20 @@ export default function Page() {
                         setHistoryQuery={setHistoryQuery}
                     />
                 </ResizablePanel>
-                <ResizableHandle className={cn("ml-8", panel === undefined && "hidden")} />
-                <ResizablePanel ref={panelRef} collapsible defaultSize={panelSize} minSize={25} maxSize={50}>
+                <ResizableHandle withHandle onMouseUp={() => isCollapsed && handleClosePanel()} className={cn("ml-6 w-2", isCollapsed && "hidden")} />
+                <ResizablePanel
+                    ref={panelRef}
+                    collapsible
+                    defaultSize={panelSize}
+                    minSize={25}
+                    maxSize={50}
+                    onCollapse={() => {
+                        setIsCollapsed(true)
+                    }}
+                    onExpand={() => {
+                        setIsCollapsed(false)
+                    }}
+                >
                     {getCurrentPanel()}
                 </ResizablePanel>
             </ResizablePanelGroup>

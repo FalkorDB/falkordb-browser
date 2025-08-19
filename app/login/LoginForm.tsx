@@ -169,7 +169,7 @@ export default function LoginForm() {
             <div className="flex flex-col gap-4">
               <div className="flex gap-2 items-center">
                 <Checkbox
-                  className="w-6 h-6 rounded-full bg-foreground border-primary data-[state=checked]:bg-primary"
+                  className="w-6 h-6 rounded-full bg-background border-primary data-[state=checked]:bg-primary"
                   checked={TLS}
                   onCheckedChange={(checked) => {
                     setTLS(checked as boolean)
@@ -190,7 +190,7 @@ export default function LoginForm() {
               
               {/* Certificate Upload Section */}
               {TLS && (
-                <div className="flex flex-col gap-3 p-4 bg-foreground border border-muted/20 rounded-lg transition-all duration-300 ease-in-out">
+                <div className="flex flex-col gap-3 p-4 bg-background border border-muted/20 rounded-lg transition-all duration-300 ease-in-out">
                   <div className="flex items-center gap-2">
                     <div className="w-2 h-2 bg-primary rounded-full" />
                     <span className="text-sm font-semibold text-muted">Certificate Authentication</span>

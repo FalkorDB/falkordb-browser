@@ -71,7 +71,7 @@ export default function Settings() {
                     <h1 className="text-2xl font-medium px-6">Settings</h1>
                     <div className="w-fit bg-background flex gap-2 p-2 rounded-lg">
                         <Button
-                            className={cn("p-2 rounded-lg", current === "Browser" ? "bg-foreground" : "text-gray-500")}
+                            className={cn("p-2 rounded-lg", current === "Browser" ? "bg-background" : "text-gray-500")}
                             label="Browser Settings"
                             title="Manage browser settings"
                             onClick={() => handleSetCurrent("Browser")}
@@ -79,13 +79,13 @@ export default function Settings() {
                         {
                             session?.user?.role === "Admin" && <>
                                 <Button
-                                    className={cn("p-2 rounded-lg", current === "DB" ? "bg-foreground" : "text-gray-500")}
+                                    className={cn("p-2 rounded-lg", current === "DB" ? "bg-background" : "text-gray-500")}
                                     label="DB Configuration"
                                     title="Configure database settings"
                                     onClick={() => handleSetCurrent("DB")}
                                 />
                                 <Button
-                                    className={cn("p-2 rounded-lg", current === "Users" ? "bg-foreground" : "text-gray-500")}
+                                    className={cn("p-2 rounded-lg", current === "Users" ? "bg-background" : "text-gray-500")}
                                     label="Users"
                                     title="Manage users accounts"
                                     onClick={() => handleSetCurrent("Users")}
