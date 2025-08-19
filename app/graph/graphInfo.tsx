@@ -54,7 +54,7 @@ export default function GraphInfoPanel({ onClose }: { onClose: () => void }) {
                 <ul className="flex flex-wrap gap-2 p-2">
                     <li className="max-w-full">
                         <Button
-                            className="h-6 w-full p-2 rounded-full flex justify-center items-center bg-gray-500"
+                            className="h-6 w-full p-2 rounded-full flex justify-center items-center bg-gray-400 text-black"
                             label="*"
                             title="All labels"
                             onClick={() => runQuery(`MATCH (n) RETURN n`)}
@@ -96,7 +96,7 @@ export default function GraphInfoPanel({ onClose }: { onClose: () => void }) {
                 <ul className="flex flex-wrap gap-2 p-2">
                     <li className="max-w-full">
                         <Button
-                            className="h-6 w-full p-2 rounded-full flex justify-center items-center bg-gray-500"
+                            className="h-6 w-full p-2 rounded-full flex justify-center items-center bg-gray-400 text-black"
                             label="*"
                             title="All relationships"
                             onClick={() => runQuery(`MATCH p=()-[]-() RETURN p`)}

@@ -6,7 +6,6 @@ import { AuthOptions, Role, User, getServerSession } from "next-auth";
 import { NextResponse } from "next/server";
 import { FalkorDBOptions } from "falkordb/dist/src/falkordb";
 import { v4 as uuidv4 } from "uuid";
-import { ErrorReply } from "redis";
 
 const connections = new Map<string, FalkorDB>();
 
@@ -70,7 +69,7 @@ async function newClient(
     await connection.aclGetUser(credentials.username || "default");
     return { role: "Admin", client };
   } catch (err) {
-    if (err instanceof ErrorReply && err.message.startsWith("NOPERM")) {
+    if ((err as Error).message.startsWith("NOPERM")) {
       console.debug("user is not admin", err);
     } else throw err;
   }

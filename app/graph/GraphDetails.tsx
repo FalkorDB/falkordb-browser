@@ -9,13 +9,13 @@ export default function GraphDetails({
     graph,
     graphName,
     tabsValue = "Graph",
-    edgesCount,
-    nodesCount,
+    edgesCount = -1,
+    nodesCount = -1,
 }: {
     graph: Graph,
     graphName?: string,
-    nodesCount?: number | null,
-    edgesCount?: number | null,
+    nodesCount?: number,
+    edgesCount?: number,
     tabsValue?: string,
 }) {
     const {
@@ -27,7 +27,7 @@ export default function GraphDetails({
     // Check if any content should be displayed
     const hasLimitWarning = graph.CurrentLimit && graph.Data.length >= graph.CurrentLimit
     const hasLimitChangeWarning = graph.CurrentLimit && lastLimit !== limit
-    const hasGraphDetails = graph.Id && tabsValue === "Graph" && graphName !== undefined && nodesCount !== undefined && edgesCount !== undefined
+    const hasGraphDetails = graph.Id && tabsValue === "Graph" && graphName !== undefined && nodesCount !== -1 && edgesCount !== -1
 
     if (!hasLimitWarning && !hasLimitChangeWarning && !hasGraphDetails) {
         return null
@@ -79,7 +79,7 @@ export default function GraphDetails({
                                     {label}:
                                 </p>
                                 {
-                                    value !== null ?
+                                    value !== undefined ?
                                         <Tooltip>
                                             <TooltipTrigger asChild>
                                                 <p
@@ -107,7 +107,7 @@ export default function GraphDetails({
 
 GraphDetails.defaultProps = {
     tabsValue: "Graph",
-    nodesCount: undefined,
-    edgesCount: undefined,
+    nodesCount: -1,
+    edgesCount: -1,
     graphName: undefined,
 }

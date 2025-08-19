@@ -16,8 +16,8 @@ import ForceGraph from "../components/ForceGraph"
 
 interface Props {
     fetchCount?: (graphName: string) => Promise<void>
-    edgesCount?: number | null
-    nodesCount?: number | null
+    edgesCount?: number
+    nodesCount?: number
     selectedElement: Node | Link | undefined
     setSelectedElement: Dispatch<SetStateAction<Node | Link | undefined>>
     selectedElements: (Node | Link)[]
@@ -97,7 +97,7 @@ export default function SchemaView({
         label.show = !label.show
 
         schema.Elements.nodes.forEach((node) => {
-            if (node.labels[0] !== label.name) return
+            if (!label.show && node.labels.some(c => schema.LabelsMap.get(c)?.show !== label.show)) return
             node.visible = label.show
         })
 

@@ -1,4 +1,5 @@
 import { getClient } from "@/app/api/auth/[...nextauth]/options";
+import { runQuery } from "@/app/api/utils";
 import { NextResponse, NextRequest } from "next/server";
 
 // eslint-disable-next-line import/prefer-default-export
@@ -29,14 +30,10 @@ export async function GET(
       const edgesQuery = "MATCH ()-[e]->() RETURN count(e) as edges";
 
       // Execute nodes count query
-      const nodesResult = user.role === "Read-Only"
-        ? await graph.roQuery(nodesQuery)
-        : await graph.query(nodesQuery);
+      const nodesResult = await runQuery(graph, nodesQuery, user.role);
 
       // Execute edges count query  
-      const edgesResult = user.role === "Read-Only"
-        ? await graph.roQuery(edgesQuery)
-        : await graph.query(edgesQuery);
+      const edgesResult = await runQuery(graph, edgesQuery, user.role);
 
       if (!nodesResult || !edgesResult) throw new Error("Something went wrong");
 
@@ -48,14 +45,6 @@ export async function GET(
         encoder.encode(`event: result\ndata: ${JSON.stringify({ nodes, edges })}\n\n`)
       );
       writer.close();
-
-      return new Response(readable, {
-        headers: {
-          "Content-Type": "text/event-stream",
-          "Cache-Control": "no-cache",
-          Connection: "keep-alive",
-        },
-      });
     } catch (error) {
       console.error(error);
       writer.write(

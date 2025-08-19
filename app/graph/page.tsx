@@ -123,9 +123,15 @@ export default function Page() {
             fetchInfo("(relationship type)"),
             fetchInfo("(property key)"),
         ]).then(async ([newLabels, newRelationships, newPropertyKeys]) => {
-            const colorsArr = JSON.parse(localStorage.getItem(graphName) || "[]")
-            const gi = GraphInfo.create(newPropertyKeys, newLabels, newRelationships, colorsArr)
+            const colorsArr = localStorage.getItem(graphName)
+            const gi = GraphInfo.create(newPropertyKeys, newLabels, newRelationships, colorsArr ? JSON.parse(colorsArr) : undefined)
             setGraphInfo(gi)
+        }).catch((error) => {
+            toast({
+                title: "Error",
+                description: error.message || "Failed to fetch graph info",
+                variant: "destructive",
+            })
         });
     }, [fetchInfo, setGraphInfo, toast, setIndicator, graphName])
 

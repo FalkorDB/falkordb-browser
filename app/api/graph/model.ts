@@ -166,7 +166,7 @@ export class GraphInfo {
     this.propertyKeys = propertyKeys;
     this.labels = labels;
     this.relationships = relationships;
-    this.colors = colors || DEFAULT_COLORS;
+    this.colors = [...(colors || DEFAULT_COLORS)];
   }
 
   get PropertyKeys(): string[] | undefined {
@@ -205,7 +205,6 @@ export class GraphInfo {
     colors?: string[]
   ): GraphInfo {
     const graphInfo = GraphInfo.empty(propertyKeys, colors);
-
     graphInfo.createLabel(labels);
     relationships.forEach((relationship) =>
       graphInfo.createRelationship(relationship)
@@ -255,15 +254,12 @@ export class GraphInfo {
       return this.colors[index];
     }
 
-    let newColor;
-    let i = index;
-    do {
-      newColor = `hsl(${
-        (i - Math.min(DEFAULT_COLORS.length, this.colors.length)) * 20
-      }, 100%, 70%)`;
-      i += 1;
-    } while (this.colors.includes(newColor));
+    const newColor = `hsl(${
+      (index - Math.min(DEFAULT_COLORS.length, this.colors.length)) * 20
+    }, 100%, 70%)`;
+
     this.colors.push(newColor);
+
     return newColor;
   }
 }
@@ -665,7 +661,8 @@ export class Graph {
             (l.source.id === start.id && l.target.id === end.id) ||
             (l.target.id === start.id && l.source.id === end.id)
         );
-        const index = sameNodesLinks.findIndex((l) => l.id === link.id) || 0;
+        let index = sameNodesLinks.findIndex((l) => l.id === link.id);
+        index = index === -1 ? 0 : index;
         const even = index % 2 === 0;
         let curve;
 
