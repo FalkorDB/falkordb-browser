@@ -9,23 +9,22 @@ import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/componen
 import { ImperativePanelHandle } from "react-resizable-panels";
 import { Label, Graph, GraphData, Link, Node, Relationship, GraphInfo } from "../api/graph/model";
 import Tutorial from "./Tutorial";
-import { GraphContext, HistoryQueryContext, IndicatorContext, PanelContext, QuerySettingsContext } from "../components/provider";
+import { GraphContext, HistoryQueryContext, IndicatorContext, PanelContext, QueryLoadingContext, QuerySettingsContext } from "../components/provider";
 import Spinning from "../components/ui/spinning";
-import GraphInfoPanel from "./graphInfo";
 import Chat from "./Chat";
 import GraphDataPanel from "./GraphDataPanel";
 
 const Selector = dynamic(() => import("./Selector"), {
     ssr: false,
     loading: () => <div className="h-[50px] flex flex-row gap-4 items-center">
-        <div className="w-[230px] h-full animate-pulse rounded-md border border-gray-300 bg-background" />
-        <div className="w-1 grow h-full animate-pulse rounded-md border border-gray-300 bg-background" />
-        <div className="w-[120px] h-full animate-pulse rounded-md border border-gray-300 bg-background" />
+        <div className="w-[230px] h-full animate-pulse rounded-md border border-border bg-background" />
+        <div className="w-1 grow h-full animate-pulse rounded-md border border-border bg-background" />
+        <div className="w-[120px] h-full animate-pulse rounded-md border border-border bg-background" />
     </div>
 })
 const GraphView = dynamic(() => import("./GraphView"), {
     ssr: false,
-    loading: () => <div className="h-full w-full bg-background flex justify-center items-center border rounded-lg">
+    loading: () => <div className="h-full w-full bg-background flex justify-center items-center border border-border rounded-lg">
         <Spinning />
     </div>
 })
@@ -34,6 +33,7 @@ export default function Page() {
     const { historyQuery, setHistoryQuery } = useContext(HistoryQueryContext)
     const { setIndicator } = useContext(IndicatorContext);
     const { panel, setPanel } = useContext(PanelContext)
+    const { isQueryLoading, setIsQueryLoading } = useContext(QueryLoadingContext)
     const {
         graph,
         setGraph,
@@ -62,18 +62,16 @@ export default function Page() {
     const chartRef = useRef<ForceGraphMethods<Node, Link>>()
     const panelRef = useRef<ImperativePanelHandle>(null)
 
-    const [isQueryLoading, setIsQueryLoading] = useState(true)
     const [selectedElement, setSelectedElement] = useState<Node | Link | undefined>()
     const [selectedElements, setSelectedElements] = useState<(Node | Link)[]>([])
     const [labels, setLabels] = useState<Label[]>([])
     const [data, setData] = useState<GraphData>({ ...graph.Elements })
     const [relationships, setRelationships] = useState<Relationship[]>([])
-    const [isCollapsed, setIsCollapsed] = useState(false)
+    const [isCollapsed, setIsCollapsed] = useState(true)
 
     const [panelSize, graphSize] = useMemo(() => {
         switch (panel) {
             case "data":
-            case "graphInfo":
                 return [30, 70]
             case "chat":
                 return [40, 60]
@@ -83,6 +81,8 @@ export default function Page() {
     }, [panel])
 
     useEffect(() => {
+        if (panel !== "data") setSelectedElement(undefined)
+
         const currentPanel = panelRef.current
         if (!currentPanel) return
         if (panel) currentPanel.expand()
@@ -90,12 +90,8 @@ export default function Page() {
     }, [panel])
 
     useEffect(() => {
-        if ((!graphName && panel === "graphInfo") || (!selectedElement && panel === "data")) setPanel(undefined)
+        if (!selectedElement && panel === "data") setPanel(undefined)
     }, [selectedElement, setPanel, graphName, panel])
-
-    useEffect(() => {
-        if (graphName) setPanel("graphInfo")
-    }, [graphName, setPanel])
 
     useEffect(() => {
         if (selectedElement) setPanel("data")
@@ -239,12 +235,6 @@ export default function Page() {
         if (!graphName) return undefined
 
         switch (panel) {
-            case "graphInfo":
-                return (
-                    <GraphInfoPanel
-                        onClose={handleClosePanel}
-                    />
-                )
             case "chat":
                 return (
                     <Chat
@@ -252,8 +242,8 @@ export default function Page() {
                     />
                 )
             case "data":
-                return selectedElement && <GraphDataPanel
-                    object={selectedElement}
+                return <GraphDataPanel
+                    object={selectedElement!}
                     setObject={setSelectedElement}
                     onDeleteElement={handleDeleteElement}
                     setLabels={setLabels}
@@ -305,7 +295,7 @@ export default function Page() {
                         setHistoryQuery={setHistoryQuery}
                     />
                 </ResizablePanel>
-                <ResizableHandle withHandle onMouseUp={() => isCollapsed && handleClosePanel()} className={cn("ml-6 w-2", isCollapsed && "hidden")} />
+                <ResizableHandle withHandle onMouseUp={() => isCollapsed && handleClosePanel()} className={cn("ml-6 w-0", isCollapsed && "hidden")} />
                 <ResizablePanel
                     ref={panelRef}
                     collapsible

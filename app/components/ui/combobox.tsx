@@ -11,18 +11,20 @@ import Input from "./Input"
 import { IndicatorContext } from "../provider"
 
 interface ComboboxProps {
+  id?: string,
   options: string[],
   selectedValue: string,
   setSelectedValue: (value: string) => void,
-  label: "Role" | "Type",
+  label: "Role" | "Type" | "Model" | "Theme",
   disabled?: boolean,
   inTable?: boolean,
   defaultOpen?: boolean,
+  className?: string,
 }
 
 const STEP = 4
 
-export default function Combobox({ disabled = false, inTable = false, label, options, selectedValue, setSelectedValue, defaultOpen = false }: ComboboxProps) {
+export default function Combobox({ id, disabled = false, inTable = false, label, options, selectedValue, setSelectedValue, defaultOpen = false, className }: ComboboxProps) {
 
   const { indicator } = useContext(IndicatorContext)
 
@@ -52,9 +54,10 @@ export default function Combobox({ disabled = false, inTable = false, label, opt
         <Tooltip>
           <TooltipTrigger asChild>
             <SelectTrigger
+              id={id}
               data-testid={`select${label}`}
               data-type="select"
-              className={cn("w-fit gap-2 items-center border p-2 disabled:text-gray-400 disabled:opacity-100 disabled:cursor-not-allowed", inTable ? "text-sm font-light" : "text-xl font-medium")}
+              className={cn("w-fit gap-2 items-center border border-border p-2 disabled:text-gray-400 disabled:cursor-not-allowed", inTable ? "text-sm font-light" : "text-xl font-medium", className)}
             >
               <SelectValue placeholder={`Select ${label}`} />
             </SelectTrigger>
@@ -122,7 +125,9 @@ export default function Combobox({ disabled = false, inTable = false, label, opt
 }
 
 Combobox.defaultProps = {
+  id: undefined,
   disabled: false,
   inTable: false,
   defaultOpen: false,
+  className: undefined,
 }

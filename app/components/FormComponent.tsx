@@ -130,6 +130,7 @@ export default function FormComponent({ handleSubmit, fields, error = undefined,
                                 {
                                     field.type === "select" ?
                                         <Combobox
+                                            id={field.label}
                                             options={field.options}
                                             label={field.selectType}
                                             selectedValue={field.value}
@@ -174,6 +175,7 @@ export default function FormComponent({ handleSubmit, fields, error = undefined,
             {error && <p className="text-sm text-destructive h-5">{error.show ? error.message : ""}</p>}
             <div className="flex justify-end gap-2">
                 <Button
+                    id="submit-button"
                     className="grow bg-primary p-4 rounded-lg flex justify-center items-center gap-2"
                     type="submit"
                     disabled={error?.show}

@@ -110,7 +110,7 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
             <DropdownMenu open={open} onOpenChange={handleOpenChange}>
                 <DropdownMenuTrigger disabled={options.length === 0 || indicator === "offline"} asChild>
                     <Button
-                        className="h-full w-[230px] text-2xl bg-background rounded-lg border p-2 justify-left disabled:text-gray-400 disabled:opacity-100"
+                        className="h-full w-[230px] text-2xl bg-background rounded-lg border border-border p-2 justify-left disabled:text-gray-400 disabled:opacity-100"
                         label={selectedValue || `Select ${type}`}
                         title={options.length === 0 ? `There are no ${type}` : undefined}
                         indicator={indicator}
@@ -125,7 +125,7 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
                     </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent
-                    className="h-[450px] w-[350px] mt-2 overflow-hidden border rounded-lg flex flex-col items-center p-8"
+                    className="h-[450px] w-[350px] mt-2 overflow-hidden border border-border rounded-lg flex flex-col items-center p-8"
                 >
                     <PaginationList
                         className="h-1 grow p-0"
@@ -179,7 +179,7 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
                 disableClose
                 className="flex flex-col border-none rounded-lg max-w-none h-[90dvh]"
             >
-                <DialogHeader className="flex-row justify-between items-center border-b border-secondary pb-4">
+                <DialogHeader className="flex-row justify-between items-center border-b border-border pb-4">
                     <DialogTitle className="text-2xl font-medium">Manage Graphs</DialogTitle>
                     <CloseDialog />
                 </DialogHeader>

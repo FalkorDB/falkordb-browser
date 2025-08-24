@@ -131,7 +131,7 @@ export default function GraphDataPanel({ object, setObject, onDeleteElement, set
 
     return (
         <div data-testid="DataPanel" className="DataPanel p-6">
-            <div className="relative flex flex-col gap-6 pb-4 border-b">
+            <div className="relative flex flex-col gap-6 pb-4 border-b border-border">
                 <div className="flex flex-row justify-between items-center">
                     <div className="flex flex-col gap-2 font-medium text-xl text-nowrap">
                         <p>ID: <span className="Gradient text-transparent bg-clip-text">{object.id}</span></p>
@@ -185,7 +185,7 @@ export default function GraphDataPanel({ object, setObject, onDeleteElement, set
                                 trigger={
                                     <Button
                                         data-testid="DataPanelAddLabel"
-                                        className="p-2 text-nowrap text-xs justify-center border border-background rounded-full"
+                                        className="p-2 text-nowrap text-xs justify-center border border-border rounded-full"
                                         label="Add Label"
                                         title=""
                                     >

@@ -9,6 +9,7 @@ import ForceGraph2D from "react-force-graph-2d"
 import { securedFetch, GraphRef, handleZoomToFit } from "@/lib/utils"
 import { useToast } from "@/components/ui/use-toast"
 import * as d3 from "d3"
+import { useTheme } from "next-themes"
 import { GraphData, Link, Node, Relationship, Graph } from "../api/graph/model"
 import { IndicatorContext } from "./provider"
 import Spinning from "./ui/spinning"
@@ -106,6 +107,7 @@ export default function ForceGraph({
 
     const { indicator, setIndicator } = useContext(IndicatorContext)
 
+    const { theme } = useTheme()
     const { toast } = useToast()
 
     const lastClick = useRef<{ date: Date, name: string }>({ date: new Date(), name: "" })
@@ -113,14 +115,7 @@ export default function ForceGraph({
 
     const [hoverElement, setHoverElement] = useState<Node | Link | undefined>()
 
-    useEffect(() => {
-        const canvas = document.querySelector('.force-graph-container canvas')
-
-        if (!canvas) return
-
-        canvas.setAttribute('data-engine-status', 'stop')
-        canvas.className += " bg-background"
-    }, [])
+    const bgColor = theme === "dark" ? "#1A1A1A" : "#FFFFFF"
 
     useEffect(() => {
         handleZoomToFit(chartRef, undefined, data.nodes.length < 2 ? 4 : undefined)
@@ -134,7 +129,7 @@ export default function ForceGraph({
         if (!canvas) return;
 
         canvas.setAttribute('data-engine-status', 'stop');
-    }, [parentRef.current])
+    }, [])
 
     useEffect(() => {
         const handleResize = () => {
@@ -336,7 +331,6 @@ export default function ForceGraph({
                 }}
                 linkDirectionalArrowColor={(link) => link.color}
                 linkWidth={(link) => isLinkSelected(link) ? 2 : 1}
-                linkColor={(link) => link.color}
                 nodeCanvasObject={(node, ctx) => {
 
                     if (!node.x || !node.y) {
@@ -347,7 +341,7 @@ export default function ForceGraph({
                     ctx.lineWidth = ((selectedElement && !("source" in selectedElement) && selectedElement.id === node.id)
                         || (hoverElement && !("source" in hoverElement) && hoverElement.id === node.id)
                         || (selectedElements.length > 0 && selectedElements.some(el => el.id === node.id && !("source" in el)))) ? 1 : 0.5
-                    ctx.strokeStyle = 'white';
+                    ctx.strokeStyle = theme === "dark" ? 'white' : 'black';
 
                     ctx.beginPath();
                     ctx.arc(node.x, node.y, NODE_SIZE, 0, 2 * Math.PI, false);
@@ -358,7 +352,7 @@ export default function ForceGraph({
                     ctx.fillStyle = 'black';
                     ctx.textAlign = 'center';
                     ctx.textBaseline = 'middle';
-                    ctx.font = '2px Arial';
+                    ctx.font = '2px Inter';
                     let name = node.displayName
 
                     if (!name) {
@@ -439,7 +433,7 @@ export default function ForceGraph({
                     }
 
                     // Get text width
-                    ctx.font = '2px Arial';
+                    ctx.font = '2px Inter';
 
                     let textWidth;
                     let textHeight;
@@ -467,7 +461,7 @@ export default function ForceGraph({
                     ctx.rotate(angle);
 
                     // Draw background rectangle (rotated)
-                    ctx.fillStyle = '#242424';
+                    ctx.fillStyle = bgColor;
                     ctx.fillRect(
                         -textWidth / 2 - padding,
                         -textHeight / 2 - padding,
@@ -476,7 +470,7 @@ export default function ForceGraph({
                     );
 
                     // Draw text
-                    ctx.fillStyle = 'white';
+                    ctx.fillStyle = theme === "dark" ? 'white' : 'black';
                     ctx.textAlign = 'center';
                     ctx.textBaseline = 'middle';
                     ctx.fillText(link.relationship, 0, 0);
@@ -500,6 +494,7 @@ export default function ForceGraph({
                 linkVisibility="visible"
                 cooldownTicks={cooldownTicks}
                 cooldownTime={1000}
+                backgroundColor={bgColor}
             />
         </div>
     )

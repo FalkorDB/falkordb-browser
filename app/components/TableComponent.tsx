@@ -148,7 +148,7 @@ export default function TableComponent({ headers, rows, label, entityName, input
             </div>
             <Table ref={tableRef} parentOnScroll={handleScroll} className="h-full overflow-hidden">
                 <TableHeader>
-                    <TableRow ref={headerRef} className="text-nowrap">
+                    <TableRow ref={headerRef} className="text-nowrap border-border">
                         {
                             setRows ?
                                 <TableHead className="w-5 !pr-2" key={headers[0]}>
@@ -169,7 +169,7 @@ export default function TableComponent({ headers, rows, label, entityName, input
                         }
                         {
                             headers.map((header, i) => (
-                                <TableHead className={cn(i === 0 ? setRows && "border-l" : "border-l", "font-bold text-lg")} key={header}>
+                                <TableHead className={cn(i === 0 ? setRows && "border-l" : "border-l", "font-bold text-lg border-border")} key={header}>
                                     {header}
                                 </TableHead>
                             ))
@@ -200,6 +200,7 @@ export default function TableComponent({ headers, rows, label, entityName, input
                             const actualIndex = rows.findIndex(r => r.cells[0].value === row.cells[0].value)
                             return (
                                 <TableRow
+                                    className="border-border"
                                     data-testid={`tableRow${label}${row.cells[0].value}`}
                                     onMouseEnter={() => setHover(`${actualIndex}`)}
                                     onMouseLeave={() => setHover("")}
@@ -227,7 +228,7 @@ export default function TableComponent({ headers, rows, label, entityName, input
                                     }
                                     {
                                         row.cells.map((cell, j) => (
-                                            <TableCell className={cn(j === 0 ? setRows && "border-l" : "border-l", row.cells[0]?.value === editable && (cell.type !== "readonly" && cell.type !== "object") && "p-2")} key={j}>
+                                            <TableCell className={cn(j === 0 ? setRows && "border-l" : "border-l", row.cells[0]?.value === editable && (cell.type !== "readonly" && cell.type !== "object") && "p-2", "border-border")} key={j}>
                                                 {
                                                     cell.type === "object" ?
                                                         <JSONTree

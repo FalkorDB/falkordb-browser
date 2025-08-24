@@ -2,8 +2,8 @@
 
 'use client'
 
-import { ArrowUpRight, Database, LifeBuoy, LogOut, Settings } from "lucide-react";
-import { useCallback, useContext } from "react";
+import { ArrowUpRight, Database, LifeBuoy, LogOut, Moon, Settings, Sun } from "lucide-react";
+import { SetStateAction, Dispatch, useCallback, useContext, useState, useEffect } from "react";
 import Image from "next/image";
 import { cn, Panel } from "@/lib/utils";
 import { getQuerySettingsNavigationToast } from "@/components/ui/toaster";
@@ -16,6 +16,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import Link from "next/link";
 import { useToast } from "@/components/ui/use-toast";
+import { useTheme } from "next-themes";
 import Button from "./ui/Button";
 import CreateGraph from "./CreateGraph";
 import { IndicatorContext, PanelContext, QuerySettingsContext } from "./provider";
@@ -24,6 +25,7 @@ interface Props {
     onSetGraphName: (newGraphName: string) => void
     graphNames: string[]
     graphName: string
+    setGraphInfoOpen: Dispatch<SetStateAction<boolean>>
 }
 
 function getPathType(pathname: string): "Schema" | "Graph" | undefined {
@@ -32,25 +34,41 @@ function getPathType(pathname: string): "Schema" | "Graph" | undefined {
     return undefined
 }
 
-export default function Header({ onSetGraphName, graphNames, graphName }: Props) {
+const iconSize = 30
+
+export default function Header({ onSetGraphName, graphNames, graphName, setGraphInfoOpen }: Props) {
 
     const { indicator } = useContext(IndicatorContext)
     const { setPanel } = useContext(PanelContext)
     const { hasChanges, saveSettings, resetSettings } = useContext(QuerySettingsContext)
 
+    const { theme, setTheme } = useTheme()
     const { data: session } = useSession()
     const pathname = usePathname()
     const router = useRouter()
     const { toast } = useToast()
 
+    const [mounted, setMounted] = useState(false)
+    const [systemTheme, setSystemTheme] = useState<"light" | "dark" | "system">("system")
+
     const type = getPathType(pathname)
     const showCreate = type && session?.user?.role && session.user.role !== "Read-Only"
+    const currentTheme = theme === "system" ? systemTheme : theme
+
+
+    useEffect(() => {
+        setMounted(true)
+        setSystemTheme(window.matchMedia('(prefers-color-scheme: dark)').matches ? "dark" : "light")
+    }, [])
 
     const navigateBack = useCallback(() => {
         if (hasChanges) {
-            getQuerySettingsNavigationToast(toast, saveSettings, () => {
+            getQuerySettingsNavigationToast(toast, () => {
+                saveSettings()
                 router.back()
+            }, () => {
                 resetSettings()
+                router.back()
             })
         } else {
             router.back()
@@ -61,9 +79,11 @@ export default function Header({ onSetGraphName, graphNames, graphName }: Props)
         setPanel(prev => prev === newPanel ? undefined : newPanel)
     }, [setPanel])
 
+    const separator = <div className="h-px w-[80%] bg-border rounded-full" />
+
     return (
         <div className="py-5 px-2 flex flex-col justify-between items-center border-r border-border">
-            <div className="flex flex-col gap-6 items-center">
+            <div className="w-full flex flex-col gap-6 items-center">
                 <Link
                     className="rounded-full h-12 w-12 overflow-hidden"
                     aria-label="FalkorDB"
@@ -75,22 +95,22 @@ export default function Header({ onSetGraphName, graphNames, graphName }: Props)
                 <Button
                     label="GRAPHS"
                     title="View and manage your graphs"
-                    className={cn(type === "Graph" ? "text-primary" : "text-white")}
+                    className={cn(type === "Graph" ? "text-primary" : "text-foreground")}
                     onClick={() => router.push("/graph")}
                     data-testid="GraphsButton"
                 />
-                <div className="h-[1px] w-[80%] bg-white rounded-lg" />
+                {separator}
                 <Button
                     label="SCHEMAS"
                     title="View and manage your schemas"
-                    className={cn(type === "Schema" ? "text-primary" : "text-white")}
+                    className={cn(type === "Schema" ? "text-primary" : "text-foreground")}
                     onClick={() => router.push("/schema")}
                     data-testid="SchemasButton"
                 />
                 {
                     showCreate &&
                     <>
-                        <div className="h-[1px] w-[80%] bg-white rounded-lg" />
+                        {separator}
                         <CreateGraph
                             label="Header"
                             onSetGraphName={onSetGraphName}
@@ -102,20 +122,20 @@ export default function Header({ onSetGraphName, graphNames, graphName }: Props)
                 {
                     type === "Graph" && graphName &&
                     <>
-                        <div className="h-[1px] w-[80%] bg-white rounded-lg" />
+                        {separator}
                         <Button
                             indicator={indicator}
                             title="Graph info"
-                            onClick={() => handleSetCurrentPanel("graphInfo")}
+                            onClick={() => setGraphInfoOpen(prev => !prev)}
                         >
-                            <Database size={35} />
+                            <Database size={iconSize} />
                         </Button>
                     </>
                 }
                 {
                     type === "Graph" && graphName &&
                     <>
-                        <div className="h-[1px] w-[80%] bg-white rounded-lg" />
+                        {separator}
                         <Button
                             className="Gradient bg-clip-text text-transparent font-semibold text-xl"
                             indicator={indicator}
@@ -125,25 +145,21 @@ export default function Header({ onSetGraphName, graphNames, graphName }: Props)
                     </>
                 }
             </div>
-            <div className="flex flex-col gap-6 items-center">
-                {
-                    session?.user?.role === "Admin" &&
-                    <>
-                        <Button
-                            indicator={indicator}
-                            title="Adjust application settings"
-                            onClick={() => pathname.includes("/settings") ? navigateBack() : router.push("/settings")}
-                        >
-                            <Settings size={35} />
-                        </Button>
-                        <div className="h-[1px] w-[80%] bg-white" />
-                    </>
-                }
+            <div className="w-full flex flex-col gap-6 items-center">
+                <Button
+                    indicator={indicator}
+                    title="Adjust application settings"
+                    onClick={() => pathname.includes("/settings") ? navigateBack() : router.push("/settings")}
+                >
+                    <Settings size={iconSize} />
+                </Button>
+                {separator}
                 <Drawer direction="right">
                     <DropdownMenu>
-                        <DropdownMenuTrigger onClick={(e) => e.preventDefault()} className="flex gap-2">
-                            <LifeBuoy size={25} />
-                            <p>Help</p>
+                        <DropdownMenuTrigger onClick={(e) => e.preventDefault()} asChild>
+                            <Button title="Help">
+                                <LifeBuoy size={iconSize} />
+                            </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent side="right" className="bg-background w-full p-4 ml-4">
                             <DropdownMenuGroup className="h-full w-full flex flex-col gap-2 p-2">
@@ -199,10 +215,21 @@ export default function Header({ onSetGraphName, graphNames, graphName }: Props)
                         </div>
                     </DrawerContent>
                 </Drawer>
+                {separator}
+                {
+                    mounted && <Button
+                        title="Toggle theme"
+                        onClick={() => {
+                            setTheme(currentTheme === "dark" ? "light" : "dark")
+                        }}
+                    >
+                        {currentTheme === "dark" ? <Sun size={iconSize} /> : <Moon size={iconSize} />}
+                    </Button>
+                }
                 {
                     indicator === "offline" &&
                     <>
-                        <div className="h-0.5 w-[80%] bg-white" />
+                        {separator}
                         <div className="flex gap-2 rounded-lg p-2 border border-destructive">
                             <Tooltip>
                                 <TooltipTrigger asChild>
@@ -215,13 +242,13 @@ export default function Header({ onSetGraphName, graphNames, graphName }: Props)
                         </div>
                     </>
                 }
-                <div className="h-[1px] w-[80%] bg-white" />
+                {separator}
                 <Button
                     title="Log Out"
                     data-testid="logoutButton"
                     onClick={() => signOut({ callbackUrl: "/login" })}
                 >
-                    <LogOut size={25} />
+                    <LogOut size={iconSize - 5} />
                 </Button>
             </div>
         </div>

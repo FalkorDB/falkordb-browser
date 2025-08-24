@@ -185,17 +185,17 @@ export default function LoginForm() {
                   }}
                   data-testid="tls-checkbox"
                 />
-                <p className="font-medium text-white">TLS Secured Connection</p>
+                <p className="font-medium text-foreground">TLS Secured Connection</p>
               </div>
-              
+
               {/* Certificate Upload Section */}
               {TLS && (
-                <div className="flex flex-col gap-3 p-4 bg-background border border-muted/20 rounded-lg transition-all duration-300 ease-in-out">
+                <div id="tls-section" className="flex flex-col gap-3 p-4 bg-background border border-border rounded-lg transition-all duration-300 ease-in-out">
                   <div className="flex items-center gap-2">
                     <div className="w-2 h-2 bg-primary rounded-full" />
                     <span className="text-sm font-semibold text-muted">Certificate Authentication</span>
                   </div>
-                  
+
                   <div className="flex flex-col gap-2">
                     {!uploadedFileName ? (
                       // Upload State
@@ -216,7 +216,7 @@ export default function LoginForm() {
                             </div>
                           </div>
                           <div className="flex flex-col">
-                            <span className="text-sm font-medium text-white">Certificate Uploaded</span>
+                            <span className="text-sm font-medium text-foreground">Certificate Uploaded</span>
                             <span className="text-xs text-muted truncate max-w-48">{uploadedFileName}</span>
                           </div>
                         </div>
@@ -230,7 +230,7 @@ export default function LoginForm() {
                             setCA(undefined)
                             setUploadedFileName("")
                           }}
-                          className="flex-shrink-0 p-1 text-muted hover:text-white hover:bg-primary/20 rounded transition-colors duration-200"
+                          className="flex-shrink-0 p-1 text-muted hover:text-foreground hover:bg-primary/20 rounded transition-colors duration-200"
                           title="Remove certificate"
                           data-testid="remove-certificate-btn"
                           aria-label="Remove certificate"

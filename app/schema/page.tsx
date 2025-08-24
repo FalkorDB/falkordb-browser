@@ -12,14 +12,14 @@ import Spinning from "../components/ui/spinning";
 const Selector = dynamic(() => import("../graph/Selector"), {
     ssr: false,
     loading: () => <div className="z-20 absolute top-5 inset-x-24 h-[50px] flex flex-row gap-4 items-center">
-        <div className="w-[230px] h-full animate-pulse rounded-md border border-gray-300 bg-background" />
-        <div className="w-1 grow h-full animate-pulse rounded-md border border-gray-300 bg-background" />
-        <div className="w-[233px] h-full animate-pulse rounded-md border border-gray-300 bg-background" />
+        <div className="w-[230px] h-full animate-pulse rounded-md border border-border bg-background" />
+        <div className="w-1 grow h-full animate-pulse rounded-md border border-border bg-background" />
+        <div className="w-[233px] h-full animate-pulse rounded-md border border-border bg-background" />
     </div>
 })
 const SchemaView = dynamic(() => import("./SchemaView"), {
     ssr: false,
-    loading: () => <div className="h-full w-full flex items-center justify-center">
+    loading: () => <div className="h-full w-full flex items-center justify-center border border-border rounded-lg">
         <Spinning />
     </div>
 })

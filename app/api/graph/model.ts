@@ -437,7 +437,7 @@ export class Graph {
       const node: Node = {
         id: cell.id,
         labels: labels.map((l) => l.name),
-        color: getLabelWithFewestElements(labels).color,
+        color: "",
         visible: true,
         expand: false,
         collapsed,
@@ -458,7 +458,7 @@ export class Graph {
     if (currentNode.labels[0] === "") {
       currentNode.id = cell.id;
       currentNode.labels = labels.map((l) => l.name);
-      currentNode.color = getLabelWithFewestElements(labels).color;
+      currentNode.color = "";
       currentNode.expand = false;
       currentNode.collapsed = collapsed;
       Object.entries(cell.properties).forEach(([key, value]) => {
@@ -503,7 +503,7 @@ export class Graph {
           source = {
             id: cell.sourceId,
             labels: [label.name],
-            color: label.color,
+            color: "",
             expand: false,
             collapsed,
             visible: true,
@@ -540,7 +540,7 @@ export class Graph {
           source = {
             id: cell.sourceId,
             labels: [label!.name],
-            color: label!.color,
+            color: "",
             expand: false,
             collapsed,
             visible: true,
@@ -557,7 +557,7 @@ export class Graph {
           target = {
             id: cell.destinationId,
             labels: [label!.name],
-            color: label!.color,
+            color: "",
             expand: false,
             collapsed,
             visible: true,
@@ -597,28 +597,27 @@ export class Graph {
     return currentEdge;
   }
 
-  public extendCell(
-    cell: any,
-    element: Node | Link | undefined,
-    collapsed: boolean,
-    isSchema: boolean,
-    newElements: (Node | Link)[]
-  ) {
+  public extendCell(cell: any, collapsed: boolean, isSchema: boolean) {
     if (cell.nodes) {
-      cell.nodes.forEach((node: any) => {
-        element = this.extendNode(node, collapsed, isSchema);
-      });
-      cell.edges.forEach((edge: any) => {
-        element = this.extendEdge(edge, collapsed, isSchema);
-      });
-    } else if (cell.relationshipType) {
-      element = this.extendEdge(cell, collapsed, isSchema);
-    } else if (cell.labels) {
-      element = this.extendNode(cell, collapsed, isSchema);
+      return [
+        ...cell.nodes.map((node: any) =>
+          this.extendNode(node, collapsed, isSchema)
+        ),
+        ...cell.edges.map((edge: any) =>
+          this.extendEdge(edge, collapsed, isSchema)
+        ),
+      ] as (Node | Link)[];
     }
-    if (element) {
-      newElements.push(element);
+
+    if (cell.relationshipType) {
+      return this.extendEdge(cell, collapsed, isSchema);
     }
+
+    if (cell.labels) {
+      return this.extendNode(cell, collapsed, isSchema);
+    }
+
+    return undefined;
   }
 
   public extend(
@@ -640,13 +639,26 @@ export class Graph {
     this.metadata = results.metadata;
     this.data.forEach((row: DataRow) => {
       Object.values(row).forEach((cell: any) => {
-        let element: Node | Link | undefined;
         if (Array.isArray(cell) && cell[0] instanceof Object) {
           cell.forEach((c: any) => {
-            this.extendCell(c, element, collapsed, isSchema, newElements);
+            const elements = this.extendCell(c, collapsed, isSchema);
+            if (elements) {
+              if (Array.isArray(elements)) {
+                newElements.push(...elements);
+              } else {
+                newElements.push(elements);
+              }
+            }
           });
         } else if (cell instanceof Object) {
-          this.extendCell(cell, element, collapsed, isSchema, newElements);
+          const elements = this.extendCell(cell, collapsed, isSchema);
+          if (elements) {
+            if (Array.isArray(elements)) {
+              newElements.push(...elements);
+            } else {
+              newElements.push(elements);
+            }
+          }
         }
       });
     });
@@ -679,6 +691,17 @@ export class Graph {
         }
 
         link.curve = curve * 0.4;
+      });
+
+    newElements
+      .filter((element): element is Node => "labels" in element)
+      .forEach((node) => {
+        const label = getLabelWithFewestElements(
+          node.labels.map(
+            (l) => this.labelsMap.get(l) || this.createLabel([l])[0]
+          )
+        );
+        node.color = label.color;
       });
 
     // remove empty category if there are no more empty nodes category

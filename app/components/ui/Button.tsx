@@ -70,7 +70,7 @@ const Button = forwardRef<HTMLButtonElement, Props>(({ label, variant = "button"
                                 {children}
                                 {
                                     label &&
-                                    <p className="truncate">
+                                    <p className="truncate text-center">
                                         {label}
                                     </p>
                                 }

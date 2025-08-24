@@ -3,12 +3,13 @@
 'use client'
 
 import { useEffect, useState, useContext, Dispatch, SetStateAction, useRef, useCallback } from "react";
-import { cn, GraphRef, formatName } from "@/lib/utils";
+import { cn, GraphRef, formatName, getTheme } from "@/lib/utils";
 import { History, Info, Maximize2 } from "lucide-react";
 import * as monaco from "monaco-editor";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Editor } from "@monaco-editor/react";
+import { useTheme } from "next-themes";
 import Button from "../components/ui/Button";
 import { IndicatorContext } from "../components/provider";
 import EditorComponent, { setTheme } from "../components/EditorComponent";
@@ -45,6 +46,9 @@ const STEP = 8
 export default function Selector({ graph, options, setOptions, graphName, setGraphName, runQuery, historyQuery, setHistoryQuery, fetchCount, selectedElements, setSelectedElement, handleDeleteElement, chartRef, setIsAddEntity, setIsAddRelation, setGraph, isCanvasLoading, isQueryLoading }: Props) {
 
     const { indicator } = useContext(IndicatorContext)
+    
+    const { theme } = useTheme()
+    const { secondary } = getTheme(theme)
 
     const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null)
     const submitQuery = useRef<HTMLButtonElement>(null)
@@ -157,6 +161,8 @@ export default function Selector({ graph, options, setOptions, graphName, setGra
         }
     }, [historyQuery, setHistoryQuery])
 
+    const separator = <div className="h-[80%] w-0.5 bg-border rounded-full" />
+
     return (
         <div className="z-20 w-full h-[50px] flex flex-row gap-4 items-center">
             <SelectGraph
@@ -183,7 +189,7 @@ export default function Selector({ graph, options, setOptions, graphName, setGra
                                 editorKey={queriesOpen ? "selector-theme" : "editor-theme"}
                             />
                         </div>
-                        <div className="h-full w-[120px] flex gap-2 p-2 border rounded-lg bg-background">
+                        <div className="h-full w-[120px] flex gap-2 items-center p-2 border border-border rounded-lg bg-background">
                             <Tooltip>
                                 <TooltipTrigger className="cursor-default">
                                     <Info />
@@ -192,7 +198,7 @@ export default function Selector({ graph, options, setOptions, graphName, setGra
                                     <p>Run (Enter) History (Arrow Up/Down) Insert new line (Shift + Enter)</p>
                                 </TooltipContent>
                             </Tooltip>
-                            <div className="w-[1px] bg-white" />
+                            {separator}
                             <div className="flex gap-4 items-center">
                                 <DialogComponent
                                     className="h-[90dvh] w-[90dvw]"
@@ -235,10 +241,10 @@ export default function Selector({ graph, options, setOptions, graphName, setGra
                                         />
                                         <Tabs value={tab} onValueChange={(value) => setTab(value as keyof Query)} className="w-[60%] flex flex-col gap-8 items-center">
                                             <TabsList className="bg-secondary h-fit w-fit p-2">
-                                                <TabsTrigger className={cn("!text-gray-500 data-[state=active]:!bg-background data-[state=active]:!text-white")} disabled={!isTabEnabled("text")} value="text">Edit Query</TabsTrigger>
-                                                <TabsTrigger className={cn("!text-gray-500 data-[state=active]:!bg-background data-[state=active]:!text-white")} disabled={!isTabEnabled("profile")} value="profile">Profile</TabsTrigger>
-                                                <TabsTrigger className={cn("!text-gray-500 data-[state=active]:!bg-background data-[state=active]:!text-white")} disabled={!isTabEnabled("metadata")} value="metadata">Metadata</TabsTrigger>
-                                                <TabsTrigger className={cn("!text-gray-500 data-[state=active]:!bg-background data-[state=active]:!text-white")} disabled={!isTabEnabled("explain")} value="explain">Explain</TabsTrigger>
+                                                <TabsTrigger className={cn("!text-border data-[state=active]:!bg-background data-[state=active]:!text-foreground")} disabled={!isTabEnabled("text")} value="text">Edit Query</TabsTrigger>
+                                                <TabsTrigger className={cn("!text-border data-[state=active]:!bg-background data-[state=active]:!text-foreground")} disabled={!isTabEnabled("profile")} value="profile">Profile</TabsTrigger>
+                                                <TabsTrigger className={cn("!text-border data-[state=active]:!bg-background data-[state=active]:!text-foreground")} disabled={!isTabEnabled("metadata")} value="metadata">Metadata</TabsTrigger>
+                                                <TabsTrigger className={cn("!text-border data-[state=active]:!bg-background data-[state=active]:!text-foreground")} disabled={!isTabEnabled("explain")} value="explain">Explain</TabsTrigger>
                                             </TabsList>
                                             <TabsContent value="text" className="w-full h-1 grow bg-secondary rounded-lg p-2 py-4 relative">
                                                 {
@@ -256,6 +262,7 @@ export default function Selector({ graph, options, setOptions, graphName, setGra
                                                             isLoading={isLoading}
                                                         />
                                                         <Editor
+                                                            className="CypherInput"
                                                             data-testid="queryHistoryEditor"
                                                             width="100%"
                                                             height="100%"
@@ -289,7 +296,7 @@ export default function Selector({ graph, options, setOptions, graphName, setGra
                                                             }}
                                                             onMount={handleEditorDidMount}
                                                             beforeMount={(m) => {
-                                                                setTheme(m, "selector-theme", "#242424")
+                                                                setTheme(m, "selector-theme", secondary, theme === "dark")
                                                             }}
                                                         />
                                                     </>
@@ -347,7 +354,7 @@ export default function Selector({ graph, options, setOptions, graphName, setGra
                                     </div>
                                 </DialogComponent>
                             </div>
-                            <div className="w-[1px] bg-white" />
+                            {separator}
                             <Button
                                 data-testid="editorMaximize"
                                 title="Maximize"

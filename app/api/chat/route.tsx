@@ -51,23 +51,34 @@ export async function POST(request: NextRequest) {
             throw new Error(await session.text())
         }
 
-        const { messages, graphName } = await request.json()
+        const { messages, graphName, key, model } = await request.json()
 
         try {
             if (!graphName) throw new Error("Graph name is required")
             if (!messages) throw new Error("Messages are required")
+
+            const requestBody = {
+                "chat_request": {
+                    messages,
+                },
+                "graph_name": graphName,
+                key,
+                model,
+            }
+
+            const curlCommand = `curl -X POST "${URL}text_to_cypher" \\
+  -H "Content-Type: application/json" \\
+  -d '${JSON.stringify(requestBody, null, 2)}'`
+
+            console.log("Equivalent curl command:")
+            console.log(curlCommand)
 
             const response = await fetch(`${URL}text_to_cypher`, {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
                 },
-                body: JSON.stringify({
-                    "chat_request": {
-                        messages,
-                    },
-                    "graph_name": graphName,
-                })
+                body: JSON.stringify(requestBody)
             });
 
             if (!response.ok) {
@@ -88,13 +99,13 @@ export async function POST(request: NextRequest) {
                 const lines = chunk.split('\n').filter(line => line);
                 let isResult = false
 
-                
+
                 lines.forEach(line => {
                     const data = JSON.parse(line.split("data:")[1])
                     const type: EventType = Object.keys(data)[0] as EventType
-                    
+
                     isResult = type === "Result" || type === "Error"
-                    
+
                     writer.write(encoder.encode(`event: ${type} data: ${data[type]}\n\n`))
                 })
 

@@ -244,7 +244,7 @@ export default function SchemaCreateElement({ onCreate, setIsAdd, selectedNodes,
             {
               (type ? (labelsHover || label.length === 0) : label.length === 0) && !isAddLabel &&
               <Button
-                className="p-2 text-xs justify-center border border-background"
+                className="p-2 text-xs justify-center border border-border"
                 variant="Secondary"
                 label="Add"
                 title="Add a new label"
@@ -259,7 +259,7 @@ export default function SchemaCreateElement({ onCreate, setIsAdd, selectedNodes,
               <>
                 <Input
                   ref={ref => ref?.focus()}
-                  className="max-w-[20dvw] h-full bg-background border-none text-white"
+                  className="max-w-[20dvw] h-full bg-background border-none text-foreground"
                   value={newLabel}
                   onChange={(e) => setNewLabel(e.target.value)}
                   data-testid="newLabelInput"
@@ -278,7 +278,7 @@ export default function SchemaCreateElement({ onCreate, setIsAdd, selectedNodes,
                   }}
                 />
                 <Button
-                  className="p-2 text-xs justify-center border border-background"
+                  className="p-2 text-xs justify-center border border-border"
                   variant="Secondary"
                   label="Save"
                   title="Save the new label"
@@ -288,7 +288,7 @@ export default function SchemaCreateElement({ onCreate, setIsAdd, selectedNodes,
                   <Check size={15} />
                 </Button>
                 <Button
-                  className="p-2 text-xs justify-center border border-background"
+                  className="p-2 text-xs justify-center border border-border"
                   variant="Secondary"
                   label="Cancel"
                   title="Discard new label"
@@ -368,7 +368,7 @@ export default function SchemaCreateElement({ onCreate, setIsAdd, selectedNodes,
                         </TableCell>
                         <TableCell>
                           <Switch
-                            className="border-[#57577B]"
+                            className="data-[state=unchecked]:bg-border"
                             onCheckedChange={(checked) => setAttribute(prev => {
                               const p: [string, string[]] = [...prev]
                               p[1][2] = checked ? "true" : "false"
@@ -379,7 +379,7 @@ export default function SchemaCreateElement({ onCreate, setIsAdd, selectedNodes,
                         </TableCell>
                         <TableCell>
                           <Switch
-                            className="border-[#57577B]"
+                            className="data-[state=unchecked]:bg-border"
                             onCheckedChange={(checked) => setAttribute(prev => {
                               const p: [string, string[]] = [...prev]
                               p[1][3] = checked ? "true" : "false"
@@ -399,7 +399,7 @@ export default function SchemaCreateElement({ onCreate, setIsAdd, selectedNodes,
                         editable === key ?
                           <>
                             <Button
-                              className="p-2 justify-center border border-foreground rounded-lg"
+                              className="p-2 justify-center border border-border rounded-lg"
                               label="Save"
                               title="Save the attribute changes"
                               data-testid="saveAttributeButton"
@@ -411,7 +411,7 @@ export default function SchemaCreateElement({ onCreate, setIsAdd, selectedNodes,
                               <Check size={20} />
                             </Button>
                             <Button
-                              className="p-2 justify-center border border-foreground rounded-lg"
+                              className="p-2 justify-center border border-border rounded-lg"
                               label="Cancel"
                               title="Discard the attribute changes"
                               data-testid="cancelAttributeButton"
@@ -426,7 +426,7 @@ export default function SchemaCreateElement({ onCreate, setIsAdd, selectedNodes,
                           : hover === key &&
                           <>
                             <Button
-                              className="p-2 justify-center border border-foreground rounded-lg"
+                              className="p-2 justify-center border border-border rounded-lg"
                               label="Remove"
                               title="Delete this attribute"
                               onClick={(e) => {
@@ -447,7 +447,7 @@ export default function SchemaCreateElement({ onCreate, setIsAdd, selectedNodes,
                               <Trash2 size={20} />
                             </Button>
                             <Button
-                              className="p-2 justify-center border border-foreground rounded-lg"
+                              className="p-2 justify-center border border-border rounded-lg"
                               label="Edit"
                               title="Modify this attribute"
                               onClick={(e) => {
@@ -504,7 +504,7 @@ export default function SchemaCreateElement({ onCreate, setIsAdd, selectedNodes,
               </TableCell>
               <TableCell>
                 <Switch
-                  className="border-[#57577B]"
+                  className="data-[state=unchecked]:bg-border"
                   onCheckedChange={(checked) => setNewAttribute(prev => {
                     const p: [string, string[]] = [...prev]
                     p[1][2] = checked ? "true" : "false"
@@ -515,7 +515,7 @@ export default function SchemaCreateElement({ onCreate, setIsAdd, selectedNodes,
               </TableCell>
               <TableCell>
                 <Switch
-                  className="border-[#57577B]"
+                  className="data-[state=unchecked]:bg-border"
                   onCheckedChange={(checked) => setNewAttribute(prev => {
                     const p: [string, string[]] = [...prev]
                     p[1][3] = checked ? "true" : "false"
@@ -527,7 +527,7 @@ export default function SchemaCreateElement({ onCreate, setIsAdd, selectedNodes,
               <TableCell>
                 <div className="flex gap-2">
                   <Button
-                    className="p-2 justify-center border border-foreground rounded-lg"
+                    className="p-2 justify-center border border-border rounded-lg"
                     label="Add"
                     title="Add a new attribute"
                     data-testid="addAttributeButton"
@@ -539,7 +539,7 @@ export default function SchemaCreateElement({ onCreate, setIsAdd, selectedNodes,
                     <Plus size={20} />
                   </Button>
                   <Button
-                    className="p-2 justify-center border border-foreground rounded-lg"
+                    className="p-2 justify-center border border-border rounded-lg"
                     label="Cancel"
                     title="Discard the new attribute"
                     data-testid="cancelNewAttributeButton"
@@ -579,19 +579,19 @@ export default function SchemaCreateElement({ onCreate, setIsAdd, selectedNodes,
               <TableCell>
                 <Switch
                   disabled
-                  className="border-[#57577B]"
+                  className="data-[state=unchecked]:bg-border"
                 />
               </TableCell>
               <TableCell>
                 <Switch
                   disabled
-                  className="border-[#57577B]"
+                  className="data-[state=unchecked]:bg-border"
                 />
               </TableCell>
               <TableCell>
                 <div className="flex gap-2">
                   <Button
-                    className="p-2 justify-center border border-foreground"
+                    className="p-2 justify-center border border-border"
                     disabled
                     variant="Secondary"
                     label="Add"
@@ -600,7 +600,7 @@ export default function SchemaCreateElement({ onCreate, setIsAdd, selectedNodes,
                     <Plus size={20} />
                   </Button>
                   <Button
-                    className="p-2 justify-center border border-foreground"
+                    className="p-2 justify-center border border-border"
                     disabled
                     variant="Secondary"
                     label="Cancel"
@@ -617,7 +617,7 @@ export default function SchemaCreateElement({ onCreate, setIsAdd, selectedNodes,
           !type &&
           <div className="w-full flex flex-col gap-2" id="relationSelection">
             <div className="w-full flex justify-between p-4 items-center" data-testid="relationSelectionHeader">
-              <div style={{ backgroundColor: selectedNodes[0]?.color }} className="flex h-16 w-16 rounded-full border-2 border-background justify-center items-center overflow-hidden">
+              <div style={{ backgroundColor: selectedNodes[0]?.color }} className="flex h-16 w-16 rounded-full border-2 border-border justify-center items-center overflow-hidden">
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <p className="truncate" data-testid="selectedNode1">{selectedNodes[0]?.labels[0]}</p>
@@ -628,7 +628,7 @@ export default function SchemaCreateElement({ onCreate, setIsAdd, selectedNodes,
                 </Tooltip>
               </div>
               <ArrowRight strokeWidth={1} size={30} />
-              <div style={{ backgroundColor: selectedNodes[1]?.color }} className="flex h-16 w-16 rounded-full border-2 border-background justify-center items-center overflow-hidden">
+              <div style={{ backgroundColor: selectedNodes[1]?.color }} className="flex h-16 w-16 rounded-full border-2 border-border justify-center items-center overflow-hidden">
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <p className="truncate" data-testid="selectedNode2">{selectedNodes[1]?.labels[0]}</p>

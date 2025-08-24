@@ -21,7 +21,7 @@ export type GraphRef = MutableRefObject<
   ForceGraphMethods<Node, Link> | undefined
 >;
 
-export type Panel = "graphInfo" | "chat" | "data" | undefined;
+export type Panel = "chat" | "data" | undefined;
 
 export type SelectCell = {
   value: string;
@@ -46,6 +46,8 @@ export type ReadOnlyCell = {
   value: string;
   type: "readonly";
 };
+
+export type Message = { role: "user" | "assistant"; content: string, type: "Text" | "Result" | "Error" | "Status" | "CypherQuery" | "CypherResult" | "Schema" }
 
 export type Cell = SelectCell | TextCell | ObjectCell | ReadOnlyCell;
 export interface Row {
@@ -275,4 +277,12 @@ export async function fetchOptions(
     (!contentPersistence || type === "Graph")
   )
     setSelectedValue(formatName(opts[0]));
+}
+
+export function getTheme(theme: string | undefined) {
+  return {
+    background: theme === "dark" ? "#1A1A1A" : "#FFFFFF",
+    foreground: theme === "dark" ? "#FFFFFF" : "#1A1A1A", 
+    secondary: theme === "dark" ? "#242424" : "#E6E6E6",
+  };
 }

@@ -127,7 +127,7 @@ export default function Toolbar({
                     graph.getElements().length > 0 && !isLoading &&
                     <Input
                         data-testid={`elementCanvasSearch${label}`}
-                        className={cn("w-[30dvw] text-white border border-primary", label === "Schema" && "h-full", backgroundColor)}
+                        className={cn("w-[30dvw] text-foreground border border-primary", label === "Schema" && "h-full", backgroundColor)}
                         placeholder="Search for element in the graph"
                         value={searchElement}
                         onChange={(e) => setSearchElement(e.target.value)}
@@ -168,7 +168,7 @@ export default function Toolbar({
                 }
                 {
                     suggestions.length > 0 &&
-                    <div tabIndex={-1} onScroll={handleScroll} ref={suggestionRef} className="max-h-[30dvh] overflow-auto absolute left-0 top-14 w-full border p-2 rounded-lg bg-background">
+                    <div tabIndex={-1} onScroll={handleScroll} ref={suggestionRef} className="max-h-[30dvh] overflow-auto absolute left-0 top-14 w-full border border-border p-2 rounded-lg bg-background">
                         <ul
                             data-testid={`elementCanvasSuggestionsList${label}`}
                             className="flex flex-col gap-2"
@@ -235,10 +235,10 @@ export default function Toolbar({
                                                             className="rounded-full h-8 w-8 p-2 flex items-center justify-center"
                                                             style={{ backgroundColor: suggestion.color }}
                                                         >
-                                                            <p className="text-white text-sm font-bold truncate">{("source" in suggestion) ? suggestion.relationship : suggestion.labels[0]}</p>
+                                                            <p className="text-foreground text-sm font-bold truncate">{("source" in suggestion) ? suggestion.relationship : suggestion.labels[0]}</p>
                                                         </div>
                                                         <div
-                                                            className={cn("w-1 grow text-center truncate", actualIndex === suggestionIndex ? "text-black" : "text-white")}
+                                                            className={cn("w-1 grow text-center truncate", actualIndex === suggestionIndex ? "text-black" : "text-foreground")}
                                                         >
                                                             {suggestion.data.name || suggestion.id}
                                                         </div>

@@ -1,12 +1,63 @@
-import { useCallback, useContext } from "react";
-import QuerySettings from "./QuerySettings";
+import { useCallback, useContext, useEffect, useState } from "react";
+import { getQuerySettingsNavigationToast } from "@/components/ui/toaster";
+import { useRouter } from "next/navigation";
+import { cn, getDefaultQuery } from "@/lib/utils";
+import { useToast } from "@/components/ui/use-toast";
+import { RotateCcw } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { useTheme } from "next-themes";
 import { QuerySettingsContext } from "../components/provider";
+import Button from "../components/ui/Button";
+import Input from "../components/ui/Input";
+import Combobox from "../components/ui/combobox";
 
 export default function BrowserSettings() {
-
     const {
+        newSettings: {
+            contentPersistenceSettings: { newContentPersistence, setNewContentPersistence },
+            runDefaultQuerySettings: { newRunDefaultQuery, setNewRunDefaultQuery },
+            defaultQuerySettings: { newDefaultQuery, setNewDefaultQuery },
+            timeoutSettings: { newTimeout, setNewTimeout },
+            limitSettings: { newLimit, setNewLimit },
+            secretKeySettings: { newSecretKey, setNewSecretKey },
+        },
+        settings: {
+            contentPersistenceSettings: { contentPersistence },
+            runDefaultQuerySettings: { runDefaultQuery },
+            defaultQuerySettings: { defaultQuery, setDefaultQuery },
+            timeoutSettings: { timeout: timeoutValue },
+            limitSettings: { limit },
+            secretKeySettings: { secretKey },
+        },
+        hasChanges,
+        setHasChanges,
+        resetSettings,
         saveSettings,
     } = useContext(QuerySettingsContext)
+
+    const { toast } = useToast()
+    const { setTheme } = useTheme()
+    const router = useRouter()
+
+    const [isResetting, setIsResetting] = useState(false)
+    const [defaultTheme, setDefaultTheme] = useState<"system" | "light" | "dark">("system")
+
+    useEffect(() => {
+        setDefaultTheme(localStorage.getItem("defaultTheme") as "system" | "light" | "dark" || "system")
+    }, [])
+
+    useEffect(() => {
+        setNewContentPersistence(contentPersistence)
+        setNewRunDefaultQuery(runDefaultQuery)
+        setNewDefaultQuery(defaultQuery)
+        setNewTimeout(timeoutValue)
+        setNewLimit(limit)
+        setNewSecretKey(secretKey)
+    }, [contentPersistence, runDefaultQuery, defaultQuery, timeoutValue, limit, secretKey, setNewContentPersistence, setNewRunDefaultQuery, setNewDefaultQuery, setNewTimeout, setNewLimit, setNewSecretKey])
+
+    useEffect(() => {
+        setHasChanges(newContentPersistence !== contentPersistence || newTimeout !== timeoutValue || newLimit !== limit || newDefaultQuery !== defaultQuery || newRunDefaultQuery !== runDefaultQuery || newSecretKey !== secretKey)
+    }, [defaultQuery, limit, newDefaultQuery, newLimit, newRunDefaultQuery, newContentPersistence, newTimeout, runDefaultQuery, contentPersistence, setHasChanges, timeoutValue, newSecretKey, secretKey])
 
     const handleSubmit = useCallback((e?: React.FormEvent<HTMLFormElement>) => {
         e?.preventDefault()
@@ -14,9 +65,235 @@ export default function BrowserSettings() {
         saveSettings()
     }, [saveSettings])
 
+    const navigateBack = useCallback((e: KeyboardEvent) => {
+        if (e.key === "Escape") {
+            e.preventDefault()
+
+            if (hasChanges) {
+                getQuerySettingsNavigationToast(toast, () => {
+                    handleSubmit()
+                    router.back()
+                }, () => {
+                    resetSettings()
+                    router.back()
+                })
+            } else {
+                router.back()
+            }
+        }
+    }, [hasChanges, toast, handleSubmit, router, resetSettings])
+
+    useEffect(() => {
+        window.addEventListener("keydown", navigateBack)
+
+        return () => {
+            window.removeEventListener("keydown", navigateBack)
+        }
+    }, [hasChanges, navigateBack])
+
+    const separator = <div className="min-h-px w-[50%] bg-border rounded-full" />
+
+    const handleThemeChange = useCallback((value: string) => {
+        if (!value) return
+
+        setTheme(value)
+        setDefaultTheme(value as "system" | "light" | "dark")
+        localStorage.setItem("defaultTheme", value)
+    }, [setTheme])
+
     return (
-        <form onSubmit={handleSubmit} className="h-full w-full flex flex-col gap-16 overflow-y-auto px-[20%]">
-            <QuerySettings handleSubmit={handleSubmit} />
-        </form>
+        <div className="h-full w-full flex flex-col gap-8 overflow-hidden">
+            <div className="flex flex-col gap-2">
+                <h1 className="text-2xl font-medium">Browser Settings</h1>
+                <p className="text-sm text-foreground">Manage your environment&apos;s settings</p>
+            </div>
+            <div className="h-1 grow p-12 border border-border rounded-lg">
+                <form className="h-full w-full flex flex-col gap-8 overflow-y-auto" onSubmit={handleSubmit}>
+                    <div className="flex flex-col gap-2">
+                        <h1 className="text-2xl font-bold">Query Execution</h1>
+                        <p className="text-sm text-muted-foreground">Control query execution and performance limits</p>
+                    </div>
+                    <div className="flex flex-col gap-6">
+                        <div className="flex justify-between items-center">
+                            <div className="flex flex-col gap-2">
+                                <h2 className="text-xl font-medium">Timeout</h2>
+                                <p>
+                                    Shows a `Timed Out` error if the query takes longer than the timeout in seconds.
+                                    <a
+                                        className="flex justify-center"
+                                        href="https://docs.falkordb.com/configuration.html#query-configurations"
+                                        target="_blank"
+                                        rel="noreferrer noreferrer"
+                                    >
+                                        Learn more
+                                    </a>
+                                </p>
+                            </div>
+                            <Input
+                                id="timeoutInput"
+                                className="text-center w-1/3"
+                                value={newTimeout === 0 ? "∞" : `${newTimeout} seconds`}
+                                onChange={(e) => {
+                                    const value = parseInt(e.target.value.replace('∞', '').replace(' seconds', ''), 10)
+
+                                    if (!value) {
+                                        setNewTimeout(0)
+                                        return
+                                    }
+
+                                    if (value < 0 || Number.isNaN(value)) return
+
+                                    setNewTimeout(value)
+                                }}
+                            />
+                        </div>
+                        <div className="flex justify-between items-center">
+                            <div className="flex flex-col gap-2">
+                                <h2 className="text-xl font-medium">Limit</h2>
+                                <p>
+                                    Limits the number of rows returned by the query.
+                                    <a
+                                        className="flex justify-center"
+                                        href="https://docs.falkordb.com/cypher/limit.html"
+                                        target="_blank"
+                                        rel="noreferrer"
+                                    >
+                                        Learn more
+                                    </a>
+                                </p>
+                            </div>
+                            <Input
+                                id="limitInput"
+                                className="text-center w-1/3"
+                                value={newLimit === 0 ? "∞" : newLimit}
+                                onChange={(e) => {
+                                    const value = parseInt(e.target.value.replace('∞', ''), 10)
+
+                                    if (!value) {
+                                        setNewLimit(0)
+                                        return
+                                    }
+
+                                    if (value < 0 || Number.isNaN(value)) return
+
+                                    setNewLimit(value)
+                                }}
+                            />
+                        </div>
+                        <div className="flex justify-between items-center">
+                            <div className="flex gap-4 items-center">
+                                <Switch
+                                    id="runDefaultQueryCheckboxOn"
+                                    className="data-[state=unchecked]:bg-border"
+                                    checked={newRunDefaultQuery}
+                                    onCheckedChange={() => setNewRunDefaultQuery(prev => !prev)}
+                                />
+                                <div className="flex flex-col gap-2">
+                                    <h2 className="text-xl font-medium">Default Query On-load</h2>
+                                    <p>Define a query to run when the graph is loaded.</p>
+                                </div>
+                            </div>
+                            <Input
+                                id="runDefaultQueryInput"
+                                className="text-center w-1/3 CypherInput"
+                                value={newDefaultQuery}
+                                onChange={(e) => setNewDefaultQuery(e.target.value)}
+                                disabled={!newRunDefaultQuery}
+                            />
+                            {
+                                ((defaultQuery !== getDefaultQuery() && newRunDefaultQuery) || isResetting) &&
+                                <Button
+                                    id="runDefaultQueryResetBtn"
+                                    variant="Secondary"
+                                    onClick={async () => {
+                                        setIsResetting(true)
+                                        try {
+                                            // add a delay to the reset to show the animation
+                                            await new Promise(resolve => { setTimeout(resolve, 1000) })
+                                            const q = getDefaultQuery()
+                                            setDefaultQuery(q)
+                                            setNewDefaultQuery(q)
+                                            localStorage.setItem("defaultQuery", q)
+                                            toast({
+                                                title: "Default query reset",
+                                                description: "Your default query has been reset.",
+                                            })
+                                        } finally {
+                                            setIsResetting(false)
+                                        }
+                                    }}
+                                    title="Reset"
+                                >
+                                    <RotateCcw className={cn(isResetting && "animate-spin")} />
+                                </Button>
+                            }
+                        </div>
+                        <div className="flex gap-4 items-center">
+                            <Switch
+                                id="contentPersistenceCheckboxOn"
+                                className="data-[state=unchecked]:bg-border"
+                                checked={newContentPersistence}
+                                onCheckedChange={() => setNewContentPersistence(prev => !prev)}
+                            />
+                            <div className="flex flex-col gap-2">
+                                <h2 className="text-xl font-medium">Content Persistence</h2>
+                                <p>Enable this function to `Auto-Save` your data in your next Browser session.</p>
+                            </div>
+                        </div>
+                    </div>
+                    {separator}
+                    <div className="flex flex-col gap-2">
+                        <h1 className="text-2xl font-bold">Environment</h1>
+                        <p className="text-sm text-muted-foreground">Define your keys</p>
+                    </div>
+                    <div className="flex flex-col gap-6">
+                        <div className="flex gap-2 items-center">
+                            <p>Secret Key</p>
+                            <Input
+                                className="w-1 grow"
+                                id="secretKeyInput"
+                                value={newSecretKey}
+                                onChange={(e) => setNewSecretKey(e.target.value)}
+                            />
+                        </div>
+                    </div>
+                    {separator}
+                    <div className="flex flex-col gap-2">
+                        <h1 className="text-2xl font-bold">Theme</h1>
+                        <p className="text-sm text-muted-foreground">Change the theme of the browser</p>
+                    </div>
+                    <div className="flex flex-col gap-6">
+                        <div className="flex gap-2 items-center">
+                            <p>Theme</p>
+                            <Combobox
+                                label="Theme"
+                                options={["system", "light", "dark"]}
+                                selectedValue={defaultTheme}
+                                setSelectedValue={handleThemeChange}
+                            />
+                        </div>
+                    </div>
+                    {
+                        hasChanges &&
+                        <div className="bg-background flex gap-4 p-2 sticky bottom-0 justify-center">
+                            <Button
+                                id="cancelQuerySettingsBtn"
+                                variant="Secondary"
+                                onClick={resetSettings}
+                            >
+                                <p>Cancel</p>
+                            </Button>
+                            <Button
+                                id="saveQuerySettingsBtn"
+                                variant="Primary"
+                                type="submit"
+                            >
+                                <p>Save</p>
+                            </Button>
+                        </div>
+                    }
+                </form >
+            </div >
+        </div>
     )
 }

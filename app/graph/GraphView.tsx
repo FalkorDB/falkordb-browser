@@ -93,13 +93,13 @@ function GraphView({
         else if (historyQuery.currentQuery && historyQuery.currentQuery.metadata.length > 0 && graph.Metadata.length > 0 && historyQuery.currentQuery.explain.length > 0) defaultChecked = "Metadata"
 
         setTabsValue(defaultChecked);
-    }, [graph, graph.Id, elementsLength, graph.Data.length, isTabEnabled, historyQuery.currentQuery])
+    }, [graph, graph.Id, elementsLength, graph.Data.length])
 
     useEffect(() => {
         if (tabsValue === "Graph" && graph.Elements.nodes.length > 0) {
             handleCooldown()
         }
-    }, [tabsValue])
+    }, [tabsValue, handleCooldown, graph.Elements.nodes.length])
 
     useEffect(() => {
         setSelectedElement(undefined)
@@ -132,7 +132,7 @@ function GraphView({
     }
 
     return (
-        <Tabs value={tabsValue} onValueChange={(value) => setTabsValue(value as Tab)} className={cn("h-full w-full relative border rounded-lg overflow-hidden", tabsValue === "Table" && "flex flex-col-reverse")}>
+        <Tabs value={tabsValue} onValueChange={(value) => setTabsValue(value as Tab)} className={cn("h-full w-full relative border border-border rounded-lg overflow-hidden", tabsValue === "Table" && "flex flex-col-reverse")}>
             <div className={cn("h-full w-full flex flex-col gap-4 absolute py-4 px-6 pointer-events-none z-20 justify-between")}>
                 <div className="h-1 grow flex flex-col gap-6">
                     {
@@ -151,7 +151,7 @@ function GraphView({
                                 (labels.length > 0 || relationships.length > 0) &&
                                 <div className="w-fit flex flex-col h-full gap-4">
                                     <Labels labels={labels} onClick={onLabelClick} label="Labels" type="Graph" />
-                                    <div className="h-1 bg-border rounded-full" />
+                                    <div className="h-px bg-border rounded-full" />
                                     <Labels labels={relationships} onClick={onRelationshipClick} label="Relationships" type="Graph" />
                                 </div>
                             }
@@ -208,7 +208,7 @@ function GraphView({
                         {
                             graph.getElements().length > 0 && tabsValue === "Graph" && !isLoading &&
                             <>
-                                <div className="h-full w-1 bg-border rounded-full" />
+                                <div className="h-full w-px bg-border rounded-full" />
                                 <Controls
                                     graph={graph}
                                     chartRef={chartRef}

@@ -141,7 +141,7 @@ export default function Users() {
             </TableComponent>
             <Dialog open={open} onOpenChange={setOpen}>
                 <DialogContent className="bg-background p-8 flex flex-col gap-8 rounded-lg border-none" disableClose>
-                    <DialogHeader className="flex-row justify-between items-center border-b border-secondary pb-4">
+                    <DialogHeader className="flex-row justify-between items-center border-b border-border pb-4">
                         <DialogTitle className="text-2xl font-medium">Set User Role</DialogTitle>
                         <CloseDialog />
                     </DialogHeader>
