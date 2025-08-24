@@ -2,7 +2,7 @@
 
 'use client'
 
-import { ArrowUpRight, Database, LifeBuoy, LogOut, Moon, Settings, Sun } from "lucide-react";
+import { ArrowUpRight, Database, LifeBuoy, LogOut, Monitor, Moon, Settings, Sun } from "lucide-react";
 import { SetStateAction, Dispatch, useCallback, useContext, useState, useEffect } from "react";
 import Image from "next/image";
 import { cn, Panel } from "@/lib/utils";
@@ -26,6 +26,7 @@ interface Props {
     graphNames: string[]
     graphName: string
     setGraphInfoOpen: Dispatch<SetStateAction<boolean>>
+    displayChat: boolean
 }
 
 function getPathType(pathname: string): "Schema" | "Graph" | undefined {
@@ -36,7 +37,7 @@ function getPathType(pathname: string): "Schema" | "Graph" | undefined {
 
 const iconSize = 30
 
-export default function Header({ onSetGraphName, graphNames, graphName, setGraphInfoOpen }: Props) {
+export default function Header({ onSetGraphName, graphNames, graphName, setGraphInfoOpen, displayChat }: Props) {
 
     const { indicator } = useContext(IndicatorContext)
     const { setPanel } = useContext(PanelContext)
@@ -49,16 +50,12 @@ export default function Header({ onSetGraphName, graphNames, graphName, setGraph
     const { toast } = useToast()
 
     const [mounted, setMounted] = useState(false)
-    const [systemTheme, setSystemTheme] = useState<"light" | "dark" | "system">("system")
 
     const type = getPathType(pathname)
     const showCreate = type && session?.user?.role && session.user.role !== "Read-Only"
-    const currentTheme = theme === "system" ? systemTheme : theme
-
 
     useEffect(() => {
         setMounted(true)
-        setSystemTheme(window.matchMedia('(prefers-color-scheme: dark)').matches ? "dark" : "light")
     }, [])
 
     const navigateBack = useCallback(() => {
@@ -133,7 +130,7 @@ export default function Header({ onSetGraphName, graphNames, graphName, setGraph
                     </>
                 }
                 {
-                    type === "Graph" && graphName &&
+                    type === "Graph" && graphName && displayChat &&
                     <>
                         {separator}
                         <Button
@@ -219,10 +216,16 @@ export default function Header({ onSetGraphName, graphNames, graphName, setGraph
                     mounted && <Button
                         title="Toggle theme"
                         onClick={() => {
-                            setTheme(currentTheme === "dark" ? "light" : "dark")
+                            let newTheme = ""
+                            if (theme === "dark") newTheme = "light"
+                            else if (theme === "light") newTheme = "system"
+                            else newTheme = "dark"
+                            setTheme(newTheme)
                         }}
                     >
-                        {currentTheme === "dark" ? <Sun size={iconSize} /> : <Moon size={iconSize} />}
+                        {theme === "dark" && <Sun size={iconSize} />}
+                        {theme === "light" && <Monitor size={iconSize} />}
+                        {theme === "system" && <Moon size={iconSize} />}
                     </Button>
                 }
                 {

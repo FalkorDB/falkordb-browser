@@ -5,11 +5,9 @@ import { cn, getDefaultQuery } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
 import { RotateCcw } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
-import { useTheme } from "next-themes";
 import { QuerySettingsContext } from "../components/provider";
 import Button from "../components/ui/Button";
 import Input from "../components/ui/Input";
-import Combobox from "../components/ui/combobox";
 
 export default function BrowserSettings() {
     const {
@@ -36,15 +34,9 @@ export default function BrowserSettings() {
     } = useContext(QuerySettingsContext)
 
     const { toast } = useToast()
-    const { setTheme } = useTheme()
     const router = useRouter()
 
     const [isResetting, setIsResetting] = useState(false)
-    const [defaultTheme, setDefaultTheme] = useState<"system" | "light" | "dark">("system")
-
-    useEffect(() => {
-        setDefaultTheme(localStorage.getItem("defaultTheme") as "system" | "light" | "dark" || "system")
-    }, [])
 
     useEffect(() => {
         setNewContentPersistence(contentPersistence)
@@ -92,14 +84,6 @@ export default function BrowserSettings() {
     }, [hasChanges, navigateBack])
 
     const separator = <div className="min-h-px w-[50%] bg-border rounded-full" />
-
-    const handleThemeChange = useCallback((value: string) => {
-        if (!value) return
-
-        setTheme(value)
-        setDefaultTheme(value as "system" | "light" | "dark")
-        localStorage.setItem("defaultTheme", value)
-    }, [setTheme])
 
     return (
         <div className="h-full w-full flex flex-col gap-8 overflow-hidden">
@@ -254,22 +238,6 @@ export default function BrowserSettings() {
                                 id="secretKeyInput"
                                 value={newSecretKey}
                                 onChange={(e) => setNewSecretKey(e.target.value)}
-                            />
-                        </div>
-                    </div>
-                    {separator}
-                    <div className="flex flex-col gap-2">
-                        <h1 className="text-2xl font-bold">Theme</h1>
-                        <p className="text-sm text-muted-foreground">Change the theme of the browser</p>
-                    </div>
-                    <div className="flex flex-col gap-6">
-                        <div className="flex gap-2 items-center">
-                            <p>Theme</p>
-                            <Combobox
-                                label="Theme"
-                                options={["system", "light", "dark"]}
-                                selectedValue={defaultTheme}
-                                setSelectedValue={handleThemeChange}
                             />
                         </div>
                     </div>

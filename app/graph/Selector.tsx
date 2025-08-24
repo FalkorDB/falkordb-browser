@@ -46,9 +46,9 @@ const STEP = 8
 export default function Selector({ graph, options, setOptions, graphName, setGraphName, runQuery, historyQuery, setHistoryQuery, fetchCount, selectedElements, setSelectedElement, handleDeleteElement, chartRef, setIsAddEntity, setIsAddRelation, setGraph, isCanvasLoading, isQueryLoading }: Props) {
 
     const { indicator } = useContext(IndicatorContext)
-    
+
     const { theme } = useTheme()
-    const { secondary } = getTheme(theme)
+    const { secondary, currentTheme } = getTheme(theme)
 
     const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null)
     const submitQuery = useRef<HTMLButtonElement>(null)
@@ -262,6 +262,7 @@ export default function Selector({ graph, options, setOptions, graphName, setGra
                                                             isLoading={isLoading}
                                                         />
                                                         <Editor
+                                                            key={currentTheme}
                                                             className="CypherInput"
                                                             data-testid="queryHistoryEditor"
                                                             width="100%"

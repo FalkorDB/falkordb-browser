@@ -47,7 +47,18 @@ export type ReadOnlyCell = {
   type: "readonly";
 };
 
-export type Message = { role: "user" | "assistant"; content: string, type: "Text" | "Result" | "Error" | "Status" | "CypherQuery" | "CypherResult" | "Schema" }
+export type Message = {
+  role: "user" | "assistant";
+  content: string;
+  type:
+    | "Text"
+    | "Result"
+    | "Error"
+    | "Status"
+    | "CypherQuery"
+    | "CypherResult"
+    | "Schema";
+};
 
 export type Cell = SelectCell | TextCell | ObjectCell | ReadOnlyCell;
 export interface Row {
@@ -280,9 +291,17 @@ export async function fetchOptions(
 }
 
 export function getTheme(theme: string | undefined) {
+  let currentTheme = theme;
+
+  if (currentTheme === "system")
+    currentTheme = window.matchMedia("(prefers-color-scheme: dark)").matches
+      ? "dark"
+      : "light"
+
   return {
-    background: theme === "dark" ? "#1A1A1A" : "#FFFFFF",
-    foreground: theme === "dark" ? "#FFFFFF" : "#1A1A1A", 
-    secondary: theme === "dark" ? "#242424" : "#E6E6E6",
+    background: currentTheme === "dark" ? "#1A1A1A" : "#FFFFFF",
+    foreground: currentTheme === "dark" ? "#FFFFFF" : "#1A1A1A",
+    secondary: currentTheme === "dark" ? "#242424" : "#E6E6E6",
+    currentTheme,
   };
 }

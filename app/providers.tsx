@@ -1,7 +1,7 @@
 "use client";
 
 import { SessionProvider, useSession } from "next-auth/react";
-import { ThemeProvider, useTheme } from 'next-themes'
+import { ThemeProvider } from 'next-themes'
 import { Dispatch, SetStateAction, useCallback, useEffect, useMemo, useState } from "react";
 import { usePathname } from "next/navigation";
 import { fetchOptions, formatName, getDefaultQuery, getQueryWithLimit, getSSEGraphResult, Panel, prepareArg, securedFetch } from "@/lib/utils";
@@ -16,7 +16,6 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const { toast } = useToast()
   const { status } = useSession()
-  const { setTheme } = useTheme()
 
   const [historyQuery, setHistoryQuery] = useState<HistoryQuery>({
     queries: [],
@@ -58,6 +57,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
   const [panel, setPanel] = useState<Panel>()
   const [graphInfoOpen, setGraphInfoOpen] = useState(false)
   const [isQueryLoading, setIsQueryLoading] = useState(false)
+  const [displayChat, setDisplayChat] = useState(false)
 
   const querySettingsContext = useMemo(() => ({
     newSettings: {
@@ -267,11 +267,18 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
     setLastLimit(l)
     setDefaultQuery(getDefaultQuery(localStorage.getItem("defaultQuery") || undefined))
     setRunDefaultQuery(localStorage.getItem("runDefaultQuery") !== "false")
-    setContentPersistence(localStorage.getItem("contentPersistence") !== "false")
-    const defaultTheme = localStorage.getItem("defaultTheme") || "system"
-    localStorage.setItem("theme", defaultTheme)
-    setTheme(defaultTheme)
-  }, [status, setTheme])
+    setContentPersistence(localStorage.getItem("contentPersistence") !== "false");
+
+    (async () => {
+      const result = await fetch("/api/chat", {
+        method: "GET",
+      })
+
+      if (result.ok) {
+        setDisplayChat(true)
+      }
+    })()
+  }, [status])
 
   const checkStatus = useCallback(async () => {
     const result = await fetch("/api/status", {
@@ -347,7 +354,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
   }, [])
 
   return (
-    <ThemeProvider attribute="class" storageKey="theme" disableTransitionOnChange>
+    <ThemeProvider attribute="class" storageKey="theme" defaultTheme="system" disableTransitionOnChange>
       <LoginVerification>
         <QuerySettingsContext.Provider value={querySettingsContext}>
           <SchemaContext.Provider value={schemaContext}>
@@ -362,6 +369,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
                           graphNames={pathname.includes("/schema") ? schemaNames : graphNames}
                           onSetGraphName={handleOnSetGraphName}
                           setGraphInfoOpen={setGraphInfoOpen}
+                          displayChat={displayChat}
                         />
                       }
                       <GraphInfoPanel

@@ -234,8 +234,6 @@ export default function EditorComponent({ graph, graphName, historyQuery, maximi
 
     const { toast } = useToast()
     const { theme } = useTheme()
-    const { background } = getTheme(theme)
-
     const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null)
     const dialogEditorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null)
     const placeholderRef = useRef<HTMLDivElement>(null)
@@ -250,6 +248,8 @@ export default function EditorComponent({ graph, graphName, historyQuery, maximi
     const [sugDisposed, setSugDisposed] = useState<monaco.IDisposable>()
     const [lineNumber, setLineNumber] = useState(1)
     const [blur, setBlur] = useState(false)
+
+    const { background, currentTheme } = getTheme(theme)
 
     const editorHeight = useMemo(() => blur
         ? LINE_HEIGHT
@@ -459,7 +459,7 @@ export default function EditorComponent({ graph, graphName, historyQuery, maximi
             ignoreCase: true,
         })
 
-        setTheme(monacoI, "editor-theme", background, theme === "dark")
+        setTheme(monacoI, "editor-theme", background, currentTheme === "dark")
 
         monacoI.languages.setLanguageConfiguration('custom-language', {
             brackets: [
@@ -632,7 +632,7 @@ export default function EditorComponent({ graph, graphName, historyQuery, maximi
                 <div ref={containerRef} className="h-full relative grow w-1" data-testid="editorContainer">
                     <Editor
                         className="CypherInput"
-                        key={`${editorKey}-${theme}`}
+                        key={`${editorKey}-${currentTheme}`}
                         height={editorHeight}
                         language="custom-language"
                         options={{
@@ -740,6 +740,7 @@ export default function EditorComponent({ graph, graphName, historyQuery, maximi
                             </div>
                         </div>
                         <Editor
+                            key={`${editorKey}-${currentTheme}`}
                             className="w-full h-full"
                             onMount={(e) => {
                                 handleEditorDidMount(e)

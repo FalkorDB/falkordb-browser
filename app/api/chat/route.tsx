@@ -13,7 +13,7 @@ export async function GET() {
 
         try {
             const response = await fetch(`${URL}list_graphs`, {
-                method: "POST",
+                method: "GET",
                 headers: {
                     "Content-Type": "application/json",
                 },

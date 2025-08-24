@@ -6,7 +6,7 @@
 
 import { Dispatch, SetStateAction, useContext, useEffect, useRef, useState } from "react"
 import ForceGraph2D from "react-force-graph-2d"
-import { securedFetch, GraphRef, handleZoomToFit } from "@/lib/utils"
+import { securedFetch, GraphRef, handleZoomToFit, getTheme } from "@/lib/utils"
 import { useToast } from "@/components/ui/use-toast"
 import * as d3 from "d3"
 import { useTheme } from "next-themes"
@@ -109,13 +109,12 @@ export default function ForceGraph({
 
     const { theme } = useTheme()
     const { toast } = useToast()
+    const { background, foreground } = getTheme(theme)
 
     const lastClick = useRef<{ date: Date, name: string }>({ date: new Date(), name: "" })
     const parentRef = useRef<HTMLDivElement>(null)
 
     const [hoverElement, setHoverElement] = useState<Node | Link | undefined>()
-
-    const bgColor = theme === "dark" ? "#1A1A1A" : "#FFFFFF"
 
     useEffect(() => {
         handleZoomToFit(chartRef, undefined, data.nodes.length < 2 ? 4 : undefined)
@@ -341,7 +340,7 @@ export default function ForceGraph({
                     ctx.lineWidth = ((selectedElement && !("source" in selectedElement) && selectedElement.id === node.id)
                         || (hoverElement && !("source" in hoverElement) && hoverElement.id === node.id)
                         || (selectedElements.length > 0 && selectedElements.some(el => el.id === node.id && !("source" in el)))) ? 1 : 0.5
-                    ctx.strokeStyle = theme === "dark" ? 'white' : 'black';
+                    ctx.strokeStyle = foreground;
 
                     ctx.beginPath();
                     ctx.arc(node.x, node.y, NODE_SIZE, 0, 2 * Math.PI, false);
@@ -461,7 +460,7 @@ export default function ForceGraph({
                     ctx.rotate(angle);
 
                     // Draw background rectangle (rotated)
-                    ctx.fillStyle = bgColor;
+                    ctx.fillStyle = background;
                     ctx.fillRect(
                         -textWidth / 2 - padding,
                         -textHeight / 2 - padding,
@@ -470,7 +469,7 @@ export default function ForceGraph({
                     );
 
                     // Draw text
-                    ctx.fillStyle = theme === "dark" ? 'white' : 'black';
+                    ctx.fillStyle = foreground;
                     ctx.textAlign = 'center';
                     ctx.textBaseline = 'middle';
                     ctx.fillText(link.relationship, 0, 0);
@@ -494,7 +493,7 @@ export default function ForceGraph({
                 linkVisibility="visible"
                 cooldownTicks={cooldownTicks}
                 cooldownTime={1000}
-                backgroundColor={bgColor}
+                backgroundColor={background}
             />
         </div>
     )
