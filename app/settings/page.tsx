@@ -11,14 +11,14 @@ import Users from "./users/Users"
 import Configurations from "./Configurations"
 import Button from "../components/ui/Button"
 import BrowserSettings from "./browserSettings"
-import { QuerySettingsContext } from "../components/provider"
+import { IndicatorContext, QuerySettingsContext } from "../components/provider"
 
 type Tab = 'Browser' | 'Configurations' | 'Users'
 
 export default function Settings() {
 
     const { hasChanges, saveSettings, resetSettings } = useContext(QuerySettingsContext)
-
+    const { indicator } = useContext(IndicatorContext)
     const { data: session } = useSession()
     const { toast } = useToast()
     const router = useRouter()
@@ -72,7 +72,7 @@ export default function Settings() {
             <p className="text-sm text-foreground"><span className="opacity-50">Settings</span> {`> ${current}`}</p>
             <div className="flex flex-col gap-8 items-center p-2">
                 {
-                    session?.user?.role === "Admin" &&
+                    session?.user?.role === "Admin" && indicator === "online" &&
                     <div className="w-fit bg-background flex gap-2 p-2 rounded-lg">
                         <Button
                             className={cn("p-2 rounded-lg", current === "Browser" ? "bg-background" : "text-gray-500")}

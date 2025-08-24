@@ -147,7 +147,6 @@ export default function Header({ onSetGraphName, graphNames, graphName, setGraph
             </div>
             <div className="w-full flex flex-col gap-6 items-center">
                 <Button
-                    indicator={indicator}
                     title="Adjust application settings"
                     onClick={() => pathname.includes("/settings") ? navigateBack() : router.push("/settings")}
                 >
