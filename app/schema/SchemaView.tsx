@@ -151,7 +151,7 @@ export default function SchemaView({
     }
 
     return (
-        <div className="relative w-full h-full border rounded-lg overflow-hidden">
+        <div className="relative w-full h-full border border-border rounded-lg overflow-hidden">
             <div className="pointer-events-none absolute bottom-4 inset-x-12 z-20 flex items-center justify-between">
                 <GraphDetails
                     graph={schema}
@@ -160,14 +160,13 @@ export default function SchemaView({
                     edgesCount={edgesCount}
                 />
                 {
-                    schema.getElements().length > 0 &&
+                    schema.getElements().length > 0 && !isLoading &&
                     <Controls
                         graph={schema}
                         disabled={!schema.Id}
                         chartRef={chartRef}
                         handleCooldown={handleCooldown}
                         cooldownTicks={cooldownTicks}
-                        isLoading={isLoading}
                     />
                 }
             </div>

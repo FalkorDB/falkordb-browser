@@ -29,8 +29,8 @@ export default function UploadGraph({ disabled, open, onOpenChange }: {
                     />
                 </DialogTrigger>
             }
-            <DialogContent disableClose className="bg-foreground max-h-[90dvh] max-w-[60dvw]">
-                <DialogHeader className="flex-row justify-between items-center border-b border-secondary pb-4">
+            <DialogContent disableClose className="bg-background max-h-[90dvh] max-w-[60dvw]">
+                <DialogHeader className="flex-row justify-between items-center border-b border-border pb-4">
                     <DialogTitle className="text-2xl font-medium">Upload Data</DialogTitle>
                     <CloseDialog />
                 </DialogHeader>

@@ -130,7 +130,6 @@ export default function TableComponent({ headers, rows, label, entityName, input
                 <Input
                     data-testid={`searchInput${label}`}
                     ref={searchRef}
-                    variant="primary"
                     className="grow"
                     value={search}
                     type="text"
@@ -149,13 +148,13 @@ export default function TableComponent({ headers, rows, label, entityName, input
             </div>
             <Table ref={tableRef} parentOnScroll={handleScroll} className="h-full overflow-hidden">
                 <TableHeader>
-                    <TableRow ref={headerRef} className="text-nowrap">
+                    <TableRow ref={headerRef} className="text-nowrap border-border">
                         {
                             setRows ?
                                 <TableHead className="w-5 !pr-2" key={headers[0]}>
                                     <Checkbox
                                         data-testid={`tableCheckbox${label}`}
-                                        className="w-6 h-6 rounded-full bg-foreground border-primary data-[state=checked]:bg-primary"
+                                        className="w-6 h-6 rounded-full bg-background border-primary data-[state=checked]:bg-primary"
                                         checked={rows.length > 0 && rows.every(row => row.checked)}
                                         onCheckedChange={() => {
                                             const checked = rows.every(row => row.checked)
@@ -170,7 +169,7 @@ export default function TableComponent({ headers, rows, label, entityName, input
                         }
                         {
                             headers.map((header, i) => (
-                                <TableHead className={cn(i === 0 ? setRows && "border-l" : "border-l", "font-bold text-lg")} key={header}>
+                                <TableHead className={cn(i === 0 ? setRows && "border-l" : "border-l", "font-bold text-lg border-border")} key={header}>
                                     {header}
                                 </TableHead>
                             ))
@@ -201,6 +200,7 @@ export default function TableComponent({ headers, rows, label, entityName, input
                             const actualIndex = rows.findIndex(r => r.cells[0].value === row.cells[0].value)
                             return (
                                 <TableRow
+                                    className="border-border"
                                     data-testid={`tableRow${label}${row.cells[0].value}`}
                                     onMouseEnter={() => setHover(`${actualIndex}`)}
                                     onMouseLeave={() => setHover("")}
@@ -211,7 +211,7 @@ export default function TableComponent({ headers, rows, label, entityName, input
                                         setRows ?
                                             <TableCell className="w-5 !pr-2">
                                                 <Checkbox
-                                                    className="w-6 h-6 rounded-full bg-foreground border-primary data-[state=checked]:bg-primary"
+                                                    className="w-6 h-6 rounded-full bg-background border-primary data-[state=checked]:bg-primary"
                                                     data-testid={`tableCheckbox${label}${row.cells[0].value}`}
                                                     checked={row.checked}
                                                     onCheckedChange={() => {
@@ -228,7 +228,7 @@ export default function TableComponent({ headers, rows, label, entityName, input
                                     }
                                     {
                                         row.cells.map((cell, j) => (
-                                            <TableCell className={cn(j === 0 ? setRows && "border-l" : "border-l", row.cells[0]?.value === editable && (cell.type !== "readonly" && cell.type !== "object") && "p-2")} key={j}>
+                                            <TableCell className={cn(j === 0 ? setRows && "border-l" : "border-l", row.cells[0]?.value === editable && (cell.type !== "readonly" && cell.type !== "object") && "p-2", "border-border")} key={j}>
                                                 {
                                                     cell.type === "object" ?
                                                         <JSONTree
@@ -277,7 +277,6 @@ export default function TableComponent({ headers, rows, label, entityName, input
                                                                         <Input
                                                                             data-testid={`input${label}`}
                                                                             ref={inputRef}
-                                                                            variant="primary"
                                                                             className="grow"
                                                                             value={newValue}
                                                                             onChange={(e) => setNewValue(e.target.value)}

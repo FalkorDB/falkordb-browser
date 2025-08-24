@@ -22,7 +22,7 @@ export default function RootLayout({
   // caused by mismatched client/server content caused by next-themes
   return (
     <html className="w-screen h-screen" lang="en" suppressHydrationWarning>
-      <body className="w-full h-full bg-foreground flex flex-row">
+      <body className="w-full h-full bg-background flex flex-row">
         <GTM />
         <TooltipProvider>
           <NextAuthProvider>

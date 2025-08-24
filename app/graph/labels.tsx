@@ -28,12 +28,12 @@ export default function Labels<T extends Label | Relationship>({ labels, onClick
     }
 
     return (
-        <div className={cn(className, "flex flex-col gap-2 max-w-[200px] h-[85%] pointer-events-none")}>
+        <div className={cn("flex flex-col gap-2 max-w-[200px]", className.includes("flex-1") ? "flex-1" : "max-h-[50%]", className)}>
             {
                 label &&
                 <h1>{label}</h1>
             }
-            <div className={cn("h-1 grow flex flex-col items-center gap-4")}>
+            <div className={cn("flex flex-col items-center gap-4")}>
                 {
                     isScrollable &&
                     <Button

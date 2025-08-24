@@ -13,7 +13,7 @@ import { useToast } from "@/components/ui/use-toast"
 
 export const getQuerySettingsNavigationToast = (
   toast: any,
-  saveCallback: () => void,
+  navigateAndSaveCallback: () => void,
   navigateBack: () => void
 ) => {
   toast({
@@ -26,10 +26,7 @@ export const getQuerySettingsNavigationToast = (
         <ToastButton
           variant="Primary"
           label="Leave & Save"
-          onClick={() => {
-            saveCallback();
-            navigateBack();
-          }}
+          onClick={navigateAndSaveCallback}
         />
       </div>
     ),

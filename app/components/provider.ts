@@ -1,5 +1,5 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { createContext, Dispatch, SetStateAction } from "react";
+import { Panel } from "@/lib/utils";
 import { Graph, GraphInfo, HistoryQuery } from "../api/graph/model";
 
 type QuerySettingsContextType = {
@@ -24,6 +24,10 @@ type QuerySettingsContextType = {
       newContentPersistence: boolean;
       setNewContentPersistence: Dispatch<SetStateAction<boolean>>;
     };
+    secretKeySettings: {
+      newSecretKey: string;
+      setNewSecretKey: Dispatch<SetStateAction<string>>;
+    };
   };
   settings: {
     limitSettings: {
@@ -47,6 +51,10 @@ type QuerySettingsContextType = {
     contentPersistenceSettings: {
       contentPersistence: boolean;
       setContentPersistence: Dispatch<SetStateAction<boolean>>;
+    };
+    secretKeySettings: {
+      secretKey: string;
+      setSecretKey: Dispatch<SetStateAction<string>>;
     };
   };
   hasChanges: boolean;
@@ -94,6 +102,16 @@ type IndicatorContextType = {
   setIndicator: Dispatch<SetStateAction<"online" | "offline">>;
 };
 
+type PanelContextType = {
+  panel: Panel;
+  setPanel: Dispatch<SetStateAction<Panel>>;
+};
+
+type QueryLoadingContextType = {
+  isQueryLoading: boolean;
+  setIsQueryLoading: Dispatch<SetStateAction<boolean>>;
+};
+
 export const QuerySettingsContext = createContext<QuerySettingsContextType>({
   newSettings: {
     limitSettings: { newLimit: 0, setNewLimit: () => {} },
@@ -107,9 +125,15 @@ export const QuerySettingsContext = createContext<QuerySettingsContextType>({
       newContentPersistence: false,
       setNewContentPersistence: () => {},
     },
+    secretKeySettings: { newSecretKey: "", setNewSecretKey: () => {} },
   },
   settings: {
-    limitSettings: { limit: 0, setLimit: () => {}, lastLimit: 0, setLastLimit: () => {} },
+    limitSettings: {
+      limit: 0,
+      setLimit: () => {},
+      lastLimit: 0,
+      setLastLimit: () => {},
+    },
     timeoutSettings: { timeout: 0, setTimeout: () => {} },
     runDefaultQuerySettings: {
       runDefaultQuery: false,
@@ -120,6 +144,7 @@ export const QuerySettingsContext = createContext<QuerySettingsContextType>({
       contentPersistence: false,
       setContentPersistence: () => {},
     },
+    secretKeySettings: { secretKey: "", setSecretKey: () => {} },
   },
   hasChanges: false,
   setHasChanges: () => {},
@@ -157,11 +182,26 @@ export const SchemaContext = createContext<SchemaContextType>({
 });
 
 export const HistoryQueryContext = createContext<HistoryQueryContextType>({
-  historyQuery: { queries: [], query: "", currentQuery: { text: "", metadata: [], explain: [], profile: [] }, counter: 0 },
+  historyQuery: {
+    queries: [],
+    query: "",
+    currentQuery: { text: "", metadata: [], explain: [], profile: [] },
+    counter: 0,
+  },
   setHistoryQuery: () => {},
 });
 
 export const IndicatorContext = createContext<IndicatorContextType>({
   indicator: "online",
   setIndicator: () => {},
+});
+
+export const PanelContext = createContext<PanelContextType>({
+  panel: undefined,
+  setPanel: () => {},
+});
+
+export const QueryLoadingContext = createContext<QueryLoadingContextType>({
+  isQueryLoading: false,
+  setIsQueryLoading: () => {},
 });

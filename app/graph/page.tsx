@@ -1,26 +1,30 @@
 'use client'
 
-import { useCallback, useContext, useEffect, useRef, useState } from "react";
-import { prepareArg, securedFetch } from "@/lib/utils";
+import { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { cn, prepareArg, securedFetch } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
 import dynamic from "next/dynamic";
 import { ForceGraphMethods } from "react-force-graph-2d";
+import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
+import { ImperativePanelHandle } from "react-resizable-panels";
 import { Label, Graph, GraphData, Link, Node, Relationship, GraphInfo } from "../api/graph/model";
 import Tutorial from "./Tutorial";
-import { GraphContext, HistoryQueryContext, IndicatorContext, QuerySettingsContext } from "../components/provider";
+import { GraphContext, HistoryQueryContext, IndicatorContext, PanelContext, QueryLoadingContext, QuerySettingsContext } from "../components/provider";
 import Spinning from "../components/ui/spinning";
+import Chat from "./Chat";
+import GraphDataPanel from "./GraphDataPanel";
 
 const Selector = dynamic(() => import("./Selector"), {
     ssr: false,
-    loading: () => <div className="z-20 absolute top-5 inset-x-24 h-[50px] flex flex-row gap-4 items-center">
-        <div className="w-[230px] h-full animate-pulse rounded-md border border-gray-300 bg-background" />
-        <div className="w-1 grow h-full animate-pulse rounded-md border border-gray-300 bg-background" />
-        <div className="w-[120px] h-full animate-pulse rounded-md border border-gray-300 bg-background" />
+    loading: () => <div className="h-[50px] flex flex-row gap-4 items-center">
+        <div className="w-[230px] h-full animate-pulse rounded-md border border-border bg-background" />
+        <div className="w-1 grow h-full animate-pulse rounded-md border border-border bg-background" />
+        <div className="w-[120px] h-full animate-pulse rounded-md border border-border bg-background" />
     </div>
 })
 const GraphView = dynamic(() => import("./GraphView"), {
     ssr: false,
-    loading: () => <div className="h-full w-full flex justify-center items-center">
+    loading: () => <div className="h-full w-full bg-background flex justify-center items-center border border-border rounded-lg">
         <Spinning />
     </div>
 })
@@ -28,6 +32,8 @@ const GraphView = dynamic(() => import("./GraphView"), {
 export default function Page() {
     const { historyQuery, setHistoryQuery } = useContext(HistoryQueryContext)
     const { setIndicator } = useContext(IndicatorContext);
+    const { panel, setPanel } = useContext(PanelContext)
+    const { isQueryLoading, setIsQueryLoading } = useContext(QueryLoadingContext)
     const {
         graph,
         setGraph,
@@ -54,13 +60,42 @@ export default function Page() {
     const { toast } = useToast()
 
     const chartRef = useRef<ForceGraphMethods<Node, Link>>()
+    const panelRef = useRef<ImperativePanelHandle>(null)
 
-    const [isQueryLoading, setIsQueryLoading] = useState(true)
     const [selectedElement, setSelectedElement] = useState<Node | Link | undefined>()
     const [selectedElements, setSelectedElements] = useState<(Node | Link)[]>([])
     const [labels, setLabels] = useState<Label[]>([])
     const [data, setData] = useState<GraphData>({ ...graph.Elements })
     const [relationships, setRelationships] = useState<Relationship[]>([])
+    const [isCollapsed, setIsCollapsed] = useState(true)
+
+    const [panelSize, graphSize] = useMemo(() => {
+        switch (panel) {
+            case "data":
+                return [30, 70]
+            case "chat":
+                return [40, 60]
+            default:
+                return [0, 100]
+        }
+    }, [panel])
+
+    useEffect(() => {
+        if (panel !== "data") setSelectedElement(undefined)
+
+        const currentPanel = panelRef.current
+        if (!currentPanel) return
+        if (panel) currentPanel.expand()
+        else currentPanel.collapse()
+    }, [panel])
+
+    useEffect(() => {
+        if (!selectedElement && panel === "data") setPanel(undefined)
+    }, [selectedElement, setPanel, graphName, panel])
+
+    useEffect(() => {
+        if (selectedElement) setPanel("data")
+    }, [selectedElement, setPanel])
 
     const fetchInfo = useCallback(async (type: string) => {
         if (!graphName) return []
@@ -125,12 +160,13 @@ export default function Page() {
             }
 
             setGraph(Graph.empty(graphName))
+            fetchCount()
         }
 
         setIsQueryLoading(false)
     }, [fetchCount, graph.Id, graphName, setGraph, runDefaultQuery, defaultQuery, contentPersistence, setGraphName, graphNames, graphInfo])
 
-    const handleDeleteElement = async () => {
+    const handleDeleteElement = useCallback(async () => {
         if (selectedElements.length === 0 && selectedElement) {
             selectedElements.push(selectedElement)
             setSelectedElement(undefined)
@@ -189,10 +225,36 @@ export default function Page() {
         })
         setSelectedElement(undefined)
         setSelectedElements([])
-    }
+    }, [selectedElements, selectedElement, graph, fetchCount, toast, setIndicator])
+
+    const handleClosePanel = useCallback(() => {
+        setPanel(undefined)
+    }, [setPanel])
+
+    const getCurrentPanel = useCallback(() => {
+        if (!graphName) return undefined
+
+        switch (panel) {
+            case "chat":
+                return (
+                    <Chat
+                        onClose={handleClosePanel}
+                    />
+                )
+            case "data":
+                return <GraphDataPanel
+                    object={selectedElement!}
+                    setObject={setSelectedElement}
+                    onDeleteElement={handleDeleteElement}
+                    setLabels={setLabels}
+                />
+            default:
+                return undefined
+        }
+    }, [graphName, selectedElement, handleDeleteElement, panel, handleClosePanel])
 
     return (
-        <div className="Page">
+        <div className="Page p-8 gap-8">
             <Selector
                 graph={graph}
                 options={graphNames}
@@ -210,30 +272,47 @@ export default function Page() {
                 fetchCount={fetchCount}
                 isQueryLoading={isQueryLoading}
             />
-            <div className="h-1 grow p-12">
-                <GraphView
-                    selectedElement={selectedElement}
-                    setSelectedElement={setSelectedElement}
-                    selectedElements={selectedElements}
-                    setSelectedElements={setSelectedElements}
-                    chartRef={chartRef}
-                    data={data}
-                    setData={setData}
-                    handleDeleteElement={handleDeleteElement}
-                    setLabels={setLabels}
-                    setRelationships={setRelationships}
-                    labels={labels}
-                    relationships={relationships}
-                    isLoading={isLoading}
-                    handleCooldown={handleCooldown}
-                    cooldownTicks={cooldownTicks}
-                    fetchCount={fetchCount}
-                    historyQuery={historyQuery}
-                    setHistoryQuery={setHistoryQuery}
-                />
-            </div>
+            <ResizablePanelGroup direction="horizontal">
+                <ResizablePanel defaultSize={graphSize} minSize={50} maxSize={100}>
+                    <GraphView
+                        selectedElement={selectedElement}
+                        setSelectedElement={setSelectedElement}
+                        selectedElements={selectedElements}
+                        setSelectedElements={setSelectedElements}
+                        chartRef={chartRef}
+                        data={data}
+                        setData={setData}
+                        handleDeleteElement={handleDeleteElement}
+                        setLabels={setLabels}
+                        setRelationships={setRelationships}
+                        labels={labels}
+                        relationships={relationships}
+                        isLoading={isLoading}
+                        handleCooldown={handleCooldown}
+                        cooldownTicks={cooldownTicks}
+                        fetchCount={fetchCount}
+                        historyQuery={historyQuery}
+                        setHistoryQuery={setHistoryQuery}
+                    />
+                </ResizablePanel>
+                <ResizableHandle withHandle onMouseUp={() => isCollapsed && handleClosePanel()} className={cn("ml-6 w-0", isCollapsed && "hidden")} />
+                <ResizablePanel
+                    ref={panelRef}
+                    collapsible
+                    defaultSize={panelSize}
+                    minSize={25}
+                    maxSize={50}
+                    onCollapse={() => {
+                        setIsCollapsed(true)
+                    }}
+                    onExpand={() => {
+                        setIsCollapsed(false)
+                    }}
+                >
+                    {getCurrentPanel()}
+                </ResizablePanel>
+            </ResizablePanelGroup>
             <Tutorial />
-            <div className="h-4 w-full Gradient" />
         </div >
     )
 }

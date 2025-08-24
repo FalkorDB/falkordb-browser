@@ -4,13 +4,13 @@ import { SessionProvider, useSession } from "next-auth/react";
 import { ThemeProvider } from 'next-themes'
 import { Dispatch, SetStateAction, useCallback, useEffect, useMemo, useState } from "react";
 import { usePathname } from "next/navigation";
-import { fetchOptions, formatName, getDefaultQuery, getQueryWithLimit, getSSEGraphResult, prepareArg, securedFetch } from "@/lib/utils";
+import { fetchOptions, formatName, getDefaultQuery, getQueryWithLimit, getSSEGraphResult, Panel, prepareArg, securedFetch } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
-import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import LoginVerification from "./loginVerification";
 import { Graph, GraphInfo, HistoryQuery } from "./api/graph/model";
 import Header from "./components/Header";
-import { GraphContext, HistoryQueryContext, IndicatorContext, QuerySettingsContext, SchemaContext } from "./components/provider";
+import { GraphContext, HistoryQueryContext, IndicatorContext, PanelContext, QueryLoadingContext, QuerySettingsContext, SchemaContext } from "./components/provider";
+import GraphInfoPanel from "./graph/graphInfo";
 
 function ProvidersWithSession({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
@@ -47,12 +47,17 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
   const [newRunDefaultQuery, setNewRunDefaultQuery] = useState(false)
   const [newDefaultQuery, setNewDefaultQuery] = useState("")
   const [newContentPersistence, setNewContentPersistence] = useState(false)
+  const [newSecretKey, setNewSecretKey] = useState("")
+  const [secretKey, setSecretKey] = useState("")
   const [hasChanges, setHasChanges] = useState(false)
   const [nodesCount, setNodesCount] = useState<number>()
   const [edgesCount, setEdgesCount] = useState<number>()
   const [isLoading, setIsLoading] = useState<boolean>(false)
   const [cooldownTicks, setCooldownTicks] = useState<number | undefined>(0)
-
+  const [panel, setPanel] = useState<Panel>()
+  const [graphInfoOpen, setGraphInfoOpen] = useState(false)
+  const [isQueryLoading, setIsQueryLoading] = useState(false)
+  const [displayChat, setDisplayChat] = useState(false)
 
   const querySettingsContext = useMemo(() => ({
     newSettings: {
@@ -61,6 +66,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       runDefaultQuerySettings: { newRunDefaultQuery, setNewRunDefaultQuery },
       defaultQuerySettings: { newDefaultQuery, setNewDefaultQuery },
       contentPersistenceSettings: { newContentPersistence, setNewContentPersistence },
+      secretKeySettings: { newSecretKey, setNewSecretKey },
     },
     settings: {
       limitSettings: { limit, setLimit, lastLimit, setLastLimit },
@@ -68,6 +74,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       runDefaultQuerySettings: { runDefaultQuery, setRunDefaultQuery },
       defaultQuerySettings: { defaultQuery, setDefaultQuery },
       contentPersistenceSettings: { contentPersistence, setContentPersistence },
+      secretKeySettings: { secretKey, setSecretKey },
     },
     hasChanges,
     setHasChanges,
@@ -78,6 +85,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       localStorage.setItem("timeout", newTimeout.toString());
       localStorage.setItem("defaultQuery", newDefaultQuery);
       localStorage.setItem("limit", newLimit.toString());
+      // localStorage.setItem("secretKey", newSecretKey);
 
       // Update context
       setContentPersistence(newContentPersistence);
@@ -86,6 +94,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       setTimeout(newTimeout);
       setLimit(newLimit);
       setLastLimit(limit);
+      setSecretKey(newSecretKey);
 
       // Reset has changes
       setHasChanges(false);
@@ -102,9 +111,10 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       setNewDefaultQuery(defaultQuery)
       setNewTimeout(timeout)
       setNewLimit(limit)
+      setNewSecretKey(secretKey)
       setHasChanges(false)
     }
-  }), [contentPersistence, defaultQuery, hasChanges, lastLimit, limit, newContentPersistence, newDefaultQuery, newLimit, newRunDefaultQuery, newTimeout, runDefaultQuery, timeout, toast])
+  }), [contentPersistence, defaultQuery, hasChanges, lastLimit, limit, newContentPersistence, newDefaultQuery, newLimit, newRunDefaultQuery, newSecretKey, newTimeout, runDefaultQuery, secretKey, timeout, toast])
 
   const historyQueryContext = useMemo(() => ({
     historyQuery,
@@ -115,6 +125,16 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
     indicator,
     setIndicator,
   }), [indicator, setIndicator])
+
+  const panelContext = useMemo(() => ({
+    panel,
+    setPanel,
+  }), [panel, setPanel])
+
+  const queryLoadingContext = useMemo(() => ({
+    isQueryLoading,
+    setIsQueryLoading,
+  }), [isQueryLoading, setIsQueryLoading])
 
   const schemaContext = useMemo(() => ({
     schema,
@@ -156,46 +176,55 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
   }, [setIsLoading, setCooldownTicks]);
 
   const runQuery = useCallback(async (q: string, name?: string): Promise<void> => {
-    const n = name || graphName
+    try {
+      setIsQueryLoading(true)
+      const n = name || graphName
 
-    const [query, existingLimit] = getQueryWithLimit(q, limit)
-    const url = `api/graph/${prepareArg(n)}?query=${prepareArg(query)}&timeout=${timeout}`;
-    const result = await getSSEGraphResult(url, toast, setIndicator);
+      const [query, existingLimit] = getQueryWithLimit(q, limit)
+      const url = `api/graph/${prepareArg(n)}?query=${prepareArg(query)}&timeout=${timeout}`;
 
-    if (!result) return;
+      setHistoryQuery(prev => ({
+        ...prev,
+        query: q,
+      }))
 
-    const explain = await securedFetch(`api/graph/${prepareArg(n)}/explain?query=${prepareArg(query)}`, {
-      method: "GET"
-    }, toast, setIndicator)
+      const result = await getSSEGraphResult(url, toast, setIndicator);
 
-    if (!explain.ok) return;
+      if (!result) return;
 
-    const explainJson = await explain.json()
-    const newQuery = { text: q, metadata: result.metadata, explain: explainJson.result, profile: [] }
-    const g = Graph.create(n, result, false, false, existingLimit, graphInfo)
-    const newQueries = [...historyQuery.queries.filter(qu => qu.text !== newQuery.text), newQuery]
+      const explain = await securedFetch(`api/graph/${prepareArg(n)}/explain?query=${prepareArg(query)}`, {
+        method: "GET"
+      }, toast, setIndicator)
 
-    setHistoryQuery(prev => ({
-      ...prev,
-      queries: newQueries,
-      currentQuery: newQuery,
-      query: q,
-      counter: 0
-    }))
-    setGraph(g)
-    fetchCount();
-    setLastLimit(limit)
+      if (!explain.ok) return;
 
-    if (g.Elements.nodes.length > 0) {
-      handleCooldown();
+      const explainJson = await explain.json()
+      const newQuery = { text: q, metadata: result.metadata, explain: explainJson.result, profile: [] }
+      const g = Graph.create(n, result, false, false, existingLimit, graphInfo)
+      const newQueries = [...historyQuery.queries.filter(qu => qu.text !== newQuery.text), newQuery]
+
+      setHistoryQuery(prev => ({
+        ...prev,
+        queries: newQueries,
+        currentQuery: newQuery,
+        counter: 0
+      }))
+      setGraph(g)
+      fetchCount();
+      setLastLimit(limit)
+
+      if (g.Elements.nodes.length > 0) {
+        handleCooldown();
+      }
+
+      localStorage.setItem("query history", JSON.stringify(newQueries))
+      localStorage.setItem("savedContent", JSON.stringify({ graphName: n, query: q }))
+      // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+      // @ts-ignore
+      window.graph = g
+    } finally {
+      setIsQueryLoading(false)
     }
-
-    localStorage.setItem("query history", JSON.stringify(newQueries))
-    localStorage.setItem("savedContent", JSON.stringify({ graphName: n, query: q }))
-    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-    // @ts-ignore
-    window.graph = g
-
   }, [graphName, limit, timeout, toast, historyQuery.queries, graphInfo, fetchCount, handleCooldown]);
 
   const graphContext = useMemo(() => ({
@@ -238,7 +267,17 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
     setLastLimit(l)
     setDefaultQuery(getDefaultQuery(localStorage.getItem("defaultQuery") || undefined))
     setRunDefaultQuery(localStorage.getItem("runDefaultQuery") !== "false")
-    setContentPersistence(localStorage.getItem("contentPersistence") !== "false")
+    setContentPersistence(localStorage.getItem("contentPersistence") !== "false");
+
+    (async () => {
+      const result = await fetch("/api/chat", {
+        method: "GET",
+      })
+
+      if (result.ok) {
+        setDisplayChat(true)
+      }
+    })()
   }, [status])
 
   const checkStatus = useCallback(async () => {
@@ -271,6 +310,14 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
     return () => clearInterval(interval)
   }, [checkStatus, status])
 
+  useEffect(() => {
+    if (pathname === "/graph" && graphName) {
+      setGraphInfoOpen(true)
+    } else {
+      setGraphInfoOpen(false)
+    }
+  }, [pathname, graphName])
+
   const handleOnSetGraphName = (newGraphName: string) => {
     if (pathname.includes("/schema")) {
       setSchemaName(formatName(newGraphName))
@@ -285,9 +332,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
     if (indicator === "offline") return
 
     await Promise.all(([["Graph", setGraphNames, setGraphName], ["Schema", setSchemaNames, setSchemaName]] as ["Graph" | "Schema", Dispatch<SetStateAction<string[]>>, Dispatch<SetStateAction<string>>][]).map(async ([type, setOptions, setName]) => {
-      const [opts, name] = await fetchOptions(type, toast, setIndicator, indicator)
-      setOptions(opts)
-      if (!contentPersistence || type === "Schema") setName(formatName(name))
+      await fetchOptions(type, toast, setIndicator, indicator, setName, setOptions, contentPersistence)
     }))
   }, [indicator, toast, contentPersistence, setGraphNames, setGraphName, setSchemaNames, setSchemaName, setIndicator])
 
@@ -295,29 +340,53 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
     if (status !== "authenticated") return undefined
 
     handleFetchOptions()
-    
+
     const interval = setInterval(handleFetchOptions, 30000)
 
     return () => clearInterval(interval)
   }, [handleFetchOptions, status])
 
+  useEffect(() => {
+    if (!process.env.NEXTAUTH_URL) {
+      const url = new URL(window.location.href)
+      process.env.NEXTAUTH_URL = url.origin
+    }
+  }, [])
+
   return (
-    <ThemeProvider attribute="class" enableSystem>
+    <ThemeProvider attribute="class" storageKey="theme" defaultTheme="system" disableTransitionOnChange>
       <LoginVerification>
         <QuerySettingsContext.Provider value={querySettingsContext}>
           <SchemaContext.Provider value={schemaContext}>
             <GraphContext.Provider value={graphContext}>
               <HistoryQueryContext.Provider value={historyQueryContext}>
                 <IndicatorContext.Provider value={indicatorContext}>
-                  <ResizablePanelGroup direction="horizontal">
-                    <ResizablePanel defaultSize={0} className="min-w-fit">
-                      {pathname !== "/" && pathname !== "/login" && <Header graphName={graphName} graphNames={pathname.includes("/schema") ? schemaNames : graphNames} onSetGraphName={handleOnSetGraphName} />}
-                    </ResizablePanel>
-                    <ResizableHandle className="w-0 !cursor-default" disabled />
-                    <ResizablePanel defaultSize={100} minSize={60}>
-                      {children}
-                    </ResizablePanel>
-                  </ResizablePanelGroup>
+                  <PanelContext.Provider value={panelContext}>
+                    <QueryLoadingContext.Provider value={queryLoadingContext}>
+                      {
+                        pathname !== "/" && pathname !== "/login" && <Header
+                          graphName={graphName}
+                          graphNames={pathname.includes("/schema") ? schemaNames : graphNames}
+                          onSetGraphName={handleOnSetGraphName}
+                          setGraphInfoOpen={setGraphInfoOpen}
+                          displayChat={displayChat}
+                        />
+                      }
+                      <GraphInfoPanel
+                        isOpen={graphInfoOpen}
+                        onClose={() => setGraphInfoOpen(false)}
+                      />
+                      {
+                        (pathname === "/graph" || pathname === "/schema") ?
+                          <div className="h-full w-1 grow flex flex-col">
+                            {children}
+                            <div className="h-4 w-full Gradient" />
+                          </div>
+                          :
+                          children
+                      }
+                    </QueryLoadingContext.Provider>
+                  </PanelContext.Provider>
                 </IndicatorContext.Provider>
               </HistoryQueryContext.Provider>
             </GraphContext.Provider>

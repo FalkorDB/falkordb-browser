@@ -56,7 +56,6 @@ export default function AddLabel({
             >
                 <Input
                     data-testid="addLabelInput"
-                    variant="primary"
                     ref={ref => ref?.focus()}
                     value={label}
                     onChange={(e) => setLabel(e.target.value)}
