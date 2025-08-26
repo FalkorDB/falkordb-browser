@@ -5,7 +5,7 @@
 import { ArrowUpRight, Database, LifeBuoy, LogOut, Monitor, Moon, Settings, Sun } from "lucide-react";
 import { SetStateAction, Dispatch, useCallback, useContext, useState, useEffect } from "react";
 import Image from "next/image";
-import { cn, Panel } from "@/lib/utils";
+import { cn, getTheme, Panel } from "@/lib/utils";
 import { getQuerySettingsNavigationToast } from "@/components/ui/toaster";
 import { useRouter, usePathname } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
@@ -44,6 +44,7 @@ export default function Header({ onSetGraphName, graphNames, graphName, setGraph
     const { hasChanges, saveSettings, resetSettings } = useContext(QuerySettingsContext)
 
     const { theme, setTheme } = useTheme()
+    const { currentTheme } = getTheme(theme)
     const { data: session } = useSession()
     const pathname = usePathname()
     const router = useRouter()
@@ -81,14 +82,29 @@ export default function Header({ onSetGraphName, graphNames, graphName, setGraph
     return (
         <div className="py-5 px-2 flex flex-col justify-between items-center border-r border-border">
             <div className="w-full flex flex-col gap-6 items-center">
-                <Link
-                    className="rounded-full h-12 w-12 overflow-hidden"
-                    aria-label="FalkorDB"
-                    href="https://www.falkordb.com"
-                    target="_blank" rel="noreferrer"
-                >
-                    <Image style={{ width: 'auto', height: 'auto' }} priority src="/icons/Logo.svg" alt="FalkorDB Logo" width={0} height={0} />
-                </Link>
+                {
+                    mounted && currentTheme &&
+                    <Link
+                        className="rounded-full h-12 w-12 overflow-hidden"
+                        aria-label="FalkorDB"
+                        href="https://www.falkordb.com"
+                        target="_blank" rel="noreferrer"
+                    >
+                        <Image style={{ width: 'auto', height: '48px' }} priority src={`/icons/F-${currentTheme}.svg`} alt="FalkorDB Logo" width={0} height={0} />
+                    </Link>
+                }
+                {
+                    showCreate &&
+                    <>
+                        <CreateGraph
+                            label="Header"
+                            onSetGraphName={onSetGraphName}
+                            type={type}
+                            graphNames={graphNames}
+                        />
+                        {separator}
+                    </>
+                }
                 <Button
                     label="GRAPHS"
                     title="View and manage your graphs"
@@ -104,18 +120,6 @@ export default function Header({ onSetGraphName, graphNames, graphName, setGraph
                     onClick={() => router.push("/schema")}
                     data-testid="SchemasButton"
                 />
-                {
-                    showCreate &&
-                    <>
-                        {separator}
-                        <CreateGraph
-                            label="Header"
-                            onSetGraphName={onSetGraphName}
-                            type={type}
-                            graphNames={graphNames}
-                        />
-                    </>
-                }
                 {
                     type === "Graph" && graphName &&
                     <>
@@ -196,7 +200,7 @@ export default function Header({ onSetGraphName, graphNames, graphName, setGraph
                         </VisuallyHidden>
                         <div className="h-full flex flex-col gap-8 max-w-[30rem] p-4">
                             <div className="h-1 grow flex flex-col gap-8 items-center justify-center">
-                                <Image style={{ width: 'auto', height: '50px' }} priority src="icons/ColorLogo.svg" alt="" width={0} height={0} />
+                                {mounted && currentTheme && <Image style={{ width: 'auto', height: '50px' }} priority src={`/icons/Falkordb-${currentTheme}.svg`} alt="" width={0} height={0} />}
                                 <h1 className="text-3xl font-bold">We Make AI Reliable</h1>
                                 <p className="text-xl text-center">
                                     Delivering a scalable,
@@ -213,8 +217,9 @@ export default function Header({ onSetGraphName, graphNames, graphName, setGraph
                 </Drawer>
                 {separator}
                 {
-                    mounted && <Button
-                        title="Toggle theme"
+                    mounted &&
+                    <Button
+                        title={`Toggle theme current theme: ${theme}`}
                         onClick={() => {
                             let newTheme = ""
                             if (theme === "dark") newTheme = "light"
@@ -248,7 +253,7 @@ export default function Header({ onSetGraphName, graphNames, graphName, setGraph
                 <Button
                     title="Log Out"
                     data-testid="logoutButton"
-                    onClick={() => signOut({ callbackUrl: "/login" })}
+                    onClick={() => signOut({ redirect: false }).then(() => router.push("/login"))}
                 >
                     <LogOut size={iconSize - 5} />
                 </Button>

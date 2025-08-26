@@ -9,9 +9,6 @@ import Button from "../components/ui/Button"
 import Input from "../components/ui/Input"
 import { GraphContext, IndicatorContext, QueryLoadingContext, QuerySettingsContext } from "../components/provider"
 import { EventType } from "../api/chat/route"
-import Combobox from "../components/ui/combobox"
-
-const MODELS = ["gpt-4.1", "gpt-4.0", "gpt-3.5-turbo"]
 
 interface Props {
     onClose: () => void
@@ -21,16 +18,15 @@ export default function Chat({ onClose }: Props) {
     const { setIndicator } = useContext(IndicatorContext)
     const { graphName, runQuery } = useContext(GraphContext)
     const { isQueryLoading } = useContext(QueryLoadingContext)
-    const { settings: { secretKeySettings: { secretKey } } } = useContext(QuerySettingsContext)
+    const { settings: { secretKeySettings: { secretKey }, modelSettings: { model } } } = useContext(QuerySettingsContext)
 
     const { toast } = useToast()
 
     const [messages, setMessages] = useState<Message[]>([])
     const [messagesList, setMessagesList] = useState<(Message | [Message[], boolean])[]>([])
-    const [newMessage, setNewMessage] = useState("how many friends does grace has ?")
+    const [newMessage, setNewMessage] = useState("")
     const [isLoading, setIsLoading] = useState(false)
     const [queryCollapse, setQueryCollapse] = useState<{ [key: string]: boolean }>({})
-    const [model, setModel] = useState("gpt-4.1")
 
     useEffect(() => {
         let statusGroup: Message[]
@@ -88,7 +84,7 @@ export default function Chat({ onClose }: Props) {
 
         setMessages(newMessages)
         setTimeout(scrollToBottom, 0)
-        // setNewMessage("")
+        setNewMessage("")
 
         try {
             const response = await fetch("/api/chat", {
@@ -262,7 +258,7 @@ export default function Chat({ onClose }: Props) {
                         >
                             {queryCollapse[i] ? <ChevronRight size={25} /> : <ChevronDown size={25} />}
                         </Button>
-                        <div className="overflow-hidden">
+                        <div className="overflow-hidden CypherInput">
                             {
                                 queryCollapse[i] ? (
                                     <Tooltip>
@@ -320,7 +316,7 @@ export default function Chat({ onClose }: Props) {
                 >
                     <X className="h-4 w-4" />
                 </Button>
-                <h1 className="mt-6">Chat</h1>
+                <h1 className="mt-6">Chat with your database in natural language</h1>
                 <ul className="w-full h-1 grow flex flex-col gap-6 overflow-x-hidden overflow-y-auto chat-container">
                     {
                         messagesList.map((message, index) => {
@@ -386,31 +382,21 @@ export default function Chat({ onClose }: Props) {
                         })
                     }
                 </ul>
-                <form className="flex flex-col border border-border rounded-lg w-full" onSubmit={handleSubmit}>
+                <form className="flex gap-2 items-center border border-border rounded-lg w-full p-2" onSubmit={handleSubmit}>
                     <Input
-                        className="h-1/2 bg-transparent border-none text-foreground text-lg p-3 CypherInput"
+                        className="w-1 grow bg-transparent border-none text-foreground text-lg CypherInput"
                         placeholder="Type your message here..."
                         value={newMessage}
                         onChange={(e) => setNewMessage(e.target.value)}
                     />
-                    <div className="h-1/2 flex justify-between items-center p-3 border-t border-border">
-                        <Combobox
-                            className="p-1"
-                            label="Model"
-                            options={MODELS}
-                            selectedValue={model}
-                            setSelectedValue={setModel}
-                            inTable
-                        />
-                        <Button
-                            disabled={newMessage.trim() === ""}
-                            title={newMessage.trim() === "" ? "Please enter a message" : "Send"}
-                            onClick={handleSubmit}
-                            isLoading={isLoading}
-                        >
-                            <CircleArrowUp size={25} />
-                        </Button>
-                    </div>
+                    <Button
+                        disabled={newMessage.trim() === ""}
+                        title={newMessage.trim() === "" ? "Please enter a message" : "Send"}
+                        onClick={handleSubmit}
+                        isLoading={isLoading}
+                    >
+                        <CircleArrowUp size={25} />
+                    </Button>
                 </form>
             </div>
         </div>

@@ -74,7 +74,7 @@ export default function GraphDetails({
                 <div className="flex gap-4 overflow-hidden">
                     {
                         [["Nodes", nodesCount, "nodesCount"], ["Edges", edgesCount, "edgesCount"], ["GraphName", graphName, "graphName"]].map(([label, value, testId]) => (
-                            <div className="flex gap-2 overflow-hidden w-1 grow max-w-fit" key={label}>
+                            <div className="flex gap-2 overflow-hidden" key={label}>
                                 <p>
                                     {label}:
                                 </p>

@@ -48,7 +48,7 @@
         font-family: 'Inter' !important;
     }
 
-    .CypherInput {
+    .CypherInput * {
         font-family: 'FiraCode' !important;
     }
 

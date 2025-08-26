@@ -121,7 +121,7 @@ export default function Toolbar({
     const stripBackground = `url("data:image/svg+xml,${stripSVG}")`;
 
     return (
-        <div className="w-full flex justify-between items-center">
+        <div className={cn("w-full flex justify-between items-center", label === "Schema" && "h-full")}>
             <div className={cn("relative pointer-events-auto", label === "Schema" && "h-full")}>
                 {
                     graph.getElements().length > 0 && !isLoading &&

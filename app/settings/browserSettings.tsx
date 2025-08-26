@@ -8,6 +8,9 @@ import { Switch } from "@/components/ui/switch";
 import { QuerySettingsContext } from "../components/provider";
 import Button from "../components/ui/Button";
 import Input from "../components/ui/Input";
+import Combobox from "../components/ui/combobox";
+
+const MODELS = ["gpt-4.1", "gpt-4o"]
 
 export default function BrowserSettings() {
     const {
@@ -18,6 +21,7 @@ export default function BrowserSettings() {
             timeoutSettings: { newTimeout, setNewTimeout },
             limitSettings: { newLimit, setNewLimit },
             secretKeySettings: { newSecretKey, setNewSecretKey },
+            modelSettings: { newModel, setNewModel },
         },
         settings: {
             contentPersistenceSettings: { contentPersistence },
@@ -26,6 +30,7 @@ export default function BrowserSettings() {
             timeoutSettings: { timeout: timeoutValue },
             limitSettings: { limit },
             secretKeySettings: { secretKey },
+            modelSettings: { model },
         },
         hasChanges,
         setHasChanges,
@@ -45,11 +50,12 @@ export default function BrowserSettings() {
         setNewTimeout(timeoutValue)
         setNewLimit(limit)
         setNewSecretKey(secretKey)
-    }, [contentPersistence, runDefaultQuery, defaultQuery, timeoutValue, limit, secretKey, setNewContentPersistence, setNewRunDefaultQuery, setNewDefaultQuery, setNewTimeout, setNewLimit, setNewSecretKey])
+        setNewModel(model)
+    }, [contentPersistence, runDefaultQuery, defaultQuery, timeoutValue, limit, secretKey, setNewContentPersistence, setNewRunDefaultQuery, setNewDefaultQuery, setNewTimeout, setNewLimit, setNewSecretKey, model, setNewModel])
 
     useEffect(() => {
-        setHasChanges(newContentPersistence !== contentPersistence || newTimeout !== timeoutValue || newLimit !== limit || newDefaultQuery !== defaultQuery || newRunDefaultQuery !== runDefaultQuery || newSecretKey !== secretKey)
-    }, [defaultQuery, limit, newDefaultQuery, newLimit, newRunDefaultQuery, newContentPersistence, newTimeout, runDefaultQuery, contentPersistence, setHasChanges, timeoutValue, newSecretKey, secretKey])
+        setHasChanges(newContentPersistence !== contentPersistence || newTimeout !== timeoutValue || newLimit !== limit || newDefaultQuery !== defaultQuery || newRunDefaultQuery !== runDefaultQuery || newSecretKey !== secretKey || newModel !== model)
+    }, [defaultQuery, limit, newDefaultQuery, newLimit, newRunDefaultQuery, newContentPersistence, newTimeout, runDefaultQuery, contentPersistence, setHasChanges, timeoutValue, newSecretKey, secretKey, newModel, model])
 
     const handleSubmit = useCallback((e?: React.FormEvent<HTMLFormElement>) => {
         e?.preventDefault()
@@ -104,7 +110,7 @@ export default function BrowserSettings() {
                                 <p>
                                     Shows a `Timed Out` error if the query takes longer than the timeout in seconds.
                                     <a
-                                        className="flex justify-center"
+                                        className="underline underline-offset-2 ml-2"
                                         href="https://docs.falkordb.com/configuration.html#query-configurations"
                                         target="_blank"
                                         rel="noreferrer noreferrer"
@@ -137,7 +143,7 @@ export default function BrowserSettings() {
                                 <p>
                                     Limits the number of rows returned by the query.
                                     <a
-                                        className="flex justify-center"
+                                        className="underline underline-offset-2 ml-2"
                                         href="https://docs.falkordb.com/cypher/limit.html"
                                         target="_blank"
                                         rel="noreferrer"
@@ -231,14 +237,27 @@ export default function BrowserSettings() {
                         <p className="text-sm text-muted-foreground">Define your keys</p>
                     </div>
                     <div className="flex flex-col gap-6">
-                        <div className="flex gap-2 items-center">
-                            <p>Secret Key</p>
-                            <Input
-                                className="w-1 grow"
-                                id="secretKeyInput"
-                                value={newSecretKey}
-                                onChange={(e) => setNewSecretKey(e.target.value)}
-                            />
+                        <div className="flex gap-4 items-center">
+                            <div className="flex gap-2 items-center">
+                                <p>Model</p>
+                                <Combobox
+                                    className="p-1"
+                                    label="Model"
+                                    options={MODELS}
+                                    selectedValue={newModel}
+                                    setSelectedValue={setNewModel}
+                                    inTable
+                                />
+                            </div>
+                            <div className="w-1 grow flex gap-2 items-center">
+                                <p>Secret Key</p>
+                                <Input
+                                    className="w-1 grow"
+                                    id="secretKeyInput"
+                                    value={newSecretKey}
+                                    onChange={(e) => setNewSecretKey(e.target.value)}
+                                />
+                            </div>
                         </div>
                     </div>
                     {

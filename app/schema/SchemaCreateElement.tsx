@@ -259,7 +259,7 @@ export default function SchemaCreateElement({ onCreate, setIsAdd, selectedNodes,
               <>
                 <Input
                   ref={ref => ref?.focus()}
-                  className="max-w-[20dvw] h-full bg-background border-none text-foreground"
+                  className="max-w-[20dvw]"
                   value={newLabel}
                   onChange={(e) => setNewLabel(e.target.value)}
                   data-testid="newLabelInput"

@@ -133,7 +133,7 @@ function GraphView({
 
     return (
         <Tabs value={tabsValue} onValueChange={(value) => setTabsValue(value as Tab)} className={cn("h-full w-full relative border border-border rounded-lg overflow-hidden", tabsValue === "Table" && "flex flex-col-reverse")}>
-            <div className={cn("h-full w-full flex flex-col gap-4 absolute py-4 px-6 pointer-events-none z-20 justify-between")}>
+            <div className="h-full w-full flex flex-col gap-4 absolute py-4 px-6 pointer-events-none z-20 justify-between">
                 <div className="h-1 grow flex flex-col gap-6">
                     {
                         !isLoading && tabsValue === "Graph" &&
@@ -150,9 +150,9 @@ function GraphView({
                             {
                                 (labels.length > 0 || relationships.length > 0) &&
                                 <div className="w-fit flex flex-col h-full gap-4">
-                                    <Labels labels={labels} onClick={onLabelClick} label="Labels" type="Graph" />
-                                    <div className="h-px bg-border rounded-full" />
-                                    <Labels labels={relationships} onClick={onRelationshipClick} label="Relationships" type="Graph" />
+                                    {labels.length > 0 && <Labels labels={labels} onClick={onLabelClick} label="Labels" type="Graph" />}
+                                    {labels.length > 0 && relationships.length > 0 && <div className="h-px bg-border rounded-full" />}
+                                    {relationships.length > 0 && <Labels labels={relationships} onClick={onRelationshipClick} label="Relationships" type="Graph" />}
                                 </div>
                             }
                         </>

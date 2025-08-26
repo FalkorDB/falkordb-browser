@@ -22,11 +22,11 @@ export const setTheme = (monacoI: Monaco, themeName: string, backgroundColor: st
         base: isDark ? 'vs-dark' : 'vs',
         inherit: true,
         rules: [
-            { token: 'keyword', foreground: isDark ? '#99E4E5' : '#0000FF' },
-            { token: 'function', foreground: isDark ? '#DCDCAA' : '#795E26' },
-            { token: 'type', foreground: isDark ? '#89D86D' : '#267F99' },
-            { token: 'string', foreground: isDark ? '#CE9178' : '#A31515' },
-            { token: 'number', foreground: isDark ? '#b5cea8' : '#098658' },
+            { token: 'keyword', foreground: isDark ? '#99E4E5' : '#7568F2' },
+            { token: 'function', foreground: isDark ? '#DCDCAA' : '#5A5A42' },
+            { token: 'type', foreground: isDark ? '#89D86D' : '#2E5A27' },
+            { token: 'string', foreground: isDark ? '#CE9178' : '#53392C' },
+            { token: 'number', foreground: isDark ? '#b5cea8' : '#3C5335' },
         ],
         colors: {
             'editor.background': backgroundColor,

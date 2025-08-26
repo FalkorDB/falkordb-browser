@@ -48,6 +48,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
   const [newDefaultQuery, setNewDefaultQuery] = useState("")
   const [newContentPersistence, setNewContentPersistence] = useState(false)
   const [newSecretKey, setNewSecretKey] = useState("")
+  const [newModel, setNewModel] = useState("")
   const [secretKey, setSecretKey] = useState("")
   const [hasChanges, setHasChanges] = useState(false)
   const [nodesCount, setNodesCount] = useState<number>()
@@ -58,6 +59,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
   const [graphInfoOpen, setGraphInfoOpen] = useState(false)
   const [isQueryLoading, setIsQueryLoading] = useState(false)
   const [displayChat, setDisplayChat] = useState(false)
+  const [model, setModel] = useState("")
 
   const querySettingsContext = useMemo(() => ({
     newSettings: {
@@ -67,6 +69,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       defaultQuerySettings: { newDefaultQuery, setNewDefaultQuery },
       contentPersistenceSettings: { newContentPersistence, setNewContentPersistence },
       secretKeySettings: { newSecretKey, setNewSecretKey },
+      modelSettings: { newModel, setNewModel },
     },
     settings: {
       limitSettings: { limit, setLimit, lastLimit, setLastLimit },
@@ -75,6 +78,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       defaultQuerySettings: { defaultQuery, setDefaultQuery },
       contentPersistenceSettings: { contentPersistence, setContentPersistence },
       secretKeySettings: { secretKey, setSecretKey },
+      modelSettings: { model, setModel },
     },
     hasChanges,
     setHasChanges,
@@ -95,7 +99,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       setLimit(newLimit);
       setLastLimit(limit);
       setSecretKey(newSecretKey);
-
+      setModel(newModel);
       // Reset has changes
       setHasChanges(false);
 
@@ -112,6 +116,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       setNewTimeout(timeout)
       setNewLimit(limit)
       setNewSecretKey(secretKey)
+      setNewModel(model)
       setHasChanges(false)
     }
   }), [contentPersistence, defaultQuery, hasChanges, lastLimit, limit, newContentPersistence, newDefaultQuery, newLimit, newRunDefaultQuery, newSecretKey, newTimeout, runDefaultQuery, secretKey, timeout, toast])
@@ -345,13 +350,6 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
 
     return () => clearInterval(interval)
   }, [handleFetchOptions, status])
-
-  useEffect(() => {
-    if (!process.env.NEXTAUTH_URL) {
-      const url = new URL(window.location.href)
-      process.env.NEXTAUTH_URL = url.origin
-    }
-  }, [])
 
   return (
     <ThemeProvider attribute="class" storageKey="theme" defaultTheme="system" disableTransitionOnChange>

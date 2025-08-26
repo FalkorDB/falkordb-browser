@@ -272,7 +272,7 @@ export default function Page() {
                 fetchCount={fetchCount}
                 isQueryLoading={isQueryLoading}
             />
-            <ResizablePanelGroup direction="horizontal">
+            <ResizablePanelGroup direction="horizontal" className="h-1 grow">
                 <ResizablePanel defaultSize={graphSize} minSize={50} maxSize={100}>
                     <GraphView
                         selectedElement={selectedElement}

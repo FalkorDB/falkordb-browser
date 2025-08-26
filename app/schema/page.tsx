@@ -1,20 +1,23 @@
 'use client'
 
-import { useContext, useState, useRef, useCallback, useEffect } from "react";
-import { getSSEGraphResult, prepareArg, securedFetch } from "@/lib/utils";
+import { useContext, useState, useRef, useCallback, useEffect, useMemo } from "react";
+import { cn, getSSEGraphResult, prepareArg, securedFetch } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
 import dynamic from "next/dynamic";
 import { ForceGraphMethods } from "react-force-graph-2d";
+import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
+import { ImperativePanelHandle } from "react-resizable-panels";
 import { Label, Graph, GraphData, Link, Node, Relationship } from "../api/graph/model";
 import { IndicatorContext, SchemaContext } from "../components/provider";
 import Spinning from "../components/ui/spinning";
+import SchemaDataPanel from "./SchemaDataPanel";
+import SchemaCreateElement from "./SchemaCreateElement";
 
 const Selector = dynamic(() => import("../graph/Selector"), {
     ssr: false,
-    loading: () => <div className="z-20 absolute top-5 inset-x-24 h-[50px] flex flex-row gap-4 items-center">
+    loading: () => <div className="h-[50px] flex flex-row gap-4 items-center justify-between">
         <div className="w-[230px] h-full animate-pulse rounded-md border border-border bg-background" />
-        <div className="w-1 grow h-full animate-pulse rounded-md border border-border bg-background" />
-        <div className="w-[233px] h-full animate-pulse rounded-md border border-border bg-background" />
+        <div className="w-[220px] h-full animate-pulse rounded-md border border-border bg-background" />
     </div>
 })
 const SchemaView = dynamic(() => import("./SchemaView"), {
@@ -38,6 +41,9 @@ export default function Page() {
 
     const { toast } = useToast()
 
+    const panelRef = useRef<ImperativePanelHandle>(null)
+
+    const [selectedNodes, setSelectedNodes] = useState<[Node | undefined, Node | undefined]>([undefined, undefined]);
     const [selectedElement, setSelectedElement] = useState<Node | Link | undefined>()
     const [selectedElements, setSelectedElements] = useState<(Node | Link)[]>([])
     const [cooldownTicks, setCooldownTicks] = useState<number | undefined>(0)
@@ -50,6 +56,22 @@ export default function Page() {
     const [nodesCount, setNodesCount] = useState<number | undefined>()
     const [isAddEntity, setIsAddEntity] = useState(false)
     const [isCanvasLoading, setIsCanvasLoading] = useState(false)
+    const [isCollapsed, setIsCollapsed] = useState(true)
+
+    const [panelSize, graphSize] = useMemo(() => {
+        if (selectedElement) return [30, 70]
+        if (isAddEntity || isAddRelation) return [40, 60]
+        return [0, 100]
+    }, [selectedElement, isAddEntity, isAddRelation])
+
+    useEffect(() => {
+        const currentPanel = panelRef.current
+
+        if (!currentPanel) return
+
+        if (isAddEntity || isAddRelation || selectedElement) currentPanel.expand()
+        else currentPanel.collapse()
+    }, [isAddEntity, isAddRelation, selectedElement])
 
     const fetchCount = useCallback(async () => {
         setEdgesCount(undefined)
@@ -162,8 +184,46 @@ export default function Page() {
         handleCooldown()
     }
 
+    const onCreateElement = async (attributes: [string, string[]][], elementLabel?: string[]) => {
+        const fakeId = "-1"
+        const result = await securedFetch(`api/schema/${prepareArg(schema.Id)}/${prepareArg(fakeId)}`, {
+            method: "POST",
+            body: JSON.stringify({ type: isAddEntity, label: elementLabel, attributes, selectedNodes })
+        }, toast, setIndicator)
+
+        if (result.ok) {
+            const json = await result.json()
+
+            if (isAddEntity) {
+                const { labels: ls } = schema.extendNode(json.result.data[0].n, false, true)!
+                setLabels(prev => [...prev, ...ls.filter(c => !prev.some(p => p.name === c)).map(c => schema.LabelsMap.get(c)!)])
+                setIsAddEntity(false)
+            } else {
+                const { relationship } = schema.extendEdge(json.result.data[0].e, false, true)!
+                setRelationships(prev => [...prev, schema.RelationshipsMap.get(relationship)!])
+                setIsAddRelation(false)
+            }
+
+            fetchCount()
+
+            setSelectedElement(undefined)
+        }
+
+        setData({ ...schema.Elements })
+
+        handleCooldown()
+
+        return result.ok
+    }
+
+    const handleClosePanel = useCallback(() => {
+        setSelectedElement(undefined)
+        setIsAddEntity(false)
+        setIsAddRelation(false)
+    }, [setSelectedElement, setIsAddEntity, setIsAddRelation])
+
     return (
-        <div className="Page">
+        <div className="Page gap-8 p-8">
             <Selector
                 graph={schema}
                 options={schemaNames}
@@ -179,33 +239,63 @@ export default function Page() {
                 setGraph={setSchema}
                 isCanvasLoading={isCanvasLoading}
             />
-            <div className="h-1 grow p-12">
-                <SchemaView
-                    fetchCount={fetchCount}
-                    edgesCount={edgesCount}
-                    nodesCount={nodesCount}
-                    selectedElement={selectedElement}
-                    setSelectedElement={setSelectedElement}
-                    selectedElements={selectedElements}
-                    setSelectedElements={setSelectedElements}
-                    isAddRelation={isAddRelation}
-                    setIsAddRelation={setIsAddRelation}
-                    isAddEntity={isAddEntity}
-                    setIsAddEntity={setIsAddEntity}
-                    chartRef={chartRef}
-                    cooldownTicks={cooldownTicks}
-                    handleCooldown={handleCooldown}
-                    data={data}
-                    setData={setData}
-                    handleDeleteElement={handleDeleteElement}
-                    setLabels={setLabels}
-                    setRelationships={setRelationships}
-                    labels={labels}
-                    relationships={relationships}
-                    isLoading={isCanvasLoading}
-                />
-            </div>
-            <div className="h-4 w-full Gradient" />
+            <ResizablePanelGroup direction="horizontal" className="h-1 grow">
+                <ResizablePanel defaultSize={graphSize} minSize={50} maxSize={100}>
+                    <SchemaView
+                        edgesCount={edgesCount}
+                        nodesCount={nodesCount}
+                        selectedElement={selectedElement}
+                        setSelectedElement={setSelectedElement}
+                        selectedElements={selectedElements}
+                        setSelectedElements={setSelectedElements}
+                        isAddRelation={isAddRelation}
+                        chartRef={chartRef}
+                        cooldownTicks={cooldownTicks}
+                        handleCooldown={handleCooldown}
+                        data={data}
+                        setData={setData}
+                        setLabels={setLabels}
+                        setRelationships={setRelationships}
+                        setSelectedNodes={setSelectedNodes}
+                        labels={labels}
+                        relationships={relationships}
+                        isLoading={isCanvasLoading}
+                    />
+                </ResizablePanel>
+                <ResizableHandle withHandle onMouseUp={() => isCollapsed && handleClosePanel()} className={cn("ml-6 w-0", isCollapsed && "hidden")} />
+                <ResizablePanel
+                    ref={panelRef}
+                    collapsible
+                    defaultSize={panelSize}
+                    minSize={25}
+                    maxSize={50}
+                    onCollapse={() => {
+                        setIsCollapsed(true)
+                    }}
+                    onExpand={() => {
+                        setIsCollapsed(false)
+                    }}
+                >
+                    {
+                        selectedElement ?
+                            <SchemaDataPanel
+                                object={selectedElement}
+                                setObject={setSelectedElement}
+                                onDeleteElement={handleDeleteElement}
+                                schema={schema}
+                                setLabels={setLabels}
+                            />
+                            : (isAddRelation || isAddEntity) &&
+                            <SchemaCreateElement
+                                onCreate={onCreateElement}
+                                setIsAdd={isAddRelation ? setIsAddRelation : setIsAddEntity}
+                                selectedNodes={selectedNodes}
+                                setSelectedNodes={setSelectedNodes}
+                                type={isAddEntity}
+                            />
+                    }
+                </ResizablePanel>
+            </ResizablePanelGroup>
         </div>
     )
 }

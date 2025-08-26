@@ -3,7 +3,7 @@
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { cn } from "@/lib/utils"
 import { Loader2 } from "lucide-react"
-import { forwardRef } from "react"
+import React, { forwardRef } from "react"
 
 export type Variant = "Large" | "Primary" | "Secondary" | "Cancel" | "Delete" | "button"
 

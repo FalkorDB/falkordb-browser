@@ -28,6 +28,10 @@ type QuerySettingsContextType = {
       newSecretKey: string;
       setNewSecretKey: Dispatch<SetStateAction<string>>;
     };
+    modelSettings: {
+      newModel: string;
+      setNewModel: Dispatch<SetStateAction<string>>;
+    };
   };
   settings: {
     limitSettings: {
@@ -55,6 +59,10 @@ type QuerySettingsContextType = {
     secretKeySettings: {
       secretKey: string;
       setSecretKey: Dispatch<SetStateAction<string>>;
+    };
+    modelSettings: {
+      model: string;
+      setModel: Dispatch<SetStateAction<string>>;
     };
   };
   hasChanges: boolean;
@@ -126,6 +134,7 @@ export const QuerySettingsContext = createContext<QuerySettingsContextType>({
       setNewContentPersistence: () => {},
     },
     secretKeySettings: { newSecretKey: "", setNewSecretKey: () => {} },
+    modelSettings: { newModel: "", setNewModel: () => {} },
   },
   settings: {
     limitSettings: {
@@ -145,6 +154,7 @@ export const QuerySettingsContext = createContext<QuerySettingsContextType>({
       setContentPersistence: () => {},
     },
     secretKeySettings: { secretKey: "", setSecretKey: () => {} },
+    modelSettings: { model: "", setModel: () => {} },
   },
   hasChanges: false,
   setHasChanges: () => {},

@@ -6,6 +6,8 @@ import { useSearchParams, useRouter } from "next/navigation";
 import Image from "next/image";
 import { Check, Info } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
+import { useTheme } from "next-themes";
+import { getTheme } from "@/lib/utils";
 import FormComponent, { Field } from "../components/FormComponent";
 import Dropzone from "../components/ui/Dropzone";
 
@@ -13,7 +15,11 @@ const DEFAULT_HOST = "localhost";
 const DEFAULT_PORT = "6379";
 
 export default function LoginForm() {
+  const { theme } = useTheme();
+  const { currentTheme } = getTheme(theme)
   const router = useRouter();
+
+  const [mounted, setMounted] = useState(false);
   const [host, setHost] = useState("");
   const [port, setPort] = useState("");
   const [TLS, setTLS] = useState(false);
@@ -96,6 +102,10 @@ export default function LoginForm() {
   ];
 
   useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  useEffect(() => {
     const hostParam = searchParams.get("host");
     const portParam = searchParams.get("port");
     const usernameParam = searchParams.get("username");
@@ -159,7 +169,7 @@ export default function LoginForm() {
     <div className="relative h-full w-full flex flex-col">
       <div className="grow flex items-center justify-center">
         <div className="flex flex-col gap-8 items-center">
-          <Image style={{ width: 'auto', height: '80px' }} priority src="/icons/BrowserLogo.svg" alt="FalkorDB Browser Logo" width={0} height={0} />
+          {mounted && currentTheme && <Image style={{ width: 'auto', height: '80px' }} priority src={`/icons/Browser-${currentTheme}.svg`} alt="FalkorDB Browser Logo" width={0} height={0} />}
           <FormComponent
             fields={fields}
             handleSubmit={onSubmit}

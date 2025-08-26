@@ -365,7 +365,7 @@ export default function Selector({ graph, options, setOptions, graphName, setGra
                             </Button>
                         </div>
                     </>
-                    : <div className="w-full h-[58px]">
+                    : <div className="w-full h-full">
                         <Toolbar
                             graph={graph}
                             label={type}
@@ -380,7 +380,7 @@ export default function Selector({ graph, options, setOptions, graphName, setGra
                         />
                     </div>
             }
-        </div >
+        </div>
     )
 }
 
