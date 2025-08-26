@@ -10,7 +10,7 @@ import Button from "../components/ui/Button";
 import Input from "../components/ui/Input";
 import Combobox from "../components/ui/combobox";
 
-const MODELS = ["gpt-4.1", "gpt-4o"]
+const MODELS = ["gpt-5", "gpt-5-mini", "gpt-5-nano", "gpt-4.1"]
 
 export default function BrowserSettings() {
     const {
@@ -20,8 +20,7 @@ export default function BrowserSettings() {
             defaultQuerySettings: { newDefaultQuery, setNewDefaultQuery },
             timeoutSettings: { newTimeout, setNewTimeout },
             limitSettings: { newLimit, setNewLimit },
-            secretKeySettings: { newSecretKey, setNewSecretKey },
-            modelSettings: { newModel, setNewModel },
+            chatSettings: { newSecretKey, setNewSecretKey, newModel, setNewModel },
         },
         settings: {
             contentPersistenceSettings: { contentPersistence },
@@ -29,8 +28,7 @@ export default function BrowserSettings() {
             defaultQuerySettings: { defaultQuery, setDefaultQuery },
             timeoutSettings: { timeout: timeoutValue },
             limitSettings: { limit },
-            secretKeySettings: { secretKey },
-            modelSettings: { model },
+            chatSettings: { secretKey, model, navigateToSettings },
         },
         hasChanges,
         setHasChanges,
@@ -241,6 +239,7 @@ export default function BrowserSettings() {
                             <div className="flex gap-2 items-center">
                                 <p>Model</p>
                                 <Combobox
+                                    disabled={!navigateToSettings}
                                     className="p-1"
                                     label="Model"
                                     options={MODELS}
@@ -252,6 +251,7 @@ export default function BrowserSettings() {
                             <div className="w-1 grow flex gap-2 items-center">
                                 <p>Secret Key</p>
                                 <Input
+                                    disabled={!navigateToSettings}
                                     className="w-1 grow"
                                     id="secretKeyInput"
                                     value={newSecretKey}

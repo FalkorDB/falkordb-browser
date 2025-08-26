@@ -60,6 +60,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
   const [isQueryLoading, setIsQueryLoading] = useState(false)
   const [displayChat, setDisplayChat] = useState(false)
   const [model, setModel] = useState("")
+  const [navigateToSettings, setNavigateToSettings] = useState(false)
 
   const querySettingsContext = useMemo(() => ({
     newSettings: {
@@ -68,8 +69,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       runDefaultQuerySettings: { newRunDefaultQuery, setNewRunDefaultQuery },
       defaultQuerySettings: { newDefaultQuery, setNewDefaultQuery },
       contentPersistenceSettings: { newContentPersistence, setNewContentPersistence },
-      secretKeySettings: { newSecretKey, setNewSecretKey },
-      modelSettings: { newModel, setNewModel },
+      chatSettings: { newSecretKey, setNewSecretKey, newModel, setNewModel },
     },
     settings: {
       limitSettings: { limit, setLimit, lastLimit, setLastLimit },
@@ -77,8 +77,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       runDefaultQuerySettings: { runDefaultQuery, setRunDefaultQuery },
       defaultQuerySettings: { defaultQuery, setDefaultQuery },
       contentPersistenceSettings: { contentPersistence, setContentPersistence },
-      secretKeySettings: { secretKey, setSecretKey },
-      modelSettings: { model, setModel },
+      chatSettings: { secretKey, setSecretKey, model, setModel, navigateToSettings, setNavigateToSettings },
     },
     hasChanges,
     setHasChanges,
@@ -119,7 +118,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       setNewModel(model)
       setHasChanges(false)
     }
-  }), [contentPersistence, defaultQuery, hasChanges, lastLimit, limit, newContentPersistence, newDefaultQuery, newLimit, newRunDefaultQuery, newSecretKey, newTimeout, runDefaultQuery, secretKey, timeout, toast])
+  }), [contentPersistence, defaultQuery, hasChanges, lastLimit, limit, model, navigateToSettings, newContentPersistence, newDefaultQuery, newLimit, newModel, newRunDefaultQuery, newSecretKey, newTimeout, runDefaultQuery, secretKey, timeout, toast])
 
   const historyQueryContext = useMemo(() => ({
     historyQuery,
@@ -273,34 +272,35 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
     setDefaultQuery(getDefaultQuery(localStorage.getItem("defaultQuery") || undefined))
     setRunDefaultQuery(localStorage.getItem("runDefaultQuery") !== "false")
     setContentPersistence(localStorage.getItem("contentPersistence") !== "false");
-
-    (async () => {
-      const result = await fetch("/api/chat", {
-        method: "GET",
-      })
-
-      if (result.ok) {
-        setDisplayChat(true)
-      }
-    })()
   }, [status])
 
-  const checkStatus = useCallback(async () => {
-    const result = await fetch("/api/status", {
-      method: "GET",
-    })
+  useEffect(() => {
+    if (status !== "authenticated") return
 
-    if (result.ok) {
-      setIndicator("online")
-    } else if (result.status === 404) {
-      setIndicator("offline")
-    } else {
-      toast({
-        title: "Error",
-        description: await result.text(),
-        variant: "destructive",
-      })
-    }
+    (async () => {
+      const result = await securedFetch("/api/chat", {
+        method: "GET",
+      }, toast, setIndicator)
+
+      if (result.ok) {
+        const json = await result.json()
+
+        if (!json.message) setDisplayChat(true)
+
+        if (json.model) {
+          setModel(json.model)
+          setNewModel(json.model)
+        } else if (json.error) {
+          setNavigateToSettings(true)
+        }
+      }
+    })()
+  }, [status, toast, setIndicator])
+
+  const checkStatus = useCallback(() => {
+    securedFetch("/api/status", {
+      method: "GET",
+    }, toast, setIndicator)
   }, [toast])
 
   useEffect(() => {
@@ -342,13 +342,9 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
   }, [indicator, toast, contentPersistence, setGraphNames, setGraphName, setSchemaNames, setSchemaName, setIndicator])
 
   useEffect(() => {
-    if (status !== "authenticated") return undefined
+    if (status !== "authenticated") return
 
     handleFetchOptions()
-
-    const interval = setInterval(handleFetchOptions, 30000)
-
-    return () => clearInterval(interval)
   }, [handleFetchOptions, status])
 
   return (
@@ -362,7 +358,8 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
                   <PanelContext.Provider value={panelContext}>
                     <QueryLoadingContext.Provider value={queryLoadingContext}>
                       {
-                        pathname !== "/" && pathname !== "/login" && <Header
+                        pathname !== "/" && pathname !== "/login" &&
+                        <Header
                           graphName={graphName}
                           graphNames={pathname.includes("/schema") ? schemaNames : graphNames}
                           onSetGraphName={handleOnSetGraphName}

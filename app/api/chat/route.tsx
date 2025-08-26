@@ -12,7 +12,7 @@ export async function GET() {
         }
 
         try {
-            const response = await fetch(`${URL}list_graphs`, {
+            const response = await fetch(`${URL}configured-model`, {
                 method: "GET",
                 headers: {
                     "Content-Type": "application/json",
@@ -28,7 +28,13 @@ export async function GET() {
             return NextResponse.json(data)
         } catch (error) {
             console.error(error)
-            return NextResponse.json({ error: (error as Error).message }, { status: 400 })
+            const { message } = (error as Error)
+
+            if (message.includes("fetch failed")) {
+                return NextResponse.json({ message: "Server is not available" }, { status: 200 })
+            }
+
+            return NextResponse.json({ error: message }, { status: 400 })
         }
     } catch (error) {
         console.error(error)

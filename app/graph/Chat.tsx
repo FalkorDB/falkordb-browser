@@ -1,6 +1,6 @@
 /* eslint-disable no-case-declarations */
 /* eslint-disable react/no-array-index-key */
-import { cn, Message } from "@/lib/utils"
+import { cn, Message, securedFetch } from "@/lib/utils"
 import { useContext, useEffect, useState } from "react"
 import { ChevronDown, ChevronRight, CircleArrowUp, Copy, Loader2, Play, Search, X } from "lucide-react"
 import { useToast } from "@/components/ui/use-toast"
@@ -18,7 +18,7 @@ export default function Chat({ onClose }: Props) {
     const { setIndicator } = useContext(IndicatorContext)
     const { graphName, runQuery } = useContext(GraphContext)
     const { isQueryLoading } = useContext(QueryLoadingContext)
-    const { settings: { secretKeySettings: { secretKey }, modelSettings: { model } } } = useContext(QuerySettingsContext)
+    const { settings: { chatSettings: { secretKey, model } } } = useContext(QuerySettingsContext)
 
     const { toast } = useToast()
 
@@ -87,7 +87,7 @@ export default function Chat({ onClose }: Props) {
         setNewMessage("")
 
         try {
-            const response = await fetch("/api/chat", {
+            const response = await securedFetch("/api/chat", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",

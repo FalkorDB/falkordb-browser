@@ -24,11 +24,9 @@ type QuerySettingsContextType = {
       newContentPersistence: boolean;
       setNewContentPersistence: Dispatch<SetStateAction<boolean>>;
     };
-    secretKeySettings: {
+    chatSettings: {
       newSecretKey: string;
       setNewSecretKey: Dispatch<SetStateAction<string>>;
-    };
-    modelSettings: {
       newModel: string;
       setNewModel: Dispatch<SetStateAction<string>>;
     };
@@ -56,13 +54,13 @@ type QuerySettingsContextType = {
       contentPersistence: boolean;
       setContentPersistence: Dispatch<SetStateAction<boolean>>;
     };
-    secretKeySettings: {
+    chatSettings: {
       secretKey: string;
       setSecretKey: Dispatch<SetStateAction<string>>;
-    };
-    modelSettings: {
       model: string;
       setModel: Dispatch<SetStateAction<string>>;
+      navigateToSettings: boolean;
+      setNavigateToSettings: Dispatch<SetStateAction<boolean>>;
     };
   };
   hasChanges: boolean;
@@ -133,8 +131,7 @@ export const QuerySettingsContext = createContext<QuerySettingsContextType>({
       newContentPersistence: false,
       setNewContentPersistence: () => {},
     },
-    secretKeySettings: { newSecretKey: "", setNewSecretKey: () => {} },
-    modelSettings: { newModel: "", setNewModel: () => {} },
+    chatSettings: { newSecretKey: "", setNewSecretKey: () => {}, newModel: "", setNewModel: () => {} },
   },
   settings: {
     limitSettings: {
@@ -153,8 +150,7 @@ export const QuerySettingsContext = createContext<QuerySettingsContextType>({
       contentPersistence: false,
       setContentPersistence: () => {},
     },
-    secretKeySettings: { secretKey: "", setSecretKey: () => {} },
-    modelSettings: { model: "", setModel: () => {} },
+    chatSettings: { secretKey: "", setSecretKey: () => {}, model: "", setModel: () => {}, navigateToSettings: false, setNavigateToSettings: () => {} },
   },
   hasChanges: false,
   setHasChanges: () => {},

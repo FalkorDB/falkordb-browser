@@ -41,7 +41,7 @@ export default function Header({ onSetGraphName, graphNames, graphName, setGraph
 
     const { indicator } = useContext(IndicatorContext)
     const { setPanel } = useContext(PanelContext)
-    const { hasChanges, saveSettings, resetSettings } = useContext(QuerySettingsContext)
+    const { hasChanges, saveSettings, resetSettings, settings: { chatSettings: { model, secretKey, navigateToSettings } } } = useContext(QuerySettingsContext)
 
     const { theme, setTheme } = useTheme()
     const { currentTheme } = getTheme(theme)
@@ -141,7 +141,13 @@ export default function Header({ onSetGraphName, graphNames, graphName, setGraph
                             className="Gradient bg-clip-text text-transparent font-semibold text-xl"
                             indicator={indicator}
                             label="CHAT"
-                            onClick={() => handleSetCurrentPanel("chat")}
+                            onClick={() => {
+                                if (navigateToSettings && (!model || !secretKey)) {
+                                    router.push("/settings")
+                                } else {
+                                    handleSetCurrentPanel("chat")
+                                }
+                            }}
                         />
                     </>
                 }
