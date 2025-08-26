@@ -98,7 +98,7 @@ export default function Chat({ onClose }: Props) {
                         content
                     })),
                     graphName,
-                    key: secretKey || process.env.DEFAULT_KEY,
+                    key: secretKey,
                     model,
                 })
             });
