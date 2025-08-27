@@ -1,5 +1,5 @@
 import { PlusCircle } from "lucide-react"
-import { Dispatch, SetStateAction, useCallback, useContext, useEffect, useRef, useState } from "react"
+import { useCallback, useContext, useEffect, useRef, useState } from "react"
 import { cn, GraphRef, handleZoomToFit } from "@/lib/utils"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
@@ -12,12 +12,12 @@ import { GraphContext } from "../components/provider"
 interface Props {
     graph: Graph
     selectedElements: (Node | Link)[]
-    setSelectedElement: Dispatch<SetStateAction<Node | Link | undefined>>
+    setSelectedElement: (el: Node | Link | undefined) => void
     handleDeleteElement: () => Promise<void>
     chartRef: GraphRef
     label: "Graph" | "Schema"
-    setIsAddEntity?: Dispatch<SetStateAction<boolean>>
-    setIsAddRelation?: Dispatch<SetStateAction<boolean>>
+    setIsAddEntity?: (isAdd: boolean) => void
+    setIsAddRelation?: (isAdd: boolean) => void
     backgroundColor?: string
     isLoadingSchema?: boolean
 }
@@ -305,8 +305,6 @@ export default function Toolbar({
                                         label="Add Node"
                                         onClick={() => {
                                             setIsAddEntity(true)
-                                            setIsAddRelation(false)
-                                            setSelectedElement(undefined)
                                             setAddOpen(false)
                                         }}
                                     >
@@ -318,9 +316,7 @@ export default function Toolbar({
                                         variant="Secondary"
                                         label="Add Edge"
                                         onClick={() => {
-                                            setIsAddEntity(false)
                                             setIsAddRelation(true)
-                                            setSelectedElement(undefined)
                                             setAddOpen(false)
                                         }}
                                     >

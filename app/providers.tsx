@@ -155,14 +155,18 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
     setEdgesCount(undefined);
     setNodesCount(undefined);
 
-    const result = await getSSEGraphResult(`api/graph/${prepareArg(graphName)}/count`, toast, setIndicator);
+    try {
+      const result = await getSSEGraphResult(`api/graph/${prepareArg(graphName)}/count`, toast, setIndicator);
 
-    if (!result) return;
+      if (!result) return;
 
-    const { nodes, edges } = result;
+      const { nodes, edges } = result;
 
-    setEdgesCount(edges);
-    setNodesCount(nodes);
+      setEdgesCount(edges);
+      setNodesCount(nodes);
+    } catch (error) {
+      console.debug(error)
+    }
   }, [graphName, toast, setIndicator, setEdgesCount, setNodesCount]);
 
   const handleCooldown = useCallback((ticks?: 0, isSetLoading: boolean = true) => {
@@ -226,6 +230,8 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       // eslint-disable-next-line @typescript-eslint/ban-ts-comment
       // @ts-ignore
       window.graph = g
+    } catch (error) {
+      console.debug(error)
     } finally {
       setIsQueryLoading(false)
     }

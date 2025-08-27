@@ -139,7 +139,7 @@ export interface Relationship extends InfoRelationship {
   textHeight?: number;
 }
 
-const getLabelWithFewestElements = (labels: Label[]): Label =>
+export const getLabelWithFewestElements = (labels: Label[]): Label =>
   labels.reduce(
     (prev, label) =>
       label.elements.length < prev.elements.length ? label : prev,
@@ -427,7 +427,7 @@ export class Graph {
     return graph;
   }
 
-  public extendNode(cell: NodeCell, collapsed: boolean, isSchema: boolean) {
+  public extendNode(cell: NodeCell, collapsed: boolean, isSchema: boolean, isColor = false) {
     const labels = this.createLabel(
       cell.labels.length === 0 ? [""] : cell.labels
     );
@@ -437,7 +437,7 @@ export class Graph {
       const node: Node = {
         id: cell.id,
         labels: labels.map((l) => l.name),
-        color: "",
+        color: isColor ? getLabelWithFewestElements(labels).color : "",
         visible: true,
         expand: false,
         collapsed,
@@ -458,7 +458,7 @@ export class Graph {
     if (currentNode.labels[0] === "") {
       currentNode.id = cell.id;
       currentNode.labels = labels.map((l) => l.name);
-      currentNode.color = "";
+      currentNode.color = isColor ? getLabelWithFewestElements(labels).color : "";
       currentNode.expand = false;
       currentNode.collapsed = collapsed;
       Object.entries(cell.properties).forEach(([key, value]) => {
@@ -487,7 +487,7 @@ export class Graph {
     return currentNode;
   }
 
-  public extendEdge(cell: LinkCell, collapsed: boolean, isSchema: boolean) {
+  public extendEdge(cell: LinkCell, collapsed: boolean, isSchema: boolean, isColor = false) {
     const relation = this.createRelationship(cell.relationshipType);
     const currentEdge = this.linksMap.get(cell.id);
 
@@ -503,7 +503,7 @@ export class Graph {
           source = {
             id: cell.sourceId,
             labels: [label.name],
-            color: "",
+            color: isColor ? label.color : "",
             expand: false,
             collapsed,
             visible: true,
@@ -540,7 +540,7 @@ export class Graph {
           source = {
             id: cell.sourceId,
             labels: [label!.name],
-            color: "",
+            color: isColor ? label!.color : "",
             expand: false,
             collapsed,
             visible: true,
@@ -557,7 +557,7 @@ export class Graph {
           target = {
             id: cell.destinationId,
             labels: [label!.name],
-            color: "",
+            color: isColor ? label!.color : "",
             expand: false,
             collapsed,
             visible: true,

@@ -10,7 +10,7 @@ export default function GraphInfoPanel({ isOpen, onClose }: { isOpen: boolean; o
     const { isQueryLoading } = useContext(QueryLoadingContext)
 
     return (
-        <div className={cn(`relative flex flex-col gap-8 overflow-y-auto border-border transition-all overflow-hidden`, isOpen ? 'w-fit opacity-100 p-6 border-r' : 'w-0 opacity-0')}>
+        <div className={cn(`relative flex flex-col gap-8 overflow-y-auto border-border transition-all overflow-hidden max-w-[30dvw]`, isOpen ? 'w-fit opacity-100 p-6 border-r' : 'w-0 opacity-0')}>
             <Button
                 className="absolute top-2 right-2"
                 title="Close"

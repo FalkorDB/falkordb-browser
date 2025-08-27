@@ -26,19 +26,21 @@ interface Props {
     setOptions: Dispatch<SetStateAction<string[]>>
     graphName: string
     setGraphName: Dispatch<SetStateAction<string>>
+    setGraph: Dispatch<SetStateAction<Graph>>
+    // graph
     runQuery?: (query: string) => Promise<void>
     historyQuery?: HistoryQuery
     setHistoryQuery?: Dispatch<SetStateAction<HistoryQuery>>
     fetchCount?: () => Promise<void>
-    selectedElements: (Node | Link)[]
-    setSelectedElement: Dispatch<SetStateAction<Node | Link | undefined>>
-    handleDeleteElement: () => Promise<void>
-    chartRef: GraphRef
-    setGraph: Dispatch<SetStateAction<Graph>>
-    setIsAddEntity?: Dispatch<SetStateAction<boolean>>
-    setIsAddRelation?: Dispatch<SetStateAction<boolean>>
-    isCanvasLoading?: boolean
     isQueryLoading?: boolean
+    // schema
+    selectedElements?: (Node | Link)[]
+    setSelectedElement?: (el: Node | Link | undefined) => void
+    handleDeleteElement?: () => Promise<void>
+    chartRef?: GraphRef
+    setIsAddEntity?: (isAdd: boolean) => void
+    setIsAddRelation?: (isAdd: boolean) => void
+    isCanvasLoading?: boolean
 }
 
 const STEP = 8
@@ -365,7 +367,7 @@ export default function Selector({ graph, options, setOptions, graphName, setGra
                             </Button>
                         </div>
                     </>
-                    : <div className="w-full h-full">
+                    : selectedElements && setSelectedElement && handleDeleteElement && handleDeleteElement && setIsAddEntity && setIsAddRelation && chartRef && isCanvasLoading !== undefined && <div className="w-full h-full">
                         <Toolbar
                             graph={graph}
                             label={type}
@@ -388,6 +390,10 @@ Selector.defaultProps = {
     runQuery: undefined,
     historyQuery: undefined,
     setHistoryQuery: undefined,
+    selectedElements: undefined,
+    setSelectedElement: undefined,
+    handleDeleteElement: undefined,
+    chartRef: undefined,
     setIsAddEntity: undefined,
     setIsAddRelation: undefined,
     fetchCount: undefined,

@@ -17,7 +17,7 @@ import { IndicatorContext } from "../components/provider";
 
 interface Props {
   onCreate: (element: [string, string[]][], label?: string[]) => Promise<boolean>
-  setIsAdd: Dispatch<SetStateAction<boolean>>
+  setIsAdd: (isAdd: boolean) => void
   selectedNodes: [Node | undefined, Node | undefined]
   setSelectedNodes: Dispatch<SetStateAction<[Node | undefined, Node | undefined]>>
   type: boolean

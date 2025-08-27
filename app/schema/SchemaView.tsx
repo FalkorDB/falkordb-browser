@@ -15,7 +15,7 @@ interface Props {
     edgesCount: number | undefined
     nodesCount: number | undefined
     selectedElement: Node | Link | undefined
-    setSelectedElement: Dispatch<SetStateAction<Node | Link | undefined>>
+    setSelectedElement: (el: Node | Link | undefined) => void
     selectedElements: (Node | Link)[]
     setSelectedElements: Dispatch<SetStateAction<(Node | Link)[]>>
     isAddRelation: boolean
@@ -106,9 +106,9 @@ export default function SchemaView({
                     {
                         !isLoading && (labels.length > 0 || relationships.length > 0) &&
                         <div className="w-fit flex flex-col h-full gap-4">
-                            {labels.length > 0 && <Labels labels={labels} onClick={onLabelClick} label="Labels" type="Graph" />}
+                            {labels.length > 0 && <Labels labels={labels} onClick={onLabelClick} label="Labels" type="Schema" />}
                             {relationships.length > 0 && labels.length > 0 && <div className="h-px bg-border rounded-full" />}
-                            {relationships.length > 0 && <Labels labels={relationships} onClick={onRelationshipClick} label="Relationships" type="Graph" />}
+                            {relationships.length > 0 && <Labels labels={relationships} onClick={onRelationshipClick} label="Relationships" type="Schema" />}
                         </div>
                     }
                 </div>

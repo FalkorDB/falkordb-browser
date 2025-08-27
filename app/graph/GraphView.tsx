@@ -24,7 +24,7 @@ interface Props {
     data: GraphData
     setData: Dispatch<SetStateAction<GraphData>>
     selectedElement: Node | Link | undefined
-    setSelectedElement: Dispatch<SetStateAction<Node | Link | undefined>>
+    setSelectedElement: (el: Node | Link | undefined) => void
     selectedElements: (Node | Link)[]
     setSelectedElements: Dispatch<SetStateAction<(Node | Link)[]>>
     chartRef: GraphRef

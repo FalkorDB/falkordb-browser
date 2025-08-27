@@ -10,7 +10,7 @@ import { securedFetch, GraphRef, handleZoomToFit, getTheme } from "@/lib/utils"
 import { useToast } from "@/components/ui/use-toast"
 import * as d3 from "d3"
 import { useTheme } from "next-themes"
-import { GraphData, Link, Node, Relationship, Graph } from "../api/graph/model"
+import { GraphData, Link, Node, Relationship, Graph, getLabelWithFewestElements } from "../api/graph/model"
 import { IndicatorContext } from "./provider"
 import Spinning from "./ui/spinning"
 
@@ -26,8 +26,6 @@ interface Props {
     type?: "schema" | "graph"
     isAddElement?: boolean
     setSelectedNodes?: Dispatch<SetStateAction<[Node | undefined, Node | undefined]>>
-    setIsAddEntity?: Dispatch<SetStateAction<boolean>>
-    setIsAddRelation?: Dispatch<SetStateAction<boolean>>
     setRelationships: Dispatch<SetStateAction<Relationship[]>>
     parentHeight: number
     parentWidth: number
@@ -93,8 +91,6 @@ export default function ForceGraph({
     type = "graph",
     isAddElement = false,
     setSelectedNodes,
-    setIsAddEntity = () => { },
-    setIsAddRelation = () => { },
     setRelationships,
     parentHeight,
     parentWidth,
@@ -285,9 +281,8 @@ export default function ForceGraph({
                 setSelectedElements([...selectedElements, element])
             }
         }
+        
         setSelectedElement(element)
-        setIsAddEntity(false)
-        setIsAddRelation(false)
     }
 
     const handleUnselected = (evt?: MouseEvent) => {
@@ -362,7 +357,7 @@ export default function ForceGraph({
                         if (type === "graph") {
                             name = getNodeDisplayText(node)
                         } else {
-                            [name] = node.labels
+                            name = getLabelWithFewestElements(node.labels.map(label => graph.LabelsMap.get(label) || graph.createLabel([label])[0])).name
                         }
 
                         // truncate text if it's too long
@@ -497,9 +492,4 @@ export default function ForceGraph({
             />
         </div>
     )
-}
-
-ForceGraph.defaultProps = {
-    setIsAddEntity: () => { },
-    setIsAddRelation: () => { },
 }

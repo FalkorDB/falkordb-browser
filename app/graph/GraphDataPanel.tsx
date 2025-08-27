@@ -18,7 +18,7 @@ import RemoveLabel from "./RemoveLabel";
 
 interface Props {
     object: Node | Link;
-    setObject: Dispatch<SetStateAction<Node | Link | undefined>>;
+    setObject: (el: Node | Link | undefined) => void;
     onDeleteElement: () => Promise<void>;
     setLabels: Dispatch<SetStateAction<Label[]>>;
 }

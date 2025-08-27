@@ -64,27 +64,67 @@ export default function Page() {
         return [0, 100]
     }, [selectedElement, isAddEntity, isAddRelation])
 
-    useEffect(() => {
+    const handleSetSelectedElement = useCallback((el: Node | Link | undefined) => {
+        setSelectedElement(el)
+        if (el) {
+            setIsAddEntity(false)
+            setIsAddRelation(false)
+        }
+
         const currentPanel = panelRef.current
 
         if (!currentPanel) return
 
-        if (isAddEntity || isAddRelation || selectedElement) currentPanel.expand()
+        if (el) currentPanel.expand()
         else currentPanel.collapse()
-    }, [isAddEntity, isAddRelation, selectedElement])
+    }, [])
+
+    const handleSetIsAddEntity = useCallback((isAdd: boolean) => {
+        const currentPanel = panelRef.current
+        setIsAddEntity(isAdd)
+
+        if (isAdd) {
+            setIsAddRelation(false)
+            setSelectedElement(undefined)
+        }
+
+        if (!currentPanel) return
+
+        if (isAdd) currentPanel.expand()
+        else currentPanel.collapse()
+    }, [])
+
+    const handleSetIsAddRelation = useCallback((isAdd: boolean) => {
+        const currentPanel = panelRef.current
+        setIsAddRelation(isAdd)
+
+        if (isAdd) {
+            setIsAddEntity(false)
+            setSelectedElement(undefined)
+        }
+
+        if (!currentPanel) return
+
+        if (isAdd) currentPanel.expand()
+        else currentPanel.collapse()
+    }, [])
 
     const fetchCount = useCallback(async () => {
         setEdgesCount(undefined)
         setNodesCount(undefined)
 
-        const result = await getSSEGraphResult(`api/schema/${prepareArg(schemaName)}/count`, toast, setIndicator)
+        try {
+            const result = await getSSEGraphResult(`api/schema/${prepareArg(schemaName)}/count`, toast, setIndicator)
 
-        if (!result) return
+            if (!result) return
 
-        const { edges, nodes } = result
+            const { edges, nodes } = result
 
-        setEdgesCount(edges)
-        setNodesCount(nodes)
+            setEdgesCount(edges)
+            setNodesCount(nodes)
+        } catch (error) {
+            console.debug(error)
+        }
     }, [toast, setIndicator, schemaName])
 
     const handleCooldown = (ticks?: 0, isSetLoading = true) => {
@@ -195,13 +235,13 @@ export default function Page() {
             const json = await result.json()
 
             if (isAddEntity) {
-                const { labels: ls } = schema.extendNode(json.result.data[0].n, false, true)!
+                const { labels: ls } = schema.extendNode(json.result.data[0].n, false, true, true)
                 setLabels(prev => [...prev, ...ls.filter(c => !prev.some(p => p.name === c)).map(c => schema.LabelsMap.get(c)!)])
-                setIsAddEntity(false)
+                handleSetIsAddEntity(false)
             } else {
-                const { relationship } = schema.extendEdge(json.result.data[0].e, false, true)!
+                const { relationship } = schema.extendEdge(json.result.data[0].e, false, true)
                 setRelationships(prev => [...prev, schema.RelationshipsMap.get(relationship)!])
-                setIsAddRelation(false)
+                handleSetIsAddRelation(false)
             }
 
             fetchCount()
@@ -216,12 +256,6 @@ export default function Page() {
         return result.ok
     }
 
-    const handleClosePanel = useCallback(() => {
-        setSelectedElement(undefined)
-        setIsAddEntity(false)
-        setIsAddRelation(false)
-    }, [setSelectedElement, setIsAddEntity, setIsAddRelation])
-
     return (
         <div className="Page gap-8 p-8">
             <Selector
@@ -231,11 +265,11 @@ export default function Page() {
                 graphName={schemaName}
                 setGraphName={setSchemaName}
                 selectedElements={selectedElements}
-                setSelectedElement={setSelectedElement}
+                setSelectedElement={handleSetSelectedElement}
                 handleDeleteElement={handleDeleteElement}
                 chartRef={chartRef}
-                setIsAddEntity={setIsAddEntity}
-                setIsAddRelation={setIsAddRelation}
+                setIsAddEntity={handleSetIsAddEntity}
+                setIsAddRelation={handleSetIsAddRelation}
                 setGraph={setSchema}
                 isCanvasLoading={isCanvasLoading}
             />
@@ -245,7 +279,7 @@ export default function Page() {
                         edgesCount={edgesCount}
                         nodesCount={nodesCount}
                         selectedElement={selectedElement}
-                        setSelectedElement={setSelectedElement}
+                        setSelectedElement={handleSetSelectedElement}
                         selectedElements={selectedElements}
                         setSelectedElements={setSelectedElements}
                         isAddRelation={isAddRelation}
@@ -262,7 +296,7 @@ export default function Page() {
                         isLoading={isCanvasLoading}
                     />
                 </ResizablePanel>
-                <ResizableHandle withHandle onMouseUp={() => isCollapsed && handleClosePanel()} className={cn("ml-6 w-0", isCollapsed && "hidden")} />
+                <ResizableHandle withHandle onMouseUp={() => isCollapsed && handleSetSelectedElement(undefined)} className={cn("ml-6 w-0", isCollapsed && "hidden")} />
                 <ResizablePanel
                     ref={panelRef}
                     collapsible
@@ -280,7 +314,7 @@ export default function Page() {
                         selectedElement ?
                             <SchemaDataPanel
                                 object={selectedElement}
-                                setObject={setSelectedElement}
+                                setObject={handleSetSelectedElement}
                                 onDeleteElement={handleDeleteElement}
                                 schema={schema}
                                 setLabels={setLabels}
@@ -288,7 +322,7 @@ export default function Page() {
                             : (isAddRelation || isAddEntity) &&
                             <SchemaCreateElement
                                 onCreate={onCreateElement}
-                                setIsAdd={isAddRelation ? setIsAddRelation : setIsAddEntity}
+                                setIsAdd={isAddRelation ? handleSetIsAddRelation : handleSetIsAddEntity}
                                 selectedNodes={selectedNodes}
                                 setSelectedNodes={setSelectedNodes}
                                 type={isAddEntity}

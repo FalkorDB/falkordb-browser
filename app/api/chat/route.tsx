@@ -27,13 +27,13 @@ export async function GET() {
 
             return NextResponse.json(data)
         } catch (error) {
-            console.error(error)
             const { message } = (error as Error)
-
+            
             if (message.includes("fetch failed")) {
                 return NextResponse.json({ message: "Server is not available" }, { status: 200 })
             }
-
+            
+            console.error(error)
             return NextResponse.json({ error: message }, { status: 400 })
         }
     } catch (error) {

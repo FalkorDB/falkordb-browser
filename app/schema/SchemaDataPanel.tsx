@@ -4,7 +4,7 @@
 "use client";
 
 import { Check, Pencil, PlusCircle, Trash2, X } from "lucide-react";
-import { SetStateAction, Dispatch, useContext, useEffect, useState, useCallback } from "react";
+import { useContext, useEffect, useState, useCallback } from "react";
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from "@/components/ui/use-toast";
 import { useSession } from "next-auth/react";
@@ -23,7 +23,7 @@ import { IndicatorContext } from "../components/provider";
 
 interface Props {
     object: Node | Link
-    setObject: Dispatch<SetStateAction<Node | Link | undefined>>
+    setObject: (el: Node | Link | undefined) => void
     onDeleteElement: () => Promise<void>;
     schema: Graph
     setLabels: (labels: Label[]) => void

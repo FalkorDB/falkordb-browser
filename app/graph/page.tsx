@@ -81,21 +81,17 @@ export default function Page() {
     }, [panel])
 
     useEffect(() => {
-        if (panel !== "data") setSelectedElement(undefined)
+        if (panel !== "data") {
+            setSelectedElement(undefined)
+        }
 
         const currentPanel = panelRef.current
+        
         if (!currentPanel) return
+
         if (panel) currentPanel.expand()
         else currentPanel.collapse()
     }, [panel])
-
-    useEffect(() => {
-        if (!selectedElement && panel === "data") setPanel(undefined)
-    }, [selectedElement, setPanel, graphName, panel])
-
-    useEffect(() => {
-        if (selectedElement) setPanel("data")
-    }, [selectedElement, setPanel])
 
     const fetchInfo = useCallback(async (type: string) => {
         if (!graphName) return []
@@ -166,10 +162,22 @@ export default function Page() {
         setIsQueryLoading(false)
     }, [fetchCount, graph.Id, graphName, setGraph, runDefaultQuery, defaultQuery, contentPersistence, setGraphName, graphNames, graphInfo])
 
+    const handleSetSelectedElement = useCallback((el: Node | Link | undefined) => {
+        setSelectedElement(el)
+        setPanel(el ? "data" : undefined)
+
+        const currentPanel = panelRef.current
+
+        if (!currentPanel) return
+
+        if (el) currentPanel.expand()
+        else currentPanel.collapse()
+    }, [setPanel])
+
     const handleDeleteElement = useCallback(async () => {
         if (selectedElements.length === 0 && selectedElement) {
             selectedElements.push(selectedElement)
-            setSelectedElement(undefined)
+            handleSetSelectedElement(undefined)
         }
 
         await Promise.all(selectedElements.map(async (element) => {
@@ -212,24 +220,16 @@ export default function Page() {
 
         graph.removeElements(selectedElements)
 
+        setRelationships(graph.removeLinks(selectedElements.map((element) => element.id)))
+        setData({ ...graph.Elements })
         fetchCount()
         setSelectedElements([])
-        setSelectedElement(undefined)
 
-        setRelationships(graph.removeLinks(selectedElements.map((element) => element.id)))
-
-        setData({ ...graph.Elements })
         toast({
             title: "Success",
             description: `${selectedElements.length > 1 ? "Elements" : "Element"} deleted`,
         })
-        setSelectedElement(undefined)
-        setSelectedElements([])
-    }, [selectedElements, selectedElement, graph, fetchCount, toast, setIndicator])
-
-    const handleClosePanel = useCallback(() => {
-        setPanel(undefined)
-    }, [setPanel])
+    }, [selectedElements, selectedElement, graph, fetchCount, handleSetSelectedElement, toast, setIndicator])
 
     const getCurrentPanel = useCallback(() => {
         if (!graphName) return undefined
@@ -238,20 +238,20 @@ export default function Page() {
             case "chat":
                 return (
                     <Chat
-                        onClose={handleClosePanel}
+                        onClose={() => setPanel(undefined)}
                     />
                 )
             case "data":
                 return <GraphDataPanel
                     object={selectedElement!}
-                    setObject={setSelectedElement}
+                    setObject={handleSetSelectedElement}
                     onDeleteElement={handleDeleteElement}
                     setLabels={setLabels}
                 />
             default:
                 return undefined
         }
-    }, [graphName, selectedElement, handleDeleteElement, panel, handleClosePanel])
+    }, [graphName, panel, selectedElement, handleSetSelectedElement, handleDeleteElement, setPanel])
 
     return (
         <div className="Page p-8 gap-8">
@@ -261,14 +261,10 @@ export default function Page() {
                 setOptions={setGraphNames}
                 graphName={graphName}
                 setGraphName={setGraphName}
+                setGraph={setGraph}
                 runQuery={runQuery}
                 historyQuery={historyQuery}
                 setHistoryQuery={setHistoryQuery}
-                selectedElements={selectedElements}
-                setSelectedElement={setSelectedElement}
-                handleDeleteElement={handleDeleteElement}
-                chartRef={chartRef}
-                setGraph={setGraph}
                 fetchCount={fetchCount}
                 isQueryLoading={isQueryLoading}
             />
@@ -276,7 +272,7 @@ export default function Page() {
                 <ResizablePanel defaultSize={graphSize} minSize={50} maxSize={100}>
                     <GraphView
                         selectedElement={selectedElement}
-                        setSelectedElement={setSelectedElement}
+                        setSelectedElement={handleSetSelectedElement}
                         selectedElements={selectedElements}
                         setSelectedElements={setSelectedElements}
                         chartRef={chartRef}
@@ -295,7 +291,7 @@ export default function Page() {
                         setHistoryQuery={setHistoryQuery}
                     />
                 </ResizablePanel>
-                <ResizableHandle withHandle onMouseUp={() => isCollapsed && handleClosePanel()} className={cn("ml-6 w-0", isCollapsed && "hidden")} />
+                <ResizableHandle withHandle onMouseUp={() => isCollapsed && handleSetSelectedElement(undefined)} className={cn("ml-6 w-0", isCollapsed && "hidden")} />
                 <ResizablePanel
                     ref={panelRef}
                     collapsible
