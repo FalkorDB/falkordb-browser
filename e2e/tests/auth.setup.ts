@@ -11,7 +11,7 @@ const adminAuthFile = 'playwright/.auth/admin.json'
 const readWriteAuthFile = 'playwright/.auth/readwriteuser.json'
 const readOnlyAuthFile = 'playwright/.auth/readonlyuser.json'
 
-setup.skip("setup authentication", async () => {
+setup("setup authentication", async () => {
     try {
         const browserWrapper = new BrowserWrapper();
         const loginPage = await browserWrapper.createNewPage(LoginPage, urls.loginUrl);
