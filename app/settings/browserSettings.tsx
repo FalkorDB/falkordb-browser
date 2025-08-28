@@ -171,7 +171,7 @@ export default function BrowserSettings() {
                         <div className="flex justify-between items-center">
                             <div className="flex gap-4 items-center">
                                 <Switch
-                                    id="runDefaultQueryCheckboxOn"
+                                    id="runDefaultQuerySwitch"
                                     className="data-[state=unchecked]:bg-border"
                                     checked={newRunDefaultQuery}
                                     onCheckedChange={() => setNewRunDefaultQuery(prev => !prev)}
@@ -218,7 +218,7 @@ export default function BrowserSettings() {
                         </div>
                         <div className="flex gap-4 items-center">
                             <Switch
-                                id="contentPersistenceCheckboxOn"
+                                id="contentPersistenceSwitch"
                                 className="data-[state=unchecked]:bg-border"
                                 checked={newContentPersistence}
                                 onCheckedChange={() => setNewContentPersistence(prev => !prev)}

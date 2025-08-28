@@ -31,12 +31,8 @@ export default class SettingsQueryPage extends GraphPage {
     return this.page.locator("#decreaseTimeoutBtn");
   }
 
-  private get runDefaultQueryCheckboxOn(): Locator {
-    return this.page.locator("#runDefaultQueryCheckboxOn");
-  }
-
-  private get runDefaultQueryCheckboxOff(): Locator {
-    return this.page.locator("#runDefaultQueryCheckboxOff");
+  private get runDefaultQuerySwitch(): Locator {
+    return this.page.locator("#runDefaultQuerySwitch");
   }
 
   private get runDefaultQueryInput(): Locator {
@@ -47,12 +43,8 @@ export default class SettingsQueryPage extends GraphPage {
     return this.page.locator("#runDefaultQueryResetBtn");
   }
 
-  private get contentPersistenceCheckboxOn(): Locator {
-    return this.page.locator("#contentPersistenceCheckboxOn");
-  }
-
-  private get contentPersistenceCheckboxOff(): Locator {
-    return this.page.locator("#contentPersistenceCheckboxOff");
+  private get contentPersistenceSwitch(): Locator {
+    return this.page.locator("#contentPersistenceSwitch");
   }
 
   private get cancelQuerySettingsBtn(): Locator {
@@ -145,35 +137,33 @@ export default class SettingsQueryPage extends GraphPage {
     return timeout;
   }
 
-  async checkRunDefaultQueryCheckboxOn(): Promise<void> {
+  async clickRunDefaultQuerySwitchOn(): Promise<void> {
     await interactWhenVisible(
-      this.runDefaultQueryCheckboxOn,
-      (el) => el.check(),
-      "check run default query ON checkbox"
+      this.runDefaultQuerySwitch,
+      async (el) => {
+        if ((await el.getAttribute("data-state")) === "checked") return;
+        el.click();
+      },
+      "check run default query ON switch"
     );
   }
 
-  async getRunDefaultQueryCheckboxOn(): Promise<boolean> {
-    return interactWhenVisible(
-      this.runDefaultQueryCheckboxOn,
-      (el) => el.isChecked(),
-      "check run default query ON checkbox"
-    );
-  }
-
-  async checkRunDefaultQueryCheckboxOff(): Promise<void> {
+  async clickRunDefaultQuerySwitchOff(): Promise<void> {
     await interactWhenVisible(
-      this.runDefaultQueryCheckboxOff,
-      (el) => el.check(),
-      "check run default query OFF checkbox"
+      this.runDefaultQuerySwitch,
+      async (el) => {
+        if ((await el.getAttribute("data-state")) === "unchecked") return;
+        el.click();
+      },
+      "check run default query OFF switch"
     );
   }
 
-  async getRunDefaultQueryCheckboxOff(): Promise<boolean> {
+  async getRunDefaultQuerySwitch(): Promise<boolean> {
     return interactWhenVisible(
-      this.runDefaultQueryCheckboxOff,
-      (el) => el.isChecked(),
-      "check run default query OFF checkbox"
+      this.runDefaultQuerySwitch,
+      async (el) => (await el.getAttribute("data-state")) === "checked",
+      "get run default query switch"
     );
   }
 
@@ -199,35 +189,33 @@ export default class SettingsQueryPage extends GraphPage {
     await waitForElementToNotBeVisible(this.runDefaultQueryInput, 1000);
   }
 
-  async checkContentPersistenceCheckboxOn(): Promise<void> {
+  async clickContentPersistenceSwitchOn(): Promise<void> {
     await interactWhenVisible(
-      this.contentPersistenceCheckboxOn,
-      (el) => el.check(),
-      "check content persistence ON checkbox"
+      this.contentPersistenceSwitch,
+      async (el) => {
+        if ((await el.getAttribute("data-state")) === "checked") return;
+        el.click();
+      },
+      "check content persistence ON switch"
     );
   }
 
-  async getContentPersistenceCheckboxOn(): Promise<boolean> {
-    return interactWhenVisible(
-      this.contentPersistenceCheckboxOn,
-      (el) => el.isChecked(),
-      "check content persistence ON checkbox"
-    );
-  }
-
-  async checkContentPersistenceCheckboxOff(): Promise<void> {
+  async clickContentPersistenceSwitchOff(): Promise<void> {
     await interactWhenVisible(
-      this.contentPersistenceCheckboxOff,
-      (el) => el.check(),
-      "check content persistence OFF checkbox"
+      this.contentPersistenceSwitch,
+      async (el) => {
+        if ((await el.getAttribute("data-state")) === "unchecked") return;
+        el.click();
+      },
+      "check content persistence OFF switch"
     );
   }
 
-  async getContentPersistenceCheckboxOff(): Promise<boolean> {
+  async getContentPersistenceSwitch(): Promise<boolean> {
     return interactWhenVisible(
-      this.contentPersistenceCheckboxOff,
-      (el) => el.isChecked(),
-      "check content persistence OFF checkbox"
+      this.contentPersistenceSwitch,
+      async (el) => (await el.getAttribute("data-state")) === "checked",
+      "check content persistence ON switch"
     );
   }
 
@@ -243,9 +231,7 @@ export default class SettingsQueryPage extends GraphPage {
     if (await waitForElementToBeVisible(this.saveQuerySettingsBtn, 1000)) {
       await this.saveQuerySettingsBtn.click();
     } else {
-      throw new Error(
-        "Save Query Settings button not visible after 1s"
-      )
+      throw new Error("Save Query Settings button not visible after 1s");
     }
   }
 }

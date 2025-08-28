@@ -126,7 +126,7 @@ test.describe.serial("Query Settings", () => {
       urls.settingsUrl
     );
     const defaultQuery = "MATCH (n) RETURN n";
-    await querySettings.checkRunDefaultQueryCheckboxOn();
+    await querySettings.clickRunDefaultQuerySwitchOn();
     await querySettings.fillRunDefaultQueryInput(defaultQuery);
     await querySettings.clickSaveQuerySettingsBtn();
     await querySettings.refreshPage();
@@ -140,7 +140,7 @@ test.describe.serial("Query Settings", () => {
       urls.settingsUrl
     );
     const defaultQuery = "MATCH (n) RETURN n";
-    await querySettings.checkRunDefaultQueryCheckboxOn();
+    await querySettings.clickRunDefaultQuerySwitchOn();
     await querySettings.fillRunDefaultQueryInput(defaultQuery);
     await querySettings.clickSaveQuerySettingsBtn();
     await querySettings.refreshPage();
@@ -157,18 +157,18 @@ test.describe.serial("Query Settings", () => {
       QuerySettingsPage,
       urls.settingsUrl
     );
-    await querySettings.checkRunDefaultQueryCheckboxOn();
+    await querySettings.clickRunDefaultQuerySwitchOn();
     await querySettings.clickSaveQuerySettingsBtn();
     await querySettings.refreshPage();
-    const runDefaultQueryCheckboxOn =
-      await querySettings.getRunDefaultQueryCheckboxOn();
-    expect(runDefaultQueryCheckboxOn).toBe(true);
-    await querySettings.checkRunDefaultQueryCheckboxOff();
+    const runDefaultQuerySwitchOn =
+      await querySettings.getRunDefaultQuerySwitch();
+    expect(runDefaultQuerySwitchOn).toBeTruthy();
+    await querySettings.clickRunDefaultQuerySwitchOff();
     await querySettings.clickSaveQuerySettingsBtn();
     await querySettings.refreshPage();
-    const runDefaultQueryCheckboxOff =
-      await querySettings.getRunDefaultQueryCheckboxOff();
-    expect(runDefaultQueryCheckboxOff).toBe(true);
+    const runDefaultQuerySwitchOff =
+      await querySettings.getRunDefaultQuerySwitch();
+    expect(runDefaultQuerySwitchOff).toBeFalsy();
   });
 
   test(`@admin Validate that content persistence is set and saved`, async () => {
@@ -176,18 +176,18 @@ test.describe.serial("Query Settings", () => {
       QuerySettingsPage,
       urls.settingsUrl
     );
-    await querySettings.checkContentPersistenceCheckboxOn();
+    await querySettings.clickContentPersistenceSwitchOn();
     await querySettings.clickSaveQuerySettingsBtn();
     await querySettings.refreshPage();
-    const contentPersistenceCheckboxOn =
-      await querySettings.getContentPersistenceCheckboxOn();
-    expect(contentPersistenceCheckboxOn).toBe(true);
-    await querySettings.checkContentPersistenceCheckboxOff();
+    const contentPersistenceSwitchOn =
+      await querySettings.getContentPersistenceSwitch();
+    expect(contentPersistenceSwitchOn).toBeTruthy();
+    await querySettings.clickContentPersistenceSwitchOff();
     await querySettings.clickSaveQuerySettingsBtn();
     await querySettings.refreshPage();
-    const contentPersistenceCheckboxOff =
-      await querySettings.getContentPersistenceCheckboxOff();
-    expect(contentPersistenceCheckboxOff).toBe(true);
+    const contentPersistenceSwitchOff =
+      await querySettings.getContentPersistenceSwitch();
+    expect(contentPersistenceSwitchOff).toBeFalsy();
   });
 
   test(`@admin Validate that when run default query is on default query will run when graph is selected`, async () => {
@@ -198,7 +198,7 @@ test.describe.serial("Query Settings", () => {
       urls.settingsUrl
     );
     const defaultQuery = "MATCH (n) RETURN n";
-    await querySettings.checkRunDefaultQueryCheckboxOn();
+    await querySettings.clickRunDefaultQuerySwitchOn();
     await querySettings.fillRunDefaultQueryInput(defaultQuery);
     await querySettings.clickSaveQuerySettingsBtn();
     await querySettings.clickGraphsTabInHeader();
@@ -220,8 +220,8 @@ test.describe.serial("Query Settings", () => {
       QuerySettingsPage,
       urls.settingsUrl
     );
-    await querySettings.checkRunDefaultQueryCheckboxOn();
-    await querySettings.checkContentPersistenceCheckboxOn();
+    await querySettings.clickRunDefaultQuerySwitchOn();
+    await querySettings.clickContentPersistenceSwitchOn();
     await querySettings.clickSaveQuerySettingsBtn();
     await querySettings.clickGraphsTabInHeader();
     await querySettings.selectGraphByName(graphName);
