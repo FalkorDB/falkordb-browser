@@ -221,7 +221,7 @@ export default function GraphDataTable({ graph, object, type, onDeleteElement, l
         <div className={cn("flex flex-col bg-background rounded-lg overflow-hidden", className)}>
             <Table parentRef={scrollableContainerRef} parentClassName="grow">
                 <TableHeader>
-                    <TableRow>
+                    <TableRow className="border-border">
                         <TableHead className="w-6"><div className="h-12 w-6" /></TableHead>
                         <TableHead>Key</TableHead>
                         <TableHead>Value</TableHead>
@@ -234,6 +234,7 @@ export default function GraphDataTable({ graph, object, type, onDeleteElement, l
 
                             return (
                                 <TableRow
+                                    className="border-border"
                                     data-testid={`DataPanelAttribute${key}`}
                                     onMouseEnter={() => setHover(key)}
                                     onMouseLeave={() => setHover("")}
@@ -391,7 +392,7 @@ export default function GraphDataTable({ graph, object, type, onDeleteElement, l
                     }
                 </TableBody >
             </Table >
-            <div className="flex justify-between gap-4 p-4">
+            <div className="flex flex-wrap justify-between gap-4 p-4">
                 {
                     session?.user?.role !== "Read-Only" &&
                     <Button

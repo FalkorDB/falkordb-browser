@@ -1,14 +1,16 @@
 import { useContext } from "react";
 import { Loader2, X } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { cn } from "@/lib/utils";
 import Button from "../components/ui/Button";
-import { GraphContext } from "../components/provider";
+import { GraphContext, QueryLoadingContext } from "../components/provider";
 
-export default function GraphInfoPanel({ onClose }: { onClose: () => void }) {
+export default function GraphInfoPanel({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
     const { graphInfo, nodesCount, edgesCount, runQuery, graphName } = useContext(GraphContext);
+    const { isQueryLoading } = useContext(QueryLoadingContext)
 
     return (
-        <div className="relative p-6 flex flex-col gap-8 overflow-y-auto max-w-[20dvw]">
+        <div className={cn(`relative flex flex-col gap-8 overflow-y-auto border-border transition-all overflow-hidden max-w-[30dvw]`, isOpen ? 'w-fit opacity-100 p-6 border-r' : 'w-0 opacity-0')}>
             <Button
                 className="absolute top-2 right-2"
                 title="Close"
@@ -54,10 +56,11 @@ export default function GraphInfoPanel({ onClose }: { onClose: () => void }) {
                 <ul className="flex flex-wrap gap-2 p-2">
                     <li className="max-w-full">
                         <Button
-                            className="h-6 w-full p-2 rounded-full flex justify-center items-center bg-gray-400 text-black"
+                            className="h-6 w-6 rounded-full flex justify-center items-center bg-border text-white"
                             label="*"
                             title="All labels"
                             onClick={() => runQuery(`MATCH (n) RETURN n`)}
+                            disabled={isQueryLoading}
                         />
                     </li>
                     {Array.from(graphInfo.Labels.values()).filter(({ name }) => !!name).map(({ name, color }) => (
@@ -67,6 +70,7 @@ export default function GraphInfoPanel({ onClose }: { onClose: () => void }) {
                                 className="h-6 w-full p-2 rounded-full flex justify-center items-center text-black"
                                 label={name}
                                 onClick={() => runQuery(`MATCH (n:${name}) RETURN n`)}
+                                disabled={isQueryLoading}
                             />
                         </li>
                     ))}
@@ -96,10 +100,11 @@ export default function GraphInfoPanel({ onClose }: { onClose: () => void }) {
                 <ul className="flex flex-wrap gap-2 p-2">
                     <li className="max-w-full">
                         <Button
-                            className="h-6 w-full p-2 rounded-full flex justify-center items-center bg-gray-400 text-black"
+                            className="h-6 w-6 rounded-full flex justify-center items-center bg-border text-white"
                             label="*"
                             title="All relationships"
                             onClick={() => runQuery(`MATCH p=()-[]-() RETURN p`)}
+                            disabled={isQueryLoading}
                         />
                     </li>
                     {Array.from(graphInfo.Relationships.values()).map(({ name, color }) => (
@@ -109,6 +114,7 @@ export default function GraphInfoPanel({ onClose }: { onClose: () => void }) {
                                 className="h-6 w-full p-2 rounded-full flex justify-center items-center text-black"
                                 label={name}
                                 onClick={() => runQuery(`MATCH p=()-[:${name}]-() RETURN p`)}
+                                disabled={isQueryLoading}
                             />
                         </li>
                     ))}
@@ -140,11 +146,12 @@ export default function GraphInfoPanel({ onClose }: { onClose: () => void }) {
                         graphInfo.PropertyKeys && graphInfo.PropertyKeys.map((key) => (
                             <li key={key} className="max-w-full">
                                 <Button
-                                    className="h-6 w-full p-2 bg-gray-500 flex justify-center items-center rounded-full"
+                                    className="h-6 w-full p-2 bg-border flex justify-center items-center rounded-full text-white"
                                     label={key}
                                     onClick={() => runQuery(
                                         `MATCH (e) WHERE e.${key} IS NOT NULL RETURN e\nUNION\nMATCH ()-[e]-() WHERE e.${key} IS NOT NULL RETURN e`
                                     )}
+                                    disabled={isQueryLoading}
                                 />
                             </li>
                         ))}

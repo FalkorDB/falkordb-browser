@@ -48,14 +48,16 @@ test.describe("Graph Tests", () => {
 
   test(`@admin Add graph via UI -> remove graph via API -> Verify graph removal in UI`, async () => {
     const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
-    const graphName = getRandomString("graph");
-    await graph.addGraph(graphName);
+    const graphName1 = getRandomString("graph");
+    const graphName2 = getRandomString("graph");
+    await graph.addGraph(graphName1);
+    await graph.addGraph(graphName2);
     await graph.refreshPage();
-    await apiCall.removeGraph(graphName);
+    await apiCall.removeGraph(graphName1);
     await graph.refreshPage();
     const response = await apiCall.getGraphs();
-    expect(response.opts.includes(graphName)).toBe(false);
-    const graphExistsInUI = await graph.verifyGraphExists(graphName, apiCall);
+    expect(response.opts.includes(graphName1)).toBe(false);
+    const graphExistsInUI = await graph.verifyGraphExists(graphName1, apiCall);
     expect(graphExistsInUI).toBe(false);
   });
 

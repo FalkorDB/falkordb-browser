@@ -9,31 +9,35 @@ import { SetStateAction, Dispatch, useEffect, useRef, useState, useContext, useM
 import * as monaco from "monaco-editor";
 import { Minimize2, X } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
-import { cn, prepareArg, securedFetch } from "@/lib/utils";
+import { cn, getTheme, prepareArg, securedFetch } from "@/lib/utils";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
+import { useTheme } from "next-themes";
 import Button from "./ui/Button";
 import CloseDialog from "./CloseDialog";
 import { IndicatorContext } from "./provider";
 import { Graph, HistoryQuery } from "../api/graph/model";
 
-export const setTheme = (monacoI: Monaco, themeName: string, backgroundColor: string) => {
+export const setTheme = (monacoI: Monaco, themeName: string, backgroundColor: string, isDark: boolean) => {
     monacoI.editor.defineTheme(themeName, {
-        base: 'vs-dark',
+        base: isDark ? 'vs-dark' : 'vs',
         inherit: true,
         rules: [
-            { token: 'keyword', foreground: '#99E4E5' },
-            { token: 'function', foreground: '#DCDCAA' },
-            { token: 'type', foreground: '#89D86D' },
-            { token: 'string', foreground: '#CE9178' },
-            { token: 'number', foreground: '#b5cea8' },
+            { token: 'keyword', foreground: isDark ? '#99E4E5' : '#7568F2' },
+            { token: 'function', foreground: isDark ? '#DCDCAA' : '#5A5A42' },
+            { token: 'type', foreground: isDark ? '#89D86D' : '#2E5A27' },
+            { token: 'string', foreground: isDark ? '#CE9178' : '#53392C' },
+            { token: 'number', foreground: isDark ? '#b5cea8' : '#3C5335' },
         ],
         colors: {
             'editor.background': backgroundColor,
-            'editor.foreground': '#ffffff',
-            'editorSuggestWidget.background': '#272745',
-            'editorSuggestWidget.foreground': '#FFFFFF',
-            'editorSuggestWidget.selectedBackground': '#57577B',
-            'editorSuggestWidget.hoverBackground': '#28283F',
+            'editor.lineHighlightBackground': isDark ? '#2A2A2A' : '#F7F7F7',
+            'editor.selectionBackground': isDark ? '#264F78' : '#ADD6FF',
+            'editor.inactiveSelectionBackground': isDark ? '#3A3D41' : '#E5EBF1',
+            'editorCursor.foreground': isDark ? '#AEAFAD' : '#000000',
+            'editorSuggestWidget.background': isDark ? '#272745' : '#F3F3F3',
+            'editorSuggestWidget.foreground': isDark ? '#FFFFFF' : '#000000',
+            'editorSuggestWidget.selectedBackground': isDark ? '#57577B' : '#0060C0',
+            'editorSuggestWidget.hoverBackground': isDark ? '#28283F' : '#F0F0F0',
             'focusBorder': '#00000000',
         },
     });
@@ -229,7 +233,7 @@ export default function EditorComponent({ graph, graphName, historyQuery, maximi
     const { indicator, setIndicator } = useContext(IndicatorContext)
 
     const { toast } = useToast()
-
+    const { theme } = useTheme()
     const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null)
     const dialogEditorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null)
     const placeholderRef = useRef<HTMLDivElement>(null)
@@ -244,6 +248,8 @@ export default function EditorComponent({ graph, graphName, historyQuery, maximi
     const [sugDisposed, setSugDisposed] = useState<monaco.IDisposable>()
     const [lineNumber, setLineNumber] = useState(1)
     const [blur, setBlur] = useState(false)
+
+    const { background, currentTheme } = getTheme(theme)
 
     const editorHeight = useMemo(() => blur
         ? LINE_HEIGHT
@@ -453,7 +459,7 @@ export default function EditorComponent({ graph, graphName, historyQuery, maximi
             ignoreCase: true,
         })
 
-        setTheme(monacoI, "editor-theme", "#191919")
+        setTheme(monacoI, "editor-theme", background, currentTheme === "dark")
 
         monacoI.languages.setLanguageConfiguration('custom-language', {
             brackets: [
@@ -621,11 +627,12 @@ export default function EditorComponent({ graph, graphName, historyQuery, maximi
     }
 
     return (
-        <div style={{ height: editorHeight + 18 }} className="absolute w-full flex items-start gap-8 border rounded-lg overflow-hidden bg-foreground p-2">
+        <div style={{ height: editorHeight + 18 }} className="absolute w-full flex items-start gap-8 border border-border rounded-lg overflow-hidden bg-background p-2">
             <div className="h-full w-1 grow flex rounded-lg overflow-hidden">
                 <div ref={containerRef} className="h-full relative grow w-1" data-testid="editorContainer">
                     <Editor
-                        key={editorKey}
+                        className="CypherInput"
+                        key={`${editorKey}-${currentTheme}`}
                         height={editorHeight}
                         language="custom-language"
                         options={{
@@ -733,6 +740,7 @@ export default function EditorComponent({ graph, graphName, historyQuery, maximi
                             </div>
                         </div>
                         <Editor
+                            key={`${editorKey}-${currentTheme}`}
                             className="w-full h-full"
                             onMount={(e) => {
                                 handleEditorDidMount(e)

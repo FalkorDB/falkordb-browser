@@ -6,10 +6,11 @@
 
 import { Dispatch, SetStateAction, useContext, useEffect, useRef, useState } from "react"
 import ForceGraph2D from "react-force-graph-2d"
-import { securedFetch, GraphRef, handleZoomToFit } from "@/lib/utils"
+import { securedFetch, GraphRef, handleZoomToFit, getTheme } from "@/lib/utils"
 import { useToast } from "@/components/ui/use-toast"
 import * as d3 from "d3"
-import { GraphData, Link, Node, Relationship, Graph } from "../api/graph/model"
+import { useTheme } from "next-themes"
+import { GraphData, Link, Node, Relationship, Graph, getLabelWithFewestElements } from "../api/graph/model"
 import { IndicatorContext } from "./provider"
 import Spinning from "./ui/spinning"
 
@@ -25,8 +26,6 @@ interface Props {
     type?: "schema" | "graph"
     isAddElement?: boolean
     setSelectedNodes?: Dispatch<SetStateAction<[Node | undefined, Node | undefined]>>
-    setIsAddEntity?: Dispatch<SetStateAction<boolean>>
-    setIsAddRelation?: Dispatch<SetStateAction<boolean>>
     setRelationships: Dispatch<SetStateAction<Relationship[]>>
     parentHeight: number
     parentWidth: number
@@ -92,8 +91,6 @@ export default function ForceGraph({
     type = "graph",
     isAddElement = false,
     setSelectedNodes,
-    setIsAddEntity = () => { },
-    setIsAddRelation = () => { },
     setRelationships,
     parentHeight,
     parentWidth,
@@ -106,20 +103,14 @@ export default function ForceGraph({
 
     const { indicator, setIndicator } = useContext(IndicatorContext)
 
+    const { theme } = useTheme()
     const { toast } = useToast()
+    const { background, foreground } = getTheme(theme)
 
     const lastClick = useRef<{ date: Date, name: string }>({ date: new Date(), name: "" })
     const parentRef = useRef<HTMLDivElement>(null)
 
     const [hoverElement, setHoverElement] = useState<Node | Link | undefined>()
-
-    useEffect(() => {
-        const canvas = document.querySelector('.force-graph-container canvas')
-
-        if (!canvas) return
-
-        canvas.setAttribute('data-engine-status', 'stop')
-    }, [])
 
     useEffect(() => {
         handleZoomToFit(chartRef, undefined, data.nodes.length < 2 ? 4 : undefined)
@@ -133,7 +124,7 @@ export default function ForceGraph({
         if (!canvas) return;
 
         canvas.setAttribute('data-engine-status', 'stop');
-    }, [parentRef.current])
+    }, [])
 
     useEffect(() => {
         const handleResize = () => {
@@ -282,7 +273,7 @@ export default function ForceGraph({
                 return
             }
         }
-        
+
         if (evt.ctrlKey) {
             if (selectedElements.includes(element)) {
                 setSelectedElements(selectedElements.filter((el) => el !== element))
@@ -290,9 +281,8 @@ export default function ForceGraph({
                 setSelectedElements([...selectedElements, element])
             }
         }
+        
         setSelectedElement(element)
-        setIsAddEntity(false)
-        setIsAddRelation(false)
     }
 
     const handleUnselected = (evt?: MouseEvent) => {
@@ -315,7 +305,6 @@ export default function ForceGraph({
             }
             <ForceGraph2D
                 ref={chartRef}
-                backgroundColor="#242424"
                 width={parentWidth}
                 height={parentHeight}
                 linkLabel={(link) => link.relationship}
@@ -336,7 +325,6 @@ export default function ForceGraph({
                 }}
                 linkDirectionalArrowColor={(link) => link.color}
                 linkWidth={(link) => isLinkSelected(link) ? 2 : 1}
-                linkColor={(link) => link.color}
                 nodeCanvasObject={(node, ctx) => {
 
                     if (!node.x || !node.y) {
@@ -347,7 +335,7 @@ export default function ForceGraph({
                     ctx.lineWidth = ((selectedElement && !("source" in selectedElement) && selectedElement.id === node.id)
                         || (hoverElement && !("source" in hoverElement) && hoverElement.id === node.id)
                         || (selectedElements.length > 0 && selectedElements.some(el => el.id === node.id && !("source" in el)))) ? 1 : 0.5
-                    ctx.strokeStyle = 'white';
+                    ctx.strokeStyle = foreground;
 
                     ctx.beginPath();
                     ctx.arc(node.x, node.y, NODE_SIZE, 0, 2 * Math.PI, false);
@@ -358,7 +346,7 @@ export default function ForceGraph({
                     ctx.fillStyle = 'black';
                     ctx.textAlign = 'center';
                     ctx.textBaseline = 'middle';
-                    ctx.font = '2px Arial';
+                    ctx.font = '2px Inter';
                     let name = node.displayName
 
                     if (!name) {
@@ -369,7 +357,7 @@ export default function ForceGraph({
                         if (type === "graph") {
                             name = getNodeDisplayText(node)
                         } else {
-                            [name] = node.labels
+                            name = getLabelWithFewestElements(node.labels.map(label => graph.LabelsMap.get(label) || graph.createLabel([label])[0])).name
                         }
 
                         // truncate text if it's too long
@@ -412,22 +400,22 @@ export default function ForceGraph({
                         const dx = end.x - start.x;
                         const dy = end.y - start.y;
                         const distance = Math.sqrt(dx * dx + dy * dy);
-                        
+
                         // Calculate perpendicular vector for curve offset
                         const perpX = dy / distance;
                         const perpY = -dx / distance;
-                        
+
                         // Control point with larger offset to match the actual curve
                         const curvature = link.curve || 0;
                         const controlX = (start.x + end.x) / 2 + perpX * curvature * distance * 1.0;
                         const controlY = (start.y + end.y) / 2 + perpY * curvature * distance * 1.0;
-                        
+
                         // Calculate point on Bézier curve at t = 0.5 (midpoint)
                         const t = 0.5;
                         const oneMinusT = 1 - t;
                         textX = oneMinusT * oneMinusT * start.x + 2 * oneMinusT * t * controlX + t * t * end.x;
                         textY = oneMinusT * oneMinusT * start.y + 2 * oneMinusT * t * controlY + t * t * end.y;
-                        
+
                         // Calculate tangent angle at t = 0.5
                         const tangentX = 2 * oneMinusT * (controlX - start.x) + 2 * t * (end.x - controlX);
                         const tangentY = 2 * oneMinusT * (controlY - start.y) + 2 * t * (end.y - controlY);
@@ -439,7 +427,7 @@ export default function ForceGraph({
                     }
 
                     // Get text width
-                    ctx.font = '2px Arial';
+                    ctx.font = '2px Inter';
 
                     let textWidth;
                     let textHeight;
@@ -461,22 +449,22 @@ export default function ForceGraph({
 
                     // Use single save/restore for both background and text
                     const padding = 0.5;
-                    
+
                     ctx.save();
                     ctx.translate(textX, textY);
                     ctx.rotate(angle);
-                    
+
                     // Draw background rectangle (rotated)
-                    ctx.fillStyle = '#242424';
+                    ctx.fillStyle = background;
                     ctx.fillRect(
                         -textWidth / 2 - padding,
                         -textHeight / 2 - padding,
                         textWidth + padding * 2,
                         textHeight + padding * 2
                     );
-                    
+
                     // Draw text
-                    ctx.fillStyle = 'white';
+                    ctx.fillStyle = foreground;
                     ctx.textAlign = 'center';
                     ctx.textBaseline = 'middle';
                     ctx.fillText(link.relationship, 0, 0);
@@ -500,12 +488,8 @@ export default function ForceGraph({
                 linkVisibility="visible"
                 cooldownTicks={cooldownTicks}
                 cooldownTime={1000}
+                backgroundColor={background}
             />
         </div>
     )
-}
-
-ForceGraph.defaultProps = {
-    setIsAddEntity: () => { },
-    setIsAddRelation: () => { },
 }
