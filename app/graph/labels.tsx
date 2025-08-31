@@ -9,10 +9,9 @@ interface Props<T extends Label | Relationship> {
     onClick: (label: T) => void,
     label: "Relationships" | "Labels",
     type: "Schema" | "Graph",
-    className?: string,
 }
 
-export default function Labels<T extends Label | Relationship>({ labels, onClick, label, type, className = "" }: Props<T>) {
+export default function Labels<T extends Label | Relationship>({ labels, onClick, label, type }: Props<T>) {
 
     const listRef = useRef<HTMLUListElement>(null)
 
@@ -28,12 +27,12 @@ export default function Labels<T extends Label | Relationship>({ labels, onClick
     }
 
     return (
-        <div className={cn(className, "flex flex-col gap-2 max-w-[200px] h-[85%] pointer-events-none")}>
+        <div className={cn("flex flex-col gap-2 max-w-1/2 max-h-1/2 overflow-hidden")}>
             {
                 label &&
                 <h1>{label}</h1>
             }
-            <div className={cn("h-1 grow flex flex-col items-center gap-4")}>
+            <div className={cn("flex flex-col items-center gap-4")}>
                 {
                     isScrollable &&
                     <Button
@@ -77,8 +76,4 @@ export default function Labels<T extends Label | Relationship>({ labels, onClick
             </div>
         </div>
     )
-}
-
-Labels.defaultProps = {
-    className: "",
 }

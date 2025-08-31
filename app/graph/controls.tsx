@@ -15,8 +15,6 @@ interface Props {
     graph: Graph,
     disabled: boolean,
     chartRef: GraphRef,
-    tabsValue?: string,
-    isLoading: boolean,
     handleCooldown: (ticks?: 0, isSetLoading?: boolean) => void,
     cooldownTicks: number | undefined
 }
@@ -25,8 +23,6 @@ export default function Controls({
     graph,
     disabled,
     chartRef,
-    tabsValue = "Graph",
-    isLoading,
     handleCooldown,
     cooldownTicks,
 }: Props) {
@@ -46,9 +42,7 @@ export default function Controls({
 
 
     return (
-        <div className="w-1 grow bg-transparent flex items-center justify-end gap-6 p-1 pointer-events-auto">
-            {
-                graph.getElements().length > 0 && tabsValue === "Graph" && !isLoading &&
+        <div className="bg-transparent flex items-center justify-end gap-6 p-1 pointer-events-auto">
                 <div className="flex items-center gap-4">
                     <Tooltip>
                         <TooltipTrigger asChild>
@@ -58,7 +52,7 @@ export default function Controls({
                                     {cooldownTicks === undefined ? <Play size={20} /> : <Pause size={20} />}
                                     <Switch
                                         data-testid="animationControl"
-                                        className="pointer-events-auto"
+                                        className="pointer-events-auto data-[state=unchecked]:bg-border"
                                         checked={cooldownTicks === undefined}
                                         onCheckedChange={() => {
                                             handleCooldown(cooldownTicks === undefined ? 0 : undefined, false)
@@ -102,7 +96,6 @@ export default function Controls({
                         <Shrink size={20} />
                     </Button>
                 </div>
-            }
         </div>
     )
 }

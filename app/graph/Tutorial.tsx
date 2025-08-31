@@ -40,18 +40,18 @@ export default function Tutorial() {
                 <div className="flex justify-center items-center p-8" id="graphTutorial">
                     <Carousel className="w-1/2 h-1/2">
                         <CarouselContent className="text-2xl">
-                            <CarouselItem className="border text-center p-40">
+                            <CarouselItem className="border border-border text-center p-40">
                                 <p>Our Browser allows you to visualize, manipulate and explore your data.</p>
                             </CarouselItem>
-                            <CarouselItem className="border text-center p-32">
+                            <CarouselItem className="border border-border text-center p-32">
                                 <p>Interact with your data on a force-directed layout,
                                     with features including zoom, pan,
                                     node-drag and interactive node/link hover and click events.</p>
                             </CarouselItem>
-                            <CarouselItem className="border text-center p-40">
+                            <CarouselItem className="border border-border text-center p-40">
                                 <p>Configure or export your graph with ease from the control center</p>
                             </CarouselItem>
-                            <CarouselItem className="border flex justify-center items-center">
+                            <CarouselItem className="border border-border flex justify-center items-center">
                                 {
                                     session?.user?.role !== "Read-Only" &&
                                     <CreateGraph

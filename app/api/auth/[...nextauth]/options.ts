@@ -152,6 +152,9 @@ const authOptions: AuthOptions = {
 
       return token;
     },
+    async redirect({ url, baseUrl }) {
+      return url.startsWith(baseUrl) ? url : baseUrl;
+    },
     async session({ session, token }) {
       if (session.user) {
         return {

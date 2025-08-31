@@ -61,12 +61,12 @@ function Dropzone({ filesCount = false, className = "", withTable = false, disab
             </div>
             {
                 withTable &&
-                <div className='grow bg-foreground flex flex-col gap-4 justify-center'>
+                <div className='grow bg-background flex flex-col gap-4 justify-center'>
                     <div className='text-lg'>
                         {`Uploaded Files ${filesCount ? `(${files.length})`: ''}`}
                     </div>
                     <Table parentClassName='h-1 grow overflow-auto'>
-                        <TableHeader className='border-b border-[#7E7E9B]'>
+                        <TableHeader className='border-b border-border'>
                             <TableRow className='border-none'>
                                 {
                                     FileProps.map((cell) => (
@@ -82,7 +82,7 @@ function Dropzone({ filesCount = false, className = "", withTable = false, disab
                                 files.length > 0 ?
                                     files.map((row, index) => (
                                         // eslint-disable-next-line react/no-array-index-key
-                                        <TableRow className='border-[#57577B]' key={index}>
+                                        <TableRow className='border-border' key={index}>
                                             {
                                                 Object.values(row).map((cell) => (
                                                     <TableCell className='text-center font-medium' key={cell}>

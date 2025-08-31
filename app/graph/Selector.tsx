@@ -3,13 +3,13 @@
 'use client'
 
 import { useEffect, useState, useContext, Dispatch, SetStateAction, useRef, useCallback } from "react";
-import { cn, GraphRef, fetchOptions, formatName } from "@/lib/utils";
+import { cn, GraphRef, formatName, getTheme } from "@/lib/utils";
 import { History, Info, Maximize2 } from "lucide-react";
-import { useToast } from "@/components/ui/use-toast";
 import * as monaco from "monaco-editor";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Editor } from "@monaco-editor/react";
+import { useTheme } from "next-themes";
 import Button from "../components/ui/Button";
 import { IndicatorContext } from "../components/provider";
 import EditorComponent, { setTheme } from "../components/EditorComponent";
@@ -26,32 +26,35 @@ interface Props {
     setOptions: Dispatch<SetStateAction<string[]>>
     graphName: string
     setGraphName: Dispatch<SetStateAction<string>>
+    setGraph: Dispatch<SetStateAction<Graph>>
+    // graph
     runQuery?: (query: string) => Promise<void>
     historyQuery?: HistoryQuery
     setHistoryQuery?: Dispatch<SetStateAction<HistoryQuery>>
     fetchCount?: () => Promise<void>
-    selectedElements: (Node | Link)[]
-    setSelectedElement: Dispatch<SetStateAction<Node | Link | undefined>>
-    handleDeleteElement: () => Promise<void>
-    chartRef: GraphRef
-    setGraph: Dispatch<SetStateAction<Graph>>
-    setIsAddEntity?: Dispatch<SetStateAction<boolean>>
-    setIsAddRelation?: Dispatch<SetStateAction<boolean>>
-    isCanvasLoading?: boolean
     isQueryLoading?: boolean
+    // schema
+    selectedElements?: (Node | Link)[]
+    setSelectedElement?: (el: Node | Link | undefined) => void
+    handleDeleteElement?: () => Promise<void>
+    chartRef?: GraphRef
+    setIsAddEntity?: (isAdd: boolean) => void
+    setIsAddRelation?: (isAdd: boolean) => void
+    isCanvasLoading?: boolean
 }
 
 const STEP = 8
 
 export default function Selector({ graph, options, setOptions, graphName, setGraphName, runQuery, historyQuery, setHistoryQuery, fetchCount, selectedElements, setSelectedElement, handleDeleteElement, chartRef, setIsAddEntity, setIsAddRelation, setGraph, isCanvasLoading, isQueryLoading }: Props) {
 
-    const { indicator, setIndicator } = useContext(IndicatorContext)
+    const { indicator } = useContext(IndicatorContext)
+
+    const { theme } = useTheme()
+    const { secondary, currentTheme } = getTheme(theme)
 
     const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null)
     const submitQuery = useRef<HTMLButtonElement>(null)
     const searchQueryRef = useRef<HTMLInputElement>(null)
-
-    const { toast } = useToast()
 
     const [queriesOpen, setQueriesOpen] = useState(false)
     const [isLoading, setIsLoading] = useState(false)
@@ -109,12 +112,6 @@ export default function Selector({ graph, options, setOptions, graphName, setGra
         setGraphName(formatName(name))
     }, [setGraphName])
 
-    const getOptions = useCallback(async () => {
-        const [opts] = await fetchOptions(type, toast, setIndicator, indicator)
-        setOptions(opts)
-    }, [setOptions, toast, setIndicator, indicator, type])
-
-
     const handleEditorDidMount = (e: monaco.editor.IStandaloneCodeEditor) => {
         editorRef.current = e
 
@@ -166,17 +163,16 @@ export default function Selector({ graph, options, setOptions, graphName, setGra
         }
     }, [historyQuery, setHistoryQuery])
 
+    const separator = <div className="h-[80%] w-0.5 bg-border rounded-full" />
+
     return (
-        <div className="z-20 absolute top-5 inset-x-24 h-[50px] flex flex-row gap-4 items-center">
+        <div className="z-20 w-full h-[50px] flex flex-row gap-4 items-center">
             <SelectGraph
                 options={options}
                 setOptions={setOptions}
                 selectedValue={graphName}
                 setSelectedValue={handleOnChange}
                 type={type}
-                onOpenChange={async (o) => {
-                    if (o) await getOptions()
-                }}
                 setGraph={setGraph}
             />
             {
@@ -195,7 +191,7 @@ export default function Selector({ graph, options, setOptions, graphName, setGra
                                 editorKey={queriesOpen ? "selector-theme" : "editor-theme"}
                             />
                         </div>
-                        <div className="h-full flex gap-2 p-2 border rounded-lg bg-foreground">
+                        <div className="h-full w-[120px] flex gap-2 items-center p-2 border border-border rounded-lg bg-background">
                             <Tooltip>
                                 <TooltipTrigger className="cursor-default">
                                     <Info />
@@ -204,7 +200,7 @@ export default function Selector({ graph, options, setOptions, graphName, setGra
                                     <p>Run (Enter) History (Arrow Up/Down) Insert new line (Shift + Enter)</p>
                                 </TooltipContent>
                             </Tooltip>
-                            <div className="w-[1px] bg-white" />
+                            {separator}
                             <div className="flex gap-4 items-center">
                                 <DialogComponent
                                     className="h-[90dvh] w-[90dvw]"
@@ -230,7 +226,7 @@ export default function Selector({ graph, options, setOptions, graphName, setGra
                                     <div className="h-1 grow flex gap-8 p-8">
                                         <PaginationList
                                             label="Query"
-                                            className="w-[40%] bg-background rounded-lg overflow-hidden"
+                                            className="w-[40%] bg-secondary rounded-lg overflow-hidden"
                                             isSelected={(item) => historyQuery.queries.findIndex(q => q.text === item.text) + 1 === historyQuery.counter}
                                             afterSearchCallback={afterSearchCallback}
                                             dataTestId="queryHistory"
@@ -246,13 +242,13 @@ export default function Selector({ graph, options, setOptions, graphName, setGra
                                             searchRef={searchQueryRef}
                                         />
                                         <Tabs value={tab} onValueChange={(value) => setTab(value as keyof Query)} className="w-[60%] flex flex-col gap-8 items-center">
-                                            <TabsList className="bg-black h-fit w-fit p-2">
-                                                <TabsTrigger className={cn("!text-gray-500 data-[state=active]:!bg-background data-[state=active]:!text-white")} disabled={!isTabEnabled("text")} value="text">Edit Query</TabsTrigger>
-                                                <TabsTrigger className={cn("!text-gray-500 data-[state=active]:!bg-background data-[state=active]:!text-white")} disabled={!isTabEnabled("profile")} value="profile">Profile</TabsTrigger>
-                                                <TabsTrigger className={cn("!text-gray-500 data-[state=active]:!bg-background data-[state=active]:!text-white")} disabled={!isTabEnabled("metadata")} value="metadata">Metadata</TabsTrigger>
-                                                <TabsTrigger className={cn("!text-gray-500 data-[state=active]:!bg-background data-[state=active]:!text-white")} disabled={!isTabEnabled("explain")} value="explain">Explain</TabsTrigger>
+                                            <TabsList className="bg-secondary h-fit w-fit p-2">
+                                                <TabsTrigger className={cn("!text-border data-[state=active]:!bg-background data-[state=active]:!text-foreground")} disabled={!isTabEnabled("text")} value="text">Edit Query</TabsTrigger>
+                                                <TabsTrigger className={cn("!text-border data-[state=active]:!bg-background data-[state=active]:!text-foreground")} disabled={!isTabEnabled("profile")} value="profile">Profile</TabsTrigger>
+                                                <TabsTrigger className={cn("!text-border data-[state=active]:!bg-background data-[state=active]:!text-foreground")} disabled={!isTabEnabled("metadata")} value="metadata">Metadata</TabsTrigger>
+                                                <TabsTrigger className={cn("!text-border data-[state=active]:!bg-background data-[state=active]:!text-foreground")} disabled={!isTabEnabled("explain")} value="explain">Explain</TabsTrigger>
                                             </TabsList>
-                                            <TabsContent value="text" className="w-full h-1 grow bg-background rounded-lg p-2 py-4 relative">
+                                            <TabsContent value="text" className="w-full h-1 grow bg-secondary rounded-lg p-2 py-4 relative">
                                                 {
                                                     currentQuery &&
                                                     <>
@@ -268,6 +264,8 @@ export default function Selector({ graph, options, setOptions, graphName, setGra
                                                             isLoading={isLoading}
                                                         />
                                                         <Editor
+                                                            key={currentTheme}
+                                                            className="CypherInput"
                                                             data-testid="queryHistoryEditor"
                                                             width="100%"
                                                             height="100%"
@@ -301,13 +299,13 @@ export default function Selector({ graph, options, setOptions, graphName, setGra
                                                             }}
                                                             onMount={handleEditorDidMount}
                                                             beforeMount={(m) => {
-                                                                setTheme(m, "selector-theme", "#242424")
+                                                                setTheme(m, "selector-theme", secondary, theme === "dark")
                                                             }}
                                                         />
                                                     </>
                                                 }
                                             </TabsContent>
-                                            <TabsContent className="w-full h-1 grow bg-background rounded-lg p-8" value="profile">
+                                            <TabsContent className="w-full h-1 grow bg-secondary rounded-lg p-8" value="profile">
                                                 <div className="h-full w-full overflow-hidden flex flex-col gap-4">
                                                     {
                                                         currentQuery &&
@@ -335,7 +333,7 @@ export default function Selector({ graph, options, setOptions, graphName, setGra
                                                     }
                                                 </div>
                                             </TabsContent>
-                                            <TabsContent className="w-full h-1 grow bg-background rounded-lg p-8" value="metadata">
+                                            <TabsContent className="w-full h-1 grow bg-secondary rounded-lg p-8" value="metadata">
                                                 <div className="h-full w-full overflow-hidden flex flex-col gap-4">
                                                     {
                                                         currentQuery &&
@@ -345,7 +343,7 @@ export default function Selector({ graph, options, setOptions, graphName, setGra
                                                     }
                                                 </div>
                                             </TabsContent>
-                                            <TabsContent className="w-full h-1 grow bg-background rounded-lg p-8" value="explain">
+                                            <TabsContent className="w-full h-1 grow bg-secondary rounded-lg p-8" value="explain">
                                                 <div className="h-full w-full overflow-hidden flex flex-col gap-4">
                                                     {
                                                         currentQuery &&
@@ -359,7 +357,7 @@ export default function Selector({ graph, options, setOptions, graphName, setGra
                                     </div>
                                 </DialogComponent>
                             </div>
-                            <div className="w-[1px] bg-white" />
+                            {separator}
                             <Button
                                 data-testid="editorMaximize"
                                 title="Maximize"
@@ -369,7 +367,7 @@ export default function Selector({ graph, options, setOptions, graphName, setGra
                             </Button>
                         </div>
                     </>
-                    : <div className="w-full h-[58px]">
+                    : selectedElements && setSelectedElement && handleDeleteElement && handleDeleteElement && setIsAddEntity && setIsAddRelation && chartRef && isCanvasLoading !== undefined && <div className="w-full h-full">
                         <Toolbar
                             graph={graph}
                             label={type}
@@ -380,11 +378,11 @@ export default function Selector({ graph, options, setOptions, graphName, setGra
                             setIsAddRelation={setIsAddRelation}
                             chartRef={chartRef}
                             isLoadingSchema={!!isCanvasLoading}
-                            backgroundColor="bg-foreground"
+                            backgroundColor="bg-background"
                         />
                     </div>
             }
-        </div >
+        </div>
     )
 }
 
@@ -392,6 +390,10 @@ Selector.defaultProps = {
     runQuery: undefined,
     historyQuery: undefined,
     setHistoryQuery: undefined,
+    selectedElements: undefined,
+    setSelectedElement: undefined,
+    handleDeleteElement: undefined,
+    chartRef: undefined,
     setIsAddEntity: undefined,
     setIsAddRelation: undefined,
     fetchCount: undefined,
