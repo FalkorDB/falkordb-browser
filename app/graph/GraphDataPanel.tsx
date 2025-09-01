@@ -9,19 +9,16 @@ import { Dispatch, SetStateAction, useCallback, useContext, useEffect, useRef, u
 import { Pencil, X } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { useSession } from "next-auth/react";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import Button from "../components/ui/Button";
 import { Label, Link, Node } from "../api/graph/model";
 import { IndicatorContext, GraphContext } from "../components/provider";
 import GraphDataTable from "./GraphDataTable";
-import PaginationList from "../components/PaginationList";
 import AddLabel from "./addLabel";
 import RemoveLabel from "./RemoveLabel";
 
 interface Props {
     object: Node | Link;
-    setObject: Dispatch<SetStateAction<Node | Link | undefined>>;
+    setObject: (el: Node | Link | undefined) => void;
     onDeleteElement: () => Promise<void>;
     setLabels: Dispatch<SetStateAction<Label[]>>;
 }
@@ -32,13 +29,10 @@ export default function GraphDataPanel({ object, setObject, onDeleteElement, set
 
     const lastObjId = useRef<number | undefined>(undefined)
     const labelsListRef = useRef<HTMLUListElement>(null)
-    const searchRef = useRef<HTMLInputElement>(null)
 
     const { toast } = useToast()
     const { data: session } = useSession()
 
-    const [selectedLabel, setSelectedLabel] = useState<string>("")
-    const [showAsDialog, setShowAsDialog] = useState(false)
     const [labelsHover, setLabelsHover] = useState(false)
     const [label, setLabel] = useState<string[]>([]);
     const type = !("source" in object)
@@ -56,12 +50,6 @@ export default function GraphDataPanel({ object, setObject, onDeleteElement, set
             window.removeEventListener("keydown", onClose)
         }
     }, [onClose])
-
-    useEffect(() => {
-        if (labelsListRef.current) {
-            setShowAsDialog(labelsListRef.current.clientHeight > 80)
-        }
-    }, [labelsListRef.current?.clientHeight])
 
     useEffect(() => {
         if (lastObjId.current !== object.id) {
@@ -134,7 +122,6 @@ export default function GraphDataPanel({ object, setObject, onDeleteElement, set
             const newGraphInfo = graph.GraphInfo.clone()
             setGraphInfo(newGraphInfo)
             graph.GraphInfo = newGraphInfo
-            setShowAsDialog(false)
             return true
         }
 
@@ -142,59 +129,9 @@ export default function GraphDataPanel({ object, setObject, onDeleteElement, set
 
     }
 
-    return showAsDialog ? (
-        <Dialog open>
-            <DialogContent className="flex flex-col bg-foreground w-[90%] h-[90%] rounded-lg border-none gap-8 p-8" disableClose>
-                <DialogHeader className="flex-row justify-between items-center border-b pb-4">
-                    <div className="flex flex-col gap-2 font-medium text-xl text-nowrap">
-                        <DialogTitle>ID: <span className="Gradient text-transparent bg-clip-text">{object.id}</span></DialogTitle>
-                        <p data-testid="DataPanelAttributesCount">Attributes: <span className="Gradient text-transparent bg-clip-text">{Object.keys(object.data).length}</span></p>
-                    </div>
-                    <Button
-                        onClick={() => setObject(undefined)}
-                    >
-                        <X />
-                    </Button>
-                    <VisuallyHidden>
-                        <DialogDescription />
-                    </VisuallyHidden>
-                </DialogHeader>
-                <div className="h-1 grow flex gap-8">
-                    <div className="w-[40%] bg-background rounded-lg flex flex-col">
-                        <PaginationList
-                            className="h-1 grow"
-                            label="Label"
-                            list={label}
-                            step={12}
-                            dataTestId="attributes"
-                            onClick={(l) => selectedLabel === l ? setSelectedLabel("") : setSelectedLabel(l)}
-                            isSelected={(item) => item === selectedLabel}
-                            afterSearchCallback={(filteredList) => {
-                                if (!filteredList.includes(selectedLabel)) {
-                                    setSelectedLabel("")
-                                }
-                            }}
-                            searchRef={searchRef}
-                        />
-                        <div className="flex gap-4 p-4 justify-between">
-                            <AddLabel onAddLabel={handleAddLabel} />
-                            <RemoveLabel onRemoveLabel={handleRemoveLabel} selectedLabel={selectedLabel} />
-                        </div>
-                    </div>
-                    <GraphDataTable
-                        className="h-full w-[60%]"
-                        graph={graph}
-                        object={object}
-                        type={type}
-                        onDeleteElement={onDeleteElement}
-                        lastObjId={lastObjId}
-                    />
-                </div>
-            </DialogContent>
-        </Dialog>
-    ) : (
+    return (
         <div data-testid="DataPanel" className="DataPanel p-6">
-            <div className="relative flex flex-col gap-6 pb-4 border-b">
+            <div className="relative flex flex-col gap-6 pb-4 border-b border-border">
                 <div className="flex flex-row justify-between items-center">
                     <div className="flex flex-col gap-2 font-medium text-xl text-nowrap">
                         <p>ID: <span className="Gradient text-transparent bg-clip-text">{object.id}</span></p>
@@ -248,7 +185,7 @@ export default function GraphDataPanel({ object, setObject, onDeleteElement, set
                                 trigger={
                                     <Button
                                         data-testid="DataPanelAddLabel"
-                                        className="p-2 text-nowrap text-xs justify-center border border-background rounded-full"
+                                        className="p-2 text-nowrap text-xs justify-center border border-border rounded-full"
                                         label="Add Label"
                                         title=""
                                     >

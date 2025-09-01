@@ -69,7 +69,6 @@ export default function DuplicateGraph({ open, onOpenChange, selectedValue, onDu
                     <Input
                         data-testid={`duplicate${type}Input`}
                         ref={ref => ref?.focus()}
-                        variant="primary"
                         placeholder={`Enter a name for the duplicated ${type}`}
                         onChange={(e) => setDuplicateName(e.target.value)}
                     />

@@ -104,7 +104,6 @@ export default function CreateGraph({
                     <p className="font-normal text-2xl">Name your {type}:</p>
                     <Input
                         data-testid={`create${type}Input`}
-                        variant="primary"
                         ref={ref => ref?.focus()}
                         value={graphName}
                         onChange={(e) => setGraphName(e.target.value)}

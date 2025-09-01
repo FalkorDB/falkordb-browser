@@ -4,7 +4,7 @@
 "use client";
 
 import { Check, Pencil, PlusCircle, Trash2, X } from "lucide-react";
-import { SetStateAction, Dispatch, useContext, useEffect, useState, useCallback } from "react";
+import { useContext, useEffect, useState, useCallback } from "react";
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from "@/components/ui/use-toast";
 import { useSession } from "next-auth/react";
@@ -23,7 +23,7 @@ import { IndicatorContext } from "../components/provider";
 
 interface Props {
     object: Node | Link
-    setObject: Dispatch<SetStateAction<Node | Link | undefined>>
+    setObject: (el: Node | Link | undefined) => void
     onDeleteElement: () => Promise<void>;
     schema: Graph
     setLabels: (labels: Label[]) => void
@@ -355,7 +355,7 @@ export default function SchemaDataPanel({ object, setObject, onDeleteElement, sc
                         {
                             type && labelsHover && !labelsEditable && session?.user?.role !== "Read-Only" &&
                             <Button
-                                className="p-2 text-xs justify-center border border-background"
+                                className="p-2 text-xs justify-center border border-border"
                                 variant="Secondary"
                                 label="Add"
                                 title="Add a new label"
@@ -370,7 +370,7 @@ export default function SchemaDataPanel({ object, setObject, onDeleteElement, sc
                             <>
                                 <Input
                                     ref={ref => ref?.focus()}
-                                    className="max-w-[20dvw] h-full bg-background border-none text-white"
+                                    className="max-w-[20dvw] h-full bg-background border-none text-foreground"
                                     value={newLabel}
                                     onChange={(e) => setNewLabel(e.target.value)}
                                     data-testid="newLabelInput"
@@ -390,7 +390,7 @@ export default function SchemaDataPanel({ object, setObject, onDeleteElement, sc
                                 />
                                 <Button
                                     indicator={indicator}
-                                    className="p-2 text-xs justify-center border border-background"
+                                    className="p-2 text-xs justify-center border border-border"
                                     variant="Secondary"
                                     label="Save"
                                     title="Save the new label"
@@ -403,7 +403,7 @@ export default function SchemaDataPanel({ object, setObject, onDeleteElement, sc
                                 {
                                     !isLabelLoading &&
                                     <Button
-                                        className="p-2 text-xs justify-center border border-background"
+                                        className="p-2 text-xs justify-center border border-border"
                                         variant="Secondary"
                                         label="Cancel"
                                         title="Discard the new label"
@@ -488,7 +488,7 @@ export default function SchemaDataPanel({ object, setObject, onDeleteElement, sc
                                             </TableCell>
                                             <TableCell>
                                                 <Switch
-                                                    className="border-[#57577B]"
+                                                    className="data-[state=unchecked]:bg-border"
                                                     onCheckedChange={(checked) => setAttribute(prev => {
                                                         const p: [string, string[]] = [...prev]
                                                         p[1][2] = checked ? "true" : "false"
@@ -499,7 +499,7 @@ export default function SchemaDataPanel({ object, setObject, onDeleteElement, sc
                                             </TableCell>
                                             <TableCell>
                                                 <Switch
-                                                    className="border-[#57577B]"
+                                                    className="data-[state=unchecked]:bg-border"
                                                     onCheckedChange={(checked) => setAttribute(prev => {
                                                         const p: [string, string[]] = [...prev]
                                                         p[1][3] = checked ? "true" : "false"
@@ -520,7 +520,7 @@ export default function SchemaDataPanel({ object, setObject, onDeleteElement, sc
                                                 editable === key ?
                                                     <>
                                                         <Button
-                                                            className="p-2 justify-center border border-foreground"
+                                                            className="p-2 justify-center border border-border"
                                                             variant="Secondary"
                                                             label="Save"
                                                             title="Save the attribute changes"
@@ -536,7 +536,7 @@ export default function SchemaDataPanel({ object, setObject, onDeleteElement, sc
                                                         {
                                                             !isSetLoading &&
                                                             <Button
-                                                                className="p-2 justify-center border border-foreground"
+                                                                className="p-2 justify-center border border-border"
                                                                 variant="Secondary"
                                                                 label="Cancel"
                                                                 title="Discard the attribute changes"
@@ -593,7 +593,7 @@ export default function SchemaDataPanel({ object, setObject, onDeleteElement, sc
                                                         </DialogComponent>
                                                         <Button
                                                             disabled={isAddValue}
-                                                            className="p-2 justify-center border border-foreground"
+                                                            className="p-2 justify-center border border-border"
                                                             variant="Secondary"
                                                             label="Edit"
                                                             title="Modify this attribute"
@@ -657,7 +657,7 @@ export default function SchemaDataPanel({ object, setObject, onDeleteElement, sc
                             </TableCell>
                             <TableCell>
                                 <Switch
-                                    className="border-[#57577B]"
+                                    className="data-[state=unchecked]:bg-border"
                                     onCheckedChange={(checked) => setAttribute(prev => {
                                         const p: [string, string[]] = [...prev]
                                         p[1][2] = checked ? "true" : "false"
@@ -668,7 +668,7 @@ export default function SchemaDataPanel({ object, setObject, onDeleteElement, sc
                             </TableCell>
                             <TableCell>
                                 <Switch
-                                    className="border-[#57577B]"
+                                    className="data-[state=unchecked]:bg-border"
                                     onCheckedChange={(checked) => setAttribute(prev => {
                                         const p: [string, string[]] = [...prev]
                                         p[1][3] = checked ? "true" : "false"
@@ -681,7 +681,7 @@ export default function SchemaDataPanel({ object, setObject, onDeleteElement, sc
                                 <div className="flex gap-2 w-44">
                                     <Button
                                         indicator={indicator}
-                                        className="p-2 justify-center border border-foreground"
+                                        className="p-2 justify-center border border-border"
                                         variant="Secondary"
                                         label="Save"
                                         title="Save the new attribute"
@@ -695,7 +695,7 @@ export default function SchemaDataPanel({ object, setObject, onDeleteElement, sc
                                         <Check size={20} />
                                     </Button>
                                     <Button
-                                        className="p-2 justify-center border border-foreground"
+                                        className="p-2 justify-center border border-border"
                                         variant="Secondary"
                                         label="Cancel"
                                         title="Discard the new attribute"

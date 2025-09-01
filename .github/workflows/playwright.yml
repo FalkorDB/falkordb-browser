@@ -16,8 +16,74 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  setup-dependencies:
+    name: Setup and cache dependencies
+    runs-on: ubuntu-latest
+    outputs:
+      cache-hit: ${{ steps.cache-npm.outputs.cache-hit }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+          cache: 'npm'
+      - name: Cache node modules
+        id: cache-npm
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.npm
+            node_modules
+            ~/.cache/ms-playwright
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}-${{ hashFiles('**/playwright.config.ts') }}
+          restore-keys: |
+            ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}-
+            ${{ runner.os }}-node-
+      - name: Install dependencies with enhanced retry logic
+        if: steps.cache-npm.outputs.cache-hit != 'true'
+        run: |
+          # Configure npm for better reliability
+          npm config set registry https://registry.npmjs.org/
+          npm config set fetch-retries 5
+          npm config set fetch-retry-factor 2
+          npm config set fetch-retry-mintimeout 10000
+          npm config set fetch-retry-maxtimeout 60000
+          npm config set maxsockets 1
+          
+          # Install with retry logic
+          for i in {1..5}; do
+            echo "Attempt $i: Installing dependencies..."
+            if npm ci --prefer-offline --no-audit --progress=false --loglevel=error; then
+              echo "Dependencies installed successfully on attempt $i"
+              break
+            else
+              echo "Attempt $i failed"
+              if [ $i -eq 5 ]; then
+                echo "All 5 attempts failed. Exiting."
+                exit 1
+              fi
+              # Progressive backoff with cache cleaning
+              npm cache clean --force 2>/dev/null || true
+              sleep_time=$((i * 20 + RANDOM % 30))
+              echo "⏳ Waiting ${sleep_time}s before retry..."
+              sleep $sleep_time
+            fi
+          done
+      - name: Install Playwright Browsers
+        if: steps.cache-npm.outputs.cache-hit != 'true'
+        run: npx playwright install --with-deps chromium firefox
+      - name: Build application
+        run: npm run build
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-output
+          path: .next/
+          retention-days: 1
+
   test-part-1:
     name: Run tests part 1 (except settings)
+    needs: setup-dependencies
     timeout-minutes: 60
     runs-on: ubuntu-latest
 
@@ -32,14 +98,36 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: lts/*
-      - name: Install dependencies
-        run: npm ci
-      - name: Install Playwright Browsers
-        run: npx playwright install --with-deps
+          cache: 'npm'
+      - name: Restore dependencies cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.npm
+            node_modules
+            ~/.cache/ms-playwright
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}-${{ hashFiles('**/playwright.config.ts') }}
+          restore-keys: |
+            ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}-
+            ${{ runner.os }}-node-
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: build-output
+          path: .next/
+        continue-on-error: true
+      - name: Fallback build if needed
+        run: |
+          if [ ! -d ".next" ] || [ -z "$(ls -A .next 2>/dev/null)" ]; then
+            echo "Build artifacts not found, building locally..."
+            npm run build
+          else
+            echo "Using cached build artifacts"
+          fi
       - name: Run Playwright tests (shard 1 of 2)
         run: |
-          npm run build
-          NEXTAUTH_SECRET=SECRET npm start & npx playwright test --grep-invert "@config|@tls|@cluster" --shard=1/2 --reporter=dot,list
+          NEXTAUTH_SECRET=SECRET npm start & 
+          npx playwright test --grep-invert "@config|@tls|@cluster" --shard=1/2 --reporter=dot,list
       - name: Upload artifacts
         if: always()
         uses: actions/upload-artifact@v4
@@ -50,6 +138,7 @@ jobs:
 
   test-part-2:
     name: Run tests part 2 (except settings)
+    needs: setup-dependencies
     timeout-minutes: 60
     runs-on: ubuntu-latest
 
@@ -64,14 +153,36 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: lts/*
-      - name: Install dependencies
-        run: npm ci
-      - name: Install Playwright Browsers
-        run: npx playwright install --with-deps
+          cache: 'npm'
+      - name: Restore dependencies cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.npm
+            node_modules
+            ~/.cache/ms-playwright
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}-${{ hashFiles('**/playwright.config.ts') }}
+          restore-keys: |
+            ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}-
+            ${{ runner.os }}-node-
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: build-output
+          path: .next/
+        continue-on-error: true
+      - name: Fallback build if needed
+        run: |
+          if [ ! -d ".next" ] || [ -z "$(ls -A .next 2>/dev/null)" ]; then
+            echo "Build artifacts not found, building locally..."
+            npm run build
+          else
+            echo "Using cached build artifacts"
+          fi
       - name: Run Playwright tests (shard 2 of 2)
         run: |
-          npm run build
-          NEXTAUTH_SECRET=SECRET npm start & npx playwright test --grep-invert "@config|@tls|@cluster" --shard=2/2 --reporter=dot,list
+          NEXTAUTH_SECRET=SECRET npm start & 
+          npx playwright test --grep-invert "@config|@tls|@cluster" --shard=2/2 --reporter=dot,list
       - name: Upload artifacts
         if: always()
         uses: actions/upload-artifact@v4
@@ -82,6 +193,7 @@ jobs:
 
   run-settings-tests:
     name: Run settings tests
+    needs: setup-dependencies
     runs-on: ubuntu-latest
 
     services:
@@ -95,14 +207,36 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: lts/*
-      - name: Install dependencies
-        run: npm ci
-      - name: Install Playwright Browsers
-        run: npx playwright install --with-deps
+          cache: 'npm'
+      - name: Restore dependencies cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.npm
+            node_modules
+            ~/.cache/ms-playwright
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}-${{ hashFiles('**/playwright.config.ts') }}
+          restore-keys: |
+            ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}-
+            ${{ runner.os }}-node-
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: build-output
+          path: .next/
+        continue-on-error: true
+      - name: Fallback build if needed
+        run: |
+          if [ ! -d ".next" ] || [ -z "$(ls -A .next 2>/dev/null)" ]; then
+            echo "Build artifacts not found, building locally..."
+            npm run build
+          else
+            echo "Using cached build artifacts"
+          fi
       - name: Run only config test
         run: |
-          npm run build
-          NEXTAUTH_SECRET=SECRET npm start & npx playwright test --grep @config --reporter=dot,list
+          NEXTAUTH_SECRET=SECRET npm start & 
+          npx playwright test --grep @config --reporter=dot,list
       - name: Ensure required directories exist
         run: |
           mkdir -p playwright-report
@@ -116,6 +250,7 @@ jobs:
 
   run-tls-tests:
     name: Run TLS tests
+    needs: setup-dependencies
     timeout-minutes: 60
     runs-on: ubuntu-latest
 
@@ -124,10 +259,32 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: lts/*
-      - name: Install dependencies
-        run: npm ci
-      - name: Install Playwright Browsers
-        run: npx playwright install --with-deps
+          cache: 'npm'
+      - name: Restore dependencies cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.npm
+            node_modules
+            ~/.cache/ms-playwright
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}-${{ hashFiles('**/playwright.config.ts') }}
+          restore-keys: |
+            ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}-
+            ${{ runner.os }}-node-
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: build-output
+          path: .next/
+        continue-on-error: true
+      - name: Fallback build if needed
+        run: |
+          if [ ! -d ".next" ] || [ -z "$(ls -A .next 2>/dev/null)" ]; then
+            echo "Build artifacts not found, building locally..."
+            npm run build
+          else
+            echo "Using cached build artifacts"
+          fi
       - name: Setup TLS certificates
         run: |
           mkdir -p tls
@@ -186,8 +343,8 @@ jobs:
           fi
       - name: Run TLS tests
         run: |
-          npm run build
-          NEXTAUTH_SECRET=SECRET npm start & npx playwright test --workers=1 --reporter=dot,list --project="[TLS - Chromium]" --project="[TLS - Firefox]"
+          NEXTAUTH_SECRET=SECRET npm start & 
+          npx playwright test --workers=1 --reporter=dot,list --project="[TLS - Chromium]" --project="[TLS - Firefox]"
       - name: Cleanup TLS certificates
         if: always()
         run: |
@@ -206,6 +363,7 @@ jobs:
 
   run-cluster-tests:
     name: Run cluster tests
+    needs: setup-dependencies
     timeout-minutes: 60
     runs-on: ubuntu-latest
 
@@ -214,10 +372,32 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: lts/*
-      - name: Install dependencies
-        run: npm ci
-      - name: Install Playwright Browsers
-        run: npx playwright install --with-deps
+          cache: 'npm'
+      - name: Restore dependencies cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.npm
+            node_modules
+            ~/.cache/ms-playwright
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}-${{ hashFiles('**/playwright.config.ts') }}
+          restore-keys: |
+            ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}-
+            ${{ runner.os }}-node-
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: build-output
+          path: .next/
+        continue-on-error: true
+      - name: Fallback build if needed
+        run: |
+          if [ ! -d ".next" ] || [ -z "$(ls -A .next 2>/dev/null)" ]; then
+            echo "Build artifacts not found, building locally..."
+            npm run build
+          else
+            echo "Using cached build artifacts"
+          fi
       - name: Start FalkorDB cluster nodes
         run: |
           echo "Starting 3 FalkorDB cluster nodes..."
@@ -290,8 +470,8 @@ jobs:
           done
       - name: Run cluster tests
         run: |
-          npm run build
-          NEXTAUTH_SECRET=SECRET npm start & npx playwright test --grep "@cluster" --reporter=dot,list
+          NEXTAUTH_SECRET=SECRET npm start & 
+          npx playwright test --grep "@cluster" --reporter=dot,list
       - name: Cleanup cluster
         if: always()
         run: |

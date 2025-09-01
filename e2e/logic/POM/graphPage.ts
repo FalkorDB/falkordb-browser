@@ -92,6 +92,10 @@ export default class GraphPage extends Page {
     return this.page.locator("#skeleton").first();
   }
 
+  private get closeHelpMessage(): Locator {
+    return this.page.locator("iframe[title='Close message']");
+  }
+
   async getBoundingBoxCanvasElement(): Promise<null | {
     x: number;
     y: number;
@@ -204,6 +208,18 @@ export default class GraphPage extends Page {
       (el) => el.click(),
       "Create Graph Cancel"
     );
+  }
+
+  async clickCloseHelpMessage(): Promise<void> {
+    await interactWhenVisible(
+      this.closeHelpMessage,
+      (el) => el.click(),
+      "Close Help Message"
+    );
+  }
+
+  async isVisibleCloseHelpMessage(): Promise<boolean> {
+    return waitForElementToBeVisible(this.closeHelpMessage);
   }
 
   async clickDelete(): Promise<void> {
@@ -522,7 +538,7 @@ export default class GraphPage extends Page {
     const content = await interactWhenVisible(
       this.labelsButtonByName(tab, label, name),
       (el) => el.textContent(),
-      ``
+      `${tab} label ${name}`
     );
     return content;
   }
@@ -726,6 +742,12 @@ export default class GraphPage extends Page {
 
   async deleteElementByName(name: string, type: string): Promise<void> {
     await this.searchElementInCanvas("Graph", name);
+    // Try to close help message, but don't fail if it's not found
+    try {
+      await this.clickCloseHelpMessage();
+    } catch (error) {
+      console.log("Help message not found or couldn't be closed, continuing with test:", error);
+    }
     await this.clickDeleteElement(type);
     await this.clickDeleteElementConfirm();
     await waitForElementToNotBeVisible(this.deleteElement("Node"));

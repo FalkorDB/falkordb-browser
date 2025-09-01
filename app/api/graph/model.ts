@@ -139,7 +139,7 @@ export interface Relationship extends InfoRelationship {
   textHeight?: number;
 }
 
-const getLabelWithFewestElements = (labels: Label[]): Label =>
+export const getLabelWithFewestElements = (labels: Label[]): Label =>
   labels.reduce(
     (prev, label) =>
       label.elements.length < prev.elements.length ? label : prev,
@@ -427,7 +427,7 @@ export class Graph {
     return graph;
   }
 
-  public extendNode(cell: NodeCell, collapsed: boolean, isSchema: boolean) {
+  public extendNode(cell: NodeCell, collapsed: boolean, isSchema: boolean, isColor = false) {
     const labels = this.createLabel(
       cell.labels.length === 0 ? [""] : cell.labels
     );
@@ -437,7 +437,7 @@ export class Graph {
       const node: Node = {
         id: cell.id,
         labels: labels.map((l) => l.name),
-        color: getLabelWithFewestElements(labels).color,
+        color: isColor ? getLabelWithFewestElements(labels).color : "",
         visible: true,
         expand: false,
         collapsed,
@@ -458,7 +458,7 @@ export class Graph {
     if (currentNode.labels[0] === "") {
       currentNode.id = cell.id;
       currentNode.labels = labels.map((l) => l.name);
-      currentNode.color = getLabelWithFewestElements(labels).color;
+      currentNode.color = isColor ? getLabelWithFewestElements(labels).color : "";
       currentNode.expand = false;
       currentNode.collapsed = collapsed;
       Object.entries(cell.properties).forEach(([key, value]) => {
@@ -487,7 +487,7 @@ export class Graph {
     return currentNode;
   }
 
-  public extendEdge(cell: LinkCell, collapsed: boolean, isSchema: boolean) {
+  public extendEdge(cell: LinkCell, collapsed: boolean, isSchema: boolean, isColor = false) {
     const relation = this.createRelationship(cell.relationshipType);
     const currentEdge = this.linksMap.get(cell.id);
 
@@ -503,7 +503,7 @@ export class Graph {
           source = {
             id: cell.sourceId,
             labels: [label.name],
-            color: label.color,
+            color: isColor ? label.color : "",
             expand: false,
             collapsed,
             visible: true,
@@ -540,7 +540,7 @@ export class Graph {
           source = {
             id: cell.sourceId,
             labels: [label!.name],
-            color: label!.color,
+            color: isColor ? label!.color : "",
             expand: false,
             collapsed,
             visible: true,
@@ -557,7 +557,7 @@ export class Graph {
           target = {
             id: cell.destinationId,
             labels: [label!.name],
-            color: label!.color,
+            color: isColor ? label!.color : "",
             expand: false,
             collapsed,
             visible: true,
@@ -597,6 +597,29 @@ export class Graph {
     return currentEdge;
   }
 
+  public extendCell(cell: any, collapsed: boolean, isSchema: boolean) {
+    if (cell.nodes) {
+      return [
+        ...cell.nodes.map((node: any) =>
+          this.extendNode(node, collapsed, isSchema)
+        ),
+        ...cell.edges.map((edge: any) =>
+          this.extendEdge(edge, collapsed, isSchema)
+        ),
+      ] as (Node | Link)[];
+    }
+
+    if (cell.relationshipType) {
+      return this.extendEdge(cell, collapsed, isSchema);
+    }
+
+    if (cell.labels) {
+      return this.extendNode(cell, collapsed, isSchema);
+    }
+
+    return undefined;
+  }
+
   public extend(
     results: { data: Data; metadata: any[] },
     collapsed = false,
@@ -616,22 +639,25 @@ export class Graph {
     this.metadata = results.metadata;
     this.data.forEach((row: DataRow) => {
       Object.values(row).forEach((cell: any) => {
-        if (cell instanceof Object) {
-          let element: Node | Link | undefined;
-          if (cell.nodes) {
-            cell.nodes.forEach((node: any) => {
-              element = this.extendNode(node, collapsed, isSchema);
-            });
-            cell.edges.forEach((edge: any) => {
-              element = this.extendEdge(edge, collapsed, isSchema);
-            });
-          } else if (cell.relationshipType) {
-            element = this.extendEdge(cell, collapsed, isSchema);
-          } else if (cell.labels) {
-            element = this.extendNode(cell, collapsed, isSchema);
-          }
-          if (element) {
-            newElements.push(element);
+        if (Array.isArray(cell) && cell[0] instanceof Object) {
+          cell.forEach((c: any) => {
+            const elements = this.extendCell(c, collapsed, isSchema);
+            if (elements) {
+              if (Array.isArray(elements)) {
+                newElements.push(...elements);
+              } else {
+                newElements.push(elements);
+              }
+            }
+          });
+        } else if (cell instanceof Object) {
+          const elements = this.extendCell(cell, collapsed, isSchema);
+          if (elements) {
+            if (Array.isArray(elements)) {
+              newElements.push(...elements);
+            } else {
+              newElements.push(elements);
+            }
           }
         }
       });
@@ -665,6 +691,17 @@ export class Graph {
         }
 
         link.curve = curve * 0.4;
+      });
+
+    newElements
+      .filter((element): element is Node => "labels" in element)
+      .forEach((node) => {
+        const label = getLabelWithFewestElements(
+          node.labels.map(
+            (l) => this.labelsMap.get(l) || this.createLabel([l])[0]
+          )
+        );
+        node.color = label.color;
       });
 
     // remove empty category if there are no more empty nodes category

@@ -6,6 +6,8 @@ import { useSearchParams, useRouter } from "next/navigation";
 import Image from "next/image";
 import { Check, Info } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
+import { useTheme } from "next-themes";
+import { getTheme } from "@/lib/utils";
 import FormComponent, { Field } from "../components/FormComponent";
 import Dropzone from "../components/ui/Dropzone";
 
@@ -13,7 +15,11 @@ const DEFAULT_HOST = "localhost";
 const DEFAULT_PORT = "6379";
 
 export default function LoginForm() {
+  const { theme } = useTheme();
+  const { currentTheme } = getTheme(theme)
   const router = useRouter();
+
+  const [mounted, setMounted] = useState(false);
   const [host, setHost] = useState("");
   const [port, setPort] = useState("");
   const [TLS, setTLS] = useState(false);
@@ -96,6 +102,10 @@ export default function LoginForm() {
   ];
 
   useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  useEffect(() => {
     const hostParam = searchParams.get("host");
     const portParam = searchParams.get("port");
     const usernameParam = searchParams.get("username");
@@ -159,7 +169,7 @@ export default function LoginForm() {
     <div className="relative h-full w-full flex flex-col">
       <div className="grow flex items-center justify-center">
         <div className="flex flex-col gap-8 items-center">
-          <Image style={{ width: 'auto', height: '80px' }} priority src="/icons/BrowserLogo.svg" alt="FalkorDB Browser Logo" width={0} height={0} />
+          {mounted && currentTheme && <Image style={{ width: 'auto', height: '80px' }} priority src={`/icons/Browser-${currentTheme}.svg`} alt="FalkorDB Browser Logo" width={0} height={0} />}
           <FormComponent
             fields={fields}
             handleSubmit={onSubmit}
@@ -169,7 +179,7 @@ export default function LoginForm() {
             <div className="flex flex-col gap-4">
               <div className="flex gap-2 items-center">
                 <Checkbox
-                  className="w-6 h-6 rounded-full bg-foreground border-primary data-[state=checked]:bg-primary"
+                  className="w-6 h-6 rounded-full bg-background border-primary data-[state=checked]:bg-primary"
                   checked={TLS}
                   onCheckedChange={(checked) => {
                     setTLS(checked as boolean)
@@ -185,17 +195,17 @@ export default function LoginForm() {
                   }}
                   data-testid="tls-checkbox"
                 />
-                <p className="font-medium text-white">TLS Secured Connection</p>
+                <p className="font-medium text-foreground">TLS Secured Connection</p>
               </div>
-              
+
               {/* Certificate Upload Section */}
               {TLS && (
-                <div className="flex flex-col gap-3 p-4 bg-foreground border border-muted/20 rounded-lg transition-all duration-300 ease-in-out">
+                <div id="tls-section" className="flex flex-col gap-3 p-4 bg-background border border-border rounded-lg transition-all duration-300 ease-in-out">
                   <div className="flex items-center gap-2">
                     <div className="w-2 h-2 bg-primary rounded-full" />
                     <span className="text-sm font-semibold text-muted">Certificate Authentication</span>
                   </div>
-                  
+
                   <div className="flex flex-col gap-2">
                     {!uploadedFileName ? (
                       // Upload State
@@ -216,7 +226,7 @@ export default function LoginForm() {
                             </div>
                           </div>
                           <div className="flex flex-col">
-                            <span className="text-sm font-medium text-white">Certificate Uploaded</span>
+                            <span className="text-sm font-medium text-foreground">Certificate Uploaded</span>
                             <span className="text-xs text-muted truncate max-w-48">{uploadedFileName}</span>
                           </div>
                         </div>
@@ -230,7 +240,7 @@ export default function LoginForm() {
                             setCA(undefined)
                             setUploadedFileName("")
                           }}
-                          className="flex-shrink-0 p-1 text-muted hover:text-white hover:bg-primary/20 rounded transition-colors duration-200"
+                          className="flex-shrink-0 p-1 text-muted hover:text-foreground hover:bg-primary/20 rounded transition-colors duration-200"
                           title="Remove certificate"
                           data-testid="remove-certificate-btn"
                           aria-label="Remove certificate"

@@ -2,7 +2,7 @@
   "name": "falkordb-browser",
   "author": "FalkorDB",
   "description": "FalkorDB Browser",
-  "version": "1.4.5",
+  "version": "1.4.6",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -58,7 +58,7 @@
     "lodash": "^4.17.21",
     "lucide-react": "^0.475.0",
     "monaco-editor": "^0.47.0",
-    "next": "^15.2.4",
+    "next": "^15.5.2",
     "next-auth": "^4.24.11",
     "next-themes": "^0.2.1",
     "node-cache": "^5.1.2",
