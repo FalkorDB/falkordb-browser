@@ -57,7 +57,7 @@ export default function Combobox({ id, disabled = false, inTable = false, label,
               id={id}
               data-testid={`select${label}`}
               data-type="select"
-              className={cn("w-fit gap-2 items-center border border-border p-2 disabled:text-gray-400 disabled:cursor-not-allowed", inTable ? "text-sm font-light" : "text-xl font-medium", className)}
+              className={cn("w-fit gap-2 items-center border border-border p-2 disabled:text-gray-300 disabled:cursor-not-allowed", inTable ? "text-sm font-light" : "text-xl font-medium", className)}
             >
               <SelectValue placeholder={`Select ${label}`} />
             </SelectTrigger>

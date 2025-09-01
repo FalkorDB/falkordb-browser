@@ -299,7 +299,7 @@ export default function Selector({ graph, options, setOptions, graphName, setGra
                                                             }}
                                                             onMount={handleEditorDidMount}
                                                             beforeMount={(m) => {
-                                                                setTheme(m, "selector-theme", secondary, theme === "dark")
+                                                                setTheme(m, "selector-theme", secondary, currentTheme === "dark")
                                                             }}
                                                         />
                                                     </>
