@@ -101,7 +101,7 @@ export default function SchemaView({
 
     return (
         <div className="relative w-full h-full border border-border rounded-lg overflow-hidden">
-            <div className="h-full w-full flex flex-col gap-4 absolute py-4 px-6 pointer-events-none z-20 justify-between">
+            <div className="h-full w-full flex flex-col gap-4 absolute py-4 px-6 pointer-events-none z-10 justify-between">
                 <div className="flex flex-col gap-6">
                     {
                         !isLoading && (labels.length > 0 || relationships.length > 0) &&

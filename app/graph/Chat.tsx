@@ -18,7 +18,7 @@ export default function Chat({ onClose }: Props) {
     const { setIndicator } = useContext(IndicatorContext)
     const { graphName, runQuery } = useContext(GraphContext)
     const { isQueryLoading } = useContext(QueryLoadingContext)
-    const { settings: { chatSettings: { secretKey, model } } } = useContext(QuerySettingsContext)
+    const { settings: { chatSettings: { secretKey, model, navigateToSettings } } } = useContext(QuerySettingsContext)
 
     const { toast } = useToast()
 
@@ -92,7 +92,13 @@ export default function Chat({ onClose }: Props) {
                 headers: {
                     "Content-Type": "application/json",
                 },
-                body: JSON.stringify({
+                body: JSON.stringify(!navigateToSettings ? {
+                    messages: newMessages.filter(message => message.role === "user" || message.type === "Result").map(({ role, content }) => ({
+                        role,
+                        content
+                    })),
+                    graphName,
+                } : {
                     messages: newMessages.filter(message => message.role === "user" || message.type === "Result").map(({ role, content }) => ({
                         role,
                         content
@@ -125,7 +131,6 @@ export default function Chat({ onClose }: Props) {
                 lines.forEach(line => {
                     const eventType: EventType | "error" = line.split(" ")[1] as EventType | "error"
                     const eventData = line.split("data:")[1]
-
                     switch (eventType) {
                         case "Status":
                             const message = {
@@ -156,7 +161,7 @@ export default function Chat({ onClose }: Props) {
                                 if (lastMessage.role === "assistant" && lastMessage.type === "Result") {
                                     return [...prev.slice(0, -1), {
                                         ...lastMessage,
-                                        content: (lastMessage.content + eventData).trim()
+                                        content: `${lastMessage.content} ${eventData.trim()}`
                                     }]
                                 }
 
