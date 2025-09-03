@@ -3,15 +3,21 @@ import { NextRequest, NextResponse } from "next/server";
 import { SignJWT } from "jose";
 import { newClient, generateTimeUUID } from "../[...nextauth]/options";
 
-// JWT secret key
-if (!process.env.NEXTAUTH_SECRET) {
-  throw new Error("NEXTAUTH_SECRET environment variable is required");
-}
-const JWT_SECRET = new TextEncoder().encode(process.env.NEXTAUTH_SECRET);
-
 // eslint-disable-next-line import/prefer-default-export
 export async function POST(request: NextRequest) {
   try {
+    // Check JWT secret at runtime
+    if (!process.env.NEXTAUTH_SECRET) {
+      // eslint-disable-next-line no-console
+      console.error("NEXTAUTH_SECRET environment variable is required");
+      return NextResponse.json(
+        { message: "Server configuration error" },
+        { status: 500 }
+      );
+    }
+    
+    const JWT_SECRET = new TextEncoder().encode(process.env.NEXTAUTH_SECRET);
+
     // Handle JSON parsing errors properly
     let body;
     try {
@@ -62,17 +68,11 @@ export async function POST(request: NextRequest) {
         role,
       };
 
-      // Create JWT token with user information (excluding password for security)
+      // Create JWT token
       const tokenPayload = {
-        user: {
-          id: user.id,
-          host: user.host,
-          port: user.port,
-          username: user.username,
-          tls: user.tls,
-          ca: user.ca,
-          role: user.role,
-        },
+        sub: user.id,           // Standard JWT claim for user ID
+        username: user.username,
+        role: user.role,
         iat: Math.floor(Date.now() / 1000),
         exp: Math.floor(Date.now() / 1000) + (24 * 60 * 60), // 24 hours
       };
