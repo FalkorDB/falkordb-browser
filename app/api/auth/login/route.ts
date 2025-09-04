@@ -62,7 +62,6 @@ export async function POST(request: NextRequest) {
         host,
         port: parseInt(port, 10),
         username,
-        password,
         tls: tls === "true" || tls === true,
         ca,
         role,
@@ -73,8 +72,6 @@ export async function POST(request: NextRequest) {
         sub: user.id,           // Standard JWT claim for user ID
         username: user.username,
         role: user.role,
-        iat: Math.floor(Date.now() / 1000),
-        exp: Math.floor(Date.now() / 1000) + (24 * 60 * 60), // 24 hours
       };
 
       const token = await new SignJWT(tokenPayload)
