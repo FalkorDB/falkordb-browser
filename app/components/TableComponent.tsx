@@ -44,7 +44,7 @@ export default function TableComponent({ headers, rows, label, entityName, input
     const [editable, setEditable] = useState<string>("")
     const [hover, setHover] = useState<string>("")
     const [newValue, setNewValue] = useState<string>("")
-    const [filteredRows, setFilteredRows] = useState<Row[]>(rows)
+    const [filteredRows, setFilteredRows] = useState<Row[]>([])
     const [isLoading, setIsLoading] = useState<boolean>(false)
     const [scrollTop, setScrollTop] = useState<number>(0)
     const [topFakeRowHeight, setTopFakeRowHeight] = useState<number>(0)
@@ -56,7 +56,7 @@ export default function TableComponent({ headers, rows, label, entityName, input
         const newEndIndex = Math.min(filteredRows.length, Math.floor((scrollTop + (itemHeight * (itemsPerPage * 2))) / itemHeight))
         const newTopFakeRowHeight = newStartIndex * itemHeight
         const newBottomFakeRowHeight = (filteredRows.length - newEndIndex) * itemHeight
-        const newVisibleRows = filteredRows.slice(newStartIndex, newEndIndex)
+        const newVisibleRows = [...filteredRows].slice(newStartIndex, newEndIndex)
 
         setTopFakeRowHeight(newTopFakeRowHeight)
         setBottomFakeRowHeight(newBottomFakeRowHeight)
@@ -95,8 +95,12 @@ export default function TableComponent({ headers, rows, label, entityName, input
     }, [search])
 
     useEffect(() => {
+        if (!search) {
+            setFilteredRows([...rows])
+        }
+
         const timeout = setTimeout(() => {
-            setFilteredRows(rows.filter((row) => !search || row.cells.some(cell =>
+            setFilteredRows([...rows].filter((row) => row.cells.some(cell =>
                 handleSearchFilter(cell)
             )))
         }, 500)
@@ -197,7 +201,10 @@ export default function TableComponent({ headers, rows, label, entityName, input
                     }
                     {
                         visibleRows.map((row) => {
-                            const actualIndex = rows.findIndex(r => r.cells[0].value === row.cells[0].value)
+                            const actualIndex = rows.findIndex(r => r === row)
+                            
+                            if (actualIndex === -1) return null
+                            
                             return (
                                 <TableRow
                                     className="border-border"
