@@ -46,13 +46,25 @@ export default function SchemaCreateElement({ onCreate, setIsAdd, selectedNodes,
   const [label, setLabel] = useState<string[]>([])
   const [hover, setHover] = useState<string>("")
 
+  const onClose = useCallback(() => {
+    setSelectedNodes([undefined, undefined])
+    setAttributes([])
+    setLabel([])
+    setNewLabel("")
+    setNewAttribute(getDefaultAttribute())
+    setAttribute(getDefaultAttribute())
+    setEditable("")
+    setIsAddLabel(false)
+    setIsAdd(false)
+  }, [setIsAdd, setSelectedNodes, setAttributes, setLabel, setNewLabel, setNewAttribute, setAttribute, setEditable, setIsAddLabel])
+
   const handleClose = useCallback((e: KeyboardEvent) => {
     if (e.defaultPrevented) return
 
     if (e.key === "Escape") {
-      setIsAdd(false)
+      onClose()
     }
-  }, [setIsAdd])
+  }, [onClose])
 
   useEffect(() => {
     window.addEventListener("keydown", handleClose)
@@ -204,18 +216,6 @@ export default function SchemaCreateElement({ onCreate, setIsAdd, selectedNodes,
     setLabel(prev => [...prev, newLabel])
     setNewLabel("")
     setIsAddLabel(false)
-  }
-
-  const onClose = () => {
-    setSelectedNodes([undefined, undefined])
-    setAttributes([])
-    setLabel([])
-    setNewLabel("")
-    setNewAttribute(getDefaultAttribute())
-    setAttribute(getDefaultAttribute())
-    setEditable("")
-    setIsAddLabel(false)
-    setIsAdd(false)
   }
 
   return (
