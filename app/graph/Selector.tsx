@@ -1,97 +1,68 @@
+/* eslint-disable no-param-reassign */
+
 'use client'
 
-import { useEffect, useRef, useState, Dispatch, SetStateAction, useContext, useCallback } from "react";
-import { DialogTitle } from "@/components/ui/dialog";
-import { Editor } from "@monaco-editor/react";
-import { editor } from "monaco-editor";
-import { cn, HistoryQuery, prepareArg, Query, securedFetch } from "@/lib/utils";
-import { Session } from "next-auth";
-import { PlusCircle, RefreshCcw } from "lucide-react";
-import { usePathname } from "next/navigation";
-import { useToast } from "@/components/ui/use-toast";
+import { useEffect, useState, useContext, Dispatch, SetStateAction, useRef, useCallback } from "react";
+import { cn, GraphRef, formatName, getTheme } from "@/lib/utils";
+import { History, Info, Maximize2 } from "lucide-react";
 import * as monaco from "monaco-editor";
-import Combobox from "../components/ui/combobox";
-import { Graph } from "../api/graph/model";
-import DialogComponent from "../components/DialogComponent";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Editor } from "@monaco-editor/react";
+import { useTheme } from "next-themes";
 import Button from "../components/ui/Button";
-import Duplicate from "./Duplicate";
-import SchemaView from "../schema/SchemaView";
-import View from "./View";
-import CreateGraph from "../components/CreateGraph";
-import ExportGraph from "../components/ExportGraph";
-import MetadataView from "./MetadataView";
-import Input from "../components/ui/Input";
 import { IndicatorContext } from "../components/provider";
+import EditorComponent, { setTheme } from "../components/EditorComponent";
+import DialogComponent from "../components/DialogComponent";
+import Toolbar from "./toolbar";
+import { Node, Link, Graph, Query, HistoryQuery } from "../api/graph/model";
+import { Explain, Metadata, Profile } from "./MetadataView";
+import PaginationList from "../components/PaginationList";
+import SelectGraph from "./selectGraph";
 
 interface Props {
-    setGraphName: (selectedGraphName: string) => void
-    graphName: string
-    runQuery?: (query: string, timeout?: number) => Promise<Query | undefined>
-    historyQuery?: HistoryQuery
-    setHistoryQuery?: Dispatch<SetStateAction<HistoryQuery>>
-    edgesCount: number
-    nodesCount: number
-    setGraph: (graph: Graph) => void
     graph: Graph
-    data: Session | null
     options: string[]
     setOptions: Dispatch<SetStateAction<string[]>>
+    graphName: string
+    setGraphName: Dispatch<SetStateAction<string>>
+    setGraph: Dispatch<SetStateAction<Graph>>
+    // graph
+    runQuery?: (query: string) => Promise<void>
+    historyQuery?: HistoryQuery
+    setHistoryQuery?: Dispatch<SetStateAction<HistoryQuery>>
+    fetchCount?: () => Promise<void>
+    isQueryLoading?: boolean
+    // schema
+    selectedElements?: (Node | Link)[]
+    setSelectedElement?: (el: Node | Link | undefined) => void
+    handleDeleteElement?: () => Promise<void>
+    chartRef?: GraphRef
+    setIsAddEntity?: (isAdd: boolean) => void
+    setIsAddRelation?: (isAdd: boolean) => void
+    isCanvasLoading?: boolean
 }
 
-export default function Selector({ setGraphName, graphName, runQuery, edgesCount, nodesCount, setGraph, graph, data: session, historyQuery, setHistoryQuery, options, setOptions }: Props) {
+const STEP = 8
 
-    const [schema, setSchema] = useState<Graph>(Graph.empty());
-    const [search, setSearch] = useState<string>("")
-    const [selectedValue, setSelectedValue] = useState<string>("");
-    const [duplicateOpen, setDuplicateOpen] = useState<boolean>(false);
-    const [queriesOpen, setQueriesOpen] = useState<boolean>(false);
-    const [isLoading, setIsLoading] = useState(false);
-    const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null)
-    const pathname = usePathname()
-    const type = pathname.includes("/schema") ? "Schema" : "Graph"
-    const [isRotating, setIsRotating] = useState(false);
-    const { toast } = useToast()
-    const [filteredQueries, setFilteredQueries] = useState<Query[]>(historyQuery?.queries || [])
-    const { indicator, setIndicator } = useContext(IndicatorContext)
+export default function Selector({ graph, options, setOptions, graphName, setGraphName, runQuery, historyQuery, setHistoryQuery, fetchCount, selectedElements, setSelectedElement, handleDeleteElement, chartRef, setIsAddEntity, setIsAddRelation, setGraph, isCanvasLoading, isQueryLoading }: Props) {
 
-    const handleOnChange = useCallback(async (name: string) => {
-        const formattedName = name === '""' ? "" : name
-        if (type === "Graph") {
-            const result = await securedFetch(`api/schema/${prepareArg(name)}?create=false`, {
-                method: "GET"
-            }, toast, setIndicator)
+    const { indicator } = useContext(IndicatorContext)
 
-            if (result.ok) {
-                const json = await result.json()
-                if (json.result) {
-                    setSchema(Graph.create(name, json.result, false, true))
-                }
-            }
-        }
-        setGraphName(formattedName)
-        setSelectedValue(name)
-    }, [setGraphName, setIndicator, toast, type])
+    const { theme } = useTheme()
+    const { secondary, currentTheme } = getTheme(theme)
 
-    const getOptions = useCallback(async () => {
-        if (indicator === "offline") return
+    const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null)
+    const submitQuery = useRef<HTMLButtonElement>(null)
+    const searchQueryRef = useRef<HTMLInputElement>(null)
 
-        const result = await securedFetch(`api/${type === "Graph" ? "graph" : "schema"}`, {
-            method: "GET"
-        }, toast, setIndicator)
-        if (!result.ok) return
-        const { opts } = (await result.json()) as { opts: string[] }
-        setOptions(opts)
-        if (opts.length === 1) handleOnChange(opts[0])
-        if (opts.length === 0) handleOnChange("")
-    }, [indicator, type, toast, setIndicator, setOptions, handleOnChange])
+    const [queriesOpen, setQueriesOpen] = useState(false)
+    const [isLoading, setIsLoading] = useState(false)
+    const [maximize, setMaximize] = useState(false)
+    const [tab, setTab] = useState<keyof Query>("text")
 
-    useEffect(() => {
-        getOptions()
-    }, [getOptions])
-
-    useEffect(() => {
-        if (indicator === "online") getOptions()
-    }, [indicator, getOptions])
+    const currentQuery = historyQuery?.counter === 0 ? historyQuery.currentQuery : historyQuery?.queries[historyQuery.counter - 1]
+    const type = runQuery && historyQuery && setHistoryQuery ? "Graph" : "Schema"
 
     const focusEditorAtEnd = () => {
         if (editorRef.current) {
@@ -109,29 +80,48 @@ export default function Selector({ setGraphName, graphName, runQuery, edgesCount
         }
     };
 
+
+    const isTabEnabled = useCallback((tabName: keyof Query) => {
+        if (tabName === "text") return !!currentQuery?.text;
+        if (tabName === "metadata") return !!currentQuery && currentQuery.metadata.length > 0;
+        if (tabName === "explain") return !!currentQuery && currentQuery.explain.length > 0;
+        return true;
+    }, [currentQuery]);
+
     useEffect(() => {
-        const timeout = setTimeout(() => {
-            if (!historyQuery) return
-            setFilteredQueries(historyQuery.queries?.filter((query, i) => !search || query.text.toLowerCase().includes(search.toLowerCase()) || i === historyQuery.counter - 1) || [])
+        if (!queriesOpen || !currentQuery || tab === "profile") return
+
+        const currentValue = currentQuery?.[tab]
+
+        if (!currentValue || currentValue.length === 0) {
+            const fallbackTab = (Object.keys(currentQuery) as (keyof Query)[]).find(isTabEnabled);
+
+            if (fallbackTab && fallbackTab !== tab) {
+                setTab(fallbackTab);
+
+                if (fallbackTab === "text" && !editorRef.current?.hasTextFocus()) {
+                    focusEditorAtEnd()
+                }
+            }
+        } else if (tab === "text" && !editorRef.current?.hasTextFocus()) {
             focusEditorAtEnd()
-        }, 500)
-
-        return () => {
-            clearTimeout(timeout)
         }
-    }, [historyQuery?.queries, search, historyQuery?.counter, historyQuery])
-    const submitQuery = useRef<HTMLButtonElement>(null)
+    }, [currentQuery, setTab, queriesOpen, historyQuery?.query, tab, isTabEnabled])
 
-    useEffect(() => {
-        setSelectedValue(graphName)
-    }, [graphName])
+    const handleOnChange = useCallback((name: string) => {
+        setGraphName(formatName(name))
+    }, [setGraphName])
 
-    const handleEditorDidMount = (e: editor.IStandaloneCodeEditor) => {
+    const handleEditorDidMount = (e: monaco.editor.IStandaloneCodeEditor) => {
         editorRef.current = e
 
         // eslint-disable-next-line no-bitwise
         e.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, () => {
             submitQuery.current?.click();
+        });
+
+        e.addCommand(monaco.KeyCode.Escape, () => {
+            searchQueryRef.current?.focus()
         });
 
         // eslint-disable-next-line no-bitwise
@@ -152,237 +142,261 @@ export default function Selector({ setGraphName, graphName, runQuery, edgesCount
         });
     }
 
-    const handleReloadClick = () => {
-        setIsRotating(true);
-        getOptions();
-        setTimeout(() => setIsRotating(false), 1000);
-    };
+    const handleSubmit = async () => {
+        try {
+            setIsLoading(true)
+            await runQuery!(historyQuery!.query.trim())
+            setQueriesOpen(false)
+        } finally {
+            setIsLoading(false)
+        }
+    }
+
+    const afterSearchCallback = useCallback((newFilteredList: Query[]) => {
+        if (!historyQuery || !setHistoryQuery) return
+
+        if (newFilteredList.every(q => q.text !== historyQuery.query)) {
+            setHistoryQuery(prev => ({
+                ...prev,
+                counter: 0
+            }))
+        }
+    }, [historyQuery, setHistoryQuery])
+
+    const separator = <div className="h-[80%] w-0.5 bg-border rounded-full" />
 
     return (
-        <div className="flex flex-col gap-4">
-            <div className="flex justify-between items-center">
-                <div className="flex items-center gap-4" id="graphManager">
-                    {
-                        session?.user?.role !== "Read-Only" &&
-                        <>
-                            <CreateGraph
-                                type={type}
-                                graphNames={options}
-                                onSetGraphName={(name) => {
-                                    handleOnChange(name)
-                                    setOptions(prev => [...prev, name])
-                                }}
-                                trigger={
-                                    <Button
-                                        variant="Primary"
-                                        title={`Create New ${type}`}
-                                    >
-                                        <PlusCircle size={20} />
-                                    </Button>
-                                }
+        <div className="z-20 w-full h-[50px] flex flex-row gap-4 items-center">
+            <SelectGraph
+                options={options}
+                setOptions={setOptions}
+                selectedValue={graphName}
+                setSelectedValue={handleOnChange}
+                type={type}
+                setGraph={setGraph}
+            />
+            {
+                runQuery && historyQuery && setHistoryQuery && fetchCount && isQueryLoading !== undefined ?
+                    <>
+                        <div className="h-full w-1 grow relative overflow-visible">
+                            <EditorComponent
+                                graph={graph}
+                                graphName={graphName}
+                                maximize={maximize}
+                                setMaximize={setMaximize}
+                                runQuery={runQuery}
+                                isQueryLoading={isQueryLoading}
+                                historyQuery={historyQuery}
+                                setHistoryQuery={setHistoryQuery}
+                                editorKey={queriesOpen ? "selector-theme" : "editor-theme"}
                             />
-                            <p className="text-secondary">|</p>
-                        </>
-                    }
-                    <Button
-                        indicator={indicator}
-                        className={cn(
-                            "transition-transform",
-                            isRotating && "animate-spin duration-1000"
-                        )}
-                        onClick={handleReloadClick}
-                        title="Reload Graphs List"
-                    >
-                        <RefreshCcw size={20} />
-                    </Button>
-                    <p className="text-secondary">|</p>
-                    <Combobox
-                        isSelectGraph
-                        type={type}
-                        options={options}
-                        setOptions={setOptions}
-                        selectedValue={selectedValue}
-                        setSelectedValue={handleOnChange}
-                    />
-                </div>
-                <div className="flex gap-16 text-[#e5e7eb]">
-                    <ExportGraph
-                        trigger={
-                            <Button
-                                label="Export Data"
-                                disabled={!selectedValue}
-                                title="Export your data to a file"
-                            />
-                        }
-                        type={type}
-                        selectedValues={[selectedValue]}
-                    />
-                    {
-                        session?.user?.role !== "Read-Only" &&
-                        <Duplicate
-                            disabled={!selectedValue}
-                            open={duplicateOpen}
-                            onOpenChange={setDuplicateOpen}
-                            onDuplicate={(name) => {
-                                setOptions(prev => [...prev, name])
-                                setSelectedValue(name)
-                                handleOnChange(name)
-                            }}
-                            type={type}
-                            selectedValue={selectedValue}
-                        />
-                    }
-                    <View setGraph={setGraph} graph={graph} selectedValue={selectedValue} />
-                </div >
-            </div >
-            <div className={cn("bg-foreground flex gap-4 justify-between items-center p-4 rounded-xl min-h-14", !selectedValue && "justify-end")}>
-                {
-                    selectedValue &&
-                    <div className="flex gap-6" id="graphStats">
-                        <span>{nodesCount}&ensp;Nodes</span>
-                        <p className="text-secondary">|</p>
-                        <span>{edgesCount}&ensp;Edges</span>
-                    </div>
-                }
-                {
-                    runQuery &&
-                    <div className="flex gap-4 items-center">
-                        <DialogComponent
-                            className="h-[90dvh] w-[90dvw]"
-                            open={queriesOpen}
-                            onOpenChange={(open) => {
-                                setQueriesOpen(open)
-                                if (open) {
-                                    setTimeout(() => {
-                                        focusEditorAtEnd()
-                                    }, 100)
-                                }
-                            }}
-                            trigger={
-                                <Button
-                                    disabled={!historyQuery || historyQuery.queries.length === 0}
-                                    title={!historyQuery || historyQuery.queries.length === 0 ? "No queries" : "View past queries"}
-                                    label="Query History"
-                                />
-                            }
-                            title="Query History"
-                        >
-                            <div className="grow flex flex-col p-8 gap-8" id="queryHistory">
-                                <DialogTitle>Queries</DialogTitle>
-                                <div className="h-1 grow flex border">
-                                    <div className="w-1 grow border-r overflow-auto">
-                                        <div className="p-8 border-b">
-                                            <Input
-                                                className="w-full"
-                                                value={search}
-                                                placeholder="Search for a query"
-                                                onChange={(e) => setSearch(e.target.value)}
-                                            />
-                                        </div>
-                                        <ul className="flex flex-col-reverse">
-                                            {
-                                                setHistoryQuery && historyQuery && filteredQueries.length > 0 && filteredQueries.map((query, index) => {
-                                                    const currentIndex = historyQuery.queries.findIndex(q => q.text === query.text)
-                                                    return (
-                                                        // eslint-disable-next-line react/no-array-index-key
-                                                        <li key={index} className="flex flex-col gap-2 w-full border-b py-3 px-12">
-                                                            <Button
-                                                                className="w-full truncate text-sm"
-                                                                label={query.text}
-                                                                onClick={() => {
-                                                                    setHistoryQuery(prev => ({
+                        </div>
+                        <div className="h-full w-[120px] flex gap-2 items-center p-2 border border-border rounded-lg bg-background">
+                            <Tooltip>
+                                <TooltipTrigger className="cursor-default">
+                                    <Info />
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                    <p>Run (Enter) History (Arrow Up/Down) Insert new line (Shift + Enter)</p>
+                                </TooltipContent>
+                            </Tooltip>
+                            {separator}
+                            <div className="flex gap-4 items-center">
+                                <DialogComponent
+                                    className="h-[90dvh] w-[90dvw]"
+                                    open={queriesOpen}
+                                    tabIndex={-1}
+                                    onEscapeKeyDown={(e) => {
+                                        if (editorRef.current && editorRef.current.hasTextFocus()) {
+                                            e.preventDefault()
+                                        }
+                                    }}
+                                    onOpenChange={setQueriesOpen}
+                                    trigger={
+                                        <Button
+                                            data-testid="queryHistory"
+                                            disabled={historyQuery.queries.length === 0}
+                                            title={historyQuery.queries.length === 0 ? "No queries" : "View past queries"}
+                                        >
+                                            <History />
+                                        </Button>
+                                    }
+                                    title="Query History"
+                                >
+                                    <div className="h-1 grow flex gap-8 p-8">
+                                        <PaginationList
+                                            label="Query"
+                                            className="w-[40%] bg-secondary rounded-lg overflow-hidden"
+                                            isSelected={(item) => historyQuery.queries.findIndex(q => q.text === item.text) + 1 === historyQuery.counter}
+                                            afterSearchCallback={afterSearchCallback}
+                                            dataTestId="queryHistory"
+                                            list={[...historyQuery.queries].reverse()}
+                                            step={STEP}
+                                            onClick={(counter) => {
+                                                const index = historyQuery.queries.findIndex(q => q.text === counter) + 1
+                                                setHistoryQuery(prev => ({
+                                                    ...prev,
+                                                    counter: index === historyQuery.counter ? 0 : index
+                                                }))
+                                            }}
+                                            searchRef={searchQueryRef}
+                                        />
+                                        <Tabs value={tab} onValueChange={(value) => setTab(value as keyof Query)} className="w-[60%] flex flex-col gap-8 items-center">
+                                            <TabsList className="bg-secondary h-fit w-fit p-2">
+                                                <TabsTrigger className={cn("!text-border data-[state=active]:!bg-background data-[state=active]:!text-foreground")} disabled={!isTabEnabled("text")} value="text">Edit Query</TabsTrigger>
+                                                <TabsTrigger className={cn("!text-border data-[state=active]:!bg-background data-[state=active]:!text-foreground")} disabled={!isTabEnabled("profile")} value="profile">Profile</TabsTrigger>
+                                                <TabsTrigger className={cn("!text-border data-[state=active]:!bg-background data-[state=active]:!text-foreground")} disabled={!isTabEnabled("metadata")} value="metadata">Metadata</TabsTrigger>
+                                                <TabsTrigger className={cn("!text-border data-[state=active]:!bg-background data-[state=active]:!text-foreground")} disabled={!isTabEnabled("explain")} value="explain">Explain</TabsTrigger>
+                                            </TabsList>
+                                            <TabsContent value="text" className="w-full h-1 grow bg-secondary rounded-lg p-2 py-4 relative">
+                                                {
+                                                    currentQuery &&
+                                                    <>
+                                                        <Button
+                                                            ref={submitQuery}
+                                                            data-testid="queryHistoryEditorRun"
+                                                            className="z-10 absolute bottom-4 right-8 py-2 px-8"
+                                                            indicator={indicator}
+                                                            variant="Primary"
+                                                            label="Run"
+                                                            title="Press Enter to run the query"
+                                                            onClick={handleSubmit}
+                                                            isLoading={isLoading}
+                                                        />
+                                                        <Editor
+                                                            key={currentTheme}
+                                                            className="CypherInput"
+                                                            data-testid="queryHistoryEditor"
+                                                            width="100%"
+                                                            height="100%"
+                                                            language="cypher"
+                                                            theme="selector-theme"
+                                                            options={{
+                                                                lineHeight: 30,
+                                                                fontSize: 25,
+                                                                lineNumbersMinChars: 3,
+                                                                scrollbar: {
+                                                                    horizontal: "hidden"
+                                                                },
+                                                                scrollBeyondLastLine: false,
+                                                                wordWrap: "on",
+                                                                renderWhitespace: "none"
+                                                            }}
+                                                            value={historyQuery.query}
+                                                            onChange={(value) => {
+                                                                setHistoryQuery(prev => {
+                                                                    const newHistoryQuery = {
                                                                         ...prev,
-                                                                        counter: currentIndex + 1
-                                                                    }))
-                                                                }}
-                                                            />
-                                                            {
-                                                                historyQuery.counter - 1 === currentIndex &&
-                                                                <div className="h-[20dvh] border" id="queryHistoryEditor">
-                                                                    <Editor
-                                                                        width="100%"
-                                                                        height="100%"
-                                                                        language="cypher"
-                                                                        theme="custom-theme"
-                                                                        options={{
-                                                                            lineHeight: 30,
-                                                                            fontSize: 25,
-                                                                            lineNumbersMinChars: 3,
-                                                                            scrollbar: {
-                                                                                horizontal: "hidden"
-                                                                            },
-                                                                            wordWrap: "on",
-                                                                            scrollBeyondLastLine: false,
-                                                                            renderWhitespace: "none"
-                                                                        }}
-                                                                        value={historyQuery.query}
-                                                                        onChange={(value) => setHistoryQuery(prev => ({
-                                                                            ...prev,
-                                                                            query: value || ""
-                                                                        }))}
-                                                                        onMount={handleEditorDidMount}
-                                                                    />
-                                                                </div>
-                                                            }
-                                                        </li>
-                                                    )
-                                                })
-                                            }
-                                        </ul>
-                                    </div>
-                                    <div className="w-1 grow">
-                                        {historyQuery && historyQuery.queries.length > 0 && historyQuery.counter ? <MetadataView query={historyQuery.queries[historyQuery.counter - 1]} graphName={selectedValue} /> : undefined}
-                                    </div>
-                                </div>
-                                <div className="flex justify-end">
-                                    <Button
-                                        ref={submitQuery}
-                                        className="text-white flex justify-center w-1/3"
-                                        disabled={isLoading || !historyQuery?.counter}
-                                        indicator={indicator}
-                                        onClick={async () => {
-                                            try {
-                                                setIsLoading(true);
-                                                const q = await runQuery(historyQuery?.query || "")
-                                                if (q) {
-                                                    setQueriesOpen(false)
+                                                                        query: value || "",
+                                                                        currentQuery: {
+                                                                            ...prev.currentQuery,
+                                                                            text: prev.counter ? prev.currentQuery.text : value || ""
+                                                                        }
+                                                                    }
+
+                                                                    return newHistoryQuery
+                                                                })
+                                                            }}
+                                                            onMount={handleEditorDidMount}
+                                                            beforeMount={(m) => {
+                                                                setTheme(m, "selector-theme", secondary, currentTheme === "dark")
+                                                            }}
+                                                        />
+                                                    </>
                                                 }
-                                            } finally {
-                                                setQueriesOpen(false)
-                                                setIsLoading(false)
-                                            }
-                                        }}
-                                        variant="Primary"
-                                        label={isLoading ? undefined : "Run"}
-                                        title={isLoading ? "Please wait..." : "Execute this query again"}
-                                        isLoading={isLoading}
-                                    />
-                                </div>
-                            </div >
-                        </DialogComponent >
-                        <DialogComponent className="h-[90%] w-[90%]" title={`${selectedValue} Schema`} trigger={
+                                            </TabsContent>
+                                            <TabsContent className="w-full h-1 grow bg-secondary rounded-lg p-8" value="profile">
+                                                <div className="h-full w-full overflow-hidden flex flex-col gap-4">
+                                                    {
+                                                        currentQuery &&
+                                                        <Profile
+                                                            graphName={graphName}
+                                                            query={currentQuery}
+                                                            setQuery={({ profile }) => {
+                                                                setHistoryQuery(prev => {
+                                                                    const newQuery = {
+                                                                        ...prev.currentQuery,
+                                                                        profile: profile || []
+                                                                    }
+
+                                                                    const newQueries = prev.queries.map(q => q.text === newQuery.text ? newQuery : q)
+
+                                                                    return {
+                                                                        ...prev,
+                                                                        currentQuery: newQuery,
+                                                                        queries: newQueries
+                                                                    }
+                                                                })
+                                                            }}
+                                                            fetchCount={fetchCount}
+                                                        />
+                                                    }
+                                                </div>
+                                            </TabsContent>
+                                            <TabsContent className="w-full h-1 grow bg-secondary rounded-lg p-8" value="metadata">
+                                                <div className="h-full w-full overflow-hidden flex flex-col gap-4">
+                                                    {
+                                                        currentQuery &&
+                                                        <Metadata
+                                                            query={currentQuery}
+                                                        />
+                                                    }
+                                                </div>
+                                            </TabsContent>
+                                            <TabsContent className="w-full h-1 grow bg-secondary rounded-lg p-8" value="explain">
+                                                <div className="h-full w-full overflow-hidden flex flex-col gap-4">
+                                                    {
+                                                        currentQuery &&
+                                                        <Explain
+                                                            query={currentQuery}
+                                                        />
+                                                    }
+                                                </div>
+                                            </TabsContent>
+                                        </Tabs>
+                                    </div>
+                                </DialogComponent>
+                            </div>
+                            {separator}
                             <Button
-                                disabled={!schema.Id}
-                                label="View Schema"
-                                title="Display the schema structure"
-                            />
-                        }>
-                            <SchemaView schema={schema} />
-                        </DialogComponent>
-                    </div >
-                }
-            </div >
-        </div >
+                                data-testid="editorMaximize"
+                                title="Maximize"
+                                onClick={() => setMaximize(true)}
+                            >
+                                <Maximize2 size={20} />
+                            </Button>
+                        </div>
+                    </>
+                    : selectedElements && setSelectedElement && handleDeleteElement && handleDeleteElement && setIsAddEntity && setIsAddRelation && chartRef && isCanvasLoading !== undefined && <div className="w-full h-full">
+                        <Toolbar
+                            graph={graph}
+                            label={type}
+                            selectedElements={selectedElements}
+                            setSelectedElement={setSelectedElement}
+                            handleDeleteElement={handleDeleteElement}
+                            setIsAddEntity={setIsAddEntity}
+                            setIsAddRelation={setIsAddRelation}
+                            chartRef={chartRef}
+                            isLoadingSchema={!!isCanvasLoading}
+                            backgroundColor="bg-background"
+                        />
+                    </div>
+            }
+        </div>
     )
 }
 
 Selector.defaultProps = {
     runQuery: undefined,
-    historyQuery: {
-        queries: [],
-        counter: 0,
-        query: "",
-        currentQuery: ""
-    },
-    setHistoryQuery: () => { }
+    historyQuery: undefined,
+    setHistoryQuery: undefined,
+    selectedElements: undefined,
+    setSelectedElement: undefined,
+    handleDeleteElement: undefined,
+    chartRef: undefined,
+    setIsAddEntity: undefined,
+    setIsAddRelation: undefined,
+    fetchCount: undefined,
+    isQueryLoading: undefined,
+    isCanvasLoading: undefined,
 }

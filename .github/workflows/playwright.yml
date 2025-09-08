@@ -1,24 +1,89 @@
 name: Playwright Tests
+permissions:
+  contents: read
 on:
   push:
     branches: [ main, staging ]
   pull_request:
     branches: [ main, staging ]
-  workflow_run:
-    workflows:
-      - "FalkorDb/Falkordb: browser tests trigger on new tag release"
-    types:
-      - completed
-    repositories:
-      - FalkorDb/Falkordb
+  workflow_call:
+    secrets:
+      RUN_BROWSER_TESTS:
+        required: true
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
+  setup-dependencies:
+    name: Setup and cache dependencies
+    runs-on: ubuntu-latest
+    outputs:
+      cache-hit: ${{ steps.cache-npm.outputs.cache-hit }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+          cache: 'npm'
+      - name: Cache node modules
+        id: cache-npm
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.npm
+            node_modules
+            ~/.cache/ms-playwright
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}-${{ hashFiles('**/playwright.config.ts') }}
+          restore-keys: |
+            ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}-
+            ${{ runner.os }}-node-
+      - name: Install dependencies with enhanced retry logic
+        if: steps.cache-npm.outputs.cache-hit != 'true'
+        run: |
+          # Configure npm for better reliability
+          npm config set registry https://registry.npmjs.org/
+          npm config set fetch-retries 5
+          npm config set fetch-retry-factor 2
+          npm config set fetch-retry-mintimeout 10000
+          npm config set fetch-retry-maxtimeout 60000
+          npm config set maxsockets 1
+          
+          # Install with retry logic
+          for i in {1..5}; do
+            echo "Attempt $i: Installing dependencies..."
+            if npm ci --prefer-offline --no-audit --progress=false --loglevel=error; then
+              echo "Dependencies installed successfully on attempt $i"
+              break
+            else
+              echo "Attempt $i failed"
+              if [ $i -eq 5 ]; then
+                echo "All 5 attempts failed. Exiting."
+                exit 1
+              fi
+              # Progressive backoff with cache cleaning
+              npm cache clean --force 2>/dev/null || true
+              sleep_time=$((i * 20 + RANDOM % 30))
+              echo "⏳ Waiting ${sleep_time}s before retry..."
+              sleep $sleep_time
+            fi
+          done
+      - name: Install Playwright Browsers
+        if: steps.cache-npm.outputs.cache-hit != 'true'
+        run: npx playwright install --with-deps chromium firefox
+      - name: Build application
+        run: npm run build
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-output
+          path: .next/
+          retention-days: 1
+
   test-part-1:
     name: Run tests part 1 (except settings)
+    needs: setup-dependencies
     timeout-minutes: 60
     runs-on: ubuntu-latest
 
@@ -33,14 +98,36 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: lts/*
-      - name: Install dependencies
-        run: npm ci
-      - name: Install Playwright Browsers
-        run: npx playwright install --with-deps
+          cache: 'npm'
+      - name: Restore dependencies cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.npm
+            node_modules
+            ~/.cache/ms-playwright
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}-${{ hashFiles('**/playwright.config.ts') }}
+          restore-keys: |
+            ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}-
+            ${{ runner.os }}-node-
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: build-output
+          path: .next/
+        continue-on-error: true
+      - name: Fallback build if needed
+        run: |
+          if [ ! -d ".next" ] || [ -z "$(ls -A .next 2>/dev/null)" ]; then
+            echo "Build artifacts not found, building locally..."
+            npm run build
+          else
+            echo "Using cached build artifacts"
+          fi
       - name: Run Playwright tests (shard 1 of 2)
         run: |
-          npm run build
-          NEXTAUTH_SECRET=SECRET npm start & npx playwright test --grep-invert @config --shard=1/2 --reporter=dot,list
+          NEXTAUTH_SECRET=SECRET npm start & 
+          npx playwright test --grep-invert "@config|@tls|@cluster" --shard=1/2 --reporter=dot,list
       - name: Upload artifacts
         if: always()
         uses: actions/upload-artifact@v4
@@ -51,6 +138,7 @@ jobs:
 
   test-part-2:
     name: Run tests part 2 (except settings)
+    needs: setup-dependencies
     timeout-minutes: 60
     runs-on: ubuntu-latest
 
@@ -65,14 +153,36 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: lts/*
-      - name: Install dependencies
-        run: npm ci
-      - name: Install Playwright Browsers
-        run: npx playwright install --with-deps
+          cache: 'npm'
+      - name: Restore dependencies cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.npm
+            node_modules
+            ~/.cache/ms-playwright
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}-${{ hashFiles('**/playwright.config.ts') }}
+          restore-keys: |
+            ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}-
+            ${{ runner.os }}-node-
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: build-output
+          path: .next/
+        continue-on-error: true
+      - name: Fallback build if needed
+        run: |
+          if [ ! -d ".next" ] || [ -z "$(ls -A .next 2>/dev/null)" ]; then
+            echo "Build artifacts not found, building locally..."
+            npm run build
+          else
+            echo "Using cached build artifacts"
+          fi
       - name: Run Playwright tests (shard 2 of 2)
         run: |
-          npm run build
-          NEXTAUTH_SECRET=SECRET npm start & npx playwright test --grep-invert @config --shard=2/2 --reporter=dot,list
+          NEXTAUTH_SECRET=SECRET npm start & 
+          npx playwright test --grep-invert "@config|@tls|@cluster" --shard=2/2 --reporter=dot,list
       - name: Upload artifacts
         if: always()
         uses: actions/upload-artifact@v4
@@ -83,6 +193,7 @@ jobs:
 
   run-settings-tests:
     name: Run settings tests
+    needs: setup-dependencies
     runs-on: ubuntu-latest
 
     services:
@@ -96,14 +207,36 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: lts/*
-      - name: Install dependencies
-        run: npm ci
-      - name: Install Playwright Browsers
-        run: npx playwright install --with-deps
+          cache: 'npm'
+      - name: Restore dependencies cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.npm
+            node_modules
+            ~/.cache/ms-playwright
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}-${{ hashFiles('**/playwright.config.ts') }}
+          restore-keys: |
+            ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}-
+            ${{ runner.os }}-node-
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: build-output
+          path: .next/
+        continue-on-error: true
+      - name: Fallback build if needed
+        run: |
+          if [ ! -d ".next" ] || [ -z "$(ls -A .next 2>/dev/null)" ]; then
+            echo "Build artifacts not found, building locally..."
+            npm run build
+          else
+            echo "Using cached build artifacts"
+          fi
       - name: Run only config test
         run: |
-          npm run build
-          NEXTAUTH_SECRET=SECRET npm start & npx playwright test --grep @config --reporter=dot,list
+          NEXTAUTH_SECRET=SECRET npm start & 
+          npx playwright test --grep @config --reporter=dot,list
       - name: Ensure required directories exist
         run: |
           mkdir -p playwright-report
@@ -112,6 +245,246 @@ jobs:
         if: always()
         with:
           name: playwright-report-settings
+          path: playwright-report/
+          retention-days: 30
+
+  run-tls-tests:
+    name: Run TLS tests
+    needs: setup-dependencies
+    timeout-minutes: 60
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+          cache: 'npm'
+      - name: Restore dependencies cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.npm
+            node_modules
+            ~/.cache/ms-playwright
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}-${{ hashFiles('**/playwright.config.ts') }}
+          restore-keys: |
+            ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}-
+            ${{ runner.os }}-node-
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: build-output
+          path: .next/
+        continue-on-error: true
+      - name: Fallback build if needed
+        run: |
+          if [ ! -d ".next" ] || [ -z "$(ls -A .next 2>/dev/null)" ]; then
+            echo "Build artifacts not found, building locally..."
+            npm run build
+          else
+            echo "Using cached build artifacts"
+          fi
+      - name: Setup TLS certificates
+        run: |
+          mkdir -p tls
+          # Generate TLS certificates using FalkorDB container (exits after generation - this is expected)
+          docker run --rm -e TLS=1 -v $(pwd)/tls:/var/lib/falkordb/tls falkordb/falkordb:latest || echo "Certificate generation completed (container exit is expected)"
+          echo "Generated certificates:"
+          ls -la tls/
+      - name: Create Redis TLS config
+        run: |
+          cat > redis.conf << 'EOF'
+          protected-mode no
+          tls-port 6379
+          port 0
+          tls-cert-file /var/lib/falkordb/tls/redis.crt
+          tls-key-file /var/lib/falkordb/tls/redis.key
+          tls-ca-cert-file /var/lib/falkordb/tls/ca.crt
+          tls-auth-clients no
+          EOF
+      - name: Start FalkorDB with TLS
+        run: |
+          echo "Starting FalkorDB with TLS configuration..."
+          docker run --rm -d --name falkordb-tls -p 6379:6379 \
+            -v $(pwd)/redis.conf:/var/lib/falkordb/data/redis.conf \
+            -e REDIS_ARGS="/var/lib/falkordb/data/redis.conf" \
+            -v $(pwd)/tls:/var/lib/falkordb/tls \
+            falkordb/falkordb:latest
+          echo "Container started with ID: $(docker ps -q -f name=falkordb-tls)"
+      - name: Wait for FalkorDB TLS to be ready
+        run: |
+          echo "Waiting a moment for container to fully start..."
+          sleep 3
+          echo "Checking container status:"
+          docker ps -a --filter name=falkordb-tls
+          
+          if docker ps --filter name=falkordb-tls --filter status=running | grep -q falkordb-tls; then
+            echo "Container is running successfully"
+            sleep 10
+            echo "Container logs:"
+            docker logs falkordb-tls
+            echo "Checking if TLS port is available:"
+            docker exec falkordb-tls redis-cli --version || echo "Redis CLI not available"
+          else
+            echo "Container failed to start or exited. Full container details:"
+            docker ps -a --filter name=falkordb-tls
+            echo "Getting logs from container (even if exited):"
+            docker logs falkordb-tls 2>&1 || echo "No logs available"
+            echo "Checking if port 6379 is in use:"
+            netstat -ln | grep :6379 || echo "Port 6379 not in use"
+            echo "Checking Redis config file:"
+            cat redis.conf
+            echo "Checking TLS certificate files:"
+            ls -la tls/
+            echo "Testing certificate validity:"
+            openssl x509 -in tls/redis.crt -text -noout | head -10 || echo "Invalid certificate"
+            exit 1
+          fi
+      - name: Run TLS tests
+        run: |
+          NEXTAUTH_SECRET=SECRET npm start & 
+          npx playwright test --workers=1 --reporter=dot,list --project="[TLS - Chromium]" --project="[TLS - Firefox]"
+      - name: Cleanup TLS certificates
+        if: always()
+        run: |
+          rm -rf tls/
+          rm -f redis.conf
+      - name: Stop FalkorDB TLS container
+        if: always()
+        run: docker stop falkordb-tls || true
+      - name: Upload artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-tls
+          path: playwright-report/
+          retention-days: 30
+
+  run-cluster-tests:
+    name: Run cluster tests
+    needs: setup-dependencies
+    timeout-minutes: 60
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+          cache: 'npm'
+      - name: Restore dependencies cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.npm
+            node_modules
+            ~/.cache/ms-playwright
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}-${{ hashFiles('**/playwright.config.ts') }}
+          restore-keys: |
+            ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}-
+            ${{ runner.os }}-node-
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: build-output
+          path: .next/
+        continue-on-error: true
+      - name: Fallback build if needed
+        run: |
+          if [ ! -d ".next" ] || [ -z "$(ls -A .next 2>/dev/null)" ]; then
+            echo "Build artifacts not found, building locally..."
+            npm run build
+          else
+            echo "Using cached build artifacts"
+          fi
+      - name: Start FalkorDB cluster nodes
+        run: |
+          echo "Starting 3 FalkorDB cluster nodes..."
+          
+          # Start node1 on port 6380
+          docker run -d \
+            --name node1 \
+            -p 6380:6379 \
+            -e BROWSER=0 \
+            -e "REDIS_ARGS=--protected-mode no" \
+            falkordb/falkordb
+          
+          # Start node2 on port 6381  
+          docker run -d \
+            --name node2 \
+            -p 6381:6379 \
+            -e BROWSER=0 \
+            -e "REDIS_ARGS=--protected-mode no" \
+            falkordb/falkordb
+          
+          # Start node3 on port 6382
+          docker run -d \
+            --name node3 \
+            -p 6382:6379 \
+            -e BROWSER=0 \
+            -e "REDIS_ARGS=--protected-mode no" \
+            falkordb/falkordb
+            
+          echo "All cluster nodes started"
+      - name: Wait for cluster nodes to be ready
+        run: |
+          echo "Waiting for cluster nodes to initialize..."
+          sleep 30
+          
+          echo "Checking cluster node connectivity:"
+          
+          # Check each port with timeout and retry
+          for port in 6380 6381 6382; do
+            echo "Testing connection to localhost:$port..."
+            max_attempts=10
+            attempt=1
+            
+            while [ $attempt -le $max_attempts ]; do
+              if nc -zv localhost $port 2>/dev/null; then
+                echo "Port $port is accessible (attempt $attempt)"
+                break
+              else
+                echo "Port $port not ready yet (attempt $attempt/$max_attempts)"
+                if [ $attempt -eq $max_attempts ]; then
+                  echo "Port $port failed to become accessible after $max_attempts attempts"
+                  docker logs node$((port - 6379)) || echo "Failed to get logs for node$((port - 6379))"
+                  exit 1
+                fi
+                sleep 3
+              fi
+              attempt=$((attempt + 1))
+            done
+          done
+          
+          echo "All cluster nodes are accessible!"
+          
+          # Show container status
+          echo "Container status:"
+          docker ps --filter "name=node[1-3]"
+          
+          # Show brief logs for each node
+          for i in {1..3}; do
+            echo "--- Node$i logs (last 5 lines) ---"
+            docker logs node$i 2>&1 | tail -5 || echo "No logs available for node$i"
+          done
+      - name: Run cluster tests
+        run: |
+          NEXTAUTH_SECRET=SECRET npm start & 
+          npx playwright test --grep "@cluster" --reporter=dot,list
+      - name: Cleanup cluster
+        if: always()
+        run: |
+          echo "Stopping and removing cluster nodes..."
+          for i in {1..3}; do
+            docker stop node$i || true
+            docker rm node$i || true
+          done
+      - name: Upload artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-cluster
           path: playwright-report/
           retention-days: 30
 

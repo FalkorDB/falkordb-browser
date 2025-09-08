@@ -1,6 +1,15 @@
 import { chromium, Browser, BrowserContext, Page, firefox } from 'playwright';
-import BasePage from './basePage';
 import { test } from '@playwright/test';
+import BasePage from './basePage';
+import { initializeLocalStorage } from '../utils';
+
+async function launchBrowser(projectName: string): Promise<Browser> {
+    if (projectName.toLowerCase().includes('firefox')) {
+        return firefox.launch();
+    }
+
+    return chromium.launch();
+}
 
 export default class BrowserWrapper {
 
@@ -13,13 +22,16 @@ export default class BrowserWrapper {
     async createNewPage<T extends BasePage>(PageClass: new (page: Page) => T, url?: string) {
         if (!this.browser) {
             const projectName = test.info().project.name;
-            this.browser = await this.launchBrowser(projectName);
+            this.browser = await launchBrowser(projectName);
         }
         if (!this.context) {
             this.context = await this.browser.newContext();
         }
         if (!this.page) {
             this.page = await this.context.newPage();
+            
+            // Initialize localStorage before any navigation
+            await this.page.addInitScript(initializeLocalStorage());
         }
         if (url) {
             await this.navigateTo(url)
@@ -27,14 +39,6 @@ export default class BrowserWrapper {
 
         const pageInstance = new PageClass(this.page);
         return pageInstance;
-    }
-
-    private async launchBrowser(projectName: string): Promise<Browser> {
-        if (projectName.toLowerCase().includes('firefox')) {
-            return await firefox.launch();
-        } else {
-            return await chromium.launch();
-        }
     }    
 
     getContext(): BrowserContext | null {
@@ -52,6 +56,7 @@ export default class BrowserWrapper {
         if (!this.page) {
             throw new Error('Browser is not launched yet!');
         }
+        
         await this.page.setViewportSize({ width: 1920, height: 1080 });
     }
 
@@ -78,4 +83,3 @@ export default class BrowserWrapper {
     }
 
 }
-

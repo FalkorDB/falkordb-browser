@@ -4,7 +4,7 @@
 "use client"
 
 import { useState } from "react"
-import { EyeIcon, EyeOffIcon, InfoIcon, Loader2 } from "lucide-react"
+import { EyeIcon, EyeOffIcon, InfoIcon } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import Button from "./ui/Button"
@@ -16,20 +16,35 @@ export type Error = {
     condition: (value: string, password?: string) => boolean
 }
 
-export type Field = {
-    label: string
+export type DefaultField = {
     value: string
-    onChange?: (e: React.ChangeEvent<HTMLInputElement>) => void
-    type: string
-    info?: string
-    options?: string[]
-    onSelectedValue?: (value: string) => void
-    placeholder?: string
+    label: string
     required: boolean
+    placeholder?: string
     show?: boolean
     description?: string
     errors?: Error[]
+    info?: string
 }
+
+export type SelectField = DefaultField & {
+    type: "select"
+    options: string[]
+    selectType: "Role"
+    onChange: (value: string) => void
+}
+
+export type PasswordField = DefaultField & {
+    onChange: (e: React.ChangeEvent<HTMLInputElement>) => void
+    type: "password"
+}
+
+export type TextField = DefaultField & {
+    onChange: (e: React.ChangeEvent<HTMLInputElement>) => void
+    type: "text"
+}
+
+export type Field = SelectField | PasswordField | TextField
 
 interface Props {
     handleSubmit: (e: React.FormEvent<HTMLFormElement>) => Promise<void>
@@ -47,6 +62,7 @@ export default function FormComponent({ handleSubmit, fields, error = undefined,
     const [show, setShow] = useState<{ [key: string]: boolean }>({});
     const [errors, setErrors] = useState<{ [key: string]: boolean }>({});
     const [isLoading, setIsLoading] = useState(false);
+
     const onHandleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault()
 
@@ -79,7 +95,7 @@ export default function FormComponent({ handleSubmit, fields, error = undefined,
                     return (
                         <div className="flex flex-col gap-2" key={field.label}>
                             <div className={cn(field.info && "flex gap-2 items-center")}>
-                                <label className={cn(errors[field.label] && "text-red-500")} htmlFor={field.label}>{field.required && <span>*</span>} {field.label}</label>
+                                <label className={cn(errors[field.label] && "text-destructive")} htmlFor={field.label}>{field.required && <span>*</span>} {field.label}</label>
                                 {
                                     field.info &&
                                     <Tooltip>
@@ -106,19 +122,19 @@ export default function FormComponent({ handleSubmit, fields, error = undefined,
                                     >
                                         {
                                             show[field.label] ?
-                                                <EyeIcon color="black" />
-                                                : <EyeOffIcon color="black" />
+                                                <EyeIcon className="text-foreground" />
+                                                : <EyeOffIcon className="text-foreground" />
                                         }
                                     </Button>
                                 }
                                 {
                                     field.type === "select" ?
                                         <Combobox
-                                            inTable
-                                            options={field.options!}
-                                            label={field.label}
+                                            id={field.label}
+                                            options={field.options}
+                                            label={field.selectType}
                                             selectedValue={field.value}
-                                            setSelectedValue={field.onSelectedValue!}
+                                            setSelectedValue={field.onChange}
                                         />
                                         : <Input
                                             id={field.label}
@@ -126,7 +142,7 @@ export default function FormComponent({ handleSubmit, fields, error = undefined,
                                             placeholder={field.placeholder}
                                             value={field.value}
                                             onChange={(e) => {
-                                                field.onChange!(e)
+                                                field.onChange(e)
                                                 if (field.type === "password") {
                                                     const confirmPasswordField = fields.find(f => f.label === "Confirm Password")
                                                     if (confirmPasswordField && confirmPasswordField.errors) {
@@ -147,7 +163,7 @@ export default function FormComponent({ handleSubmit, fields, error = undefined,
                                 <p className="text-sm text-gray-500">{field.description}</p>
                                 {
                                     field.errors && errors[field.label] ?
-                                        <p className="text-sm text-red-500">{field.errors.find((err) => err.condition(field.value))?.message}</p>
+                                        <p className="text-sm text-destructive">{field.errors.find((err) => err.condition(field.value))?.message}</p>
                                         : <p className="h-5" />
                                 }
                             </div>
@@ -156,15 +172,16 @@ export default function FormComponent({ handleSubmit, fields, error = undefined,
                 })
             }
             {children}
-            {error?.show && <p className="text-sm text-red-500">{error.message}</p>}
-            <div className="flex justify-end gap-2 mt-10">
+            {error && <p className="text-sm text-destructive h-5">{error.show ? error.message : ""}</p>}
+            <div className="flex justify-end gap-2">
                 <Button
+                    id="submit-button"
                     className="grow bg-primary p-4 rounded-lg flex justify-center items-center gap-2"
                     type="submit"
-                    disabled={error?.show || isLoading}
-                >
-                    {isLoading ? <Loader2 className="animate-spin" /> : submitButtonLabel}
-                </Button>
+                    disabled={error?.show}
+                    isLoading={isLoading}
+                    label={submitButtonLabel}
+                />
             </div>
         </form>
     )

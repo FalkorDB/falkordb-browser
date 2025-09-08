@@ -5,192 +5,61 @@
 'use client'
 
 import { prepareArg, securedFetch } from "@/lib/utils";
-import { Dispatch, SetStateAction, useContext, useEffect, useRef, useState } from "react";
-import { Check, ChevronRight, Pencil, Plus, Trash2, X } from "lucide-react";
-import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Dispatch, SetStateAction, useCallback, useContext, useEffect, useRef, useState } from "react";
+import { Pencil, X } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { useSession } from "next-auth/react";
 import Button from "../components/ui/Button";
-import { Category, Graph, Link, Node } from "../api/graph/model";
-import Input from "../components/ui/Input";
-import DialogComponent from "../components/DialogComponent";
-import CloseDialog from "../components/CloseDialog";
-import DeleteElement from "./DeleteElement";
-import ToastButton from "../components/ToastButton";
-import { IndicatorContext } from "../components/provider";
+import { Label, Link, Node } from "../api/graph/model";
+import { IndicatorContext, GraphContext } from "../components/provider";
+import GraphDataTable from "./GraphDataTable";
+import AddLabel from "./addLabel";
+import RemoveLabel from "./RemoveLabel";
 
 interface Props {
     object: Node | Link;
-    onExpand: (expand?: boolean) => void;
-    graph: Graph;
+    setObject: (el: Node | Link | undefined) => void;
     onDeleteElement: () => Promise<void>;
-    setCategories: Dispatch<SetStateAction<Category[]>>;
+    setLabels: Dispatch<SetStateAction<Label[]>>;
 }
 
-export default function GraphDataPanel({ object, onExpand, onDeleteElement, graph, setCategories }: Props) {
+export default function GraphDataPanel({ object, setObject, onDeleteElement, setLabels }: Props) {
+    const { setIndicator } = useContext(IndicatorContext)
+    const { graph, setGraphInfo } = useContext(GraphContext)
 
-    const [attributes, setAttributes] = useState<string[]>([]);
-    const [editable, setEditable] = useState<string>("");
-    const [hover, setHover] = useState<string>("");
-    const [isAddValue, setIsAddValue] = useState<boolean>(false);
-    const [deleteOpen, setDeleteOpen] = useState(false)
-    const [newKey, setNewKey] = useState<string>("");
-    const [newVal, setNewVal] = useState<string>("");
-    const [label, setLabel] = useState<string[]>([]);
-    const [labelsHover, setLabelsHover] = useState(false)
-    const [labelsEditable, setLabelsEditable] = useState(false)
-    const [newLabel, setNewLabel] = useState("")
-    const type = !("source" in object)
-    const [isLabelLoading, setIsLabelLoading] = useState(false)
-    const [isAddLoading, setIsAddLoading] = useState(false)
-    const [isSetLoading, setIsSetLoading] = useState(false)
-    const [isRemoveLoading, setIsRemoveLoading] = useState(false)
+    const lastObjId = useRef<number | undefined>(undefined)
+    const labelsListRef = useRef<HTMLUListElement>(null)
+
     const { toast } = useToast()
     const { data: session } = useSession()
-    const { indicator, setIndicator } = useContext(IndicatorContext)
-    const lastObjId = useRef<number | undefined>(undefined)
 
-    const handleSetEditable = (key: string, val: string) => {
-        if (key !== "") {
-            setIsAddValue(false)
+    const [labelsHover, setLabelsHover] = useState(false)
+    const [label, setLabel] = useState<string[]>([]);
+    const type = !("source" in object)
+
+    const onClose = useCallback((e: KeyboardEvent) => {
+        if (e.key === "Escape") {
+            setObject(undefined)
         }
+    }, [setObject])
 
-        setEditable(key)
-        setNewVal(val)
-    }
+    useEffect(() => {
+        window.addEventListener("keydown", onClose)
+
+        return () => {
+            window.removeEventListener("keydown", onClose)
+        }
+    }, [onClose])
 
     useEffect(() => {
         if (lastObjId.current !== object.id) {
-            setEditable("")
-            setNewVal("")
-            setNewKey("")
-            setLabelsEditable(false)
             setLabelsHover(false)
-            setIsAddValue(false)
         }
-        setAttributes(Object.keys(object.data));
-        setLabel(type ? [...object.category.filter((c) => c !== "")] : [object.label]);
+        setLabel(type ? [...object.labels.filter((c) => c !== "")] : [object.relationship]);
         lastObjId.current = object.id
     }, [object, type]);
 
-    const setProperty = async (key: string, val: string, isUndo: boolean, actionType: ("added" | "set") = "set") => {
-        const { id } = object
-        if (!val || val === "") {
-            toast({
-                title: "Error",
-                description: "Please fill in the value field",
-                variant: "destructive"
-            })
-            return false
-        }
-        try {
-            if (actionType === "set") setIsSetLoading(true)
-            const result = await securedFetch(`api/graph/${prepareArg(graph.Id)}/${id}/${key}`, {
-                method: "POST",
-                body: JSON.stringify({
-                    value: val,
-                    type
-                })
-            }, toast, setIndicator)
-
-            if (result.ok) {
-                const value = object.data[key]
-
-                graph.setProperty(key, val, id, type)
-                object.data[key] = val
-                setAttributes(Object.keys(object.data))
-
-                handleSetEditable("", "")
-                toast({
-                    title: "Success",
-                    description: `Attribute ${actionType}`,
-                    variant: "default",
-                    action: isUndo ? <ToastButton onClick={() => setProperty(key, value, false)} /> : undefined
-                })
-            }
-
-            return result.ok
-        } finally {
-            if (actionType === "set") setIsSetLoading(false)
-        }
-    }
-
-    const handleAddValue = async (key: string, value: string) => {
-        if (!key || key === "" || !value || value === "") {
-            toast({
-                title: "Error",
-                description: "Please fill in both fields",
-                variant: "destructive"
-            })
-            return
-        }
-        try {
-            setIsAddLoading(true)
-            const success = await setProperty(key, value, false, "added")
-            if (!success) return
-            setIsAddValue(false)
-            setNewKey("")
-            setNewVal("")
-        } finally {
-            setIsAddLoading(false)
-        }
-    }
-
-    const removeProperty = async (key: string) => {
-        try {
-            setIsRemoveLoading(true)
-            const { id } = object
-            const success = (await securedFetch(`api/graph/${prepareArg(graph.Id)}/${id}/${key}`, {
-                method: "DELETE",
-                body: JSON.stringify({ type }),
-            }, toast, setIndicator)).ok
-
-            if (success) {
-                const value = object.data[key]
-
-                graph.removeProperty(key, id, type)
-                delete object.data[key]
-                setAttributes(Object.keys(object.data))
-
-                toast({
-                    title: "Success",
-                    description: "Attribute removed",
-                    action: <ToastButton onClick={() => handleAddValue(key, value)} />,
-                    variant: "default"
-                })
-            }
-
-            return success
-        } finally {
-            setIsRemoveLoading(false)
-        }
-    }
-
-    const handleAddKeyDown = async (e: React.KeyboardEvent<HTMLInputElement>) => {
-        if (e.key === "Escape") {
-            setIsAddValue(false)
-            setNewKey("")
-            setNewVal("")
-            return
-        }
-
-        if (e.key !== "Enter" || isAddLoading || indicator === "offline") return
-
-        handleAddValue(newKey, newVal)
-    }
-
-    const handleSetKeyDown = async (e: React.KeyboardEvent<HTMLInputElement>) => {
-        if (e.key === "Escape") {
-            handleSetEditable("", "")
-            setNewKey("")
-        }
-
-        if (e.key !== "Enter" || isSetLoading || indicator === "offline") return
-
-        setProperty(editable, newVal, true)
-    }
-
-    const handleAddLabel = async () => {
+    const handleAddLabel = async (newLabel: string) => {
         const node = object as Node
         if (newLabel === "") {
             toast({
@@ -198,7 +67,7 @@ export default function GraphDataPanel({ object, onExpand, onDeleteElement, grap
                 description: "Please fill the label",
                 variant: "destructive"
             })
-            return
+            return false
         }
         if (label.includes(newLabel)) {
             toast({
@@ -206,32 +75,39 @@ export default function GraphDataPanel({ object, onExpand, onDeleteElement, grap
                 description: "Label already exists",
                 variant: "destructive"
             })
-            return
+            return false
         }
-        try {
-            setIsLabelLoading(true)
-            const result = await securedFetch(`api/graph/${prepareArg(graph.Id)}/${node.id}/label`, {
-                method: "POST",
-                body: JSON.stringify({
-                    label: newLabel
-                })
-            }, toast, setIndicator)
+        const result = await securedFetch(`api/graph/${prepareArg(graph.Id)}/${node.id}/label`, {
+            method: "POST",
+            body: JSON.stringify({
+                label: newLabel
+            })
+        }, toast, setIndicator)
 
-            if (result.ok) {
-                graph.addLabel(newLabel, node)
-                node.category.push(newLabel)
-                setLabel([...node.category])
-                setCategories([...graph.Categories])
-                setNewLabel("")
-                setLabelsEditable(false)
-            }
-        } finally {
-            setIsLabelLoading(false)
+        if (result.ok) {
+            setLabels([...graph.addLabel(newLabel, node)])
+            setLabel([...node.labels])
+            const newGraphInfo = graph.GraphInfo.clone()
+            setGraphInfo(newGraphInfo)
+            graph.GraphInfo = newGraphInfo
+            return true
         }
+
+        return false
     }
 
     const handleRemoveLabel = async (removeLabel: string) => {
         const node = object as Node
+
+        if (removeLabel === "") {
+            toast({
+                title: "Error",
+                description: "You cannot remove the default label",
+                variant: "destructive"
+            })
+            return false
+        }
+
         const result = await securedFetch(`api/graph/${prepareArg(graph.Id)}/${node.id}/label`, {
             method: "DELETE",
             body: JSON.stringify({
@@ -241,305 +117,94 @@ export default function GraphDataPanel({ object, onExpand, onDeleteElement, grap
 
         if (result.ok) {
             graph.removeLabel(removeLabel, node)
-            node.category = node.category.filter((c) => c !== removeLabel)
-            setLabel([...node.category])
-            setCategories([...graph.Categories])
+            setLabels([...graph.Labels])
+            setLabel([...node.labels])
+            const newGraphInfo = graph.GraphInfo.clone()
+            setGraphInfo(newGraphInfo)
+            graph.GraphInfo = newGraphInfo
+            return true
         }
-    }
 
-    const handleDeleteElement = async () => {
-        await onDeleteElement()
-        setDeleteOpen(false)
-        onExpand(false)
+        return false
+
     }
 
     return (
-        <div className="h-full flex flex-col gap-4 border-foreground border-[3px] rounded-lg" id="graphDataPanel">
-            <div className="flex justify-between items-center p-4" id="dataPanelHeader">
-                <div className="flex gap-4 items-center">
+        <div data-testid="DataPanel" className="DataPanel p-6">
+            <div className="relative flex flex-col gap-6 pb-4 border-b border-border">
+                <div className="flex flex-row justify-between items-center">
+                    <div className="flex flex-col gap-2 font-medium text-xl text-nowrap">
+                        <p>ID: <span className="Gradient text-transparent bg-clip-text">{object.id}</span></p>
+                        <p data-testid="DataPanelAttributesCount">Attributes: <span className="Gradient text-transparent bg-clip-text">{Object.keys(object.data).length}</span></p>
+                    </div>
                     <Button
-                        variant="button"
+                        data-testid="DataPanelClose"
                         title="Close"
-                        onClick={() => onExpand()}
+                        onClick={() => setObject(undefined)}
                     >
-                        <ChevronRight size={25} />
+                        <X />
                     </Button>
-                    {
-                        type ?
-                            <ul className="flex flex-wrap gap-4 min-w-[10%]" onMouseEnter={() => setLabelsHover(true)} onMouseLeave={() => setLabelsHover(false)}>
-                                {label.map((l) => (
-                                    <li key={l} className="flex gap-2 px-2 py-1 bg-foreground rounded-full items-center">
-                                        <p>{l}</p>
-                                        {
-                                            session?.user?.role !== "Read-Only" &&
-                                            <Button
-                                                title="Remove"
-                                                onClick={() => handleRemoveLabel(l)}
-                                                indicator={indicator}
-                                            >
-                                                <X size={15} />
-                                            </Button>
-                                        }
-                                    </li>
-                                ))}
-                                <li className="h-8 flex flex-wrap gap-2">
-                                    {
-                                        labelsHover && !labelsEditable && session?.user?.role !== "Read-Only" &&
+                </div>
+                <ul
+                    ref={labelsListRef}
+                    data-testid="DataPanelLabel"
+                    className="flex flex-wrap gap-4"
+                    onMouseEnter={() => setLabelsHover(true)}
+                    onMouseLeave={() => setLabelsHover(false)}
+                >
+                    {label.map((l) => (
+                        <li
+                            data-testid={`DataPanelLabel${l}`}
+                            key={l}
+                            className="flex gap-2 px-2 py-1 bg-background rounded-full items-center"
+                        >
+                            <p>{l || "No Label"}</p>
+                            {
+                                type && l && session?.user?.role !== "Read-Only" &&
+                                <RemoveLabel
+                                    onRemoveLabel={handleRemoveLabel}
+                                    selectedLabel={l}
+                                    trigger={
                                         <Button
-                                            className="p-2 text-xs justify-center border border-foreground"
-                                            variant="Secondary"
-                                            label="Add"
-                                            title="Add a new label"
-                                            onClick={() => setLabelsEditable(true)}
+                                            data-testid={`DataPanelRemoveLabel${l}`}
+                                            title="Remove Label"
+                                            tooltipVariant="Delete"
                                         >
-                                            <Pencil size={15} />
+                                            <X size={15} />
                                         </Button>
                                     }
-                                    {
-                                        labelsEditable &&
-                                        <>
-                                            <Input
-                                                ref={ref => ref?.focus()}
-                                                className="max-w-[50%] h-full bg-foreground border-none text-white"
-                                                value={newLabel}
-                                                onChange={(e) => setNewLabel(e.target.value)}
-                                                onKeyDown={(e) => {
-
-                                                    if (e.key === "Escape") {
-                                                        e.preventDefault()
-                                                        setLabelsEditable(false)
-                                                        setNewLabel("")
-                                                    }
-
-                                                    if (e.key !== "Enter" || isLabelLoading) return
-
-                                                    e.preventDefault()
-                                                    handleAddLabel()
-                                                }}
-                                            />
-                                            <Button
-                                                className="p-2 text-xs justify-center border border-foreground"
-                                                variant="Secondary"
-                                                label="Save"
-                                                title="Save the new label"
-                                                onClick={() => handleAddLabel()}
-                                                isLoading={isLabelLoading}
-                                                indicator={indicator}
-                                            >
-                                                <Check size={15} />
-                                            </Button>
-                                            {
-                                                !isLabelLoading &&
-                                                <Button
-                                                    className="p-2 text-xs justify-center border border-foreground"
-                                                    variant="Secondary"
-                                                    label="Cancel"
-                                                    title="Discard new label"
-                                                    onClick={() => {
-                                                        setLabelsEditable(false)
-                                                        setNewLabel("")
-                                                    }}
-                                                >
-                                                    <X size={15} />
-                                                </Button>
-                                            }
-                                        </>
-                                    }
-                                </li>
-                            </ul>
-                            :
-                            <p className="bg-foreground rounded-full px-2 py-1">{label[0]}</p>
-                    }
-                </div>
-                <p className="font-medium text-xl text-nowrap">{attributes.length}&ensp;Attributes</p>
-            </div>
-            <Table parentClassName="grow">
-                <TableHeader>
-                    <TableRow>
-                        <TableHead className="w-1" />
-                        <TableHead>Key</TableHead>
-                        <TableHead>Value</TableHead>
-                    </TableRow>
-                </TableHeader>
-                <TableBody>
-                    <TableRow>
-                        <TableCell />
-                        <TableCell>id:</TableCell>
-                        <TableCell>{object.id}</TableCell>
-                    </TableRow>
-                    {
-                        attributes.map((key) => (
-                            <TableRow
-                                onMouseEnter={() => setHover(key)}
-                                onMouseLeave={() => setHover("")}
-                                key={key}
-                            >
-                                <TableCell>
-                                    <div className="h-10 w-6 flex flex-col items-center gap-2 justify-center">
-                                        {
-                                            session?.user?.role !== "Read-Only" && (
-                                                editable === key ?
-                                                    <>
-                                                        <Button
-                                                            indicator={indicator}
-                                                            variant="button"
-                                                            onClick={(e) => {
-                                                                e.stopPropagation()
-                                                                setProperty(key, newVal, true)
-                                                            }}
-                                                            isLoading={isSetLoading}
-                                                        >
-                                                            <Check size={20} />
-                                                        </Button>
-                                                        {
-                                                            !isSetLoading &&
-                                                            <Button variant="button" onClick={(e) => {
-                                                                e.stopPropagation()
-                                                                handleSetEditable("", "")
-                                                            }}>
-                                                                <X size={20} />
-                                                            </Button>
-                                                        }
-                                                    </>
-                                                    : hover === key &&
-                                                    <>
-                                                        <Button
-                                                            variant="button"
-                                                            onClick={() => handleSetEditable(key, object.data[key])}
-                                                            disabled={isAddValue}
-                                                        >
-                                                            <Pencil size={20} />
-                                                        </Button>
-                                                        <DialogComponent
-                                                            trigger={
-                                                                <Button
-                                                                    variant="button"
-                                                                    title="Delete Attribute"
-                                                                >
-                                                                    <Trash2 size={20} />
-                                                                </Button>
-                                                            }
-                                                            title="Delete Attribute"
-                                                            description="Are you sure you want to delete this attribute?"
-                                                        >
-                                                            <div className="flex justify-end gap-4">
-                                                                <Button
-                                                                    variant="Primary"
-                                                                    label="Delete"
-                                                                    onClick={() => removeProperty(key)}
-                                                                    isLoading={isRemoveLoading}
-                                                                />
-                                                                <CloseDialog
-                                                                    label="Cancel"
-                                                                    variant="Cancel"
-                                                                />
-                                                            </div>
-                                                        </DialogComponent>
-                                                    </>
-                                            )
-                                        }
-                                    </div>
-                                </TableCell>
-                                <TableCell>{key}:</TableCell>
-                                <TableCell>
-                                    {
-                                        editable === key ?
-                                            <Input
-                                                className="w-full"
-                                                value={newVal}
-                                                onChange={(e) => setNewVal(e.target.value)}
-                                                onKeyDown={handleSetKeyDown}
-                                            />
-                                            : <Button
-                                                label={object.data[key]}
-                                                title="Click to edit the attribute value"
-                                                variant="button"
-                                                onClick={() => handleSetEditable(key, object.data[key])}
-                                            />
-                                    }
-                                </TableCell>
-                            </TableRow>
-                        ))
-                    }
-                    {
-                        isAddValue &&
-                        <TableRow>
-                            <TableCell className="flex flex-col items-center gap-2">
-                                <Button
-                                    variant="button"
-                                    title="Save"
-                                    onClick={() => handleAddValue(newKey, newVal)}
-                                    isLoading={isAddLoading}
-                                    indicator={indicator}
-                                >
-                                    <Check size={20} />
-                                </Button>
-                                {
-                                    !isAddLoading &&
+                                />
+                            }
+                        </li>
+                    ))}
+                    <li className="h-8 w-[106px] flex justify-center items-center" key="addLabel">
+                        {
+                            type && (labelsHover || label.length === 0) && session?.user?.role !== "Read-Only" &&
+                            <AddLabel
+                                onAddLabel={handleAddLabel}
+                                trigger={
                                     <Button
-                                        variant="button"
-                                        onClick={() => setIsAddValue(false)}
-                                        title="Cancel"
+                                        data-testid="DataPanelAddLabel"
+                                        className="p-2 text-nowrap text-xs justify-center border border-border rounded-full"
+                                        label="Add Label"
+                                        title=""
                                     >
-                                        <X size={20} />
+                                        <Pencil size={15} />
                                     </Button>
                                 }
-                            </TableCell >
-                            <TableCell>
-                                <Input
-                                    ref={ref => !newKey ? ref?.focus() : undefined}
-                                    className="w-full"
-                                    value={newKey}
-                                    onChange={(e) => setNewKey(e.target.value)}
-                                    onKeyDown={handleAddKeyDown}
-                                />
-                            </TableCell>
-                            <TableCell>
-                                <Input
-                                    className="w-full"
-                                    value={newVal}
-                                    onChange={(e) => setNewVal(e.target.value)}
-                                    onKeyDown={handleAddKeyDown}
-                                />
-                            </TableCell>
-                        </TableRow >
-                    }
-                </TableBody >
-                <TableCaption>
-                    {
-                        session?.user?.role !== "Read-Only" &&
-                        <Button
-                            disabled={attributes.some((key) => key === editable)}
-                            variant="Primary"
-                            label="Add Attribute"
-                            title="Add a new attribute"
-                            onClick={() => setIsAddValue(true)}
-                        >
-                            <Plus size={20} />
-                        </Button>
-                    }
-                </TableCaption>
-            </Table >
-            <div className="flex justify-end p-4">
-                {
-                    session?.user?.role !== "Read-Only" &&
-                    <DeleteElement
-                        description={`Are you sure you want to delete this ${type ? "Node" : "Relation"}?`}
-                        open={deleteOpen}
-                        setOpen={setDeleteOpen}
-                        onDeleteElement={handleDeleteElement}
-                        trigger={
-                            <Button
-                                variant="Primary"
-                                label={`Delete ${type ? "Node" : "Relation"}`}
-                                title={`Delete the selected ${type ? "Node" : "Relation"}`}
-                            >
-                                <Trash2 size={20} />
-                            </Button>
+                            />
                         }
-                    />
-                }
+                    </li>
+                </ul>
             </div>
+            <GraphDataTable
+                className="h-1 grow w-full"
+                lastObjId={lastObjId}
+                graph={graph}
+                object={object}
+                type={type}
+                onDeleteElement={onDeleteElement}
+            />
         </div >
     )
 }

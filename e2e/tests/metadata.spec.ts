@@ -30,17 +30,17 @@ test.describe('Metadata Tests', () => {
 
     test('@admin check metadata view tab is enabled when there is metadata', async () => {
         const metadataView = await browser.createNewPage(MetadataView, urls.graphUrl);
-        await metadataView.selectExistingGraph(GRAPH_NAME);
+        await metadataView.selectGraphByName(GRAPH_NAME);
         await metadataView.insertQuery("CREATE (n) RETURN n");
-        await metadataView.clickRunQuery(false);
+        await metadataView.clickRunQuery();
         const isMetadataViewTabEnabled = await metadataView.GetIsMetadataViewTabEnabled();
         expect(isMetadataViewTabEnabled).toBe(true);
     })
     
     test('@admin check that metadata view tab is selected by default when only metadata is returned from a query', async () => {
         const metadataView = await browser.createNewPage(MetadataView, urls.graphUrl);
-        await metadataView.selectExistingGraph(GRAPH_NAME);
-        await metadataView.insertQuery("CREATE (n)");
+        await metadataView.selectGraphByName(GRAPH_NAME);
+        await metadataView.insertQuery("MATCH (n) WHERE false RETURN n");
         await metadataView.clickRunQuery(false);
         const isMetadataViewTabSelected = await metadataView.GetIsMetadataViewTabSelected();
         expect(isMetadataViewTabSelected).toBe(true);

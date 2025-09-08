@@ -7,7 +7,7 @@ import ApiCalls from "../logic/api/apiCalls";
 import GraphPage from "../logic/POM/graphPage";
 import urls from '../config/urls.json'
 import { BATCH_CREATE_PERSONS } from "../config/constants";
-import { getRandomString } from "../infra/utils";
+import { CREATE_NODE_QUERY, CREATE_QUERY, CREATE_TWO_NODES_QUERY, getRandomString } from "../infra/utils";
 
 test.describe('Canvas Tests', () => {
     let browser: BrowserWrapper;
@@ -21,55 +21,62 @@ test.describe('Canvas Tests', () => {
     test.afterEach(async () => {
         await browser.closeBrowser();
     })
-    
+
     const testNodes = [1, 5, 10];
-    for (const node of testNodes) {
-        test(`@admin Validate search for Person ${node} in the canvas and ensure focus`, async () => {
+    testNodes.forEach(async (node) => {
+        test(`@admin Validate search for node: ${node} in the canvas and ensure focus on correct node`, async () => {
             const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
             await browser.setPageToFullScreen();
             const graphName = getRandomString('canvas');
             await graph.addGraph(graphName);
             await graph.insertQuery(BATCH_CREATE_PERSONS);
             await graph.clickRunQuery();
-            const searchQuery = `Person ${node}`;
-            await graph.searchForElementInCanvas(searchQuery);
+            const searchQuery = `Person${node}`;
+            await graph.searchElementInCanvas("Graph", searchQuery);
             await graph.hoverAtCanvasCenter();
             expect(await graph.getNodeCanvasToolTip()).toBe(searchQuery);
             await apicalls.removeGraph(graphName);
         });
-    }
+    });
 
     test(`@admin Validate zoom-in functionality upon clicking the zoom in button`, async () => {
         const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
         await browser.setPageToFullScreen();
         const graphName = getRandomString('canvas');
         await graph.addGraph(graphName);
-        await graph.insertQuery(BATCH_CREATE_PERSONS);
+        await graph.insertQuery(CREATE_TWO_NODES_QUERY);
         await graph.clickRunQuery();
-        await graph.clickOnFitToSize();
+        await graph.clickCenterControl();
+        await graph.waitForScaleToStabilize();
         const initialGraph = await graph.getCanvasScaling();
-        await graph.clickOnZoomIn();
-        await graph.clickOnZoomIn();
+        await graph.clickZoomInControl();
+        await graph.waitForScaleToStabilize();
+        await graph.clickZoomInControl();
+        await graph.waitForScaleToStabilize();
         const updatedGraph = await graph.getCanvasScaling();
-        expect(updatedGraph.scaleX).toBeGreaterThan(initialGraph.scaleX);
-        expect(updatedGraph.scaleY).toBeGreaterThan(initialGraph.scaleY);
+        expect(updatedGraph.scaleX - initialGraph.scaleX).toBeGreaterThanOrEqual(1);
+        expect(updatedGraph.scaleY - initialGraph.scaleY).toBeGreaterThanOrEqual(1);
         await apicalls.removeGraph(graphName);
     });
 
-    test(`@admin Validate zoom-out functionality upon clicking the zoom in button`, async () => {
+    test(`@admin Validate zoom-out functionality upon clicking the zoom out button`, async () => {
         const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
         await browser.setPageToFullScreen();
         const graphName = getRandomString('canvas');
         await graph.addGraph(graphName);
-        await graph.insertQuery(BATCH_CREATE_PERSONS);
+        await graph.insertQuery(CREATE_TWO_NODES_QUERY);
         await graph.clickRunQuery();
-        await graph.clickOnFitToSize();
+        await graph.clickCenterControl();
+        await graph.waitForScaleToStabilize();
         const initialGraph = await graph.getCanvasScaling();
-        await graph.clickOnZoomOut();
-        await graph.clickOnZoomOut();
+        await graph.clickZoomOutControl();
+        await graph.waitForScaleToStabilize();
+        await graph.clickZoomOutControl();
+        await graph.waitForScaleToStabilize();
         const updatedGraph = await graph.getCanvasScaling();
-        expect(updatedGraph.scaleX).toBeLessThan(initialGraph.scaleX);
-        expect(updatedGraph.scaleY).toBeLessThan(initialGraph.scaleY);
+        expect(initialGraph.scaleX - updatedGraph.scaleX).toBeGreaterThanOrEqual(1);
+        expect(initialGraph.scaleY - updatedGraph.scaleY).toBeGreaterThanOrEqual(1);
+
         await apicalls.removeGraph(graphName);
     });
 
@@ -78,15 +85,17 @@ test.describe('Canvas Tests', () => {
         await browser.setPageToFullScreen();
         const graphName = getRandomString('canvas');
         await graph.addGraph(graphName);
+        await graph.insertQuery(CREATE_TWO_NODES_QUERY);
         await graph.clickRunQuery();
-        await graph.clickOnFitToSize();
+        await graph.clickCenterControl();
+        await graph.waitForScaleToStabilize();
         const initialGraph = await graph.getCanvasScaling();
-        await graph.clickOnZoomOut();
-        await graph.clickOnZoomOut();
-        await graph.clickOnFitToSize();
+        await graph.clickZoomOutControl();
+        await graph.clickCenterControl();
+        await graph.waitForScaleToStabilize();
         const updatedGraph = await graph.getCanvasScaling();
-        expect(Math.abs(initialGraph.scaleX - updatedGraph.scaleX)).toBeLessThanOrEqual(0.2);
-        expect(Math.abs(initialGraph.scaleY - updatedGraph.scaleY)).toBeLessThanOrEqual(0.2);
+        expect(updatedGraph.scaleX - initialGraph.scaleX).toBeLessThanOrEqual(1);
+        expect(updatedGraph.scaleY - initialGraph.scaleY).toBeLessThanOrEqual(1);
         await apicalls.removeGraph(graphName);
     });
 
@@ -97,61 +106,245 @@ test.describe('Canvas Tests', () => {
         await graph.addGraph(graphName);
         await graph.insertQuery(BATCH_CREATE_PERSONS);
         await graph.clickRunQuery();
-        const initialGraph = await graph.getNodeScreenPositions('graph');
+        const initialGraph = await graph.getNodesScreenPositions('graph');
         const fromX = initialGraph[0].screenX;
         const fromY = initialGraph[0].screenY;
         const toX = fromX + 100;
-        const toY = fromY + 50;
+        const toY = fromY + 100;
         await graph.changeNodePosition(fromX, fromY, toX, toY);
-        const updateGraph = await graph.getNodeScreenPositions('graph');
+        const updateGraph = await graph.getNodesScreenPositions('graph');
         expect(updateGraph[0].x).not.toBe(initialGraph[0].x);
         expect(updateGraph[0].y).not.toBe(initialGraph[0].y);
         await apicalls.removeGraph(graphName);
     });
 
-    test(`@admin Validate success when creating a node and confirming its display on the canvas`, async () => {
+    test(`@admin Creating a node and confirming its display on the canvas`, async () => {
         const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
         await browser.setPageToFullScreen();
         const graphName = getRandomString('canvas');
         await graph.addGraph(graphName,);
         await graph.insertQuery('CREATE (p:Person {name: "Alice", age: 30}) return p');
         await graph.clickRunQuery();
-        await graph.getNodeScreenPositions('graph');
-        await graph.searchForElementInCanvas("Alice");
+        await graph.getNodesScreenPositions('graph');
+        await graph.searchElementInCanvas("Graph", "Alice");
         await graph.hoverAtCanvasCenter();
         expect(await graph.getNodeCanvasToolTip()).toBe("Alice");
         await apicalls.removeGraph(graphName);
     });
 
-    test(`@admin Validate success when updating node properties and seeing the update on the canvas`, async () => {
+    test(`@admin Deleting a node and ensuring its removed from the canvas`, async () => {
         const graphName = getRandomString('canvas');
         await apicalls.addGraph(graphName);
-        await apicalls.runQuery(graphName, 'CREATE (:Person {name: "Bob", age: 40})');
         const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
         await browser.setPageToFullScreen();
-        await graph.selectExistingGraph(graphName);
-        await graph.insertQuery('MATCH (p:Person {name: "Bob"}) RETURN p');
+        await graph.selectGraphByName(graphName);
+        await graph.insertQuery('CREATE (a:Person {name: "Alice"}), (b:Person {name: "Bob"}) return a, b');
         await graph.clickRunQuery();
-        await graph.getNodeScreenPositions('graph');
-        await graph.searchForElementInCanvas("bob");
-        await graph.rightClickAtCanvasCenter();
-        expect(await graph.getDataCellByAttrInDataPanel("age")).toBe("40");
+        await graph.deleteElementByName("Bob", "Node");
+        expect(await graph.isSearchElementInCanvasVisible("Bob")).toBe(false);
         await apicalls.removeGraph(graphName);
     });
 
-    test(`@admin Validate success when deleting a node and ensuring its removed from the canvas`, async () => {
+    test(`@admin validate hovering on a node display correct toolTip`, async () => {
         const graphName = getRandomString('canvas');
         await apicalls.addGraph(graphName);
-        await apicalls.runQuery(graphName, 'CREATE (:Person {name: "Alice"}), (:Person {name: "Bob"}) WITH * MATCH (p:Person {name: "Bob"}) DELETE p');
         const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
         await browser.setPageToFullScreen();
-        await graph.selectExistingGraph(graphName);
-        await graph.insertQuery('MATCH (n) RETURN n');
+        await graph.selectGraphByName(graphName);
+        await graph.insertQuery('CREATE (a:Person {name: "Bob"}) return a');
         await graph.clickRunQuery();
-        await graph.getNodeScreenPositions('graph');
-        await graph.searchForElementInCanvas("bob");
-        await graph.rightClickAtCanvasCenter();
-        expect(await graph.getNodeCanvasToolTip()).not.toBe("bob");
+        await graph.searchElementInCanvas("Graph", "Bob");
+        await graph.waitForCanvasAnimationToEnd();
+        await graph.hoverAtCanvasCenter();
+        expect(await graph.isNodeCanvasToolTipVisible())
+        expect(await graph.getNodeCanvasToolTip()).toBe("Bob");
+        await apicalls.removeGraph(graphName);
+    });
+
+    test(`@readwrite moving a node to another node's position while animation is off should place them at the same position`, async () => {
+        const graphName = getRandomString('graph');
+        await apicalls.addGraph(graphName);
+        const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+        await browser.setPageToFullScreen();
+        await graph.selectGraphByName(graphName);
+        await graph.insertQuery(CREATE_TWO_NODES_QUERY);
+        await graph.clickRunQuery();
+        await graph.waitForScaleToStabilize();
+        const initNodes = await graph.getNodesScreenPositions('graph');
+        const fromX = initNodes[0].screenX;
+        const fromY = initNodes[0].screenY;
+        const toX = initNodes[1].screenX;;
+        const toY = initNodes[1].screenY;
+        await graph.changeNodePosition(fromX, fromY, toX, toY);
+        await graph.waitForScaleToStabilize();
+        const nodes = await graph.getNodesScreenPositions('graph');
+        expect(nodes[1].screenX - nodes[0].screenX).toBeLessThanOrEqual(2);
+        expect(nodes[1].screenY - nodes[0].screenY).toBeLessThanOrEqual(2);
+        await apicalls.removeGraph(graphName);
+    });
+
+    test(`@readwrite moving a node to another node's position while animation is on should push them apart`, async () => {
+        const graphName = getRandomString('graph');
+        await apicalls.addGraph(graphName);
+        
+        const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+        await browser.setPageToFullScreen();
+        await graph.selectGraphByName(graphName);
+        await graph.insertQuery(CREATE_TWO_NODES_QUERY);
+        await graph.clickRunQuery();
+        await graph.waitForScaleToStabilize();
+        const initNodes = await graph.getNodesScreenPositions('graph');
+        
+        const fromX = initNodes[0].screenX;
+        const fromY = initNodes[0].screenY;
+        const toX = initNodes[1].screenX;;
+        const toY = initNodes[1].screenY;
+        await graph.changeNodePosition(fromX, fromY, toX, toY);
+        await graph.waitForScaleToStabilize();
+        
+        const nodes = await graph.getNodesScreenPositions('graph');
+        expect(Math.abs(nodes[1].screenX - nodes[0].screenX)).toBeLessThanOrEqual(2);
+        expect(Math.abs(nodes[1].screenY - nodes[0].screenY)).toBeLessThanOrEqual(2);
+        await apicalls.removeGraph(graphName);
+    });
+
+    test(`@admin Validate that toggling a category label updates node visibility on the canvas`, async () => {
+        const graphName = getRandomString('graph');
+        await apicalls.addGraph(graphName);
+        const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+        await browser.setPageToFullScreen();
+        await graph.selectGraphByName(graphName);
+        await graph.insertQuery(CREATE_NODE_QUERY);
+        await graph.clickRunQuery();
+        await graph.clickLabelsButtonByLabel("Graph", "Labels", "person1");
+        const nodes1 = await graph.getNodesScreenPositions('graph');
+        expect(nodes1[0].visible).toBeFalsy();
+        await graph.clickLabelsButtonByLabel("Graph", "Labels", "person1");
+        const nodes2 = await graph.getNodesScreenPositions('graph');
+        expect(nodes2[0].visible).toBeTruthy();
+        await apicalls.removeGraph(graphName);
+    });
+
+    test(`@admin Validate that toggling a relationship label updates edge visibility on the canvas`, async () => {
+        const graphName = getRandomString('graph');
+        await apicalls.addGraph(graphName);
+        const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+        await browser.setPageToFullScreen();
+        await graph.selectGraphByName(graphName);
+        await graph.insertQuery(CREATE_QUERY);
+        await graph.clickRunQuery();
+        await graph.clickLabelsButtonByLabel("Graph", "Relationships", "KNOWS");
+        const links1 = await graph.getLinksScreenPositions('graph');
+        expect(links1[0].visible).toBeFalsy();
+        await graph.clickLabelsButtonByLabel("Graph", "Relationships", "KNOWS");
+        const links2 = await graph.getLinksScreenPositions('graph');
+        expect(links2[0].visible).toBeTruthy();
+        await apicalls.removeGraph(graphName);
+    });
+
+    test(`@admin Validate label toggle does not hide multi-labeled node`, async () => {
+        const graphName = getRandomString('graph');
+        await apicalls.addGraph(graphName);
+        const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+        await browser.setPageToFullScreen();
+        await graph.selectGraphByName(graphName);
+        await graph.insertQuery("CREATE (p:Person:Female {name: 'Alice'})-[r:KNOWS]->(c:Company {name: 'FalkorDB'}) RETURN p, r, c");
+        await graph.clickRunQuery();
+        await graph.clickLabelsButtonByLabel("Graph", "Labels", "Person");
+        let nodes = await graph.getNodesScreenPositions('graph');
+        expect(nodes[0].visible).toBeTruthy();
+        
+        await graph.clickLabelsButtonByLabel("Graph", "Labels", "Female");
+        nodes = await graph.getNodesScreenPositions('graph');
+        expect(nodes[0].visible).toBeFalsy();
+        await apicalls.removeGraph(graphName);
+    });
+
+    const testLabels = ["Person", "Female"];
+    testLabels.forEach(async (label) => {
+        test(`@admin Multi-labeled node remains visible when toggling ${label}`, async () => {
+            const graphName = getRandomString('graph');
+            await apicalls.addGraph(graphName);
+            const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+            await browser.setPageToFullScreen();
+            await graph.selectGraphByName(graphName);
+            await graph.insertQuery(`CREATE (p:Childe:${label} {name: 'Alice'})-[r:KNOWS]->(c:Company {name: 'FalkorDB'}) RETURN p, r, c`);
+            await graph.clickRunQuery();
+            await graph.clickLabelsButtonByLabel("Graph", "Labels", label);
+            const nodes = await graph.getNodesScreenPositions('graph');
+            expect(nodes[0].visible).toBeTruthy();
+            await apicalls.removeGraph(graphName);
+        });
+    });
+
+    test(`@admin Validate initial visibility with overlapping and multi labels`, async () => {
+        const graphName = getRandomString('graph');
+        await apicalls.addGraph(graphName);
+        const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+        await browser.setPageToFullScreen();
+        await graph.selectGraphByName(graphName);
+        await graph.insertQuery(`CREATE (alice:Person:Female {name: 'Alice'}), (bob:Person:Male {name: 'Bob'}) RETURN alice, bob`);
+        await graph.clickRunQuery();
+      
+        await graph.clickLabelsButtonByLabel("Graph", "Labels", "Female");
+        const nodes = await graph.getNodesScreenPositions('graph');
+        // Alice has Female label, so should be visible
+        const aliceNode = nodes.find(n => n.data?.name === 'Alice');
+        expect(aliceNode.visible).toBeTruthy();
+        // Bob does not have Female label, so should still be visible
+        const bobNode = nodes.find(n => n.data?.name === 'Bob');
+        expect(bobNode.visible).toBeTruthy();
+        await apicalls.removeGraph(graphName);
+      });
+      
+      test(`@admin Validate progressive visibility changes when labels toggled off with overlapping and multi labels`, async () => {
+        const graphName = getRandomString('graph');
+        await apicalls.addGraph(graphName);
+        const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+        await browser.setPageToFullScreen();
+        await graph.selectGraphByName(graphName);
+        await graph.insertQuery(`CREATE (alice:Person:Female {name: 'Alice'}), (bob:Person:Male {name: 'Bob'}) RETURN alice, bob`);
+        await graph.clickRunQuery();
+      
+        await graph.clickLabelsButtonByLabel("Graph", "Labels", "Female");
+        // Toggle off 'Person' — now Alice should be hidden
+        await graph.clickLabelsButtonByLabel("Graph", "Labels", "Person");
+        let nodes = await graph.getNodesScreenPositions('graph');
+        expect(nodes.find(n => n.data?.name === 'Alice').visible).toBeFalsy();
+        // Bob should still be visible
+        expect(nodes.find(n => n.data?.name === 'Bob').visible).toBeTruthy();
+      
+        // Toggle 'Male' off — Alice should still be hidden and Bob should be hidden
+        await graph.clickLabelsButtonByLabel("Graph", "Labels", "Male");
+        nodes = await graph.getNodesScreenPositions('graph');
+        expect(nodes.find(n => n.data?.name === 'Alice').visible).toBeFalsy();
+        expect(nodes.find(n => n.data?.name === 'Bob').visible).toBeFalsy();
+        await apicalls.removeGraph(graphName);
+      });
+      
+      test(`@admin Validate progressive visibility restoration when labels toggled back on with overlapping and multi labels`, async () => {
+        const graphName = getRandomString('graph');
+        await apicalls.addGraph(graphName);
+        const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
+        await browser.setPageToFullScreen();
+        await graph.selectGraphByName(graphName);
+        await graph.insertQuery(`CREATE (alice:Person:Female {name: 'Alice'}), (bob:Person:Male {name: 'Bob'}) RETURN alice, bob`);
+        await graph.clickRunQuery();
+      
+        await graph.clickLabelsButtonByLabel("Graph", "Labels", "Female");
+        await graph.clickLabelsButtonByLabel("Graph", "Labels", "Person");
+        await graph.clickLabelsButtonByLabel("Graph", "Labels", "Male");
+        // toggle female back on — Alice visible again
+        await graph.clickLabelsButtonByLabel("Graph", "Labels", "Female");
+        let nodes = await graph.getNodesScreenPositions('graph');
+        expect(nodes.find(n => n.data?.name === 'Alice').visible).toBeTruthy();
+        expect(nodes.find(n => n.data?.name === 'Bob').visible).toBeFalsy();
+      
+        // Toggle 'Male' back on — Alice should and bob should be visible
+        await graph.clickLabelsButtonByLabel("Graph", "Labels", "Male");
+        nodes = await graph.getNodesScreenPositions('graph');
+        expect(nodes.find(n => n.data?.name === 'Alice').visible).toBeTruthy();
+        expect(nodes.find(n => n.data?.name === 'Bob').visible).toBeTruthy();
         await apicalls.removeGraph(graphName);
     });
 

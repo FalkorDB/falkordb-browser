@@ -1,31 +1,84 @@
-import { getClient } from "@/app/api/auth/[...nextauth]/options"
-import { NextResponse, NextRequest } from "next/server"
+import { getClient } from "@/app/api/auth/[...nextauth]/options";
+import { runQuery } from "@/app/api/utils";
+import { NextResponse, NextRequest } from "next/server";
 
 // eslint-disable-next-line import/prefer-default-export
-export async function GET(request: NextRequest, { params }: { params: Promise<{ graph: string }> }) {
-    const session = await getClient()
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ graph: string }> }
+) {
+  const encoder = new TextEncoder();
+  const { readable, writable } = new TransformStream();
+  const writer = writable.getWriter();
+
+  try {
+    const session = await getClient();
 
     if (session instanceof NextResponse) {
-        return session
+      throw new Error(await session.text());
     }
 
-    const { client, user } = session
-    const { graph: graphId } = await params
+    const { client, user } = session;
+    const { graph: graphId } = await params;
 
     try {
-        const graph = client.selectGraph(graphId)
-        const query = "MATCH (n) OPTIONAL MATCH (n)-[e]->() WITH count(n) as nodes, count(e) as edges RETURN nodes, edges"
-        const { data } = user.role === "Read-Only"
-            ? await graph.roQuery(query)
-            : await graph.query(query)
+      const graph = client.selectGraph(graphId);
 
-        if (!data) throw new Error("Something went wrong")
+      // Execute two separate queries for accurate counts
+      const nodesQuery = "MATCH (n) RETURN count(n) as nodes";
+      const edgesQuery = "MATCH ()-[e]->() RETURN count(e) as edges";
 
-        const result = data.length === 0 ? { nodes: 0, edges: 0 } : data[0]
+      // Execute nodes count query
+      const nodesResult = await runQuery(graph, nodesQuery, user.role);
 
-        return NextResponse.json({ result }, { status: 200 })
+      // Execute edges count query  
+      const edgesResult = await runQuery(graph, edgesQuery, user.role);
+
+      if (!nodesResult || !edgesResult) throw new Error("Something went wrong");
+
+      // Combine results into expected format
+      const nodes = (nodesResult.data && nodesResult.data[0] && (nodesResult.data[0] as { nodes: number }).nodes) || 0;
+      const edges = (edgesResult.data && edgesResult.data[0] && (edgesResult.data[0] as { edges: number }).edges) || 0;
+
+      writer.write(
+        encoder.encode(`event: result\ndata: ${JSON.stringify({ nodes, edges })}\n\n`)
+      );
+      writer.close();
     } catch (error) {
-        console.log(error)
-        return NextResponse.json({ error: (error as Error).message }, { status: 400 })
+      console.error(error);
+      writer.write(
+        encoder.encode(
+          `event: error\ndata: ${JSON.stringify({
+            message: (error as Error).message,
+            status: 400,
+          })}\n\n`
+        )
+      );
+      writer.close();
     }
+  } catch (error) {
+    console.error(error);
+    writer.write(
+      encoder.encode(
+        `event: error\ndata: ${JSON.stringify({
+          message: (error as Error).message,
+          status: 500,
+        })}\n\n`
+      )
+    );
+    writer.close();
+  }
+
+  // Clean up if the client disconnects early
+  request.signal.addEventListener("abort", () => {
+    writer.close();
+  });
+
+  return new Response(readable, {
+    headers: {
+      "Content-Type": "text/event-stream",
+      "Cache-Control": "no-cache",
+      Connection: "keep-alive",
+    },
+  });
 }

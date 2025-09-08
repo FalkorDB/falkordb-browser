@@ -1,14 +1,11 @@
 /* eslint-disable @typescript-eslint/ban-ts-comment */
 
 import "./globals.css";
-import { Inter } from "next/font/google";
 import { Metadata } from "next";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NextAuthProvider from "./providers";
 import GTM from "./GTM";
-
-const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
   title: "FalkorDB Browser",
@@ -25,14 +22,14 @@ export default function RootLayout({
   // caused by mismatched client/server content caused by next-themes
   return (
     <html className="w-screen h-screen" lang="en" suppressHydrationWarning>
-      <body className={`h-full bg-foreground ${inter.className}`}>
+      <body className="w-full h-full bg-background flex flex-row">
         <GTM />
-        <NextAuthProvider>
-          <TooltipProvider>
+        <TooltipProvider>
+          <NextAuthProvider>
             {children}
             <Toaster />
-          </TooltipProvider>
-        </NextAuthProvider>
+          </NextAuthProvider>
+        </TooltipProvider>
       </body>
     </html>
   );

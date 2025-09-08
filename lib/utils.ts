@@ -1,42 +1,117 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 // eslint-disable-next-line import/prefer-default-export
 
-"use client"
+"use client";
 
-import { type ClassValue, clsx } from "clsx"
-import { twMerge } from "tailwind-merge"
-import { MutableRefObject } from "react"
-import { ForceGraphMethods } from "react-force-graph-2d"
-import { Node, Link, DataCell } from "@/app/api/graph/model"
+import { type ClassValue, clsx } from "clsx";
+import { twMerge } from "tailwind-merge";
+import { MutableRefObject } from "react";
+import { ForceGraphMethods } from "react-force-graph-2d";
+import { Node, Link, DataCell } from "@/app/api/graph/model";
 
-export type GraphRef = MutableRefObject<ForceGraphMethods<Node, Link> | undefined>
+export const screenSize = {
+  sm: 640,
+  md: 768,
+  lg: 1024,
+  xl: 1280,
+  "2xl": 1536,
+};
 
-export interface HistoryQuery {
-  queries: Query[]
-  query: string
-  currentQuery: string
-  counter: number
-}
+export type GraphRef = MutableRefObject<
+  ForceGraphMethods<Node, Link> | undefined
+>;
 
-export interface Query {
-  text: string
-  metadata: string[]
-  explain: string[]
-}
+export type Panel = "chat" | "data" | undefined;
 
-export type Cell = {
-  value: DataCell,
-  onChange?: (value: string) => Promise<boolean>,
-  type?: string
-  comboboxType?: string
-}
+export type SelectCell = {
+  value: string;
+  type: "select";
+  options: string[];
+  selectType: "Role";
+  onChange: (value: string) => Promise<boolean>;
+};
+
+export type ObjectCell = {
+  value: DataCell;
+  type: "object";
+};
+
+export type TextCell = {
+  value: string;
+  type: "text";
+  onChange: (value: string) => Promise<boolean>;
+};
+
+export type ReadOnlyCell = {
+  value: string;
+  type: "readonly";
+};
+
+export type Message = {
+  role: "user" | "assistant";
+  content: string;
+  type:
+    | "Text"
+    | "Result"
+    | "Error"
+    | "Status"
+    | "CypherQuery"
+    | "CypherResult"
+    | "Schema";
+};
+
+export type Cell = SelectCell | TextCell | ObjectCell | ReadOnlyCell;
 export interface Row {
-  cells: Cell[]
-  checked?: boolean
+  cells: Cell[];
+  checked?: boolean;
 }
 
 export function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs))
+  return twMerge(clsx(inputs));
+}
+
+export async function getSSEGraphResult(
+  url: string,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  toast: any,
+  setIndicator: (indicator: "online" | "offline") => void
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+): Promise<any> {
+  return new Promise((resolve, reject) => {
+    let handled = false;
+
+    const evtSource = new EventSource(url);
+    evtSource.addEventListener("result", (event: MessageEvent) => {
+      const result = JSON.parse(event.data);
+      evtSource.close();
+      resolve(result);
+    });
+
+    evtSource.addEventListener("error", (event: MessageEvent) => {
+      handled = true;
+      const { message, status } = JSON.parse(event.data);
+
+      evtSource.close();
+      toast({ title: "Error", description: message, variant: "destructive" });
+
+      if (status === 401 || status >= 500) setIndicator("offline");
+
+      reject();
+    });
+
+    evtSource.onerror = () => {
+      if (handled) return;
+
+      evtSource.close();
+      toast({
+        title: "Error",
+        description: "Network or server error",
+        variant: "destructive",
+      });
+      setIndicator("offline");
+      reject();
+    };
+  });
 }
 
 export async function securedFetch(
@@ -45,35 +120,36 @@ export async function securedFetch(
   toast?: any,
   setIndicator?: (indicator: "online" | "offline") => void
 ): Promise<Response> {
-  const response = await fetch(input, init)
-  const { status } = response
+  const response = await fetch(input, init);
+  const { status } = response;
   if (status >= 300) {
-    const err = await response.text()
+    const err = await response.text();
     if (toast) {
       toast({
         title: "Error",
         description: err,
-        variant: "destructive"
-      })
+        variant: "destructive",
+      });
     }
     if (status === 401 || status >= 500) {
       if (setIndicator) {
-        setIndicator("offline")
+        setIndicator("offline");
       }
     }
   }
-  return response
+  return response;
 }
 
 export function prepareArg(arg: string) {
-  return encodeURIComponent(arg.trim())
+  return encodeURIComponent(arg.trim());
 }
 
-export const defaultQuery = (q?: string) => q || "MATCH (n) OPTIONAL MATCH (n)-[e]-(m) return * LIMIT 100"
+export const getDefaultQuery = (q?: string) =>
+  q || "MATCH (n) OPTIONAL MATCH (n)-[e]-(m) RETURN * LIMIT 100";
 
 export function rgbToHSL(hex: string): string {
   // Remove the # if present
-  const formattedHex = hex.replace(/^#/, '');
+  const formattedHex = hex.replace(/^#/, "");
 
   // Convert hex to RGB
   const r = parseInt(formattedHex.slice(0, 2), 16) / 255;
@@ -115,17 +191,26 @@ export function rgbToHSL(hex: string): string {
   return `hsl(${hDeg}, ${sPct}%, ${lPct}%)`;
 }
 
-export function handleZoomToFit(chartRef?: GraphRef, filter?: (node: Node) => boolean) {
-  const chart = chartRef?.current
+export function handleZoomToFit(
+  chartRef?: GraphRef,
+  filter?: (node: Node) => boolean,
+  paddingMultiplier = 1
+) {
+  const chart = chartRef?.current;
   if (chart) {
     // Get canvas dimensions
-    const canvas = document.querySelector('.force-graph-container canvas') as HTMLCanvasElement;
+    const canvas = document.querySelector(
+      ".force-graph-container canvas"
+    ) as HTMLCanvasElement;
+
     if (!canvas) return;
 
-    // Calculate padding as 10% of the smallest canvas dimension, with minimum of 40px
-    const minDimension = Math.min(canvas.width, canvas.height);
-    const padding = minDimension * 0.1
-    chart.zoomToFit(1000, padding, filter)
+    const rect = canvas.getBoundingClientRect();
+
+    // Calculate padding as 10% of the smallest canvas dimension
+    const minDimension = Math.min(rect.width, rect.height);
+    const padding = minDimension * 0.1;
+    chart.zoomToFit(500, padding * paddingMultiplier, filter);
   }
 }
 
@@ -136,27 +221,87 @@ export function createNestedObject(arr: string[]): object {
   return { [first]: createNestedObject(rest) };
 }
 
-export function getMainReturnLimit(query: string): number {
-  const match = query.match(/.*\bRETURN\b.*?(?:\bLIMIT\b\s*(\d+))?(?:\s*;?\s*$|\s*$)/i);
-  return match && match[1] ? parseInt(match[1], 10) : -1;
-}
+export function getQueryWithLimit(
+  query: string,
+  limit: number
+): [string, number] {
+  let existingLimit = 0;
 
-export function removeMainReturnLimit(query: string) {
-  return query.replace(/(\bRETURN\b\s+[^;]*?)\bLIMIT\b\s+\d+\s*$/i, '$1').trim();
-}
-
-export function getQueryWithLimit(query: string, limit: number) {
-  if (limit === 0) return query
-
-  const mainReturnLimit = getMainReturnLimit(query)
-
-  if (mainReturnLimit !== -1) {
-    if (mainReturnLimit > limit) {
-      return query
-    }
-
-    return `${removeMainReturnLimit(query)} LIMIT ${limit}`
+  const finalReturnMatch = query.match(
+    /\bRETURN\b(?!\s+.+?\bCALL\b)[^;]*?\bLIMIT\s+(\d+)/
+  );
+  if (finalReturnMatch) {
+    existingLimit = parseInt(finalReturnMatch[1], 10);
   }
 
-  return `${query} LIMIT ${limit}`
+  if (limit === 0) return [query, existingLimit];
+
+  if (query.includes("UNION")) {
+    if (!query.includes("CALL")) {
+      return [`CALL { ${query} } RETURN * LIMIT ${limit}`, limit];
+    }
+
+    if (query.match(/\bCALL\s*\{.*?\}\s*RETURN\b(?!\s+.+?\s+\bLIMIT\b)/i)) {
+      return [`${query} LIMIT ${limit}`, limit];
+    }
+  }
+
+  if (query.match(/\bRETURN\b(?!\s+.+?\s+\bLIMIT\b)/i)) {
+    return [`${query} LIMIT ${limit}`, limit];
+  }
+
+  return [query, existingLimit];
+}
+
+export const formatName = (newGraphName: string) =>
+  newGraphName === '""' ? "" : newGraphName;
+
+export async function fetchOptions(
+  type: "Graph" | "Schema",
+  toast: any,
+  setIndicator: (indicator: "online" | "offline") => void,
+  indicator: "online" | "offline",
+  setSelectedValue: (value: string) => void,
+  setOptions: (options: string[]) => void,
+  contentPersistence: boolean
+) {
+  if (indicator === "offline") return;
+
+  const result = await securedFetch(
+    `api/${type === "Graph" ? "graph" : "schema"}`,
+    {
+      method: "GET",
+    },
+    toast,
+    setIndicator
+  );
+
+  if (!result.ok) return;
+
+  const { opts } = (await result.json()) as { opts: string[] };
+
+  setOptions(opts);
+
+  if (
+    setSelectedValue &&
+    opts.length === 1 &&
+    (!contentPersistence || type === "Graph")
+  )
+    setSelectedValue(formatName(opts[0]));
+}
+
+export function getTheme(theme: string | undefined) {
+  let currentTheme = theme;
+
+  if (currentTheme === "system")
+    currentTheme = window.matchMedia("(prefers-color-scheme: dark)").matches
+      ? "dark"
+      : "light"
+
+  return {
+    background: currentTheme === "dark" ? "#1A1A1A" : "#FFFFFF",
+    foreground: currentTheme === "dark" ? "#FFFFFF" : "#1A1A1A",
+    secondary: currentTheme === "dark" ? "#242424" : "#E6E6E6",
+    currentTheme,
+  };
 }

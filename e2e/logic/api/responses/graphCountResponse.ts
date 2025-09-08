@@ -1,6 +1,6 @@
 export interface GraphCountResponse {
-    result: {
-      nodes: number,
-      edges: number
-    };
-  }
+  result: {
+      nodes: number;
+      edges: number;
+  };
+}

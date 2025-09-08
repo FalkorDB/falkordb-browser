@@ -4,7 +4,7 @@
 "use client";
 
 import { Check, ChevronRight, Pencil, PlusCircle, Trash2, X } from "lucide-react";
-import { useContext, useEffect, useState } from "react";
+import { useContext, useEffect, useState, useCallback } from "react";
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from "@/components/ui/use-toast";
 import { useSession } from "next-auth/react";
@@ -13,7 +13,7 @@ import { prepareArg, securedFetch } from "@/lib/utils";
 import Button from "../components/ui/Button";
 import { ATTRIBUTES, getDefaultAttribute, OPTIONS } from "./SchemaCreateElement";
 import Combobox from "../components/ui/combobox";
-import { Category, Graph, Link, Node } from "../api/graph/model";
+import { Label, Graph, Link, Node } from "../api/graph/model";
 import Input from "../components/ui/Input";
 import ToastButton from "../components/ToastButton";
 import DeleteElement from "../graph/DeleteElement";
@@ -22,39 +22,57 @@ import CloseDialog from "../components/CloseDialog";
 import { IndicatorContext } from "../components/provider";
 
 interface Props {
-    obj: Node | Link
-    onExpand: (expand?: boolean) => void;
+    object: Node | Link
+    setObject: (el: Node | Link | undefined) => void
     onDeleteElement: () => Promise<void>;
     schema: Graph
-    setCategories: (categories: Category[]) => void
+    setLabels: (labels: Label[]) => void
 }
 
-export default function SchemaDataPanel({ obj, onExpand, onDeleteElement, schema, setCategories }: Props) {
+export default function SchemaDataPanel({ object, setObject, onDeleteElement, schema, setLabels }: Props) {
 
-    const [attribute, setAttribute] = useState<[string, string[]]>(getDefaultAttribute())
-    const [attributes, setAttributes] = useState<[string, string[]][]>([])
-    const [label, setLabel] = useState<string[]>([])
-    const [editable, setEditable] = useState<string>("")
-    const [hover, setHover] = useState<string>("")
-    const [labelsHover, setLabelsHover] = useState<boolean>(false)
-    const [labelsEditable, setLabelsEditable] = useState<boolean>(false)
-    const [newLabel, setNewLabel] = useState<string>("")
-    const [isAddValue, setIsAddValue] = useState<boolean>(false)
-    const [isAddLoading, setIsAddLoading] = useState<boolean>(false)
-    const [isRemoveLoading, setIsRemoveLoading] = useState<boolean>(false)
-    const [isSetLoading, setIsSetLoading] = useState<boolean>(false)
-    const [isLabelLoading, setIsLabelLoading] = useState<boolean>(false)
-    const [isRemoveLabelLoading, setIsRemoveLabelLoading] = useState<boolean>(false)
-    const [deleteOpen, setDeleteOpen] = useState<boolean>(false)
-    const type = !!obj.category
-    const { toast } = useToast()
-    const { data: session } = useSession()
     const { indicator } = useContext(IndicatorContext)
 
+    const { data: session } = useSession()
+    const { toast } = useToast()
+
+    const [attribute, setAttribute] = useState<[string, string[]]>(getDefaultAttribute())
+    const [isRemoveLabelLoading, setIsRemoveLabelLoading] = useState<boolean>(false)
+    const [attributes, setAttributes] = useState<[string, string[]][]>([])
+    const [isRemoveLoading, setIsRemoveLoading] = useState<boolean>(false)
+    const [labelsEditable, setLabelsEditable] = useState<boolean>(false)
+    const [isLabelLoading, setIsLabelLoading] = useState<boolean>(false)
+    const [isAddLoading, setIsAddLoading] = useState<boolean>(false)
+    const [isSetLoading, setIsSetLoading] = useState<boolean>(false)
+    const [labelsHover, setLabelsHover] = useState<boolean>(false)
+    const [isAddValue, setIsAddValue] = useState<boolean>(false)
+    const [deleteOpen, setDeleteOpen] = useState<boolean>(false)
+    const [editable, setEditable] = useState<string>("")
+    const [newLabel, setNewLabel] = useState<string>("")
+    const [label, setLabel] = useState<string[]>([])
+    const [hover, setHover] = useState<string>("")
+    const type = !("source" in object)
+
+    const handleClose = useCallback((e: KeyboardEvent) => {
+        if (e.defaultPrevented) return
+
+        if (e.key === "Escape") {
+            setObject(undefined)
+        }
+    }, [setObject])
+
     useEffect(() => {
-        setAttributes(Object.entries(obj.data).filter(([key, val]) => !(key === "name" && Number(val) === obj.id)).map(([key, val]) => [key, Array.isArray(val) ? val : (val as string).split(',')]))
-        setLabel("source" in obj ? [obj.label] : [...obj.category])
-    }, [obj])
+        window.addEventListener("keydown", handleClose)
+
+        return () => {
+            window.removeEventListener("keydown", handleClose)
+        }
+    }, [handleClose])
+
+    useEffect(() => {
+        setAttributes(Object.entries(object.data).filter(([key, val]) => !(key === "name" && Number(val) === object.id)).map(([key, val]) => [key, Array.isArray(val) ? val : (val as string).split(',')]))
+        setLabel("source" in object ? [object.relationship] : [...object.labels])
+    }, [object])
 
     const handleSetEditable = ([key, val]: [string, string[]] = getDefaultAttribute()) => {
         if (key !== "") {
@@ -66,7 +84,7 @@ export default function SchemaDataPanel({ obj, onExpand, onDeleteElement, schema
     }
 
     const onSetAttribute = async (att: [string, string[]]) => {
-        const { ok } = await securedFetch(`api/schema/${prepareArg(schema.Id)}/${prepareArg(obj.id.toString())}/${prepareArg(att[0])}`, {
+        const { ok } = await securedFetch(`api/schema/${prepareArg(schema.Id)}/${prepareArg(object.id.toString())}/${prepareArg(att[0])}`, {
             method: "PATCH",
             body: JSON.stringify({ type, attribute: att[1] })
         }, toast)
@@ -96,7 +114,7 @@ export default function SchemaDataPanel({ obj, onExpand, onDeleteElement, schema
                     schema.Elements = {
                         ...schema.Elements,
                         nodes: schema.Elements.nodes.map(element =>
-                            element.id === obj.id ? { ...element, data: { ...element.data, [newAttribute[0]]: newAttribute[1] } } : element
+                            element.id === object.id ? { ...element, data: { ...element.data, [newAttribute[0]]: newAttribute[1] } } : element
                         )
                     }
                 } else {
@@ -104,7 +122,7 @@ export default function SchemaDataPanel({ obj, onExpand, onDeleteElement, schema
                     schema.Elements = {
                         ...schema.Elements,
                         links: schema.Elements.links.map(element =>
-                            element.id === obj.id ? { ...element, data: { ...element.data, [newAttribute[0]]: newAttribute[1] } } : element
+                            element.id === object.id ? { ...element, data: { ...element.data, [newAttribute[0]]: newAttribute[1] } } : element
                         )
                     }
                 }
@@ -113,7 +131,12 @@ export default function SchemaDataPanel({ obj, onExpand, onDeleteElement, schema
                 toast({
                     title: "Success",
                     description: `Property set`,
-                    action: isUndo && oldAttribute ? <ToastButton onClick={() => handleSetAttribute(false, oldAttribute)} /> : undefined,
+                    action: isUndo && oldAttribute ?
+                        <ToastButton
+                            showUndo
+                            onClick={() => handleSetAttribute(false, oldAttribute)}
+                        />
+                        : undefined,
                 })
             }
 
@@ -126,7 +149,7 @@ export default function SchemaDataPanel({ obj, onExpand, onDeleteElement, schema
         try {
             setIsRemoveLoading(true)
 
-            const { ok } = await securedFetch(`api/schema/${prepareArg(schema.Id)}/${prepareArg(obj.id.toString())}/${prepareArg(key)}`, {
+            const { ok } = await securedFetch(`api/schema/${prepareArg(schema.Id)}/${prepareArg(object.id.toString())}/${prepareArg(key)}`, {
                 method: "DELETE",
                 body: JSON.stringify({ type })
             }, toast)
@@ -138,7 +161,7 @@ export default function SchemaDataPanel({ obj, onExpand, onDeleteElement, schema
                     schema.Elements = {
                         ...schema.Elements,
                         nodes: schema.Elements.nodes.map(element =>
-                            element.id === obj.id ? { ...element, data: { ...Object.fromEntries(Object.entries(element.data).filter(([k]) => k !== key)), [key]: [] } } : element
+                            element.id === object.id ? { ...element, data: { ...Object.fromEntries(Object.entries(element.data).filter(([k]) => k !== key)), [key]: [] } } : element
                         )
                     }
                 } else {
@@ -146,7 +169,7 @@ export default function SchemaDataPanel({ obj, onExpand, onDeleteElement, schema
                     schema.Elements = {
                         ...schema.Elements,
                         links: schema.Elements.links.map(element =>
-                            element.id === obj.id ? { ...element, data: { ...Object.fromEntries(Object.entries(element.data).filter(([k]) => k !== key)), [key]: [] } } : element
+                            element.id === object.id ? { ...element, data: { ...Object.fromEntries(Object.entries(element.data).filter(([k]) => k !== key)), [key]: [] } } : element
                         )
                     }
                 }
@@ -154,7 +177,11 @@ export default function SchemaDataPanel({ obj, onExpand, onDeleteElement, schema
                 toast({
                     title: "Success",
                     description: "Attribute removed",
-                    action: att && <ToastButton onClick={() => handleAddAttribute(att)} />,
+                    action: att &&
+                        <ToastButton
+                            showUndo
+                            onClick={() => handleAddAttribute(att)}
+                        />,
                 })
                 setAttribute(getDefaultAttribute())
             }
@@ -184,13 +211,13 @@ export default function SchemaDataPanel({ obj, onExpand, onDeleteElement, schema
                     // eslint-disable-next-line no-param-reassign
                     schema.Elements = {
                         ...schema.Elements,
-                        nodes: [...schema.Elements.nodes, { ...obj as Node, data: { ...obj.data, [newAttribute[0]]: newAttribute[1] } }]
+                        nodes: [...schema.Elements.nodes, { ...object as Node, data: { ...object.data, [newAttribute[0]]: newAttribute[1] } }]
                     }
                 } else {
                     // eslint-disable-next-line no-param-reassign
                     schema.Elements = {
                         ...schema.Elements,
-                        links: [...schema.Elements.links, { ...obj as Link, data: { ...obj.data, [newAttribute[0]]: newAttribute[1] } }]
+                        links: [...schema.Elements.links, { ...object as Link, data: { ...object.data, [newAttribute[0]]: newAttribute[1] } }]
                     }
                 }
                 setAttributes(prev => [...prev, newAttribute])
@@ -227,7 +254,7 @@ export default function SchemaDataPanel({ obj, onExpand, onDeleteElement, schema
     }
 
     const handleAddLabel = async () => {
-        const node = obj as Node
+        const node = object as Node
 
         if (newLabel === "") {
             toast({
@@ -250,16 +277,14 @@ export default function SchemaDataPanel({ obj, onExpand, onDeleteElement, schema
         try {
             setIsLabelLoading(true)
 
-            const result = await securedFetch(`api/schema/${prepareArg(schema.Id)}/${prepareArg(obj.id.toString())}/label`, {
+            const result = await securedFetch(`api/schema/${prepareArg(schema.Id)}/${prepareArg(object.id.toString())}/label`, {
                 method: "POST",
                 body: JSON.stringify({ label: newLabel })
             }, toast)
 
             if (result.ok) {
-                schema.createCategory([newLabel], node)
-                node.category.push(newLabel)
-                setCategories([...schema.Categories])
-                setLabel([...label, newLabel])
+                setLabels([...schema.addLabel(newLabel, node, false)])
+                setLabel([...node.labels])
                 setNewLabel("")
                 setLabelsEditable(false)
             }
@@ -269,21 +294,28 @@ export default function SchemaDataPanel({ obj, onExpand, onDeleteElement, schema
     }
 
     const handleRemoveLabel = async (removeLabel: string) => {
-        const node = obj as Node
+        const node = object as Node
+
+        if (removeLabel === "") {
+            toast({
+                title: "Error",
+                description: "You cannot remove the default label",
+                variant: "destructive"
+            })
+            return
+        }
 
         try {
             setIsRemoveLabelLoading(true)
-            const result = await securedFetch(`api/schema/${prepareArg(schema.Id)}/${prepareArg(obj.id.toString())}/label`, {
+            const result = await securedFetch(`api/schema/${prepareArg(schema.Id)}/${prepareArg(object.id.toString())}/label`, {
                 method: "DELETE",
                 body: JSON.stringify({ label: removeLabel })
             }, toast)
 
             if (result.ok) {
-                schema.Categories.splice(schema.Categories.findIndex(c => c.name === removeLabel), 1)
-                schema.CategoriesMap.delete(removeLabel)
-                node.category.splice(node.category.findIndex(l => l === removeLabel), 1)
-                setCategories([...schema.Categories])
-                setLabel(prev => prev.filter(l => l !== removeLabel))
+                schema.removeLabel(removeLabel, node, false)
+                setLabels([...schema.Labels])
+                setLabel([...node.labels])
             }
         } finally {
             setIsRemoveLabelLoading(false)
@@ -295,7 +327,7 @@ export default function SchemaDataPanel({ obj, onExpand, onDeleteElement, schema
             <div className="w-full flex justify-between items-center p-4" id="headerDataPanel">
                 <div className="flex gap-4 items-center">
                     <Button
-                        onClick={() => onExpand()}
+                        onClick={() => setObject(undefined)}
                     >
                         <ChevronRight size={20} />
                     </Button>
@@ -401,7 +433,7 @@ export default function SchemaDataPanel({ obj, onExpand, onDeleteElement, schema
                         }
                     </TableRow>
                 </TableHeader>
-                <TableBody>
+                <TableBody data-testid="attributesTableBody">
                     {
                         attributes.length > 0 &&
                         attributes.map(([key, val]) => (
@@ -450,7 +482,7 @@ export default function SchemaDataPanel({ obj, onExpand, onDeleteElement, schema
                                             </TableCell>
                                             <TableCell>
                                                 <Switch
-                                                    className="border-[#57577B]"
+                                                    className="data-[state=unchecked]:bg-border"
                                                     onCheckedChange={(checked) => setAttribute(prev => {
                                                         const p: [string, string[]] = [...prev]
                                                         p[1][2] = checked ? "true" : "false"
@@ -461,7 +493,7 @@ export default function SchemaDataPanel({ obj, onExpand, onDeleteElement, schema
                                             </TableCell>
                                             <TableCell>
                                                 <Switch
-                                                    className="border-[#57577B]"
+                                                    className="data-[state=unchecked]:bg-border"
                                                     onCheckedChange={(checked) => setAttribute(prev => {
                                                         const p: [string, string[]] = [...prev]
                                                         p[1][3] = checked ? "true" : "false"
@@ -482,10 +514,11 @@ export default function SchemaDataPanel({ obj, onExpand, onDeleteElement, schema
                                                 editable === key ?
                                                     <>
                                                         <Button
-                                                            className="p-2 justify-center border border-foreground"
+                                                            className="p-2 justify-center border border-border"
                                                             variant="Secondary"
                                                             label="Save"
                                                             title="Save the attribute changes"
+                                                            data-testid="saveEditAttributeButton"
                                                             onClick={(e) => {
                                                                 e.stopPropagation()
                                                                 handleSetAttribute(true)
@@ -497,10 +530,11 @@ export default function SchemaDataPanel({ obj, onExpand, onDeleteElement, schema
                                                         {
                                                             !isSetLoading &&
                                                             <Button
-                                                                className="p-2 justify-center border border-foreground"
+                                                                className="p-2 justify-center border border-border"
                                                                 variant="Secondary"
                                                                 label="Cancel"
                                                                 title="Discard the attribute changes"
+                                                                data-testid="cancelEditAttributeButton"
                                                                 onClick={(e) => {
                                                                     e.stopPropagation()
                                                                     handleSetEditable()
@@ -522,6 +556,7 @@ export default function SchemaDataPanel({ obj, onExpand, onDeleteElement, schema
                                                                     variant="button"
                                                                     title="Delete Attribute"
                                                                     label="Delete"
+                                                                    data-testid="removeAttributeButton"
                                                                 >
                                                                     <Trash2 size={20} />
                                                                 </Button>
@@ -534,6 +569,7 @@ export default function SchemaDataPanel({ obj, onExpand, onDeleteElement, schema
                                                                     variant="Primary"
                                                                     label="Delete"
                                                                     title="Confirm the deletion of the attribute"
+                                                                    data-testid="confirmRemoveAttributeButton"
                                                                     onClick={(e) => {
                                                                         e.stopPropagation()
                                                                         handleRemoveAttribute(key)
@@ -551,10 +587,11 @@ export default function SchemaDataPanel({ obj, onExpand, onDeleteElement, schema
                                                         </DialogComponent>
                                                         <Button
                                                             disabled={isAddValue}
-                                                            className="p-2 justify-center border border-foreground"
+                                                            className="p-2 justify-center border border-border"
                                                             variant="Secondary"
                                                             label="Edit"
                                                             title="Modify this attribute"
+                                                            data-testid="editAttributeButton"
                                                             onClick={(e) => {
                                                                 e.stopPropagation()
                                                                 handleSetEditable([key, [...val]])
@@ -577,6 +614,7 @@ export default function SchemaDataPanel({ obj, onExpand, onDeleteElement, schema
                                 <Input
                                     className="w-full"
                                     onKeyDown={handleAddKeyDown}
+                                    data-testid="addAttributeKeyInput"
                                     onChange={(e) => setAttribute(prev => {
                                         const p: [string, string[]] = [...prev]
                                         p[0] = e.target.value
@@ -602,6 +640,7 @@ export default function SchemaDataPanel({ obj, onExpand, onDeleteElement, schema
                                 <Input
                                     className="w-full"
                                     onKeyDown={handleAddKeyDown}
+                                    data-testid="addAttributeValueInput"
                                     onChange={(e) => setAttribute(prev => {
                                         const p: [string, string[]] = [...prev]
                                         p[1][1] = e.target.value
@@ -612,7 +651,7 @@ export default function SchemaDataPanel({ obj, onExpand, onDeleteElement, schema
                             </TableCell>
                             <TableCell>
                                 <Switch
-                                    className="border-[#57577B]"
+                                    className="data-[state=unchecked]:bg-border"
                                     onCheckedChange={(checked) => setAttribute(prev => {
                                         const p: [string, string[]] = [...prev]
                                         p[1][2] = checked ? "true" : "false"
@@ -623,7 +662,7 @@ export default function SchemaDataPanel({ obj, onExpand, onDeleteElement, schema
                             </TableCell>
                             <TableCell>
                                 <Switch
-                                    className="border-[#57577B]"
+                                    className="data-[state=unchecked]:bg-border"
                                     onCheckedChange={(checked) => setAttribute(prev => {
                                         const p: [string, string[]] = [...prev]
                                         p[1][3] = checked ? "true" : "false"
@@ -636,7 +675,7 @@ export default function SchemaDataPanel({ obj, onExpand, onDeleteElement, schema
                                 <div className="flex gap-2 w-44">
                                     <Button
                                         indicator={indicator}
-                                        className="p-2 justify-center border border-foreground"
+                                        className="p-2 justify-center border border-border"
                                         variant="Secondary"
                                         label="Save"
                                         title="Save the new attribute"
@@ -645,11 +684,12 @@ export default function SchemaDataPanel({ obj, onExpand, onDeleteElement, schema
                                             handleAddAttribute()
                                         }}
                                         isLoading={isAddLoading}
+                                        data-testid="saveAddValueButton"
                                     >
                                         <Check size={20} />
                                     </Button>
                                     <Button
-                                        className="p-2 justify-center border border-foreground"
+                                        className="p-2 justify-center border border-border"
                                         variant="Secondary"
                                         label="Cancel"
                                         title="Discard the new attribute"
@@ -658,6 +698,7 @@ export default function SchemaDataPanel({ obj, onExpand, onDeleteElement, schema
                                             handleSetEditable()
                                             setIsAddValue(false)
                                         }}
+                                        data-testid="cancelAddValueButton"
                                     >
                                         <X size={20} />
                                     </Button>
@@ -674,6 +715,7 @@ export default function SchemaDataPanel({ obj, onExpand, onDeleteElement, schema
                             variant="Primary"
                             label="Add Value"
                             title="Add a new attribute"
+                            data-testid="addValueButton"
                             onClick={() => setIsAddValue(true)}
                         >
                             <PlusCircle size={20} />
@@ -685,11 +727,11 @@ export default function SchemaDataPanel({ obj, onExpand, onDeleteElement, schema
                 {
                     session?.user.role !== "Read-Only" &&
                     <DeleteElement
+                        label="Schema"
                         description={`Are you sure you want to delete this ${type ? "Node" : "Relation"}?`}
                         open={deleteOpen}
                         setOpen={setDeleteOpen}
                         onDeleteElement={onDeleteElement}
-                        trigger={<Button label={`Delete ${type ? "Node" : "Relation"}`} variant="Secondary" title="Remove the selected element" />}
                     />
                 }
             </div>

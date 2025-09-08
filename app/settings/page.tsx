@@ -1,67 +1,103 @@
+
 'use client'
 
-import { useEffect, useState } from "react"
+import { useCallback, useContext, useEffect, useState } from "react"
 import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
-import Header from "../components/Header"
+import { getQuerySettingsNavigationToast } from "@/components/ui/toaster"
+import { useToast } from "@/components/ui/use-toast"
 import Users from "./users/Users"
 import Configurations from "./Configurations"
 import Button from "../components/ui/Button"
-import QuerySettings from "./QuerySettings"
+import BrowserSettings from "./browserSettings"
+import { IndicatorContext, QuerySettingsContext } from "../components/provider"
+
+type Tab = 'Browser' | 'Configurations' | 'Users'
 
 export default function Settings() {
 
-    const [current, setCurrent] = useState<'Query' | 'DB' | 'Users'>('Query')
-    const router = useRouter()
+    const { hasChanges, saveSettings, resetSettings } = useContext(QuerySettingsContext)
+    const { indicator } = useContext(IndicatorContext)
     const { data: session } = useSession()
+    const { toast } = useToast()
+    const router = useRouter()
+
+    const [current, setCurrent] = useState<Tab>('Browser')
+
+
+    const navigateBack = useCallback((e: KeyboardEvent) => {
+        if (e.key === "Escape" && current !== "Browser") {
+            e.preventDefault()
+
+            router.back()
+        }
+    }, [current, router])
 
     useEffect(() => {
-        if (session && session.user.role !== "Admin") router.back()
-    }, [router, session])
+        window.addEventListener("keydown", navigateBack)
+
+        return () => {
+            window.removeEventListener("keydown", navigateBack)
+        }
+    }, [navigateBack])
+
+    const handleSetCurrent = useCallback((tab: Tab) => {
+        if (current === "Browser" && hasChanges) {
+            getQuerySettingsNavigationToast(toast, () => {
+                saveSettings()
+                setCurrent(tab)
+            }, () => {
+                resetSettings()
+                setCurrent(tab)
+            })
+        } else {
+            setCurrent(tab)
+        }
+    }, [current, hasChanges, resetSettings, saveSettings, toast])
 
     const getCurrentTab = () => {
         switch (current) {
             case 'Users':
                 return <Users />
-            case 'DB':
+            case 'Configurations':
                 return <Configurations />
             default:
-                return <QuerySettings />
+                return <BrowserSettings />
         }
     }
 
     return (
-        <div className="Page">
-            <Header />
-            <div className="grow flex flex-col items-center gap-8 p-32">
-                <h1 className="text-2xl font-medium px-6">Settings</h1>
-                <div className="w-fit bg-foreground flex gap-2 p-2 rounded-lg">
-                    <Button
-                        className={cn("p-2 rounded-lg", current === "Query" ? "bg-background" : "text-gray-500")}
-                        label="Query Settings"
-                        title="Manage query settings"
-                        onClick={() => setCurrent("Query")}
-                    />
-                    <Button
-                        className={cn("p-2 rounded-lg", current === "DB" ? "bg-background" : "text-gray-500")}
-                        label="DB Configuration"
-                        title="Configure database settings"
-                        onClick={() => setCurrent("DB")}
-                    />
-                    <Button
-                        className={cn("p-2 rounded-lg", current === "Users" ? "bg-background" : "text-gray-500")}
-                        label="Users"
-                        title="Manage users accounts"
-                        onClick={() => setCurrent("Users")}
-                    />
-                </div>
-                <div className="w-full h-1 grow px-6">
-                    {
-                        getCurrentTab()
-                    }
-                </div>
+        <div className="Page p-12">
+            <p className="text-sm text-foreground"><span className="opacity-50">Settings</span> {`> ${current}`}</p>
+            <div className="flex flex-col gap-8 items-center p-2">
+                {
+                    session?.user?.role === "Admin" && indicator === "online" &&
+                    <div className="w-fit bg-background flex gap-2 p-2 rounded-lg">
+                        <Button
+                            className={cn("p-2 rounded-lg", current === "Browser" ? "bg-background" : "text-gray-500")}
+                            label="Browser Settings"
+                            title="Manage browser settings"
+                            onClick={() => handleSetCurrent("Browser")}
+                        />
+                        <Button
+                            className={cn("p-2 rounded-lg", current === "Configurations" ? "bg-background" : "text-gray-500")}
+                            label="DB Configurations"
+                            title="Configure database settings"
+                            onClick={() => handleSetCurrent("Configurations")}
+                        />
+                        <Button
+                            className={cn("p-2 rounded-lg", current === "Users" ? "bg-background" : "text-gray-500")}
+                            label="Users"
+                            title="Manage users accounts"
+                            onClick={() => handleSetCurrent("Users")}
+                        />
+                    </div>
+                }
             </div>
+            {
+                getCurrentTab()
+            }
         </div>
     )
 }

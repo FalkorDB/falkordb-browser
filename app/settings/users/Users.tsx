@@ -32,7 +32,7 @@ export default function Users() {
 
     const [users, setUsers] = useState<User[]>([])
     const [rows, setRows] = useState<Row[]>([])
-    const [setUser, setSetUser] = useState<SetUser | null>(null)
+    const [newUser, setNewUser] = useState<SetUser | null>(null)
     const [open, setOpen] = useState(false)
     const { toast } = useToast()
     const { setIndicator } = useContext(IndicatorContext);
@@ -45,7 +45,7 @@ export default function Users() {
 
         if (result.ok) {
             setUsers(prev => prev.map(u => u.username === username ? { ...u, role } : u))
-            setRows(prev => prev.map(row => row.cells[0].value === username ? { ...row, cells: [row.cells[0], { ...row.cells[1], value: role }] } : row))
+            setRows(prev => prev.map((row): Row => row.cells[0].value === username ? { ...row, cells: [row.cells[0], { ...row.cells[1], value: role }] } : row))
 
             toast({
                 title: "Success",
@@ -68,17 +68,23 @@ export default function Users() {
             if (result.ok) {
                 const data = await result.json()
                 setUsers(data.result.map((user: User) => ({ ...user, selected: false })))
-                setRows(data.result.map(({ username, role }: User) => ({
+                setRows(data.result.map(({ username, role }: User): Row => ({
                     cells: [{
                         value: username,
-                    }, {
+                        type: "readonly"
+                    }, username === "default" ? {
                         value: role,
-                        onChange: username === "default" ? undefined : (value: string) => {
-                            setSetUser({ username, role: value, oldRole: role })
+                        type: "readonly",
+                    } : {
+                        value: role,
+                        type: "select",
+                        onChange: async (value: string) => {
+                            setNewUser({ username, role: value, oldRole: role })
                             setOpen(true)
+                            return true
                         },
-                        type: "combobox",
-                        comboboxType: "Role",
+                        options: ROLES,
+                        selectType: "Role"
                     }],
                     checked: false,
                 })))
@@ -104,14 +110,15 @@ export default function Users() {
             setRows(prev => [...prev, {
                 cells: [{
                     value: username,
+                    type: "readonly"
                 }, {
                     value: role,
                     onChange: (value: string) => {
-                        setSetUser({ username, role: value, oldRole: role })
+                        setNewUser({ username, role: value, oldRole: role })
                         setOpen(true)
                     },
-                    type: "combobox",
-                    comboboxType: "Role"
+                    type: "select",
+                    selectType: "Role"
                 }],
                 checked: false,
             }] as Row[])
@@ -121,10 +128,11 @@ export default function Users() {
     return (
         <div className="w-full h-full flex flex-col space-y-4">
             <TableComponent
+                label="Users"
+                entityName="User"
                 headers={["Name", "Role"]}
                 rows={rows}
                 setRows={setRows}
-                options={ROLES}
             >
                 <div className="flex flex-row-reverse gap-4">
                     <AddUser onAddUser={handleAddUser} />
@@ -132,14 +140,14 @@ export default function Users() {
                 </div>
             </TableComponent>
             <Dialog open={open} onOpenChange={setOpen}>
-                <DialogContent className="bg-foreground p-8 flex flex-col gap-8 rounded-lg border-none" disableClose>
-                    <DialogHeader className="flex-row justify-between items-center border-b border-secondary pb-4">
+                <DialogContent className="bg-background p-8 flex flex-col gap-8 rounded-lg border-none" disableClose>
+                    <DialogHeader className="flex-row justify-between items-center border-b border-border pb-4">
                         <DialogTitle className="text-2xl font-medium">Set User Role</DialogTitle>
                         <CloseDialog />
                     </DialogHeader>
-                    <DialogDescription>Are you sure you want to set the user role to {setUser?.role}?</DialogDescription>
+                    <DialogDescription>Are you sure you want to set the user role to {newUser?.role}?</DialogDescription>
                     <div className="flex justify-end gap-4">
-                        <Button onClick={() => handleSetRole(setUser!)}>Set User</Button>
+                        <Button onClick={() => handleSetRole(newUser!)}>Set User</Button>
                         <CloseDialog label="Cancel" />
                     </div>
                 </DialogContent>

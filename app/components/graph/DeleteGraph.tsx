@@ -1,76 +1,115 @@
 import { useToast } from "@/components/ui/use-toast";
 import { prepareArg, securedFetch, Row } from "@/lib/utils";
-import React, { ReactNode, useContext, useState } from "react";
+import React, { useContext, useEffect, useState } from "react";
+import { Graph } from "@/app/api/graph/model";
 import DialogComponent from "../DialogComponent";
 import Button from "../ui/Button";
 import CloseDialog from "../CloseDialog";
 import { IndicatorContext } from "../provider";
 
-export default function DeleteGraph({ type, trigger, options, rows, handleSetRows, setOpenMenage, setOptions, selectedValue, setSelectedValue }: {
+interface Props {
   type: "Schema" | "Graph"
-  trigger: ReactNode
-  options: string[]
   rows: Row[]
   handleSetRows: (rows: string[]) => void
   setOpenMenage: (openMenage: boolean) => void
-  setOptions: (options: string[]) => void
   selectedValue: string
-  setSelectedValue: (selectedValue: string) => void
-}) {
+  setGraphName: (graphName: string) => void
+  setGraph: (graph: Graph) => void
+  graphNames: string[]
+  setGraphNames: (graphNames: string[]) => void
+}
+
+export default function DeleteGraph({
+  type,
+  rows,
+  handleSetRows,
+  setOpenMenage,
+  selectedValue,
+  setGraphName,
+  setGraph,
+  graphNames,
+  setGraphNames
+}: Props) {
 
   const [open, setOpen] = useState(false)
+  const [closeManage, setCloseManage] = useState(false)
   const { toast } = useToast()
   const [isLoading, setIsLoading] = useState(false)
   const { indicator, setIndicator } = useContext(IndicatorContext)
 
-  const handleDelete = async (opts: string[]) => {
+  useEffect(() => {
+    if (!open && closeManage) {
+      setOpenMenage(false)
+      setCloseManage(false)
+    }
+  }, [open, closeManage, setOpenMenage])
+
+  const handleDelete = async (deleteGraphNames: string[]) => {
     setIsLoading(true)
     try {
-      const newNames = await Promise.all(opts.map(async (opt) => {
-        const result = await securedFetch(`api/${type === "Schema" ? "schema" : "graph"}/${prepareArg(opt)}`, {
-          method: "DELETE"
-        }, toast, setIndicator)
+      const [failedDeletedGraphs, successDeletedGraphs] = await Promise.all(deleteGraphNames
+        .map(async (name) => {
+          const result = await securedFetch(`api/${type === "Schema" ? "schema" : "graph"}/${prepareArg(name)}`, {
+            method: "DELETE"
+          }, toast, setIndicator)
 
-        if (result.ok) return ""
+          if (result.ok) return ""
 
-        return opt
+          return name
 
-      })).then(newGraphNames => newGraphNames.filter(opt => opt !== ""))
+        })).then(newGraphNames => [newGraphNames.filter(n => n !== ""), deleteGraphNames.filter(n => !newGraphNames.includes(n))])
 
-      setOptions(newNames)
+      const newGraphNames = graphNames.filter(n => !successDeletedGraphs.includes(n))
 
-      if (!newNames.includes(selectedValue) && setSelectedValue) setSelectedValue(newNames.length > 0 ? newNames[newNames.length - 1] : "")
+      setGraphNames(newGraphNames)
 
-      setOpen(false)
-      setOpenMenage(false)
-      handleSetRows(options.filter(opt => newNames.includes(opt)))
+      if (successDeletedGraphs.includes(selectedValue)) {
+        setGraphName(successDeletedGraphs.length > 0 ? newGraphNames[successDeletedGraphs.length - 1] : "")
+        setGraph(Graph.empty())
+      }
+
+      handleSetRows(successDeletedGraphs)
       toast({
         title: "Graph(s) deleted successfully",
-        description: `The graph(s) ${opts.join(", ")} have been deleted successfully`,
+        description: successDeletedGraphs.length > 0 && `The graph(s) ${successDeletedGraphs.join(", ")} have been deleted successfully${failedDeletedGraphs.length > 0 && `The graph(s) ${failedDeletedGraphs.join(", ")} have not been deleted`}`,
       })
     } finally {
       setIsLoading(false)
+      setOpen(false)
+      setCloseManage(true)
     }
   }
 
   return (
     <DialogComponent
-      className="max-w-[90dvw]"
+      className="max-w-[70dvw]"
       open={open}
       onOpenChange={setOpen}
       title="Delete Graph"
-      trigger={trigger}
+      trigger={
+        <Button
+          data-testid="deleteGraph"
+          variant="Delete"
+          disabled={rows.filter(opt => opt.checked).length === 0}
+          label="Delete"
+          title="Confirm the deletion of the selected graph(s)"
+        />
+      }
       description={`Are you sure you want to delete the selected graph(s)? (${rows.filter(opt => opt.checked).map(opt => opt.cells[0].value as string).join(", ")})`}
     >
       <div className="flex justify-end gap-2">
         <Button
+          data-testid="deleteGraphConfirm"
           indicator={indicator}
-          variant="Primary"
+          variant="Delete"
           label="Delete Graph"
           onClick={() => handleDelete(rows.filter(opt => opt.checked).map(opt => opt.cells[0].value as string))}
           isLoading={isLoading}
         />
-        <CloseDialog label="Cancel" />
+        <CloseDialog
+          data-testid="deleteGraphCancel"
+          label="Cancel"
+        />
       </div>
     </DialogComponent>
   );

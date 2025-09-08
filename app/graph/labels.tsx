@@ -1,23 +1,22 @@
 import { useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import { ChevronDown, ChevronUp } from "lucide-react";
-import { Category, Graph } from "../api/graph/model";
+import { Label, Relationship } from "../api/graph/model";
 import Button from "../components/ui/Button";
 
-/* eslint-disable react/require-default-props */
-interface Props {
-    graph: Graph,
-    categories: Category[],
-    onClick: (category: Category) => void,
-    label?: string,
-    className?: string
+interface Props<T extends Label | Relationship> {
+    labels: T[],
+    onClick: (label: T) => void,
+    label: "Relationships" | "Labels",
+    type: "Schema" | "Graph",
 }
 
-export default function Labels({ graph, categories, onClick, label, className = "" }: Props) {
+export default function Labels<T extends Label | Relationship>({ labels, onClick, label, type }: Props<T>) {
+
+    const listRef = useRef<HTMLUListElement>(null)
 
     // fake state to force reload
     const [, setReload] = useState(false)
-    const listRef = useRef<HTMLUListElement>(null)
     const isScrollable = listRef.current && listRef.current.scrollHeight > listRef.current.clientHeight
 
     const handleScroll = (scrollTo: number) => {
@@ -28,12 +27,12 @@ export default function Labels({ graph, categories, onClick, label, className = 
     }
 
     return (
-        <div className={cn(className, "absolute top-14 flex flex-col gap-2 p-4 max-w-[200px] h-[95%] pointer-events-none", label === "RelationshipTypes" ? "right-2" : "left-2")} id={`${label}Panel`}>
+        <div className={cn("flex flex-col gap-2 max-w-1/2 max-h-1/2 overflow-hidden")}>
             {
                 label &&
                 <h1>{label}</h1>
             }
-            <div className={cn("h-1 grow flex flex-col items-center gap-4")}>
+            <div className={cn("flex flex-col items-center gap-4")}>
                 {
                     isScrollable &&
                     <Button
@@ -46,18 +45,19 @@ export default function Labels({ graph, categories, onClick, label, className = 
                 }
                 <ul ref={listRef} className={cn("flex flex-col gap-4 w-full overflow-auto hide-scrollbar")}>
                     {
-                        categories.length > 0 &&
-                        categories.map((category) => (
-                            <li key={category.name}>
+                        labels.length > 0 &&
+                        labels.map((l) => (
+                            <li key={l.name}>
                                 <Button
-                                    className={cn(category.name && "w-full pointer-events-auto")}
-                                    label={category.name}
+                                    data-testid={`${type}${label}Button${l.name}`}
+                                    className={cn("w-full pointer-events-auto", l.show ? "opacity-100" : "opacity-50")}
+                                    label={l.name}
                                     onClick={() => {
-                                        onClick(category)
+                                        onClick(l)
                                         setReload(prev => !prev)
                                     }}
                                 >
-                                    <div style={{ backgroundColor: graph.getCategoryColorValue(category.index) }} className={cn("min-w-6 min-h-6 rounded-full")} />
+                                    <div style={{ backgroundColor: l.color }} className={cn("min-w-6 min-h-6 rounded-full")} />
                                 </Button>
                             </li>
                         ))

@@ -4,17 +4,25 @@
 
 @layer base {
     :root {
-        --background: 0 0% 14%;
+        --background: 0 0% 100%;
         --foreground: 0 0% 10%;
-        --primary: 243 91% 68%;
-        --secondary: 39 33% 96%;
-        --destructive: 0 84% 60%;
+        --secondary: 0 0% 90%;
+        --primary: 247 100% 70%;
+        --destructive: 0 100% 66%;
         --accent: var(--background);
-        --popover: var(--primary);
-        --popover-foreground: 0 0% 100%;
+        --popover: var(--background);
+        --popover-foreground: var(--foreground);
         --radius: 0.5rem;
-        --input: var(--popover-foreground);
+        --input: var(--background);
+        --text-muted-foreground: var(--foreground);
         --muted: 0 0% 80%;
+        --border: 0 0% 26%;
+    }
+
+    .dark {
+        --background: 0 0% 10%;
+        --foreground: 0 0% 100%;
+        --secondary: 0 0% 14.1%;
     }
 
     :focus-visible {
@@ -22,22 +30,30 @@
     }
 }
 
-@layer base {
-    body {
-        @apply bg-background text-white;
-    }
-}
-
 @layer components {
 
     @font-face {
-        font-family: 'FiraCode';
-        src: url('/fonts/fira_code.ttf') format('truetype');
+        font-family: 'Inter';
+        src: url('/fonts/Inter.ttf') format('truetype');
         font-display: swap;
     }
 
+    @font-face {
+        font-family: 'FiraCode';
+        src: url('/fonts/FiraCode.ttf') format('truetype');
+        font-display: swap;
+    }
+
+    * {
+        font-family: 'Inter' !important;
+    }
+
+    .CypherInput * {
+        font-family: 'FiraCode' !important;
+    }
+
     .tabs-trigger {
-        @apply !p-2 rounded-lg data-[state=active]:bg-foreground data-[state=active]:!text-white text-gray-500;
+        @apply !p-2 rounded-lg data-[state=active]:!text-primary text-foreground !bg-transparent;
     }
 
     .hide-scrollbar {
@@ -46,24 +62,44 @@
     }
 
     .Page {
-        @apply h-full w-full flex flex-col bg-background;
+        @apply w-full h-full bg-background relative overflow-hidden flex flex-col;
     }
 
     .Gradient {
         background: linear-gradient(90deg, #EC806C 0%, #B66EBD 43.41%, #7568F2 100%);
     }
 
+    .border-Gradient {
+        border: 2px solid;
+        border-image-source: linear-gradient(90deg, #EC806C 0%, #B66EBD 43.41%, #7568F2 100%);
+        border-image-slice: 1;
+    }
+
+    .border-Gradient-rounded {
+        position: relative;
+        z-index: 1;
+        padding: 2px;
+    }
+
+    .border-Gradient-rounded::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: linear-gradient(90deg, #EC806C 0%, #B66EBD 43.41%, #7568F2 100%);
+        border-radius: 0.5rem;
+        z-index: -1;
+    }
+
     .DataPanel {
-        @apply h-full w-full flex flex-col shadow-lg bg-background;
+        @apply h-full w-full flex flex-col gap-4 bg-background border border-border rounded-lg;
     }
 
     .Dropzone {
         @apply flex grow shrink bg-background items-center justify-center;
     }
-}
-
-* {
-    font-family: 'FiraCode', 'Arial', monospace !important;
 }
 
 ::-webkit-scrollbar {
@@ -76,14 +112,10 @@
 }
 
 ::-webkit-scrollbar-thumb {
-    background-color: #d6dee1;
+    @apply bg-secondary;
     border-radius: 20px;
     border: 6px solid transparent;
     background-clip: content-box;
-}
-
-::-webkit-scrollbar-thumb:hover {
-    background-color: #a8bbbf;
 }
 
 input[type="color"]::-webkit-color-swatch-wrapper {
