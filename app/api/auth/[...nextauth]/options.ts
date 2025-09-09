@@ -9,7 +9,7 @@ import { v4 as uuidv4 } from "uuid";
 
 const connections = new Map<string, FalkorDB>();
 
-async function newClient(
+export async function newClient(
   credentials: {
     host: string;
     port: string;
@@ -88,7 +88,7 @@ async function newClient(
   return { role: "Admin", client };
 }
 
-function generateTimeUUID() {
+export function generateTimeUUID() {
   const timestamp = Date.now(); // Get current time in milliseconds
   const uuid = uuidv4(); // Generate a random UUID
   return `${timestamp}-${uuid}`; // Combine both
