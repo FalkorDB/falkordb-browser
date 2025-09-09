@@ -2,7 +2,7 @@
 
 'use client'
 
-import { ArrowUpRight, Database, LifeBuoy, LogOut, Monitor, Moon, Settings, Sun } from "lucide-react";
+import { ArrowUpRight, Database, FileCode, LogOut, Monitor, Moon, Settings, Sun } from "lucide-react";
 import { SetStateAction, Dispatch, useCallback, useContext, useState, useEffect } from "react";
 import Image from "next/image";
 import { cn, getTheme, Panel } from "@/lib/utils";
@@ -164,7 +164,7 @@ export default function Header({ onSetGraphName, graphNames, graphName, setGraph
                     <DropdownMenu>
                         <DropdownMenuTrigger onClick={(e) => e.preventDefault()} asChild>
                             <Button title="Help">
-                                <LifeBuoy size={iconSize} />
+                                <FileCode size={iconSize} />
                             </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent side="right" className="bg-background w-full p-4 ml-4">
@@ -176,6 +176,15 @@ export default function Header({ onSetGraphName, graphNames, graphName, setGraph
                                         </span>
                                         <ArrowUpRight size={15} />
                                     </a>
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem className="focus:bg-transparent">
+                                    <Link className="flex gap-2 items-center" href="/docs">
+                                        <span>
+                                            API Documentation
+                                        </span>
+                                        <ArrowUpRight size={15} />
+                                    </Link>
                                 </DropdownMenuItem>
                                 <DropdownMenuSeparator />
                                 <DropdownMenuItem className="focus:bg-transparent">
