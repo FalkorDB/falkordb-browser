@@ -10,11 +10,11 @@ import Button from "./Button"
 import Input from "./Input"
 import { IndicatorContext } from "../provider"
 
-interface ComboboxProps {
+interface ComboboxProps<T extends string> {
   id?: string,
-  options: string[],
-  selectedValue: string,
-  setSelectedValue: (value: string) => void,
+  options: T[],
+  selectedValue: T,
+  setSelectedValue: (value: T) => void,
   label: "Role" | "Type" | "Model" | "Theme",
   disabled?: boolean,
   inTable?: boolean,
@@ -24,11 +24,11 @@ interface ComboboxProps {
 
 const STEP = 4
 
-export default function Combobox({ id, disabled = false, inTable = false, label, options, selectedValue, setSelectedValue, defaultOpen = false, className }: ComboboxProps) {
+export default function Combobox<T extends string>({ id, disabled = false, inTable = false, label, options, selectedValue, setSelectedValue, defaultOpen = false, className }: ComboboxProps<T>) {
 
   const { indicator } = useContext(IndicatorContext)
 
-  const [filteredOptions, setFilteredOptions] = useState<string[]>([])
+  const [filteredOptions, setFilteredOptions] = useState<T[]>([])
   const [openMenage, setOpenMenage] = useState<boolean>(false)
   const [maxOptions, setMaxOptions] = useState<number>(STEP)
   const [open, setOpen] = useState<boolean>(defaultOpen)
