@@ -510,11 +510,13 @@ export default function EditorComponent({ graph, graphName, historyQuery, maximi
             if (placeholderRef.current) {
                 placeholderRef.current.style.display = 'none';
             }
+
             setBlur(false)
         });
 
         e.onDidBlurEditorText(() => {
             updatePlaceholderVisibility();
+
             setBlur(true)
         });
 
@@ -639,7 +641,7 @@ export default function EditorComponent({ graph, graphName, historyQuery, maximi
                             ...monacoOptions,
                             lineNumbers: lineNumber > 1 ? "on" : "off",
                         }}
-                        value={blur ? historyQuery.query.replace(/\s+/g, ' ').trim() : historyQuery.query}
+                        value={blur ? historyQuery.query.replace(/\n/g, ' ') : historyQuery.query}
                         onChange={(val) => {
                             if (!historyQuery.counter) {
                                 setHistoryQuery(prev => ({
@@ -757,7 +759,7 @@ export default function EditorComponent({ graph, graphName, historyQuery, maximi
                                 lineHeight: 30,
                                 fontSize: 25,
                             }}
-                            value={(blur ? historyQuery.query.replace(/\s+/g, ' ').trim() : historyQuery.query)}
+                            value={historyQuery.query}
                             onChange={(val) => {
                                 if (historyQuery.counter) {
                                     setHistoryQuery(prev => ({
