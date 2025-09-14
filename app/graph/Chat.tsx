@@ -321,7 +321,7 @@ export default function Chat({ onClose }: Props) {
                 >
                     <X className="h-4 w-4" />
                 </Button>
-                <h1 className="mt-6">Chat with your database in natural language</h1>
+                <h1 className="mt-6 text-center">Chat with your database in natural language</h1>
                 <ul className="w-full h-1 grow flex flex-col gap-6 overflow-x-hidden overflow-y-auto chat-container">
                     {
                         messagesList.map((message, index) => {
