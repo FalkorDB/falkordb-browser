@@ -1,0 +1,142 @@
+/* CSS Reset and Swagger UI Optimization for FalkorDB Browser */
+
+.docs-layout {
+  background: white;
+  min-height: 100vh;
+  width: 100% !important;
+  overflow-x: hidden !important;
+}
+
+/* Force Swagger UI to take full width */
+.docs-layout .swagger-ui {
+  width: 100% !important;
+  max-width: none !important;
+  overflow-x: hidden !important;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Oxygen",
+    "Ubuntu", "Cantarell", "Fira Sans", "Droid Sans", "Helvetica Neue",
+    sans-serif !important;
+  color: #3b4151 !important;
+  line-height: 1.4 !important;
+}
+
+/* Force wrapper and container to full width */
+.docs-layout .swagger-ui .wrapper {
+  max-width: none !important;
+  width: 100% !important;
+  padding: 0 20px !important;
+}
+
+/* Hide info section completely but keep authorization */
+.docs-layout .swagger-ui .info,
+.docs-layout .swagger-ui .loading-container {
+  display: none !important;
+}
+
+/* Keep the authorization section visible */
+.docs-layout .swagger-ui .scheme-container {
+  display: block !important;
+  box-shadow: none !important;
+}
+
+/* Remove any borders and margins from top containers */
+.docs-layout .swagger-ui .swagger-container {
+  border: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+/* Reset box-sizing to match Swagger UI expectations */
+.docs-layout *,
+.docs-layout *::before,
+.docs-layout *::after {
+  box-sizing: border-box;
+}
+
+/* Ensure proper button styling */
+.docs-layout .swagger-ui .btn {
+  box-shadow: 0 1px 2px rgba(0,0,0,0.1) !important;
+  border-radius: 4px !important;
+  font-size: 14px !important;
+  font-weight: 600 !important;
+  padding: 5px 23px !important;
+  text-align: center !important;
+  cursor: pointer !important;
+  transition: all 0.3s !important;
+}
+
+/* Improve authorization button styling */
+.docs-layout .swagger-ui .authorization__btn {
+  background-color: #49cc90 !important;
+  border-color: #49cc90 !important;
+  color: white !important;
+}
+
+.docs-layout .swagger-ui .authorization__btn:hover {
+  background-color: #3eb370 !important;
+}
+
+/* Better operation blocks */
+.docs-layout .swagger-ui .opblock {
+  margin: 0 0 15px 0 !important;
+  border-radius: 4px !important;
+  border: none !important;
+}
+
+/* Improve the try-it-out experience */
+.docs-layout .swagger-ui .try-out__btn {
+  background-color: #61affe !important;
+  border-color: #61affe !important;
+  color: white !important;
+}
+
+.docs-layout .swagger-ui .execute-wrapper .btn.execute {
+  background-color: #4990e2 !important;
+  border-color: #4990e2 !important;
+  color: white !important;
+}
+
+/* Better response section styling */
+.docs-layout .swagger-ui .responses-wrapper {
+  background: #f7f7f7 !important;
+  border-radius: 4px !important;
+  padding: 20px !important;
+  margin-top: 20px !important;
+}
+
+/* Improve parameter table readability */
+.docs-layout .swagger-ui table {
+  border-collapse: collapse !important;
+  width: 100% !important;
+}
+
+.docs-layout .swagger-ui table th,
+.docs-layout .swagger-ui table td {
+  border: 1px solid #e1e5ea !important;
+  padding: 12px !important;
+  text-align: left !important;
+}
+
+.docs-layout .swagger-ui table th {
+  background-color: #f0f0f0 !important;
+  font-weight: 600 !important;
+}
+
+/* Make the info section more readable */
+.docs-layout .swagger-ui .info {
+  background-color: #f8f9fa !important;
+  border-radius: 8px !important;
+  padding: 30px !important;
+  margin-bottom: 30px !important;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .docs-layout .swagger-ui {
+    font-size: 14px !important;
+  }
+  
+  .docs-layout .swagger-ui .btn {
+    padding: 8px 16px !important;
+    font-size: 12px !important;
+  }
+}
