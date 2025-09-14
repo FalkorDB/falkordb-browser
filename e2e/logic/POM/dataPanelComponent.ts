@@ -195,10 +195,10 @@ export default class DataPanel extends GraphPage {
     );
   }
 
-  async fillDataPanelSetAttributeValue(value: string | number): Promise<void> {
+  async fillDataPanelSetAttributeValue(value: string): Promise<void> {
     await interactWhenVisible(
       this.dataPanelSetAttributeValue,
-      (el) => el.fill(String(value)),
+      (el) => el.fill(value),
       "Data Panel Set Attribute Value"
     );
   }
@@ -259,6 +259,22 @@ export default class DataPanel extends GraphPage {
     );
   }
 
+  async clickDataPanelAddAttributeValue(): Promise<void> {
+    await interactWhenVisible(
+      this.dataPanelAddAttributeValue,
+      (el) => el.click(),
+      "Data Panel Add Attribute Value"
+    );
+  }
+
+  async isCheckedDataPanelAddAttributeValue(): Promise<boolean> {
+    return interactWhenVisible(
+      this.dataPanelAddAttributeValue,
+      async (el) => (await el.getAttribute("data-state") || "") === "checked",
+      "Data Panel Add Attribute Value"
+    );
+  }
+
   async clickDataPanelAddAttributeConfirm(): Promise<void> {
     await interactWhenVisible(
       this.dataPanelAddAttributeConfirm,
@@ -295,6 +311,14 @@ export default class DataPanel extends GraphPage {
     await interactWhenVisible(
       this.dataPanelSetAttributeValue,
       (el) => el.click(),
+      "Data Panel Set Attribute Value"
+    );
+  }
+
+  async isCheckedDataPanelSetAttributeValue(): Promise<boolean> {
+    return interactWhenVisible(
+      this.dataPanelSetAttributeValue,
+      async (el) => ((await el.getAttribute("data-state")) || "") === "checked",
       "Data Panel Set Attribute Value"
     );
   }
@@ -398,30 +422,61 @@ export default class DataPanel extends GraphPage {
     return labelValue ? labelValue.trim() : "";
   }
 
-  async setAttribute(key: string, value: string | number, type: "string" | "number"): Promise<void>;
-  async setAttribute(key: string, value: boolean, type: "boolean"): Promise<void>;
-  async setAttribute(key: string, value: string | number | boolean, type: "string" | "number" | "boolean"): Promise<void> {
+  async setAttribute(
+    key: string,
+    value: string,
+    type: "string" | "number"
+  ): Promise<void>;
+  async setAttribute(
+    key: string,
+    value: boolean,
+    type: "boolean"
+  ): Promise<void>;
+  async setAttribute(
+    key: string,
+    value: string | boolean,
+    type: "string" | "number" | "boolean"
+  ): Promise<void> {
     await this.hoverDataPanelAttribute(key);
     await this.clickDataPanelSetAttribute();
     await this.clickSelect("Type");
     await this.clickSelectItem(type, "Type");
-    
+
     if (type === "boolean") {
-      await this.clickDataPanelSetAttributeValue()
+      if ((await this.isCheckedDataPanelSetAttributeValue()) !== value)
+        await this.clickDataPanelSetAttributeValue();
     } else {
-      await this.fillDataPanelSetAttributeValue(value as string | number);
+      await this.fillDataPanelSetAttributeValue(value as string);
     }
-    
+
     await this.clickDataPanelSetAttributeConfirm();
     await waitForElementToNotBeVisible(this.dataPanelSetAttributeConfirm);
   }
 
-  async addAttribute(key: string, value: string, type: "string" | "number" | "boolean"): Promise<void> {
+  async addAttribute(
+    key: string,
+    value: string,
+    type: "string" | "number"
+  ): Promise<void>;
+  async addAttribute(
+    key: string,
+    value: boolean,
+    type: "boolean"
+  ): Promise<void>;
+  async addAttribute(
+    key: string,
+    value: string | boolean,
+    type: "string" | "number" | "boolean"
+  ): Promise<void> {
     await this.clickDataPanelAddAttribute();
     await this.fillDataPanelAddAttributeKey(key);
-    await this.clickSelect("Type")
-    await this.clickSelectItem(type, "Type")
-    await this.fillDataPanelAddAttributeValue(value);
+    await this.clickSelect("Type");
+    await this.clickSelectItem(type, "Type");
+    if (type === "boolean") {
+      if (await this.isCheckedDataPanelAddAttributeValue() !== value) await this.clickDataPanelAddAttributeValue()
+    } else {
+      await this.fillDataPanelAddAttributeValue(value as string);
+    }
     await this.clickDataPanelAddAttributeConfirm();
     await waitForElementToNotBeVisible(this.dataPanelAddAttributeConfirm);
   }

@@ -97,6 +97,31 @@ test.describe("Data panel Tests", () => {
     await apicalls.removeGraph(graphName);
   });
 
+  test.only(`@readwrite Validate adding new boolean attribute for node via ui and validation via API`, async () => {
+    const graphName = getRandomString("datapanel");
+    await apicalls.addGraph(graphName);
+    await apicalls.runQuery(
+      graphName,
+      'CREATE (:Person {name: "Alice"}), (:Person {name: "Bob"})'
+    );
+    const graph = await browser.createNewPage(DataPanel, urls.graphUrl);
+    await browser.setPageToFullScreen();
+    await graph.selectGraphByName(graphName);
+    await graph.insertQuery(FETCH_FIRST_TEN_NODES);
+    await graph.clickRunQuery();
+    await graph.searchElementInCanvas("Graph", "Alice");
+    await graph.addAttribute("isLocal", true, "boolean");
+    const response = await apicalls.runQuery(
+      graphName,
+      FETCH_FIRST_TEN_NODES ?? ""
+    );
+    const person = response.data.find(
+      (item) => "isLocal" in item.n.properties
+    );
+    expect(person?.n.properties.isLocal).toBe(true);
+    await apicalls.removeGraph(graphName);
+  });
+
   test(`@readwrite Validate adding new attribute for node via API and validation via UI`, async () => {
     const graphName = getRandomString("datapanel");
     await apicalls.addGraph(graphName);
