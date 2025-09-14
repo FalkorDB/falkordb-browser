@@ -8,7 +8,6 @@ import { ForceGraphMethods } from "react-force-graph-2d";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { ImperativePanelHandle } from "react-resizable-panels";
 import { Label, Graph, GraphData, Link, Node, Relationship, GraphInfo } from "../api/graph/model";
-import Tutorial from "./Tutorial";
 import { GraphContext, HistoryQueryContext, IndicatorContext, PanelContext, QueryLoadingContext, QuerySettingsContext } from "../components/provider";
 import Spinning from "../components/ui/spinning";
 import Chat from "./Chat";
@@ -308,7 +307,6 @@ export default function Page() {
                     {getCurrentPanel()}
                 </ResizablePanel>
             </ResizablePanelGroup>
-            <Tutorial />
         </div >
     )
 }
