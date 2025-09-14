@@ -10,7 +10,7 @@ export default function GraphInfoPanel({ isOpen, onClose }: { isOpen: boolean; o
     const { isQueryLoading } = useContext(QueryLoadingContext)
 
     return (
-        <div className={cn(`relative flex flex-col gap-8 overflow-y-auto border-border transition-all overflow-hidden max-w-[30dvw]`, isOpen ? 'w-fit opacity-100 p-6 border-r' : 'w-0 opacity-0')}>
+        <div className={cn(`relative flex flex-col gap-8 overflow-y-auto border-border transition-all max-w-[30dvw]`, isOpen ? 'w-fit opacity-100 p-6 border-r' : 'w-0 opacity-0')}>
             <Button
                 className="absolute top-2 right-2"
                 title="Close"
@@ -32,7 +32,7 @@ export default function GraphInfoPanel({ isOpen, onClose }: { isOpen: boolean; o
                     </Tooltip>
                 </div>
             </div>
-            <div className="flex flex-col gap-2">
+            <div className="h-1 grow max-h-fit flex flex-col gap-2 overflow-hidden">
                 <div className="flex gap-2 items-center">
                     <h2>Nodes</h2>
                     {
@@ -53,7 +53,7 @@ export default function GraphInfoPanel({ isOpen, onClose }: { isOpen: boolean; o
                             :
                             <Loader2 data-testid="nodesCountLoader" className="animate-spin" />
                     }</div>
-                <ul className="flex flex-wrap gap-2 p-2">
+                <ul className="flex flex-wrap gap-2 p-2 overflow-auto">
                     <li className="max-w-full">
                         <Button
                             className="h-6 w-6 rounded-full flex justify-center items-center bg-border text-white"
@@ -76,7 +76,7 @@ export default function GraphInfoPanel({ isOpen, onClose }: { isOpen: boolean; o
                     ))}
                 </ul>
             </div>
-            <div className="flex flex-col gap-2">
+            <div className="h-1 grow max-h-fit flex flex-col gap-2 overflow-hidden">
                 <div className="flex gap-2 items-center">
                     <h2>Edges</h2>
                     {
@@ -97,7 +97,7 @@ export default function GraphInfoPanel({ isOpen, onClose }: { isOpen: boolean; o
                             :
                             <Loader2 data-testid="edgesCountLoader" className="animate-spin" />
                     }</div>
-                <ul className="flex flex-wrap gap-2 p-2">
+                <ul className="flex flex-wrap gap-2 p-2 overflow-auto">
                     <li className="max-w-full">
                         <Button
                             className="h-6 w-6 rounded-full flex justify-center items-center bg-border text-white"
@@ -120,7 +120,7 @@ export default function GraphInfoPanel({ isOpen, onClose }: { isOpen: boolean; o
                     ))}
                 </ul>
             </div>
-            <div className="flex flex-col gap-2">
+            <div className="h-1 grow max-h-fit flex flex-col gap-2 overflow-hidden">
                 <div className="flex gap-2 items-center">
                     <h2>Property Keys</h2>
                     {
@@ -140,8 +140,9 @@ export default function GraphInfoPanel({ isOpen, onClose }: { isOpen: boolean; o
                             </Tooltip>
                             :
                             <Loader2 className="animate-spin" />
-                    }</div>
-                <ul className="flex flex-wrap gap-2 p-2">
+                    }
+                </div>
+                <ul className="flex flex-wrap gap-2 p-2 overflow-auto">
                     {
                         graphInfo.PropertyKeys && graphInfo.PropertyKeys.map((key) => (
                             <li key={key} className="max-w-full">
