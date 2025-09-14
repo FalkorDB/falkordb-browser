@@ -1,55 +1,59 @@
 import BasePage from "@/e2e/infra/ui/basePage";
 import { Locator } from "@playwright/test";
 
-type Type = "Graph" | "Schema" | "Node" | "Relation"
+type GraphType = "Graph" | "Schema"
+
+type Element = "Node" | "Relation"
+
+type Type = GraphType | "Role" | "Type" | "Model" | "Theme"
 
 export default class Page extends BasePage {
     // CREATE
-    public get create(): (type: Type) => Locator {
-        return (type: Type) => this.page.getByTestId(`create${type}`);
+    public get create(): (type: GraphType) => Locator {
+        return (type: GraphType) => this.page.getByTestId(`create${type}`);
     }
 
-    public get insertInput(): (type: Type) => Locator {
-        return (type: Type) => this.page.getByTestId(`create${type}Input`);
+    public get insertInput(): (type: GraphType) => Locator {
+        return (type: GraphType) => this.page.getByTestId(`create${type}Input`);
     }
 
-    public get createConfirm(): (type: Type) => Locator {
-        return (type: Type) => this.page.getByTestId(`create${type}Confirm`);
+    public get createConfirm(): (type: GraphType) => Locator {
+        return (type: GraphType) => this.page.getByTestId(`create${type}Confirm`);
     }
 
-    public get createCancel(): (type: Type) => Locator {
-        return (type: Type) => this.page.getByTestId(`create${type}Cancel`);
+    public get createCancel(): (type: GraphType) => Locator {
+        return (type: GraphType) => this.page.getByTestId(`create${type}Cancel`);
     }
 
     // DELETE
-    public get delete(): (type: Type) => Locator {
-        return (type: Type) => this.page.getByTestId(`delete${type}`);
+    public get delete(): (type: GraphType) => Locator {
+        return (type: GraphType) => this.page.getByTestId(`delete${type}`);
     }
 
-    public get deleteConfirm(): (type: Type) => Locator {
-        return (type: Type) => this.page.getByTestId(`delete${type}Confirm`);
+    public get deleteConfirm(): (type: GraphType) => Locator {
+        return (type: GraphType) => this.page.getByTestId(`delete${type}Confirm`);
     }
 
-    public get deleteCancel(): (type: Type) => Locator {
-        return (type: Type) => this.page.getByTestId(`delete${type}Cancel`);
+    public get deleteCancel(): (type: GraphType) => Locator {
+        return (type: GraphType) => this.page.getByTestId(`delete${type}Cancel`);
     }
 
     // EXPORT
-    public get export(): (type: Type) => Locator {
-        return (type: Type) => this.page.getByTestId(`export${type}`);
+    public get export(): (type: GraphType) => Locator {
+        return (type: GraphType) => this.page.getByTestId(`export${type}`);
     }
 
-    public get exportConfirm(): (type: Type) => Locator {
-        return (type: Type) => this.page.getByTestId(`export${type}Confirm`);
+    public get exportConfirm(): (type: GraphType) => Locator {
+        return (type: GraphType) => this.page.getByTestId(`export${type}Confirm`);
     }
 
-    public get exportCancel(): (type: Type) => Locator {
-        return (type: Type) => this.page.getByTestId(`export${type}Cancel`);
+    public get exportCancel(): (type: GraphType) => Locator {
+        return (type: GraphType) => this.page.getByTestId(`export${type}Cancel`);
     }
 
     // RELOAD
-    public get reloadList(): (type: Type) => Locator {
-        return (type: Type) => this.page.getByTestId(`reload${type}sList`);
+    public get reloadList(): (type: GraphType) => Locator {
+        return (type: GraphType) => this.page.getByTestId(`reload${type}sList`);
     }
 
     // SELECT
@@ -57,93 +61,93 @@ export default class Page extends BasePage {
         return (type: Type) => this.page.getByTestId(`select${type}`);
     }
 
-    public get selectItemBySearch(): (type: Type, graphId: string) => Locator {
-        return (type: Type, graphId: string) => this.page.getByTestId(`select${type}${graphId}`);
+    public get selectItemBySearch(): (type: Type, id: string) => Locator {
+        return (type: Type, id: string) => this.page.getByTestId(`select${type}${id}`);
     }
 
     // SEARCH
-    public get search(): (type: Type) => Locator {
-        return (type: Type) => this.page.getByTestId(`search${type}`);
+    public get search(): (type: GraphType) => Locator {
+        return (type: GraphType) => this.page.getByTestId(`search${type}`);
     }
 
     // MANAGE
-    public get manage(): (type: Type) => Locator {
-        return (type: Type) => this.page.getByTestId(`manage${type}s`);
+    public get manage(): (type: GraphType) => Locator {
+        return (type: GraphType) => this.page.getByTestId(`manage${type}s`);
     }
 
     // TABLE
-    public get tableCheckbox(): (type: Type) => Locator {
-        return (type: Type) => this.page.getByTestId(`table${type}sCheckbox`);
+    public get tableCheckbox(): (type: GraphType) => Locator {
+        return (type: GraphType) => this.page.getByTestId(`table${type}sCheckbox`);
     }
 
-    public get tableRowByName(): (type: Type, name: string) => Locator {
-        return (type: Type, name: string) => this.page.getByTestId(`tableRow${type}s${name}`);
+    public get tableRowByName(): (type: GraphType, name: string) => Locator {
+        return (type: GraphType, name: string) => this.page.getByTestId(`tableRow${type}s${name}`);
     }
 
-    public get tableCheckboxByName(): (type: Type, name: string) => Locator {
-        return (type: Type, name: string) => this.page.getByTestId(`tableCheckbox${type}s${name}`);
+    public get tableCheckboxByName(): (type: GraphType, name: string) => Locator {
+        return (type: GraphType, name: string) => this.page.getByTestId(`tableCheckbox${type}s${name}`);
     }
 
-    public get editButton(): (type: Type) => Locator {
-        return (type: Type) => this.page.getByTestId(`editButton${type}s`);
+    public get editButton(): (type: GraphType) => Locator {
+        return (type: GraphType) => this.page.getByTestId(`editButton${type}s`);
     }
 
-    public get input(): (type: Type) => Locator {
-        return (type: Type) => this.page.getByTestId(`input${type}s`);
+    public get input(): (type: GraphType) => Locator {
+        return (type: GraphType) => this.page.getByTestId(`input${type}s`);
     }
 
-    public get saveButton(): (type: Type) => Locator {
-        return (type: Type) => this.page.getByTestId(`saveButton${type}s`);
+    public get saveButton(): (type: GraphType) => Locator {
+        return (type: GraphType) => this.page.getByTestId(`saveButton${type}s`);
     }
 
-    public get cancelButton(): (type: Type) => Locator {
-        return (type: Type) => this.page.getByTestId(`cancel${type}Button`);
+    public get cancelButton(): (type: GraphType) => Locator {
+        return (type: GraphType) => this.page.getByTestId(`cancel${type}Button`);
     }
 
     // CANVAS TOOLBAR
 
     // SEARCH
-    public get elementCanvasSearch(): (type: Type) => Locator {
-        return (type: Type) => this.page.getByTestId(`elementCanvasSearch${type}`);
+    public get elementCanvasSearch(): (type: GraphType) => Locator {
+        return (type: GraphType) => this.page.getByTestId(`elementCanvasSearch${type}`);
     }
 
-    public get elementCanvasSuggestionList(): (type: Type) => Locator {
-        return (type: Type) => this.page.getByTestId(`elementCanvasSuggestionsList${type}`);
+    public get elementCanvasSuggestionList(): (type: GraphType) => Locator {
+        return (type: GraphType) => this.page.getByTestId(`elementCanvasSuggestionsList${type}`);
     }
 
-    public get elementCanvasSuggestionByName(): (type: Type, name: string) => Locator {
-        return (type: Type, name: string) => this.page.getByTestId(`elementCanvasSuggestion${type}${name}`);
+    public get elementCanvasSuggestionByName(): (type: GraphType, name: string) => Locator {
+        return (type: GraphType, name: string) => this.page.getByTestId(`elementCanvasSuggestion${type}${name}`);
     }
 
     // ADD
-    public get elementCanvasAdd(): (type: Type) => Locator {
-        return (type: Type) => this.page.getByTestId(`elementCanvasAdd${type}`);
+    public get elementCanvasAdd(): (type: GraphType) => Locator {
+        return (type: GraphType) => this.page.getByTestId(`elementCanvasAdd${type}`);
     }
 
-    public get elementCanvasAddNode(): (type: Type) => Locator {
-        return (type: Type) => this.page.getByTestId(`elementCanvasAddNode${type}`);
+    public get elementCanvasAddNode(): (type: GraphType) => Locator {
+        return (type: GraphType) => this.page.getByTestId(`elementCanvasAddNode${type}`);
     }
 
-    public get elementCanvasAddEdge(): (type: Type) => Locator {
-        return (type: Type) => this.page.getByTestId(`elementCanvasAddEdge${type}`);
+    public get elementCanvasAddEdge(): (type: GraphType) => Locator {
+        return (type: GraphType) => this.page.getByTestId(`elementCanvasAddEdge${type}`);
     }
 
     // DELETE
-    public get deleteElement(): (type: "Node" | "Relation" | Type) => Locator {
-        return (type: "Node" | "Relation" | Type) => this.page.getByTestId(`delete${type}`);
+    public get deleteElement(): (type: Element | GraphType) => Locator {
+        return (type: Element | GraphType) => this.page.getByTestId(`delete${type}`);
     }
 
-    public get deleteElementConfirm(): (type: Type) => Locator {
-        return (type: Type) => this.page.getByTestId(`deleteElementConfirm${type}`);
+    public get deleteElementConfirm(): (type: GraphType) => Locator {
+        return (type: GraphType) => this.page.getByTestId(`deleteElementConfirm${type}`);
     }
 
-    public get deleteElementCancel(): (type: Type) => Locator {
-        return (type: Type) => this.page.getByTestId(`deleteElementCancel${type}`);
+    public get deleteElementCancel(): (type: GraphType) => Locator {
+        return (type: GraphType) => this.page.getByTestId(`deleteElementCancel${type}`);
     }
 
     // LABELS
-    public get labelsButtonByName(): (type: Type, label: "Relationships" | "Labels", name: string) => Locator {
-        return (type: Type, label: "Relationships" | "Labels", name: string) => this.page.getByTestId(`${type}${label}Button${name}`);
+    public get labelsButtonByName(): (type: GraphType, label: "Relationships" | "Labels", name: string) => Locator {
+        return (type: GraphType, label: "Relationships" | "Labels", name: string) => this.page.getByTestId(`${type}${label}Button${name}`);
     }
 
     // CANVAS CONTROLS

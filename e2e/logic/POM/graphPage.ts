@@ -270,7 +270,7 @@ export default class GraphPage extends Page {
     );
   }
 
-  async clickSelect(type: "Graph" | "Schema"): Promise<void> {
+  async clickSelect(type: "Graph" | "Schema" | "Role" | "Type" | "Model" | "Theme" = "Graph"): Promise<void> {
     await interactWhenVisible(
       this.select(type),
       (el) => el.click(),
@@ -278,11 +278,11 @@ export default class GraphPage extends Page {
     );
   }
 
-  async clickSelectItem(graphName: string): Promise<void> {
+  async clickSelectItem(id: string, type: "Graph" | "Schema" | "Role" | "Type" | "Model" | "Theme" = "Graph"): Promise<void> {
     await interactWhenVisible(
-      this.selectItemBySearch("Graph", graphName),
+      this.selectItemBySearch(type, id),
       (el) => el.click(),
-      `Select Graph Item ${graphName}`
+      `Select ${type} Item ${id}`
     );
   }
 
@@ -590,7 +590,7 @@ export default class GraphPage extends Page {
   }
 
   async getGraphsCountInList(graphName: string): Promise<number> {
-    await this.clickSelect("Graph");
+    await this.clickSelect();
     await this.fillSearch(graphName);
     const items = this.page.locator('//ul[@data-testid="queryList"]//li');
     const count = await items.count();
@@ -616,7 +616,7 @@ export default class GraphPage extends Page {
     }
 
     try {
-      await this.clickSelect("Graph");
+      await this.clickSelect();
       await this.page.waitForTimeout(1000);
 
       await this.fillSearch(graphName);
@@ -660,7 +660,7 @@ export default class GraphPage extends Page {
   }
 
   async removeGraph(graphName: string): Promise<void> {
-    await this.clickSelect("Graph");
+    await this.clickSelect();
     await this.clickManage();
     await this.clickTableCheckboxByName(graphName);
     await this.clickDelete();
@@ -682,7 +682,7 @@ export default class GraphPage extends Page {
   }
 
   async duplicateGraph(graphName: string): Promise<void> {
-    await this.clickSelect("Graph");
+    await this.clickSelect();
     await this.clickManage();
     await this.clickTableCheckboxByName(graphName);
     await this.clickDuplicateGraphBtn();
@@ -692,7 +692,7 @@ export default class GraphPage extends Page {
   }
 
   async exportGraphByName(graphName: string): Promise<Download> {
-    await this.clickSelect("Graph");
+    await this.clickSelect();
     await this.clickManage();
     await this.clickTableCheckboxByName(graphName);
     await this.clickExport();
@@ -704,7 +704,7 @@ export default class GraphPage extends Page {
   }
 
   async isModifyGraphNameButtonVisible(graphName: string): Promise<boolean> {
-    await this.clickSelect("Graph");
+    await this.clickSelect();
     await this.clickManage();
     await this.hoverTableRowByName(graphName);
     const isVisible = await this.isVisibleEditButton();
@@ -712,7 +712,7 @@ export default class GraphPage extends Page {
   }
 
   async modifyGraphName(oldName: string, newName: string): Promise<void> {
-    await this.clickSelect("Graph");
+    await this.clickSelect();
     await this.clickManage();
     await this.hoverTableRowByName(oldName);
     await this.clickEditButton("Graph");
@@ -722,10 +722,10 @@ export default class GraphPage extends Page {
   }
 
   async selectGraphByName(graphName: string): Promise<void> {
-    await this.clickSelect("Graph");
+    await this.clickSelect();
     await this.fillSearch(graphName);
     await this.page.waitForTimeout(500); // wait for the search results to be populated
-    await this.clickSelectItem("0"); // selecting the first item in list after search
+    await this.clickSelectItem(graphName); // selecting the first item in list after search
   }
 
   async deleteElementsByPosition(

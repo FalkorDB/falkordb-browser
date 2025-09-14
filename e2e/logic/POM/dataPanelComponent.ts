@@ -76,8 +76,8 @@ export default class DataPanel extends GraphPage {
     return this.page.getByTestId("DataPanelSetAttribute");
   }
 
-  private get dataPanelSetAttributeInput(): Locator {
-    return this.page.getByTestId("DataPanelSetAttributeInput");
+  private get dataPanelSetAttributeValue(): Locator {
+    return this.page.getByTestId("DataPanelSetAttributeValue");
   }
 
   private get dataPanelSetAttributeConfirm(): Locator {
@@ -195,11 +195,11 @@ export default class DataPanel extends GraphPage {
     );
   }
 
-  async fillDataPanelSetAttributeInput(value: string): Promise<void> {
+  async fillDataPanelSetAttributeValue(value: string | number): Promise<void> {
     await interactWhenVisible(
-      this.dataPanelSetAttributeInput,
-      (el) => el.fill(value),
-      "Data Panel Set Attribute Input"
+      this.dataPanelSetAttributeValue,
+      (el) => el.fill(String(value)),
+      "Data Panel Set Attribute Value"
     );
   }
 
@@ -291,6 +291,14 @@ export default class DataPanel extends GraphPage {
     );
   }
 
+  async clickDataPanelSetAttributeValue(): Promise<void> {
+    await interactWhenVisible(
+      this.dataPanelSetAttributeValue,
+      (el) => el.click(),
+      "Data Panel Set Attribute Value"
+    );
+  }
+
   async clickDataPanelSetAttributeConfirm(): Promise<void> {
     await interactWhenVisible(
       this.dataPanelSetAttributeConfirm,
@@ -334,7 +342,7 @@ export default class DataPanel extends GraphPage {
   async getAttributeValueByName(attribute: string): Promise<string | null> {
     return interactWhenVisible(
       this.attributeValue(attribute),
-      (el) => el.textContent(),
+      (el) => el.nth(1).textContent(),
       "Data Panel Delete Attribute Cancel"
     );
   }
@@ -390,17 +398,29 @@ export default class DataPanel extends GraphPage {
     return labelValue ? labelValue.trim() : "";
   }
 
-  async setAttribute(key: string, value: string): Promise<void> {
+  async setAttribute(key: string, value: string | number, type: "string" | "number"): Promise<void>;
+  async setAttribute(key: string, value: boolean, type: "boolean"): Promise<void>;
+  async setAttribute(key: string, value: string | number | boolean, type: "string" | "number" | "boolean"): Promise<void> {
     await this.hoverDataPanelAttribute(key);
     await this.clickDataPanelSetAttribute();
-    await this.fillDataPanelSetAttributeInput(value);
+    await this.clickSelect("Type");
+    await this.clickSelectItem(type, "Type");
+    
+    if (type === "boolean") {
+      await this.clickDataPanelSetAttributeValue()
+    } else {
+      await this.fillDataPanelSetAttributeValue(value as string | number);
+    }
+    
     await this.clickDataPanelSetAttributeConfirm();
     await waitForElementToNotBeVisible(this.dataPanelSetAttributeConfirm);
   }
 
-  async addAttribute(key: string, value: string): Promise<void> {
+  async addAttribute(key: string, value: string, type: "string" | "number" | "boolean"): Promise<void> {
     await this.clickDataPanelAddAttribute();
     await this.fillDataPanelAddAttributeKey(key);
+    await this.clickSelect("Type")
+    await this.clickSelectItem(type, "Type")
     await this.fillDataPanelAddAttributeValue(value);
     await this.clickDataPanelAddAttributeConfirm();
     await waitForElementToNotBeVisible(this.dataPanelAddAttributeConfirm);
@@ -412,13 +432,5 @@ export default class DataPanel extends GraphPage {
     await this.clickDataPanelDeleteAttribute();
     await this.clickDataPanelDeleteAttributeConfirm();
     await waitForElementToNotBeVisible(this.dataPanelDeleteAttributeConfirm);
-  }
-
-  async modifyAttribute(key: string, value: string): Promise<void> {
-    await this.hoverDataPanelAttribute(key);
-    await this.clickDataPanelValueSetAttribute();
-    await this.fillDataPanelSetAttributeInput(value);
-    await this.clickDataPanelSetAttributeConfirm();
-    await waitForElementToNotBeVisible(this.dataPanelSetAttributeConfirm);
   }
 }

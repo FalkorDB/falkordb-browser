@@ -234,18 +234,20 @@ export default function GraphDataTable({ graph, object, type, onDeleteElement, l
     }
 
     const getCellEditableContent = (t: ValueType, actionType: "set" | "add" = "set") => {
+        const dataTestId = `DataPanel${actionType === "set" ? "Set" : "Add"}AttributeValue`
+
         switch (t) {
             case "boolean":
                 return <Switch
                     className="data-[state=unchecked]:bg-border"
                     checked={newVal as boolean}
-                    data-testid="DataPanelSetAttributeSwitch"
+                    data-testid={dataTestId}
                     onCheckedChange={(checked) => setNewVal(checked)}
                 />
             case "number":
                 return <Input
                     ref={setInputRef}
-                    data-testid="DataPanelSetAttributeInput"
+                    data-testid={dataTestId}
                     className="w-full"
                     value={newVal as number}
                     onChange={(e) => Number(e.target.value) && setNewVal(Number(e.target.value))}
@@ -254,7 +256,7 @@ export default function GraphDataTable({ graph, object, type, onDeleteElement, l
             default:
                 return <Input
                     ref={setInputRef}
-                    data-testid="DataPanelSetAttributeInput"
+                    data-testid={dataTestId}
                     className="w-full"
                     value={newVal as string}
                     onChange={(e) => setNewVal(e.target.value)}

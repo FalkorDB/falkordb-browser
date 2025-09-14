@@ -84,14 +84,18 @@ export default function Combobox<T extends string>({ id, disabled = false, inTab
           <SelectGroup>
             <ul className="shrink grow overflow-auto">
               {selectedValue && (
-                <SelectItem value={selectedValue}>
+                <SelectItem
+                  data-testid={`select${label}${selectedValue}`}
+                  value={selectedValue}
+                  key={`key-${selectedValue}`}
+                >
                   {selectedValue}
                 </SelectItem>
               )}
               {
                 filteredOptions.slice(0, maxOptions).filter((option) => selectedValue !== option).map((option) => (
                   <SelectItem
-                    data-testid={`select${label}Item${option}`}
+                    data-testid={`select${label}${option}`}
                     value={!option ? '""' : option}
                     key={`key-${option}`}
                   >
