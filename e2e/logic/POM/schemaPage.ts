@@ -375,7 +375,7 @@ export default class SchemaPage extends GraphPage {
     await this.clickSelect("Schema");
     await this.fillSearch(schemaName);
     await this.page.waitForTimeout(1000); // wait for the search results to load
-    await this.clickGraphSelectItem("0"); // selecting the first item in list after search
+    await this.clickSelectItem(schemaName); // selecting the first item in list after search
     await this.waitForCanvasAnimationToEnd();
   }
 
