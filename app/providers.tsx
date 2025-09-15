@@ -11,6 +11,7 @@ import { Graph, GraphInfo, HistoryQuery } from "./api/graph/model";
 import Header from "./components/Header";
 import { GraphContext, HistoryQueryContext, IndicatorContext, PanelContext, QueryLoadingContext, QuerySettingsContext, SchemaContext } from "./components/provider";
 import GraphInfoPanel from "./graph/graphInfo";
+import Tutorial from "./graph/Tutorial";
 
 function ProvidersWithSession({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
@@ -61,6 +62,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
   const [displayChat, setDisplayChat] = useState(false)
   const [model, setModel] = useState("")
   const [navigateToSettings, setNavigateToSettings] = useState(false)
+  const [tutorialOpen, setTutorialOpen] = useState(false)
 
   const querySettingsContext = useMemo(() => ({
     newSettings: {
@@ -278,6 +280,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
     setDefaultQuery(getDefaultQuery(localStorage.getItem("defaultQuery") || undefined))
     setRunDefaultQuery(localStorage.getItem("runDefaultQuery") !== "false")
     setContentPersistence(localStorage.getItem("contentPersistence") !== "false");
+    setTutorialOpen(localStorage.getItem("tutorial") !== "false")
   }, [status])
 
   useEffect(() => {
@@ -382,6 +385,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
                           <div className="h-full w-1 grow flex flex-col">
                             {children}
                             <div className="h-4 w-full Gradient" />
+                            {pathname === "/graph" && <Tutorial open={tutorialOpen} setOpen={setTutorialOpen} />}
                           </div>
                           :
                           children
