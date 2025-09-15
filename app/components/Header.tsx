@@ -189,7 +189,7 @@ export default function Header({ onSetGraphName, graphNames, graphName, setGraph
                                 <DropdownMenuSeparator />
                                 <DropdownMenuItem className="focus:bg-transparent">
                                     <a className="flex gap-2 items-center" href="https://discord.com/invite/jyUgBweNQz" target="_blank" rel="noreferrer noreferrer">
-                                        <Image style={{ width: 'auto', height: '14px' }} src="/icons/Discord.svg" alt="" width={0} height={0} />
+                                        <Image style={{ width: 'auto', height: currentTheme === "dark" ? '14px' : '18px' }} src={`/icons/Discord-${currentTheme}.svg`} alt="" width={0} height={0} />
                                         <span>
                                             Get Support
                                         </span>
