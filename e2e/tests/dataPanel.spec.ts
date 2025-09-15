@@ -97,7 +97,7 @@ test.describe("Data panel Tests", () => {
     await apicalls.removeGraph(graphName);
   });
 
-  test.only(`@readwrite Validate adding new boolean attribute for node via ui and validation via API`, async () => {
+  test(`@readwrite Validate adding new boolean attribute for node via ui and validation via API`, async () => {
     const graphName = getRandomString("datapanel");
     await apicalls.addGraph(graphName);
     await apicalls.runQuery(
