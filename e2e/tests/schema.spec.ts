@@ -62,7 +62,7 @@ test.describe('Schema Tests', () => {
         const attributeRow = "1"
         await schema.addNode(attributeRow, "person", 'id', "Integer", "100", true, true);
         await schema.waitForCanvasAnimationToEnd();
-        const labelContent = await schema.getLabelsButtonByNameContent("Schema", "Labels", "person");
+        const labelContent = await schema.getLabelsButtonByNameContent("Labels", "person");
         expect(labelContent).toBe("person");
         await apicalls.removeSchema(schemaName);
     });
@@ -75,7 +75,7 @@ test.describe('Schema Tests', () => {
         await schema.selectSchemaByName(schemaName);
         const attributeRow = "1"
         await schema.addEdge(attributeRow, "knows", 'id', "Integer", "100", true, true);
-        const labelContent = await schema.getLabelsButtonByNameContent("Schema", "Relationships", "knows");
+        const labelContent = await schema.getLabelsButtonByNameContent("Relationships", "knows");
         expect(labelContent).toBe("knows");
         await apicalls.removeSchema(schemaName);
     });
@@ -88,7 +88,7 @@ test.describe('Schema Tests', () => {
         await schema.selectSchemaByName(schemaName);
         await schema.searchElementInCanvasSelectFirst("0");
         await schema.deleteSchemaElement();;
-        expect(await schema.isVisibleLabelsButtonByName("Schema", "Labels", "person")).toBeFalsy();
+        expect(await schema.isVisibleLabelsButtonByName("Labels", "person")).toBeFalsy();
         await apicalls.removeSchema(schemaName);
     });
 
@@ -100,7 +100,7 @@ test.describe('Schema Tests', () => {
         await schema.selectSchemaByName(schemaName);
         await schema.searchElementInCanvasSelectFirst("knows");
         await schema.deleteSchemaElement();;
-        expect(await schema.isVisibleLabelsButtonByName("Schema", "Relationships", "knows")).toBeFalsy();
+        expect(await schema.isVisibleLabelsButtonByName("Relationships", "knows")).toBeFalsy();
         await apicalls.removeSchema(schemaName);
     });
 
@@ -110,10 +110,10 @@ test.describe('Schema Tests', () => {
         const schema = await browser.createNewPage(SchemaPage, urls.schemaUrl);
         await browser.setPageToFullScreen();
         await schema.selectSchemaByName(schemaName);
-        await schema.clickLabelsButtonByLabel("Schema", "Labels", "person1");
+        await schema.clickLabelsButtonByLabel("Labels", "person1");
         const nodes1 = await schema.getNodesScreenPositions('schema');
         expect(nodes1[0].visible).toBeFalsy();
-        await schema.clickLabelsButtonByLabel("Schema", "Labels", "person1");
+        await schema.clickLabelsButtonByLabel("Labels", "person1");
         const nodes2 = await schema.getNodesScreenPositions('schema');
         expect(nodes2[0].visible).toBeTruthy();
         await apicalls.removeSchema(schemaName);
@@ -125,10 +125,10 @@ test.describe('Schema Tests', () => {
         const schema = await browser.createNewPage(SchemaPage, urls.schemaUrl);
         await browser.setPageToFullScreen();
         await schema.selectSchemaByName(schemaName);
-        await schema.clickLabelsButtonByLabel("Schema", "Relationships", "knows");
+        await schema.clickLabelsButtonByLabel("Relationships", "knows");
         const links1 = await schema.getLinksScreenPositions('schema');
         expect(links1[0].visible).toBeFalsy();
-        await schema.clickLabelsButtonByLabel("Schema", "Relationships", "knows");
+        await schema.clickLabelsButtonByLabel("Relationships", "knows");
         const links2 = await schema.getLinksScreenPositions('schema');
         expect(links2[0].visible).toBeTruthy();
         await apicalls.removeSchema(schemaName);
@@ -219,7 +219,7 @@ test.describe('Schema Tests', () => {
         const schema = await browser.createNewPage(SchemaPage, urls.schemaUrl);
         await browser.setPageToFullScreen();
         await schema.selectSchemaByName(schemaName);
-        const initialNodesCount = parseInt(await schema.getNodesCount() ?? "0", 10);
+    const initialNodesCount = parseInt(await schema.getNodesCount() ?? "0", 10);
         await schema.searchElementInCanvasSelectFirst("0");
         await schema.deleteSchemaElement();
         const finalNodesCount = parseInt(await schema.getNodesCount() ?? "0", 10);

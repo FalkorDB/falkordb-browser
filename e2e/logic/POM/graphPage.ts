@@ -5,10 +5,9 @@ import {
   waitForElementToBeVisible,
   waitForElementToNotBeVisible,
   interactWhenVisible,
-  pollForElementContent,
   waitForElementToBeEnabled,
 } from "@/e2e/infra/utils";
-import Page from "./page";
+import Page, { ElementLabel, Type } from "./page";
 
 export default class GraphPage extends Page {
   // TABS
@@ -88,10 +87,6 @@ export default class GraphPage extends Page {
     return this.page.getByTestId("duplicateGraphConfirm");
   }
 
-  private get skeleton(): Locator {
-    return this.page.locator("#skeleton").first();
-  }
-
   private get closeHelpMessage(): Locator {
     return this.page.locator("iframe[title='Close message']");
   }
@@ -135,11 +130,11 @@ export default class GraphPage extends Page {
     );
   }
 
-  async fillInput(type: "Graph" | "Schema", text: string): Promise<void> {
+  async fillInput(text: string): Promise<void> {
     await interactWhenVisible(
-      this.input(type),
+      this.input("Graph"),
       (el) => el.fill(text),
-      `Input ${type}s`
+      `Input Graphs`
     );
   }
 
@@ -152,13 +147,12 @@ export default class GraphPage extends Page {
   }
 
   async fillElementCanvasSearch(
-    type: "Graph" | "Schema",
     text: string
   ): Promise<void> {
     await interactWhenVisible(
-      this.elementCanvasSearch(type),
+      this.elementCanvasSearch("Graph"),
       (el) => el.fill(text),
-      `Element Canvas Search ${type}`
+      `Element Canvas Search Graph`
     );
   }
 
@@ -270,7 +264,7 @@ export default class GraphPage extends Page {
     );
   }
 
-  async clickSelect(type: "Graph" | "Schema" | "Role" | "Type" | "Model" | "Theme" = "Graph"): Promise<void> {
+  async clickSelect(type: Type = "Graph"): Promise<void> {
     await interactWhenVisible(
       this.select(type),
       (el) => el.click(),
@@ -278,7 +272,7 @@ export default class GraphPage extends Page {
     );
   }
 
-  async clickSelectItem(id: string, type: "Graph" | "Schema" | "Role" | "Type" | "Model" | "Theme" = "Graph"): Promise<void> {
+  async clickSelectItem(id: string, type: Type = "Graph"): Promise<void> {
     await interactWhenVisible(
       this.selectItem(type, id),
       (el) => el.click(),
@@ -404,25 +398,23 @@ export default class GraphPage extends Page {
   }
 
   async clickElementCanvasSuggestionByName(
-    type: "Graph" | "Schema",
     name: string
   ): Promise<void> {
     await interactWhenVisible(
-      this.elementCanvasSuggestionByName(type, name),
+      this.elementCanvasSuggestionByName("Graph", name),
       (el) => el.click(),
-      `Element Canvas Suggestion ${type} ${name}`
+      `Element Canvas Suggestion Graph ${name}`
     );
   }
 
   async clickLabelsButtonByLabel(
-    tab: "Graph" | "Schema",
-    label: "Relationships" | "Labels",
+    label: ElementLabel,
     name: string
   ): Promise<void> {
     await interactWhenVisible(
-      this.labelsButtonByName(tab, label, name),
+      this.labelsButtonByName("Graph", label, name),
       (el) => el.click(),
-      `Labels Panel Button ${tab} ${label} ${name}`
+      `Labels Panel Button Graph ${label} ${name}`
     );
   }
 
@@ -446,11 +438,11 @@ export default class GraphPage extends Page {
     );
   }
 
-  async clickEditButton(type: "Graph" | "Schema"): Promise<void> {
+  async clickEditButton(): Promise<void> {
     await interactWhenVisible(
-      this.editButton(type),
+      this.editButton("Graph"),
       (el) => el.click(),
-      `Edit Button ${type}s`
+      `Edit Button Graphs`
     );
   }
 
@@ -482,11 +474,11 @@ export default class GraphPage extends Page {
     await this.isVisibleToast();
   }
 
-  async clickSaveButton(type: "Graph" | "Schema"): Promise<void> {
+  async clickSaveButton(): Promise<void> {
     await interactWhenVisible(
-      this.saveButton(type),
+      this.saveButton("Graph"),
       (el) => el.click(),
-      `Save Button ${type}s`
+      `Save Button Graphs`
     );
   }
 
@@ -523,22 +515,20 @@ export default class GraphPage extends Page {
   }
 
   async isVisibleLabelsButtonByName(
-    tab: "Graph" | "Schema",
-    label: "Relationships" | "Labels",
+    label: ElementLabel,
     name: string
   ): Promise<boolean> {
-    return waitForElementToBeVisible(this.labelsButtonByName(tab, label, name));
+    return waitForElementToBeVisible(this.labelsButtonByName("Graph", label, name));
   }
 
   async getLabelsButtonByNameContent(
-    tab: "Graph" | "Schema",
-    label: "Relationships" | "Labels",
+    label: ElementLabel,
     name: string
   ): Promise<string | null> {
     const content = await interactWhenVisible(
-      this.labelsButtonByName(tab, label, name),
+      this.labelsButtonByName("Graph", label, name),
       (el) => el.textContent(),
-      `${tab} label ${name}`
+      `Graph label ${name}`
     );
     return content;
   }
@@ -549,10 +539,6 @@ export default class GraphPage extends Page {
 
   async isVisibleToast(): Promise<boolean> {
     return waitForElementToBeVisible(this.toast);
-  }
-
-  async isVisibleErrorToast(): Promise<boolean> {
-    return waitForElementToBeVisible(this.errorToast);
   }
 
   async isVisibleNodeCanvasToolTip(): Promise<boolean> {
@@ -568,24 +554,15 @@ export default class GraphPage extends Page {
     return content;
   }
 
-  async getNodesCount(): Promise<string | null> {
-    return (await pollForElementContent(this.nodesCount(), "Nodes Count", this.nodesCountLoader()))?.replace(/[()]/g, '') || null;
-  }
-
-  async getEdgesCount(): Promise<string | null> {
-    return (await pollForElementContent(this.edgesCount(), "Edges Count", this.edgesCountLoader()))?.replace(/[()]/g, '') || null;
-  }
-
   async searchElementInCanvas(
-    type: "Graph" | "Schema",
     name: string
   ): Promise<void> {
-    await this.fillElementCanvasSearch(type, name);
-    await this.clickElementCanvasSuggestionByName(type, name);
+    await this.fillElementCanvasSearch(name);
+    await this.clickElementCanvasSuggestionByName(name);
   }
 
   async isSearchElementInCanvasVisible(name: string): Promise<boolean> {
-    await this.fillElementCanvasSearch("Graph", name);
+    await this.fillElementCanvasSearch(name);
     return this.elementCanvasSuggestionsListGraph.isVisible();
   }
 
@@ -714,9 +691,9 @@ export default class GraphPage extends Page {
     await this.clickSelect();
     await this.clickManage();
     await this.hoverTableRowByName(oldName);
-    await this.clickEditButton("Graph");
-    await this.fillInput("Graph", newName);
-    await this.clickSaveButton("Graph");
+    await this.clickEditButton();
+    await this.fillInput(newName);
+    await this.clickSaveButton();
     await waitForElementToNotBeVisible(this.saveButton("Graph"));
   }
 
@@ -740,7 +717,7 @@ export default class GraphPage extends Page {
   }
 
   async deleteElementByName(name: string, type: string): Promise<void> {
-    await this.searchElementInCanvas("Graph", name);
+    await this.searchElementInCanvas(name);
     // Try to close help message, but don't fail if it's not found
     try {
       await this.clickCloseHelpMessage();
@@ -759,30 +736,9 @@ export default class GraphPage extends Page {
     return isVisible;
   }
 
-  async getNotificationErrorToast(): Promise<boolean> {
-    await this.page.waitForTimeout(1000);
-    const isVisible = await this.isVisibleErrorToast();
-    return isVisible;
-  }
-
   async getAnimationControl(): Promise<boolean> {
     const status = await this.getAttributeCanvasElement("data-engine-status");
     return status === "running";
-  }
-
-  // 2000 is the timeout for the animation to end
-  // 1000 is the timeout for the fit to size animation
-  // 1500 is extra timeout to ensure the animation is over
-  async waitForCanvasAnimationToEnd(timeout = 4500): Promise<void> {
-    await waitForElementToBeVisible(this.skeleton);
-    await this.page.waitForFunction(
-      ({ selector }) => {
-        const canvas = document.querySelector(selector);
-        return canvas?.getAttribute("data-engine-status") === "stop";
-      },
-      { selector: ".force-graph-container canvas" },
-      { timeout }
-    );
   }
 
   async isNodeCanvasToolTipVisible(): Promise<boolean> {
@@ -795,20 +751,6 @@ export default class GraphPage extends Page {
     await this.page.waitForTimeout(1000);
     const toolTipText = await this.getNodeCanvasToolTipContent();
     return toolTipText;
-  }
-
-  async getCanvasScaling(): Promise<{ scaleX: number; scaleY: number }> {
-    const { scaleX, scaleY } = await this.canvasElement.evaluate(
-      (canvas: HTMLCanvasElement) => {
-        const ctx = canvas.getContext("2d");
-        const transform = ctx?.getTransform();
-        return {
-          scaleX: transform?.a || 1,
-          scaleY: transform?.d || 1,
-        };
-      }
-    );
-    return { scaleX, scaleY };
   }
 
   // eslint-disable-next-line class-methods-use-this
@@ -834,253 +776,6 @@ export default class GraphPage extends Page {
     }
 
     throw new Error("Canvas transform data not available!");
-  }
-
-  async getNodesScreenPositions(windowKey: "graph" | "schema"): Promise<any[]> {
-    // Wait for canvas to be ready and animations to settle
-    await this.waitForCanvasAnimationToEnd();
-    await this.page.waitForTimeout(1500); // Allow some time for the canvas to render properly
-
-    // Get canvas element and its properties
-    const canvasInfo = await this.page.evaluate((selector) => {
-      const canvasElement = document.querySelector(
-        selector
-      ) as HTMLCanvasElement;
-      if (!canvasElement) return null;
-      const rect = canvasElement.getBoundingClientRect();
-      const ctx = canvasElement.getContext("2d");
-      const transform = ctx?.getTransform();
-      return {
-        width: canvasElement.width,
-        height: canvasElement.height,
-        clientWidth: rect.width,
-        clientHeight: rect.height,
-        left: rect.left,
-        top: rect.top,
-        devicePixelRatio: window.devicePixelRatio || 1,
-        transform: transform
-          ? {
-              a: transform.a,
-              b: transform.b,
-              c: transform.c,
-              d: transform.d,
-              e: transform.e,
-              f: transform.f,
-            }
-          : null,
-      };
-    }, ".force-graph-container canvas");
-
-    if (!canvasInfo || !canvasInfo.transform) return [];
-
-    // Get graph data from window object
-    const graphData = await this.page.evaluate(
-      (key) => (window as any)[key],
-      windowKey
-    );
-
-    if (!graphData?.elements?.nodes) return [];
-
-    const {
-      a: scaleX,
-      e: translateX,
-      d: scaleY,
-      f: translateY,
-    } = canvasInfo.transform;
-
-    return graphData.elements.nodes.map((node: any) => {
-      // Apply canvas transform matrix to node coordinates
-      // Transform: screenX = node.x * scaleX + translateX, screenY = node.y * scaleY + translateY
-      const transformedX = node.x * scaleX + translateX;
-      const transformedY = node.y * scaleY + translateY;
-
-      // Convert from canvas coordinates to actual screen coordinates
-      // Account for canvas positioning and device pixel ratio
-      const screenX = canvasInfo.left + transformedX;
-      const screenY = canvasInfo.top + transformedY;
-
-      // Check if node is visible in viewport
-      const isVisible =
-        screenX >= canvasInfo.left &&
-        screenX <= canvasInfo.left + canvasInfo.clientWidth &&
-        screenY >= canvasInfo.top &&
-        screenY <= canvasInfo.top + canvasInfo.clientHeight;
-
-      return {
-        id: node.id,
-        screenX,
-        screenY,
-        isVisible,
-        canvasWidth: canvasInfo.clientWidth,
-        canvasHeight: canvasInfo.clientHeight,
-        // Keep original coordinates for reference
-        x: node.x,
-        y: node.y,
-        // Transform data for debugging
-        transformedX,
-        transformedY,
-        transform: { scaleX, translateX, scaleY, translateY },
-        canvasInfo: {
-          left: canvasInfo.left,
-          top: canvasInfo.top,
-          clientWidth: canvasInfo.clientWidth,
-          clientHeight: canvasInfo.clientHeight,
-          devicePixelRatio: canvasInfo.devicePixelRatio,
-        },
-        ...node,
-      };
-    });
-  }
-
-  async getLinksScreenPositions(windowKey: "graph" | "schema"): Promise<any[]> {
-    // Wait for canvas to be ready and animations to settle
-    await this.waitForCanvasAnimationToEnd();
-
-    // Get canvas element and its properties
-    const canvasInfo = await this.page.evaluate((selector) => {
-      const canvasElement = document.querySelector(
-        selector
-      ) as HTMLCanvasElement;
-      if (!canvasElement) return null;
-      const rect = canvasElement.getBoundingClientRect();
-      const ctx = canvasElement.getContext("2d");
-      const transform = ctx?.getTransform();
-      return {
-        width: canvasElement.width,
-        height: canvasElement.height,
-        clientWidth: rect.width,
-        clientHeight: rect.height,
-        left: rect.left,
-        top: rect.top,
-        devicePixelRatio: window.devicePixelRatio || 1,
-        transform: transform
-          ? {
-              a: transform.a,
-              b: transform.b,
-              c: transform.c,
-              d: transform.d,
-              e: transform.e,
-              f: transform.f,
-            }
-          : null,
-      };
-    }, ".force-graph-container canvas");
-
-    if (!canvasInfo || !canvasInfo.transform) return [];
-
-    // Get graph data from window object
-    const graphData = await this.page.evaluate(
-      (key) => (window as any)[key],
-      windowKey
-    );
-
-    if (!graphData?.elements?.links || !graphData?.elements?.nodes) return [];
-
-    const {
-      a: scaleX,
-      e: translateX,
-      d: scaleY,
-      f: translateY,
-    } = canvasInfo.transform;
-
-    return graphData.elements.links.map((link: any) => {
-      const sourceId =
-        typeof link.source === "object" ? link.source.id : link.source;
-      const targetId =
-        typeof link.target === "object" ? link.target.id : link.target;
-
-      const source = graphData.elements.nodes.find(
-        (n: any) => n.id === sourceId
-      );
-      const target = graphData.elements.nodes.find(
-        (n: any) => n.id === targetId
-      );
-
-      if (!source || !target) {
-        return {
-          id: link.id,
-          sourceId,
-          targetId,
-          sourceScreenX: 0,
-          sourceScreenY: 0,
-          targetScreenX: 0,
-          targetScreenY: 0,
-          midX: 0,
-          midY: 0,
-          isVisible: false,
-          canvasWidth: canvasInfo.clientWidth,
-          canvasHeight: canvasInfo.clientHeight,
-          ...link,
-        };
-      }
-
-      // Apply canvas transform matrix to node coordinates
-      // Transform: screenX = node.x * scaleX + translateX, screenY = node.y * scaleY + translateY
-      const sourceTransformedX = source.x * scaleX + translateX;
-      const sourceTransformedY = source.y * scaleY + translateY;
-      const targetTransformedX = target.x * scaleX + translateX;
-      const targetTransformedY = target.y * scaleY + translateY;
-
-      // Convert from canvas coordinates to actual screen coordinates
-      // Account for canvas positioning and device pixel ratio
-      const sourceScreenX = canvasInfo.left + sourceTransformedX;
-      const sourceScreenY = canvasInfo.top + sourceTransformedY;
-      const targetScreenX = canvasInfo.left + targetTransformedX;
-      const targetScreenY = canvasInfo.top + targetTransformedY;
-
-      // Calculate midpoint
-      const midX = (sourceScreenX + targetScreenX) / 2;
-      const midY = (sourceScreenY + targetScreenY) / 2;
-
-      // Check if link is visible in viewport (if any part of the link is visible)
-      const isVisible =
-        ((sourceScreenX >= canvasInfo.left &&
-          sourceScreenX <= canvasInfo.left + canvasInfo.clientWidth) ||
-          (targetScreenX >= canvasInfo.left &&
-            targetScreenX <= canvasInfo.left + canvasInfo.clientWidth) ||
-          (midX >= canvasInfo.left &&
-            midX <= canvasInfo.left + canvasInfo.clientWidth)) &&
-        ((sourceScreenY >= canvasInfo.top &&
-          sourceScreenY <= canvasInfo.top + canvasInfo.clientHeight) ||
-          (targetScreenY >= canvasInfo.top &&
-            targetScreenY <= canvasInfo.top + canvasInfo.clientHeight) ||
-          (midY >= canvasInfo.top &&
-            midY <= canvasInfo.top + canvasInfo.clientHeight));
-
-      return {
-        id: link.id,
-        sourceId,
-        targetId,
-        sourceScreenX,
-        sourceScreenY,
-        targetScreenX,
-        targetScreenY,
-        midX,
-        midY,
-        isVisible,
-        canvasWidth: canvasInfo.clientWidth,
-        canvasHeight: canvasInfo.clientHeight,
-        // Keep original coordinates for reference
-        sourceX: source.x,
-        sourceY: source.y,
-        targetX: target.x,
-        targetY: target.y,
-        // Transform data for debugging
-        sourceTransformedX,
-        sourceTransformedY,
-        targetTransformedX,
-        targetTransformedY,
-        transform: { scaleX, translateX, scaleY, translateY },
-        canvasInfo: {
-          left: canvasInfo.left,
-          top: canvasInfo.top,
-          clientWidth: canvasInfo.clientWidth,
-          clientHeight: canvasInfo.clientHeight,
-          devicePixelRatio: canvasInfo.devicePixelRatio,
-        },
-        ...link,
-      };
-    });
   }
 
   async changeNodePosition(
@@ -1111,10 +806,6 @@ export default class GraphPage extends Page {
     await this.page.mouse.move(centerX, centerY);
   }
 
-  async elementClick(x: number, y: number): Promise<void> {
-    await this.page.mouse.click(x, y, { button: "right" });
-  }
-
   async getQuerySearchListText(): Promise<string[]> {
     await waitForElementToBeVisible(this.querySearchList);
     const elements = this.querySearchListItems;
@@ -1138,32 +829,5 @@ export default class GraphPage extends Page {
     console.log(`Right-clicking element at position (${x}, ${y})`);
     await this.page.mouse.click(x, y, { button: "right" });
     await this.page.waitForTimeout(500);
-  }
-
-  async waitForScaleToStabilize(
-    threshold = 0.01,
-    stableCycles = 5,
-    timeout = 3000
-  ) {
-    let lastScale = await this.getCanvasScaling();
-    let stableCount = 0;
-    const start = Date.now();
-    while (Date.now() - start < timeout) {
-      await new Promise((res) => {
-        setTimeout(res, 100);
-      });
-      const currentScale = await this.getCanvasScaling();
-      if (
-        Math.abs(currentScale.scaleX - lastScale.scaleX) < threshold &&
-        Math.abs(currentScale.scaleY - lastScale.scaleY) < threshold
-      ) {
-        stableCount += 1;
-        if (stableCount >= stableCycles) return;
-      } else {
-        stableCount = 0;
-      }
-      lastScale = currentScale;
-    }
-    throw new Error("Scale did not stabilize within timeout");
   }
 }
