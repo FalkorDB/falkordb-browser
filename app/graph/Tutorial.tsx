@@ -1,3 +1,5 @@
+"use client"
+
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from "@/components/ui/carousel";
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from "@/components/ui/drawer";
 import { useContext, useState } from "react";
@@ -31,7 +33,7 @@ export default function Tutorial({ open, setOpen }: Props) {
             }
             setOpen(o)
         }}>
-            <DrawerContent className="flex flex-co">
+            <DrawerContent>
                 <VisuallyHidden>
                     <DrawerHeader>
                         <DrawerTitle />
