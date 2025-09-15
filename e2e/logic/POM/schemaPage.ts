@@ -57,7 +57,7 @@ export default class SchemaPage extends GraphPage {
   }
 
   private selectTypeItem(type: string): Locator {
-    return this.page.getByTestId(`selectTypeItem${type}`);
+    return this.page.getByTestId(`selectType${type}`);
   }
 
   private get dataPanelAttributesCount(): Locator {
@@ -330,9 +330,9 @@ export default class SchemaPage extends GraphPage {
 
   async clickSelectTypeItem(type: string): Promise<void> {
     await interactWhenVisible(
-      this.selectTypeItem(type),
+      this.selectItem("Type", type),
       (el) => el.click(),
-      "Edit Button Schemas"
+      "Select Type Item"
     );
   }
 

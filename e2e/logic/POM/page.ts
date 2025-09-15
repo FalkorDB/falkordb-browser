@@ -61,7 +61,7 @@ export default class Page extends BasePage {
         return (type: Type) => this.page.getByTestId(`select${type}`);
     }
 
-    public get selectItemBySearch(): (type: Type, id: string) => Locator {
+    public get selectItem(): (type: Type, id: string) => Locator {
         return (type: Type, id: string) => this.page.getByTestId(`select${type}${id}`);
     }
 

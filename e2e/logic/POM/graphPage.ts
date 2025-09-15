@@ -280,7 +280,7 @@ export default class GraphPage extends Page {
 
   async clickSelectItem(id: string, type: "Graph" | "Schema" | "Role" | "Type" | "Model" | "Theme" = "Graph"): Promise<void> {
     await interactWhenVisible(
-      this.selectItemBySearch(type, id),
+      this.selectItem(type, id),
       (el) => el.click(),
       `Select ${type} Item ${id}`
     );
@@ -507,7 +507,7 @@ export default class GraphPage extends Page {
   }
 
   async isVisibleSelectItem(name: string): Promise<boolean> {
-    return waitForElementToBeVisible(this.selectItemBySearch("Graph", name));
+    return waitForElementToBeVisible(this.selectItem("Graph", name));
   }
 
   async isEnabledEditorRun(): Promise<boolean> {
