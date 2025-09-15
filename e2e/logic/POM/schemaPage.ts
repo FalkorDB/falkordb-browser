@@ -52,10 +52,6 @@ export default class SchemaPage extends Page {
     return this.page.getByTestId(`saveNewLabelButton`);
   }
 
-  private searchTypeInput(): Locator {
-    return this.page.getByTestId(`searchType`);
-  }
-
   private get dataPanelAttributesCount(): Locator {
     return this.page.getByTestId("DataPanelAttributesCount");
   }
@@ -173,14 +169,6 @@ export default class SchemaPage extends Page {
       this.saveNewLabelButton(),
       (el) => el.click(),
       "Click Save New Label Button"
-    );
-  }
-
-  async insertSeachType(searchInput: string): Promise<void> {
-    await interactWhenVisible(
-      this.searchTypeInput(),
-      (el) => el.fill(searchInput),
-      "Insert Search Type Input"
     );
   }
 
@@ -411,9 +399,9 @@ export default class SchemaPage extends Page {
     );
   }
 
-  async fillSearch(text: string): Promise<void> {
+  async fillSearch(text: string, type: Type = "Schema"): Promise<void> {
     await interactWhenVisible(
-      this.search("Schema"),
+      this.search(type),
       (el) => el.fill(text),
       "Search Schema"
     );
@@ -469,7 +457,7 @@ export default class SchemaPage extends Page {
   }
 
   async modifySchemaName(oldName: string, newName: string): Promise<void> {
-    await this.clickSelect("Schema");
+    await this.clickSelect();
     await this.clickManage();
     await this.hoverTableRowByName(oldName);
     await this.clickEditButton();
@@ -480,14 +468,14 @@ export default class SchemaPage extends Page {
   }
 
   async verifySchemaExists(schemaName: string): Promise<boolean> {
-    await this.clickSelect("Schema");
+    await this.clickSelect();
     await this.fillSearch(schemaName);
     const isVisible = await this.isVisibleSelectItem(schemaName);
     return isVisible;
   }
 
   async selectSchemaByName(schemaName: string): Promise<void> {
-    await this.clickSelect("Schema");
+    await this.clickSelect();
     await this.fillSearch(schemaName);
     await this.page.waitForTimeout(1000); // wait for the search results to load
     await this.clickSelectItem(schemaName); // selecting the first item in list after search
@@ -502,7 +490,7 @@ export default class SchemaPage extends Page {
   }
 
   async deleteSchema(schemaName: string): Promise<void> {
-    await this.clickSelect("Schema");
+    await this.clickSelect();
     await this.clickManage();
     await this.clickTableCheckboxByName(schemaName);
     await this.clickDelete();
@@ -518,7 +506,7 @@ export default class SchemaPage extends Page {
 
   async selectAttributeType(attributeRow: string, type: string): Promise<void> {
     await this.clickAttributeButton(attributeRow, "2"); // click type button
-    await this.insertSeachType(type); // search for type
+    await this.fillSearch(type, "Type"); // search for type
     await this.clickSelectItem(type, "Type"); // select type from list
   }
 

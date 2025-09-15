@@ -24,10 +24,6 @@ export default class QueryHistory extends GraphPage {
         return this.page.locator('[data-testid="queryList"] li');
     }
 
-    public get searchQueryInput(): Locator {
-        return this.page.getByTestId("searchQuery");
-    }
-
     public tabButton(buttonName: string): Locator {
         return this.page.getByRole('button', { name: buttonName });
     }
@@ -45,7 +41,7 @@ export default class QueryHistory extends GraphPage {
     }
 
     async insertSearchQueryInput(searchInput: string): Promise<void> {   
-        await interactWhenVisible(this.searchQueryInput, (el) => el.fill(searchInput), `search query input`);
+        await interactWhenVisible(this.search("Query"), (el) => el.fill(searchInput), `search query input`);
     }
 
     async clickOnTabButton(button: string): Promise<void> {   

@@ -86,7 +86,7 @@ export default function Page() {
         }
 
         const currentPanel = panelRef.current
-        
+
         if (!currentPanel) return
 
         if (panel) currentPanel.expand()
@@ -256,6 +256,7 @@ export default function Page() {
     return (
         <div className="Page p-8 gap-8">
             <Selector
+                type="Graph"
                 graph={graph}
                 options={graphNames}
                 setOptions={setGraphNames}

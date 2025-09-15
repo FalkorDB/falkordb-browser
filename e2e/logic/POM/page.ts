@@ -10,7 +10,7 @@ export type Element = "Node" | "Relation";
 
 export type ElementLabel = "Relationships" | "Labels";
 
-export type Type = GraphType | "Role" | "Type" | "Model" | "Theme";
+export type Type = GraphType | "Role" | "Type" | "Model" | "Theme" | "Query";
 
 export default class Page extends BasePage {
   // CREATE
@@ -73,7 +73,7 @@ export default class Page extends BasePage {
 
   // SEARCH
   public get search(): (type: Type) => Locator {
-    return (type: Type) => this.page.getByTestId(`search${type}`);
+    return (type: Type) => this.page.getByTestId(`${type}Search`);
   }
 
   // MANAGE

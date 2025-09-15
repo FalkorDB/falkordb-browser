@@ -132,8 +132,8 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
                         list={options}
                         step={3}
                         onClick={handleClick}
-                        dataTestId="selectGraph"
-                        label="graph"
+                        dataTestId={`select${type}`}
+                        label={type}
                         afterSearchCallback={() => { }}
                         isSelected={(value) => selectedValue === value}
                         isLoading={isLoading}

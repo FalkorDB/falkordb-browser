@@ -66,7 +66,7 @@ export default function PaginationList<T extends Item>({ list, step, onClick, da
             <div className="flex gap-2 items-center">
                 <Input
                     ref={searchRef}
-                    data-testid={`search${label.charAt(0).toUpperCase() + label.slice(1)}`}
+                    data-testid={`${label}Search`}
                     className="w-full bg-background text-foreground"
                     value={search}
                     placeholder={`Search for a ${label}`}
