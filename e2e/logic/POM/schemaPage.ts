@@ -366,8 +366,7 @@ export default class SchemaPage extends GraphPage {
   async verifySchemaExists(schemaName: string): Promise<boolean> {
     await this.clickSelect("Schema");
     await this.fillSearch(schemaName);
-    const schemaId = "0"; // always select the first result
-    const isVisible = await this.isVisibleSelectItem(schemaId);
+    const isVisible = await this.isVisibleSelectItem(schemaName);
     return isVisible;
   }
 

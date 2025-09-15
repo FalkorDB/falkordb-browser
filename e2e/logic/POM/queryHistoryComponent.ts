@@ -12,8 +12,8 @@ export default class QueryHistory extends GraphPage {
         return this.page.getByTestId("queryHistory");
     }
 
-    public selectQueryHistory(index: string): Locator {
-        return this.page.getByTestId(`queryHistory${index}`);
+    public selectQueryHistory(query: string): Locator {
+        return this.page.getByTestId(`queryHistory${query}`);
     }
 
     public get runQueryHistoryButton(): Locator {
@@ -54,26 +54,26 @@ export default class QueryHistory extends GraphPage {
 
     async isQueryHistoryListVisible(): Promise<boolean> {
         await waitForElementToBeVisible(this.queryList);
-        return await this.queryList.isVisible();
+        return this.queryList.isVisible();
     }
 
-    async runAQueryFromHistory(queryNumber: string): Promise<void> {
+    async runAQueryFromHistory(query: string): Promise<void> {
         await this.clickQueryHistoryButton();
-        await this.clickSelectQueryInHistory(queryNumber);
+        await this.clickSelectQueryInHistory(query);
         await this.clickRunInQueryHistory();
         await this.waitForCanvasAnimationToEnd();
     }
 
-    async getQueryHistory(queryNumber: string): Promise<boolean> {
-        await waitForElementToBeVisible(this.selectQueryHistory(queryNumber));
-        return await this.selectQueryHistory(queryNumber).isVisible();
+    async getQueryHistory(query: string): Promise<boolean> {
+        await waitForElementToBeVisible(this.selectQueryHistory(query));
+        return this.selectQueryHistory(query).isVisible();
     }
 
-    async selectQueryInHistory(queryNumber: string): Promise<void> {
-        await this.clickSelectQueryInHistory(queryNumber);
+    async selectQueryInHistory(query: string): Promise<void> {
+        await this.clickSelectQueryInHistory(query);
     }
 
     async getQueryHistoryEditorContent(): Promise<string[]> {
-        return await this.queryHistoryTextarea.allTextContents();
+        return this.queryHistoryTextarea.allTextContents();
     }
 }

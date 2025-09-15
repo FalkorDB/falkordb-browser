@@ -54,7 +54,7 @@ test.describe('Schema Tests', () => {
         await apicalls.removeSchema(newSchemaName);
     });
     
-    test(`@admin Validate that a creating a node updates labels on the canvas`, async () => {
+    test(`@admin Validate that creating a node updates labels on the canvas`, async () => {
         const schema = await browser.createNewPage(SchemaPage, urls.schemaUrl);
         await browser.setPageToFullScreen();
         const schemaName = getRandomString('schema');

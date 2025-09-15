@@ -627,8 +627,7 @@ export default class GraphPage extends Page {
 
       while (attempts < maxAttempts) {
         await this.page.waitForTimeout(1000); // wait for the search results to be populated
-        const graphId = "0"; // always select the first result after search
-        isVisible = await this.isVisibleSelectItem(graphId);
+        isVisible = await this.isVisibleSelectItem(graphName);
 
         if (!isVisible) {
           break;
