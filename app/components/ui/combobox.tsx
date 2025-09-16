@@ -70,7 +70,7 @@ export default function Combobox<T extends string>({ id, disabled = false, inTab
         <SelectContent className="min-w-52 max-h-[40dvh] bg-background">
           <div className="p-4 flex gap-2 items-center">
             <Input
-              data-testid={`search${label}`}
+              data-testid={`${label}Search`}
               ref={ref => ref?.focus()}
               className="w-1 grow"
               placeholder={`Search for a ${label}`}
