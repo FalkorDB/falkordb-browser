@@ -183,7 +183,7 @@ export default function BrowserSettings() {
                             </div>
                             <Input
                                 id="runDefaultQueryInput"
-                                className="text-center w-1/3 CypherInput"
+                                className="text-center w-1/3 SofiaSans"
                                 value={newDefaultQuery}
                                 onChange={(e) => setNewDefaultQuery(e.target.value)}
                                 disabled={!newRunDefaultQuery}

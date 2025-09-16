@@ -39,8 +39,8 @@
     }
 
     @font-face {
-        font-family: 'FiraCode';
-        src: url('/fonts/FiraCode.ttf') format('truetype');
+        font-family: 'SofiaSans';
+        src: url('/fonts/SofiaSans.ttf') format('truetype');
         font-display: swap;
     }
 
@@ -48,8 +48,10 @@
         font-family: 'Inter' !important;
     }
 
-    .CypherInput * {
-        font-family: 'FiraCode' !important;
+    .SofiaSans, .SofiaSans * {
+        font-family: 'SofiaSans' !important;
+        letter-spacing: 0.1px;
+        font: 400;
     }
 
     .tabs-trigger {

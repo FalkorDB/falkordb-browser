@@ -18,13 +18,13 @@ export default function GraphInfoPanel({ isOpen, onClose }: { isOpen: boolean; o
             >
                 <X className="h-4 w-4" />
             </Button>
-            <h1>Graph Information</h1>
+            <h1 className="text-2xl">Graph Information</h1>
             <div className="flex flex-col gap-2">
                 <div className="flex gap-2 items-center">
                     <h2>Graph Name:</h2>
                     <Tooltip>
                         <TooltipTrigger asChild>
-                            <p className="truncate pointer-events-auto">{graphName}</p>
+                            <p className="truncate pointer-events-auto SofiaSans">{graphName}</p>
                         </TooltipTrigger>
                         <TooltipContent>
                             {graphName}
@@ -41,7 +41,7 @@ export default function GraphInfoPanel({ isOpen, onClose }: { isOpen: boolean; o
                                 <TooltipTrigger asChild>
                                     <p
                                         data-testid="nodesCount"
-                                        className="truncate pointer-events-auto"
+                                        className="truncate pointer-events-auto SofiaSans"
                                     >
                                         ({nodesCount})
                                     </p>
@@ -56,7 +56,7 @@ export default function GraphInfoPanel({ isOpen, onClose }: { isOpen: boolean; o
                 <ul className="flex flex-wrap gap-2 p-2 overflow-auto">
                     <li className="max-w-full">
                         <Button
-                            className="h-6 w-6 rounded-full flex justify-center items-center bg-border text-white"
+                            className="pt-1 h-6 w-6 rounded-full flex justify-center items-center bg-border text-white"
                             label="*"
                             title="All labels"
                             onClick={() => runQuery(`MATCH (n) RETURN n`)}
@@ -67,7 +67,7 @@ export default function GraphInfoPanel({ isOpen, onClose }: { isOpen: boolean; o
                         <li key={name} className="max-w-full">
                             <Button
                                 style={{ backgroundColor: color }}
-                                className="h-6 w-full p-2 rounded-full flex justify-center items-center text-black"
+                                className="h-6 w-full p-2 rounded-full flex justify-center items-center text-black SofiaSans"
                                 label={name}
                                 onClick={() => runQuery(`MATCH (n:${name}) RETURN n`)}
                                 disabled={isQueryLoading}
@@ -85,7 +85,7 @@ export default function GraphInfoPanel({ isOpen, onClose }: { isOpen: boolean; o
                                 <TooltipTrigger asChild>
                                     <p
                                         data-testid="edgesCount"
-                                        className="truncate pointer-events-auto"
+                                        className="truncate pointer-events-auto SofiaSans"
                                     >
                                         ({edgesCount})
                                     </p>
@@ -100,7 +100,7 @@ export default function GraphInfoPanel({ isOpen, onClose }: { isOpen: boolean; o
                 <ul className="flex flex-wrap gap-2 p-2 overflow-auto">
                     <li className="max-w-full">
                         <Button
-                            className="h-6 w-6 rounded-full flex justify-center items-center bg-border text-white"
+                            className="pt-1 h-6 w-6 rounded-full flex justify-center items-center bg-border text-white"
                             label="*"
                             title="All relationships"
                             onClick={() => runQuery(`MATCH p=()-[]-() RETURN p`)}
@@ -111,7 +111,7 @@ export default function GraphInfoPanel({ isOpen, onClose }: { isOpen: boolean; o
                         <li key={name} className="max-w-full">
                             <Button
                                 style={{ backgroundColor: color }}
-                                className="h-6 w-full p-2 rounded-full flex justify-center items-center text-black"
+                                className="h-6 w-full p-2 rounded-full flex justify-center items-center text-black SofiaSans"
                                 label={name}
                                 onClick={() => runQuery(`MATCH p=()-[:${name}]-() RETURN p`)}
                                 disabled={isQueryLoading}
@@ -129,7 +129,7 @@ export default function GraphInfoPanel({ isOpen, onClose }: { isOpen: boolean; o
                                 <TooltipTrigger asChild>
                                     <p
                                         data-testid="propertyKeysCount"
-                                        className="truncate pointer-events-auto"
+                                        className="truncate pointer-events-auto SofiaSans"
                                     >
                                         ({graphInfo.PropertyKeys.length})
                                     </p>
@@ -147,7 +147,7 @@ export default function GraphInfoPanel({ isOpen, onClose }: { isOpen: boolean; o
                         graphInfo.PropertyKeys && graphInfo.PropertyKeys.map((key) => (
                             <li key={key} className="max-w-full">
                                 <Button
-                                    className="h-6 w-full p-2 bg-border flex justify-center items-center rounded-full text-white"
+                                    className="h-6 w-full p-2 bg-border flex justify-center items-center rounded-full text-white SofiaSans"
                                     label={key}
                                     onClick={() => runQuery(
                                         `MATCH (e) WHERE e.${key} IS NOT NULL RETURN e\nUNION\nMATCH ()-[e]-() WHERE e.${key} IS NOT NULL RETURN e`

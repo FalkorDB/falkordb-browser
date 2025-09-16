@@ -265,7 +265,7 @@ export default function Selector({ graph, options, setOptions, graphName, setGra
                                                         />
                                                         <Editor
                                                             key={currentTheme}
-                                                            className="CypherInput"
+                                                            className="SofiaSans"
                                                             data-testid="queryHistoryEditor"
                                                             width="100%"
                                                             height="100%"
@@ -310,6 +310,7 @@ export default function Selector({ graph, options, setOptions, graphName, setGra
                                                     {
                                                         currentQuery &&
                                                         <Profile
+                                                            background={secondary}
                                                             graphName={graphName}
                                                             query={currentQuery}
                                                             setQuery={({ profile }) => {
@@ -348,6 +349,7 @@ export default function Selector({ graph, options, setOptions, graphName, setGra
                                                     {
                                                         currentQuery &&
                                                         <Explain
+                                                            background={secondary}
                                                             query={currentQuery}
                                                         />
                                                     }

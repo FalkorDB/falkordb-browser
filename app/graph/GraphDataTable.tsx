@@ -322,13 +322,13 @@ export default function GraphDataTable({ graph, object, type, onDeleteElement, l
                                                 <Input
                                                     ref={setInputRef}
                                                     data-testid="DataPanelSetAttributeInput"
-                                                    className="w-full"
+                                                    className="w-full SofiaSans"
                                                     value={newVal}
                                                     onChange={(e) => setNewVal(e.target.value)}
                                                     onKeyDown={handleSetKeyDown}
                                                 />
                                                 : <Button
-                                                    className="disabled:opacity-100 disabled:cursor-default"
+                                                    className="disabled:opacity-100 disabled:cursor-default SofiaSans"
                                                     data-testid="DataPanelValueSetAttribute"
                                                     label={typeof value === "boolean" ? value.toString() : value}
                                                     title="Click to edit the attribute value"
@@ -382,7 +382,7 @@ export default function GraphDataTable({ graph, object, type, onDeleteElement, l
                             <TableCell>
                                 <Input
                                     data-testid="DataPanelAddAttributeValue"
-                                    className="w-full"
+                                    className="w-full SofiaSans"
                                     value={newVal}
                                     onChange={(e) => setNewVal(e.target.value)}
                                     onKeyDown={handleAddKeyDown}
