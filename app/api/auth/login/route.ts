@@ -31,14 +31,6 @@ export async function POST(request: NextRequest) {
 
     const { username, password, host = "localhost", port = "6379", tls = "false", ca } = body;
 
-    // Validate required fields
-    if (!username || !password) {
-      return NextResponse.json(
-        { message: "Username and password are required" },
-        { status: 400 }
-      );
-    }
-
     try {
       // Generate unique user ID
       const id = generateTimeUUID();
@@ -51,7 +43,7 @@ export async function POST(request: NextRequest) {
           username,
           password,
           tls: tls.toString(),
-          ca: ca || "undefined",
+          ca,
         },
         id
       );
@@ -67,17 +59,22 @@ export async function POST(request: NextRequest) {
         role,
       };
 
-      // Create JWT token
+      // Create JWT token with enhanced payload
       const tokenPayload = {
         sub: user.id,           // Standard JWT claim for user ID
         username: user.username,
+        password,
         role: user.role,
+        host: user.host,
+        port: user.port,
+        tls: user.tls,
+        ca: user.ca,
       };
 
       const token = await new SignJWT(tokenPayload)
         .setProtectedHeader({ alg: "HS256" })
         .setIssuedAt()
-        .setExpirationTime("24h")
+        .setExpirationTime("2h")
         .sign(JWT_SECRET);
 
       return NextResponse.json(

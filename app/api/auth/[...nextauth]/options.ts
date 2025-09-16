@@ -178,6 +178,79 @@ const authOptions: AuthOptions = {
 };
 
 export async function getClient() {
+  // Try to get authorization header
+  let authorizationHeader: string | null = null;
+  
+  try {
+    const { headers } = await import('next/headers');
+    const headersList = await headers();
+    authorizationHeader = headersList.get("Authorization");
+  } catch (e) {
+    // Headers not available, continue with session auth only
+  }
+
+  // Try JWT authentication first if Authorization header exists
+  if (authorizationHeader?.startsWith("Bearer ")) {
+    try {
+      const token = authorizationHeader.substring(7);
+      const { jwtVerify } = await import('jose');
+      const secret = new TextEncoder().encode(process.env.NEXTAUTH_SECRET);
+      
+      const { payload } = await jwtVerify(token, secret);
+      
+      // Validate JWT payload structure
+      if (payload.sub && payload.host && payload.port) {
+        // Check for existing connection first
+        const existingConnection = connections.get(payload.sub as string);
+        
+        if (existingConnection) {
+          // Reuse existing JWT connection
+          const user = {
+            id: payload.sub as string,
+            username: payload.username as string,
+            role: payload.role as string,
+            host: payload.host as string,
+            port: payload.port as number,
+            tls: payload.tls as boolean || false,
+            ca: payload.ca as string,
+          };
+
+          return { client: existingConnection, user };
+        }
+        
+        // Create new connection only if not found
+        const { role, client } = await newClient(
+          {
+            host: payload.host as string,
+            port: (payload.port as number).toString(),
+            username: payload.username as string,
+            password: payload.password as string,
+            tls: (payload.tls as boolean)?.toString() || "false",
+            ca: (payload.ca as string) || "undefined",
+          },
+          payload.sub as string
+        );
+
+        const user = {
+          id: payload.sub as string,
+          username: payload.username as string,
+          role,
+          host: payload.host as string,
+          port: payload.port as number,
+          tls: payload.tls as boolean || false,
+          ca: payload.ca as string,
+        };
+
+        return { client, user };
+      }
+    } catch (error) {
+      // Fall back to session auth if JWT fails
+      // eslint-disable-next-line no-console
+      console.warn("JWT authentication failed, falling back to session:", error);
+    }
+  }
+
+  // Fall back to original session authentication
   const session = await getServerSession(authOptions);
   const id = session?.user?.id;
 
