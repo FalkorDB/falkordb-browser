@@ -366,7 +366,7 @@ export default class DataPanel extends GraphPage {
   async getAttributeValueByName(attribute: string): Promise<string | null> {
     return interactWhenVisible(
       this.attributeValue(attribute),
-      (el) => el.nth(1).textContent(),
+      (el) => el.textContent(),
       "Data Panel Delete Attribute Cancel"
     );
   }
