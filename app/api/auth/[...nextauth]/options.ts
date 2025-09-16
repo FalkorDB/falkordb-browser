@@ -208,7 +208,7 @@ export async function getClient() {
           const user = {
             id: payload.sub as string,
             username: payload.username as string,
-            role: payload.role as string,
+            role: payload.role as Role,
             host: payload.host as string,
             port: payload.port as number,
             tls: payload.tls as boolean || false,
@@ -234,7 +234,7 @@ export async function getClient() {
         const user = {
           id: payload.sub as string,
           username: payload.username as string,
-          role,
+          role: role as Role,
           host: payload.host as string,
           port: payload.port as number,
           tls: payload.tls as boolean || false,
