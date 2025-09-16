@@ -107,7 +107,6 @@
     "react-json-view": {
       "react": "$react",
       "react-dom": "$react-dom"
-    },
-    "prismjs": "^1.30.0"
+    }
   }
 }

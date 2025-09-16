@@ -31,6 +31,18 @@ export async function POST(request: NextRequest) {
 
     const { username, password, host = "localhost", port = "6379", tls = "false", ca } = body;
 
+    // Validate username presence (password can be empty for some Redis configs)
+    if (
+      typeof username !== "string" ||
+      username.trim() === "" ||
+      typeof password !== "string"
+    ) {
+      return NextResponse.json(
+        { message: "Username is required and password must be a string" },
+        { status: 400 }
+      );
+    }
+
     try {
       // Generate unique user ID
       const id = generateTimeUUID();

@@ -225,7 +225,7 @@ export async function getClient() {
             port: (payload.port as number).toString(),
             username: payload.username as string,
             password: payload.password as string,
-            tls: (payload.tls as boolean)?.toString() || "false",
+            tls: Boolean(payload.tls).toString(),
             ca: (payload.ca as string) || "undefined",
           },
           payload.sub as string
