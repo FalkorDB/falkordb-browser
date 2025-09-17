@@ -5,12 +5,12 @@ import { cn } from "@/lib/utils";
 import Button from "../components/ui/Button";
 import { GraphContext, QueryLoadingContext } from "../components/provider";
 
-export default function GraphInfoPanel({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
+export default function GraphInfoPanel({ onClose }: { onClose: () => void }) {
     const { graphInfo, nodesCount, edgesCount, runQuery, graphName } = useContext(GraphContext);
     const { isQueryLoading } = useContext(QueryLoadingContext)
 
     return (
-        <div className={cn(`relative flex flex-col gap-8 overflow-y-auto border-border transition-all max-w-[30dvw]`, isOpen ? 'w-fit opacity-100 p-6 border-r' : 'w-0 opacity-0')}>
+        <div className={cn(`relative h-full w-full p-6 flex flex-col gap-8 overflow-y-auto border-r border-border`)}>
             <Button
                 className="absolute top-2 right-2"
                 title="Close"
@@ -24,7 +24,7 @@ export default function GraphInfoPanel({ isOpen, onClose }: { isOpen: boolean; o
                     <h2>Graph Name:</h2>
                     <Tooltip>
                         <TooltipTrigger asChild>
-                            <p className="truncate pointer-events-auto SofiaSans">{graphName}</p>
+                            <p className="truncate pointer-events-auto text-1.5xl SofiaSans">{graphName}</p>
                         </TooltipTrigger>
                         <TooltipContent>
                             {graphName}
