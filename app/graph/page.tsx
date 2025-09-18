@@ -68,14 +68,14 @@ export default function Page() {
     const [relationships, setRelationships] = useState<Relationship[]>([])
     const [isCollapsed, setIsCollapsed] = useState(true)
 
-    const [panelSize, graphSize] = useMemo(() => {
+    const panelSize = useMemo(() => {
         switch (panel) {
             case "data":
-                return [30, 70]
+                return 30
             case "chat":
-                return [40, 60]
+                return 40
             default:
-                return [0, 100]
+                return 0
         }
     }, [panel])
 
@@ -268,7 +268,7 @@ export default function Page() {
                 isQueryLoading={isQueryLoading}
             />
             <ResizablePanelGroup direction="horizontal" className="h-1 grow">
-                <ResizablePanel defaultSize={graphSize} minSize={50} maxSize={100}>
+                <ResizablePanel defaultSize={100 - panelSize} minSize={50} maxSize={100}>
                     <GraphView
                         selectedElement={selectedElement}
                         setSelectedElement={handleSetSelectedElement}

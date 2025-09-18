@@ -3,7 +3,7 @@
 'use client'
 
 import { ArrowUpRight, Database, FileCode, LogOut, Monitor, Moon, Settings, Sun } from "lucide-react";
-import { SetStateAction, Dispatch, useCallback, useContext, useState, useEffect } from "react";
+import { useCallback, useContext, useState, useEffect } from "react";
 import Image from "next/image";
 import { cn, getTheme, Panel } from "@/lib/utils";
 import { getQuerySettingsNavigationToast } from "@/components/ui/toaster";
@@ -25,7 +25,7 @@ interface Props {
     onSetGraphName: (newGraphName: string) => void
     graphNames: string[]
     graphName: string
-    setGraphInfoOpen: Dispatch<SetStateAction<boolean>>
+    onOpenGraphInfo: () => void
     displayChat: boolean
 }
 
@@ -37,7 +37,7 @@ function getPathType(pathname: string): "Schema" | "Graph" | undefined {
 
 const iconSize = 30
 
-export default function Header({ onSetGraphName, graphNames, graphName, setGraphInfoOpen, displayChat }: Props) {
+export default function Header({ onSetGraphName, graphNames, graphName, onOpenGraphInfo, displayChat }: Props) {
 
     const { indicator } = useContext(IndicatorContext)
     const { setPanel } = useContext(PanelContext)
@@ -127,7 +127,7 @@ export default function Header({ onSetGraphName, graphNames, graphName, setGraph
                         <Button
                             indicator={indicator}
                             title="Graph info"
-                            onClick={() => setGraphInfoOpen(prev => !prev)}
+                            onClick={() => onOpenGraphInfo()}
                         >
                             <Database size={iconSize} />
                         </Button>

@@ -10,10 +10,11 @@
 import { Checkbox } from "@/components/ui/checkbox";
 import { JSONTree } from "react-json-tree"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Cell, cn, Row } from "@/lib/utils";
+import { Cell, cn, getTheme, Row } from "@/lib/utils";
 import { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { CheckCircle, Pencil, XCircle } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { useTheme } from "next-themes";
 import Button from "./ui/Button";
 import Input from "./ui/Input";
 import Combobox from "./ui/combobox";
@@ -24,6 +25,7 @@ interface Props {
     rows: Row[],
     label: "Graphs" | "Schemas" | "Configs" | "Users" | "TableView",
     entityName: "Graph" | "Schema" | "Config" | "User" | "Element",
+    valueClassName?: string
     inputRef?: React.RefObject<HTMLInputElement>,
     children?: React.ReactNode,
     setRows?: (rows: Row[]) => void,
@@ -32,9 +34,12 @@ interface Props {
     itemsPerPage?: number
 }
 
-export default function TableComponent({ headers, rows, label, entityName, inputRef, children, setRows, className, itemHeight = 70.5, itemsPerPage = 30 }: Props) {
+export default function TableComponent({ headers, rows, label, entityName, valueClassName, inputRef, children, setRows, className, itemHeight = 70.5, itemsPerPage = 30 }: Props) {
 
     const { indicator } = useContext(IndicatorContext)
+
+    const { theme } = useTheme()
+    const { currentTheme } = getTheme(theme)
 
     const searchRef = useRef<HTMLInputElement>(null)
     const headerRef = useRef<HTMLTableRowElement>(null)
@@ -127,6 +132,14 @@ export default function TableComponent({ headers, rows, label, entityName, input
     const stripBackground = useMemo(() => `url("data:image/svg+xml,${stripSVG}")`, [stripSVG])
     const columnCount = setRows ? headers.length + 1 : headers.length;
 
+    const renderValue = (v: any) => (
+        <span className={valueClassName}>{v}</span>
+    )
+
+    const renderLabel = (l: any) => (
+        <span className={valueClassName}>{l[0]}:</span>
+    )
+
     return (
         <div className={cn("h-full w-full flex flex-col gap-4", className)}>
             <div className="flex gap-4">
@@ -134,7 +147,7 @@ export default function TableComponent({ headers, rows, label, entityName, input
                 <Input
                     data-testid={`searchInput${label}`}
                     ref={searchRef}
-                    className="grow"
+                    className={cn("grow", valueClassName)}
                     value={search}
                     type="text"
                     placeholder={`Search for${entityName ? ` a ${entityName}` : ""}`}
@@ -202,9 +215,9 @@ export default function TableComponent({ headers, rows, label, entityName, input
                     {
                         visibleRows.map((row) => {
                             const actualIndex = rows.findIndex(r => r === row)
-                            
+
                             if (actualIndex === -1) return null
-                            
+
                             return (
                                 <TableRow
                                     className="border-border"
@@ -244,6 +257,9 @@ export default function TableComponent({ headers, rows, label, entityName, input
                                                                 !!search && handleSearchFilter(cell)
                                                             }
                                                             keyPath={[headers[j]]}
+                                                            valueRenderer={renderValue}
+                                                            labelRenderer={renderLabel}
+
                                                             theme={{
                                                                 base00: "var(--background)", // background
                                                                 base01: '#000000',
@@ -258,7 +274,7 @@ export default function TableComponent({ headers, rows, label, entityName, input
                                                                 base0A: '#CE9178',
                                                                 base0B: '#CE9178', // close values
                                                                 base0C: '#CE9178',
-                                                                base0D: '#99E4E5', // * keys
+                                                                base0D: currentTheme === "dark" ? '#66B2B5' : '#4A90A4', // * keys
                                                                 base0E: '#ae81ff',
                                                                 base0F: '#cc6633'
                                                             }}
