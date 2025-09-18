@@ -5,7 +5,7 @@ import GraphPage from "./graphPage";
 export default class TableView extends GraphPage {
 
     private get tableViewTab(): Locator {
-        return this.page.getByRole('tab', { name: 'Table' });
+        return this.page.getByTestId("tableTab");
     }
 
     private get tableViewTabPanel(): Locator {
