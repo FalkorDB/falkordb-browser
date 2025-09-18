@@ -31,13 +31,8 @@ export async function POST(request: NextRequest) {
 
     const { username, password, host = "localhost", port = "6379", tls = "false", ca } = body;
 
-    // Validate required fields
-    if (!username || !password) {
-      return NextResponse.json(
-        { message: "Username and password are required" },
-        { status: 400 }
-      );
-    }
+    // Note: username and password are optional - same as NextAuth session behavior
+    // The newClient function handles empty credentials by using "default" user
 
     try {
       // Generate unique user ID
@@ -48,8 +43,8 @@ export async function POST(request: NextRequest) {
         {
           host,
           port: port.toString(),
-          username,
-          password,
+          username: username || "", // Handle undefined username like NextAuth does
+          password: password || "", // Handle undefined password like NextAuth does
           tls: tls.toString(),
           ca: ca || "undefined",
         },
@@ -67,17 +62,22 @@ export async function POST(request: NextRequest) {
         role,
       };
 
-      // Create JWT token
+      // Create JWT token with all necessary connection information
       const tokenPayload = {
         sub: user.id,           // Standard JWT claim for user ID
-        username: user.username,
+        username: username || undefined,
+        password: password || undefined,
         role: user.role,
+        host: user.host,
+        port: user.port,
+        tls: user.tls,
+        ca: user.ca || undefined,
       };
 
       const token = await new SignJWT(tokenPayload)
         .setProtectedHeader({ alg: "HS256" })
         .setIssuedAt()
-        .setExpirationTime("24h")
+        .setExpirationTime("2h")
         .sign(JWT_SECRET);
 
       return NextResponse.json(
