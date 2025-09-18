@@ -118,31 +118,31 @@ export default function PaginationList<T extends Item>({ list, step, onClick, da
                                     "border-b",
                                     // eslint-disable-next-line no-nested-ternary
                                     selected
-                                        ? "text-primary border-primary"
-                                        : hover
-                                            ? "text-foreground border-foreground"
-                                            : "text-border border-border"
+                                    ? "text-primary border-primary"
+                                    : hover
+                                    ? "text-foreground border-foreground"
+                                    : "text-border border-border"
                                 )}
                                 onMouseEnter={() => setHoverIndex(index)}
                                 onMouseLeave={() => searchRef.current !== document.activeElement && setHoverIndex(-1)}
                                 style={{ height: `${1 / step * 100}%` }}
                                 key={text}
-                            >
+                                >
                                 {
                                     onClick ?
-                                        <Button
-                                            className={cn("w-full h-full text-xl", !isString ? "flex-col" : "text-center")}
-                                            title={text}
-                                            label={!isString ? undefined : text}
-                                            onClick={() => {
-                                                onClick(text)
-                                            }}
-                                            tabIndex={-1}
-                                        >
+                                    <Button
+                                    className={cn("w-full h-full text-xl", !isString ? "flex-col" : "text-center")}
+                                    title={text}
+                                    label={!isString ? undefined : text}
+                                    onClick={() => {
+                                        onClick(text)
+                                    }}
+                                    tabIndex={-1}
+                                    >
                                             {
                                                 !isString && (item.timestamp || item.graphName) &&
                                                 <>
-                                                    <div className="flex gap-2 items-start w-full">
+                                                    <div className="h-1 grow flex gap-2 items-start w-full">
                                                         <p className="w-1 grow text-start truncate">
                                                             {
                                                                 !isString && item.timestamp &&
@@ -151,22 +151,22 @@ export default function PaginationList<T extends Item>({ list, step, onClick, da
                                                                     const now = new Date();
                                                                     const timeDiff = now.getTime() - date.getTime();
                                                                     const hoursAgo = timeDiff / (1000 * 60 * 60);
-
+                                                                    
                                                                     if (hoursAgo <= 24) {
                                                                         return date.toLocaleTimeString([], { hour12: false });
                                                                     }
-
+                                                                    
                                                                     return date.toLocaleString([], { hour12: false });
                                                                 })()
                                                             }
                                                         </p>
                                                         <p className="w-1 grow text-start truncate">{!isString && item.graphName && `${item.graphName}`}</p>
                                                     </div>
-                                                    <p className="truncate text-center w-full">{text}</p>
+                                                    <p data-testid={`${dataTestId}${index}Text`} className="h-1 grow truncate text-center w-full">{text}</p>
                                                 </>
                                             }
                                         </Button>
-                                        : <p className="w-full h-full text-xl text-center">{text}</p>
+                                        : <p data-testid={`${dataTestId}${index}Text`} className="w-full h-full text-xl text-center">{text}</p>
                                 }
                             </li>
                         )

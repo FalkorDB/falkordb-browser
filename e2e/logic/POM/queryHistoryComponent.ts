@@ -16,12 +16,12 @@ export default class QueryHistory extends GraphPage {
         return this.page.getByTestId(`queryHistory${index}`);
     }
 
-    public get runQueryHistoryButton(): Locator {
-        return this.page.getByTestId("queryHistoryEditorRun");
+    public selectQueryHistoryText(index: string): Locator {
+        return this.page.getByTestId(`queryHistory${index}Text`);
     }
 
-    private get queryHistoryTextarea(): Locator {
-        return this.page.locator('[data-testid="queryList"] li');
+    public get runQueryHistoryButton(): Locator {
+        return this.page.getByTestId("queryHistoryEditorRun");
     }
 
     public get searchQueryInput(): Locator {
@@ -57,6 +57,14 @@ export default class QueryHistory extends GraphPage {
         return await this.queryList.isVisible();
     }
 
+    async getContentSelectQueryHistoryText(index: string): Promise<string | null> {
+        return interactWhenVisible(
+            this.selectQueryHistoryText(index),
+            (el) => el.textContent(),
+            `Query History ${index} Text`
+        )
+    }
+
     async runAQueryFromHistory(queryNumber: string): Promise<void> {
         await this.clickQueryHistoryButton();
         await this.clickSelectQueryInHistory(queryNumber);
@@ -73,7 +81,7 @@ export default class QueryHistory extends GraphPage {
         await this.clickSelectQueryInHistory(queryNumber);
     }
 
-    async getQueryHistoryEditorContent(): Promise<string[]> {
-        return await this.queryHistoryTextarea.allTextContents();
+    async getQueryHistoryEditorContent(): Promise<string> {
+        return await this.selectQueryHistoryText("0").textContent() || "";
     }
 }
