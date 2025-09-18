@@ -407,7 +407,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
                         </ResizablePanel>
                         <ResizableHandle withHandle onMouseUp={() => isCollapsed && onExpand()} className={cn("w-0", isCollapsed && "hidden")} />
                         <ResizablePanel
-                          defaultSize={70 - panelSize}
+                          defaultSize={100 - panelSize}
                           minSize={50}
                           maxSize={100}
                         >

@@ -143,7 +143,7 @@ export default function PaginationList<T extends Item>({ list, step, onClick, da
                                                 !isString && (item.timestamp || item.graphName) &&
                                                 <>
                                                     <div className="flex gap-2 items-start w-full">
-                                                        <p className="w-1 grow text-start">
+                                                        <p className="w-1 grow text-start truncate">
                                                             {
                                                                 !isString && item.timestamp &&
                                                                 (() => {
@@ -160,7 +160,7 @@ export default function PaginationList<T extends Item>({ list, step, onClick, da
                                                                 })()
                                                             }
                                                         </p>
-                                                        <p className="w-1 grow text-start">{!isString && item.graphName && `${item.graphName}`}</p>
+                                                        <p className="w-1 grow text-start truncate">{!isString && item.graphName && `${item.graphName}`}</p>
                                                     </div>
                                                     <p className="truncate text-center w-full">{text}</p>
                                                 </>

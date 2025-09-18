@@ -104,6 +104,16 @@
     "react-json-view": {
       "react": "$react",
       "react-dom": "$react-dom"
-    }
+    },
+    "swagger-ui-react": {
+      "react-syntax-highlighter": "^15.6.6"
+    },
+    "react-syntax-highlighter": {
+      "refractor": "^4.9.0"
+    },
+    "refractor": {
+      "prismjs": "^1.30.0"
+    },
+    "prismjs": "^1.30.0"
   }
 }

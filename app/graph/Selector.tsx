@@ -64,6 +64,8 @@ export default function Selector({ graph, options, setOptions, graphName, setGra
     const [isLoading, setIsLoading] = useState(false)
     const [maximize, setMaximize] = useState(false)
     const [tab, setTab] = useState<Tab>("text")
+
+    const filters = Array.from(new Set(historyQuery?.queries.map(query => query.graphName).filter(name => !!name)))
     const currentQuery = historyQuery?.counter === 0 ? historyQuery.currentQuery : historyQuery?.queries[historyQuery.counter - 1]
     const type = runQuery && historyQuery && setHistoryQuery ? "Graph" : "Schema"
 
@@ -82,7 +84,7 @@ export default function Selector({ graph, options, setOptions, graphName, setGra
         if (!historyQuery) return
 
         let newActiveFilters = activeFilters;
-
+        debugger
         if (name) {
             if (activeFilters.some(f => f === name)) {
                 newActiveFilters = activeFilters.filter(f => f !== name);
@@ -106,9 +108,9 @@ export default function Selector({ graph, options, setOptions, graphName, setGra
     useEffect(() => {
         if (!historyQuery) return
 
-        if (Array.from(new Set(historyQuery.queries.map(query => query.graphName))).some(name => name === graphName)) {
+        if (filters.some(name => name === graphName) && graphName) {
             setActiveFilters([graphName]);
-
+            
             const newFilteredQueries = [
                 ...historyQuery.queries.filter(({ graphName: n }) => graphName === n)
             ].reverse()
@@ -208,6 +210,9 @@ export default function Selector({ graph, options, setOptions, graphName, setGra
 
     const separator = <div className="h-[80%] w-0.5 bg-border rounded-full" />
 
+    console.log(activeFilters);
+    
+
     return (
         <div className="z-20 w-full h-[50px] flex flex-row gap-4 items-center">
             <SelectGraph
@@ -296,7 +301,7 @@ export default function Selector({ graph, options, setOptions, graphName, setGra
                                                     </Tooltip>
                                                 </li>
                                                 {
-                                                    Array.from(new Set(historyQuery.queries.map(query => query.graphName))).map(name => (
+                                                    filters.map(name => (
                                                         <li key={name}>
                                                             <Button
                                                                 className={cn("bg-background py-1 px-2 rounded-full", activeFilters.some(f => f === name) && "text-background bg-foreground")}
