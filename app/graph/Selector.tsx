@@ -84,7 +84,6 @@ export default function Selector({ graph, options, setOptions, graphName, setGra
         if (!historyQuery) return
 
         let newActiveFilters = activeFilters;
-        debugger
         if (name) {
             if (activeFilters.some(f => f === name)) {
                 newActiveFilters = activeFilters.filter(f => f !== name);
@@ -209,9 +208,6 @@ export default function Selector({ graph, options, setOptions, graphName, setGra
     }
 
     const separator = <div className="h-[80%] w-0.5 bg-border rounded-full" />
-
-    console.log(activeFilters);
-    
 
     return (
         <div className="z-20 w-full h-[50px] flex flex-row gap-4 items-center">
