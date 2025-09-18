@@ -31,17 +31,8 @@ export async function POST(request: NextRequest) {
 
     const { username, password, host = "localhost", port = "6379", tls = "false", ca } = body;
 
-    // Validate username presence (password can be empty for some Redis configs)
-    if (
-      typeof username !== "string" ||
-      username.trim() === "" ||
-      typeof password !== "string"
-    ) {
-      return NextResponse.json(
-        { message: "Username is required and password must be a string" },
-        { status: 400 }
-      );
-    }
+    // Note: username and password are optional - same as NextAuth session behavior
+    // The newClient function handles empty credentials by using "default" user
 
     try {
       // Generate unique user ID
@@ -52,10 +43,10 @@ export async function POST(request: NextRequest) {
         {
           host,
           port: port.toString(),
-          username,
-          password,
+          username: username || "", // Handle undefined username like NextAuth does
+          password: password || "", // Handle undefined password like NextAuth does
           tls: tls.toString(),
-          ca,
+          ca: ca || "undefined",
         },
         id
       );
@@ -71,16 +62,16 @@ export async function POST(request: NextRequest) {
         role,
       };
 
-      // Create JWT token with enhanced payload
+      // Create JWT token with all necessary connection information
       const tokenPayload = {
         sub: user.id,           // Standard JWT claim for user ID
-        username: user.username,
-        password,
+        username: username || undefined,
+        password: password || undefined,
         role: user.role,
         host: user.host,
         port: user.port,
         tls: user.tls,
-        ca: user.ca,
+        ca: user.ca || undefined,
       };
 
       const token = await new SignJWT(tokenPayload)
