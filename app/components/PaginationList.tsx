@@ -63,6 +63,7 @@ export default function PaginationList<T extends Item>({ list, step, onClick, da
 
     return (
         <div className={cn("w-full flex flex-col gap-4 p-6", className)}>
+            {children}
             <div className="flex gap-2 items-center">
                 <Input
                     ref={searchRef}
@@ -99,12 +100,6 @@ export default function PaginationList<T extends Item>({ list, step, onClick, da
                 />
                 {isLoading && <Loader2 className="w-4 h-4 animate-spin duration-[infinite]" />}
             </div>
-            {
-                children &&
-                <div className="flex gap-2 items-center">
-                    {children}
-                </div>
-            }
             <ul
                 data-testid="queryList"
                 className="h-1 grow flex flex-col p-2"
@@ -113,6 +108,9 @@ export default function PaginationList<T extends Item>({ list, step, onClick, da
                     items.map((item, index) => {
                         const selected = isSelected ? isSelected(item) : false
                         const hover = hoverIndex === index
+                        const isString = typeof item === "string"
+                        const text = isString ? item : item.text
+
                         return (
                             <li
                                 data-testid={`${dataTestId}${index}`}
@@ -128,19 +126,47 @@ export default function PaginationList<T extends Item>({ list, step, onClick, da
                                 onMouseEnter={() => setHoverIndex(index)}
                                 onMouseLeave={() => searchRef.current !== document.activeElement && setHoverIndex(-1)}
                                 style={{ height: `${1 / step * 100}%` }}
-                                key={typeof item === "string" ? item : item.text}
+                                key={text}
                             >
                                 {
                                     onClick ?
                                         <Button
-                                            className={cn("w-full h-full text-xl text-center")}
-                                            label={typeof item === "string" ? item : item.text}
+                                            className={cn("w-full h-full text-xl", !isString ? "flex-col" : "text-center")}
+                                            title={text}
+                                            label={!isString ? undefined : text}
                                             onClick={() => {
-                                                onClick(typeof item === "string" ? item : item.text)
+                                                onClick(text)
                                             }}
                                             tabIndex={-1}
-                                        />
-                                        : <p className="w-full h-full text-xl text-center">{typeof item === "string" ? item : item.text}</p>
+                                        >
+                                            {
+                                                !isString && (item.timestamp || item.graphName) &&
+                                                <>
+                                                    <div className="flex gap-2 items-start w-full">
+                                                        <p className="w-1 grow text-start">
+                                                            {
+                                                                !isString && item.timestamp &&
+                                                                (() => {
+                                                                    const date = new Date(item.timestamp);
+                                                                    const now = new Date();
+                                                                    const timeDiff = now.getTime() - date.getTime();
+                                                                    const hoursAgo = timeDiff / (1000 * 60 * 60);
+
+                                                                    if (hoursAgo <= 24) {
+                                                                        return date.toLocaleTimeString([], { hour12: false });
+                                                                    }
+
+                                                                    return date.toLocaleString([], { hour12: false });
+                                                                })()
+                                                            }
+                                                        </p>
+                                                        <p className="w-1 grow text-start">{!isString && item.graphName && `${item.graphName}`}</p>
+                                                    </div>
+                                                    <p className="truncate text-center w-full">{text}</p>
+                                                </>
+                                            }
+                                        </Button>
+                                        : <p className="w-full h-full text-xl text-center">{text}</p>
                                 }
                             </li>
                         )

@@ -13,22 +13,26 @@ import { GraphContext, HistoryQueryContext, IndicatorContext, PanelContext, Quer
 import GraphInfoPanel from "./graph/graphInfo";
 import Tutorial from "./graph/Tutorial";
 
+const defaultQueryHistory = {
+  queries: [],
+  query: "",
+  currentQuery: {
+    text: "",
+    metadata: [],
+    explain: [],
+    profile: [],
+    graphName: "",
+    timestamp: 0,
+  },
+  counter: 0
+}
+
 function ProvidersWithSession({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const { toast } = useToast()
   const { status } = useSession()
 
-  const [historyQuery, setHistoryQuery] = useState<HistoryQuery>({
-    queries: [],
-    query: "",
-    currentQuery: {
-      text: "",
-      metadata: [],
-      explain: [],
-      profile: [],
-    },
-    counter: 0
-  })
+  const [historyQuery, setHistoryQuery] = useState<HistoryQuery>(defaultQueryHistory)
   const [indicator, setIndicator] = useState<"online" | "offline">("online")
   const [runDefaultQuery, setRunDefaultQuery] = useState(false)
   const [schemaNames, setSchemaNames] = useState<string[]>([])
@@ -130,7 +134,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
   const indicatorContext = useMemo(() => ({
     indicator,
     setIndicator,
-  }), [indicator, setIndicator])
+  }), [indicator])
 
   const panelContext = useMemo(() => ({
     panel,
@@ -209,7 +213,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       if (!explain.ok) return;
 
       const explainJson = await explain.json()
-      const newQuery = { text: q, metadata: result.metadata, explain: explainJson.result, profile: [] }
+      const newQuery = { text: q, metadata: result.metadata, explain: explainJson.result, profile: [], graphName, timestamp: new Date().getTime() }
       const g = Graph.create(n, result, false, false, existingLimit, graphInfo)
       const newQueries = [...historyQuery.queries.filter(qu => qu.text !== newQuery.text), newQuery]
 
@@ -262,17 +266,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (status !== "authenticated") return
 
-    setHistoryQuery({
-      queries: JSON.parse(localStorage.getItem(`query history`) || "[]"),
-      query: "",
-      currentQuery: {
-        text: "",
-        metadata: [],
-        explain: [],
-        profile: [],
-      },
-      counter: 0
-    })
+    setHistoryQuery({ ...defaultQueryHistory, queries: JSON.parse(localStorage.getItem("query history") || "[]") })
     setTimeout(parseInt(localStorage.getItem("timeout") || "0", 10))
     const l = parseInt(localStorage.getItem("limit") || "300", 10)
     setLimit(l)
@@ -310,7 +304,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
     securedFetch("/api/status", {
       method: "GET",
     }, toast, setIndicator)
-  }, [toast])
+  }, [toast, setIndicator])
 
   useEffect(() => {
     let interval: NodeJS.Timeout | undefined

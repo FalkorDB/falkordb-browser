@@ -17,6 +17,8 @@ export type Query = {
   metadata: string[];
   explain: string[];
   profile: string[];
+  graphName: string;
+  timestamp: number; 
 };
 
 const getSchemaValue = (value: string): string[] => {
