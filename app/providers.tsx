@@ -250,7 +250,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
 
       const explainJson = await explain.json()
       const newQuery = { text: q, metadata: result.metadata, explain: explainJson.result, profile: [], graphName, timestamp: new Date().getTime() }
-      const g = Graph.create(n, result, false, false, existingLimit, graphInfo)
+      const g = Graph.create(n, result, false, false, existingLimit, graphI)
       const newQueries = [...historyQuery.queries.filter(qu => qu.text !== newQuery.text), newQuery]
 
       setHistoryQuery(prev => ({
