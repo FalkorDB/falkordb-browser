@@ -22,32 +22,76 @@ import SelectGraph from "./selectGraph";
 
 type Tab = "text" | "metadata" | "explain" | "profile"
 
-interface Props {
+interface BaseProps<T = "Schema" | "Graph"> {
+    type: T
     graph: Graph
     options: string[]
     setOptions: Dispatch<SetStateAction<string[]>>
     graphName: string
     setGraphName: Dispatch<SetStateAction<string>>
     setGraph: Dispatch<SetStateAction<Graph>>
-    // graph
-    runQuery?: (query: string) => Promise<void>
-    historyQuery?: HistoryQuery
-    setHistoryQuery?: Dispatch<SetStateAction<HistoryQuery>>
-    fetchCount?: () => Promise<void>
-    isQueryLoading?: boolean
-    // schema
-    selectedElements?: (Node | Link)[]
-    setSelectedElement?: (el: Node | Link | undefined) => void
-    handleDeleteElement?: () => Promise<void>
-    chartRef?: GraphRef
-    setIsAddEntity?: (isAdd: boolean) => void
-    setIsAddRelation?: (isAdd: boolean) => void
-    isCanvasLoading?: boolean
 }
+
+interface SchemaProps {
+    selectedElements: (Node | Link)[];
+    setSelectedElement: (el: Node | Link | undefined) => void;
+    handleDeleteElement: () => Promise<void>;
+    chartRef: GraphRef;
+    setIsAddEntity: (isAdd: boolean) => void;
+    setIsAddRelation: (isAdd: boolean) => void;
+    isCanvasLoading: boolean;
+    runQuery?: never;
+    historyQuery?: never;
+    setHistoryQuery?: never;
+    fetchCount?: never;
+    isQueryLoading?: never;
+}
+
+interface GraphProps {
+    runQuery: (query: string) => Promise<void>;
+    historyQuery: HistoryQuery;
+    setHistoryQuery: Dispatch<SetStateAction<HistoryQuery>>;
+    fetchCount: () => Promise<void>;
+    isQueryLoading: boolean;
+    selectedElements?: never;
+    setSelectedElement?: never;
+    handleDeleteElement?: never;
+    chartRef?: never;
+    setIsAddEntity?: never;
+    setIsAddRelation?: never;
+    isCanvasLoading?: never;
+}
+
+type Props<T = "Graph" | "Schema"> =
+    BaseProps<T> & (
+        T extends "Graph"
+        ? GraphProps
+        : SchemaProps
+    )
 
 const STEP = 8
 
-export default function Selector({ graph, options, setOptions, graphName, setGraphName, runQuery, historyQuery, setHistoryQuery, fetchCount, selectedElements, setSelectedElement, handleDeleteElement, chartRef, setIsAddEntity, setIsAddRelation, setGraph, isCanvasLoading, isQueryLoading }: Props) {
+export default function Selector<T extends "Graph" | "Schema" = "Graph" | "Schema">({
+    graph,
+    options,
+    setOptions,
+    graphName,
+    setGraphName,
+    runQuery,
+    historyQuery,
+    setHistoryQuery,
+    fetchCount,
+    selectedElements,
+    setSelectedElement,
+    handleDeleteElement,
+    chartRef,
+    setIsAddEntity,
+    setIsAddRelation,
+    setGraph,
+    type,
+    isCanvasLoading,
+    isQueryLoading
+}: Props<T>) {
 
     const { indicator } = useContext(IndicatorContext)
 
@@ -67,7 +111,6 @@ export default function Selector({ graph, options, setOptions, graphName, setGra
 
     const filters = Array.from(new Set(historyQuery?.queries.map(query => query.graphName).filter(name => !!name)))
     const currentQuery = historyQuery?.counter === 0 ? historyQuery.currentQuery : historyQuery?.queries[historyQuery.counter - 1]
-    const type = runQuery && historyQuery && setHistoryQuery ? "Graph" : "Schema"
 
     const afterSearchCallback = useCallback((newFilteredList: Query[]) => {
         if (!historyQuery || !setHistoryQuery) return
@@ -220,7 +263,7 @@ export default function Selector({ graph, options, setOptions, graphName, setGra
                 setGraph={setGraph}
             />
             {
-                runQuery && historyQuery && setHistoryQuery && fetchCount && isQueryLoading !== undefined ?
+                historyQuery ?
                     <>
                         <div className="h-full w-1 grow relative overflow-visible">
                             <EditorComponent
@@ -437,7 +480,7 @@ export default function Selector({ graph, options, setOptions, graphName, setGra
                             </Button>
                         </div>
                     </>
-                    : selectedElements && setSelectedElement && handleDeleteElement && handleDeleteElement && setIsAddEntity && setIsAddRelation && chartRef && isCanvasLoading !== undefined && <div className="w-full h-full">
+                    : selectedElements && setSelectedElement && handleDeleteElement && setIsAddEntity && setIsAddRelation && chartRef && isCanvasLoading !== undefined && <div className="w-full h-full">
                         <Toolbar
                             graph={graph}
                             label={type}
@@ -454,19 +497,4 @@ export default function Selector({ graph, options, setOptions, graphName, setGra
             }
         </div>
     )
-}
-
-Selector.defaultProps = {
-    runQuery: undefined,
-    historyQuery: undefined,
-    setHistoryQuery: undefined,
-    selectedElements: undefined,
-    setSelectedElement: undefined,
-    handleDeleteElement: undefined,
-    chartRef: undefined,
-    setIsAddEntity: undefined,
-    setIsAddRelation: undefined,
-    fetchCount: undefined,
-    isQueryLoading: undefined,
-    isCanvasLoading: undefined,
 }

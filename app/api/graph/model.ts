@@ -5,6 +5,8 @@
 
 import { LinkObject, NodeObject } from "react-force-graph-2d";
 
+export type Value = string | number | boolean
+
 export type HistoryQuery = {
   queries: Query[];
   currentQuery: Query;
@@ -173,6 +175,10 @@ export class GraphInfo {
 
   get PropertyKeys(): string[] | undefined {
     return this.propertyKeys;
+  }
+
+  set PropertyKeys(propertyKeys: string[] | undefined) {
+    this.propertyKeys = propertyKeys;
   }
 
   get Labels(): Map<string, InfoLabel> {
@@ -1027,7 +1033,7 @@ export class Graph {
     });
   }
 
-  public setProperty(key: string, val: string, id: number, type: boolean) {
+  public setProperty(key: string, val: Value, id: number, type: boolean) {
     this.Data = this.Data.map((row) =>
       Object.fromEntries(
         Object.entries(row).map(([k, cell]) => {
