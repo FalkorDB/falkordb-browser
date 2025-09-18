@@ -117,7 +117,7 @@ export default function Selector({ graph, options, setOptions, graphName, setGra
             setFilteredQueries(newFilteredQueries)
             afterSearchCallback(newFilteredQueries)
         }
-    }, [graphName])
+    }, [graphName, historyQuery?.queries])
 
     const focusEditorAtEnd = () => {
         if (editorRef.current) {
