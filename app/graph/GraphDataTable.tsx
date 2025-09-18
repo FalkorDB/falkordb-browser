@@ -3,14 +3,14 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Check, Pencil, Plus, Trash2, X } from "lucide-react"
 import { cn, prepareArg, securedFetch } from "@/lib/utils"
 import { toast } from "@/components/ui/use-toast"
-import { Dispatch, MutableRefObject, SetStateAction, useCallback, useContext, useEffect, useRef, useState } from "react"
+import { MutableRefObject, useContext, useEffect, useRef, useState } from "react"
 import { useSession } from "next-auth/react"
 import { Switch } from "@/components/ui/switch"
 import DeleteElement from "./DeleteElement"
 import Input from "../components/ui/Input"
 import DialogComponent from "../components/DialogComponent"
 import CloseDialog from "../components/CloseDialog"
-import { Graph, GraphInfo, Link, Node, Value } from "../api/graph/model"
+import { Link, Node, Value } from "../api/graph/model"
 import { GraphContext, IndicatorContext } from "../components/provider"
 import ToastButton from "../components/ToastButton"
 import Button from "../components/ui/Button"
@@ -28,7 +28,7 @@ interface Props {
 
 export default function GraphDataTable({ object, type, onDeleteElement, lastObjId, className }: Props) {
 
-    const { graph, graphName, graphInfo, setGraphInfo } = useContext(GraphContext)
+    const { graph, graphInfo, setGraphInfo } = useContext(GraphContext)
 
     const setInputRef = useRef<HTMLInputElement>(null)
     const addInputRef = useRef<HTMLInputElement>(null)
