@@ -200,7 +200,6 @@ export default function GraphDataPanel({ object, setObject, onDeleteElement, set
             <GraphDataTable
                 className="h-1 grow w-full"
                 lastObjId={lastObjId}
-                graph={graph}
                 object={object}
                 type={type}
                 onDeleteElement={onDeleteElement}

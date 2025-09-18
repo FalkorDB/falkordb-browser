@@ -3,15 +3,15 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Check, Pencil, Plus, Trash2, X } from "lucide-react"
 import { cn, prepareArg, securedFetch } from "@/lib/utils"
 import { toast } from "@/components/ui/use-toast"
-import { MutableRefObject, useContext, useEffect, useRef, useState } from "react"
+import { Dispatch, MutableRefObject, SetStateAction, useCallback, useContext, useEffect, useRef, useState } from "react"
 import { useSession } from "next-auth/react"
 import { Switch } from "@/components/ui/switch"
 import DeleteElement from "./DeleteElement"
 import Input from "../components/ui/Input"
 import DialogComponent from "../components/DialogComponent"
 import CloseDialog from "../components/CloseDialog"
-import { Graph, Link, Node, Value } from "../api/graph/model"
-import { IndicatorContext } from "../components/provider"
+import { Graph, GraphInfo, Link, Node, Value } from "../api/graph/model"
+import { GraphContext, IndicatorContext } from "../components/provider"
 import ToastButton from "../components/ToastButton"
 import Button from "../components/ui/Button"
 import Combobox from "../components/ui/combobox"
@@ -19,7 +19,6 @@ import Combobox from "../components/ui/combobox"
 type ValueType = "string" | "number" | "boolean"
 
 interface Props {
-    graph: Graph
     object: Node | Link
     type: boolean
     onDeleteElement: () => Promise<void>
@@ -27,7 +26,9 @@ interface Props {
     className?: string
 }
 
-export default function GraphDataTable({ graph, object, type, onDeleteElement, lastObjId, className }: Props) {
+export default function GraphDataTable({ object, type, onDeleteElement, lastObjId, className }: Props) {
+
+    const { graph, graphName, graphInfo, setGraphInfo } = useContext(GraphContext)
 
     const setInputRef = useRef<HTMLInputElement>(null)
     const addInputRef = useRef<HTMLInputElement>(null)
@@ -125,6 +126,12 @@ export default function GraphDataTable({ graph, object, type, onDeleteElement, l
                 const value = object.data[key]
 
                 graph.setProperty(key, val, id, type)
+
+                graphInfo.PropertyKeys = [...(graphInfo.PropertyKeys || []).filter((k) => k !== key), key];
+                const graphI = graphInfo.clone();
+                graph.GraphInfo = graphI
+                setGraphInfo(graphI)
+
                 object.data[key] = val
                 setAttributes(Object.keys(object.data))
 

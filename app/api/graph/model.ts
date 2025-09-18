@@ -1050,8 +1050,5 @@ export class Graph {
         })
       )
     );
-
-    this.GraphInfo.PropertyKeys = [...(this.GraphInfo.PropertyKeys || []).filter((k) => k !== key), key];
-    this.GraphInfo = this.GraphInfo.clone();
   }
 }
