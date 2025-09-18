@@ -259,6 +259,7 @@ export default function Page() {
     return (
         <div className="Page gap-8 p-8">
             <Selector
+                type="Schema"
                 graph={schema}
                 options={schemaNames}
                 setOptions={setSchemaNames}

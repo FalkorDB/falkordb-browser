@@ -189,6 +189,20 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
     }
   }, [setIsLoading, setCooldownTicks]);
 
+  const fetchInfo = useCallback(async (type: string) => {
+    if (!graphName) return []
+
+    const result = await securedFetch(`/api/graph/${graphName}/info?type=${type}`, {
+      method: "GET",
+    }, toast, setIndicator);
+
+    if (!result.ok) return []
+
+    const json = await result.json();
+
+    return json.result.data.map(({ info }: { info: string }) => info);
+  }, [graphName, setIndicator, toast]);
+
   const runQuery = useCallback(async (q: string, name?: string): Promise<void> => {
     try {
       setIsQueryLoading(true)
@@ -206,6 +220,24 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
 
       if (!result) return;
 
+      const graphI = await Promise.all([
+        fetchInfo("(label)"),
+        fetchInfo("(relationship type)"),
+        fetchInfo("(property key)"),
+      ]).then(async ([newLabels, newRelationships, newPropertyKeys]) => {
+        const colorsArr = localStorage.getItem(n)
+        const gi = GraphInfo.create(newPropertyKeys, newLabels, newRelationships, colorsArr ? JSON.parse(colorsArr) : undefined)
+        setGraphInfo(gi)
+        return gi
+      }).catch((error) => {
+        toast({
+          title: "Error",
+          description: error.message || "Failed to fetch graph info",
+          variant: "destructive",
+        })
+        return undefined
+      });
+
       const explain = await securedFetch(`api/graph/${prepareArg(n)}/explain?query=${prepareArg(query)}`, {
         method: "GET"
       }, toast, setIndicator)
@@ -214,7 +246,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
 
       const explainJson = await explain.json()
       const newQuery = { text: q, metadata: result.metadata, explain: explainJson.result, profile: [] }
-      const g = Graph.create(n, result, false, false, existingLimit, graphInfo)
+      const g = Graph.create(n, result, false, false, existingLimit, graphI)
       const newQueries = [...historyQuery.queries.filter(qu => qu.text !== newQuery.text), newQuery]
 
       setHistoryQuery(prev => ({
