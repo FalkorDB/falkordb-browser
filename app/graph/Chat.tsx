@@ -263,7 +263,7 @@ export default function Chat({ onClose }: Props) {
                         >
                             {queryCollapse[i] ? <ChevronRight size={25} /> : <ChevronDown size={25} />}
                         </Button>
-                        <div className="overflow-hidden CypherInput">
+                        <div className="overflow-hidden SofiaSans">
                             {
                                 queryCollapse[i] ? (
                                     <Tooltip>
@@ -389,7 +389,7 @@ export default function Chat({ onClose }: Props) {
                 </ul>
                 <form className="flex gap-2 items-center border border-border rounded-lg w-full p-2" onSubmit={handleSubmit}>
                     <Input
-                        className="w-1 grow bg-transparent border-none text-foreground text-lg CypherInput"
+                        className="w-1 grow bg-transparent border-none text-foreground text-lg SofiaSans"
                         placeholder="Type your message here..."
                         value={newMessage}
                         onChange={(e) => setNewMessage(e.target.value)}

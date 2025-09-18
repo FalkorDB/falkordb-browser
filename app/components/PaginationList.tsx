@@ -102,7 +102,7 @@ export default function PaginationList<T extends Item>({ list, step, onClick, da
             </div>
             <ul
                 data-testid="queryList"
-                className="h-1 grow flex flex-col p-2"
+                className={cn("h-1 grow flex flex-col p-2", items.length > 0 && typeof items[0] === "object" && "SofiaSans")}
             >
                 {
                     items.map((item, index) => {
