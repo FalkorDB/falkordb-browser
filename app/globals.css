@@ -122,10 +122,17 @@
 }
 
 ::-webkit-scrollbar-thumb {
-    @apply bg-secondary;
     border-radius: 20px;
     border: 6px solid transparent;
     background-clip: content-box;
+}
+
+.dark ::-webkit-scrollbar-thumb {
+    background: hsl(0 0% 14.1%);
+}
+
+.light ::-webkit-scrollbar-thumb {
+    background: hsl(0 0% 90%);
 }
 
 input[type="color"]::-webkit-color-swatch-wrapper {

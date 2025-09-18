@@ -285,10 +285,10 @@ export default function Selector({ graph, options, setOptions, graphName, setGra
                                             }}
                                             searchRef={searchQueryRef}
                                         >
-                                            <ul className="flex flex-wrap gap-2 overflow-auto max-h-[64px] items-center">
-                                                <li className="flex items-center">
+                                            <ul className="w-full flex flex-wrap gap-2 overflow-y-auto max-h-[72px]">
+                                                <li key="info">
                                                     <Tooltip>
-                                                        <TooltipTrigger>
+                                                        <TooltipTrigger className="h-[32px] flex items-center">
                                                             <Info />
                                                         </TooltipTrigger>
                                                         <TooltipContent>
@@ -298,9 +298,9 @@ export default function Selector({ graph, options, setOptions, graphName, setGra
                                                 </li>
                                                 {
                                                     filters.map(name => (
-                                                        <li key={name}>
+                                                        <li key={name} className="max-w-full">
                                                             <Button
-                                                                className={cn("bg-background py-1 px-2 rounded-full", activeFilters.some(f => f === name) && "text-background bg-foreground")}
+                                                                className={cn("bg-background py-1 px-2 rounded-full w-full", activeFilters.some(f => f === name) && "text-background bg-foreground")}
                                                                 label={name}
                                                                 onClick={() => handelSetFilteredQueries(name)}
                                                             />
