@@ -6,9 +6,9 @@ import {
   waitForElementToBeVisible,
 } from "@/e2e/infra/utils";
 import { Locator } from "playwright";
-import GraphPage from "./graphPage";
+import Page, { ElementLabel, Type } from "./page";
 
-export default class SchemaPage extends GraphPage {
+export default class SchemaPage extends Page {
   // TABLE
   private get dataPanelTable(): Locator {
     return this.page.getByTestId("attributesTableBody");
@@ -50,14 +50,6 @@ export default class SchemaPage extends GraphPage {
 
   private saveNewLabelButton(): Locator {
     return this.page.getByTestId(`saveNewLabelButton`);
-  }
-
-  private searchTypeInput(): Locator {
-    return this.page.getByTestId(`searchType`);
-  }
-
-  private selectTypeItem(type: string): Locator {
-    return this.page.getByTestId(`selectTypeItem${type}`);
   }
 
   private get dataPanelAttributesCount(): Locator {
@@ -114,19 +106,14 @@ export default class SchemaPage extends GraphPage {
     );
   }
 
-  async getContentDataPanelAttributesCount(): Promise<number> {
-    const content = await pollForElementContent(
-      this.dataPanelAttributesCount,
-      "Data Panel Attributes Count"
-    );
-    return parseInt(content ?? "0", 10);
-  }
-
-  async getDataPanelNodeSelection(nodeId: string): Promise<string | null> {
-    return interactWhenVisible(
-      this.dataPanelNodeSelection(nodeId),
-      (el) => el.textContent(),
-      "Data Panel Node Selection Count"
+  async clickLabelsButtonByLabel(
+    label: ElementLabel,
+    name: string
+  ): Promise<void> {
+    await interactWhenVisible(
+      this.labelsButtonByName("Schema", label, name),
+      (el) => el.click(),
+      `Labels Panel Button Schema ${label} ${name}`
     );
   }
 
@@ -182,14 +169,6 @@ export default class SchemaPage extends GraphPage {
       this.saveNewLabelButton(),
       (el) => el.click(),
       "Click Save New Label Button"
-    );
-  }
-
-  async insertSeachType(searchInput: string): Promise<void> {
-    await interactWhenVisible(
-      this.searchTypeInput(),
-      (el) => el.fill(searchInput),
-      "Insert Search Type Input"
     );
   }
 
@@ -328,11 +307,63 @@ export default class SchemaPage extends GraphPage {
     );
   }
 
-  async clickSelectTypeItem(type: string): Promise<void> {
+  async clickSelect(type: Type = "Schema"): Promise<void> {
     await interactWhenVisible(
-      this.selectTypeItem(type),
+      this.select(type),
       (el) => el.click(),
-      "Edit Button Schemas"
+      `Select ${type}`
+    );
+  }
+
+  async clickSelectItem(id: string, type: Type = "Schema"): Promise<void> {
+    await interactWhenVisible(
+      this.selectItem(type, id),
+      (el) => el.click(),
+      `Select ${type} Item ${id}`
+    );
+  }
+
+  async clickSearch(type: Type = "Schema"): Promise<void> {
+    await interactWhenVisible(this.search(type), (el) => el.click(), "Schema");
+  }
+
+  async clickDelete(): Promise<void> {
+    await interactWhenVisible(
+      this.delete("Schema"),
+      (el) => el.click(),
+      "Delete Schema"
+    );
+  }
+
+  async clickDeleteConfirm(): Promise<void> {
+    await interactWhenVisible(
+      this.deleteConfirm("Schema"),
+      (el) => el.click(),
+      "Confirm Delete Schema"
+    );
+  }
+
+  async clickDeleteCancel(): Promise<void> {
+    await interactWhenVisible(
+      this.deleteCancel("Schema"),
+      (el) => el.click(),
+      "Cancel Delete Schema"
+    );
+  }
+
+  async clickExport(): Promise<void> {
+    await interactWhenVisible(
+      this.export("Schema"),
+      (el) => el.click(),
+      "Export Schema"
+    );
+  }
+
+  async clickExportConfirm(): Promise<void> {
+    await interactWhenVisible(
+      this.exportConfirm("Schema"),
+      (el) => el.click(),
+      "Confirm Export Schema"
     );
   }
 
@@ -352,30 +383,102 @@ export default class SchemaPage extends GraphPage {
     );
   }
 
+  async clickSaveButton(): Promise<void> {
+    await interactWhenVisible(
+      this.saveButton("Schema"),
+      (el) => el.click(),
+      `Save Button Schemas`
+    );
+  }
+
+  async fillInput(text: string): Promise<void> {
+    await interactWhenVisible(
+      this.input("Schema"),
+      (el) => el.fill(text),
+      `Input Schemas`
+    );
+  }
+
+  async fillSearch(text: string, type: Type = "Schema"): Promise<void> {
+    await interactWhenVisible(
+      this.search(type),
+      (el) => el.fill(text),
+      "Search Schema"
+    );
+  }
+
+  async fillElementCanvasSearch(text: string): Promise<void> {
+    await interactWhenVisible(
+      this.elementCanvasSearch("Schema"),
+      (el) => el.fill(text),
+      `Element Canvas Search Schema`
+    );
+  }
+
+  async isVisibleSelectItem(name: string): Promise<boolean> {
+    return waitForElementToBeVisible(this.selectItem("Schema", name));
+  }
+
+  async isVisibleLabelsButtonByName(
+    label: ElementLabel,
+    name: string
+  ): Promise<boolean> {
+    return waitForElementToBeVisible(
+      this.labelsButtonByName("Schema", label, name)
+    );
+  }
+
+  async getLabelsButtonByNameContent(
+    label: ElementLabel,
+    name: string
+  ): Promise<string | null> {
+    const content = await interactWhenVisible(
+      this.labelsButtonByName("Schema", label, name),
+      (el) => el.textContent(),
+      `Schema label ${name}`
+    );
+    return content;
+  }
+
+  async getContentDataPanelAttributesCount(): Promise<number> {
+    const content = await pollForElementContent(
+      this.dataPanelAttributesCount,
+      "Data Panel Attributes Count"
+    );
+    return parseInt(content ?? "0", 10);
+  }
+
+  async getDataPanelNodeSelection(nodeId: string): Promise<string | null> {
+    return interactWhenVisible(
+      this.dataPanelNodeSelection(nodeId),
+      (el) => el.textContent(),
+      "Data Panel Node Selection Count"
+    );
+  }
+
   async modifySchemaName(oldName: string, newName: string): Promise<void> {
-    await this.clickSelect("Schema");
+    await this.clickSelect();
     await this.clickManage();
     await this.hoverTableRowByName(oldName);
     await this.clickEditButton();
-    await this.fillInput("Schema", newName);
-    await this.clickSaveButton("Schema");
+    await this.fillInput(newName);
+    await this.clickSaveButton();
     await this.waitForPageIdle();
     // await waitForElementToNotBeVisible(this.saveButton("Schema"));
   }
 
   async verifySchemaExists(schemaName: string): Promise<boolean> {
-    await this.clickSelect("Schema");
+    await this.clickSelect();
     await this.fillSearch(schemaName);
-    const schemaId = "0"; // always select the first result
-    const isVisible = await this.isVisibleSelectItem(schemaId);
+    const isVisible = await this.isVisibleSelectItem(schemaName);
     return isVisible;
   }
 
   async selectSchemaByName(schemaName: string): Promise<void> {
-    await this.clickSelect("Schema");
+    await this.clickSelect();
     await this.fillSearch(schemaName);
     await this.page.waitForTimeout(1000); // wait for the search results to load
-    await this.clickSelectItem("0"); // selecting the first item in list after search
+    await this.clickSelectItem(schemaName); // selecting the first item in list after search
     await this.waitForCanvasAnimationToEnd();
   }
 
@@ -387,7 +490,7 @@ export default class SchemaPage extends GraphPage {
   }
 
   async deleteSchema(schemaName: string): Promise<void> {
-    await this.clickSelect("Schema");
+    await this.clickSelect();
     await this.clickManage();
     await this.clickTableCheckboxByName(schemaName);
     await this.clickDelete();
@@ -403,8 +506,8 @@ export default class SchemaPage extends GraphPage {
 
   async selectAttributeType(attributeRow: string, type: string): Promise<void> {
     await this.clickAttributeButton(attributeRow, "2"); // click type button
-    await this.insertSeachType(type); // search for type
-    await this.clickSelectTypeItem(type); // select type from list
+    await this.fillSearch(type, "Type"); // search for type
+    await this.clickSelectItem(type, "Type"); // select type from list
   }
 
   async addAttribute(
@@ -465,7 +568,7 @@ export default class SchemaPage extends GraphPage {
   }
 
   async searchElementInCanvasSelectFirst(name: string): Promise<void> {
-    await this.fillElementCanvasSearch("Schema", name);
+    await this.fillElementCanvasSearch(name);
     await this.clickFirstElementSuggestionInSearch();
   }
 
@@ -544,7 +647,7 @@ export default class SchemaPage extends GraphPage {
     );
     await this.selectTwoNodesByValidSelection();
     await this.clickCreateNewNodeButton();
-    await waitForElementToNotBeVisible(this.createNewNodeButton())
+    await waitForElementToNotBeVisible(this.createNewNodeButton());
     await this.waitForCanvasAnimationToEnd();
   }
 

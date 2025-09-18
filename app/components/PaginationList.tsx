@@ -66,7 +66,7 @@ export default function PaginationList<T extends Item>({ list, step, onClick, da
             <div className="flex gap-2 items-center">
                 <Input
                     ref={searchRef}
-                    data-testid={`search${label.charAt(0).toUpperCase() + label.slice(1)}`}
+                    data-testid={`${label}Search`}
                     className="w-full bg-background text-foreground"
                     value={search}
                     placeholder={`Search for a ${label}`}
@@ -107,7 +107,7 @@ export default function PaginationList<T extends Item>({ list, step, onClick, da
             }
             <ul
                 data-testid="queryList"
-                className="h-1 grow flex flex-col p-2"
+                className={cn("h-1 grow flex flex-col p-2", items.length > 0 && typeof items[0] === "object" && "SofiaSans")}
             >
                 {
                     items.map((item, index) => {
@@ -115,7 +115,7 @@ export default function PaginationList<T extends Item>({ list, step, onClick, da
                         const hover = hoverIndex === index
                         return (
                             <li
-                                data-testid={`${dataTestId}${index}`}
+                                data-testid={`${dataTestId}${typeof item === "string" ? item : item.text}`}
                                 className={cn(
                                     "border-b",
                                     // eslint-disable-next-line no-nested-ternary

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { createNestedObject, getTheme, prepareArg, securedFetch } from "@/lib/utils";
 import { JSONTree } from "react-json-tree";
 import { useContext, useMemo, useState } from "react";
@@ -8,18 +9,27 @@ import Button from "../components/ui/Button";
 import { IndicatorContext } from "../components/provider";
 import { Query } from "../api/graph/model";
 
-export function Profile({ graphName, query, setQuery, fetchCount }: {
+const renderValue = (v: any) => (
+    <span className="SofiaSans">{v}</span>
+)
+
+const renderLabel = (l: any) => (
+    <span className="SofiaSans">{l[0]}:</span>
+)
+
+export function Profile({ graphName, query, setQuery, fetchCount, background }: {
     graphName: string,
     query: Query,
     setQuery: (q: Query) => void,
     fetchCount: () => Promise<void>
+    background: string
 }) {
 
     const { indicator, setIndicator } = useContext(IndicatorContext)
 
     const { toast } = useToast()
     const { theme } = useTheme()
-    const { background, foreground } = useMemo(() => getTheme(theme), [theme])
+    const { foreground } = useMemo(() => getTheme(theme), [theme])
 
     const [profile, setProfile] = useState<string[]>(query.profile || [])
     const [isLoading, setIsLoading] = useState(false)
@@ -71,8 +81,8 @@ export function Profile({ graphName, query, setQuery, fetchCount }: {
                         data={createNestedObject(profile)}
                         shouldExpandNodeInitially={() => true}
                         hideRoot
-                        // eslint-disable-next-line react/no-unstable-nested-components
-                        labelRenderer={(label) => <span>{label}</span>}
+                        labelRenderer={renderLabel}
+                        valueRenderer={renderValue}
                         theme={{
                             base00: background, // background
                             base01: '#000000',
@@ -104,7 +114,7 @@ export function Metadata({ query }: {
     return (
         <>
             <h1 className="text-2xl font-bold">Metadata</h1>
-            <ul className="flex flex-col gap-2 p-2 h-1 grow overflow-auto">
+            <ul className="flex flex-col gap-2 p-2 h-1 grow overflow-auto SofiaSans">
                 {query.metadata.map((m, i) => (
                     // eslint-disable-next-line react/no-array-index-key
                     <li key={i}>{m}</li>
@@ -114,12 +124,13 @@ export function Metadata({ query }: {
     )
 }
 
-export function Explain({ query }: {
+export function Explain({ query, background }: {
     query: Query,
+    background: string
 }) {
 
     const { theme } = useTheme()
-    const { background, foreground } = useMemo(() => getTheme(theme), [theme])
+    const { foreground } = useMemo(() => getTheme(theme), [theme])
 
     return (
         <>
@@ -129,8 +140,8 @@ export function Explain({ query }: {
                     data={createNestedObject(query.explain)}
                     shouldExpandNodeInitially={() => true}
                     hideRoot
-                    // eslint-disable-next-line react/no-unstable-nested-components
-                    labelRenderer={(label) => <span>{label}</span>}
+                    labelRenderer={renderLabel}
+                    valueRenderer={renderValue}
                     theme={{
                         base00: background,
                         base01: '#000000',
@@ -163,16 +174,19 @@ export default function MetadataView({ graphName, query, setQuery, fetchCount }:
     fetchCount: () => Promise<void>
 }) {
 
+    const { theme } = useTheme()
+    const { background } = getTheme(theme)
+
     return (
         <div className="h-full grid grid-cols-2 grid-rows-2 overflow-hidden">
             <div className="flex flex-col gap-4 border-r border-border p-12 overflow-auto row-span-2">
-                <Profile graphName={graphName} query={query} setQuery={setQuery} fetchCount={fetchCount} />
+                <Profile background={background} graphName={graphName} query={query} setQuery={setQuery} fetchCount={fetchCount} />
             </div>
             <div className="flex flex-col gap-4 p-12 overflow-auto overflow-x-hidden border-b border-border">
                 <Metadata query={query} />
             </div>
             <div className="flex flex-col gap-4 p-12 overflow-auto overflow-x-hidden border-border">
-                <Explain query={query} />
+                <Explain background={background} query={query} />
             </div>
         </div>
     )

@@ -1,6 +1,5 @@
 import { useRef, useState } from "react";
 import { cn } from "@/lib/utils";
-import { ChevronDown, ChevronUp } from "lucide-react";
 import { Label, Relationship } from "../api/graph/model";
 import Button from "../components/ui/Button";
 
@@ -17,40 +16,22 @@ export default function Labels<T extends Label | Relationship>({ labels, onClick
 
     // fake state to force reload
     const [, setReload] = useState(false)
-    const isScrollable = listRef.current && listRef.current.scrollHeight > listRef.current.clientHeight
-
-    const handleScroll = (scrollTo: number) => {
-        listRef.current?.scrollBy({
-            behavior: "smooth",
-            top: scrollTo,
-        })
-    }
 
     return (
-        <div className={cn("flex flex-col gap-2 max-w-1/2 max-h-1/2 overflow-hidden")}>
+        <div className={cn("h-1 grow max-h-fit flex flex-col gap-2 max-w-1/2")}>
             {
                 label &&
                 <h1>{label}</h1>
             }
-            <div className={cn("flex flex-col items-center gap-4")}>
-                {
-                    isScrollable &&
-                    <Button
-                        className="pointer-events-auto"
-                        title="Scroll up"
-                        onClick={() => handleScroll(-200)}
-                    >
-                        <ChevronUp />
-                    </Button>
-                }
-                <ul ref={listRef} className={cn("flex flex-col gap-4 w-full overflow-auto hide-scrollbar")}>
+            <div className="flex flex-col items-center gap-4 overflow-hidden">
+                <ul ref={listRef} className={cn("flex flex-col gap-4 w-full overflow-auto pointer-events-auto")}>
                     {
                         labels.length > 0 &&
                         labels.map((l) => (
                             <li key={l.name}>
                                 <Button
                                     data-testid={`${type}${label}Button${l.name}`}
-                                    className={cn("w-full pointer-events-auto", l.show ? "opacity-100" : "opacity-50")}
+                                    className={cn("w-full SofiaSans", l.show ? "opacity-100" : "opacity-50")}
                                     label={l.name}
                                     onClick={() => {
                                         onClick(l)
@@ -63,16 +44,6 @@ export default function Labels<T extends Label | Relationship>({ labels, onClick
                         ))
                     }
                 </ul>
-                {
-                    isScrollable &&
-                    <Button
-                        className="pointer-events-auto"
-                        title="Scroll down"
-                        onClick={() => handleScroll(200)}
-                    >
-                        <ChevronDown />
-                    </Button>
-                }
             </div>
         </div>
     )

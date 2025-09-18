@@ -510,11 +510,13 @@ export default function EditorComponent({ graph, graphName, historyQuery, maximi
             if (placeholderRef.current) {
                 placeholderRef.current.style.display = 'none';
             }
+
             setBlur(false)
         });
 
         e.onDidBlurEditorText(() => {
             updatePlaceholderVisibility();
+
             setBlur(true)
         });
 
@@ -631,7 +633,7 @@ export default function EditorComponent({ graph, graphName, historyQuery, maximi
             <div className="h-full w-1 grow flex rounded-lg overflow-hidden">
                 <div ref={containerRef} className="h-full relative grow w-1" data-testid="editorContainer">
                     <Editor
-                        className="CypherInput"
+                        className="SofiaSans"
                         key={`${editorKey}-${currentTheme}`}
                         height={editorHeight}
                         language="custom-language"
@@ -639,7 +641,7 @@ export default function EditorComponent({ graph, graphName, historyQuery, maximi
                             ...monacoOptions,
                             lineNumbers: lineNumber > 1 ? "on" : "off",
                         }}
-                        value={blur ? historyQuery.query.replace(/\s+/g, ' ').trim() : historyQuery.query}
+                        value={blur ? historyQuery.query.replace(/\n/g, ' ') : historyQuery.query}
                         onChange={(val) => {
                             if (!historyQuery.counter) {
                                 setHistoryQuery(prev => ({
@@ -664,7 +666,7 @@ export default function EditorComponent({ graph, graphName, historyQuery, maximi
                             editorRef.current = e
                         }}
                     />
-                    <span ref={placeholderRef} className="w-full top-0 left-0 absolute pointer-events-none text-2xl truncate">
+                    <span ref={placeholderRef} className="w-full top-0 left-0 absolute pointer-events-none text-2xl truncate SofiaSans">
                         {PLACEHOLDER}
                     </span>
                 </div>
@@ -757,7 +759,7 @@ export default function EditorComponent({ graph, graphName, historyQuery, maximi
                                 lineHeight: 30,
                                 fontSize: 25,
                             }}
-                            value={(blur ? historyQuery.query.replace(/\s+/g, ' ').trim() : historyQuery.query)}
+                            value={historyQuery.query}
                             onChange={(val) => {
                                 if (historyQuery.counter) {
                                     setHistoryQuery(prev => ({
