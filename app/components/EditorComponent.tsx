@@ -633,7 +633,7 @@ export default function EditorComponent({ graph, graphName, historyQuery, maximi
             <div className="h-full w-1 grow flex rounded-lg overflow-hidden">
                 <div ref={containerRef} className="h-full relative grow w-1" data-testid="editorContainer">
                     <Editor
-                        className="CypherInput"
+                        className="SofiaSans"
                         key={`${editorKey}-${currentTheme}`}
                         height={editorHeight}
                         language="custom-language"
@@ -666,7 +666,7 @@ export default function EditorComponent({ graph, graphName, historyQuery, maximi
                             editorRef.current = e
                         }}
                     />
-                    <span ref={placeholderRef} className="w-full top-0 left-0 absolute pointer-events-none text-2xl truncate">
+                    <span ref={placeholderRef} className="w-full top-0 left-0 absolute pointer-events-none text-2xl truncate SofiaSans">
                         {PLACEHOLDER}
                     </span>
                 </div>

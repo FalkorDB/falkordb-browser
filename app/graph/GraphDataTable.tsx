@@ -248,7 +248,7 @@ export default function GraphDataTable({ graph, object, type, onDeleteElement, l
                 return <Input
                     ref={setInputRef}
                     data-testid={dataTestId}
-                    className="w-full"
+                    className="w-full SofiaSans"
                     value={newVal as number}
                     onChange={(e) => Number(e.target.value) && setNewVal(Number(e.target.value))}
                     onKeyDown={actionType === "set" ? handleSetKeyDown : handleAddKeyDown}
@@ -257,7 +257,7 @@ export default function GraphDataTable({ graph, object, type, onDeleteElement, l
                 return <Input
                     ref={setInputRef}
                     data-testid={dataTestId}
-                    className="w-full"
+                    className="w-full SofiaSans"
                     value={newVal as string}
                     onChange={(e) => setNewVal(e.target.value)}
                     onKeyDown={actionType === "set" ? handleSetKeyDown : handleAddKeyDown}
@@ -383,7 +383,7 @@ export default function GraphDataTable({ graph, object, type, onDeleteElement, l
                                             editable === key ?
                                                 getCellEditableContent(typeof newVal as ValueType)
                                                 : <Button
-                                                    className="disabled:opacity-100 disabled:cursor-default"
+                                                    className="disabled:opacity-100 disabled:cursor-default SofiaSans"
                                                     data-testid="DataPanelValueSetAttribute"
                                                     label={value.toString()}
                                                     title="Click to edit the attribute value"

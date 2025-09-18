@@ -308,7 +308,7 @@ export default function Selector<T extends "Graph" | "Schema" = "Graph" | "Schem
                                                         />
                                                         <Editor
                                                             key={currentTheme}
-                                                            className="CypherInput"
+                                                            className="SofiaSans"
                                                             data-testid="queryHistoryEditor"
                                                             width="100%"
                                                             height="100%"
@@ -353,6 +353,7 @@ export default function Selector<T extends "Graph" | "Schema" = "Graph" | "Schem
                                                     {
                                                         currentQuery &&
                                                         <Profile
+                                                            background={secondary}
                                                             graphName={graphName}
                                                             query={currentQuery}
                                                             setQuery={({ profile }) => {
@@ -391,6 +392,7 @@ export default function Selector<T extends "Graph" | "Schema" = "Graph" | "Schem
                                                     {
                                                         currentQuery &&
                                                         <Explain
+                                                            background={secondary}
                                                             query={currentQuery}
                                                         />
                                                     }
