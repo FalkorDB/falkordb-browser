@@ -73,6 +73,66 @@ const getNodeDisplayText = (node: Node): string => {
     return otherStringProperty?.[1] || node.id.toString();
 };
 
+/**
+ * Wraps text into two lines with ellipsis handling for circular nodes
+ * @param ctx Canvas context for text measurement
+ * @param text The text to wrap
+ * @param maxRadius Maximum radius of the circular node for text fitting
+ * @returns Tuple of [line1, line2] with proper ellipsis handling
+ */
+const wrapTextForCircularNode = (ctx: CanvasRenderingContext2D, text: string, maxRadius: number): [string, string] => {
+    const ellipsis = '...';
+    const ellipsisWidth = ctx.measureText(ellipsis).width;
+
+    // Use fixed text height - it's essentially constant for a given font
+    const halfTextHeight = 1.125; // Fixed value based on font size (1.5px * 1.5 spacing / 2)
+
+    
+    const availableRadius = Math.sqrt(Math.max(0, maxRadius * maxRadius - halfTextHeight * halfTextHeight));
+    
+    const lineWidth = availableRadius * 2;
+
+    const words = text.split(/\s+/);
+    let line1 = '';
+    let line2 = '';
+
+    // Build first line - try to fit as many words as possible
+    for (let i = 0; i < words.length; i += 1) {
+        const word = words[i];
+        const testLine = line1 ? `${line1} ${word}` : word;
+        const testWidth = ctx.measureText(testLine).width;
+
+        if (testWidth <= lineWidth) {
+            line1 = testLine;
+        } else if (!line1) {
+            // If first word is too long, break it in the middle
+            let partialWord = word;
+            while (partialWord.length > 0 && ctx.measureText(partialWord).width > lineWidth) {
+                partialWord = partialWord.slice(0, -1);
+            }
+            line1 = partialWord;
+            // Put remaining part of word and other words in line2
+            const remainingWords = [word.slice(partialWord.length), ...words.slice(i + 1)];
+            line2 = remainingWords.join(' ');
+            break;
+        } else {
+            // Put remaining words in line2
+            line2 = words.slice(i).join(' ');
+            break;
+        }
+    }
+
+    // Truncate line2 if needed
+    if (line2 && ctx.measureText(line2).width > lineWidth) {
+        while (line2.length > 0 && ctx.measureText(line2).width + ellipsisWidth > lineWidth) {
+            line2 = line2.slice(0, -1);
+        }
+        line2 += ellipsis;
+    }
+
+    return [line1, line2 || ''];
+};
+
 const REFERENCE_NODE_COUNT = 2000;
 const BASE_LINK_DISTANCE = 20;
 const BASE_LINK_STRENGTH = 0.5;
@@ -281,7 +341,7 @@ export default function ForceGraph({
                 setSelectedElements([...selectedElements, element])
             }
         }
-        
+
         setSelectedElement(element)
     }
 
@@ -342,37 +402,43 @@ export default function ForceGraph({
                     ctx.stroke();
                     ctx.fill();
 
-
                     ctx.fillStyle = 'black';
                     ctx.textAlign = 'center';
                     ctx.textBaseline = 'middle';
-                    ctx.font = '2px Inter';
-                    let name = node.displayName
+                    ctx.font = `400 2px SofiaSans`;
+                    ctx.letterSpacing = '0.1px'
 
-                    if (!name) {
-                        const ellipsis = '...';
-                        const ellipsisWidth = ctx.measureText(ellipsis).width;
-                        const nodeSize = NODE_SIZE * 2 - PADDING;
+                    let [line1, line2] = node.displayName;
+
+                    // If displayName is empty or invalid, generate new text wrapping
+                    if (!line1 && !line2) {
+                        let text = '';
 
                         if (type === "graph") {
-                            name = getNodeDisplayText(node)
+                            text = getNodeDisplayText(node);
                         } else {
-                            name = getLabelWithFewestElements(node.labels.map(label => graph.LabelsMap.get(label) || graph.createLabel([label])[0])).name
+                            text = getLabelWithFewestElements(node.labels.map(label => graph.LabelsMap.get(label) || graph.createLabel([label])[0])).name;
                         }
 
-                        // truncate text if it's too long
-                        if (ctx.measureText(name).width > nodeSize) {
-                            while (name.length > 0 && ctx.measureText(name).width + ellipsisWidth > nodeSize) {
-                                name = name.slice(0, -1);
-                            }
+                        // Calculate text wrapping for circular node
+                        const textRadius = NODE_SIZE - PADDING / 2; // Leave some padding inside the circle
+                        [line1, line2] = wrapTextForCircularNode(ctx, text, textRadius);
 
-                            name += ellipsis;
-                            node.displayName = name;
-                        }
+                        // Cache the result
+                        node.displayName = [line1, line2];
                     }
 
-                    // add label
-                    ctx.fillText(name, node.x, node.y);
+                    const textMetrics = ctx.measureText(line1);
+                    const textHeight = textMetrics.actualBoundingBoxAscent + textMetrics.actualBoundingBoxDescent;
+                    const halfTextHeight = textHeight / 2 * 1.5;
+
+                    // Draw the text lines
+                    if (line1) {
+                        ctx.fillText(line1, node.x, line2 ? node.y - halfTextHeight : node.y);
+                    }
+                    if (line2) {
+                        ctx.fillText(line2, node.x, node.y + halfTextHeight);
+                    }
                 }}
                 linkCanvasObject={(link, ctx) => {
                     const start = link.source;
@@ -427,7 +493,8 @@ export default function ForceGraph({
                     }
 
                     // Get text width
-                    ctx.font = '2px Inter';
+                    ctx.font = '400 2px SofiaSans';
+                    ctx.letterSpacing = '0.1px'
 
                     let textWidth;
                     let textHeight;

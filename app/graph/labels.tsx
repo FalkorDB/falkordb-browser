@@ -31,7 +31,7 @@ export default function Labels<T extends Label | Relationship>({ labels, onClick
                             <li key={l.name}>
                                 <Button
                                     data-testid={`${type}${label}Button${l.name}`}
-                                    className={cn("w-full", l.show ? "opacity-100" : "opacity-50")}
+                                    className={cn("w-full SofiaSans", l.show ? "opacity-100" : "opacity-50")}
                                     label={l.name}
                                     onClick={() => {
                                         onClick(l)
