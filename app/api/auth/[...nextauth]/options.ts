@@ -6,7 +6,7 @@ import { AuthOptions, Role, User, getServerSession } from "next-auth";
 import { NextResponse } from "next/server";
 import { FalkorDBOptions } from "falkordb/dist/src/falkordb";
 import { v4 as uuidv4 } from "uuid";
-import { isTokenActive } from "../revoke/route";
+import { isTokenActive } from "../tokenUtils";
 
 interface CustomJWTPayload {
   sub: string;
@@ -189,13 +189,6 @@ async function tryJWTAuthentication(): Promise<{ client: FalkorDB; user: Authent
       const token = authorizationHeader.substring(7);
       const payload = await verifyJWTToken(token);
 
-      // Check if token is active
-      const tokenActive = await isTokenActive(token);
-      if (!tokenActive) {
-        console.warn("JWT authentication failed: token is not active (revoked or expired)");
-        return null;
-      }
-
       // Validate JWT payload structure
       if (!isValidJWTPayload(payload)) {
         return null;
@@ -205,6 +198,13 @@ async function tryJWTAuthentication(): Promise<{ client: FalkorDB; user: Authent
       const existingConnection = connections.get(payload.sub);
 
       if (existingConnection) {
+        // Check if token is active using existing connection
+        const tokenActive = await isTokenActive(token, existingConnection);
+        if (!tokenActive) {
+          console.warn("JWT authentication failed: token is not active (revoked or expired)");
+          return null;
+        }
+        
         // Reuse existing JWT connection
         const user = createUserFromJWTPayload(payload);
         return { client: existingConnection, user };
@@ -222,6 +222,13 @@ async function tryJWTAuthentication(): Promise<{ client: FalkorDB; user: Authent
         },
         payload.sub
       );
+
+      // Check if token is active using new connection
+      const tokenActive = await isTokenActive(token, client);
+      if (!tokenActive) {
+        console.warn("JWT authentication failed: token is not active (revoked or expired)");
+        return null;
+      }
 
       const user = {
         id: payload.sub,
