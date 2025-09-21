@@ -63,6 +63,7 @@ export default function PaginationList<T extends Item>({ list, step, onClick, da
 
     return (
         <div className={cn("w-full flex flex-col gap-4 p-6", className)}>
+            {children}
             <div className="flex gap-2 items-center">
                 <Input
                     ref={searchRef}
@@ -99,12 +100,6 @@ export default function PaginationList<T extends Item>({ list, step, onClick, da
                 />
                 {isLoading && <Loader2 className="w-4 h-4 animate-spin duration-[infinite]" />}
             </div>
-            {
-                children &&
-                <div className="flex gap-2 items-center">
-                    {children}
-                </div>
-            }
             <ul
                 data-testid="queryList"
                 className={cn("h-1 grow flex flex-col p-2", items.length > 0 && typeof items[0] === "object" && "SofiaSans")}
@@ -113,9 +108,12 @@ export default function PaginationList<T extends Item>({ list, step, onClick, da
                     items.map((item, index) => {
                         const selected = isSelected ? isSelected(item) : false
                         const hover = hoverIndex === index
+                        const isString = typeof item === "string"
+                        const text = isString ? item : item.text
+
                         return (
                             <li
-                                data-testid={`${dataTestId}${typeof item === "string" ? item : item.text}`}
+                                data-testid={`${dataTestId}${text}`}
                                 className={cn(
                                     "border-b",
                                     // eslint-disable-next-line no-nested-ternary
@@ -128,19 +126,57 @@ export default function PaginationList<T extends Item>({ list, step, onClick, da
                                 onMouseEnter={() => setHoverIndex(index)}
                                 onMouseLeave={() => searchRef.current !== document.activeElement && setHoverIndex(-1)}
                                 style={{ height: `${1 / step * 100}%` }}
-                                key={typeof item === "string" ? item : item.text}
+                                key={text}
                             >
                                 {
                                     onClick ?
                                         <Button
-                                            className={cn("w-full h-full text-xl text-center")}
-                                            label={typeof item === "string" ? item : item.text}
+                                            className={cn("w-full h-full text-xl gap-0", !isString ? "flex-col" : "text-center")}
+                                            title={text}
+                                            label={!isString ? undefined : text}
                                             onClick={() => {
-                                                onClick(typeof item === "string" ? item : item.text)
+                                                onClick(text)
                                             }}
                                             tabIndex={-1}
-                                        />
-                                        : <p className="w-full h-full text-xl text-center">{typeof item === "string" ? item : item.text}</p>
+                                        >
+                                            {
+                                                !isString && (item.timestamp || item.graphName) &&
+                                                <>
+                                                    <div className="h-1 grow flex gap-2 items-center w-full">
+                                                        <p className="text-start truncate">
+                                                            {
+                                                                !isString && item.timestamp &&
+                                                                (() => {
+                                                                    const date = new Date(item.timestamp);
+                                                                    const now = new Date();
+                                                                    const timeDiff = now.getTime() - date.getTime();
+                                                                    const hoursAgo = timeDiff / (1000 * 60 * 60);
+
+                                                                    if (hoursAgo <= 24) {
+                                                                        return date.toLocaleTimeString([], { hour12: false });
+                                                                    }
+
+                                                                    return date.toLocaleString([], { hour12: false });
+                                                                })()
+                                                            }
+                                                        </p>
+                                                        <div
+                                                            className={cn("h-2/3 w-px rounded-full",
+                                                                // eslint-disable-next-line no-nested-ternary
+                                                                selected
+                                                                    ? "bg-primary"
+                                                                    : hover
+                                                                        ? "bg-foreground"
+                                                                        : "bg-border"
+                                                            )}
+                                                        />
+                                                        <p className="w-1 grow text-start truncate">{!isString && item.graphName && `${item.graphName}`}</p>
+                                                    </div>
+                                                    <p data-testid={`${dataTestId}${text}Text`} className="h-1 grow truncate w-full text-left">{text}</p>
+                                                </>
+                                            }
+                                        </Button>
+                                        : <p data-testid={`${dataTestId}${text}Text`} className="w-full h-full text-xl text-center">{text}</p>
                                 }
                             </li>
                         )

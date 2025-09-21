@@ -11,7 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Editor } from "@monaco-editor/react";
 import { useTheme } from "next-themes";
 import Button from "../components/ui/Button";
-import { IndicatorContext } from "../components/provider";
+import { GraphContext, IndicatorContext } from "../components/provider";
 import EditorComponent, { setTheme } from "../components/EditorComponent";
 import DialogComponent from "../components/DialogComponent";
 import Toolbar from "./toolbar";
@@ -19,6 +19,8 @@ import { Node, Link, Graph, Query, HistoryQuery } from "../api/graph/model";
 import { Explain, Metadata, Profile } from "./MetadataView";
 import PaginationList from "../components/PaginationList";
 import SelectGraph from "./selectGraph";
+
+type Tab = "text" | "metadata" | "explain" | "profile"
 
 interface BaseProps<T = "Schema" | "Graph"> {
     type: T
@@ -92,6 +94,7 @@ export default function Selector<T extends "Graph" | "Schema" = "Graph" | "Schem
 }: Props<T>) {
 
     const { indicator } = useContext(IndicatorContext)
+    const { graphNames } = useContext(GraphContext)
 
     const { theme } = useTheme()
     const { secondary, currentTheme } = getTheme(theme)
@@ -101,11 +104,64 @@ export default function Selector<T extends "Graph" | "Schema" = "Graph" | "Schem
     const searchQueryRef = useRef<HTMLInputElement>(null)
 
     const [queriesOpen, setQueriesOpen] = useState(false)
+    const [filteredQueries, setFilteredQueries] = useState<Query[]>([])
+    const [activeFilters, setActiveFilters] = useState<string[]>([])
     const [isLoading, setIsLoading] = useState(false)
     const [maximize, setMaximize] = useState(false)
-    const [tab, setTab] = useState<keyof Query>("text")
+    const [tab, setTab] = useState<Tab>("text")
 
+    const filters = graphNames.length + 10 <= (historyQuery?.queries.length || 0) ? graphNames.filter(name => historyQuery?.queries.some(query => query.graphName === name)) : Array.from(new Set(historyQuery?.queries.map(query => query.graphName).filter(name => !!name)))
     const currentQuery = historyQuery?.counter === 0 ? historyQuery.currentQuery : historyQuery?.queries[historyQuery.counter - 1]
+
+    const afterSearchCallback = useCallback((newFilteredList: Query[]) => {
+        if (!historyQuery || !setHistoryQuery) return
+
+        if (newFilteredList.every(q => q.text !== historyQuery.query)) {
+            setHistoryQuery(prev => ({
+                ...prev,
+                counter: 0
+            }))
+        }
+    }, [historyQuery, setHistoryQuery])
+
+    const handelSetFilteredQueries = useCallback((name?: string) => {
+        if (!historyQuery) return
+
+        let newActiveFilters = activeFilters;
+        if (name) {
+            if (activeFilters.some(f => f === name)) {
+                newActiveFilters = activeFilters.filter(f => f !== name);
+            } else {
+                newActiveFilters = [...activeFilters, name];
+            }
+        }
+
+        setActiveFilters(newActiveFilters);
+
+        const newFilteredQueries = [
+            ...historyQuery.queries.filter(({ graphName: n }) =>
+                newActiveFilters.some(f => f === n)
+            )
+        ].reverse()
+
+        setFilteredQueries(newFilteredQueries)
+        afterSearchCallback(newFilteredQueries)
+    }, [activeFilters, afterSearchCallback, historyQuery]);
+
+    useEffect(() => {
+        if (!historyQuery) return
+
+        if (filters.some(name => name === graphName) && graphName) {
+            setActiveFilters([graphName]);
+            
+            const newFilteredQueries = [
+                ...historyQuery.queries.filter(({ graphName: n }) => graphName === n)
+            ].reverse()
+
+            setFilteredQueries(newFilteredQueries)
+            afterSearchCallback(newFilteredQueries)
+        }
+    }, [graphName, historyQuery?.queries])
 
     const focusEditorAtEnd = () => {
         if (editorRef.current) {
@@ -124,7 +180,7 @@ export default function Selector<T extends "Graph" | "Schema" = "Graph" | "Schem
     };
 
 
-    const isTabEnabled = useCallback((tabName: keyof Query) => {
+    const isTabEnabled = useCallback((tabName: Tab) => {
         if (tabName === "text") return !!currentQuery?.text;
         if (tabName === "metadata") return !!currentQuery && currentQuery.metadata.length > 0;
         if (tabName === "explain") return !!currentQuery && currentQuery.explain.length > 0;
@@ -137,7 +193,7 @@ export default function Selector<T extends "Graph" | "Schema" = "Graph" | "Schem
         const currentValue = currentQuery?.[tab]
 
         if (!currentValue || currentValue.length === 0) {
-            const fallbackTab = (Object.keys(currentQuery) as (keyof Query)[]).find(isTabEnabled);
+            const fallbackTab = (Object.keys(currentQuery) as Tab[]).find(isTabEnabled);
 
             if (fallbackTab && fallbackTab !== tab) {
                 setTab(fallbackTab);
@@ -195,17 +251,6 @@ export default function Selector<T extends "Graph" | "Schema" = "Graph" | "Schem
         }
     }
 
-    const afterSearchCallback = useCallback((newFilteredList: Query[]) => {
-        if (!historyQuery || !setHistoryQuery) return
-
-        if (newFilteredList.every(q => q.text !== historyQuery.query)) {
-            setHistoryQuery(prev => ({
-                ...prev,
-                counter: 0
-            }))
-        }
-    }, [historyQuery, setHistoryQuery])
-
     const separator = <div className="h-[80%] w-0.5 bg-border rounded-full" />
 
     return (
@@ -219,7 +264,7 @@ export default function Selector<T extends "Graph" | "Schema" = "Graph" | "Schem
                 setGraph={setGraph}
             />
             {
-                type === "Graph" && historyQuery ?
+                historyQuery ?
                     <>
                         <div className="h-full w-1 grow relative overflow-visible">
                             <EditorComponent
@@ -273,7 +318,7 @@ export default function Selector<T extends "Graph" | "Schema" = "Graph" | "Schem
                                             isSelected={(item) => historyQuery.queries.findIndex(q => q.text === item.text) + 1 === historyQuery.counter}
                                             afterSearchCallback={afterSearchCallback}
                                             dataTestId="queryHistory"
-                                            list={[...historyQuery.queries].reverse()}
+                                            list={filteredQueries}
                                             step={STEP}
                                             onClick={(counter) => {
                                                 const index = historyQuery.queries.findIndex(q => q.text === counter) + 1
@@ -283,8 +328,32 @@ export default function Selector<T extends "Graph" | "Schema" = "Graph" | "Schem
                                                 }))
                                             }}
                                             searchRef={searchQueryRef}
-                                        />
-                                        <Tabs value={tab} onValueChange={(value) => setTab(value as keyof Query)} className="w-[60%] flex flex-col gap-8 items-center">
+                                        >
+                                            <ul className="w-full flex flex-wrap gap-2 overflow-y-auto max-h-[72px] p-1 graphsFilter">
+                                                <li key="info">
+                                                    <Tooltip>
+                                                        <TooltipTrigger className="h-[32px] flex items-center">
+                                                            <Info />
+                                                        </TooltipTrigger>
+                                                        <TooltipContent>
+                                                            Press graph name to see history of that graph
+                                                        </TooltipContent>
+                                                    </Tooltip>
+                                                </li>
+                                                {
+                                                    filters.map(name => (
+                                                        <li key={name} className="max-w-full">
+                                                            <Button
+                                                                className={cn("bg-background py-1 px-2 rounded-full w-full", activeFilters.some(f => f === name) && "text-background bg-foreground")}
+                                                                label={name}
+                                                                onClick={() => handelSetFilteredQueries(name)}
+                                                            />
+                                                        </li>
+                                                    ))
+                                                }
+                                            </ul>
+                                        </PaginationList>
+                                        <Tabs value={tab} onValueChange={(value) => setTab(value as Tab)} className="w-[60%] flex flex-col gap-8 items-center">
                                             <TabsList className="bg-secondary h-fit w-fit p-2">
                                                 <TabsTrigger className={cn("!text-border data-[state=active]:!bg-background data-[state=active]:!text-foreground")} disabled={!isTabEnabled("text")} value="text">Edit Query</TabsTrigger>
                                                 <TabsTrigger className={cn("!text-border data-[state=active]:!bg-background data-[state=active]:!text-foreground")} disabled={!isTabEnabled("profile")} value="profile">Profile</TabsTrigger>

@@ -55,7 +55,7 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
 
     const getOptions = useCallback(async () =>
         fetchOptions(type, toast, setIndicator, indicator, setSelectedValue, setOptions, contentPersistence)
-        , [type, toast, setIndicator, indicator, setOptions, setSelectedValue])
+        , [type, toast, setIndicator, setOptions, setSelectedValue, contentPersistence])
 
 
     const handleSetOption = async (option: string, optionName: string) => {

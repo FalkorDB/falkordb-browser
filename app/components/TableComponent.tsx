@@ -163,7 +163,7 @@ export default function TableComponent({ headers, rows, label, entityName, value
                     onChange={(e) => setSearch(e.target.value)}
                 />
             </div>
-            <Table ref={tableRef} parentOnScroll={handleScroll} className="h-full overflow-hidden">
+            <Table ref={tableRef} parentOnScroll={handleScroll} className="h-full overflow-hidden" parentClassName="p-1">
                 <TableHeader>
                     <TableRow ref={headerRef} className="text-nowrap border-border">
                         {
