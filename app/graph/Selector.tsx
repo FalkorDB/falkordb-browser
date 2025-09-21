@@ -11,7 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Editor } from "@monaco-editor/react";
 import { useTheme } from "next-themes";
 import Button from "../components/ui/Button";
-import { IndicatorContext } from "../components/provider";
+import { GraphContext, IndicatorContext } from "../components/provider";
 import EditorComponent, { setTheme } from "../components/EditorComponent";
 import DialogComponent from "../components/DialogComponent";
 import Toolbar from "./toolbar";
@@ -94,6 +94,7 @@ export default function Selector<T extends "Graph" | "Schema" = "Graph" | "Schem
 }: Props<T>) {
 
     const { indicator } = useContext(IndicatorContext)
+    const { graphNames } = useContext(GraphContext)
 
     const { theme } = useTheme()
     const { secondary, currentTheme } = getTheme(theme)
@@ -109,7 +110,7 @@ export default function Selector<T extends "Graph" | "Schema" = "Graph" | "Schem
     const [maximize, setMaximize] = useState(false)
     const [tab, setTab] = useState<Tab>("text")
 
-    const filters = Array.from(new Set(historyQuery?.queries.map(query => query.graphName).filter(name => !!name)))
+    const filters = graphNames.length + 10 <= (historyQuery?.queries.length || 0) ? graphNames.filter(name => historyQuery?.queries.some(query => query.graphName === name)) : Array.from(new Set(historyQuery?.queries.map(query => query.graphName).filter(name => !!name)))
     const currentQuery = historyQuery?.counter === 0 ? historyQuery.currentQuery : historyQuery?.queries[historyQuery.counter - 1]
 
     const afterSearchCallback = useCallback((newFilteredList: Query[]) => {
@@ -328,7 +329,7 @@ export default function Selector<T extends "Graph" | "Schema" = "Graph" | "Schem
                                             }}
                                             searchRef={searchQueryRef}
                                         >
-                                            <ul className="w-full flex flex-wrap gap-2 overflow-y-auto max-h-[72px]">
+                                            <ul className="w-full flex flex-wrap gap-2 overflow-y-auto max-h-[72px] p-1 graphsFilter">
                                                 <li key="info">
                                                     <Tooltip>
                                                         <TooltipTrigger className="h-[32px] flex items-center">

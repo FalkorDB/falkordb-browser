@@ -16,13 +16,14 @@
         --input: var(--background);
         --text-muted-foreground: var(--foreground);
         --muted: 0 0% 80%;
-        --border: 0 0% 26%;
+        --border: 0 0% 40%;
     }
 
     .dark {
         --background: 0 0% 10%;
         --foreground: 0 0% 100%;
         --secondary: 0 0% 14.1%;
+        --border: 0 0% 26%;
     }
 
     :focus-visible {
@@ -113,8 +114,7 @@
 }
 
 ::-webkit-scrollbar {
-    width: 20px;
-    height: 20px;
+    width: 10px;
 }
 
 ::-webkit-scrollbar-corner {
@@ -127,12 +127,20 @@
     background-clip: content-box;
 }
 
+.light ::-webkit-scrollbar-thumb {
+    background: hsl(0 0% 90%);
+}
+
 .dark ::-webkit-scrollbar-thumb {
     background: hsl(0 0% 14.1%);
 }
 
-.light ::-webkit-scrollbar-thumb {
-    background: hsl(0 0% 90%);
+.light .graphsFilter::-webkit-scrollbar-thumb {
+    background: hsl(0 0% 80%);
+}
+
+.dark .graphsFilter::-webkit-scrollbar-thumb {
+    background: hsl(0 0% 24.1%);
 }
 
 input[type="color"]::-webkit-color-swatch-wrapper {

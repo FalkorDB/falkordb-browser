@@ -131,7 +131,7 @@ export default function PaginationList<T extends Item>({ list, step, onClick, da
                                 {
                                     onClick ?
                                         <Button
-                                            className={cn("w-full h-full text-xl", !isString ? "flex-col" : "text-center")}
+                                            className={cn("w-full h-full text-xl gap-0", !isString ? "flex-col" : "text-center")}
                                             title={text}
                                             label={!isString ? undefined : text}
                                             onClick={() => {
@@ -142,8 +142,8 @@ export default function PaginationList<T extends Item>({ list, step, onClick, da
                                             {
                                                 !isString && (item.timestamp || item.graphName) &&
                                                 <>
-                                                    <div className="h-1 grow flex gap-2 items-start w-full">
-                                                        <p className="w-1 grow text-start truncate">
+                                                    <div className="h-1 grow flex gap-2 items-center w-full">
+                                                        <p className="text-start truncate">
                                                             {
                                                                 !isString && item.timestamp &&
                                                                 (() => {
@@ -160,9 +160,19 @@ export default function PaginationList<T extends Item>({ list, step, onClick, da
                                                                 })()
                                                             }
                                                         </p>
+                                                        <div
+                                                            className={cn("h-2/3 w-px rounded-full",
+                                                                // eslint-disable-next-line no-nested-ternary
+                                                                selected
+                                                                    ? "bg-primary"
+                                                                    : hover
+                                                                        ? "bg-foreground"
+                                                                        : "bg-border"
+                                                            )}
+                                                        />
                                                         <p className="w-1 grow text-start truncate">{!isString && item.graphName && `${item.graphName}`}</p>
                                                     </div>
-                                                    <p data-testid={`${dataTestId}${text}Text`} className="h-1 grow truncate text-center w-full">{text}</p>
+                                                    <p data-testid={`${dataTestId}${text}Text`} className="h-1 grow truncate w-full text-left">{text}</p>
                                                 </>
                                             }
                                         </Button>
