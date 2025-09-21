@@ -334,7 +334,7 @@ export default function SchemaDataPanel({ object, setObject, onDeleteElement, sc
                 </Button>
                 <ul className="flex flex-wrap gap-4 min-w-[10%]" onMouseEnter={() => setLabelsHover(true)} onMouseLeave={() => setLabelsHover(false)}>
                     {label.map((l) => (
-                        <li key={l} className="flex gap-2 px-2 py-1 bg-background rounded-full items-center">
+                        <li key={l} className="flex gap-2 px-2 py-1 bg-secondary rounded-full items-center">
                             <p>{l}</p>
                             {
                                 type && session?.user?.role !== "Read-Only" &&
