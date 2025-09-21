@@ -55,7 +55,7 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
 
     const getOptions = useCallback(async () =>
         fetchOptions(type, toast, setIndicator, indicator, setSelectedValue, setOptions, contentPersistence)
-        , [type, toast, setIndicator, indicator, setOptions, setSelectedValue])
+        , [type, toast, setIndicator, setOptions, setSelectedValue, contentPersistence])
 
 
     const handleSetOption = async (option: string, optionName: string) => {
@@ -110,7 +110,7 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
             <DropdownMenu open={open} onOpenChange={handleOpenChange}>
                 <DropdownMenuTrigger disabled={options.length === 0 || indicator === "offline"} asChild>
                     <Button
-                        className="h-full w-[230px] text-2xl bg-background rounded-lg border border-border p-2 justify-left disabled:text-gray-400 disabled:opacity-100"
+                        className="h-full w-[230px] text-2xl bg-background rounded-lg border border-border p-2 justify-left disabled:text-gray-400 disabled:opacity-100 SofiaSans"
                         label={selectedValue || `Select ${type}`}
                         title={options.length === 0 ? `There are no ${type}` : undefined}
                         indicator={indicator}
@@ -132,8 +132,8 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
                         list={options}
                         step={3}
                         onClick={handleClick}
-                        dataTestId="selectGraph"
-                        label="graph"
+                        dataTestId={`select${type}`}
+                        label={type}
                         afterSearchCallback={() => { }}
                         isSelected={(value) => selectedValue === value}
                         isLoading={isLoading}

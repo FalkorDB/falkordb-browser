@@ -5,6 +5,8 @@
 
 import { LinkObject, NodeObject } from "react-force-graph-2d";
 
+export type Value = string | number | boolean
+
 export type HistoryQuery = {
   queries: Query[];
   currentQuery: Query;
@@ -17,6 +19,8 @@ export type Query = {
   metadata: string[];
   explain: string[];
   profile: string[];
+  graphName: string;
+  timestamp: number; 
 };
 
 const getSchemaValue = (value: string): string[] => {
@@ -53,7 +57,7 @@ export type Node = NodeObject<{
   visible: boolean;
   expand: boolean;
   collapsed: boolean;
-  displayName: string;
+  displayName: [string, string];
   data: {
     [key: string]: any;
   };
@@ -171,6 +175,10 @@ export class GraphInfo {
 
   get PropertyKeys(): string[] | undefined {
     return this.propertyKeys;
+  }
+
+  set PropertyKeys(propertyKeys: string[] | undefined) {
+    this.propertyKeys = propertyKeys;
   }
 
   get Labels(): Map<string, InfoLabel> {
@@ -441,7 +449,7 @@ export class Graph {
         visible: true,
         expand: false,
         collapsed,
-        displayName: "",
+        displayName: ["", ""],
         data: {},
       };
       Object.entries(cell.properties).forEach(([key, value]) => {
@@ -507,7 +515,7 @@ export class Graph {
             expand: false,
             collapsed,
             visible: true,
-            displayName: "",
+            displayName: ["", ""],
             data: {},
           };
 
@@ -544,7 +552,7 @@ export class Graph {
             expand: false,
             collapsed,
             visible: true,
-            displayName: "",
+            displayName: ["", ""],
             data: {},
           };
 
@@ -561,7 +569,7 @@ export class Graph {
             expand: false,
             collapsed,
             visible: true,
-            displayName: "",
+            displayName: ["", ""],
             data: {},
           };
 
@@ -1025,7 +1033,7 @@ export class Graph {
     });
   }
 
-  public setProperty(key: string, val: string, id: number, type: boolean) {
+  public setProperty(key: string, val: Value, id: number, type: boolean) {
     this.Data = this.Data.map((row) =>
       Object.fromEntries(
         Object.entries(row).map(([k, cell]) => {

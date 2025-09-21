@@ -5,7 +5,7 @@ import { Locator } from "@playwright/test";
 export default class MetadataView extends GraphPage {
 
     private get metadataViewTab(): Locator {
-        return this.page.getByRole('tab', { name: 'Metadata' });
+        return this.page.getByTestId("metadataTab");
     }
 
     private get profileButton(): Locator {

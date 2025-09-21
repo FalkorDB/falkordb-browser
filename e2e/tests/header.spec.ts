@@ -40,6 +40,12 @@ test.describe(`Header tests`, () => {
     expect(page.url()).toBe(urls.documentationUrl);
   });
 
+  test(`@admin Verify clicking on help -> API Documentation redirects to specified URL`, async () => {
+    const navBar = await browser.createNewPage(NavBarComponent, urls.graphUrl);
+    const page = await navBar.clickOnApiDocumentation();
+    expect(page.url()).toContain('/docs');
+  });
+
   test(`@admin Verify clicking on help -> Support redirects to specified URL`, async () => {
     const navBar = await browser.createNewPage(NavBarComponent, urls.graphUrl);
     const page = await navBar.clickOnSupport();

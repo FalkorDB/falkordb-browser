@@ -21,7 +21,11 @@ export default class HeaderComponent extends BasePage {
     }
 
     private get documentationButton(): Locator {
-        return this.page.getByRole("link", { name: "Documentation" })
+        return this.page.getByRole("link", { name: "Documentation", exact: true })
+    }
+
+    private get apiDocumentationButton(): Locator {
+        return this.page.getByRole("link", { name: "API Documentation" })
     }
 
     private get supportButton(): Locator {
@@ -70,6 +74,10 @@ export default class HeaderComponent extends BasePage {
         await interactWhenVisible(this.documentationButton, (el) => el.click(), "Click Documentation Button");
     }
 
+    async clickOnApiDocumentationBtn(): Promise<void> {
+        await interactWhenVisible(this.apiDocumentationButton, (el) => el.click(), "Click API Documentation Button");
+    }
+
     async clickOnSupportBtn(): Promise<void> {
         await interactWhenVisible(this.supportButton, (el) => el.click(), "Click Support Button");
     }
@@ -107,6 +115,14 @@ export default class HeaderComponent extends BasePage {
             this.clickOnDocumentationBtn()
         ]);
         return newPage;
+    }
+
+    async clickOnApiDocumentation(): Promise<Page> {
+        await this.waitForPageIdle();
+        await this.clickOnHelpBtn();
+        await this.clickOnApiDocumentationBtn();
+        await this.page.waitForURL('**/docs**', { timeout: 5000 });
+        return this.page;
     }
 
     async clickOnSupport(): Promise<Page> {

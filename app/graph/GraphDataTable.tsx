@@ -5,17 +5,20 @@ import { cn, prepareArg, securedFetch } from "@/lib/utils"
 import { toast } from "@/components/ui/use-toast"
 import { MutableRefObject, useContext, useEffect, useRef, useState } from "react"
 import { useSession } from "next-auth/react"
+import { Switch } from "@/components/ui/switch"
 import DeleteElement from "./DeleteElement"
 import Input from "../components/ui/Input"
 import DialogComponent from "../components/DialogComponent"
 import CloseDialog from "../components/CloseDialog"
-import { Graph, Link, Node } from "../api/graph/model"
-import { IndicatorContext } from "../components/provider"
+import { Link, Node, Value } from "../api/graph/model"
+import { GraphContext, IndicatorContext } from "../components/provider"
 import ToastButton from "../components/ToastButton"
 import Button from "../components/ui/Button"
+import Combobox from "../components/ui/combobox"
+
+type ValueType = "string" | "number" | "boolean"
 
 interface Props {
-    graph: Graph
     object: Node | Link
     type: boolean
     onDeleteElement: () => Promise<void>
@@ -23,7 +26,9 @@ interface Props {
     className?: string
 }
 
-export default function GraphDataTable({ graph, object, type, onDeleteElement, lastObjId, className }: Props) {
+export default function GraphDataTable({ object, type, onDeleteElement, lastObjId, className }: Props) {
+
+    const { graph, graphInfo, setGraphInfo } = useContext(GraphContext)
 
     const setInputRef = useRef<HTMLInputElement>(null)
     const addInputRef = useRef<HTMLInputElement>(null)
@@ -34,13 +39,14 @@ export default function GraphDataTable({ graph, object, type, onDeleteElement, l
     const [isAddValue, setIsAddValue] = useState<boolean>(false)
     const [deleteOpen, setDeleteOpen] = useState(false)
     const [newKey, setNewKey] = useState<string>("")
-    const [newVal, setNewVal] = useState<string>("")
+    const [newVal, setNewVal] = useState<Value>("")
+    const [newType, setNewType] = useState<ValueType>("string")
     const [isSetLoading, setIsSetLoading] = useState(false)
     const [isAddLoading, setIsAddLoading] = useState(false)
     const [isRemoveLoading, setIsRemoveLoading] = useState(false)
     const { indicator, setIndicator } = useContext(IndicatorContext)
     const { data: session } = useSession()
-    const [attributes, setAttributes] = useState<string[]>(Object.keys(object.data))
+    const [attributes, setAttributes] = useState<string[]>([])
 
     useEffect(() => {
         if (setInputRef.current && editable) {
@@ -75,16 +81,28 @@ export default function GraphDataTable({ graph, object, type, onDeleteElement, l
         setAttributes(Object.keys(object.data))
     }, [lastObjId, object, setAttributes, type])
 
-    const handleSetEditable = (key: string, val: string) => {
+    const getDefaultVal = (t: ValueType) => {
+        switch (t) {
+            case "boolean":
+                return false
+            case "number":
+                return 0
+            default:
+                return ""
+        }
+    }
+
+    const handleSetEditable = (key: string, value?: Value) => {
         if (key !== "") {
             setIsAddValue(false)
         }
 
         setEditable(key)
-        setNewVal(val)
+        setNewVal(value || "")
+        setNewType(typeof value === "undefined" ? "string" : typeof value as ValueType)
     }
 
-    const setProperty = async (key: string, val: string, isUndo: boolean, actionType: ("added" | "set") = "set") => {
+    const setProperty = async (key: string, val: Value, isUndo: boolean, actionType: ("added" | "set") = "set") => {
         const { id } = object
         if (!val || val === "") {
             toast({
@@ -108,10 +126,16 @@ export default function GraphDataTable({ graph, object, type, onDeleteElement, l
                 const value = object.data[key]
 
                 graph.setProperty(key, val, id, type)
+
+                graphInfo.PropertyKeys = [...(graphInfo.PropertyKeys || []).filter((k) => k !== key), key];
+                const graphI = graphInfo.clone();
+                graph.GraphInfo = graphI
+                setGraphInfo(graphI)
+
                 object.data[key] = val
                 setAttributes(Object.keys(object.data))
 
-                handleSetEditable("", "")
+                handleSetEditable("")
                 toast({
                     title: "Success",
                     description: `Attribute ${actionType}`,
@@ -131,7 +155,7 @@ export default function GraphDataTable({ graph, object, type, onDeleteElement, l
         }
     }
 
-    const handleAddValue = async (key: string, value: string) => {
+    const handleAddValue = async (key: string, value: Value) => {
         if (!key || key === "" || !value || value === "") {
             toast({
                 title: "Error",
@@ -216,6 +240,50 @@ export default function GraphDataTable({ graph, object, type, onDeleteElement, l
         setDeleteOpen(false)
     }
 
+    const getCellEditableContent = (t: ValueType, actionType: "set" | "add" = "set") => {
+        const dataTestId = `DataPanel${actionType === "set" ? "Set" : "Add"}AttributeValue`
+
+        switch (t) {
+            case "boolean":
+                return <Switch
+                    className="data-[state=unchecked]:bg-border"
+                    checked={newVal as boolean}
+                    data-testid={dataTestId}
+                    onCheckedChange={(checked) => setNewVal(checked)}
+                />
+            case "number":
+                return <Input
+                    ref={setInputRef}
+                    data-testid={dataTestId}
+                    className="w-full SofiaSans"
+                    value={newVal as number}
+                    onChange={(e) => Number(e.target.value) && setNewVal(Number(e.target.value))}
+                    onKeyDown={actionType === "set" ? handleSetKeyDown : handleAddKeyDown}
+                />
+            default:
+                return <Input
+                    ref={setInputRef}
+                    data-testid={dataTestId}
+                    className="w-full SofiaSans"
+                    value={newVal as string}
+                    onChange={(e) => setNewVal(e.target.value)}
+                    onKeyDown={actionType === "set" ? handleSetKeyDown : handleAddKeyDown}
+                />
+        }
+    }
+
+    const getNewTypeInput = () => (
+        <Combobox
+            options={["string", "number", "boolean"]}
+            selectedValue={newType}
+            setSelectedValue={(value) => {
+                setNewType(value)
+
+                setNewVal(typeof newVal === value ? newVal : getDefaultVal(value))
+            }}
+            label="Type"
+        />
+    )
 
     return (
         <div className={cn("flex flex-col bg-background rounded-lg overflow-hidden", className)}>
@@ -225,6 +293,7 @@ export default function GraphDataTable({ graph, object, type, onDeleteElement, l
                         <TableHead className="w-6"><div className="h-12 w-6" /></TableHead>
                         <TableHead>Key</TableHead>
                         <TableHead>Value</TableHead>
+                        <TableHead>Type</TableHead>
                     </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -278,7 +347,7 @@ export default function GraphDataTable({ graph, object, type, onDeleteElement, l
                                                                 data-testid="DataPanelSetAttribute"
                                                                 variant="button"
                                                                 onClick={() => handleSetEditable(key, value)}
-                                                                disabled={isAddValue || typeof value === "boolean"}
+                                                                disabled={isAddValue}
                                                             >
                                                                 <Pencil size={20} />
                                                             </Button>
@@ -319,25 +388,19 @@ export default function GraphDataTable({ graph, object, type, onDeleteElement, l
                                     <TableCell>
                                         {
                                             editable === key ?
-                                                <Input
-                                                    ref={setInputRef}
-                                                    data-testid="DataPanelSetAttributeInput"
-                                                    className="w-full"
-                                                    value={newVal}
-                                                    onChange={(e) => setNewVal(e.target.value)}
-                                                    onKeyDown={handleSetKeyDown}
-                                                />
+                                                getCellEditableContent(typeof newVal as ValueType)
                                                 : <Button
-                                                    className="disabled:opacity-100 disabled:cursor-default"
+                                                    className="disabled:opacity-100 disabled:cursor-default SofiaSans"
                                                     data-testid="DataPanelValueSetAttribute"
-                                                    label={typeof value === "boolean" ? value.toString() : value}
+                                                    label={value.toString()}
                                                     title="Click to edit the attribute value"
                                                     variant="button"
                                                     onClick={() => handleSetEditable(key, value)}
-                                                    disabled={typeof value === "boolean"}
+                                                    disabled={isAddValue}
                                                 />
                                         }
                                     </TableCell>
+                                    <TableCell>{editable === key ? getNewTypeInput() : typeof value}</TableCell>
                                 </TableRow>
                             )
                         }
@@ -380,13 +443,10 @@ export default function GraphDataTable({ graph, object, type, onDeleteElement, l
                                 />
                             </TableCell>
                             <TableCell>
-                                <Input
-                                    data-testid="DataPanelAddAttributeValue"
-                                    className="w-full"
-                                    value={newVal}
-                                    onChange={(e) => setNewVal(e.target.value)}
-                                    onKeyDown={handleAddKeyDown}
-                                />
+                                {getCellEditableContent(newType, "add")}
+                            </TableCell>
+                            <TableCell>
+                                {getNewTypeInput()}
                             </TableCell>
                         </TableRow >
                     }

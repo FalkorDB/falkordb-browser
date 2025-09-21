@@ -235,7 +235,7 @@ test.describe("Graph Tests", () => {
     await graph.insertQuery(CREATE_QUERY);
     await graph.clickRunQuery();
     expect(
-      await graph.isVisibleLabelsButtonByName("Graph", "Labels", "person1")
+      await graph.isVisibleLabelsButtonByName("Labels", "person1")
     ).toBeTruthy();
     await apiCall.removeGraph(graphName);
   });
@@ -249,7 +249,7 @@ test.describe("Graph Tests", () => {
     await graph.insertQuery(CREATE_QUERY);
     await graph.clickRunQuery();
     expect(
-      await graph.isVisibleLabelsButtonByName("Graph", "Relationships", "KNOWS")
+      await graph.isVisibleLabelsButtonByName("Relationships", "KNOWS")
     ).toBeTruthy();
     await apiCall.removeGraph(graphName);
   });
@@ -306,7 +306,7 @@ test.describe("Graph Tests", () => {
     await graph.clickRunQuery();
     expect(await graph.getNotificationErrorToast()).toBeFalsy();
     expect(
-      await graph.isVisibleLabelsButtonByName("Graph", "Labels", "person1")
+      await graph.isVisibleLabelsButtonByName("Labels", "person1")
     ).toBeTruthy();
     await apiCall.removeGraph(graphName, "admin");
   });

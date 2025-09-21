@@ -1,4 +1,5 @@
 import test, { expect } from "@playwright/test";
+import path from 'path';
 import urls from '../config/urls.json'
 import BrowserWrapper from "../infra/ui/browserWrapper";
 import LoginPage from "../logic/POM/loginPage";
@@ -20,11 +21,11 @@ test.describe(`@tls TLS Login tests`, () => {
         
         await login.clickEnableTLS();
         expect(await login.isTLSEnabled()).toBe(true);
-        
-        const invalidCertPath = require('path').join(process.cwd(), 'tls', 'client.crt');
+
+        const invalidCertPath = path.join(process.cwd(), 'tls', 'client.crt');
         await login.uploadCertificate(invalidCertPath);
         expect(await login.isCertificateUploaded()).toBe(true);
-    
+
         await login.clickConnect();
         expect(login.getCurrentURL()).not.toBe(urls.graphUrl);
     });
@@ -35,7 +36,7 @@ test.describe(`@tls TLS Login tests`, () => {
         await login.clickEnableTLS();
         expect(await login.isTLSEnabled()).toBe(true);
         
-        const validCertPath = require('path').join(process.cwd(), 'tls', 'ca.crt');
+        const validCertPath = path.join(process.cwd(), 'tls', 'ca.crt');
         await login.uploadCertificate(validCertPath);
         expect(await login.isCertificateUploaded()).toBe(true);
         
@@ -51,7 +52,7 @@ test.describe(`@tls TLS Login tests`, () => {
         await login.clickEnableTLS();
         expect(await login.isTLSEnabled()).toBe(true);
         
-        const validCertPath = require('path').join(process.cwd(), 'tls', 'ca.crt');
+        const validCertPath = path.join(process.cwd(), 'tls', 'ca.crt');
         await login.uploadCertificate(validCertPath);
         expect(await login.isCertificateUploaded()).toBe(true);
         await login.clickRemoveCertificateBtn();
