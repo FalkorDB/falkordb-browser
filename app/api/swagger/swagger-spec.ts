@@ -187,6 +187,22 @@ const swaggerSpec = {
               }
             }
           },
+          "403": {
+            description: "Forbidden - can only revoke own tokens unless admin",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    message: {
+                      type: "string",
+                      example: "Forbidden: Can only revoke your own tokens unless you are an admin"
+                    }
+                  }
+                }
+              }
+            }
+          },
           "500": {
             description: "Server configuration error",
             content: {

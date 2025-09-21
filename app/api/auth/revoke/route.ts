@@ -51,6 +51,17 @@ export async function POST(request: NextRequest) {
       // Verify the token to be revoked
       const { payload } = await jwtVerify(tokenToRevoke, JWT_SECRET);
       
+      // Get the authenticated user info
+      const { user: authenticatedUser } = session;
+      
+      // Security check: Only allow revoking own tokens or admin override
+      if (payload.sub !== authenticatedUser.id && authenticatedUser.role !== 'Admin') {
+        return NextResponse.json(
+          { message: "Forbidden: Can only revoke your own tokens unless you are an admin" },
+          { status: 403 }
+        );
+      }
+      
       // Use the existing Redis connection from FalkorDB client
       const connection = await client.connection;
       

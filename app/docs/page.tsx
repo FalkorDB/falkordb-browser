@@ -94,8 +94,8 @@ export default function DocsPage() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col">
-      <div className="bg-white py-8 border-b sticky top-0 z-50">
+    <div className="h-full w-full flex flex-col">
+      <div className="bg-white py-8 border-b">
         <div className="container mx-auto px-4 text-center">
           <h1 className="text-4xl font-bold text-gray-900 mb-4">FalkorDB Browser API</h1>
           <p className="text-lg text-gray-600 mb-4">
@@ -110,10 +110,8 @@ export default function DocsPage() {
         </div>
       </div>
       
-      <div className="flex-1 w-full px-6">
-        <div className="w-full" style={{ width: '100%', maxWidth: 'none' }}>
-          <SwaggerWrapper baseUrl={baseUrl} />
-        </div>
+      <div className="flex-1 h-0 overflow-y-auto px-6 py-4">
+        <SwaggerWrapper baseUrl={baseUrl} />
       </div>
     </div>
   );
