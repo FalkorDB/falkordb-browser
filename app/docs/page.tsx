@@ -62,7 +62,11 @@ function SwaggerWrapper({ baseUrl }: { baseUrl: string }) {
           }
         }
       ]}
-      requestInterceptor={(request) => request}
+      requestInterceptor={(request) => {
+        // Add JWT-only header for all requests from docs page
+        request.headers['X-JWT-Only'] = 'true';
+        return request;
+      }}
     />
   );
 }

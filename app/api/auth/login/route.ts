@@ -1,7 +1,32 @@
 import { NextRequest, NextResponse } from "next/server";
 // eslint-disable-next-line import/no-extraneous-dependencies
 import { SignJWT } from "jose";
+import { createClient } from "redis";
 import { newClient, generateTimeUUID } from "../[...nextauth]/options";
+
+// Create Redis client for token storage
+let redisClient: ReturnType<typeof createClient> | null = null;
+
+async function getRedisClient() {
+  if (!redisClient) {
+    redisClient = createClient({
+      url: process.env.REDIS_URL || "redis://localhost:6379",
+    });
+    
+    redisClient.on('error', (err) => {
+      console.error('Redis client error:', err);
+    });
+    
+    await redisClient.connect();
+  }
+  return redisClient;
+}
+
+// Helper function to get token ID (jti or sub + iat)
+function getTokenId(payload: any): string {
+  // Use jti if available, otherwise create from sub + iat
+  return payload.jti || `${payload.sub}-${payload.iat}`;
+}
 
 // eslint-disable-next-line import/prefer-default-export
 export async function POST(request: NextRequest) {
@@ -63,6 +88,7 @@ export async function POST(request: NextRequest) {
       };
 
       // Create JWT token with all necessary connection information
+      const currentTime = Math.floor(Date.now() / 1000);
       const tokenPayload = {
         sub: user.id,           // Standard JWT claim for user ID
         username: username || undefined,
@@ -72,13 +98,26 @@ export async function POST(request: NextRequest) {
         port: user.port,
         tls: user.tls,
         ca: user.ca || undefined,
+        iat: currentTime,       // Issued at time
       };
 
       const token = await new SignJWT(tokenPayload)
         .setProtectedHeader({ alg: "HS256" })
         .setIssuedAt()
-        .setExpirationTime("2h")
+        .setExpirationTime("1w")
         .sign(JWT_SECRET);
+
+      // Store the active token in Redis with TTL
+      try {
+        const redis = await getRedisClient();
+        const tokenId = getTokenId(tokenPayload);
+        
+        // Store active token with 1 week TTL (604800 seconds)
+        await redis.setEx(`api-jwt-active:${tokenId}`, 604800, token);
+      } catch (redisError) {
+        console.error('Failed to store token in Redis:', redisError);
+        // Continue without Redis storage - token will still work but can't be revoked
+      }
 
       return NextResponse.json(
         {

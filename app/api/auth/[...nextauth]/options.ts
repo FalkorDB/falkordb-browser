@@ -6,6 +6,7 @@ import { AuthOptions, Role, User, getServerSession } from "next-auth";
 import { NextResponse } from "next/server";
 import { FalkorDBOptions } from "falkordb/dist/src/falkordb";
 import { v4 as uuidv4 } from "uuid";
+import { isTokenActive } from "../revoke/route";
 
 interface CustomJWTPayload {
   sub: string;
@@ -130,6 +131,19 @@ async function getAuthorizationHeader(): Promise<string | null> {
 }
 
 /**
+ * Checks if the request requires JWT-only authentication
+ */
+async function isJWTOnlyRequest(): Promise<boolean> {
+  try {
+    const { headers } = await import('next/headers');
+    const headersList = await headers();
+    return headersList.get("X-JWT-Only") === "true";
+  } catch (e) {
+    return false;
+  }
+}
+
+/**
  * Verifies and decodes a JWT token
  */
 async function verifyJWTToken(token: string): Promise<CustomJWTPayload> {
@@ -174,6 +188,13 @@ async function tryJWTAuthentication(): Promise<{ client: FalkorDB; user: Authent
     try {
       const token = authorizationHeader.substring(7);
       const payload = await verifyJWTToken(token);
+
+      // Check if token is active
+      const tokenActive = await isTokenActive(token);
+      if (!tokenActive) {
+        console.warn("JWT authentication failed: token is not active (revoked or expired)");
+        return null;
+      }
 
       // Validate JWT payload structure
       if (!isValidJWTPayload(payload)) {
@@ -258,6 +279,7 @@ const authOptions: AuthOptions = {
           };
           return res;
         } catch (err) {
+          // eslint-disable-next-line no-console
           console.error("FalkorDB Client Connect Error", err);
           return null;
         }
@@ -308,13 +330,23 @@ const authOptions: AuthOptions = {
 };
 
 export async function getClient() {
+  // Check if this is a JWT-only request (from /docs)
+  const jwtOnlyRequired = await isJWTOnlyRequest();
+  
   // Try JWT authentication first
   const jwtResult = await tryJWTAuthentication();
   if (jwtResult) {
     return jwtResult;
   }
 
-  // Fall back to session authentication
+  // If JWT-only is required and JWT failed, return 401 immediately
+  if (jwtOnlyRequired) {
+    return NextResponse.json({ 
+      message: "JWT authentication required for API documentation. Please use the login endpoint to get a token and authorize in Swagger UI." 
+    }, { status: 401 });
+  }
+
+  // Fall back to session authentication for regular app requests
   const session = await getServerSession(authOptions);
   const id = session?.user?.id;
 

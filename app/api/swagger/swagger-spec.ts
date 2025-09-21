@@ -68,7 +68,7 @@ const swaggerSpec = {
                   password: {
                     type: "string",
                     description: "User's password",
-                    example: "password"
+                    example: ""
                   }
                 },
                 required: ["username", "password"]
@@ -105,6 +105,103 @@ const swaggerSpec = {
           },
           "500": {
             description: "Internal server error"
+          }
+        }
+      }
+    },
+    "/api/auth/revoke": {
+      post: {
+        tags: ["Authentication"],
+        summary: "Revoke JWT token",
+        description: "Revoke a JWT token by removing it from the active tokens list in Redis. Once revoked, the token cannot be used for authentication.",
+        security: [{ bearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                required: ["token"],
+                properties: {
+                  token: {
+                    type: "string",
+                    description: "JWT token to revoke",
+                    example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                  }
+                }
+              }
+            }
+          }
+        },
+        responses: {
+          "200": {
+            description: "Token revoked successfully",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    message: {
+                      type: "string",
+                      example: "Token revoked successfully"
+                    },
+                    tokenId: {
+                      type: "string",
+                      description: "ID of the revoked token",
+                      example: "user-123-1640995200"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            description: "Bad request - missing token in request body",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    message: {
+                      type: "string",
+                      example: "Token to revoke is required in request body"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            description: "Authentication failed - invalid or missing token",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    message: {
+                      type: "string",
+                      example: "Authorization header with Bearer token required"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            description: "Server configuration error",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    message: {
+                      type: "string",
+                      example: "Server configuration error"
+                    }
+                  }
+                }
+              }
+            }
           }
         }
       }
