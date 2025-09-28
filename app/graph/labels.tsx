@@ -18,7 +18,7 @@ export default function Labels<T extends Label | Relationship>({ labels, onClick
     const [, setReload] = useState(false)
 
     return (
-        <div className={cn("h-1 grow max-h-fit flex flex-col gap-2 max-w-1/2")}>
+        <div className={cn("h-1 grow max-h-fit flex flex-col gap-2 max-w-1/2 bg-background rounded-lg p-1")}>
             {
                 label &&
                 <h1>{label}</h1>

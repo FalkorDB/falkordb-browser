@@ -180,7 +180,7 @@ export default function Page() {
         }
 
         await Promise.all(selectedElements.map(async (element) => {
-            const type = !("source" in element)
+            const type = !element.source
             const result = await securedFetch(`api/graph/${prepareArg(graph.Id)}/${prepareArg(element.id.toString())}`, {
                 method: "DELETE",
                 body: JSON.stringify({ type })

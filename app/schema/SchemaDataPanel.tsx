@@ -51,7 +51,7 @@ export default function SchemaDataPanel({ object, setObject, onDeleteElement, sc
     const [newLabel, setNewLabel] = useState<string>("")
     const [label, setLabel] = useState<string[]>([])
     const [hover, setHover] = useState<string>("")
-    const type = !("source" in object)
+    const type = !object.source
 
     const handleClose = useCallback((e: KeyboardEvent) => {
         if (e.defaultPrevented) return
@@ -71,7 +71,7 @@ export default function SchemaDataPanel({ object, setObject, onDeleteElement, sc
 
     useEffect(() => {
         setAttributes(Object.entries(object.data).filter(([key, val]) => !(key === "name" && Number(val) === object.id)).map(([key, val]) => [key, Array.isArray(val) ? val : (val as string).split(',')]))
-        setLabel("source" in object ? [object.relationship] : [...object.labels])
+        setLabel(object.source ? [object.relationship] : [...object.labels])
     }, [object])
 
     const handleSetEditable = ([key, val]: [string, string[]] = getDefaultAttribute()) => {

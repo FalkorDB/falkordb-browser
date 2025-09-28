@@ -5,7 +5,7 @@
 
 import { LinkObject, NodeObject } from "react-force-graph-2d";
 
-export type Value = string | number | boolean
+export type Value = string | number | boolean;
 
 export type HistoryQuery = {
   queries: Query[];
@@ -20,7 +20,7 @@ export type Query = {
   explain: string[];
   profile: string[];
   graphName: string;
-  timestamp: number; 
+  timestamp: number;
 };
 
 const getSchemaValue = (value: string): string[] => {
@@ -435,7 +435,12 @@ export class Graph {
     return graph;
   }
 
-  public extendNode(cell: NodeCell, collapsed: boolean, isSchema: boolean, isColor = false) {
+  public extendNode(
+    cell: NodeCell,
+    collapsed: boolean,
+    isSchema: boolean,
+    isColor = false
+  ) {
     const labels = this.createLabel(
       cell.labels.length === 0 ? [""] : cell.labels
     );
@@ -466,7 +471,9 @@ export class Graph {
     if (currentNode.labels[0] === "") {
       currentNode.id = cell.id;
       currentNode.labels = labels.map((l) => l.name);
-      currentNode.color = isColor ? getLabelWithFewestElements(labels).color : "";
+      currentNode.color = isColor
+        ? getLabelWithFewestElements(labels).color
+        : "";
       currentNode.expand = false;
       currentNode.collapsed = collapsed;
       Object.entries(cell.properties).forEach(([key, value]) => {
@@ -495,7 +502,12 @@ export class Graph {
     return currentNode;
   }
 
-  public extendEdge(cell: LinkCell, collapsed: boolean, isSchema: boolean, isColor = false) {
+  public extendEdge(
+    cell: LinkCell,
+    collapsed: boolean,
+    isSchema: boolean,
+    isColor = false
+  ) {
     const relation = this.createRelationship(cell.relationshipType);
     const currentEdge = this.linksMap.get(cell.id);
 
@@ -835,7 +847,7 @@ export class Graph {
   public removeElements(elements: (Node | Link)[]) {
     elements.forEach((element) => {
       const { id } = element;
-      const type = !("source" in element);
+      const type = !element.source;
 
       if (type) {
         this.elements.nodes.splice(
@@ -874,8 +886,8 @@ export class Graph {
       }
     });
 
-    const nodes = elements.filter((n): n is Node => !("source" in n));
-    const links = elements.filter((l): l is Link => "source" in l);
+    const nodes = elements.filter((n): n is Node => !n.source);
+    const links = elements.filter((l): l is Link => l.source);
 
     this.elements = {
       nodes: this.elements.nodes.filter(
