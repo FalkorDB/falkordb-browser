@@ -35,7 +35,7 @@ export default function GraphDataPanel({ object, setObject, onDeleteElement, set
 
     const [labelsHover, setLabelsHover] = useState(false)
     const [label, setLabel] = useState<string[]>([]);
-    const type = !("source" in object)
+    const type = !object.source
 
     const onClose = useCallback((e: KeyboardEvent) => {
         if (e.key === "Escape") {
@@ -55,7 +55,7 @@ export default function GraphDataPanel({ object, setObject, onDeleteElement, set
         if (lastObjId.current !== object.id) {
             setLabelsHover(false)
         }
-        setLabel(type ? [...object.labels.filter((c) => c !== "")] : [object.relationship]);
+        setLabel(type ? [...(object as Node).labels.filter((c) => c !== "")] : [object.relationship]);
         lastObjId.current = object.id
     }, [object, type]);
 
@@ -156,7 +156,7 @@ export default function GraphDataPanel({ object, setObject, onDeleteElement, set
                         <li
                             data-testid={`DataPanelLabel${l}`}
                             key={l}
-                            className="flex gap-2 px-2 py-1 bg-background rounded-full items-center"
+                            className="flex gap-2 px-2 py-1 bg-secondary rounded-full items-center"
                         >
                             <p>{l || "No Label"}</p>
                             {
@@ -200,7 +200,6 @@ export default function GraphDataPanel({ object, setObject, onDeleteElement, set
             <GraphDataTable
                 className="h-1 grow w-full"
                 lastObjId={lastObjId}
-                graph={graph}
                 object={object}
                 type={type}
                 onDeleteElement={onDeleteElement}

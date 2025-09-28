@@ -51,7 +51,7 @@ export default function SchemaDataPanel({ object, setObject, onDeleteElement, sc
     const [newLabel, setNewLabel] = useState<string>("")
     const [label, setLabel] = useState<string[]>([])
     const [hover, setHover] = useState<string>("")
-    const type = !("source" in object)
+    const type = !object.source
 
     const handleClose = useCallback((e: KeyboardEvent) => {
         if (e.defaultPrevented) return
@@ -71,7 +71,7 @@ export default function SchemaDataPanel({ object, setObject, onDeleteElement, sc
 
     useEffect(() => {
         setAttributes(Object.entries(object.data).filter(([key, val]) => !(key === "name" && Number(val) === object.id)).map(([key, val]) => [key, Array.isArray(val) ? val : (val as string).split(',')]))
-        setLabel("source" in object ? [object.relationship] : [...object.labels])
+        setLabel(object.source ? [object.relationship] : [...object.labels])
     }, [object])
 
     const handleSetEditable = ([key, val]: [string, string[]] = getDefaultAttribute()) => {
@@ -334,7 +334,7 @@ export default function SchemaDataPanel({ object, setObject, onDeleteElement, sc
                 </Button>
                 <ul className="flex flex-wrap gap-4 min-w-[10%]" onMouseEnter={() => setLabelsHover(true)} onMouseLeave={() => setLabelsHover(false)}>
                     {label.map((l) => (
-                        <li key={l} className="flex gap-2 px-2 py-1 bg-background rounded-full items-center">
+                        <li key={l} className="flex gap-2 px-2 py-1 bg-secondary rounded-full items-center">
                             <p>{l}</p>
                             {
                                 type && session?.user?.role !== "Read-Only" &&

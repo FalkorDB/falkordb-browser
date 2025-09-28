@@ -145,7 +145,6 @@ function GraphView({
                                 selectedElements={selectedElements}
                                 handleDeleteElement={handleDeleteElement}
                                 chartRef={chartRef}
-                                backgroundColor="bg-transparent"
                             />
                             {
                                 (labels.length > 0 || relationships.length > 0) &&
@@ -173,7 +172,7 @@ function GraphView({
                                 <Button
                                     disabled={graph.getElements().length === 0}
                                     className="tabs-trigger"
-                                    title="Graph"
+                                    title={graph.getElements().length === 0 ? "No Elements" : "Graph"}
                                 >
                                     <GitGraph />
                                 </Button>
@@ -186,7 +185,7 @@ function GraphView({
                                 <Button
                                     disabled={graph.Data.length === 0}
                                     className="tabs-trigger"
-                                    title="Table"
+                                    title={graph.Data.length === 0 ? "No Data" : "Table"}
                                 >
                                     <Table />
                                 </Button>
@@ -199,7 +198,7 @@ function GraphView({
                                 <Button
                                     disabled={!historyQuery.currentQuery || historyQuery.currentQuery.metadata.length === 0 || historyQuery.currentQuery.explain.length === 0 || graph.Metadata.length === 0}
                                     className="tabs-trigger"
-                                    title="Metadata"
+                                    title={!historyQuery.currentQuery || historyQuery.currentQuery.metadata.length === 0 || historyQuery.currentQuery.explain.length === 0 || graph.Metadata.length === 0 ? "No Metadata" : "Metadata"}
                                 >
                                     <Info />
                                 </Button>

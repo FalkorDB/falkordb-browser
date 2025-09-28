@@ -191,7 +191,7 @@ export const HistoryQueryContext = createContext<HistoryQueryContextType>({
   historyQuery: {
     queries: [],
     query: "",
-    currentQuery: { text: "", metadata: [], explain: [], profile: [] },
+    currentQuery: { text: "", metadata: [], explain: [], profile: [], graphName: "", timestamp: 0 },
     counter: 0,
   },
   setHistoryQuery: () => {},

@@ -25,10 +25,11 @@ test.describe('Query history Tests', () => {
         const graph = await browser.createNewPage(QueryHistory, urls.graphUrl);
         await browser.setPageToFullScreen();
         await graph.selectGraphByName(graphName);
-        await graph.insertQuery("CREATE (n:Person { name: 'Alice' }) RETURN n");
+        const query = "CREATE (n:Person { name: 'Alice' }) RETURN n"
+        await graph.insertQuery(query);
         await graph.clickRunQuery();
         await graph.clickQueryHistoryButton();
-        expect(await graph.getQueryHistory("0")).toBe(true);
+        expect(await graph.getQueryHistory(query)).toBe(true);
         await apicalls.removeGraph(graphName);         
     });
 
@@ -38,11 +39,12 @@ test.describe('Query history Tests', () => {
         const graph = await browser.createNewPage(QueryHistory, urls.graphUrl);
         await browser.setPageToFullScreen();
         await graph.selectGraphByName(graphName);
-        await graph.insertQuery("CREATE (n:Person { name: 'Alice' }) RETURN n");
+        const query = "CREATE (n:Person { name: 'Alice' }) RETURN n"
+        await graph.insertQuery(query);
         await graph.clickRunQuery();
-        await graph.runAQueryFromHistory("0");
+        await graph.runAQueryFromHistory(query);
         const searchQuery = `Alice`;
-        await graph.searchElementInCanvas("Graph", searchQuery);
+        await graph.searchElementInCanvas(searchQuery);
         await graph.hoverAtCanvasCenter();
         expect(await graph.getNodeCanvasToolTip()).toBe(searchQuery);
         await apicalls.removeGraph(graphName);        
@@ -53,11 +55,12 @@ test.describe('Query history Tests', () => {
         await browser.setPageToFullScreen();
         const graphName = getRandomString('queryhistory');
         await graph.addGraph(graphName);
-        await graph.insertQuery("CREATE (n:Person { name: 'Alice' }) RETURN n");
+        const query = "CREATE (n:Person { name: 'Alice' }) RETURN n"
+        await graph.insertQuery(query);
         await graph.clickRunQuery(false);
         await graph.clickQueryHistoryButton();
-        await graph.clickSelectQueryInHistory("0");
-        expect((await graph.getQueryHistoryEditorContent())[0]).toBe("CREATE (n:Person { name: 'Alice' }) RETURN n");
+        await graph.clickSelectQueryInHistory(query);
+        expect(await graph.getQueryHistoryEditorContent(query)).toBe("CREATE (n:Person { name: 'Alice' }) RETURN n");
         await apicalls.removeGraph(graphName);
     });
 

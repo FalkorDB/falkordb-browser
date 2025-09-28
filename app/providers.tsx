@@ -2,32 +2,41 @@
 
 import { SessionProvider, useSession } from "next-auth/react";
 import { ThemeProvider } from 'next-themes'
-import { Dispatch, SetStateAction, useCallback, useEffect, useMemo, useState } from "react";
+import { Dispatch, SetStateAction, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
-import { fetchOptions, formatName, getDefaultQuery, getQueryWithLimit, getSSEGraphResult, Panel, prepareArg, securedFetch } from "@/lib/utils";
+import { cn, fetchOptions, formatName, getDefaultQuery, getQueryWithLimit, getSSEGraphResult, Panel, prepareArg, securedFetch } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
+import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
+import { ImperativePanelHandle } from "react-resizable-panels";
 import LoginVerification from "./loginVerification";
 import { Graph, GraphInfo, HistoryQuery } from "./api/graph/model";
 import Header from "./components/Header";
 import { GraphContext, HistoryQueryContext, IndicatorContext, PanelContext, QueryLoadingContext, QuerySettingsContext, SchemaContext } from "./components/provider";
+import Tutorial from "./graph/Tutorial";
 import GraphInfoPanel from "./graph/graphInfo";
+
+const defaultQueryHistory = {
+  queries: [],
+  query: "",
+  currentQuery: {
+    text: "",
+    metadata: [],
+    explain: [],
+    profile: [],
+    graphName: "",
+    timestamp: 0,
+  },
+  counter: 0
+}
 
 function ProvidersWithSession({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const { toast } = useToast()
   const { status } = useSession()
 
-  const [historyQuery, setHistoryQuery] = useState<HistoryQuery>({
-    queries: [],
-    query: "",
-    currentQuery: {
-      text: "",
-      metadata: [],
-      explain: [],
-      profile: [],
-    },
-    counter: 0
-  })
+  const panelRef = useRef<ImperativePanelHandle>(null)
+  
+  const [historyQuery, setHistoryQuery] = useState<HistoryQuery>(defaultQueryHistory)
   const [indicator, setIndicator] = useState<"online" | "offline">("online")
   const [runDefaultQuery, setRunDefaultQuery] = useState(false)
   const [schemaNames, setSchemaNames] = useState<string[]>([])
@@ -56,11 +65,12 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState<boolean>(false)
   const [cooldownTicks, setCooldownTicks] = useState<number | undefined>(0)
   const [panel, setPanel] = useState<Panel>()
-  const [graphInfoOpen, setGraphInfoOpen] = useState(false)
   const [isQueryLoading, setIsQueryLoading] = useState(false)
   const [displayChat, setDisplayChat] = useState(false)
   const [model, setModel] = useState("")
   const [navigateToSettings, setNavigateToSettings] = useState(false)
+  const [tutorialOpen, setTutorialOpen] = useState(false)
+  const [isCollapsed, setIsCollapsed] = useState(true)
 
   const querySettingsContext = useMemo(() => ({
     newSettings: {
@@ -128,7 +138,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
   const indicatorContext = useMemo(() => ({
     indicator,
     setIndicator,
-  }), [indicator, setIndicator])
+  }), [indicator])
 
   const panelContext = useMemo(() => ({
     panel,
@@ -183,6 +193,20 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
     }
   }, [setIsLoading, setCooldownTicks]);
 
+  const fetchInfo = useCallback(async (type: string) => {
+    if (!graphName) return []
+
+    const result = await securedFetch(`/api/graph/${graphName}/info?type=${type}`, {
+      method: "GET",
+    }, toast, setIndicator);
+
+    if (!result.ok) return []
+
+    const json = await result.json();
+
+    return json.result.data.map(({ info }: { info: string }) => info);
+  }, [graphName, setIndicator, toast]);
+
   const runQuery = useCallback(async (q: string, name?: string): Promise<void> => {
     try {
       setIsQueryLoading(true)
@@ -200,6 +224,24 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
 
       if (!result) return;
 
+      const graphI = await Promise.all([
+        fetchInfo("(label)"),
+        fetchInfo("(relationship type)"),
+        fetchInfo("(property key)"),
+      ]).then(async ([newLabels, newRelationships, newPropertyKeys]) => {
+        const colorsArr = localStorage.getItem(n)
+        const gi = GraphInfo.create(newPropertyKeys, newLabels, newRelationships, colorsArr ? JSON.parse(colorsArr) : undefined)
+        setGraphInfo(gi)
+        return gi
+      }).catch((error) => {
+        toast({
+          title: "Error",
+          description: error.message || "Failed to fetch graph info",
+          variant: "destructive",
+        })
+        return undefined
+      });
+
       const explain = await securedFetch(`api/graph/${prepareArg(n)}/explain?query=${prepareArg(query)}`, {
         method: "GET"
       }, toast, setIndicator)
@@ -207,8 +249,8 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       if (!explain.ok) return;
 
       const explainJson = await explain.json()
-      const newQuery = { text: q, metadata: result.metadata, explain: explainJson.result, profile: [] }
-      const g = Graph.create(n, result, false, false, existingLimit, graphInfo)
+      const newQuery = { text: q, metadata: result.metadata, explain: explainJson.result, profile: [], graphName, timestamp: new Date().getTime() }
+      const g = Graph.create(n, result, false, false, existingLimit, graphI)
       const newQueries = [...historyQuery.queries.filter(qu => qu.text !== newQuery.text), newQuery]
 
       setHistoryQuery(prev => ({
@@ -258,19 +300,10 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
   }), [graph, graphInfo, graphName, graphNames, nodesCount, edgesCount, runQuery, fetchCount, handleCooldown, cooldownTicks, isLoading])
 
   useEffect(() => {
+
     if (status !== "authenticated") return
 
-    setHistoryQuery({
-      queries: JSON.parse(localStorage.getItem(`query history`) || "[]"),
-      query: "",
-      currentQuery: {
-        text: "",
-        metadata: [],
-        explain: [],
-        profile: [],
-      },
-      counter: 0
-    })
+    setHistoryQuery({ ...defaultQueryHistory, queries: JSON.parse(localStorage.getItem("query history") || "[]") })
     setTimeout(parseInt(localStorage.getItem("timeout") || "0", 10))
     const l = parseInt(localStorage.getItem("limit") || "300", 10)
     setLimit(l)
@@ -278,7 +311,20 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
     setDefaultQuery(getDefaultQuery(localStorage.getItem("defaultQuery") || undefined))
     setRunDefaultQuery(localStorage.getItem("runDefaultQuery") !== "false")
     setContentPersistence(localStorage.getItem("contentPersistence") !== "false");
+    setTutorialOpen(localStorage.getItem("tutorial") !== "false")
   }, [status])
+
+  const panelSize = useMemo(() => isCollapsed ? 0 : 15, [isCollapsed])
+
+  useEffect(() => {
+    const currentPanel = panelRef.current
+
+    if (!currentPanel) return
+
+    if (pathname === "/graph" && graphName) {
+      if (currentPanel.isCollapsed()) currentPanel.expand()
+    } else if (currentPanel.isExpanded()) currentPanel.collapse()
+  }, [graphName, pathname])
 
   useEffect(() => {
     if (status !== "authenticated") return
@@ -307,7 +353,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
     securedFetch("/api/status", {
       method: "GET",
     }, toast, setIndicator)
-  }, [toast])
+  }, [toast, setIndicator])
 
   useEffect(() => {
     let interval: NodeJS.Timeout | undefined
@@ -320,14 +366,6 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
 
     return () => clearInterval(interval)
   }, [checkStatus, status])
-
-  useEffect(() => {
-    if (pathname === "/graph" && graphName) {
-      setGraphInfoOpen(true)
-    } else {
-      setGraphInfoOpen(false)
-    }
-  }, [pathname, graphName])
 
   const handleOnSetGraphName = (newGraphName: string) => {
     if (pathname.includes("/schema")) {
@@ -353,6 +391,18 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
     handleFetchOptions()
   }, [handleFetchOptions, status])
 
+  const onExpand = () => {
+    const currentPanel = panelRef.current
+
+    if (!currentPanel) return
+
+    if (currentPanel.isCollapsed()) {
+      currentPanel.expand()
+    } else {
+      currentPanel.collapse()
+    }
+  }
+
   return (
     <ThemeProvider attribute="class" storageKey="theme" defaultTheme="system" disableTransitionOnChange>
       <LoginVerification>
@@ -369,23 +419,42 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
                           graphName={graphName}
                           graphNames={pathname.includes("/schema") ? schemaNames : graphNames}
                           onSetGraphName={handleOnSetGraphName}
-                          setGraphInfoOpen={setGraphInfoOpen}
+                          onOpenGraphInfo={onExpand}
                           displayChat={displayChat}
                         />
                       }
-                      <GraphInfoPanel
-                        isOpen={graphInfoOpen}
-                        onClose={() => setGraphInfoOpen(false)}
-                      />
-                      {
-                        (pathname === "/graph" || pathname === "/schema") ?
-                          <div className="h-full w-1 grow flex flex-col">
-                            {children}
-                            <div className="h-4 w-full Gradient" />
-                          </div>
-                          :
-                          children
-                      }
+                      <ResizablePanelGroup direction="horizontal" className="w-1 grow">
+                        <ResizablePanel
+                          ref={panelRef}
+                          defaultSize={panelSize}
+                          collapsible
+                          minSize={15}
+                          maxSize={30}
+                          onCollapse={() => setIsCollapsed(true)}
+                          onExpand={() => setIsCollapsed(false)}
+                        >
+                          <GraphInfoPanel
+                            onClose={onExpand}
+                          />
+                        </ResizablePanel>
+                        <ResizableHandle withHandle onMouseUp={() => isCollapsed && onExpand()} className={cn("w-0", isCollapsed && "hidden")} />
+                        <ResizablePanel
+                          defaultSize={100 - panelSize}
+                          minSize={50}
+                          maxSize={100}
+                        >
+                          {
+                            (pathname === "/graph" || pathname === "/schema") ?
+                              <div className="h-full w-full flex flex-col">
+                                {children}
+                                <div className="h-4 w-full Gradient" />
+                                {pathname === "/graph" && <Tutorial open={tutorialOpen} setOpen={setTutorialOpen} />}
+                              </div>
+                              :
+                              children
+                          }
+                        </ResizablePanel>
+                      </ResizablePanelGroup>
                     </QueryLoadingContext.Provider>
                   </PanelContext.Provider>
                 </IndicatorContext.Provider>

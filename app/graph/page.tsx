@@ -8,7 +8,6 @@ import { ForceGraphMethods } from "react-force-graph-2d";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { ImperativePanelHandle } from "react-resizable-panels";
 import { Label, Graph, GraphData, Link, Node, Relationship, GraphInfo } from "../api/graph/model";
-import Tutorial from "./Tutorial";
 import { GraphContext, HistoryQueryContext, IndicatorContext, PanelContext, QueryLoadingContext, QuerySettingsContext } from "../components/provider";
 import Spinning from "../components/ui/spinning";
 import Chat from "./Chat";
@@ -69,14 +68,14 @@ export default function Page() {
     const [relationships, setRelationships] = useState<Relationship[]>([])
     const [isCollapsed, setIsCollapsed] = useState(true)
 
-    const [panelSize, graphSize] = useMemo(() => {
+    const panelSize = useMemo(() => {
         switch (panel) {
             case "data":
-                return [30, 70]
+                return 30
             case "chat":
-                return [40, 60]
+                return 40
             default:
-                return [0, 100]
+                return 0
         }
     }, [panel])
 
@@ -86,7 +85,7 @@ export default function Page() {
         }
 
         const currentPanel = panelRef.current
-        
+
         if (!currentPanel) return
 
         if (panel) currentPanel.expand()
@@ -181,7 +180,7 @@ export default function Page() {
         }
 
         await Promise.all(selectedElements.map(async (element) => {
-            const type = !("source" in element)
+            const type = !element.source
             const result = await securedFetch(`api/graph/${prepareArg(graph.Id)}/${prepareArg(element.id.toString())}`, {
                 method: "DELETE",
                 body: JSON.stringify({ type })
@@ -256,6 +255,7 @@ export default function Page() {
     return (
         <div className="Page p-8 gap-8">
             <Selector
+                type="Graph"
                 graph={graph}
                 options={graphNames}
                 setOptions={setGraphNames}
@@ -269,7 +269,7 @@ export default function Page() {
                 isQueryLoading={isQueryLoading}
             />
             <ResizablePanelGroup direction="horizontal" className="h-1 grow">
-                <ResizablePanel defaultSize={graphSize} minSize={50} maxSize={100}>
+                <ResizablePanel defaultSize={100 - panelSize} minSize={50} maxSize={100}>
                     <GraphView
                         selectedElement={selectedElement}
                         setSelectedElement={handleSetSelectedElement}
@@ -308,7 +308,6 @@ export default function Page() {
                     {getCurrentPanel()}
                 </ResizablePanel>
             </ResizablePanelGroup>
-            <Tutorial />
         </div >
     )
 }

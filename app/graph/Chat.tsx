@@ -263,7 +263,7 @@ export default function Chat({ onClose }: Props) {
                         >
                             {queryCollapse[i] ? <ChevronRight size={25} /> : <ChevronDown size={25} />}
                         </Button>
-                        <div className="overflow-hidden CypherInput">
+                        <div className="overflow-hidden SofiaSans">
                             {
                                 queryCollapse[i] ? (
                                     <Tooltip>
@@ -321,7 +321,7 @@ export default function Chat({ onClose }: Props) {
                 >
                     <X className="h-4 w-4" />
                 </Button>
-                <h1 className="mt-6">Chat with your database in natural language</h1>
+                <h1 className="mt-6 text-center">Chat with your database in natural language</h1>
                 <ul className="w-full h-1 grow flex flex-col gap-6 overflow-x-hidden overflow-y-auto chat-container">
                     {
                         messagesList.map((message, index) => {
@@ -389,7 +389,7 @@ export default function Chat({ onClose }: Props) {
                 </ul>
                 <form className="flex gap-2 items-center border border-border rounded-lg w-full p-2" onSubmit={handleSubmit}>
                     <Input
-                        className="w-1 grow bg-transparent border-none text-foreground text-lg CypherInput"
+                        className="w-1 grow bg-transparent border-none text-foreground text-lg SofiaSans"
                         placeholder="Type your message here..."
                         value={newMessage}
                         onChange={(e) => setNewMessage(e.target.value)}
