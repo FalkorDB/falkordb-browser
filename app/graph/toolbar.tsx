@@ -216,6 +216,7 @@ export default function Toolbar({
                             {
                                 visibleSuggestions.map((suggestion, index) => {
                                     const actualIndex = index + startIndex
+                                    const type = !!suggestion.source
 
                                     return (
                                         <li key={actualIndex}>
@@ -233,7 +234,7 @@ export default function Toolbar({
                                                             className="rounded-full h-8 w-8 p-2 flex items-center justify-center"
                                                             style={{ backgroundColor: suggestion.color }}
                                                         >
-                                                            <p className="text-foreground text-sm font-bold truncate">{("source" in suggestion) ? suggestion.relationship : suggestion.labels[0]}</p>
+                                                            <p className="text-foreground text-sm font-bold truncate">{type ? suggestion.relationship : suggestion.labels[0]}</p>
                                                         </div>
                                                         <div
                                                             className={cn("w-1 grow text-center truncate", actualIndex === suggestionIndex ? "text-black" : "text-foreground")}
@@ -243,7 +244,7 @@ export default function Toolbar({
                                                     </Button>
                                                 </TooltipTrigger>
                                                 <TooltipContent>
-                                                    {("source" in suggestion) ? suggestion.relationship : suggestion.labels[0]}
+                                                    {type ? suggestion.relationship : suggestion.labels[0]}
                                                 </TooltipContent>
                                             </Tooltip>
                                         </li>

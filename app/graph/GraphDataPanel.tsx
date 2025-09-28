@@ -35,7 +35,7 @@ export default function GraphDataPanel({ object, setObject, onDeleteElement, set
 
     const [labelsHover, setLabelsHover] = useState(false)
     const [label, setLabel] = useState<string[]>([]);
-    const type = !("source" in object)
+    const type = !object.source
 
     const onClose = useCallback((e: KeyboardEvent) => {
         if (e.key === "Escape") {
@@ -55,7 +55,7 @@ export default function GraphDataPanel({ object, setObject, onDeleteElement, set
         if (lastObjId.current !== object.id) {
             setLabelsHover(false)
         }
-        setLabel(type ? [...object.labels.filter((c) => c !== "")] : [object.relationship]);
+        setLabel(type ? [...(object as Node).labels.filter((c) => c !== "")] : [object.relationship]);
         lastObjId.current = object.id
     }, [object, type]);
 
