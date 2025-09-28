@@ -18,7 +18,6 @@ interface Props {
     label: "Graph" | "Schema"
     setIsAddEntity?: (isAdd: boolean) => void
     setIsAddRelation?: (isAdd: boolean) => void
-    backgroundColor?: string
     isLoadingSchema?: boolean
 }
 
@@ -35,7 +34,6 @@ export default function Toolbar({
     label,
     setIsAddEntity,
     setIsAddRelation,
-    backgroundColor,
     isLoadingSchema,
 }: Props) {
 
@@ -55,7 +53,7 @@ export default function Toolbar({
     const [visibleSuggestions, setVisibleSuggestions] = useState<(Node | Link)[]>([])
 
     const isLoading = isLoadingSchema || isLoadingGraph
-    
+
     useEffect(() => {
         const newStartIndex = Math.max(0, Math.floor((scrollTop - ((ITEM_HEIGHT + GAP) * ITEMS_PER_PAGE)) / (ITEM_HEIGHT + GAP)))
         const newEndIndex = Math.min(suggestions.length, Math.floor((scrollTop + ((ITEM_HEIGHT + GAP) * (ITEMS_PER_PAGE * 2))) / (ITEM_HEIGHT + GAP)))
@@ -127,7 +125,7 @@ export default function Toolbar({
                     graph.getElements().length > 0 && !isLoading &&
                     <Input
                         data-testid={`elementCanvasSearch${label}`}
-                        className={cn("w-[30dvw] text-foreground border border-primary", label === "Schema" && "h-full", backgroundColor)}
+                        className={cn("w-[30dvw] text-foreground border border-primary", label === "Schema" && "h-full")}
                         placeholder="Search for element in the graph"
                         value={searchElement}
                         onChange={(e) => setSearchElement(e.target.value)}
@@ -281,7 +279,6 @@ export default function Toolbar({
                                 open={deleteOpen}
                                 setOpen={setDeleteOpen}
                                 onDeleteElement={handleDeleteElement}
-                                backgroundColor={backgroundColor}
                             />
                         }
                         {
@@ -290,7 +287,7 @@ export default function Toolbar({
                                 <DropdownMenuTrigger asChild>
                                     <Button
                                         data-testid={`elementCanvasAdd${label}`}
-                                        className={cn("pointer-events-auto", backgroundColor)}
+                                        className="pointer-events-auto"
                                         variant="Secondary"
                                         label="Add Element"
                                     >
@@ -300,7 +297,7 @@ export default function Toolbar({
                                 <DropdownMenuContent>
                                     <Button
                                         data-testid={`elementCanvasAddNode${label}`}
-                                        className={cn("pointer-events-auto", backgroundColor)}
+                                        className="pointer-events-auto"
                                         variant="Secondary"
                                         label="Add Node"
                                         onClick={() => {
@@ -312,7 +309,7 @@ export default function Toolbar({
                                     </Button>
                                     <Button
                                         data-testid={`elementCanvasAddEdge${label}`}
-                                        className={cn("pointer-events-auto", backgroundColor)}
+                                        className="pointer-events-auto"
                                         variant="Secondary"
                                         label="Add Edge"
                                         onClick={() => {
@@ -335,6 +332,5 @@ export default function Toolbar({
 Toolbar.defaultProps = {
     setIsAddEntity: undefined,
     setIsAddRelation: undefined,
-    backgroundColor: undefined,
     isLoadingSchema: false,
 }

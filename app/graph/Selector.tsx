@@ -492,7 +492,6 @@ export default function Selector<T extends "Graph" | "Schema" = "Graph" | "Schem
                             setIsAddRelation={setIsAddRelation}
                             chartRef={chartRef}
                             isLoadingSchema={!!isCanvasLoading}
-                            backgroundColor="bg-background"
                         />
                     </div>
             }

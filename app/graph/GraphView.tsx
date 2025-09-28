@@ -145,7 +145,6 @@ function GraphView({
                                 selectedElements={selectedElements}
                                 handleDeleteElement={handleDeleteElement}
                                 chartRef={chartRef}
-                                backgroundColor="bg-transparent"
                             />
                             {
                                 (labels.length > 0 || relationships.length > 0) &&

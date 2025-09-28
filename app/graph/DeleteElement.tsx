@@ -4,7 +4,6 @@
 
 import React, { useState, useContext } from "react";
 import { Trash2 } from "lucide-react";
-import { cn } from "@/lib/utils";
 import CloseDialog from "../components/CloseDialog";
 import DialogComponent from "../components/DialogComponent";
 import Button from "../components/ui/Button";
@@ -17,7 +16,6 @@ interface Props {
     description: string
     label?: "Graph" | "Schema"
     trigger?: React.ReactNode
-    backgroundColor?: string
 }
 
 export default function DeleteElement({
@@ -25,11 +23,10 @@ export default function DeleteElement({
     open,
     setOpen,
     description,
-    backgroundColor,
     label = "Graph",
     trigger = <Button
         data-testid={`deleteElement${label}`}
-        className={cn("pointer-events-auto", backgroundColor)}
+        className="pointer-events-auto bg-background"
         variant="Delete"
         title="Delete Element(s)"
     >
