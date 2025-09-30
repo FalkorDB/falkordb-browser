@@ -141,6 +141,7 @@ function GraphView({
                             <Toolbar
                                 graph={graph}
                                 label="Graph"
+                                selectedElement={selectedElement}
                                 setSelectedElement={setSelectedElement}
                                 selectedElements={selectedElements}
                                 handleDeleteElement={handleDeleteElement}
