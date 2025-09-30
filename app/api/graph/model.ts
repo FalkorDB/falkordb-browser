@@ -21,6 +21,8 @@ export type Query = {
   profile: string[];
   graphName: string;
   timestamp: number;
+  status: "Success" | "Failed" | "Empty";
+  elementsCount: number
 };
 
 const getSchemaValue = (value: string): string[] => {
