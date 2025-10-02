@@ -131,7 +131,12 @@ export const QuerySettingsContext = createContext<QuerySettingsContextType>({
       newContentPersistence: false,
       setNewContentPersistence: () => {},
     },
-    chatSettings: { newSecretKey: "", setNewSecretKey: () => {}, newModel: "", setNewModel: () => {} },
+    chatSettings: {
+      newSecretKey: "",
+      setNewSecretKey: () => {},
+      newModel: "",
+      setNewModel: () => {},
+    },
   },
   settings: {
     limitSettings: {
@@ -150,7 +155,14 @@ export const QuerySettingsContext = createContext<QuerySettingsContextType>({
       contentPersistence: false,
       setContentPersistence: () => {},
     },
-    chatSettings: { secretKey: "", setSecretKey: () => {}, model: "", setModel: () => {}, navigateToSettings: false, setNavigateToSettings: () => {} },
+    chatSettings: {
+      secretKey: "",
+      setSecretKey: () => {},
+      model: "",
+      setModel: () => {},
+      navigateToSettings: false,
+      setNavigateToSettings: () => {},
+    },
   },
   hasChanges: false,
   setHasChanges: () => {},
@@ -191,7 +203,16 @@ export const HistoryQueryContext = createContext<HistoryQueryContextType>({
   historyQuery: {
     queries: [],
     query: "",
-    currentQuery: { text: "", metadata: [], explain: [], profile: [], graphName: "", timestamp: 0 },
+    currentQuery: {
+      text: "",
+      metadata: [],
+      explain: [],
+      profile: [],
+      graphName: "",
+      timestamp: 0,
+      elementsCount: 0,
+      status: "Failed",
+    },
     counter: 0,
   },
   setHistoryQuery: () => {},

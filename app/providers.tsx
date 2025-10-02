@@ -9,13 +9,13 @@ import { useToast } from "@/components/ui/use-toast";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { ImperativePanelHandle } from "react-resizable-panels";
 import LoginVerification from "./loginVerification";
-import { Graph, GraphInfo, HistoryQuery } from "./api/graph/model";
+import { Graph, GraphInfo, HistoryQuery, Query } from "./api/graph/model";
 import Header from "./components/Header";
 import { GraphContext, HistoryQueryContext, IndicatorContext, PanelContext, QueryLoadingContext, QuerySettingsContext, SchemaContext } from "./components/provider";
 import Tutorial from "./graph/Tutorial";
 import GraphInfoPanel from "./graph/graphInfo";
 
-const defaultQueryHistory = {
+const defaultQueryHistory: HistoryQuery = {
   queries: [],
   query: "",
   currentQuery: {
@@ -25,6 +25,8 @@ const defaultQueryHistory = {
     profile: [],
     graphName: "",
     timestamp: 0,
+    status: "Failed",
+    elementsCount: 0
   },
   counter: 0
 }
@@ -35,7 +37,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
   const { status } = useSession()
 
   const panelRef = useRef<ImperativePanelHandle>(null)
-  
+
   const [historyQuery, setHistoryQuery] = useState<HistoryQuery>(defaultQueryHistory)
   const [indicator, setIndicator] = useState<"online" | "offline">("online")
   const [runDefaultQuery, setRunDefaultQuery] = useState(false)
@@ -205,12 +207,25 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
     const json = await result.json();
 
     return json.result.data.map(({ info }: { info: string }) => info);
-  }, [graphName, setIndicator, toast]);
+  }, [graphName, toast]);
+
+  const handelGetNewQueries = useCallback((newQuery: Query) => [...historyQuery.queries.filter(qu => qu.text !== newQuery.text), newQuery], [historyQuery.queries])
 
   const runQuery = useCallback(async (q: string, name?: string): Promise<void> => {
+    const n = name || graphName
+    let newQuery: Query = {
+      elementsCount: 0,
+      explain: [],
+      graphName: n,
+      metadata: [],
+      profile: [],
+      status: "Failed",
+      text: q,
+      timestamp: new Date().getTime()
+    }
+
     try {
       setIsQueryLoading(true)
-      const n = name || graphName
 
       const [query, existingLimit] = getQueryWithLimit(q, limit)
       const url = `api/graph/${prepareArg(n)}?query=${prepareArg(query)}&timeout=${timeout}`;
@@ -222,7 +237,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
 
       const result = await getSSEGraphResult(url, toast, setIndicator);
 
-      if (!result) return;
+      if (!result) throw new Error()
 
       const graphI = await Promise.all([
         fetchInfo("(label)"),
@@ -246,19 +261,21 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
         method: "GET"
       }, toast, setIndicator)
 
-      if (!explain.ok) return;
+      if (!explain.ok) throw new Error();
 
       const explainJson = await explain.json()
-      const newQuery = { text: q, metadata: result.metadata, explain: explainJson.result, profile: [], graphName, timestamp: new Date().getTime() }
       const g = Graph.create(n, result, false, false, existingLimit, graphI)
-      const newQueries = [...historyQuery.queries.filter(qu => qu.text !== newQuery.text), newQuery]
-
-      setHistoryQuery(prev => ({
-        ...prev,
-        queries: newQueries,
-        currentQuery: newQuery,
-        counter: 0
-      }))
+      newQuery = {
+        text: q,
+        metadata: result.metadata,
+        explain: explainJson.result,
+        profile: [],
+        graphName: n,
+        timestamp: new Date().getTime(),
+        status: "Success",
+        elementsCount: g.getElements().length
+      }
+      
       setGraph(g)
       fetchCount();
       setLastLimit(limit)
@@ -267,7 +284,6 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
         handleCooldown();
       }
 
-      localStorage.setItem("query history", JSON.stringify(newQueries))
       localStorage.setItem("savedContent", JSON.stringify({ graphName: n, query: q }))
       // eslint-disable-next-line @typescript-eslint/ban-ts-comment
       // @ts-ignore
@@ -275,9 +291,19 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
     } catch (error) {
       console.debug(error)
     } finally {
+      const newQueries = handelGetNewQueries(newQuery)
+
+      localStorage.setItem("query history", JSON.stringify(newQueries))
+
+      setHistoryQuery(prev => ({
+        ...prev,
+        queries: newQueries,
+        currentQuery: newQuery,
+        counter: 0
+      }))
       setIsQueryLoading(false)
     }
-  }, [graphName, limit, timeout, toast, historyQuery.queries, graphInfo, fetchCount, handleCooldown]);
+  }, [graphName, limit, timeout, toast, fetchInfo, fetchCount, handleCooldown, handelGetNewQueries]);
 
   const graphContext = useMemo(() => ({
     graph,
