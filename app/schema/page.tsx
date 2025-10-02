@@ -265,6 +265,7 @@ export default function Page() {
                 setOptions={setSchemaNames}
                 graphName={schemaName}
                 setGraphName={setSchemaName}
+                selectedElement={selectedElement}
                 selectedElements={selectedElements}
                 setSelectedElement={handleSetSelectedElement}
                 handleDeleteElement={handleDeleteElement}

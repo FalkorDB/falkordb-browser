@@ -12,6 +12,7 @@ import { GraphContext } from "../components/provider"
 interface Props {
     graph: Graph
     selectedElements: (Node | Link)[]
+    selectedElement: Node | Link | undefined
     setSelectedElement: (el: Node | Link | undefined) => void
     handleDeleteElement: () => Promise<void>
     chartRef: GraphRef
@@ -28,6 +29,7 @@ const ITEMS_PER_PAGE = 30
 export default function Toolbar({
     graph,
     selectedElements,
+    selectedElement,
     setSelectedElement,
     handleDeleteElement,
     chartRef,
@@ -119,13 +121,13 @@ export default function Toolbar({
     const stripBackground = `url("data:image/svg+xml,${stripSVG}")`;
 
     return (
-        <div className={cn("w-full flex justify-between items-center", label === "Schema" && "h-full")}>
-            <div className={cn("relative pointer-events-auto", label === "Schema" && "h-full")}>
+        <div className={cn("w-full flex flex-wrap gap-4 justify-between items-center", label === "Schema" && "h-full")}>
+            <div className={cn("w-full relative pointer-events-auto min-w-[10dvw] max-w-[30dvw]", label === "Schema" && "h-full")}>
                 {
                     graph.getElements().length > 0 && !isLoading &&
                     <Input
                         data-testid={`elementCanvasSearch${label}`}
-                        className={cn("w-[30dvw] text-foreground border border-primary", label === "Schema" && "h-full")}
+                        className={cn("w-full text-foreground border border-primary", label === "Schema" && "h-full")}
                         placeholder="Search for element in the graph"
                         value={searchElement}
                         onChange={(e) => setSearchElement(e.target.value)}
@@ -273,7 +275,7 @@ export default function Toolbar({
                     graph.Id &&
                     <>
                         {
-                            selectedElements.length > 1 &&
+                            (selectedElements.length !== 0 || selectedElement) &&
                             <DeleteElement
                                 label={label}
                                 description="Are you sure you want to delete this element(s)?"

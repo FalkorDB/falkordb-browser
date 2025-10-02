@@ -395,7 +395,7 @@ export default function ForceGraph({
 
                     ctx.lineWidth = ((selectedElement && !selectedElement.source && selectedElement.id === node.id)
                         || (hoverElement && !hoverElement.source && hoverElement.id === node.id)
-                        || (selectedElements.length > 0 && selectedElements.some(el => el.id === node.id && !el.source))) ? 1 : 0.5
+                        || (selectedElements.length > 0 && selectedElements.some(el => el.id === node.id && !el.source))) ? 1.5 : 0.5
                     ctx.strokeStyle = foreground;
 
                     ctx.beginPath();

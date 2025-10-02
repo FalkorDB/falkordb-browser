@@ -1,12 +1,12 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable no-param-reassign */
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Check, Pencil, Plus, Trash2, X } from "lucide-react"
+
+import { Check, CirclePlus, Pencil, Trash2, X } from "lucide-react"
 import { cn, prepareArg, securedFetch } from "@/lib/utils"
 import { toast } from "@/components/ui/use-toast"
-import { MutableRefObject, useContext, useEffect, useRef, useState } from "react"
+import { Fragment, MutableRefObject, useContext, useEffect, useRef, useState } from "react"
 import { useSession } from "next-auth/react"
 import { Switch } from "@/components/ui/switch"
-import DeleteElement from "./DeleteElement"
 import Input from "../components/ui/Input"
 import DialogComponent from "../components/DialogComponent"
 import CloseDialog from "../components/CloseDialog"
@@ -16,17 +16,16 @@ import ToastButton from "../components/ToastButton"
 import Button from "../components/ui/Button"
 import Combobox from "../components/ui/combobox"
 
-type ValueType = "string" | "number" | "boolean"
+type ValueType = "string" | "number" | "boolean" | "object"
 
 interface Props {
     object: Node | Link
     type: boolean
-    onDeleteElement: () => Promise<void>
     lastObjId: MutableRefObject<number | undefined>
     className?: string
 }
 
-export default function GraphDataTable({ object, type, onDeleteElement, lastObjId, className }: Props) {
+export default function GraphDataTable({ object, type, lastObjId, className }: Props) {
 
     const { graph, graphInfo, setGraphInfo } = useContext(GraphContext)
 
@@ -37,7 +36,6 @@ export default function GraphDataTable({ object, type, onDeleteElement, lastObjI
     const [hover, setHover] = useState<string>("")
     const [editable, setEditable] = useState<string>("")
     const [isAddValue, setIsAddValue] = useState<boolean>(false)
-    const [deleteOpen, setDeleteOpen] = useState(false)
     const [newKey, setNewKey] = useState<string>("")
     const [newVal, setNewVal] = useState<Value>("")
     const [newType, setNewType] = useState<ValueType>("string")
@@ -87,6 +85,8 @@ export default function GraphDataTable({ object, type, onDeleteElement, lastObjI
                 return false
             case "number":
                 return 0
+            case "object":
+                return [] as Value[]
             default:
                 return ""
         }
@@ -235,36 +235,40 @@ export default function GraphDataTable({ object, type, onDeleteElement, lastObjI
         setProperty(editable, newVal, true)
     }
 
-    const handleDeleteElement = async () => {
-        await onDeleteElement()
-        setDeleteOpen(false)
-    }
-
     const getCellEditableContent = (t: ValueType, actionType: "set" | "add" = "set") => {
         const dataTestId = `DataPanel${actionType === "set" ? "Set" : "Add"}AttributeValue`
 
         switch (t) {
             case "boolean":
                 return <Switch
-                    className="data-[state=unchecked]:bg-border"
+                    className="data-[state=unchecked]:bg-border w-full"
                     checked={newVal as boolean}
                     data-testid={dataTestId}
                     onCheckedChange={(checked) => setNewVal(checked)}
                 />
             case "number":
                 return <Input
+                    className="w-full"
                     ref={setInputRef}
                     data-testid={dataTestId}
-                    className="w-full SofiaSans"
                     value={newVal as number}
                     onChange={(e) => Number(e.target.value) && setNewVal(Number(e.target.value))}
                     onKeyDown={actionType === "set" ? handleSetKeyDown : handleAddKeyDown}
                 />
-            default:
+            case "object":
                 return <Input
+                    className="w-full"
                     ref={setInputRef}
                     data-testid={dataTestId}
-                    className="w-full SofiaSans"
+                    value={String(newVal)}
+                    onChange={(e) => setNewVal(e.target.value)}
+                    onKeyDown={actionType === "set" ? handleSetKeyDown : handleAddKeyDown}
+                />
+            default:
+                return <Input
+                    className="w-full"
+                    ref={setInputRef}
+                    data-testid={dataTestId}
                     value={newVal as string}
                     onChange={(e) => setNewVal(e.target.value)}
                     onKeyDown={actionType === "set" ? handleSetKeyDown : handleAddKeyDown}
@@ -272,215 +276,228 @@ export default function GraphDataTable({ object, type, onDeleteElement, lastObjI
         }
     }
 
+    const getArrayType = (t: any) => t === "object" ? "array" : t
+    const getObjectType = (t: any) => t === "array" ? "object" : t
+
     const getNewTypeInput = () => (
         <Combobox
-            options={["string", "number", "boolean"]}
-            selectedValue={newType}
+            className="w-full"
+            options={["string", "number", "boolean", "array"]}
+            selectedValue={getArrayType(newType)}
             setSelectedValue={(value) => {
-                setNewType(value)
+                const t = getObjectType(value)
+                setNewType(t)
 
-                setNewVal(typeof newVal === value ? newVal : getDefaultVal(value))
+                setNewVal(typeof newVal === t ? newVal : getDefaultVal(t))
             }}
             label="Type"
         />
     )
 
+    const getStringValue = (value: ValueType) => {
+        switch (typeof value) {
+            case "object":
+            case "number":
+                return String(value)
+            case "boolean":
+                return value ? "true" : "false"
+            default:
+                return value
+        }
+    }
+
     return (
-        <div className={cn("flex flex-col bg-background rounded-lg overflow-hidden", className)}>
-            <Table parentRef={scrollableContainerRef} parentClassName="grow">
-                <TableHeader>
-                    <TableRow className="border-border">
-                        <TableHead className="w-6"><div className="h-12 w-6" /></TableHead>
-                        <TableHead>Key</TableHead>
-                        <TableHead>Value</TableHead>
-                        <TableHead>Type</TableHead>
-                    </TableRow>
-                </TableHeader>
-                <TableBody>
+        <div className={cn("flex flex-col gap-4 bg-background rounded-lg overflow-hidden", className)}>
+            <div ref={scrollableContainerRef} className="h-1 grow overflow-y-auto overflow-x-hidden">
+                <div className="grid grid-cols-[minmax(0,max-content)_minmax(0,max-content)_minmax(0,max-content)_1fr]">
+                    <div className="flex items-center font-medium text-muted-foreground px-2 border-b border-border h-10">Key</div>
+                    <div className="flex items-center font-medium text-muted-foreground px-2 border-b border-border h-10">Value</div>
+                    <div className="flex items-center font-medium text-muted-foreground px-2 border-b border-border h-10">Type</div>
+                    <div className="flex items-center px-2 border-b border-border h-10"><div className="w-6" /></div>
                     {
                         attributes.map((key) => {
                             const value = object.data[key]
 
                             return (
-                                <TableRow
-                                    className="border-border"
-                                    data-testid={`DataPanelAttribute${key}`}
-                                    onMouseEnter={() => setHover(key)}
-                                    onMouseLeave={() => setHover("")}
-                                    key={key}
-                                >
-                                    <TableCell>
-                                        <div className="h-12 w-6 flex flex-col items-center gap-2 justify-center">
-                                            {
-                                                session?.user?.role !== "Read-Only" && (
-                                                    editable === key ?
-                                                        <>
-                                                            <Button
-                                                                data-testid="DataPanelSetAttributeConfirm"
-                                                                indicator={indicator}
-                                                                variant="button"
-                                                                onClick={(e) => {
-                                                                    e.stopPropagation()
-                                                                    setProperty(key, newVal, true)
-                                                                }}
-                                                                isLoading={isSetLoading}
-                                                            >
-                                                                <Check size={20} />
-                                                            </Button>
-                                                            {
-                                                                !isSetLoading &&
-                                                                <Button
-                                                                    data-testid="DataPanelSetAttributeCancel"
-                                                                    variant="button"
-                                                                    onClick={(e) => {
-                                                                        e.stopPropagation()
-                                                                        handleSetEditable("", "")
-                                                                    }}
-                                                                >
-                                                                    <X size={20} />
-                                                                </Button>
-                                                            }
-                                                        </>
-                                                        : hover === key &&
-                                                        <>
-                                                            <Button
-                                                                data-testid="DataPanelSetAttribute"
-                                                                variant="button"
-                                                                onClick={() => handleSetEditable(key, value)}
-                                                                disabled={isAddValue}
-                                                            >
-                                                                <Pencil size={20} />
-                                                            </Button>
-                                                            <DialogComponent
-                                                                trigger={
-                                                                    <Button
-                                                                        data-testid="DataPanelDeleteAttribute"
-                                                                        variant="button"
-                                                                        title="Delete Attribute"
-                                                                    >
-                                                                        <Trash2 size={20} />
-                                                                    </Button>
-                                                                }
-                                                                title="Delete Attribute"
-                                                                description="Are you sure you want to delete this attribute?"
-                                                            >
-                                                                <div className="flex justify-end gap-4">
-                                                                    <Button
-                                                                        data-testid="DataPanelDeleteAttributeConfirm"
-                                                                        variant="Delete"
-                                                                        label="Delete"
-                                                                        onClick={() => removeProperty(key)}
-                                                                        isLoading={isRemoveLoading}
-                                                                    />
-                                                                    <CloseDialog
-                                                                        data-testid="DataPanelDeleteAttributeCancel"
-                                                                        label="Cancel"
-                                                                        variant="Cancel"
-                                                                    />
-                                                                </div>
-                                                            </DialogComponent>
-                                                        </>
-                                                )
-                                            }
-                                        </div>
-                                    </TableCell>
-                                    <TableCell>{key}:</TableCell>
-                                    <TableCell>
+                                <Fragment key={key}>
+                                    <div
+                                        className={cn("flex items-center px-2 border-b border-border h-10", editable === key ? "h-14" : "h-10")}
+                                        data-testid={`DataPanelAttribute${key}`}
+                                        onMouseEnter={() => setHover(key)}
+                                        onMouseLeave={() => setHover("")}
+                                        key={`${key}-key`}
+                                    >
+                                        <p className="w-full truncate">{key}:</p>
+                                    </div>
+                                    <div
+                                        className={cn("flex items-center px-2 border-b border-border h-10", editable === key ? "h-14" : "h-10")}
+                                        onMouseEnter={() => setHover(key)}
+                                        onMouseLeave={() => setHover("")}
+                                        key={`${key}-value`}
+                                    >
                                         {
                                             editable === key ?
                                                 getCellEditableContent(typeof newVal as ValueType)
                                                 : <Button
-                                                    className="disabled:opacity-100 disabled:cursor-default SofiaSans"
+                                                    className="disabled:opacity-100 disabled:cursor-default w-full"
                                                     data-testid="DataPanelValueSetAttribute"
-                                                    label={value.toString()}
+                                                    label={getStringValue(value)}
                                                     title="Click to edit the attribute value"
                                                     variant="button"
                                                     onClick={() => handleSetEditable(key, value)}
                                                     disabled={isAddValue}
                                                 />
                                         }
-                                    </TableCell>
-                                    <TableCell>{editable === key ? getNewTypeInput() : typeof value}</TableCell>
-                                </TableRow>
+                                    </div>
+                                    <div
+                                        className={cn("flex items-center px-2 border-b border-border", editable === key ? "h-14" : "h-10")}
+                                        onMouseEnter={() => setHover(key)}
+                                        onMouseLeave={() => setHover("")}
+                                        key={`${key}-type`}
+                                    >
+                                        {editable === key ? getNewTypeInput() : <p className="w-full truncate">{getArrayType(typeof value)}</p>}
+                                    </div>
+                                    <div
+                                        className={cn("flex items-center gap-1 justify-start px-2 border-b border-border", editable === key ? "h-14" : "h-10")}
+                                        onMouseEnter={() => setHover(key)}
+                                        onMouseLeave={() => setHover("")}
+                                        key={`${key}-actions`}
+                                    >
+                                        {
+                                            session?.user?.role !== "Read-Only" && (
+                                                editable === key ?
+                                                    <>
+                                                        <Button
+                                                            data-testid="DataPanelSetAttributeConfirm"
+                                                            indicator={indicator}
+                                                            variant="button"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation()
+                                                                setProperty(key, newVal, true)
+                                                            }}
+                                                            isLoading={isSetLoading}
+                                                        >
+                                                            <Check size={20} />
+                                                        </Button>
+                                                        {
+                                                            !isSetLoading &&
+                                                            <Button
+                                                                data-testid="DataPanelSetAttributeCancel"
+                                                                variant="button"
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation()
+                                                                    handleSetEditable("", "")
+                                                                }}
+                                                            >
+                                                                <X size={20} />
+                                                            </Button>
+                                                        }
+                                                    </>
+                                                    : hover === key &&
+                                                    <>
+                                                        <Button
+                                                            data-testid="DataPanelSetAttribute"
+                                                            variant="button"
+                                                            onClick={() => handleSetEditable(key, value)}
+                                                            disabled={isAddValue}
+                                                        >
+                                                            <Pencil size={20} />
+                                                        </Button>
+                                                        <DialogComponent
+                                                            trigger={
+                                                                <Button
+                                                                    data-testid="DataPanelDeleteAttribute"
+                                                                    variant="button"
+                                                                    title="Delete Attribute"
+                                                                >
+                                                                    <Trash2 size={20} />
+                                                                </Button>
+                                                            }
+                                                            title="Delete Attribute"
+                                                            description="Are you sure you want to delete this attribute?"
+                                                        >
+                                                            <div className="flex justify-end gap-4">
+                                                                <Button
+                                                                    data-testid="DataPanelDeleteAttributeConfirm"
+                                                                    variant="Delete"
+                                                                    label="Delete"
+                                                                    onClick={() => removeProperty(key)}
+                                                                    isLoading={isRemoveLoading}
+                                                                />
+                                                                <CloseDialog
+                                                                    data-testid="DataPanelDeleteAttributeCancel"
+                                                                    label="Cancel"
+                                                                    variant="Cancel"
+                                                                />
+                                                            </div>
+                                                        </DialogComponent>
+                                                    </>
+                                            )
+                                        }
+                                    </div>
+                                </Fragment>
                             )
                         }
                         )
                     }
                     {
-                        isAddValue &&
-                        <TableRow>
-                            <TableCell className="flex flex-col items-center gap-2">
-                                <Button
-                                    data-testid="DataPanelAddAttributeConfirm"
-                                    variant="button"
-                                    title="Save"
-                                    onClick={() => handleAddValue(newKey, newVal)}
-                                    isLoading={isAddLoading}
-                                    indicator={indicator}
-                                >
-                                    <Check size={20} />
-                                </Button>
-                                {
-                                    !isAddLoading &&
+                        isAddValue && (
+                            <>
+                                <div className="flex items-center px-2 border-b border-border h-14">
+                                    <Input
+                                        className="w-full"
+                                        data-testid="DataPanelAddAttributeKey"
+                                        ref={addInputRef}
+                                        value={newKey}
+                                        onChange={(e) => setNewKey(e.target.value)}
+                                        onKeyDown={handleAddKeyDown}
+                                    />
+                                </div>
+                                <div className="flex items-center px-2 border-b border-border h-14">
+                                    {getCellEditableContent(newType, "add")}
+                                </div>
+                                <div className="flex items-center px-2 border-b border-border h-14">
+                                    {getNewTypeInput()}
+                                </div>
+                                <div className="flex items-center gap-1 justify-start px-2 border-b border-border h-14">
                                     <Button
-                                        data-testid="DataPanelAddAttributeCancel"
+                                        data-testid="DataPanelAddAttributeConfirm"
                                         variant="button"
-                                        onClick={() => setIsAddValue(false)}
-                                        title="Cancel"
+                                        title="Save"
+                                        onClick={() => handleAddValue(newKey, newVal)}
+                                        isLoading={isAddLoading}
+                                        indicator={indicator}
                                     >
-                                        <X size={20} />
+                                        <Check size={20} />
                                     </Button>
-                                }
-                            </TableCell >
-                            <TableCell>
-                                <Input
-                                    data-testid="DataPanelAddAttributeKey"
-                                    ref={addInputRef}
-                                    className="w-full"
-                                    value={newKey}
-                                    onChange={(e) => setNewKey(e.target.value)}
-                                    onKeyDown={handleAddKeyDown}
-                                />
-                            </TableCell>
-                            <TableCell>
-                                {getCellEditableContent(newType, "add")}
-                            </TableCell>
-                            <TableCell>
-                                {getNewTypeInput()}
-                            </TableCell>
-                        </TableRow >
+                                    {
+                                        !isAddLoading &&
+                                        <Button
+                                            data-testid="DataPanelAddAttributeCancel"
+                                            variant="button"
+                                            onClick={() => setIsAddValue(false)}
+                                            title="Cancel"
+                                        >
+                                            <X size={20} />
+                                        </Button>
+                                    }
+                                </div>
+                            </>
+                        )
                     }
-                </TableBody >
-            </Table >
-            <div className="flex flex-wrap justify-between gap-4 p-4">
+                </div>
                 {
                     session?.user?.role !== "Read-Only" &&
                     <Button
+                        className="mt-4"
                         disabled={attributes.some((key) => key === editable)}
                         variant="Primary"
                         data-testid="DataPanelAddAttribute"
-                        label="Add Attribute"
                         title="Add a new attribute"
                         onClick={() => setIsAddValue(true)}
                     >
-                        <Plus size={20} />
+                        <CirclePlus size={20} />
                     </Button>
-                }
-                {
-                    session?.user?.role !== "Read-Only" &&
-                    <DeleteElement
-                        description={`Are you sure you want to delete this ${type ? "Node" : "Relation"}?`}
-                        open={deleteOpen}
-                        setOpen={setDeleteOpen}
-                        onDeleteElement={handleDeleteElement}
-                        trigger={<Button
-                            data-testid={`delete${type ? "Node" : "Relation"}`}
-                            variant="Delete"
-                            label={`Delete ${type ? "Node" : "Relation"}`}
-                        >
-                            <Trash2 size={20} />
-                        </Button>}
-                    />
                 }
             </div>
         </div>

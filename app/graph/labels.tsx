@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useRef } from "react";
 import { cn } from "@/lib/utils";
 import { Label, Relationship } from "../api/graph/model";
 import Button from "../components/ui/Button";
@@ -14,11 +14,8 @@ export default function Labels<T extends Label | Relationship>({ labels, onClick
 
     const listRef = useRef<HTMLUListElement>(null)
 
-    // fake state to force reload
-    const [, setReload] = useState(false)
-
     return (
-        <div className={cn("h-1 grow max-h-fit flex flex-col gap-2 max-w-1/2 bg-background rounded-lg p-1")}>
+        <div className={cn("flex flex-col gap-2 max-w-1/2 bg-background rounded-lg p-1")}>
             {
                 label &&
                 <h1>{label}</h1>
@@ -35,7 +32,6 @@ export default function Labels<T extends Label | Relationship>({ labels, onClick
                                     label={l.name}
                                     onClick={() => {
                                         onClick(l)
-                                        setReload(prev => !prev)
                                     }}
                                 >
                                     <div style={{ backgroundColor: l.color }} className={cn("min-w-6 min-h-6 rounded-full")} />
