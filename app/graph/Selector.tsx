@@ -33,7 +33,7 @@ interface BaseProps<T = "Schema" | "Graph"> {
 }
 
 interface SchemaProps {
-    selectedElement: Node | Link
+    selectedElement: Node | Link | undefined
     selectedElements: (Node | Link)[];
     setSelectedElement: (el: Node | Link | undefined) => void;
     handleDeleteElement: () => Promise<void>;
