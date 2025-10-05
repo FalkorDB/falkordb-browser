@@ -107,9 +107,9 @@ export default function Page() {
     }, [graphName, setIndicator, toast]);
 
     useEffect(() => {
-        if (!graphName) return
+        if (!graphName) return undefined
 
-        Promise.all([
+        const handleSetInfo = () => Promise.all([
             fetchInfo("(label)"),
             fetchInfo("(relationship type)"),
             fetchInfo("(property key)"),
@@ -124,6 +124,15 @@ export default function Page() {
                 variant: "destructive",
             })
         });
+
+        handleSetInfo()
+
+        const interval = setInterval(handleSetInfo, 10000)
+
+        return () => {
+            interval.close()
+        }
+
     }, [fetchInfo, setGraphInfo, toast, setIndicator, graphName])
 
     useEffect(() => {

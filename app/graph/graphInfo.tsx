@@ -18,7 +18,7 @@ export default function GraphInfoPanel({ onClose }: { onClose: () => void }) {
             >
                 <X className="h-4 w-4" />
             </Button>
-            <h1 className="text-2xl">Graph Information</h1>
+            <h1 className="text-2xl">Graph Info</h1>
             <div className="flex flex-col gap-2">
                 <div className="flex gap-2 items-center">
                     <h2>Graph Name:</h2>
