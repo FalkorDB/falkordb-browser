@@ -313,7 +313,7 @@ export default class GraphPage extends Page {
   }
 
   async clickDeleteElement(type: string): Promise<void> {
-    const element = type === "Node" ? "Node" : "Relation";
+    const element = type === "Graph" ? "Graph" : "Schema";
     await interactWhenVisible(
       this.deleteElement(element),
       (el) => el.click(),
@@ -718,15 +718,9 @@ export default class GraphPage extends Page {
 
   async deleteElementByName(name: string, type: string): Promise<void> {
     await this.searchElementInCanvas(name);
-    // Try to close help message, but don't fail if it's not found
-    try {
-      await this.clickCloseHelpMessage();
-    } catch (error) {
-      console.log("Help message not found or couldn't be closed, continuing with test:", error);
-    }
     await this.clickDeleteElement(type);
     await this.clickDeleteElementConfirm();
-    await waitForElementToNotBeVisible(this.deleteElement("Node"));
+    await waitForElementToNotBeVisible(this.deleteElement("Graph"));
     await this.waitForCanvasAnimationToEnd();
   }
 
