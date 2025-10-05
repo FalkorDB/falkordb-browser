@@ -370,9 +370,9 @@ test.describe("Data panel Tests", () => {
     await dataPanel.insertQuery(CREATE_NODE_QUERY);
     await dataPanel.clickRunQuery();
     await dataPanel.searchElementInCanvas("a");
-    await dataPanel.addAttribute("test", "test", "string");
+    await dataPanel.addAttribute("testname", "testvalue", "string");
     const initialCount = await dataPanel.getContentDataPanelAttributesCount();
-    await dataPanel.removeAttribute("test");
+    await dataPanel.removeAttribute("testname");
     const newCount = await dataPanel.getContentDataPanelAttributesCount();
     expect(newCount).toBe(initialCount - 1);
     await apicalls.removeGraph(graphName);
