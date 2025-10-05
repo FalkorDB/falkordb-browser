@@ -484,7 +484,7 @@ export default function Selector<T extends "Graph" | "Schema" = "Graph" | "Schem
                             </Button>
                         </div>
                     </>
-                    : selectedElement && selectedElements && setSelectedElement && handleDeleteElement && setIsAddEntity && setIsAddRelation && chartRef && isCanvasLoading !== undefined && <div className="w-full h-full">
+                    : selectedElements && setSelectedElement && handleDeleteElement && setIsAddEntity && setIsAddRelation && chartRef && isCanvasLoading !== undefined && <div className="w-full h-full">
                         <Toolbar
                             graph={graph}
                             label={type}
