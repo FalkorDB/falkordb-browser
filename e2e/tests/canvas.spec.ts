@@ -140,7 +140,7 @@ test.describe('Canvas Tests', () => {
         await graph.selectGraphByName(graphName);
         await graph.insertQuery('CREATE (a:Person {name: "Alice"}), (b:Person {name: "Bob"}) return a, b');
         await graph.clickRunQuery();
-        await graph.deleteElementByName("Bob", "Graph");
+        await graph.deleteElementByName("Bob");
         expect(await graph.isSearchElementInCanvasVisible("Bob")).toBe(false);
         await apicalls.removeGraph(graphName);
     });

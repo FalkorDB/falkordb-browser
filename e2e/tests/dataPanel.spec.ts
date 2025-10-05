@@ -135,7 +135,7 @@ test.describe("Data panel Tests", () => {
     await graph.insertQuery(FETCH_FIRST_TEN_NODES);
     await graph.clickRunQuery();
     await graph.searchElementInCanvas("Alice");
-    expect(await graph.getAttributeValueByName("age")).toContain("30");
+    expect(await graph.getAttributeValueByName("30")).toContain("30");
     await apicalls.removeGraph(graphName);
   });
 
@@ -227,7 +227,7 @@ test.describe("Data panel Tests", () => {
     await graph.insertQuery(FETCH_FIRST_TEN_NODES);
     await graph.clickRunQuery();
     await graph.searchElementInCanvas("Alice");
-    expect(await graph.getAttributeValueByName("age")).toContain("35");
+    expect(await graph.getAttributeValueByName("35")).toContain("35");
     await apicalls.removeGraph(graphName);
   });
 
@@ -244,7 +244,7 @@ test.describe("Data panel Tests", () => {
     await graph.insertQuery(FETCH_FIRST_TEN_NODES);
     await graph.clickRunQuery();
     await graph.searchElementInCanvas("Alice");
-    await graph.deleteElementByName("Alice", "Node");
+    await graph.deleteElementByName("Alice");
     const response = await apicalls.runQuery(
       graphName,
       FETCH_FIRST_TEN_NODES ?? ""
@@ -386,7 +386,7 @@ test.describe("Data panel Tests", () => {
     await dataPanel.insertQuery(CREATE_TWO_NODES_QUERY);
     await dataPanel.clickRunQuery();
     await dataPanel.searchElementInCanvas("a");
-    await dataPanel.deleteElementByName("a", "Node");
+    await dataPanel.deleteElementByName("a");
     expect(await dataPanel.isVisibleDataPanel()).toBe(false);
     await apicalls.removeGraph(graphName);
   });

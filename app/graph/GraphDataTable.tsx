@@ -331,6 +331,7 @@ export default function GraphDataTable({ object, type, lastObjId, className }: P
                                     </div>
                                     <div
                                         className={cn("flex items-center px-2 border-b border-border h-10", editable === key ? "h-14" : "h-10")}
+                                        data-testid={`DataPanelAttribute${value}`}
                                         onMouseEnter={() => setHover(key)}
                                         onMouseLeave={() => setHover("")}
                                         key={`${key}-value`}

@@ -312,10 +312,9 @@ export default class GraphPage extends Page {
     );
   }
 
-  async clickDeleteElement(type: string): Promise<void> {
-    const element = type === "Graph" ? "Graph" : "Schema";
+  async clickDeleteElement(): Promise<void> {
     await interactWhenVisible(
-      this.deleteElement(element),
+      this.deleteElement("Graph"),
       (el) => el.click(),
       "Delete Element"
     );
@@ -705,20 +704,19 @@ export default class GraphPage extends Page {
   }
 
   async deleteElementsByPosition(
-    positions: { x: number; y: number }[],
-    type: string
+    positions: { x: number; y: number }[]
   ): Promise<void> {
     positions.forEach(async (position) => {
       await this.elementClick(position.x, position.y);
     });
-    await this.clickDeleteElement(type);
+    await this.clickDeleteElement();
     await this.clickDeleteElementConfirm();
     await waitForElementToNotBeVisible(this.deleteElement("Graph"));
   }
 
-  async deleteElementByName(name: string, type: string): Promise<void> {
+  async deleteElementByName(name: string): Promise<void> {
     await this.searchElementInCanvas(name);
-    await this.clickDeleteElement(type);
+    await this.clickDeleteElement();
     await this.clickDeleteElementConfirm();
     await waitForElementToNotBeVisible(this.deleteElement("Graph"));
     await this.waitForCanvasAnimationToEnd();
