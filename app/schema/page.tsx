@@ -317,7 +317,6 @@ export default function Page() {
                             <SchemaDataPanel
                                 object={selectedElement}
                                 setObject={handleSetSelectedElement}
-                                onDeleteElement={handleDeleteElement}
                                 schema={schema}
                                 setLabels={setLabels}
                             />
