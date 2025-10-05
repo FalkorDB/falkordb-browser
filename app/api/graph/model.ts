@@ -141,6 +141,8 @@ export interface Relationship extends InfoRelationship {
   elements: Link[];
   textWidth?: number;
   textHeight?: number;
+  displayText?: string;
+  cachedMaxWidth?: number;
 }
 
 export const getLabelWithFewestElements = (labels: Label[]): Label =>

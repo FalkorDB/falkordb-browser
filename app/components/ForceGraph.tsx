@@ -74,6 +74,57 @@ const getNodeDisplayText = (node: Node): string => {
 };
 
 /**
+ * Core function to truncate text with ellipsis to fit within a specified width
+ * @param ctx Canvas context for text measurement
+ * @param text The text to truncate
+ * @param maxWidth Maximum width available for the text
+ * @returns The truncated text with ellipsis if needed
+ */
+const truncateTextWithEllipsis = (ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string => {
+    const ellipsis = '...';
+
+    // If text already fits, return as is
+    if (ctx.measureText(text).width <= maxWidth) {
+        return text;
+    }
+
+    const ellipsisWidth = ctx.measureText(ellipsis).width;
+    const words = text.split(/\s+/);
+    let truncated = '';
+
+    // Try to fit as many words as possible
+    for (let i = 0; i < words.length; i += 1) {
+        const word = words[i];
+        const testLine = truncated ? `${truncated} ${word}` : word;
+        const testWidth = ctx.measureText(testLine).width;
+
+        if (testWidth + ellipsisWidth <= maxWidth) {
+            truncated = testLine;
+        } else if (!truncated) {
+            // If even the first word doesn't fit, break it
+            let partialWord = word;
+            while (partialWord.length > 0 && ctx.measureText(partialWord).width + ellipsisWidth > maxWidth) {
+                partialWord = partialWord.slice(0, -1);
+            }
+            return partialWord + ellipsis;
+        } else {
+            break;
+        }
+    }
+
+    return truncated + ellipsis;
+};
+
+/**
+ * Truncates text to fit within a specified width (single line with ellipsis)
+ * @param ctx Canvas context for text measurement
+ * @param text The text to truncate
+ * @param maxWidth Maximum width available for the text
+ * @returns The truncated text with ellipsis if needed
+ */
+const truncateTextForLink = (ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string => truncateTextWithEllipsis(ctx, text, maxWidth);
+
+/**
  * Wraps text into two lines with ellipsis handling for circular nodes
  * @param ctx Canvas context for text measurement
  * @param text The text to wrap
@@ -81,15 +132,10 @@ const getNodeDisplayText = (node: Node): string => {
  * @returns Tuple of [line1, line2] with proper ellipsis handling
  */
 const wrapTextForCircularNode = (ctx: CanvasRenderingContext2D, text: string, maxRadius: number): [string, string] => {
-    const ellipsis = '...';
-    const ellipsisWidth = ctx.measureText(ellipsis).width;
-
     // Use fixed text height - it's essentially constant for a given font
     const halfTextHeight = 1.125; // Fixed value based on font size (1.5px * 1.5 spacing / 2)
 
-
     const availableRadius = Math.sqrt(Math.max(0, maxRadius * maxRadius - halfTextHeight * halfTextHeight));
-
     const lineWidth = availableRadius * 2;
 
     const words = text.split(/\s+/);
@@ -122,12 +168,9 @@ const wrapTextForCircularNode = (ctx: CanvasRenderingContext2D, text: string, ma
         }
     }
 
-    // Truncate line2 if needed
-    if (line2 && ctx.measureText(line2).width > lineWidth) {
-        while (line2.length > 0 && ctx.measureText(line2).width + ellipsisWidth > lineWidth) {
-            line2 = line2.slice(0, -1);
-        }
-        line2 += ellipsis;
+    // Truncate line2 if needed using core function
+    if (line2) {
+        line2 = truncateTextWithEllipsis(ctx, line2, lineWidth);
     }
 
     return [line1, line2 || ''];
@@ -493,25 +536,52 @@ export default function ForceGraph({
                         if (angle < -Math.PI / 2) angle = -(-Math.PI - angle);
                     }
 
-                    // Get text width
+                    // Get text width and apply truncation
                     ctx.font = '400 2px SofiaSans';
                     ctx.letterSpacing = '0.1px'
 
+                    // Calculate maximum width for link text (based on distance between nodes)
+                    const dx = end.x - start.x;
+                    const dy = end.y - start.y;
+                    const linkDistance = Math.sqrt(dx * dx + dy * dy);
+                    // Subtract node radii from both ends and use 60% of remaining space
+                    const maxLinkTextWidth = (linkDistance - 2 * NODE_SIZE) * 0.6
+
                     let textWidth;
                     let textHeight;
+                    let displayText = link.relationship;
                     const relationship = graph.RelationshipsMap.get(link.relationship)
 
-                    if (relationship) {
-                        ({ textWidth, textHeight } = relationship)
-                    }
+                    // Check if cache is valid (cached maxWidth matches current maxWidth)
+                    // Recalculate if link gets smaller (to shorten text) or significantly larger
+                    const useCachedText = relationship && 
+                        relationship.displayText && 
+                        relationship.textHeight && 
+                        relationship.textWidth &&
+                        relationship.cachedMaxWidth !== undefined &&
+                        Math.abs(maxLinkTextWidth - relationship.cachedMaxWidth) <= 1
 
-                    if (!textWidth || !textHeight) {
-                        const { width, actualBoundingBoxAscent, actualBoundingBoxDescent } = ctx.measureText(link.relationship)
+                    if (useCachedText) {
+                        // Use cached truncated text
+                        displayText = relationship.displayText!;
+                        ({ textWidth, textHeight } = relationship);
+                    } else {
+                        // Truncate text to fit within max width
+                        displayText = truncateTextForLink(ctx, link.relationship, maxLinkTextWidth);
 
-                        textWidth = width
-                        textHeight = actualBoundingBoxAscent + actualBoundingBoxDescent
+                        const { width, actualBoundingBoxAscent, actualBoundingBoxDescent } = ctx.measureText(displayText);
+                        textWidth = width;
+                        textHeight = actualBoundingBoxAscent + actualBoundingBoxDescent;
+
+                        // Cache the result with the maxWidth used
                         if (relationship) {
-                            graph.RelationshipsMap.set(link.relationship, { ...relationship, textWidth, textHeight })
+                            graph.RelationshipsMap.set(link.relationship, {
+                                ...relationship,
+                                displayText,
+                                textWidth,
+                                textHeight,
+                                cachedMaxWidth: maxLinkTextWidth
+                            });
                         }
                     }
 
@@ -525,17 +595,17 @@ export default function ForceGraph({
                     // Draw background rectangle (rotated)
                     ctx.fillStyle = background;
                     ctx.fillRect(
-                        -textWidth / 2 - padding,
-                        -textHeight / 2 - padding,
-                        textWidth + padding * 2,
-                        textHeight + padding * 2
+                        -(textWidth || 0) / 2 - padding,
+                        -(textHeight || 0) / 2 - padding,
+                        (textWidth || 0) + padding * 2,
+                        (textHeight || 0) + padding * 2
                     );
 
                     // Draw text
                     ctx.fillStyle = foreground;
                     ctx.textAlign = 'center';
                     ctx.textBaseline = 'middle';
-                    ctx.fillText(link.relationship, 0, 0);
+                    ctx.fillText(displayText, 0, 0);
                     ctx.restore();
                 }}
                 onNodeClick={indicator === "offline" ? undefined : handleNodeClick}
