@@ -130,10 +130,9 @@ export default function Page() {
         const interval = setInterval(handleSetInfo, 10000)
 
         return () => {
-            interval.close()
+            clearInterval(interval)
         }
-
-    }, [fetchInfo, setGraphInfo, toast, setIndicator, graphName])
+    }, [fetchInfo, graphName, setGraphInfo, toast])
 
     useEffect(() => {
         setRelationships([...graph.Relationships])
