@@ -11,7 +11,7 @@ import { ImperativePanelHandle } from "react-resizable-panels";
 import LoginVerification from "./loginVerification";
 import { Graph, GraphInfo, HistoryQuery } from "./api/graph/model";
 import Header from "./components/Header";
-import { GraphContext, HistoryQueryContext, IndicatorContext, PanelContext, QueryLoadingContext, QuerySettingsContext, SchemaContext } from "./components/provider";
+import { GraphContext, HistoryQueryContext, IndicatorContext, PanelContext, QueryLoadingContext, BrowserSettingsContext, SchemaContext } from "./components/provider";
 import Tutorial from "./graph/Tutorial";
 import GraphInfoPanel from "./graph/graphInfo";
 
@@ -35,7 +35,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
   const { status } = useSession()
 
   const panelRef = useRef<ImperativePanelHandle>(null)
-  
+
   const [historyQuery, setHistoryQuery] = useState<HistoryQuery>(defaultQueryHistory)
   const [indicator, setIndicator] = useState<"online" | "offline">("online")
   const [runDefaultQuery, setRunDefaultQuery] = useState(false)
@@ -56,6 +56,8 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
   const [newRunDefaultQuery, setNewRunDefaultQuery] = useState(false)
   const [newDefaultQuery, setNewDefaultQuery] = useState("")
   const [newContentPersistence, setNewContentPersistence] = useState(false)
+  const [refreshDelay, setRefreshDelay] = useState(10)
+  const [newRefreshDelay, setNewRefreshDelay] = useState(0)
   const [newSecretKey, setNewSecretKey] = useState("")
   const [newModel, setNewModel] = useState("")
   const [secretKey, setSecretKey] = useState("")
@@ -72,7 +74,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
   const [tutorialOpen, setTutorialOpen] = useState(false)
   const [isCollapsed, setIsCollapsed] = useState(true)
 
-  const querySettingsContext = useMemo(() => ({
+  const browserSettingsContext = useMemo(() => ({
     newSettings: {
       limitSettings: { newLimit, setNewLimit },
       timeoutSettings: { newTimeout, setNewTimeout },
@@ -80,6 +82,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       defaultQuerySettings: { newDefaultQuery, setNewDefaultQuery },
       contentPersistenceSettings: { newContentPersistence, setNewContentPersistence },
       chatSettings: { newSecretKey, setNewSecretKey, newModel, setNewModel },
+      graphInfo: { newRefreshDelay, setNewRefreshDelay }
     },
     settings: {
       limitSettings: { limit, setLimit, lastLimit, setLastLimit },
@@ -88,6 +91,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       defaultQuerySettings: { defaultQuery, setDefaultQuery },
       contentPersistenceSettings: { contentPersistence, setContentPersistence },
       chatSettings: { secretKey, setSecretKey, model, setModel, navigateToSettings, setNavigateToSettings },
+      graphInfo: { refreshDelay, setRefreshDelay }
     },
     hasChanges,
     setHasChanges,
@@ -98,7 +102,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       localStorage.setItem("timeout", newTimeout.toString());
       localStorage.setItem("defaultQuery", newDefaultQuery);
       localStorage.setItem("limit", newLimit.toString());
-      // localStorage.setItem("secretKey", newSecretKey);
+      localStorage.setItem("refreshDelay", newRefreshDelay.toString())
 
       // Update context
       setContentPersistence(newContentPersistence);
@@ -109,6 +113,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       setLastLimit(limit);
       setSecretKey(newSecretKey);
       setModel(newModel);
+      setRefreshDelay(newRefreshDelay)
       // Reset has changes
       setHasChanges(false);
 
@@ -126,9 +131,10 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       setNewLimit(limit)
       setNewSecretKey(secretKey)
       setNewModel(model)
+      setNewRefreshDelay(refreshDelay)
       setHasChanges(false)
     }
-  }), [contentPersistence, defaultQuery, hasChanges, lastLimit, limit, model, navigateToSettings, newContentPersistence, newDefaultQuery, newLimit, newModel, newRunDefaultQuery, newSecretKey, newTimeout, runDefaultQuery, secretKey, timeout, toast])
+  }), [contentPersistence, defaultQuery, hasChanges, lastLimit, limit, model, navigateToSettings, newContentPersistence, newDefaultQuery, newLimit, newModel, newRefreshDelay, newRunDefaultQuery, newSecretKey, newTimeout, refreshDelay, runDefaultQuery, secretKey, timeout, toast])
 
   const historyQueryContext = useMemo(() => ({
     historyQuery,
@@ -312,6 +318,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
     setRunDefaultQuery(localStorage.getItem("runDefaultQuery") !== "false")
     setContentPersistence(localStorage.getItem("contentPersistence") !== "false");
     setTutorialOpen(localStorage.getItem("tutorial") !== "false")
+    setRefreshDelay(Number(localStorage.getItem("refreshDelay") || 10))
   }, [status])
 
   const panelSize = useMemo(() => isCollapsed ? 0 : 15, [isCollapsed])
@@ -406,7 +413,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
   return (
     <ThemeProvider attribute="class" storageKey="theme" defaultTheme="system" disableTransitionOnChange>
       <LoginVerification>
-        <QuerySettingsContext.Provider value={querySettingsContext}>
+        <BrowserSettingsContext.Provider value={browserSettingsContext}>
           <SchemaContext.Provider value={schemaContext}>
             <GraphContext.Provider value={graphContext}>
               <HistoryQueryContext.Provider value={historyQueryContext}>
@@ -461,7 +468,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
               </HistoryQueryContext.Provider>
             </GraphContext.Provider>
           </SchemaContext.Provider>
-        </QuerySettingsContext.Provider>
+        </BrowserSettingsContext.Provider>
       </LoginVerification>
     </ThemeProvider >
   )

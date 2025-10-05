@@ -9,7 +9,7 @@ import { useSession } from "next-auth/react";
 import { useToast } from "@/components/ui/use-toast";
 import { ChevronDown, ChevronUp, PlusCircle, Settings } from "lucide-react";
 import Button from "../components/ui/Button";
-import { IndicatorContext, QuerySettingsContext } from "../components/provider";
+import { IndicatorContext, BrowserSettingsContext } from "../components/provider";
 import PaginationList from "../components/PaginationList";
 import TableComponent from "../components/TableComponent";
 import ExportGraph from "../components/ExportGraph";
@@ -37,7 +37,7 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
                 contentPersistence
             }
         }
-    } = useContext(QuerySettingsContext)
+    } = useContext(BrowserSettingsContext)
 
     const inputRef = useRef<HTMLInputElement>(null)
 

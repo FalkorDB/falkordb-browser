@@ -11,13 +11,13 @@ import Users from "./users/Users"
 import Configurations from "./Configurations"
 import Button from "../components/ui/Button"
 import BrowserSettings from "./browserSettings"
-import { IndicatorContext, QuerySettingsContext } from "../components/provider"
+import { IndicatorContext, BrowserSettingsContext } from "../components/provider"
 
 type Tab = 'Browser' | 'Configurations' | 'Users'
 
 export default function Settings() {
 
-    const { hasChanges, saveSettings, resetSettings } = useContext(QuerySettingsContext)
+    const { hasChanges, saveSettings, resetSettings } = useContext(BrowserSettingsContext)
     const { indicator } = useContext(IndicatorContext)
     const { data: session } = useSession()
     const { toast } = useToast()

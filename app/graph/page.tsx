@@ -8,7 +8,7 @@ import { ForceGraphMethods } from "react-force-graph-2d";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { ImperativePanelHandle } from "react-resizable-panels";
 import { Label, Graph, GraphData, Link, Node, Relationship, GraphInfo } from "../api/graph/model";
-import { GraphContext, HistoryQueryContext, IndicatorContext, PanelContext, QueryLoadingContext, QuerySettingsContext } from "../components/provider";
+import { BrowserSettingsContext, GraphContext, HistoryQueryContext, IndicatorContext, PanelContext, QueryLoadingContext } from "../components/provider";
 import Spinning from "../components/ui/spinning";
 import Chat from "./Chat";
 import GraphDataPanel from "./GraphDataPanel";
@@ -48,14 +48,14 @@ export default function Page() {
         handleCooldown,
         cooldownTicks,
     } = useContext(GraphContext)
-
     const {
         settings: {
             runDefaultQuerySettings: { runDefaultQuery },
             defaultQuerySettings: { defaultQuery },
             contentPersistenceSettings: { contentPersistence },
+            graphInfo: { refreshDelay }
         }
-    } = useContext(QuerySettingsContext)
+    } = useContext(BrowserSettingsContext)
     const { toast } = useToast()
 
     const chartRef = useRef<ForceGraphMethods<Node, Link>>()
@@ -127,7 +127,7 @@ export default function Page() {
 
         handleSetInfo()
 
-        const interval = setInterval(handleSetInfo, 10000)
+        const interval = setInterval(handleSetInfo, refreshDelay)
 
         return () => {
             clearInterval(interval)

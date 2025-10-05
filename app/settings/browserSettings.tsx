@@ -1,11 +1,11 @@
-import { useCallback, useContext, useEffect, useState } from "react";
+import { useCallback, useContext, useEffect, useRef, useState } from "react";
 import { getQuerySettingsNavigationToast } from "@/components/ui/toaster";
 import { useRouter } from "next/navigation";
 import { cn, getDefaultQuery } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
 import { RotateCcw } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
-import { QuerySettingsContext } from "../components/provider";
+import { BrowserSettingsContext } from "../components/provider";
 import Button from "../components/ui/Button";
 import Input from "../components/ui/Input";
 import Combobox from "../components/ui/combobox";
@@ -21,6 +21,7 @@ export default function BrowserSettings() {
             timeoutSettings: { newTimeout, setNewTimeout },
             limitSettings: { newLimit, setNewLimit },
             chatSettings: { newSecretKey, setNewSecretKey, newModel, setNewModel },
+            graphInfo: { newRefreshDelay, setNewRefreshDelay }
         },
         settings: {
             contentPersistenceSettings: { contentPersistence },
@@ -29,12 +30,15 @@ export default function BrowserSettings() {
             timeoutSettings: { timeout: timeoutValue },
             limitSettings: { limit },
             chatSettings: { secretKey, model, navigateToSettings },
+            graphInfo: { refreshDelay }
         },
         hasChanges,
         setHasChanges,
         resetSettings,
         saveSettings,
-    } = useContext(QuerySettingsContext)
+    } = useContext(BrowserSettingsContext)
+
+    const scrollableContainerRef = useRef<HTMLFormElement>(null)
 
     const { toast } = useToast()
     const router = useRouter()
@@ -49,11 +53,12 @@ export default function BrowserSettings() {
         setNewLimit(limit)
         setNewSecretKey(secretKey)
         setNewModel(model)
-    }, [contentPersistence, runDefaultQuery, defaultQuery, timeoutValue, limit, secretKey, setNewContentPersistence, setNewRunDefaultQuery, setNewDefaultQuery, setNewTimeout, setNewLimit, setNewSecretKey, model, setNewModel])
+        setNewRefreshDelay(refreshDelay)
+    }, [contentPersistence, runDefaultQuery, defaultQuery, timeoutValue, limit, secretKey, setNewContentPersistence, setNewRunDefaultQuery, setNewDefaultQuery, setNewTimeout, setNewLimit, setNewSecretKey, model, setNewModel, setNewRefreshDelay, refreshDelay])
 
     useEffect(() => {
-        setHasChanges(newContentPersistence !== contentPersistence || newTimeout !== timeoutValue || newLimit !== limit || newDefaultQuery !== defaultQuery || newRunDefaultQuery !== runDefaultQuery || newSecretKey !== secretKey || newModel !== model)
-    }, [defaultQuery, limit, newDefaultQuery, newLimit, newRunDefaultQuery, newContentPersistence, newTimeout, runDefaultQuery, contentPersistence, setHasChanges, timeoutValue, newSecretKey, secretKey, newModel, model])
+        setHasChanges(newContentPersistence !== contentPersistence || newTimeout !== timeoutValue || newLimit !== limit || newDefaultQuery !== defaultQuery || newRunDefaultQuery !== runDefaultQuery || newSecretKey !== secretKey || newModel !== model || refreshDelay !== newRefreshDelay)
+    }, [defaultQuery, limit, newDefaultQuery, newLimit, newRunDefaultQuery, newContentPersistence, newTimeout, runDefaultQuery, contentPersistence, setHasChanges, timeoutValue, newSecretKey, secretKey, newModel, model, refreshDelay, newRefreshDelay])
 
     const handleSubmit = useCallback((e?: React.FormEvent<HTMLFormElement>) => {
         e?.preventDefault()
@@ -89,6 +94,69 @@ export default function BrowserSettings() {
 
     const separator = <div className="min-h-px w-[50%] bg-border rounded-full" />
 
+    const handleScrollTo = (elementId?: string) => {
+        if (elementId) {
+            // Find the element by ID and scroll to it
+            setTimeout(() => {
+                const el = document.getElementById(elementId)
+                if (el) {
+                    el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+                }
+            }, 0)
+        } else {
+            scrollableContainerRef.current?.scrollIntoView()
+        }
+    }
+
+    // Generic function to handle input changes with scroll
+    const createChangeHandler = <T,>(setter: (value: T) => void) => (value: T, elementId?: string) => {
+        setter(value)
+        handleScrollTo(elementId)
+    }
+
+    // Handle numeric inputs with infinity support (for timeout and limit)
+    const handleInfinityNumberChange = (
+        setter: (value: number) => void,
+        inputValue: string,
+        elementId: string,
+        replacements: string[] = []
+    ) => {
+        let cleanValue = inputValue.replace('∞', '')
+        replacements.forEach(replacement => {
+            cleanValue = cleanValue.replace(replacement, '')
+        })
+        
+        const value = parseInt(cleanValue, 10)
+
+        if (!value) {
+            createChangeHandler(setter)(0, elementId)
+            return
+        }
+
+        if (value < 0 || Number.isNaN(value)) return
+
+        createChangeHandler(setter)(value, elementId)
+    }
+
+    // Handle numeric inputs with minimum value validation
+    const handleMinValueNumberChange = (
+        setter: (value: number) => void,
+        inputValue: string,
+        elementId: string,
+        minValue: number
+    ) => {
+        const value = parseInt(inputValue, 10)
+
+        if (value < minValue || Number.isNaN(value)) return
+
+        createChangeHandler(setter)(value, elementId)
+    }
+
+    // Wrapper for model combobox to handle scroll
+    const handleModelChange = (value: string) => {
+        createChangeHandler(setNewModel)(value, 'secretKeyInput')
+    }
+
     return (
         <div className="h-full w-full flex flex-col gap-8 overflow-hidden">
             <div className="flex flex-col gap-2">
@@ -96,7 +164,7 @@ export default function BrowserSettings() {
                 <p className="text-sm text-foreground">Manage your environment&apos;s settings</p>
             </div>
             <div className="h-1 grow p-12 border border-border rounded-lg">
-                <form className="h-full w-full flex flex-col gap-8 overflow-y-auto" onSubmit={handleSubmit}>
+                <form ref={scrollableContainerRef} className="h-full w-full flex flex-col gap-8 overflow-y-auto" onSubmit={handleSubmit}>
                     <div className="flex flex-col gap-2">
                         <h1 className="text-2xl font-bold">Query Execution</h1>
                         <p className="text-sm text-muted-foreground">Control query execution and performance limits</p>
@@ -121,18 +189,7 @@ export default function BrowserSettings() {
                                 id="timeoutInput"
                                 className="text-center w-1/3"
                                 value={newTimeout === 0 ? "∞" : `${newTimeout} seconds`}
-                                onChange={(e) => {
-                                    const value = parseInt(e.target.value.replace('∞', '').replace(' seconds', ''), 10)
-
-                                    if (!value) {
-                                        setNewTimeout(0)
-                                        return
-                                    }
-
-                                    if (value < 0 || Number.isNaN(value)) return
-
-                                    setNewTimeout(value)
-                                }}
+                                onChange={(e) => handleInfinityNumberChange(setNewTimeout, e.target.value, 'timeoutInput', [' seconds'])}
                             />
                         </div>
                         <div className="flex justify-between items-center">
@@ -154,18 +211,7 @@ export default function BrowserSettings() {
                                 id="limitInput"
                                 className="text-center w-1/3"
                                 value={newLimit === 0 ? "∞" : newLimit}
-                                onChange={(e) => {
-                                    const value = parseInt(e.target.value.replace('∞', ''), 10)
-
-                                    if (!value) {
-                                        setNewLimit(0)
-                                        return
-                                    }
-
-                                    if (value < 0 || Number.isNaN(value)) return
-
-                                    setNewLimit(value)
-                                }}
+                                onChange={(e) => handleInfinityNumberChange(setNewLimit, e.target.value, 'limitInput')}
                             />
                         </div>
                         <div className="flex justify-between items-center">
@@ -174,7 +220,7 @@ export default function BrowserSettings() {
                                     id="runDefaultQuerySwitch"
                                     className="data-[state=unchecked]:bg-border"
                                     checked={newRunDefaultQuery}
-                                    onCheckedChange={() => setNewRunDefaultQuery(prev => !prev)}
+                                    onCheckedChange={() => createChangeHandler(setNewRunDefaultQuery)(!newRunDefaultQuery, 'runDefaultQuerySwitch')}
                                 />
                                 <div className="flex flex-col gap-2">
                                     <h2 className="text-xl font-medium">Default Query On-load</h2>
@@ -185,7 +231,7 @@ export default function BrowserSettings() {
                                 id="runDefaultQueryInput"
                                 className="text-center w-1/3 SofiaSans"
                                 value={newDefaultQuery}
-                                onChange={(e) => setNewDefaultQuery(e.target.value)}
+                                onChange={(e) => createChangeHandler(setNewDefaultQuery)(e.target.value, 'runDefaultQueryInput')}
                                 disabled={!newRunDefaultQuery}
                             />
                             {
@@ -221,7 +267,7 @@ export default function BrowserSettings() {
                                 id="contentPersistenceSwitch"
                                 className="data-[state=unchecked]:bg-border"
                                 checked={newContentPersistence}
-                                onCheckedChange={() => setNewContentPersistence(prev => !prev)}
+                                onCheckedChange={() => createChangeHandler(setNewContentPersistence)(!newContentPersistence, 'contentPersistenceSwitch')}
                             />
                             <div className="flex flex-col gap-2">
                                 <h2 className="text-xl font-medium">Content Persistence</h2>
@@ -244,7 +290,7 @@ export default function BrowserSettings() {
                                     label="Model"
                                     options={MODELS}
                                     selectedValue={newModel}
-                                    setSelectedValue={setNewModel}
+                                    setSelectedValue={handleModelChange}
                                     inTable
                                 />
                             </div>
@@ -255,10 +301,24 @@ export default function BrowserSettings() {
                                     className="w-1 grow"
                                     id="secretKeyInput"
                                     value={newSecretKey}
-                                    onChange={(e) => setNewSecretKey(e.target.value)}
+                                    onChange={(e) => createChangeHandler(setNewSecretKey)(e.target.value, 'secretKeyInput')}
                                 />
                             </div>
                         </div>
+                    </div>
+                    {separator}
+                    <h1 className="text-2xl font-bold">Graph Information</h1>
+                    <div className="flex justify-between items-center">
+                        <div className="flex flex-col gap-2">
+                            <h2 className="text-xl font-medium">Refresh Delay</h2>
+                            <p>In how much time to fetch graph info</p>
+                        </div>
+                        <Input
+                            id="refreshDelay"
+                            className="text-center w-1/3"
+                            value={newRefreshDelay}
+                            onChange={(e) => handleMinValueNumberChange(setNewRefreshDelay, e.target.value, 'refreshDelay', 5)}
+                        />
                     </div>
                     {
                         hasChanges &&
@@ -281,6 +341,6 @@ export default function BrowserSettings() {
                     }
                 </form >
             </div >
-        </div>
+        </div >
     )
 }
