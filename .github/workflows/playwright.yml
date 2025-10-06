@@ -288,8 +288,22 @@ jobs:
       - name: Setup TLS certificates
         run: |
           mkdir -p tls
-          # Generate TLS certificates using FalkorDB container (exits after generation - this is expected)
-          docker run --rm -e TLS=1 -v $(pwd)/tls:/var/lib/falkordb/tls falkordb/falkordb:latest || echo "Certificate generation completed (container exit is expected)"
+          # Start container in background and wait for certificate generation
+          CONTAINER_ID=$(docker run --rm -d -e TLS=1 -v $(pwd)/tls:/var/lib/falkordb/tls falkordb/falkordb:latest)
+          echo "Started certificate generation container: $CONTAINER_ID"
+          
+          # Wait for certificates to be generated (look for "Ready to accept connections tls")
+          timeout 300 bash -c '
+            while ! docker logs '"$CONTAINER_ID"' 2>&1 | grep -q "Ready to accept connections tls"; do
+              echo "Waiting for certificate generation..."
+              sleep 5
+            done
+          ' || true
+          
+          # Stop the container gracefully once certificates are ready
+          echo "Certificates generated, stopping container..."
+          docker stop $CONTAINER_ID || true
+          
           echo "Generated certificates:"
           ls -la tls/
       - name: Create Redis TLS config
