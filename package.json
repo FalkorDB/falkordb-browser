@@ -2,7 +2,7 @@
   "name": "falkordb-browser",
   "author": "FalkorDB",
   "description": "FalkorDB Browser",
-  "version": "1.4.7",
+  "version": "1.4.8",
   "private": true,
   "scripts": {
     "dev": "next dev",
