@@ -58,8 +58,8 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
   const [newRunDefaultQuery, setNewRunDefaultQuery] = useState(false)
   const [newDefaultQuery, setNewDefaultQuery] = useState("")
   const [newContentPersistence, setNewContentPersistence] = useState(false)
-  const [refreshDelay, setRefreshDelay] = useState(10)
-  const [newRefreshDelay, setNewRefreshDelay] = useState(0)
+  const [refreshInterval, setRefreshInterval] = useState(10)
+  const [newRefreshInterval, setNewRefreshInterval] = useState(0)
   const [newSecretKey, setNewSecretKey] = useState("")
   const [newModel, setNewModel] = useState("")
   const [secretKey, setSecretKey] = useState("")
@@ -84,7 +84,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       defaultQuerySettings: { newDefaultQuery, setNewDefaultQuery },
       contentPersistenceSettings: { newContentPersistence, setNewContentPersistence },
       chatSettings: { newSecretKey, setNewSecretKey, newModel, setNewModel },
-      graphInfo: { newRefreshDelay, setNewRefreshDelay }
+      graphInfo: { newRefreshInterval, setNewRefreshInterval }
     },
     settings: {
       limitSettings: { limit, setLimit, lastLimit, setLastLimit },
@@ -93,7 +93,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       defaultQuerySettings: { defaultQuery, setDefaultQuery },
       contentPersistenceSettings: { contentPersistence, setContentPersistence },
       chatSettings: { secretKey, setSecretKey, model, setModel, navigateToSettings, setNavigateToSettings },
-      graphInfo: { refreshDelay, setRefreshDelay }
+      graphInfo: { refreshInterval, setRefreshInterval }
     },
     hasChanges,
     setHasChanges,
@@ -104,7 +104,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       localStorage.setItem("timeout", newTimeout.toString());
       localStorage.setItem("defaultQuery", newDefaultQuery);
       localStorage.setItem("limit", newLimit.toString());
-      localStorage.setItem("refreshDelay", newRefreshDelay.toString())
+      localStorage.setItem("refreshInterval", newRefreshInterval.toString())
 
       // Update context
       setContentPersistence(newContentPersistence);
@@ -115,7 +115,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       setLastLimit(limit);
       setSecretKey(newSecretKey);
       setModel(newModel);
-      setRefreshDelay(newRefreshDelay)
+      setRefreshInterval(newRefreshInterval)
       // Reset has changes
       setHasChanges(false);
 
@@ -133,10 +133,10 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       setNewLimit(limit)
       setNewSecretKey(secretKey)
       setNewModel(model)
-      setNewRefreshDelay(refreshDelay)
+      setNewRefreshInterval(refreshInterval)
       setHasChanges(false)
     }
-  }), [contentPersistence, defaultQuery, hasChanges, lastLimit, limit, model, navigateToSettings, newContentPersistence, newDefaultQuery, newLimit, newModel, newRefreshDelay, newRunDefaultQuery, newSecretKey, newTimeout, refreshDelay, runDefaultQuery, secretKey, timeout, toast])
+  }), [contentPersistence, defaultQuery, hasChanges, lastLimit, limit, model, navigateToSettings, newContentPersistence, newDefaultQuery, newLimit, newModel, newRefreshInterval, newRunDefaultQuery, newSecretKey, newTimeout, refreshInterval, runDefaultQuery, secretKey, timeout, toast])
 
   const historyQueryContext = useMemo(() => ({
     historyQuery,
@@ -344,7 +344,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
     setRunDefaultQuery(localStorage.getItem("runDefaultQuery") !== "false")
     setContentPersistence(localStorage.getItem("contentPersistence") !== "false");
     setTutorialOpen(localStorage.getItem("tutorial") !== "false")
-    setRefreshDelay(Number(localStorage.getItem("refreshDelay") || 10))
+    setRefreshInterval(Number(localStorage.getItem("refreshInterval") || 10))
   }, [status])
 
   const panelSize = useMemo(() => isCollapsed ? 0 : 15, [isCollapsed])

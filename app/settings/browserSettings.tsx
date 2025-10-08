@@ -22,7 +22,7 @@ export default function BrowserSettings() {
             timeoutSettings: { newTimeout, setNewTimeout },
             limitSettings: { newLimit, setNewLimit },
             chatSettings: { newSecretKey, setNewSecretKey, newModel, setNewModel },
-            graphInfo: { newRefreshDelay, setNewRefreshDelay }
+            graphInfo: { newRefreshInterval, setNewRefreshInterval }
         },
         settings: {
             contentPersistenceSettings: { contentPersistence },
@@ -31,7 +31,7 @@ export default function BrowserSettings() {
             timeoutSettings: { timeout: timeoutValue },
             limitSettings: { limit },
             chatSettings: { secretKey, model, navigateToSettings },
-            graphInfo: { refreshDelay }
+            graphInfo: { refreshInterval }
         },
         hasChanges,
         setHasChanges,
@@ -54,12 +54,12 @@ export default function BrowserSettings() {
         setNewLimit(limit)
         setNewSecretKey(secretKey)
         setNewModel(model)
-        setNewRefreshDelay(refreshDelay)
-    }, [contentPersistence, runDefaultQuery, defaultQuery, timeoutValue, limit, secretKey, setNewContentPersistence, setNewRunDefaultQuery, setNewDefaultQuery, setNewTimeout, setNewLimit, setNewSecretKey, model, setNewModel, setNewRefreshDelay, refreshDelay])
+        setNewRefreshInterval(refreshInterval)
+    }, [contentPersistence, runDefaultQuery, defaultQuery, timeoutValue, limit, secretKey, setNewContentPersistence, setNewRunDefaultQuery, setNewDefaultQuery, setNewTimeout, setNewLimit, setNewSecretKey, model, setNewModel, setNewRefreshInterval, refreshInterval])
 
     useEffect(() => {
-        setHasChanges(newContentPersistence !== contentPersistence || newTimeout !== timeoutValue || newLimit !== limit || newDefaultQuery !== defaultQuery || newRunDefaultQuery !== runDefaultQuery || newSecretKey !== secretKey || newModel !== model || refreshDelay !== newRefreshDelay)
-    }, [defaultQuery, limit, newDefaultQuery, newLimit, newRunDefaultQuery, newContentPersistence, newTimeout, runDefaultQuery, contentPersistence, setHasChanges, timeoutValue, newSecretKey, secretKey, newModel, model, refreshDelay, newRefreshDelay])
+        setHasChanges(newContentPersistence !== contentPersistence || newTimeout !== timeoutValue || newLimit !== limit || newDefaultQuery !== defaultQuery || newRunDefaultQuery !== runDefaultQuery || newSecretKey !== secretKey || newModel !== model || refreshInterval !== newRefreshInterval)
+    }, [defaultQuery, limit, newDefaultQuery, newLimit, newRunDefaultQuery, newContentPersistence, newTimeout, runDefaultQuery, contentPersistence, setHasChanges, timeoutValue, newSecretKey, secretKey, newModel, model, refreshInterval, newRefreshInterval])
 
     const handleSubmit = useCallback((e?: React.FormEvent<HTMLFormElement>) => {
         e?.preventDefault()
@@ -294,19 +294,19 @@ export default function BrowserSettings() {
                         </div>
                     </div>
                     {separator}
-                    <h1 className="text-2xl font-bold">Graph Information</h1>
+                    <h1 className="text-2xl font-bold">Graph Info</h1>
                     <div className="flex justify-between items-center">
                         <div className="flex flex-col gap-2">
-                            <h2 className="text-xl font-medium">Refresh Delay</h2>
-                            <p>In how much time to fetch graph info</p>
+                            <h2 className="text-xl font-medium">Refresh Interval</h2>
+                            <p>Reload graph info data every x seconds</p>
                         </div>
                         <Slider
-                            id="refreshDelay"
+                            id="refreshInterval"
                             className="w-1/3"
                             min={5}
                             max={60}
-                            value={[newRefreshDelay]}
-                            onValueChange={(value) => createChangeHandler(setNewRefreshDelay)(value[value.length - 1], "refreshDelay")}
+                            value={[newRefreshInterval]}
+                            onValueChange={(value) => createChangeHandler(setNewRefreshInterval)(value[value.length - 1], "refreshInterval")}
                         />
                     </div>
                     {

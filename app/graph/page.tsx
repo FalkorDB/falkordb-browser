@@ -53,7 +53,7 @@ export default function Page() {
             runDefaultQuerySettings: { runDefaultQuery },
             defaultQuerySettings: { defaultQuery },
             contentPersistenceSettings: { contentPersistence },
-            graphInfo: { refreshDelay }
+            graphInfo: { refreshInterval }
         }
     } = useContext(BrowserSettingsContext)
     const { toast } = useToast()
@@ -127,12 +127,12 @@ export default function Page() {
 
         handleSetInfo()
 
-        const interval = setInterval(handleSetInfo, refreshDelay * 1000)
+        const interval = setInterval(handleSetInfo, refreshInterval * 1000)
 
         return () => {
             clearInterval(interval)
         }
-    }, [fetchInfo, graphName, refreshDelay, setGraphInfo, toast])
+    }, [fetchInfo, graphName, refreshInterval, setGraphInfo, toast])
 
     useEffect(() => {
         setRelationships([...graph.Relationships])
