@@ -1,11 +1,122 @@
 import { cn } from "@/lib/utils"
-import { useEffect, useState } from "react"
-import { Loader2 } from "lucide-react"
+import { Fragment, useEffect, useState } from "react"
+import { Check, Circle, Loader2, X } from "lucide-react"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import Button from "./ui/Button"
 import { Query } from "../api/graph/model"
 import Input from "./ui/Input"
 
 type Item = string | Query
+
+type ElementItem = {
+    content: React.ReactNode;
+    tooltip: string;
+    className?: string;
+};
+
+const getLastRun = (timestamp: number) => {
+    const date = new Date(timestamp);
+    const now = new Date();
+    const timeDiff = now.getTime() - date.getTime();
+    const hoursAgo = timeDiff / (1000 * 60 * 60);
+
+    if (hoursAgo <= 24) {
+        return date.toLocaleTimeString([], { hour12: false });
+    }
+
+    return date.toLocaleString([], { hour12: false });
+}
+
+const getExecutionTime = (metadata: string[]) => metadata.find(value => value.startsWith("Query internal execution time:"))?.split(":")[1].replace(" milliseconds", "ms")
+
+const getSeparator = (selected: boolean, hover: boolean) => (
+    <div
+        className={cn("h-2/3 w-px rounded-full",
+            // eslint-disable-next-line no-nested-ternary
+            selected
+                ? "bg-primary"
+                : hover
+                    ? "bg-foreground"
+                    : "bg-border"
+        )}
+    />
+)
+
+const getStatusIcon = (status: Query["status"]) => {
+    const size = 20
+    switch (status) {
+        case "Empty":
+            return <Circle color="orange" size={size} />
+        case "Failed":
+            return <X size={size} color="red" />
+        default:
+            return <Check size={size} color="green" />
+    }
+}
+
+const getQueryElement = (item: Query, selected: boolean, hover: boolean) => {
+    const executionTime = getExecutionTime(item.metadata);
+
+    // Build array of items to display
+    const elements: ElementItem[] = [];
+
+    if (item.status) {
+        elements.push({
+            content: getStatusIcon(item.status),
+            tooltip: `Status: ${item.status}`,
+            className: "text-center truncate"
+        });
+    }
+
+    if (item.elementsCount) {
+        elements.push({
+            content: item.elementsCount,
+            tooltip: `Elements: ${item.elementsCount}`,
+        });
+    }
+
+    if (item.timestamp) {
+        elements.push({
+            content: getLastRun(item.timestamp),
+            tooltip: `Last Run: ${getLastRun(item.timestamp)}`,
+            className: "truncate"
+        });
+    }
+
+    if (item.graphName) {
+        elements.push({
+            content: item.graphName,
+            tooltip: `Graph Name: ${item.graphName}`,
+            className: "truncate"
+        });
+    }
+
+    if (executionTime) {
+        elements.push({
+            content: executionTime,
+            tooltip: `Internal Execution Time: ${executionTime}`,
+            className: "truncate"
+        });
+    }
+
+    return (
+        <div className="h-1 grow flex gap-2 items-center w-full">
+            {elements.map((element, index) => (
+                <Fragment key={element.tooltip}>
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <div className={element.className}>{element.content}</div>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                            {element.tooltip}
+                        </TooltipContent>
+                    </Tooltip>
+                    {index < elements.length - 1 && getSeparator(selected, hover)}
+                </Fragment>
+            ))}
+        </div>
+    );
+}
 
 interface Props<T extends Item> {
     list: T[]
@@ -111,6 +222,16 @@ export default function PaginationList<T extends Item>({ list, step, onClick, da
                         const isString = typeof item === "string"
                         const text = isString ? item : item.text
 
+                        const content = (
+                            <>
+                                {
+                                    !isString && (item.status || item.elementsCount || item.timestamp || item.graphName || getExecutionTime(item.metadata)) &&
+                                    getQueryElement(item, selected, hover)
+                                }
+                                <p data-testid={`${dataTestId}${text}Text`} className="h-1 grow truncate w-full text-left">{text}</p>
+                            </>
+                        )
+
                         return (
                             <li
                                 data-testid={`${dataTestId}${text}`}
@@ -133,50 +254,14 @@ export default function PaginationList<T extends Item>({ list, step, onClick, da
                                         <Button
                                             className={cn("w-full h-full text-xl gap-0", !isString ? "flex-col" : "text-center")}
                                             title={text}
-                                            label={!isString ? undefined : text}
                                             onClick={() => {
                                                 onClick(text)
                                             }}
                                             tabIndex={-1}
                                         >
-                                            {
-                                                !isString && (item.timestamp || item.graphName) &&
-                                                <>
-                                                    <div className="h-1 grow flex gap-2 items-center w-full">
-                                                        <p className="text-start truncate">
-                                                            {
-                                                                !isString && item.timestamp &&
-                                                                (() => {
-                                                                    const date = new Date(item.timestamp);
-                                                                    const now = new Date();
-                                                                    const timeDiff = now.getTime() - date.getTime();
-                                                                    const hoursAgo = timeDiff / (1000 * 60 * 60);
-
-                                                                    if (hoursAgo <= 24) {
-                                                                        return date.toLocaleTimeString([], { hour12: false });
-                                                                    }
-
-                                                                    return date.toLocaleString([], { hour12: false });
-                                                                })()
-                                                            }
-                                                        </p>
-                                                        <div
-                                                            className={cn("h-2/3 w-px rounded-full",
-                                                                // eslint-disable-next-line no-nested-ternary
-                                                                selected
-                                                                    ? "bg-primary"
-                                                                    : hover
-                                                                        ? "bg-foreground"
-                                                                        : "bg-border"
-                                                            )}
-                                                        />
-                                                        <p className="w-1 grow text-start truncate">{!isString && item.graphName && `${item.graphName}`}</p>
-                                                    </div>
-                                                    <p data-testid={`${dataTestId}${text}Text`} className="h-1 grow truncate w-full text-left">{text}</p>
-                                                </>
-                                            }
+                                            {content}
                                         </Button>
-                                        : <p data-testid={`${dataTestId}${text}Text`} className="w-full h-full text-xl text-center">{text}</p>
+                                        : content
                                 }
                             </li>
                         )
