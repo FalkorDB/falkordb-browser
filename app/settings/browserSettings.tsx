@@ -5,6 +5,7 @@ import { cn, getDefaultQuery } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
 import { RotateCcw } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
+import { Slider } from "@/components/ui/slider";
 import { BrowserSettingsContext } from "../components/provider";
 import Button from "../components/ui/Button";
 import Input from "../components/ui/Input";
@@ -125,7 +126,7 @@ export default function BrowserSettings() {
         replacements.forEach(replacement => {
             cleanValue = cleanValue.replace(replacement, '')
         })
-        
+
         const value = parseInt(cleanValue, 10)
 
         if (!value) {
@@ -134,20 +135,6 @@ export default function BrowserSettings() {
         }
 
         if (value < 0 || Number.isNaN(value)) return
-
-        createChangeHandler(setter)(value, elementId)
-    }
-
-    // Handle numeric inputs with minimum value validation
-    const handleMinValueNumberChange = (
-        setter: (value: number) => void,
-        inputValue: string,
-        elementId: string,
-        minValue: number
-    ) => {
-        const value = parseInt(inputValue, 10)
-
-        if (value < minValue || Number.isNaN(value)) return
 
         createChangeHandler(setter)(value, elementId)
     }
@@ -313,11 +300,13 @@ export default function BrowserSettings() {
                             <h2 className="text-xl font-medium">Refresh Delay</h2>
                             <p>In how much time to fetch graph info</p>
                         </div>
-                        <Input
+                        <Slider
                             id="refreshDelay"
-                            className="text-center w-1/3"
-                            value={newRefreshDelay}
-                            onChange={(e) => handleMinValueNumberChange(setNewRefreshDelay, e.target.value, 'refreshDelay', 5)}
+                            className="w-1/3"
+                            min={5}
+                            max={60}
+                            value={[newRefreshDelay]}
+                            onValueChange={(value) => createChangeHandler(setNewRefreshDelay)(value[value.length - 1], "refreshDelay")}
                         />
                     </div>
                     {

@@ -127,12 +127,12 @@ export default function Page() {
 
         handleSetInfo()
 
-        const interval = setInterval(handleSetInfo, refreshDelay)
+        const interval = setInterval(handleSetInfo, refreshDelay * 1000)
 
         return () => {
             clearInterval(interval)
         }
-    }, [fetchInfo, graphName, setGraphInfo, toast])
+    }, [fetchInfo, graphName, refreshDelay, setGraphInfo, toast])
 
     useEffect(() => {
         setRelationships([...graph.Relationships])
@@ -185,16 +185,16 @@ export default function Page() {
         if (selectedElements.length === 0 && selectedElement) {
             selectedElements.push(selectedElement)
         }
-        
+
         await Promise.all(selectedElements.map(async (element) => {
             const type = !element.source
             const result = await securedFetch(`api/graph/${prepareArg(graph.Id)}/${prepareArg(element.id.toString())}`, {
                 method: "DELETE",
                 body: JSON.stringify({ type })
             }, toast, setIndicator)
-            
+
             if (!result.ok) return
-            
+
             if (type) {
                 (element as Node).labels.forEach((label) => {
                     const l = graph.LabelsMap.get(label)
@@ -223,9 +223,9 @@ export default function Page() {
                 }
             }
         }))
-        
+
         graph.removeElements(selectedElements)
-        
+
         setRelationships(graph.removeLinks(selectedElements.map((element) => element.id)))
         setData({ ...graph.Elements })
         fetchCount()
