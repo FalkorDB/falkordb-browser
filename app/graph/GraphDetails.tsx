@@ -3,7 +3,7 @@ import { useContext } from "react"
 import { Info, Loader2 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Graph } from "../api/graph/model"
-import { QuerySettingsContext } from "../components/provider"
+import { BrowserSettingsContext } from "../components/provider"
 
 export default function GraphDetails({
     graph,
@@ -22,7 +22,7 @@ export default function GraphDetails({
         settings: {
             limitSettings: { limit, lastLimit },
         }
-    } = useContext(QuerySettingsContext)
+    } = useContext(BrowserSettingsContext)
 
     // Check if any content should be displayed
     const hasLimitWarning = graph.CurrentLimit && graph.Data.length >= graph.CurrentLimit

@@ -5,7 +5,7 @@
 
 import { LinkObject, NodeObject } from "react-force-graph-2d";
 
-export type Value = string | number | boolean;
+export type Value = string | number | boolean | Value[];
 
 export type HistoryQuery = {
   queries: Query[];
@@ -21,6 +21,8 @@ export type Query = {
   profile: string[];
   graphName: string;
   timestamp: number;
+  status: "Success" | "Failed" | "Empty";
+  elementsCount: number
 };
 
 const getSchemaValue = (value: string): string[] => {

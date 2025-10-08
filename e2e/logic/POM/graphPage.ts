@@ -312,10 +312,9 @@ export default class GraphPage extends Page {
     );
   }
 
-  async clickDeleteElement(type: string): Promise<void> {
-    const element = type === "Node" ? "Node" : "Relation";
+  async clickDeleteElement(): Promise<void> {
     await interactWhenVisible(
-      this.deleteElement(element),
+      this.deleteElement("Graph"),
       (el) => el.click(),
       "Delete Element"
     );
@@ -705,28 +704,21 @@ export default class GraphPage extends Page {
   }
 
   async deleteElementsByPosition(
-    positions: { x: number; y: number }[],
-    type: string
+    positions: { x: number; y: number }[]
   ): Promise<void> {
     positions.forEach(async (position) => {
       await this.elementClick(position.x, position.y);
     });
-    await this.clickDeleteElement(type);
+    await this.clickDeleteElement();
     await this.clickDeleteElementConfirm();
     await waitForElementToNotBeVisible(this.deleteElement("Graph"));
   }
 
-  async deleteElementByName(name: string, type: string): Promise<void> {
+  async deleteElementByName(name: string): Promise<void> {
     await this.searchElementInCanvas(name);
-    // Try to close help message, but don't fail if it's not found
-    try {
-      await this.clickCloseHelpMessage();
-    } catch (error) {
-      console.log("Help message not found or couldn't be closed, continuing with test:", error);
-    }
-    await this.clickDeleteElement(type);
+    await this.clickDeleteElement();
     await this.clickDeleteElementConfirm();
-    await waitForElementToNotBeVisible(this.deleteElement("Node"));
+    await waitForElementToNotBeVisible(this.deleteElement("Graph"));
     await this.waitForCanvasAnimationToEnd();
   }
 

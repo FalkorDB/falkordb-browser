@@ -27,6 +27,7 @@ test.describe('@Config Settings users tests', () => {
         const isVisible = await settingsUsersPage.verifyUserExists(username);
         await settingsUsersPage.removeUser(username);
         expect(isVisible).toBe(true);
+        apiCall.deleteUsers({ users: [{ username }] });
     })
 
     test("@admin Add one user -> remove one user -> Validate that the user has been removed", async () => {
@@ -50,8 +51,8 @@ test.describe('@Config Settings users tests', () => {
         await settingsUsersPage.refreshPage();
         await settingsUsersPage.navigateToUserTab();
         const newUserRole = await settingsUsersPage.getUserRole(username);
-        await settingsUsersPage.removeUser(username);
         expect(newUserRole).toBe("Read-Only");
+        apiCall.deleteUsers({ users: [{ username }] });
     })
 
     const searchData = [

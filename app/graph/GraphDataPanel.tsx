@@ -19,11 +19,10 @@ import RemoveLabel from "./RemoveLabel";
 interface Props {
     object: Node | Link;
     setObject: (el: Node | Link | undefined) => void;
-    onDeleteElement: () => Promise<void>;
     setLabels: Dispatch<SetStateAction<Label[]>>;
 }
 
-export default function GraphDataPanel({ object, setObject, onDeleteElement, setLabels }: Props) {
+export default function GraphDataPanel({ object, setObject, setLabels }: Props) {
     const { setIndicator } = useContext(IndicatorContext)
     const { graph, setGraphInfo } = useContext(GraphContext)
 
@@ -130,14 +129,15 @@ export default function GraphDataPanel({ object, setObject, onDeleteElement, set
     }
 
     return (
-        <div data-testid="DataPanel" className="DataPanel p-6">
+        <div data-testid="DataPanel" className="DataPanel p-4">
             <div className="relative flex flex-col gap-6 pb-4 border-b border-border">
-                <div className="flex flex-row justify-between items-center">
+                <div className="flex flex-row justify-between">
                     <div className="flex flex-col gap-2 font-medium text-xl text-nowrap">
                         <p>ID: <span className="Gradient text-transparent bg-clip-text">{object.id}</span></p>
                         <p data-testid="DataPanelAttributesCount">Attributes: <span className="Gradient text-transparent bg-clip-text">{Object.keys(object.data).length}</span></p>
                     </div>
                     <Button
+                        className="h-fit"
                         data-testid="DataPanelClose"
                         title="Close"
                         onClick={() => setObject(undefined)}
@@ -202,7 +202,6 @@ export default function GraphDataPanel({ object, setObject, onDeleteElement, set
                 lastObjId={lastObjId}
                 object={object}
                 type={type}
-                onDeleteElement={onDeleteElement}
             />
         </div >
     )

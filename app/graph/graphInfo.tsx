@@ -10,7 +10,7 @@ export default function GraphInfoPanel({ onClose }: { onClose: () => void }) {
     const { isQueryLoading } = useContext(QueryLoadingContext)
 
     return (
-        <div className={cn(`relative h-full w-full p-6 flex flex-col gap-8 overflow-y-auto border-r border-border`)}>
+        <div className={cn(`relative h-full w-full p-6 grid grid-rows-[max-content_max-content_minmax(0,max-content)_minmax(0,max-content)_minmax(0,max-content)] gap-8 border-r border-border`)}>
             <Button
                 className="absolute top-2 right-2"
                 title="Close"
@@ -18,7 +18,7 @@ export default function GraphInfoPanel({ onClose }: { onClose: () => void }) {
             >
                 <X className="h-4 w-4" />
             </Button>
-            <h1 className="text-2xl">Graph Information</h1>
+            <h1 className="text-2xl">Graph Info</h1>
             <div className="flex flex-col gap-2">
                 <div className="flex gap-2 items-center">
                     <h2>Graph Name:</h2>
@@ -32,7 +32,7 @@ export default function GraphInfoPanel({ onClose }: { onClose: () => void }) {
                     </Tooltip>
                 </div>
             </div>
-            <div className="h-1 grow max-h-fit flex flex-col gap-2 overflow-hidden">
+            <div className="flex flex-col gap-2 overflow-hidden">
                 <div className="flex gap-2 items-center">
                     <h2>Nodes</h2>
                     {
@@ -52,7 +52,8 @@ export default function GraphInfoPanel({ onClose }: { onClose: () => void }) {
                             </Tooltip>
                             :
                             <Loader2 data-testid="nodesCountLoader" className="animate-spin" />
-                    }</div>
+                    }
+                </div>
                 <ul className="flex flex-wrap gap-2 p-2 overflow-auto">
                     <li className="max-w-full">
                         <Button
@@ -76,7 +77,7 @@ export default function GraphInfoPanel({ onClose }: { onClose: () => void }) {
                     ))}
                 </ul>
             </div>
-            <div className="h-1 grow max-h-fit flex flex-col gap-2 overflow-hidden">
+            <div className="flex flex-col gap-2 overflow-hidden">
                 <div className="flex gap-2 items-center">
                     <h2>Edges</h2>
                     {
@@ -96,7 +97,8 @@ export default function GraphInfoPanel({ onClose }: { onClose: () => void }) {
                             </Tooltip>
                             :
                             <Loader2 data-testid="edgesCountLoader" className="animate-spin" />
-                    }</div>
+                    }
+                </div>
                 <ul className="flex flex-wrap gap-2 p-2 overflow-auto">
                     <li className="max-w-full">
                         <Button
@@ -120,7 +122,7 @@ export default function GraphInfoPanel({ onClose }: { onClose: () => void }) {
                     ))}
                 </ul>
             </div>
-            <div className="h-1 grow max-h-fit flex flex-col gap-2 overflow-hidden">
+            <div className="flex flex-col gap-2 overflow-hidden">
                 <div className="flex gap-2 items-center">
                     <h2>Property Keys</h2>
                     {
