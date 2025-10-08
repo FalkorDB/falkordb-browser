@@ -33,6 +33,7 @@ interface BaseProps<T = "Schema" | "Graph"> {
 }
 
 interface SchemaProps {
+    selectedElement: Node | Link | undefined
     selectedElements: (Node | Link)[];
     setSelectedElement: (el: Node | Link | undefined) => void;
     handleDeleteElement: () => Promise<void>;
@@ -53,6 +54,7 @@ interface GraphProps {
     setHistoryQuery: Dispatch<SetStateAction<HistoryQuery>>;
     fetchCount: () => Promise<void>;
     isQueryLoading: boolean;
+    selectedElement?: never
     selectedElements?: never;
     setSelectedElement?: never;
     handleDeleteElement?: never;
@@ -81,6 +83,7 @@ export default function Selector<T extends "Graph" | "Schema" = "Graph" | "Schem
     historyQuery,
     setHistoryQuery,
     fetchCount,
+    selectedElement,
     selectedElements,
     setSelectedElement,
     handleDeleteElement,
@@ -485,6 +488,7 @@ export default function Selector<T extends "Graph" | "Schema" = "Graph" | "Schem
                         <Toolbar
                             graph={graph}
                             label={type}
+                            selectedElement={selectedElement}
                             selectedElements={selectedElements}
                             setSelectedElement={setSelectedElement}
                             handleDeleteElement={handleDeleteElement}
