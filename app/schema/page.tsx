@@ -265,6 +265,7 @@ export default function Page() {
                 setOptions={setSchemaNames}
                 graphName={schemaName}
                 setGraphName={setSchemaName}
+                selectedElement={selectedElement}
                 selectedElements={selectedElements}
                 setSelectedElement={handleSetSelectedElement}
                 handleDeleteElement={handleDeleteElement}
@@ -316,7 +317,6 @@ export default function Page() {
                             <SchemaDataPanel
                                 object={selectedElement}
                                 setObject={handleSetSelectedElement}
-                                onDeleteElement={handleDeleteElement}
                                 schema={schema}
                                 setLabels={setLabels}
                             />

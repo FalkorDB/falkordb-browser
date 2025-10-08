@@ -152,7 +152,7 @@ export default class Page extends BasePage {
   // DELETE
   public get deleteElement(): (type: Element | GraphType) => Locator {
     return (type: Element | GraphType) =>
-      this.page.getByTestId(`delete${type}`);
+      this.page.getByTestId(`deleteElement${type}`);
   }
 
   public get deleteElementConfirm(): (type: GraphType) => Locator {
