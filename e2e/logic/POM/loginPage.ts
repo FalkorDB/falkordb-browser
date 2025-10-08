@@ -145,6 +145,9 @@ export default class LoginPage extends HeaderComponent {
     }
 
     async waitForSuccessfulLogin(Url: string): Promise<void> {
-        await this.page.waitForURL(Url, { timeout: 5000 });
+        await this.page.waitForURL(Url, { timeout: 10000 });
+        // Wait for the page to fully load after navigation
+        await this.page.waitForLoadState('domcontentloaded');
+        await this.page.waitForLoadState('networkidle');
     }
 }

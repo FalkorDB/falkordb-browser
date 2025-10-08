@@ -71,14 +71,16 @@ test.describe("Cluster Functionality Tests", () => {
     test("@cluster Host and port fields accept cluster node configurations", async () => {
       const loginPage = await browser.createNewPage(LoginPage, urls.loginUrl);
       await browser.setPageToFullScreen();
-      CLUSTER_NODES.forEach(async (node) => {
+      
+      for (const node of CLUSTER_NODES) {
         await loginPage.fillHost(node.host);
         await loginPage.fillPort(node.port);
         expect(await loginPage.getHost()).toBe(node.host);
         expect(await loginPage.getPort()).toBe(node.port);
         await loginPage.fillHost("");
         await loginPage.fillPort("");
-      });
+      }
+      
       expect(CLUSTER_NODES.length).toBeGreaterThan(0);
     });
 

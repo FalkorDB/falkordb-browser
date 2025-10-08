@@ -485,7 +485,7 @@ jobs:
       - name: Run cluster tests
         run: |
           NEXTAUTH_SECRET=SECRET npm start & 
-          npx playwright test --grep "@cluster" --reporter=dot,list
+          npx playwright test --grep "@cluster" --workers=2 --reporter=dot,list
       - name: Cleanup cluster
         if: always()
         run: |
