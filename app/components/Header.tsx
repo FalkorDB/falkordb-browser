@@ -19,7 +19,7 @@ import { useToast } from "@/components/ui/use-toast";
 import { useTheme } from "next-themes";
 import Button from "./ui/Button";
 import CreateGraph from "./CreateGraph";
-import { IndicatorContext, PanelContext, QuerySettingsContext } from "./provider";
+import { IndicatorContext, PanelContext, BrowserSettingsContext } from "./provider";
 
 interface Props {
     onSetGraphName: (newGraphName: string) => void
@@ -41,7 +41,7 @@ export default function Header({ onSetGraphName, graphNames, graphName, onOpenGr
 
     const { indicator } = useContext(IndicatorContext)
     const { setPanel } = useContext(PanelContext)
-    const { hasChanges, saveSettings, resetSettings, settings: { chatSettings: { model, secretKey, navigateToSettings } } } = useContext(QuerySettingsContext)
+    const { hasChanges, saveSettings, resetSettings, settings: { chatSettings: { model, secretKey, navigateToSettings } } } = useContext(BrowserSettingsContext)
 
     const { theme, setTheme } = useTheme()
     const { currentTheme } = getTheme(theme)

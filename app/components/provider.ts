@@ -2,7 +2,7 @@ import { createContext, Dispatch, SetStateAction } from "react";
 import { Panel } from "@/lib/utils";
 import { Graph, GraphInfo, HistoryQuery } from "../api/graph/model";
 
-type QuerySettingsContextType = {
+type BrowserSettingsContextType = {
   newSettings: {
     limitSettings: {
       newLimit: number;
@@ -29,6 +29,10 @@ type QuerySettingsContextType = {
       setNewSecretKey: Dispatch<SetStateAction<string>>;
       newModel: string;
       setNewModel: Dispatch<SetStateAction<string>>;
+    };
+    graphInfo: {
+      newRefreshInterval: number;
+      setNewRefreshInterval: Dispatch<SetStateAction<number>>;
     };
   };
   settings: {
@@ -61,6 +65,10 @@ type QuerySettingsContextType = {
       setModel: Dispatch<SetStateAction<string>>;
       navigateToSettings: boolean;
       setNavigateToSettings: Dispatch<SetStateAction<boolean>>;
+    };
+    graphInfo: {
+      refreshInterval: number;
+      setRefreshInterval: Dispatch<SetStateAction<number>>;
     };
   };
   hasChanges: boolean;
@@ -118,7 +126,7 @@ type QueryLoadingContextType = {
   setIsQueryLoading: Dispatch<SetStateAction<boolean>>;
 };
 
-export const QuerySettingsContext = createContext<QuerySettingsContextType>({
+export const BrowserSettingsContext = createContext<BrowserSettingsContextType>({
   newSettings: {
     limitSettings: { newLimit: 0, setNewLimit: () => {} },
     timeoutSettings: { newTimeout: 0, setNewTimeout: () => {} },
@@ -137,6 +145,7 @@ export const QuerySettingsContext = createContext<QuerySettingsContextType>({
       newModel: "",
       setNewModel: () => {},
     },
+    graphInfo: { newRefreshInterval: 0, setNewRefreshInterval: () => {} },
   },
   settings: {
     limitSettings: {
@@ -163,6 +172,7 @@ export const QuerySettingsContext = createContext<QuerySettingsContextType>({
       navigateToSettings: false,
       setNavigateToSettings: () => {},
     },
+    graphInfo: { refreshInterval: 0, setRefreshInterval: () => {} },
   },
   hasChanges: false,
   setHasChanges: () => {},

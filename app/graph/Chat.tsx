@@ -7,7 +7,7 @@ import { useToast } from "@/components/ui/use-toast"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import Button from "../components/ui/Button"
 import Input from "../components/ui/Input"
-import { GraphContext, IndicatorContext, QueryLoadingContext, QuerySettingsContext } from "../components/provider"
+import { GraphContext, IndicatorContext, QueryLoadingContext, BrowserSettingsContext } from "../components/provider"
 import { EventType } from "../api/chat/route"
 
 interface Props {
@@ -18,7 +18,7 @@ export default function Chat({ onClose }: Props) {
     const { setIndicator } = useContext(IndicatorContext)
     const { graphName, runQuery } = useContext(GraphContext)
     const { isQueryLoading } = useContext(QueryLoadingContext)
-    const { settings: { chatSettings: { secretKey, model, navigateToSettings } } } = useContext(QuerySettingsContext)
+    const { settings: { chatSettings: { secretKey, model, navigateToSettings } } } = useContext(BrowserSettingsContext)
 
     const { toast } = useToast()
 

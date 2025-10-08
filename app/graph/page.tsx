@@ -8,7 +8,7 @@ import { ForceGraphMethods } from "react-force-graph-2d";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { ImperativePanelHandle } from "react-resizable-panels";
 import { Label, Graph, GraphData, Link, Node, Relationship, GraphInfo } from "../api/graph/model";
-import { GraphContext, HistoryQueryContext, IndicatorContext, PanelContext, QueryLoadingContext, QuerySettingsContext } from "../components/provider";
+import { BrowserSettingsContext, GraphContext, HistoryQueryContext, IndicatorContext, PanelContext, QueryLoadingContext } from "../components/provider";
 import Spinning from "../components/ui/spinning";
 import Chat from "./Chat";
 import GraphDataPanel from "./GraphDataPanel";
@@ -48,14 +48,14 @@ export default function Page() {
         handleCooldown,
         cooldownTicks,
     } = useContext(GraphContext)
-
     const {
         settings: {
             runDefaultQuerySettings: { runDefaultQuery },
             defaultQuerySettings: { defaultQuery },
             contentPersistenceSettings: { contentPersistence },
+            graphInfo: { refreshInterval }
         }
-    } = useContext(QuerySettingsContext)
+    } = useContext(BrowserSettingsContext)
     const { toast } = useToast()
 
     const chartRef = useRef<ForceGraphMethods<Node, Link>>()
@@ -107,9 +107,9 @@ export default function Page() {
     }, [graphName, setIndicator, toast]);
 
     useEffect(() => {
-        if (!graphName) return
+        if (!graphName) return undefined
 
-        Promise.all([
+        const handleSetInfo = () => Promise.all([
             fetchInfo("(label)"),
             fetchInfo("(relationship type)"),
             fetchInfo("(property key)"),
@@ -124,7 +124,15 @@ export default function Page() {
                 variant: "destructive",
             })
         });
-    }, [fetchInfo, setGraphInfo, toast, setIndicator, graphName])
+
+        handleSetInfo()
+
+        const interval = setInterval(handleSetInfo, refreshInterval * 1000)
+
+        return () => {
+            clearInterval(interval)
+        }
+    }, [fetchInfo, graphName, refreshInterval, setGraphInfo, toast])
 
     useEffect(() => {
         setRelationships([...graph.Relationships])
@@ -177,16 +185,16 @@ export default function Page() {
         if (selectedElements.length === 0 && selectedElement) {
             selectedElements.push(selectedElement)
         }
-        
+
         await Promise.all(selectedElements.map(async (element) => {
             const type = !element.source
             const result = await securedFetch(`api/graph/${prepareArg(graph.Id)}/${prepareArg(element.id.toString())}`, {
                 method: "DELETE",
                 body: JSON.stringify({ type })
             }, toast, setIndicator)
-            
+
             if (!result.ok) return
-            
+
             if (type) {
                 (element as Node).labels.forEach((label) => {
                     const l = graph.LabelsMap.get(label)
@@ -215,9 +223,9 @@ export default function Page() {
                 }
             }
         }))
-        
+
         graph.removeElements(selectedElements)
-        
+
         setRelationships(graph.removeLinks(selectedElements.map((element) => element.id)))
         setData({ ...graph.Elements })
         fetchCount()
