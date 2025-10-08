@@ -317,7 +317,7 @@ export default function Selector<T extends "Graph" | "Schema" = "Graph" | "Schem
                                     <div className="h-1 grow flex gap-8 p-8">
                                         <PaginationList
                                             label="Query"
-                                            className="w-[40%] bg-secondary rounded-lg overflow-hidden"
+                                            className="w-1/2 bg-secondary rounded-lg overflow-hidden"
                                             isSelected={(item) => historyQuery.queries.findIndex(q => q.text === item.text) + 1 === historyQuery.counter}
                                             afterSearchCallback={afterSearchCallback}
                                             dataTestId="queryHistory"
@@ -356,7 +356,7 @@ export default function Selector<T extends "Graph" | "Schema" = "Graph" | "Schem
                                                 }
                                             </ul>
                                         </PaginationList>
-                                        <Tabs value={tab} onValueChange={(value) => setTab(value as Tab)} className="w-[60%] flex flex-col gap-8 items-center">
+                                        <Tabs value={tab} onValueChange={(value) => setTab(value as Tab)} className="w-1/2 flex flex-col gap-8 items-center">
                                             <TabsList className="bg-secondary h-fit w-fit p-2">
                                                 <TabsTrigger className={cn("!text-border data-[state=active]:!bg-background data-[state=active]:!text-foreground")} disabled={!isTabEnabled("text")} value="text">Edit Query</TabsTrigger>
                                                 <TabsTrigger className={cn("!text-border data-[state=active]:!bg-background data-[state=active]:!text-foreground")} disabled={!isTabEnabled("profile")} value="profile">Profile</TabsTrigger>

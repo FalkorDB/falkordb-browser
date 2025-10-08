@@ -220,6 +220,8 @@ export const HistoryQueryContext = createContext<HistoryQueryContextType>({
       profile: [],
       graphName: "",
       timestamp: 0,
+      elementsCount: 0,
+      status: "Failed",
     },
     counter: 0,
   },
