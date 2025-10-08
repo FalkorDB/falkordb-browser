@@ -16,14 +16,11 @@ export default class SettingsUsersPage extends BasePage {
   }
 
   private get selectRoleBtnInAddUser(): Locator {
-    return this.page.locator(
-      "//div[@role='dialog']//button[span[text()='Select Role']]"
-    );
+    return this.page.getByTestId("selectRole");
   }
 
-  private get userSelectRoleEditBtn(): (selectedUser: string) => Locator {
-    return (selectedUser: string) =>
-      this.page.locator(`//tbody/tr[@data-id='${selectedUser}']/td[3]//button`);
+  private get userSelectRoleEditBtn(): Locator {
+    return this.page.getByTestId("editButtonUsers");
   }
 
   private get userRow(): (selectedUser: string) => Locator {
@@ -64,7 +61,7 @@ export default class SettingsUsersPage extends BasePage {
 
   private get userRoleContent(): (selectedUser: string) => Locator {
     return (selectedUser: string) =>
-      this.page.locator(`//tbody/tr[@data-id='${selectedUser}']/td[3]/div/p`);
+      this.page.locator(`//tr[@data-id='${selectedUser}']/td[4]/div/p`);
   }
 
   private get userCheckboxBtn(): (selectedUser: string) => Locator {
@@ -172,11 +169,11 @@ export default class SettingsUsersPage extends BasePage {
     );
   }
 
-  async clickUserSelectRoleEditBtn(selectedUser: string): Promise<void> {
+  async clickUserSelectRoleEditBtn(): Promise<void> {
     await interactWhenVisible(
-      this.userSelectRoleEditBtn(selectedUser),
+      this.userSelectRoleEditBtn,
       (el) => el.click(),
-      `select role edit button for ${selectedUser}`
+      `select role edit button`
     );
   }
 
@@ -251,7 +248,7 @@ export default class SettingsUsersPage extends BasePage {
   async modifyUserRole(selectedUser: string, role: string): Promise<void> {
     await this.waitForPageIdle();
     await this.clickUserRow(selectedUser);
-    await this.clickUserSelectRoleEditBtn(selectedUser);
+    await this.clickUserSelectRoleEditBtn();
     await this.clickUserSelectRoleBtn();
     await this.clickOnSelectUserRole(role);
     await this.clickOnConfirmModifyingUserRole();

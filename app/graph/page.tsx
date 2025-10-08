@@ -167,7 +167,7 @@ export default function Page() {
         }
 
         setIsQueryLoading(false)
-    }, [fetchCount, graph.Id, graphName, setGraph, runDefaultQuery, defaultQuery, contentPersistence, setGraphName, graphNames, graphInfo])
+    }, [fetchCount, graph.Id, graphName, setGraph, runDefaultQuery, defaultQuery, contentPersistence, setGraphName, graphNames, setIsQueryLoading])
 
     const handleSetSelectedElement = useCallback((el: Node | Link | undefined) => {
         setSelectedElement(el)
@@ -184,18 +184,17 @@ export default function Page() {
     const handleDeleteElement = useCallback(async () => {
         if (selectedElements.length === 0 && selectedElement) {
             selectedElements.push(selectedElement)
-            handleSetSelectedElement(undefined)
         }
-
+        
         await Promise.all(selectedElements.map(async (element) => {
             const type = !element.source
             const result = await securedFetch(`api/graph/${prepareArg(graph.Id)}/${prepareArg(element.id.toString())}`, {
                 method: "DELETE",
                 body: JSON.stringify({ type })
             }, toast, setIndicator)
-
+            
             if (!result.ok) return
-
+            
             if (type) {
                 (element as Node).labels.forEach((label) => {
                     const l = graph.LabelsMap.get(label)
@@ -224,13 +223,14 @@ export default function Page() {
                 }
             }
         }))
-
+        
         graph.removeElements(selectedElements)
-
+        
         setRelationships(graph.removeLinks(selectedElements.map((element) => element.id)))
         setData({ ...graph.Elements })
         fetchCount()
         setSelectedElements([])
+        handleSetSelectedElement(undefined)
 
         toast({
             title: "Success",
@@ -252,7 +252,6 @@ export default function Page() {
                 return <GraphDataPanel
                     object={selectedElement!}
                     setObject={handleSetSelectedElement}
-                    onDeleteElement={handleDeleteElement}
                     setLabels={setLabels}
                 />
             default:
@@ -277,7 +276,11 @@ export default function Page() {
                 isQueryLoading={isQueryLoading}
             />
             <ResizablePanelGroup direction="horizontal" className="h-1 grow">
-                <ResizablePanel defaultSize={100 - panelSize} minSize={50} maxSize={100}>
+                <ResizablePanel
+                    defaultSize={100 - panelSize}
+                    collapsible
+                    minSize={30}
+                >
                     <GraphView
                         selectedElement={selectedElement}
                         setSelectedElement={handleSetSelectedElement}
@@ -304,8 +307,7 @@ export default function Page() {
                     ref={panelRef}
                     collapsible
                     defaultSize={panelSize}
-                    minSize={25}
-                    maxSize={50}
+                    minSize={30}
                     onCollapse={() => {
                         setIsCollapsed(true)
                     }}

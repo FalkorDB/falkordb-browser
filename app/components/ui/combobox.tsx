@@ -4,8 +4,7 @@
 import { Dialog } from "@/components/ui/dialog"
 import { cn } from "@/lib/utils"
 import { useContext, useEffect, useState } from "react"
-import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
+import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger } from "@/components/ui/select"
 import Button from "./Button"
 import Input from "./Input"
 import { IndicatorContext } from "../provider"
@@ -42,6 +41,17 @@ export default function Combobox<T extends string>({ id, disabled = false, inTab
     return () => clearTimeout(timeout)
   }, [options, search])
 
+  const getTitle = () => {
+    switch (true) {
+      case indicator === "offline":
+        return "The FalkorDB server is offline"
+      case options.length === 0:
+        return `There are no ${label}s`
+      default:
+        return selectedValue || `Select ${label}`
+    }
+  }
+
   return (
     <Dialog open={openMenage} onOpenChange={setOpenMenage}>
       <Select
@@ -51,22 +61,15 @@ export default function Combobox<T extends string>({ id, disabled = false, inTab
         open={open}
         onOpenChange={setOpen}
       >
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <SelectTrigger
-              id={id}
-              data-testid={`select${label}`}
-              data-type="select"
-              className={cn("w-fit gap-2 items-center border border-border p-2 disabled:text-gray-300 disabled:cursor-not-allowed", inTable ? "text-sm font-light" : "text-xl font-medium", className)}
-            >
-              <SelectValue placeholder={`Select ${label}`} />
-            </SelectTrigger>
-          </TooltipTrigger>
-          <TooltipContent>
-            {indicator === "offline" && "The FalkorDB server is offline"}
-            {indicator !== "offline" && (options.length === 0 ? `There are no ${label}s` : selectedValue || `Select ${label}`)}
-          </TooltipContent>
-        </Tooltip>
+        <SelectTrigger
+          id={id}
+          data-testid={`select${label}`}
+          data-type="select"
+          title={getTitle()}
+          className={cn("w-fit gap-2 items-center border border-border p-2 disabled:text-gray-300 disabled:cursor-not-allowed", inTable ? "text-sm font-light" : "text-xl font-medium", className)}
+        >
+          <p className="truncate">{selectedValue || `Select ${label}`}</p>
+        </SelectTrigger>
         <SelectContent className="min-w-52 max-h-[40dvh] bg-background">
           <div className="p-4 flex gap-2 items-center">
             <Input
