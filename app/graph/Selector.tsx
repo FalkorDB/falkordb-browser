@@ -71,8 +71,6 @@ type Props<T = "Graph" | "Schema"> =
         : SchemaProps
     )
 
-const STEP = 8
-
 export default function Selector<T extends "Graph" | "Schema" = "Graph" | "Schema">({
     graph,
     options,
@@ -322,7 +320,6 @@ export default function Selector<T extends "Graph" | "Schema" = "Graph" | "Schem
                                             afterSearchCallback={afterSearchCallback}
                                             dataTestId="queryHistory"
                                             list={filteredQueries}
-                                            step={STEP}
                                             onClick={(counter) => {
                                                 const index = historyQuery.queries.findIndex(q => q.text === counter) + 1
                                                 setHistoryQuery(prev => ({
