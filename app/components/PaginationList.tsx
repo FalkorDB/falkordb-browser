@@ -1,5 +1,5 @@
 import { cn } from "@/lib/utils"
-import { Fragment, useEffect, useState } from "react"
+import { Fragment, useEffect, useRef, useState } from "react"
 import { Check, Circle, Loader2, X } from "lucide-react"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import Button from "./ui/Button"
@@ -120,7 +120,6 @@ const getQueryElement = (item: Query, selected: boolean, hover: boolean) => {
 
 interface Props<T extends Item> {
     list: T[]
-    step: number
     onClick: (label: string) => void
     dataTestId: string
     label: string
@@ -132,24 +131,55 @@ interface Props<T extends Item> {
     children?: React.ReactNode
 }
 
-export default function PaginationList<T extends Item>({ list, step, onClick, dataTestId, afterSearchCallback, isSelected, label, isLoading, className, children, searchRef }: Props<T>) {
+export default function PaginationList<T extends Item>({ list, onClick, dataTestId, afterSearchCallback, isSelected, label, isLoading, className, children, searchRef }: Props<T>) {
 
     const [filteredList, setFilteredList] = useState<T[]>([...list])
     const [hoverIndex, setHoverIndex] = useState<number>(0)
     const [stepCounter, setStepCounter] = useState(0)
     const [pageCount, setPageCount] = useState(0)
     const [search, setSearch] = useState("")
-    const startIndex = stepCounter * step
-    const endIndex = Math.min(startIndex + step, filteredList.length)
+    const [itemsPerPage, setItemsPerPage] = useState(1)
+
+    const containerRef = useRef<HTMLUListElement>(null)
+
+    const startIndex = stepCounter * itemsPerPage
+    const endIndex = Math.min(startIndex + itemsPerPage, filteredList.length)
     const items = filteredList.slice(startIndex, endIndex)
+    const itemHeight = typeof items[0] === "string" ? 30 : 50
 
     useEffect(() => {
         setStepCounter(0)
     }, [filteredList])
 
     useEffect(() => {
-        setPageCount(Math.ceil(filteredList.length / step))
-    }, [filteredList, step])
+        const newPageCount = Math.ceil(filteredList.length / itemsPerPage)
+        setPageCount(newPageCount)
+        if (newPageCount < stepCounter + 1) setStepCounter(0)
+    }, [filteredList, itemsPerPage, stepCounter])
+
+    useEffect(() => {
+        const calculateItemsPerPage = () => {
+            if (containerRef.current) {
+                const containerHeight = containerRef.current.clientHeight
+                const calculatedItems = Math.floor(containerHeight / itemHeight)
+                setItemsPerPage(Math.max(1, calculatedItems))
+            }
+        }
+
+        calculateItemsPerPage()
+
+        const resizeObserver = new ResizeObserver(() => {
+            calculateItemsPerPage()
+        })
+
+        if (containerRef.current) {
+            resizeObserver.observe(containerRef.current)
+        }
+
+        return () => {
+            resizeObserver.disconnect()
+        }
+    }, [itemHeight, items, items.length])
 
     useEffect(() => {
         const timeout = setTimeout(() => {
@@ -212,6 +242,7 @@ export default function PaginationList<T extends Item>({ list, step, onClick, da
                 {isLoading && <Loader2 className="w-4 h-4 animate-spin duration-[infinite]" />}
             </div>
             <ul
+                ref={containerRef}
                 data-testid="queryList"
                 className={cn("h-1 grow flex flex-col p-2", items.length > 0 && typeof items[0] === "object" && "SofiaSans")}
             >
@@ -228,7 +259,7 @@ export default function PaginationList<T extends Item>({ list, step, onClick, da
                                     !isString && (item.status || item.elementsCount || item.timestamp || item.graphName || getExecutionTime(item.metadata)) &&
                                     getQueryElement(item, selected, hover)
                                 }
-                                <p data-testid={`${dataTestId}${text}Text`} className="h-1 grow truncate w-full text-left">{text}</p>
+                                <p data-testid={`${dataTestId}${text}Text`} className={cn("truncate w-full text-left", !isString && "h-1 grow")}>{text}</p>
                             </>
                         )
 
@@ -246,7 +277,7 @@ export default function PaginationList<T extends Item>({ list, step, onClick, da
                                 )}
                                 onMouseEnter={() => setHoverIndex(index)}
                                 onMouseLeave={() => searchRef.current !== document.activeElement && setHoverIndex(-1)}
-                                style={{ height: `${1 / step * 100}%` }}
+                                style={{ height: `${itemHeight}px` }}
                                 key={text}
                             >
                                 {
