@@ -117,6 +117,7 @@ export default function Page() {
             const colorsArr = localStorage.getItem(graphName)
             const gi = GraphInfo.create(newPropertyKeys, newLabels, newRelationships, colorsArr ? JSON.parse(colorsArr) : undefined)
             setGraphInfo(gi)
+            fetchCount()
         }).catch((error) => {
             toast({
                 title: "Error",

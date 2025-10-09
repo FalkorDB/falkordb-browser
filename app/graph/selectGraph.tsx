@@ -125,12 +125,11 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
                     </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent
-                    className="h-[450px] w-[350px] mt-2 overflow-hidden border border-border rounded-lg flex flex-col items-center p-8"
+                    className="h-[40dvh] min-h-fit w-[350px] mt-2 overflow-hidden border border-border rounded-lg flex flex-col items-center p-8"
                 >
                     <PaginationList
-                        className="h-1 grow p-0"
+                        className="basis-0 grow min-h-fit p-0"
                         list={options}
-                        step={3}
                         onClick={handleClick}
                         dataTestId={`select${type}`}
                         label={type}
