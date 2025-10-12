@@ -62,7 +62,11 @@ function SwaggerWrapper({ baseUrl }: { baseUrl: string }) {
           }
         }
       ]}
-      requestInterceptor={(request) => request}
+      requestInterceptor={(request) => {
+        // Add JWT-only header for all requests from docs page
+        request.headers['X-JWT-Only'] = 'true';
+        return request;
+      }}
     />
   );
 }
@@ -90,8 +94,8 @@ export default function DocsPage() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col">
-      <div className="bg-white py-8 border-b sticky top-0 z-50">
+    <div className="h-full w-full flex flex-col">
+      <div className="bg-white py-8 border-b">
         <div className="container mx-auto px-4 text-center">
           <h1 className="text-4xl font-bold text-gray-900 mb-4">FalkorDB Browser API</h1>
           <p className="text-lg text-gray-600 mb-4">
@@ -99,17 +103,15 @@ export default function DocsPage() {
           </p>
           <div className="bg-blue-50 border-l-4 border-blue-400 p-4 rounded max-w-2xl mx-auto">
             <p className="text-sm text-blue-800">
-              <strong>Note:</strong> Most endpoints require authentication. Use the login endpoint to obtain a JWT token,
+              <strong>Note:</strong> Endpoints require authentication. Use the login endpoint to obtain a JWT token,
               then click the &ldquo;Authorize&rdquo; button below to authenticate your requests.
             </p>
           </div>
         </div>
       </div>
       
-      <div className="flex-1 w-full px-6">
-        <div className="w-full" style={{ width: '100%', maxWidth: 'none' }}>
-          <SwaggerWrapper baseUrl={baseUrl} />
-        </div>
+      <div className="flex-1 h-0 overflow-y-auto px-6 py-4">
+        <SwaggerWrapper baseUrl={baseUrl} />
       </div>
     </div>
   );
