@@ -103,7 +103,7 @@ export default function DocsPage() {
           </p>
           <div className="bg-blue-50 border-l-4 border-blue-400 p-4 rounded max-w-2xl mx-auto">
             <p className="text-sm text-blue-800">
-              <strong>Note:</strong> Most endpoints require authentication. Use the login endpoint to obtain a JWT token,
+              <strong>Note:</strong> Endpoints require authentication. Use the login endpoint to obtain a JWT token,
               then click the &ldquo;Authorize&rdquo; button below to authenticate your requests.
             </p>
           </div>

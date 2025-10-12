@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { jwtVerify } from "jose";
+import crypto from "crypto";
 import { getTokenId } from "../tokenUtils";
-import { getClient } from "../[...nextauth]/options";
+import { getClient, getAdminConnectionForTokens } from "../[...nextauth]/options";
 
 
 
@@ -10,6 +11,7 @@ export async function POST(request: NextRequest) {
   try {
     // Check JWT secret at runtime
     if (!process.env.NEXTAUTH_SECRET) {
+      // eslint-disable-next-line no-console
       console.error("NEXTAUTH_SECRET environment variable is required");
       return NextResponse.json(
         { message: "Server configuration error" },
@@ -19,13 +21,21 @@ export async function POST(request: NextRequest) {
 
     const JWT_SECRET = new TextEncoder().encode(process.env.NEXTAUTH_SECRET);
 
-    // Get authenticated client (this verifies auth and gives us FalkorDB connection)
+    // Get authenticated client (this verifies auth and gives us user info)
     const session = await getClient();
     if (session instanceof NextResponse) {
       return session; // Return the error response
     }
 
-    const { client } = session;
+    const { user: authenticatedUser } = session;
+
+    // CRITICAL: Only Admin users can revoke tokens
+    if (authenticatedUser.role !== 'Admin') {
+      return NextResponse.json(
+        { message: "Forbidden: Only Admin users can revoke tokens" },
+        { status: 403 }
+      );
+    }
 
     // Parse request body to get token to revoke
     let body;
@@ -51,25 +61,28 @@ export async function POST(request: NextRequest) {
       // Verify the token to be revoked
       const { payload } = await jwtVerify(tokenToRevoke, JWT_SECRET);
       
-      // Get the authenticated user info
-      const { user: authenticatedUser } = session;
+      // Get Admin connection for token management (same host/port as the token)
+      const adminClient = await getAdminConnectionForTokens(
+        payload.host as string,
+        payload.port as number,
+        payload.tls as boolean,
+        payload.ca as string | undefined
+      );
+      const adminConnection = await adminClient.connection;
       
-      // Security check: Only allow revoking own tokens or admin override
-      if (payload.sub !== authenticatedUser.id && authenticatedUser.role !== 'Admin') {
-        return NextResponse.json(
-          { message: "Forbidden: Can only revoke your own tokens unless you are an admin" },
-          { status: 403 }
-        );
-      }
-      
-      // Use the existing Redis connection from FalkorDB client
-      const connection = await client.connection;
-      
-      // Generate token ID for revocation storage
+      // Generate token ID for revocation
       const tokenId = getTokenId(payload);
       
-      // Remove the active token from Redis using Redis method
-      const deletedCount = await connection.del(`api-jwt-active:${tokenId}`);
+      // Hash the token to match storage format
+      const tokenHash = crypto.createHash('sha256').update(tokenToRevoke).digest('hex');
+      
+      // Remove the token from Redis
+      const deletedCount = await adminConnection.del(`api_token:${tokenHash}`);
+      
+      // Also remove from user's token set
+      if (payload.sub) {
+        await adminConnection.sRem(`user_tokens:${payload.sub}`, tokenId);
+      }
       
       if (deletedCount === 0) {
         return NextResponse.json(
@@ -90,6 +103,7 @@ export async function POST(request: NextRequest) {
       );
       
     } catch (jwtError) {
+      // eslint-disable-next-line no-console
       console.error("JWT verification failed:", jwtError);
       return NextResponse.json(
         { message: "Invalid token" },
@@ -98,6 +112,7 @@ export async function POST(request: NextRequest) {
     }
     
   } catch (error) {
+    // eslint-disable-next-line no-console
     console.error("Token revocation error:", error);
     return NextResponse.json(
       { message: "Internal server error" },

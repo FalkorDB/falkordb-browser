@@ -112,8 +112,8 @@ const swaggerSpec = {
     "/api/auth/revoke": {
       post: {
         tags: ["Authentication"],
-        summary: "Revoke JWT token",
-        description: "Revoke a JWT token by removing it from the active tokens list in Redis. Once revoked, the token cannot be used for authentication.",
+        summary: "Revoke JWT token (Admin only)",
+        description: "Revoke a JWT token by removing it from the active tokens list in Redis. Once revoked, the token cannot be used for authentication. This endpoint requires Admin role.",
         security: [{ bearerAuth: [] }],
         requestBody: {
           required: true,
@@ -188,7 +188,7 @@ const swaggerSpec = {
             }
           },
           "403": {
-            description: "Forbidden - can only revoke own tokens unless admin",
+            description: "Forbidden - Admin role required to revoke tokens",
             content: {
               "application/json": {
                 schema: {
@@ -196,7 +196,7 @@ const swaggerSpec = {
                   properties: {
                     message: {
                       type: "string",
-                      example: "Forbidden: Can only revoke your own tokens unless you are an admin"
+                      example: "Forbidden: Only Admin users can revoke tokens"
                     }
                   }
                 }
