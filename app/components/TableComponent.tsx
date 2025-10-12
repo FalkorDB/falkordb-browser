@@ -102,6 +102,7 @@ export default function TableComponent({ headers, rows, label, entityName, value
     useEffect(() => {
         if (!search) {
             setFilteredRows([...rows])
+            return undefined
         }
 
         const timeout = setTimeout(() => {
@@ -184,7 +185,7 @@ export default function TableComponent({ headers, rows, label, entityName, value
                                 </TableHead>
                                 : null
                         }
-                                <TableHead key="index" className="w-0 border-r border-border">Index</TableHead>
+                        <TableHead key="index" className="w-0 border-r border-border">Index</TableHead>
                         {
                             headers.map((header, i) => (
                                 <TableHead className={cn(i + 1 !== headers.length && "border-r", "font-bold text-lg border-border")} key={header}>
