@@ -16,13 +16,14 @@
         --input: var(--background);
         --text-muted-foreground: var(--foreground);
         --muted: 0 0% 80%;
-        --border: 0 0% 26%;
+        --border: 0 0% 40%;
     }
 
     .dark {
         --background: 0 0% 10%;
         --foreground: 0 0% 100%;
         --secondary: 0 0% 14.1%;
+        --border: 0 0% 26%;
     }
 
     :focus-visible {
@@ -97,7 +98,7 @@
     }
 
     .DataPanel {
-        @apply h-full w-full flex flex-col gap-4 bg-background border border-border rounded-lg;
+        @apply h-full w-full flex flex-col gap-2 bg-background border border-border rounded-lg;
     }
 
     .Dropzone {
@@ -113,8 +114,7 @@
 }
 
 ::-webkit-scrollbar {
-    width: 20px;
-    height: 20px;
+    width: 10px;
 }
 
 ::-webkit-scrollbar-corner {
@@ -122,10 +122,25 @@
 }
 
 ::-webkit-scrollbar-thumb {
-    @apply bg-secondary;
     border-radius: 20px;
     border: 6px solid transparent;
     background-clip: content-box;
+}
+
+.light ::-webkit-scrollbar-thumb {
+    background: hsl(0 0% 90%);
+}
+
+.dark ::-webkit-scrollbar-thumb {
+    background: hsl(0 0% 14.1%);
+}
+
+.light .graphsFilter::-webkit-scrollbar-thumb {
+    background: hsl(0 0% 80%);
+}
+
+.dark .graphsFilter::-webkit-scrollbar-thumb {
+    background: hsl(0 0% 24.1%);
 }
 
 input[type="color"]::-webkit-color-swatch-wrapper {

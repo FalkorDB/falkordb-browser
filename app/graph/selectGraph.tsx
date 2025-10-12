@@ -9,7 +9,7 @@ import { useSession } from "next-auth/react";
 import { useToast } from "@/components/ui/use-toast";
 import { ChevronDown, ChevronUp, PlusCircle, Settings } from "lucide-react";
 import Button from "../components/ui/Button";
-import { IndicatorContext, QuerySettingsContext } from "../components/provider";
+import { IndicatorContext, BrowserSettingsContext } from "../components/provider";
 import PaginationList from "../components/PaginationList";
 import TableComponent from "../components/TableComponent";
 import ExportGraph from "../components/ExportGraph";
@@ -37,7 +37,7 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
                 contentPersistence
             }
         }
-    } = useContext(QuerySettingsContext)
+    } = useContext(BrowserSettingsContext)
 
     const inputRef = useRef<HTMLInputElement>(null)
 
@@ -55,7 +55,7 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
 
     const getOptions = useCallback(async () =>
         fetchOptions(type, toast, setIndicator, indicator, setSelectedValue, setOptions, contentPersistence)
-        , [type, toast, setIndicator, indicator, setOptions, setSelectedValue])
+        , [type, toast, setIndicator, setOptions, setSelectedValue, contentPersistence])
 
 
     const handleSetOption = async (option: string, optionName: string) => {
@@ -125,12 +125,11 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
                     </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent
-                    className="h-[450px] w-[350px] mt-2 overflow-hidden border border-border rounded-lg flex flex-col items-center p-8"
+                    className="h-[40dvh] min-h-fit w-[350px] mt-2 overflow-hidden border border-border rounded-lg flex flex-col items-center p-8"
                 >
                     <PaginationList
-                        className="h-1 grow p-0"
+                        className="basis-0 grow min-h-fit p-0"
                         list={options}
-                        step={3}
                         onClick={handleClick}
                         dataTestId={`select${type}`}
                         label={type}

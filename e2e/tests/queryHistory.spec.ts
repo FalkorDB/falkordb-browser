@@ -60,7 +60,7 @@ test.describe('Query history Tests', () => {
         await graph.clickRunQuery(false);
         await graph.clickQueryHistoryButton();
         await graph.clickSelectQueryInHistory(query);
-        expect((await graph.getQueryHistoryEditorContent())[0]).toBe(query);
+        expect(await graph.getQueryHistoryEditorContent(query)).toBe("CREATE (n:Person { name: 'Alice' }) RETURN n");
         await apicalls.removeGraph(graphName);
     });
 

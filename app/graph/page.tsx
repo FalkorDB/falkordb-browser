@@ -8,7 +8,7 @@ import { ForceGraphMethods } from "react-force-graph-2d";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { ImperativePanelHandle } from "react-resizable-panels";
 import { Label, Graph, GraphData, Link, Node, Relationship, GraphInfo } from "../api/graph/model";
-import { GraphContext, HistoryQueryContext, IndicatorContext, PanelContext, QueryLoadingContext, QuerySettingsContext } from "../components/provider";
+import { BrowserSettingsContext, GraphContext, HistoryQueryContext, IndicatorContext, PanelContext, QueryLoadingContext } from "../components/provider";
 import Spinning from "../components/ui/spinning";
 import Chat from "./Chat";
 import GraphDataPanel from "./GraphDataPanel";
@@ -48,14 +48,14 @@ export default function Page() {
         handleCooldown,
         cooldownTicks,
     } = useContext(GraphContext)
-
     const {
         settings: {
             runDefaultQuerySettings: { runDefaultQuery },
             defaultQuerySettings: { defaultQuery },
             contentPersistenceSettings: { contentPersistence },
+            graphInfo: { refreshInterval }
         }
-    } = useContext(QuerySettingsContext)
+    } = useContext(BrowserSettingsContext)
     const { toast } = useToast()
 
     const chartRef = useRef<ForceGraphMethods<Node, Link>>()
@@ -107,9 +107,9 @@ export default function Page() {
     }, [graphName, setIndicator, toast]);
 
     useEffect(() => {
-        if (!graphName) return
+        if (!graphName) return undefined
 
-        Promise.all([
+        const handleSetInfo = () => Promise.all([
             fetchInfo("(label)"),
             fetchInfo("(relationship type)"),
             fetchInfo("(property key)"),
@@ -117,6 +117,7 @@ export default function Page() {
             const colorsArr = localStorage.getItem(graphName)
             const gi = GraphInfo.create(newPropertyKeys, newLabels, newRelationships, colorsArr ? JSON.parse(colorsArr) : undefined)
             setGraphInfo(gi)
+            fetchCount()
         }).catch((error) => {
             toast({
                 title: "Error",
@@ -124,7 +125,15 @@ export default function Page() {
                 variant: "destructive",
             })
         });
-    }, [fetchInfo, setGraphInfo, toast, setIndicator, graphName])
+
+        handleSetInfo()
+
+        const interval = setInterval(handleSetInfo, refreshInterval * 1000)
+
+        return () => {
+            clearInterval(interval)
+        }
+    }, [fetchInfo, graphName, refreshInterval, setGraphInfo, toast])
 
     useEffect(() => {
         setRelationships([...graph.Relationships])
@@ -159,7 +168,7 @@ export default function Page() {
         }
 
         setIsQueryLoading(false)
-    }, [fetchCount, graph.Id, graphName, setGraph, runDefaultQuery, defaultQuery, contentPersistence, setGraphName, graphNames, graphInfo])
+    }, [fetchCount, graph.Id, graphName, setGraph, runDefaultQuery, defaultQuery, contentPersistence, setGraphName, graphNames, setIsQueryLoading])
 
     const handleSetSelectedElement = useCallback((el: Node | Link | undefined) => {
         setSelectedElement(el)
@@ -176,11 +185,10 @@ export default function Page() {
     const handleDeleteElement = useCallback(async () => {
         if (selectedElements.length === 0 && selectedElement) {
             selectedElements.push(selectedElement)
-            handleSetSelectedElement(undefined)
         }
 
         await Promise.all(selectedElements.map(async (element) => {
-            const type = !("source" in element)
+            const type = !element.source
             const result = await securedFetch(`api/graph/${prepareArg(graph.Id)}/${prepareArg(element.id.toString())}`, {
                 method: "DELETE",
                 body: JSON.stringify({ type })
@@ -223,6 +231,7 @@ export default function Page() {
         setData({ ...graph.Elements })
         fetchCount()
         setSelectedElements([])
+        handleSetSelectedElement(undefined)
 
         toast({
             title: "Success",
@@ -244,7 +253,6 @@ export default function Page() {
                 return <GraphDataPanel
                     object={selectedElement!}
                     setObject={handleSetSelectedElement}
-                    onDeleteElement={handleDeleteElement}
                     setLabels={setLabels}
                 />
             default:
@@ -269,7 +277,11 @@ export default function Page() {
                 isQueryLoading={isQueryLoading}
             />
             <ResizablePanelGroup direction="horizontal" className="h-1 grow">
-                <ResizablePanel defaultSize={100 - panelSize} minSize={50} maxSize={100}>
+                <ResizablePanel
+                    defaultSize={100 - panelSize}
+                    collapsible
+                    minSize={30}
+                >
                     <GraphView
                         selectedElement={selectedElement}
                         setSelectedElement={handleSetSelectedElement}
@@ -296,8 +308,7 @@ export default function Page() {
                     ref={panelRef}
                     collapsible
                     defaultSize={panelSize}
-                    minSize={25}
-                    maxSize={50}
+                    minSize={30}
                     onCollapse={() => {
                         setIsCollapsed(true)
                     }}

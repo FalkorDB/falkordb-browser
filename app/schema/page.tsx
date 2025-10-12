@@ -173,7 +173,7 @@ export default function Page() {
 
         await Promise.all(stateSelectedElements.map(async (element) => {
             const { id } = element
-            const type = !("source" in element)
+            const type = !element.source
             const result = await securedFetch(`api/schema/${prepareArg(schema.Id)}/${prepareArg(id.toString())}`, {
                 method: "DELETE",
                 body: JSON.stringify({ type }),
@@ -190,7 +190,7 @@ export default function Page() {
             }
 
             if (type) {
-                element.labels.forEach((labelName) => {
+                (element as Node).labels.forEach((labelName) => {
                     const label = schema.LabelsMap.get(labelName)
 
                     if (label) {
@@ -265,6 +265,7 @@ export default function Page() {
                 setOptions={setSchemaNames}
                 graphName={schemaName}
                 setGraphName={setSchemaName}
+                selectedElement={selectedElement}
                 selectedElements={selectedElements}
                 setSelectedElement={handleSetSelectedElement}
                 handleDeleteElement={handleDeleteElement}
@@ -316,7 +317,6 @@ export default function Page() {
                             <SchemaDataPanel
                                 object={selectedElement}
                                 setObject={handleSetSelectedElement}
-                                onDeleteElement={handleDeleteElement}
                                 schema={schema}
                                 setLabels={setLabels}
                             />

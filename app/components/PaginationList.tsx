@@ -1,15 +1,125 @@
 import { cn } from "@/lib/utils"
-import { useEffect, useState } from "react"
-import { Loader2 } from "lucide-react"
+import { Fragment, useEffect, useRef, useState } from "react"
+import { Check, Circle, Loader2, X } from "lucide-react"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import Button from "./ui/Button"
 import { Query } from "../api/graph/model"
 import Input from "./ui/Input"
 
 type Item = string | Query
 
+type ElementItem = {
+    content: React.ReactNode;
+    tooltip: string;
+    className?: string;
+};
+
+const getLastRun = (timestamp: number) => {
+    const date = new Date(timestamp);
+    const now = new Date();
+    const timeDiff = now.getTime() - date.getTime();
+    const hoursAgo = timeDiff / (1000 * 60 * 60);
+
+    if (hoursAgo <= 24) {
+        return date.toLocaleTimeString([], { hour12: false });
+    }
+
+    return date.toLocaleString([], { hour12: false });
+}
+
+const getExecutionTime = (metadata: string[]) => metadata.find(value => value.startsWith("Query internal execution time:"))?.split(":")[1].replace(" milliseconds", "ms")
+
+const getSeparator = (selected: boolean, hover: boolean) => (
+    <div
+        className={cn("h-2/3 w-px rounded-full",
+            // eslint-disable-next-line no-nested-ternary
+            selected
+                ? "bg-primary"
+                : hover
+                    ? "bg-foreground"
+                    : "bg-border"
+        )}
+    />
+)
+
+const getStatusIcon = (status: Query["status"]) => {
+    const size = 20
+    switch (status) {
+        case "Empty":
+            return <Circle color="orange" size={size} />
+        case "Failed":
+            return <X size={size} color="red" />
+        default:
+            return <Check size={size} color="green" />
+    }
+}
+
+const getQueryElement = (item: Query, selected: boolean, hover: boolean) => {
+    const executionTime = getExecutionTime(item.metadata);
+
+    // Build array of items to display
+    const elements: ElementItem[] = [];
+
+    if (item.status) {
+        elements.push({
+            content: getStatusIcon(item.status),
+            tooltip: `Status: ${item.status}`,
+            className: "text-center truncate"
+        });
+    }
+
+    if (item.elementsCount) {
+        elements.push({
+            content: item.elementsCount,
+            tooltip: `Elements: ${item.elementsCount}`,
+        });
+    }
+
+    if (item.timestamp) {
+        elements.push({
+            content: getLastRun(item.timestamp),
+            tooltip: `Last Run: ${getLastRun(item.timestamp)}`,
+            className: "truncate"
+        });
+    }
+
+    if (item.graphName) {
+        elements.push({
+            content: item.graphName,
+            tooltip: `Graph Name: ${item.graphName}`,
+            className: "truncate"
+        });
+    }
+
+    if (executionTime) {
+        elements.push({
+            content: executionTime,
+            tooltip: `Internal Execution Time: ${executionTime}`,
+            className: "truncate"
+        });
+    }
+
+    return (
+        <div className="h-1 grow flex gap-2 items-center w-full">
+            {elements.map((element, index) => (
+                <Fragment key={element.tooltip}>
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <div className={element.className}>{element.content}</div>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                            {element.tooltip}
+                        </TooltipContent>
+                    </Tooltip>
+                    {index < elements.length - 1 && getSeparator(selected, hover)}
+                </Fragment>
+            ))}
+        </div>
+    );
+}
+
 interface Props<T extends Item> {
     list: T[]
-    step: number
     onClick: (label: string) => void
     dataTestId: string
     label: string
@@ -21,24 +131,55 @@ interface Props<T extends Item> {
     children?: React.ReactNode
 }
 
-export default function PaginationList<T extends Item>({ list, step, onClick, dataTestId, afterSearchCallback, isSelected, label, isLoading, className, children, searchRef }: Props<T>) {
+export default function PaginationList<T extends Item>({ list, onClick, dataTestId, afterSearchCallback, isSelected, label, isLoading, className, children, searchRef }: Props<T>) {
 
     const [filteredList, setFilteredList] = useState<T[]>([...list])
     const [hoverIndex, setHoverIndex] = useState<number>(0)
     const [stepCounter, setStepCounter] = useState(0)
     const [pageCount, setPageCount] = useState(0)
     const [search, setSearch] = useState("")
-    const startIndex = stepCounter * step
-    const endIndex = Math.min(startIndex + step, filteredList.length)
+    const [itemsPerPage, setItemsPerPage] = useState(1)
+
+    const containerRef = useRef<HTMLUListElement>(null)
+
+    const startIndex = stepCounter * itemsPerPage
+    const endIndex = Math.min(startIndex + itemsPerPage, filteredList.length)
     const items = filteredList.slice(startIndex, endIndex)
+    const itemHeight = typeof items[0] === "string" ? 30 : 50
 
     useEffect(() => {
         setStepCounter(0)
     }, [filteredList])
 
     useEffect(() => {
-        setPageCount(Math.ceil(filteredList.length / step))
-    }, [filteredList, step])
+        const newPageCount = Math.ceil(filteredList.length / itemsPerPage)
+        setPageCount(newPageCount)
+        if (newPageCount < stepCounter + 1) setStepCounter(0)
+    }, [filteredList, itemsPerPage, stepCounter])
+
+    useEffect(() => {
+        const calculateItemsPerPage = () => {
+            if (containerRef.current) {
+                const containerHeight = containerRef.current.clientHeight
+                const calculatedItems = Math.floor(containerHeight / itemHeight)
+                setItemsPerPage(Math.max(1, calculatedItems))
+            }
+        }
+
+        calculateItemsPerPage()
+
+        const resizeObserver = new ResizeObserver(() => {
+            calculateItemsPerPage()
+        })
+
+        if (containerRef.current) {
+            resizeObserver.observe(containerRef.current)
+        }
+
+        return () => {
+            resizeObserver.disconnect()
+        }
+    }, [itemHeight, items, items.length])
 
     useEffect(() => {
         const timeout = setTimeout(() => {
@@ -63,6 +204,7 @@ export default function PaginationList<T extends Item>({ list, step, onClick, da
 
     return (
         <div className={cn("w-full flex flex-col gap-4 p-6", className)}>
+            {children}
             <div className="flex gap-2 items-center">
                 <Input
                     ref={searchRef}
@@ -99,13 +241,8 @@ export default function PaginationList<T extends Item>({ list, step, onClick, da
                 />
                 {isLoading && <Loader2 className="w-4 h-4 animate-spin duration-[infinite]" />}
             </div>
-            {
-                children &&
-                <div className="flex gap-2 items-center">
-                    {children}
-                </div>
-            }
             <ul
+                ref={containerRef}
                 data-testid="queryList"
                 className={cn("h-1 grow flex flex-col p-2", items.length > 0 && typeof items[0] === "object" && "SofiaSans")}
             >
@@ -113,9 +250,22 @@ export default function PaginationList<T extends Item>({ list, step, onClick, da
                     items.map((item, index) => {
                         const selected = isSelected ? isSelected(item) : false
                         const hover = hoverIndex === index
+                        const isString = typeof item === "string"
+                        const text = isString ? item : item.text
+
+                        const content = (
+                            <>
+                                {
+                                    !isString && (item.status || item.elementsCount || item.timestamp || item.graphName || getExecutionTime(item.metadata)) &&
+                                    getQueryElement(item, selected, hover)
+                                }
+                                <p data-testid={`${dataTestId}${text}Text`} className={cn("truncate w-full text-left", !isString && "h-1 grow")}>{text}</p>
+                            </>
+                        )
+
                         return (
                             <li
-                                data-testid={`${dataTestId}${typeof item === "string" ? item : item.text}`}
+                                data-testid={`${dataTestId}${text}`}
                                 className={cn(
                                     "border-b",
                                     // eslint-disable-next-line no-nested-ternary
@@ -127,20 +277,22 @@ export default function PaginationList<T extends Item>({ list, step, onClick, da
                                 )}
                                 onMouseEnter={() => setHoverIndex(index)}
                                 onMouseLeave={() => searchRef.current !== document.activeElement && setHoverIndex(-1)}
-                                style={{ height: `${1 / step * 100}%` }}
-                                key={typeof item === "string" ? item : item.text}
+                                style={{ height: `${itemHeight}px` }}
+                                key={text}
                             >
                                 {
                                     onClick ?
                                         <Button
-                                            className={cn("w-full h-full text-xl text-center")}
-                                            label={typeof item === "string" ? item : item.text}
+                                            className={cn("w-full h-full text-xl gap-0", !isString ? "flex-col" : "text-center")}
+                                            title={text}
                                             onClick={() => {
-                                                onClick(typeof item === "string" ? item : item.text)
+                                                onClick(text)
                                             }}
                                             tabIndex={-1}
-                                        />
-                                        : <p className="w-full h-full text-xl text-center">{typeof item === "string" ? item : item.text}</p>
+                                        >
+                                            {content}
+                                        </Button>
+                                        : content
                                 }
                             </li>
                         )

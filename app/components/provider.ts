@@ -2,7 +2,7 @@ import { createContext, Dispatch, SetStateAction } from "react";
 import { Panel } from "@/lib/utils";
 import { Graph, GraphInfo, HistoryQuery } from "../api/graph/model";
 
-type QuerySettingsContextType = {
+type BrowserSettingsContextType = {
   newSettings: {
     limitSettings: {
       newLimit: number;
@@ -29,6 +29,10 @@ type QuerySettingsContextType = {
       setNewSecretKey: Dispatch<SetStateAction<string>>;
       newModel: string;
       setNewModel: Dispatch<SetStateAction<string>>;
+    };
+    graphInfo: {
+      newRefreshInterval: number;
+      setNewRefreshInterval: Dispatch<SetStateAction<number>>;
     };
   };
   settings: {
@@ -61,6 +65,10 @@ type QuerySettingsContextType = {
       setModel: Dispatch<SetStateAction<string>>;
       navigateToSettings: boolean;
       setNavigateToSettings: Dispatch<SetStateAction<boolean>>;
+    };
+    graphInfo: {
+      refreshInterval: number;
+      setRefreshInterval: Dispatch<SetStateAction<number>>;
     };
   };
   hasChanges: boolean;
@@ -118,7 +126,7 @@ type QueryLoadingContextType = {
   setIsQueryLoading: Dispatch<SetStateAction<boolean>>;
 };
 
-export const QuerySettingsContext = createContext<QuerySettingsContextType>({
+export const BrowserSettingsContext = createContext<BrowserSettingsContextType>({
   newSettings: {
     limitSettings: { newLimit: 0, setNewLimit: () => {} },
     timeoutSettings: { newTimeout: 0, setNewTimeout: () => {} },
@@ -131,7 +139,13 @@ export const QuerySettingsContext = createContext<QuerySettingsContextType>({
       newContentPersistence: false,
       setNewContentPersistence: () => {},
     },
-    chatSettings: { newSecretKey: "", setNewSecretKey: () => {}, newModel: "", setNewModel: () => {} },
+    chatSettings: {
+      newSecretKey: "",
+      setNewSecretKey: () => {},
+      newModel: "",
+      setNewModel: () => {},
+    },
+    graphInfo: { newRefreshInterval: 0, setNewRefreshInterval: () => {} },
   },
   settings: {
     limitSettings: {
@@ -150,7 +164,15 @@ export const QuerySettingsContext = createContext<QuerySettingsContextType>({
       contentPersistence: false,
       setContentPersistence: () => {},
     },
-    chatSettings: { secretKey: "", setSecretKey: () => {}, model: "", setModel: () => {}, navigateToSettings: false, setNavigateToSettings: () => {} },
+    chatSettings: {
+      secretKey: "",
+      setSecretKey: () => {},
+      model: "",
+      setModel: () => {},
+      navigateToSettings: false,
+      setNavigateToSettings: () => {},
+    },
+    graphInfo: { refreshInterval: 0, setRefreshInterval: () => {} },
   },
   hasChanges: false,
   setHasChanges: () => {},
@@ -191,7 +213,16 @@ export const HistoryQueryContext = createContext<HistoryQueryContextType>({
   historyQuery: {
     queries: [],
     query: "",
-    currentQuery: { text: "", metadata: [], explain: [], profile: [] },
+    currentQuery: {
+      text: "",
+      metadata: [],
+      explain: [],
+      profile: [],
+      graphName: "",
+      timestamp: 0,
+      elementsCount: 0,
+      status: "Failed",
+    },
     counter: 0,
   },
   setHistoryQuery: () => {},

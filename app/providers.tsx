@@ -9,11 +9,27 @@ import { useToast } from "@/components/ui/use-toast";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { ImperativePanelHandle } from "react-resizable-panels";
 import LoginVerification from "./loginVerification";
-import { Graph, GraphInfo, HistoryQuery } from "./api/graph/model";
+import { Graph, GraphInfo, HistoryQuery, Query } from "./api/graph/model";
 import Header from "./components/Header";
-import { GraphContext, HistoryQueryContext, IndicatorContext, PanelContext, QueryLoadingContext, QuerySettingsContext, SchemaContext } from "./components/provider";
+import { GraphContext, HistoryQueryContext, IndicatorContext, PanelContext, QueryLoadingContext, BrowserSettingsContext, SchemaContext } from "./components/provider";
 import Tutorial from "./graph/Tutorial";
 import GraphInfoPanel from "./graph/graphInfo";
+
+const defaultQueryHistory: HistoryQuery = {
+  queries: [],
+  query: "",
+  currentQuery: {
+    text: "",
+    metadata: [],
+    explain: [],
+    profile: [],
+    graphName: "",
+    timestamp: 0,
+    status: "Failed",
+    elementsCount: 0
+  },
+  counter: 0
+}
 
 function ProvidersWithSession({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
@@ -22,17 +38,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
 
   const panelRef = useRef<ImperativePanelHandle>(null)
 
-  const [historyQuery, setHistoryQuery] = useState<HistoryQuery>({
-    queries: [],
-    query: "",
-    currentQuery: {
-      text: "",
-      metadata: [],
-      explain: [],
-      profile: [],
-    },
-    counter: 0
-  })
+  const [historyQuery, setHistoryQuery] = useState<HistoryQuery>(defaultQueryHistory)
   const [indicator, setIndicator] = useState<"online" | "offline">("online")
   const [runDefaultQuery, setRunDefaultQuery] = useState(false)
   const [schemaNames, setSchemaNames] = useState<string[]>([])
@@ -52,6 +58,8 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
   const [newRunDefaultQuery, setNewRunDefaultQuery] = useState(false)
   const [newDefaultQuery, setNewDefaultQuery] = useState("")
   const [newContentPersistence, setNewContentPersistence] = useState(false)
+  const [refreshInterval, setRefreshInterval] = useState(10)
+  const [newRefreshInterval, setNewRefreshInterval] = useState(0)
   const [newSecretKey, setNewSecretKey] = useState("")
   const [newModel, setNewModel] = useState("")
   const [secretKey, setSecretKey] = useState("")
@@ -68,7 +76,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
   const [tutorialOpen, setTutorialOpen] = useState(false)
   const [isCollapsed, setIsCollapsed] = useState(true)
 
-  const querySettingsContext = useMemo(() => ({
+  const browserSettingsContext = useMemo(() => ({
     newSettings: {
       limitSettings: { newLimit, setNewLimit },
       timeoutSettings: { newTimeout, setNewTimeout },
@@ -76,6 +84,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       defaultQuerySettings: { newDefaultQuery, setNewDefaultQuery },
       contentPersistenceSettings: { newContentPersistence, setNewContentPersistence },
       chatSettings: { newSecretKey, setNewSecretKey, newModel, setNewModel },
+      graphInfo: { newRefreshInterval, setNewRefreshInterval }
     },
     settings: {
       limitSettings: { limit, setLimit, lastLimit, setLastLimit },
@@ -84,6 +93,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       defaultQuerySettings: { defaultQuery, setDefaultQuery },
       contentPersistenceSettings: { contentPersistence, setContentPersistence },
       chatSettings: { secretKey, setSecretKey, model, setModel, navigateToSettings, setNavigateToSettings },
+      graphInfo: { refreshInterval, setRefreshInterval }
     },
     hasChanges,
     setHasChanges,
@@ -94,7 +104,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       localStorage.setItem("timeout", newTimeout.toString());
       localStorage.setItem("defaultQuery", newDefaultQuery);
       localStorage.setItem("limit", newLimit.toString());
-      // localStorage.setItem("secretKey", newSecretKey);
+      localStorage.setItem("refreshInterval", newRefreshInterval.toString())
 
       // Update context
       setContentPersistence(newContentPersistence);
@@ -105,6 +115,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       setLastLimit(limit);
       setSecretKey(newSecretKey);
       setModel(newModel);
+      setRefreshInterval(newRefreshInterval)
       // Reset has changes
       setHasChanges(false);
 
@@ -122,9 +133,10 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       setNewLimit(limit)
       setNewSecretKey(secretKey)
       setNewModel(model)
+      setNewRefreshInterval(refreshInterval)
       setHasChanges(false)
     }
-  }), [contentPersistence, defaultQuery, hasChanges, lastLimit, limit, model, navigateToSettings, newContentPersistence, newDefaultQuery, newLimit, newModel, newRunDefaultQuery, newSecretKey, newTimeout, runDefaultQuery, secretKey, timeout, toast])
+  }), [contentPersistence, defaultQuery, hasChanges, lastLimit, limit, model, navigateToSettings, newContentPersistence, newDefaultQuery, newLimit, newModel, newRefreshInterval, newRunDefaultQuery, newSecretKey, newTimeout, refreshInterval, runDefaultQuery, secretKey, timeout, toast])
 
   const historyQueryContext = useMemo(() => ({
     historyQuery,
@@ -134,7 +146,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
   const indicatorContext = useMemo(() => ({
     indicator,
     setIndicator,
-  }), [indicator, setIndicator])
+  }), [indicator])
 
   const panelContext = useMemo(() => ({
     panel,
@@ -201,12 +213,25 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
     const json = await result.json();
 
     return json.result.data.map(({ info }: { info: string }) => info);
-  }, [graphName, setIndicator, toast]);
+  }, [graphName, toast]);
+
+  const handelGetNewQueries = useCallback((newQuery: Query) => [...historyQuery.queries.filter(qu => qu.text !== newQuery.text), newQuery], [historyQuery.queries])
 
   const runQuery = useCallback(async (q: string, name?: string): Promise<void> => {
+    const n = name || graphName
+    let newQuery: Query = {
+      elementsCount: 0,
+      explain: [],
+      graphName: n,
+      metadata: [],
+      profile: [],
+      status: "Failed",
+      text: q,
+      timestamp: new Date().getTime()
+    }
+
     try {
       setIsQueryLoading(true)
-      const n = name || graphName
 
       const [query, existingLimit] = getQueryWithLimit(q, limit)
       const url = `api/graph/${prepareArg(n)}?query=${prepareArg(query)}&timeout=${timeout}`;
@@ -218,7 +243,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
 
       const result = await getSSEGraphResult(url, toast, setIndicator);
 
-      if (!result) return;
+      if (!result) throw new Error()
 
       const graphI = await Promise.all([
         fetchInfo("(label)"),
@@ -242,19 +267,21 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
         method: "GET"
       }, toast, setIndicator)
 
-      if (!explain.ok) return;
+      if (!explain.ok) throw new Error();
 
       const explainJson = await explain.json()
-      const newQuery = { text: q, metadata: result.metadata, explain: explainJson.result, profile: [] }
       const g = Graph.create(n, result, false, false, existingLimit, graphI)
-      const newQueries = [...historyQuery.queries.filter(qu => qu.text !== newQuery.text), newQuery]
-
-      setHistoryQuery(prev => ({
-        ...prev,
-        queries: newQueries,
-        currentQuery: newQuery,
-        counter: 0
-      }))
+      newQuery = {
+        text: q,
+        metadata: result.metadata,
+        explain: explainJson.result,
+        profile: [],
+        graphName: n,
+        timestamp: new Date().getTime(),
+        status: "Success",
+        elementsCount: g.getElements().length
+      }
+      
       setGraph(g)
       fetchCount();
       setLastLimit(limit)
@@ -263,7 +290,6 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
         handleCooldown();
       }
 
-      localStorage.setItem("query history", JSON.stringify(newQueries))
       localStorage.setItem("savedContent", JSON.stringify({ graphName: n, query: q }))
       // eslint-disable-next-line @typescript-eslint/ban-ts-comment
       // @ts-ignore
@@ -271,9 +297,19 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
     } catch (error) {
       console.debug(error)
     } finally {
+      const newQueries = handelGetNewQueries(newQuery)
+
+      localStorage.setItem("query history", JSON.stringify(newQueries))
+
+      setHistoryQuery(prev => ({
+        ...prev,
+        queries: newQueries,
+        currentQuery: newQuery,
+        counter: 0
+      }))
       setIsQueryLoading(false)
     }
-  }, [graphName, limit, timeout, toast, historyQuery.queries, graphInfo, fetchCount, handleCooldown]);
+  }, [graphName, limit, timeout, toast, fetchInfo, fetchCount, handleCooldown, handelGetNewQueries]);
 
   const graphContext = useMemo(() => ({
     graph,
@@ -299,17 +335,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
 
     if (status !== "authenticated") return
 
-    setHistoryQuery({
-      queries: JSON.parse(localStorage.getItem(`query history`) || "[]"),
-      query: "",
-      currentQuery: {
-        text: "",
-        metadata: [],
-        explain: [],
-        profile: [],
-      },
-      counter: 0
-    })
+    setHistoryQuery({ ...defaultQueryHistory, queries: JSON.parse(localStorage.getItem("query history") || "[]") })
     setTimeout(parseInt(localStorage.getItem("timeout") || "0", 10))
     const l = parseInt(localStorage.getItem("limit") || "300", 10)
     setLimit(l)
@@ -318,6 +344,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
     setRunDefaultQuery(localStorage.getItem("runDefaultQuery") !== "false")
     setContentPersistence(localStorage.getItem("contentPersistence") !== "false");
     setTutorialOpen(localStorage.getItem("tutorial") !== "false")
+    setRefreshInterval(Number(localStorage.getItem("refreshInterval") || 10))
   }, [status])
 
   const panelSize = useMemo(() => isCollapsed ? 0 : 15, [isCollapsed])
@@ -359,7 +386,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
     securedFetch("/api/status", {
       method: "GET",
     }, toast, setIndicator)
-  }, [toast])
+  }, [toast, setIndicator])
 
   useEffect(() => {
     let interval: NodeJS.Timeout | undefined
@@ -412,7 +439,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
   return (
     <ThemeProvider attribute="class" storageKey="theme" defaultTheme="system" disableTransitionOnChange>
       <LoginVerification>
-        <QuerySettingsContext.Provider value={querySettingsContext}>
+        <BrowserSettingsContext.Provider value={browserSettingsContext}>
           <SchemaContext.Provider value={schemaContext}>
             <GraphContext.Provider value={graphContext}>
               <HistoryQueryContext.Provider value={historyQueryContext}>
@@ -445,8 +472,8 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
                         </ResizablePanel>
                         <ResizableHandle withHandle onMouseUp={() => isCollapsed && onExpand()} className={cn("w-0", isCollapsed && "hidden")} />
                         <ResizablePanel
-                          defaultSize={70 - panelSize}
-                          minSize={50}
+                          defaultSize={100 - panelSize}
+                          minSize={70}
                           maxSize={100}
                         >
                           {
@@ -467,7 +494,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
               </HistoryQueryContext.Provider>
             </GraphContext.Provider>
           </SchemaContext.Provider>
-        </QuerySettingsContext.Provider>
+        </BrowserSettingsContext.Provider>
       </LoginVerification>
     </ThemeProvider >
   )

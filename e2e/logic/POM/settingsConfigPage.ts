@@ -9,19 +9,19 @@ export default class SettingsConfigPage extends BasePage {
     }
 
     private get roleContentValue(): (role: string) => Locator {
-        return (role: string) => this.page.locator(`//tbody/tr[@data-id='${role}']/td[3]/div/p`)
+        return (role: string) => this.page.locator(`//tr[@data-id='${role}']/td[4]/div/p`)
     }
 
-    private get EditRoleButton(): (role: string) => Locator {
-        return (role: string) => this.page.locator(`//tbody//tr[@data-id='${role}']/td[3]/div/div/button`)
+    private get EditRoleButton(): () => Locator {
+        return () => this.page.getByTestId("editButtonConfigs");
     }
 
-    private get roleValueInput(): (role: string) => Locator {
-        return (role: string) => this.page.locator(`//tbody//tr[@data-id='${role}']/td[3]/div/input`)
+    private get roleValueInput(): () => Locator {
+        return () => this.page.getByTestId("inputConfigs")
     }
 
-    private get confirmValueInputBtn(): (role: string) => Locator {
-        return (role: string) => this.page.locator(`//tbody//tr[@data-id='${role}']/td[3]/div/div/button[1]`)
+    private get confirmValueInputBtn(): () => Locator {
+        return () => this.page.getByTestId("saveButtonConfigs");
     }
 
     private get toastCloseBtn(): Locator {
@@ -48,6 +48,10 @@ export default class SettingsConfigPage extends BasePage {
         return this.page.locator("//button[contains(text(), 'Undo')]");
     }
 
+    private get searchForConfigInput(): Locator {
+        return this.page.getByTestId('searchInputConfigs');
+    }
+
     async navigateToDBConfigurationTab(): Promise<void> {
         await this.dbConfigurationTabBtn.click();
     }
@@ -56,16 +60,16 @@ export default class SettingsConfigPage extends BasePage {
         await interactWhenVisible(this.roleContentValue(role), (el) => el.hover(), `role content value ${role}`);
     }
     
-    async clickEditRoleButton(role: string): Promise<void> {
-        await interactWhenVisible(this.EditRoleButton(role), (el) => el.click(), `edit role button ${role}`);
+    async clickEditRoleButton(): Promise<void> {
+        await interactWhenVisible(this.EditRoleButton(), (el) => el.click(), `edit role button`);
     }
     
-    async fillRoleValueInput(role: string, input: string): Promise<void> {
-        await interactWhenVisible(this.roleValueInput(role), (el) => el.fill(input), `role value input ${role}`);
+    async fillRoleValueInput(input: string): Promise<void> {
+        await interactWhenVisible(this.roleValueInput(), (el) => el.fill(input), `role value input`);
     }
     
-    async clickConfirmValueInputBtn(role: string): Promise<void> {
-        await interactWhenVisible(this.confirmValueInputBtn(role), (el) => el.click(), `confirm value input button ${role}`);
+    async clickConfirmValueInputBtn(): Promise<void> {
+        await interactWhenVisible(this.confirmValueInputBtn(), (el) => el.click(), `confirm value input button`);
     }
     
     async getRoleContentValue(role: string): Promise<string | null> {
@@ -83,6 +87,10 @@ export default class SettingsConfigPage extends BasePage {
     async fillSearchInput(value: string): Promise<void> {
         await interactWhenVisible(this.searchInput, (el) => el.fill(value), "search input");
     }
+
+    async fillSearchForConfigInput(value: string): Promise<void> {
+        await interactWhenVisible(this.searchForConfigInput, (el) => el.fill(value), "search input");
+    }
     
     async isUndoBtnInToastMsg(): Promise<void> {
         await this.page.waitForTimeout(500);
@@ -91,9 +99,9 @@ export default class SettingsConfigPage extends BasePage {
 
     async modifyRoleValue(role: string, input: string): Promise<string | null> {
         await this.hoverOnRoleContentValue(role);
-        await this.clickEditRoleButton(role);
-        await this.fillRoleValueInput(role, input);
-        await this.clickConfirmValueInputBtn(role);
+        await this.clickEditRoleButton();
+        await this.fillRoleValueInput(input);
+        await this.clickConfirmValueInputBtn();
         const value = await this.getRoleContentValue(role);
         return value
     }

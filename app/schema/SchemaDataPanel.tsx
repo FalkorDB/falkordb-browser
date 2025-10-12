@@ -16,7 +16,6 @@ import Combobox from "../components/ui/combobox";
 import { Label, Graph, Link, Node } from "../api/graph/model";
 import Input from "../components/ui/Input";
 import ToastButton from "../components/ToastButton";
-import DeleteElement from "../graph/DeleteElement";
 import DialogComponent from "../components/DialogComponent";
 import CloseDialog from "../components/CloseDialog";
 import { IndicatorContext } from "../components/provider";
@@ -24,12 +23,11 @@ import { IndicatorContext } from "../components/provider";
 interface Props {
     object: Node | Link
     setObject: (el: Node | Link | undefined) => void
-    onDeleteElement: () => Promise<void>;
     schema: Graph
     setLabels: (labels: Label[]) => void
 }
 
-export default function SchemaDataPanel({ object, setObject, onDeleteElement, schema, setLabels }: Props) {
+export default function SchemaDataPanel({ object, setObject, schema, setLabels }: Props) {
 
     const { indicator } = useContext(IndicatorContext)
 
@@ -46,12 +44,11 @@ export default function SchemaDataPanel({ object, setObject, onDeleteElement, sc
     const [isSetLoading, setIsSetLoading] = useState<boolean>(false)
     const [labelsHover, setLabelsHover] = useState<boolean>(false)
     const [isAddValue, setIsAddValue] = useState<boolean>(false)
-    const [deleteOpen, setDeleteOpen] = useState<boolean>(false)
     const [editable, setEditable] = useState<string>("")
     const [newLabel, setNewLabel] = useState<string>("")
     const [label, setLabel] = useState<string[]>([])
     const [hover, setHover] = useState<string>("")
-    const type = !("source" in object)
+    const type = !object.source
 
     const handleClose = useCallback((e: KeyboardEvent) => {
         if (e.defaultPrevented) return
@@ -71,7 +68,7 @@ export default function SchemaDataPanel({ object, setObject, onDeleteElement, sc
 
     useEffect(() => {
         setAttributes(Object.entries(object.data).filter(([key, val]) => !(key === "name" && Number(val) === object.id)).map(([key, val]) => [key, Array.isArray(val) ? val : (val as string).split(',')]))
-        setLabel("source" in object ? [object.relationship] : [...object.labels])
+        setLabel(object.source ? [object.relationship] : [...object.labels])
     }, [object])
 
     const handleSetEditable = ([key, val]: [string, string[]] = getDefaultAttribute()) => {
@@ -729,18 +726,6 @@ export default function SchemaDataPanel({ object, setObject, onDeleteElement, sc
                     }
                 </TableCaption>
             </Table>
-            <div className="p-8 flex justify-end">
-                {
-                    session?.user.role !== "Read-Only" &&
-                    <DeleteElement
-                        label="Schema"
-                        description={`Are you sure you want to delete this ${type ? "Node" : "Relation"}?`}
-                        open={deleteOpen}
-                        setOpen={setDeleteOpen}
-                        onDeleteElement={onDeleteElement}
-                    />
-                }
-            </div>
         </div>
     )
 }

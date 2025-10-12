@@ -153,7 +153,7 @@ test.describe("Graph Tests", () => {
     await graph.insertQuery(CREATE_QUERY);
     await graph.clickRunQuery();
     const initCount = parseInt((await graph.getNodesCount()) ?? "", 10);
-    await graph.deleteElementByName("knows", "Relation");
+    await graph.deleteElementByName("knows");
     expect(parseInt((await graph.getNodesCount()) ?? "", 10)).toBe(initCount);
     await apiCall.removeGraph(graphName);
   });
@@ -167,7 +167,7 @@ test.describe("Graph Tests", () => {
     await graph.insertQuery(CREATE_QUERY);
     await graph.clickRunQuery();
     const initEdgesCount = await graph.getEdgesCount();
-    await graph.deleteElementByName("a", "Node");
+    await graph.deleteElementByName("a");
     const edgesCount = await graph.getEdgesCount();
     expect(parseInt(edgesCount ?? "0", 10)).toBe(
       parseInt(initEdgesCount ?? "0", 10) - 1
@@ -184,7 +184,7 @@ test.describe("Graph Tests", () => {
     await graph.insertQuery(CREATE_QUERY);
     await graph.clickRunQuery();
     const initEdgesCount = await graph.getEdgesCount();
-    await graph.deleteElementByName("knows", "Relation");
+    await graph.deleteElementByName("knows");
     const edgesCount = await graph.getEdgesCount();
     expect(parseInt(edgesCount ?? "0", 10)).toBe(
       parseInt(initEdgesCount ?? "0", 10) - 1
@@ -201,7 +201,7 @@ test.describe("Graph Tests", () => {
     await graph.insertQuery(CREATE_QUERY);
     await graph.clickRunQuery();
     const initNodesCount = await graph.getNodesCount();
-    await graph.deleteElementByName("a", "Node");
+    await graph.deleteElementByName("a");
     const nodesCount = await graph.getNodesCount();
     expect(parseInt(nodesCount ?? "0", 10)).toBe(
       parseInt(initNodesCount ?? "0", 10) - 1
@@ -218,7 +218,7 @@ test.describe("Graph Tests", () => {
     await graph.insertQuery(CREATE_QUERY);
     await graph.clickRunQuery();
     const initEdgesCount = await graph.getEdgesCount();
-    await graph.deleteElementByName("knows", "Relation");
+    await graph.deleteElementByName("knows");
     const edgesCount = await graph.getEdgesCount();
     expect(parseInt(edgesCount ?? "0", 10)).toBe(
       parseInt(initEdgesCount ?? "0", 10) - 1

@@ -12,13 +12,13 @@ import { GraphContext } from "../components/provider"
 interface Props {
     graph: Graph
     selectedElements: (Node | Link)[]
+    selectedElement: Node | Link | undefined
     setSelectedElement: (el: Node | Link | undefined) => void
     handleDeleteElement: () => Promise<void>
     chartRef: GraphRef
     label: "Graph" | "Schema"
     setIsAddEntity?: (isAdd: boolean) => void
     setIsAddRelation?: (isAdd: boolean) => void
-    backgroundColor?: string
     isLoadingSchema?: boolean
 }
 
@@ -29,13 +29,13 @@ const ITEMS_PER_PAGE = 30
 export default function Toolbar({
     graph,
     selectedElements,
+    selectedElement,
     setSelectedElement,
     handleDeleteElement,
     chartRef,
     label,
     setIsAddEntity,
     setIsAddRelation,
-    backgroundColor,
     isLoadingSchema,
 }: Props) {
 
@@ -55,7 +55,7 @@ export default function Toolbar({
     const [visibleSuggestions, setVisibleSuggestions] = useState<(Node | Link)[]>([])
 
     const isLoading = isLoadingSchema || isLoadingGraph
-    
+
     useEffect(() => {
         const newStartIndex = Math.max(0, Math.floor((scrollTop - ((ITEM_HEIGHT + GAP) * ITEMS_PER_PAGE)) / (ITEM_HEIGHT + GAP)))
         const newEndIndex = Math.min(suggestions.length, Math.floor((scrollTop + ((ITEM_HEIGHT + GAP) * (ITEMS_PER_PAGE * 2))) / (ITEM_HEIGHT + GAP)))
@@ -121,13 +121,13 @@ export default function Toolbar({
     const stripBackground = `url("data:image/svg+xml,${stripSVG}")`;
 
     return (
-        <div className={cn("w-full flex justify-between items-center", label === "Schema" && "h-full")}>
-            <div className={cn("relative pointer-events-auto", label === "Schema" && "h-full")}>
+        <div className={cn("w-full flex flex-wrap gap-4 justify-between items-center", label === "Schema" && "h-full")}>
+            <div className={cn("w-full relative pointer-events-auto min-w-[10dvw] max-w-[30dvw]", label === "Schema" && "h-full")}>
                 {
                     graph.getElements().length > 0 && !isLoading &&
                     <Input
                         data-testid={`elementCanvasSearch${label}`}
-                        className={cn("w-[30dvw] text-foreground border border-primary", label === "Schema" && "h-full", backgroundColor)}
+                        className={cn("w-full text-foreground border border-primary", label === "Schema" && "h-full")}
                         placeholder="Search for element in the graph"
                         value={searchElement}
                         onChange={(e) => setSearchElement(e.target.value)}
@@ -218,6 +218,7 @@ export default function Toolbar({
                             {
                                 visibleSuggestions.map((suggestion, index) => {
                                     const actualIndex = index + startIndex
+                                    const type = !!suggestion.source
 
                                     return (
                                         <li key={actualIndex}>
@@ -235,7 +236,7 @@ export default function Toolbar({
                                                             className="rounded-full h-8 w-8 p-2 flex items-center justify-center"
                                                             style={{ backgroundColor: suggestion.color }}
                                                         >
-                                                            <p className="text-foreground text-sm font-bold truncate">{("source" in suggestion) ? suggestion.relationship : suggestion.labels[0]}</p>
+                                                            <p className="text-foreground text-sm font-bold truncate">{type ? suggestion.relationship : suggestion.labels[0]}</p>
                                                         </div>
                                                         <div
                                                             className={cn("w-1 grow text-center truncate", actualIndex === suggestionIndex ? "text-black" : "text-foreground")}
@@ -245,7 +246,7 @@ export default function Toolbar({
                                                     </Button>
                                                 </TooltipTrigger>
                                                 <TooltipContent>
-                                                    {("source" in suggestion) ? suggestion.relationship : suggestion.labels[0]}
+                                                    {type ? suggestion.relationship : suggestion.labels[0]}
                                                 </TooltipContent>
                                             </Tooltip>
                                         </li>
@@ -274,14 +275,13 @@ export default function Toolbar({
                     graph.Id &&
                     <>
                         {
-                            selectedElements.length > 1 &&
+                            (selectedElements.length !== 0 || selectedElement) &&
                             <DeleteElement
                                 label={label}
                                 description="Are you sure you want to delete this element(s)?"
                                 open={deleteOpen}
                                 setOpen={setDeleteOpen}
                                 onDeleteElement={handleDeleteElement}
-                                backgroundColor={backgroundColor}
                             />
                         }
                         {
@@ -290,7 +290,7 @@ export default function Toolbar({
                                 <DropdownMenuTrigger asChild>
                                     <Button
                                         data-testid={`elementCanvasAdd${label}`}
-                                        className={cn("pointer-events-auto", backgroundColor)}
+                                        className="pointer-events-auto"
                                         variant="Secondary"
                                         label="Add Element"
                                     >
@@ -300,7 +300,7 @@ export default function Toolbar({
                                 <DropdownMenuContent>
                                     <Button
                                         data-testid={`elementCanvasAddNode${label}`}
-                                        className={cn("pointer-events-auto", backgroundColor)}
+                                        className="pointer-events-auto"
                                         variant="Secondary"
                                         label="Add Node"
                                         onClick={() => {
@@ -312,7 +312,7 @@ export default function Toolbar({
                                     </Button>
                                     <Button
                                         data-testid={`elementCanvasAddEdge${label}`}
-                                        className={cn("pointer-events-auto", backgroundColor)}
+                                        className="pointer-events-auto"
                                         variant="Secondary"
                                         label="Add Edge"
                                         onClick={() => {
@@ -335,6 +335,5 @@ export default function Toolbar({
 Toolbar.defaultProps = {
     setIsAddEntity: undefined,
     setIsAddRelation: undefined,
-    backgroundColor: undefined,
     isLoadingSchema: false,
 }

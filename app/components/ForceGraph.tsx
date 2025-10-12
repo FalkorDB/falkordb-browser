@@ -87,9 +87,9 @@ const wrapTextForCircularNode = (ctx: CanvasRenderingContext2D, text: string, ma
     // Use fixed text height - it's essentially constant for a given font
     const halfTextHeight = 1.125; // Fixed value based on font size (1.5px * 1.5 spacing / 2)
 
-    
+
     const availableRadius = Math.sqrt(Math.max(0, maxRadius * maxRadius - halfTextHeight * halfTextHeight));
-    
+
     const lineWidth = availableRadius * 2;
 
     const words = text.split(/\s+/);
@@ -319,16 +319,17 @@ export default function ForceGraph({
     }
 
     const handleRightClick = (element: Node | Link, evt: MouseEvent) => {
-        if (!("source" in element) && isAddElement) {
+        if (!element.source && isAddElement) {
             if (setSelectedNodes) {
                 setSelectedNodes(prev => {
+                    const node = element as Node
                     if (prev[0] === undefined) {
-                        return [element, undefined]
+                        return [node, undefined]
                     }
                     if (prev[1] === undefined) {
-                        return [prev[0], element]
+                        return [prev[0], node]
                     }
-                    return [element, prev[0]]
+                    return [node, prev[0]]
                 })
                 return
             }
@@ -351,9 +352,9 @@ export default function ForceGraph({
         setSelectedElements([])
     }
 
-    const isLinkSelected = (link: Link) => ((selectedElement && ("source" in selectedElement) && selectedElement.id === link.id)
-        || (hoverElement && ("source" in hoverElement) && hoverElement.id === link.id)
-        || (selectedElements.length > 0 && selectedElements.some(el => el.id === link.id && ("source" in el))))
+    const isLinkSelected = (link: Link) => (selectedElement && selectedElement.source && selectedElement.id === link.id)
+        || (hoverElement && hoverElement.source && hoverElement.id === link.id)
+        || (selectedElements.length > 0 && selectedElements.some(el => el.id === link.id && el.source))
 
     return (
         <div ref={parentRef} className="w-full h-full relative">
@@ -392,9 +393,9 @@ export default function ForceGraph({
                         node.y = 0
                     }
 
-                    ctx.lineWidth = ((selectedElement && !("source" in selectedElement) && selectedElement.id === node.id)
-                        || (hoverElement && !("source" in hoverElement) && hoverElement.id === node.id)
-                        || (selectedElements.length > 0 && selectedElements.some(el => el.id === node.id && !("source" in el)))) ? 1 : 0.5
+                    ctx.lineWidth = ((selectedElement && !selectedElement.source && selectedElement.id === node.id)
+                        || (hoverElement && !hoverElement.source && hoverElement.id === node.id)
+                        || (selectedElements.length > 0 && selectedElements.some(el => el.id === node.id && !el.source))) ? 1.5 : 0.5
                     ctx.strokeStyle = foreground;
 
                     ctx.beginPath();

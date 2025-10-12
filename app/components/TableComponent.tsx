@@ -163,12 +163,12 @@ export default function TableComponent({ headers, rows, label, entityName, value
                     onChange={(e) => setSearch(e.target.value)}
                 />
             </div>
-            <Table ref={tableRef} parentOnScroll={handleScroll} className="h-full overflow-hidden">
-                <TableHeader>
+            <Table ref={tableRef} parentOnScroll={handleScroll} className="h-full" parentClassName="p-1 relative">
+                <TableHeader className="sticky top-0 z-10 bg-background">
                     <TableRow ref={headerRef} className="text-nowrap border-border">
                         {
                             setRows ?
-                                <TableHead className="w-5 !pr-2" key={headers[0]}>
+                                <TableHead className="w-5 !pr-2 border-r border-border" key={headers[0]}>
                                     <Checkbox
                                         data-testid={`tableCheckbox${label}`}
                                         className="w-6 h-6 rounded-full bg-background border-primary data-[state=checked]:bg-primary"
@@ -184,9 +184,10 @@ export default function TableComponent({ headers, rows, label, entityName, value
                                 </TableHead>
                                 : null
                         }
+                                <TableHead key="index" className="w-0 border-r border-border">Index</TableHead>
                         {
                             headers.map((header, i) => (
-                                <TableHead className={cn(i === 0 ? setRows && "border-l" : "border-l", "font-bold text-lg border-border")} key={header}>
+                                <TableHead className={cn(i + 1 !== headers.length && "border-r", "font-bold text-lg border-border")} key={header}>
                                     {header}
                                 </TableHead>
                             ))
@@ -229,7 +230,7 @@ export default function TableComponent({ headers, rows, label, entityName, value
                                 >
                                     {
                                         setRows ?
-                                            <TableCell className="w-5 !pr-2">
+                                            <TableCell className="w-5 !pr-2 border-r border-border">
                                                 <Checkbox
                                                     className="w-6 h-6 rounded-full bg-background border-primary data-[state=checked]:bg-primary"
                                                     data-testid={`tableCheckbox${label}${row.cells[0].value}`}
@@ -246,9 +247,12 @@ export default function TableComponent({ headers, rows, label, entityName, value
                                             </TableCell>
                                             : null
                                     }
+                                    <TableCell className="border-r border-border">
+                                        <p>{actualIndex + 1}.</p>
+                                    </TableCell>
                                     {
                                         row.cells.map((cell, j) => (
-                                            <TableCell className={cn(j === 0 ? setRows && "border-l" : "border-l", row.cells[0]?.value === editable && (cell.type !== "readonly" && cell.type !== "object") && "p-2", "border-border")} key={j}>
+                                            <TableCell className={cn(j + 1 !== row.cells.length && "border-r", row.cells[0]?.value === editable && (cell.type !== "readonly" && cell.type !== "object") && "p-2", cell.type === "object" && "p-1", "border-border")} key={j}>
                                                 {
                                                     cell.type === "object" ?
                                                         <JSONTree
