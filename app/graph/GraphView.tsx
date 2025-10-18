@@ -13,7 +13,9 @@ import TableView from "./TableView";
 import Toolbar from "./toolbar";
 import Controls from "./controls";
 import GraphDetails from "./GraphDetails";
-import Labels from "./labels";
+import Labels from "./labels"
+import RelationshipControls from "./relationshipControls"
+import NodeControls from "./nodeControls";
 import MetadataView from "./MetadataView";
 import ForceGraph from "../components/ForceGraph";
 
@@ -106,6 +108,7 @@ function GraphView({
         setSelectedElements([])
     }, [graph.Id, setSelectedElement, setSelectedElements])
 
+
     const onLabelClick = (label: Label) => {
         label.show = !label.show
 
@@ -131,6 +134,32 @@ function GraphView({
         setData({ ...graph.Elements })
     }
 
+    const onRelationshipDisplayPropertyChange = (relationship: Relationship, property: string | undefined) => {
+        relationship.displayProperty = property;
+        graph.RelationshipsMap.set(relationship.name, relationship);
+        setData({ ...graph.Elements });
+        setRelationships([...relationships]);
+        
+        // Persist to localStorage
+        const storageKey = `relationshipDisplayProperties_${graph.Id}`;
+        const existingSettings = JSON.parse(localStorage.getItem(storageKey) || '{}');
+        existingSettings[relationship.name] = property;
+        localStorage.setItem(storageKey, JSON.stringify(existingSettings));
+    }
+
+    const onLabelDisplayPropertyChange = (label: Label, property: string | undefined) => {
+        label.displayProperty = property;
+        graph.LabelsMap.set(label.name, label);
+        setData({ ...graph.Elements });
+        setLabels([...labels]);
+        
+        // Persist to localStorage
+        const storageKey = `labelDisplayProperties_${graph.Id}`;
+        const existingSettings = JSON.parse(localStorage.getItem(storageKey) || '{}');
+        existingSettings[label.name] = property;
+        localStorage.setItem(storageKey, JSON.stringify(existingSettings));
+    }
+
     return (
         <Tabs value={tabsValue} onValueChange={(value) => setTabsValue(value as Tab)} className={cn("h-full w-full relative border border-border rounded-lg overflow-hidden", tabsValue === "Table" && "flex flex-col-reverse")}>
             <div className="h-full w-full flex flex-col gap-4 absolute py-4 px-6 pointer-events-none z-10 justify-between">
@@ -150,9 +179,9 @@ function GraphView({
                             {
                                 (labels.length !== 0 || relationships.length !== 0) &&
                                 <div className={cn("w-fit h-1 grow grid gap-4", labels.length !== 0 && relationships.length !== 0 ? "grid-rows-[minmax(0,max-content)_max-content_minmax(0,max-content)]" : "grid-rows-[minmax(0,max-content)]")}>
-                                    {labels.length !== 0 && <Labels labels={labels} onClick={onLabelClick} label="Labels" type="Graph" />}
+                                    {labels.length !== 0 && <NodeControls labels={labels} onToggle={onLabelClick} onDisplayPropertyChange={onLabelDisplayPropertyChange} type="Graph" />}
                                     {labels.length !== 0 && relationships.length > 0 && <div className="h-px bg-border rounded-full" />}
-                                    {relationships.length !== 0 && <Labels labels={relationships} onClick={onRelationshipClick} label="Relationships" type="Graph" />}
+                                    {relationships.length !== 0 && <RelationshipControls relationships={relationships} onToggle={onRelationshipClick} onDisplayPropertyChange={onRelationshipDisplayPropertyChange} type="Graph" />}
                                 </div>
                             }
                         </>
@@ -232,6 +261,8 @@ function GraphView({
                     selectedElements={selectedElements}
                     setSelectedElements={setSelectedElements}
                     setRelationships={setRelationships}
+                    relationships={relationships}
+                    labels={labels}
                     parentHeight={parentHeight}
                     parentWidth={parentWidth}
                     setParentHeight={setParentHeight}

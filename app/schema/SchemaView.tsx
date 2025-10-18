@@ -5,6 +5,8 @@
 import { useEffect, useState, useContext, Dispatch, SetStateAction } from "react"
 import { GraphRef } from "@/lib/utils"
 import Labels from "../graph/labels"
+import RelationshipControls from "../graph/relationshipControls"
+import NodeControls from "../graph/nodeControls"
 import { Label, Link, Node, GraphData, Relationship } from "../api/graph/model"
 import { SchemaContext } from "../components/provider"
 import Controls from "../graph/controls"
@@ -74,6 +76,7 @@ export default function SchemaView({
         setSelectedElements([])
     }, [schema.Id, setSelectedElement, setSelectedElements])
 
+
     const onLabelClick = (label: Label) => {
         label.show = !label.show
 
@@ -99,6 +102,32 @@ export default function SchemaView({
         setData({ ...schema.Elements })
     }
 
+    const onRelationshipDisplayPropertyChange = (relationship: Relationship, property: string | undefined) => {
+        relationship.displayProperty = property;
+        schema.RelationshipsMap.set(relationship.name, relationship);
+        setData({ ...schema.Elements });
+        setRelationships([...relationships]);
+        
+        // Persist to localStorage
+        const storageKey = `relationshipDisplayProperties_${schema.Id}`;
+        const existingSettings = JSON.parse(localStorage.getItem(storageKey) || '{}');
+        existingSettings[relationship.name] = property;
+        localStorage.setItem(storageKey, JSON.stringify(existingSettings));
+    }
+
+    const onLabelDisplayPropertyChange = (label: Label, property: string | undefined) => {
+        label.displayProperty = property;
+        schema.LabelsMap.set(label.name, label);
+        setData({ ...schema.Elements });
+        setLabels([...labels]);
+        
+        // Persist to localStorage
+        const storageKey = `labelDisplayProperties_${schema.Id}`;
+        const existingSettings = JSON.parse(localStorage.getItem(storageKey) || '{}');
+        existingSettings[label.name] = property;
+        localStorage.setItem(storageKey, JSON.stringify(existingSettings));
+    }
+
     return (
         <div className="relative w-full h-full border border-border rounded-lg overflow-hidden">
             <div className="h-full w-full flex flex-col gap-4 absolute py-4 px-6 pointer-events-none z-10 justify-between">
@@ -106,9 +135,9 @@ export default function SchemaView({
                     {
                         !isLoading && (labels.length > 0 || relationships.length > 0) &&
                         <div className="w-fit flex flex-col h-full gap-4">
-                            {labels.length > 0 && <Labels labels={labels} onClick={onLabelClick} label="Labels" type="Schema" />}
+                            {labels.length > 0 && <NodeControls labels={labels} onToggle={onLabelClick} onDisplayPropertyChange={onLabelDisplayPropertyChange} type="Schema" />}
                             {relationships.length > 0 && labels.length > 0 && <div className="h-px bg-border rounded-full" />}
-                            {relationships.length > 0 && <Labels labels={relationships} onClick={onRelationshipClick} label="Relationships" type="Schema" />}
+                            {relationships.length > 0 && <RelationshipControls relationships={relationships} onToggle={onRelationshipClick} onDisplayPropertyChange={onRelationshipDisplayPropertyChange} type="Schema" />}
                         </div>
                     }
                 </div>
@@ -151,6 +180,8 @@ export default function SchemaView({
                     handleCooldown={handleCooldown}
                     cooldownTicks={cooldownTicks}
                     setRelationships={setRelationships}
+                    relationships={relationships}
+                    labels={labels}
                     parentHeight={parentHeight}
                     parentWidth={parentWidth}
                     setParentHeight={setParentHeight}

@@ -125,6 +125,7 @@ export interface InfoLabel {
   name: string;
   color: string;
   show: boolean;
+  displayProperty?: string;
 }
 
 export interface Label extends InfoLabel {
@@ -137,6 +138,7 @@ export interface InfoRelationship {
   name: string;
   color: string;
   show: boolean;
+  displayProperty?: string;
 }
 
 export interface Relationship extends InfoRelationship {
@@ -432,8 +434,8 @@ export class Graph {
     graphInfo?: GraphInfo
   ): Graph {
     const graph = Graph.empty(undefined, currentLimit, graphInfo);
+    graph.id = id; // Set ID before extend so createRelationship can access it
     graph.extend(results, isCollapsed, isSchema);
-    graph.id = id;
     return graph;
   }
 
@@ -747,6 +749,9 @@ export class Graph {
           ...infoLabel,
           elements: [],
         };
+        
+        // Load persisted display property
+        this.loadPersistedLabelDisplayProperty(c);
 
         this.labelsMap.set(c.name, c);
         this.labels.push(c);
@@ -769,11 +774,41 @@ export class Graph {
         ...infoRelationship,
         elements: [],
       };
+      
+      // Load persisted display property
+      this.loadPersistedDisplayProperty(l);
+      
       this.relationshipsMap.set(l.name, l);
       this.relationships.push(l);
     }
 
     return l;
+  }
+
+  private loadPersistedDisplayProperty(relationship: Relationship): void {
+    try {
+      const storageKey = `relationshipDisplayProperties_${this.id}`;
+      const savedSettings = JSON.parse(localStorage.getItem(storageKey) || '{}');
+      if (savedSettings[relationship.name] !== undefined) {
+        relationship.displayProperty = savedSettings[relationship.name];
+      }
+    } catch (error) {
+      // Silently handle localStorage errors
+      console.warn('Failed to load persisted display properties:', error);
+    }
+  }
+
+  private loadPersistedLabelDisplayProperty(label: Label): void {
+    try {
+      const storageKey = `labelDisplayProperties_${this.id}`;
+      const savedSettings = JSON.parse(localStorage.getItem(storageKey) || '{}');
+      if (savedSettings[label.name] !== undefined) {
+        label.displayProperty = savedSettings[label.name];
+      }
+    } catch (error) {
+      // Silently handle localStorage errors
+      console.warn('Failed to load persisted label display properties:', error);
+    }
   }
 
   public visibleLinks(visible: boolean) {
