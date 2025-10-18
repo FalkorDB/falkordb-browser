@@ -457,26 +457,19 @@ export default function ForceGraph({
                     ctx.font = `400 2px SofiaSans`;
                     ctx.letterSpacing = '0.1px'
 
-                    let [line1, line2] = node.displayName;
+                    // Always generate text based on current label settings
+                    let text = '';
 
-                    // If displayName is empty or invalid, generate new text wrapping
-                    if (!line1 && !line2) {
-                        let text = '';
-
-                        if (type === "graph") {
-                            const label = labels.find(l => node.labels.includes(l.name));
-                            text = label ? getNodeDisplayTextWithLabel(node, label) : getNodeDisplayText(node);
-                        } else {
-                            text = getLabelWithFewestElements(node.labels.map(label => graph.LabelsMap.get(label) || graph.createLabel([label])[0])).name;
-                        }
-
-                        // Calculate text wrapping for circular node
-                        const textRadius = NODE_SIZE - PADDING / 2; // Leave some padding inside the circle
-                        [line1, line2] = wrapTextForCircularNode(ctx, text, textRadius);
-
-                        // Cache the result
-                        node.displayName = [line1, line2];
+                    if (type === "graph") {
+                        const label = labels.find(l => node.labels.includes(l.name));
+                        text = label ? getNodeDisplayTextWithLabel(node, label) : getNodeDisplayText(node);
+                    } else {
+                        text = getLabelWithFewestElements(node.labels.map(label => graph.LabelsMap.get(label) || graph.createLabel([label])[0])).name;
                     }
+
+                    // Calculate text wrapping for circular node
+                    const textRadius = NODE_SIZE - PADDING / 2; // Leave some padding inside the circle
+                    const [line1, line2] = wrapTextForCircularNode(ctx, text, textRadius);
 
                     const textMetrics = ctx.measureText(line1);
                     const textHeight = textMetrics.actualBoundingBoxAscent + textMetrics.actualBoundingBoxDescent;
