@@ -42,6 +42,8 @@ export type TextCell = {
   onChange: (value: string) => Promise<boolean>;
 };
 
+export type Tab = "Graph" | "Table" | "Metadata";
+
 export type ReadOnlyCell = {
   value: string;
   type: "readonly";

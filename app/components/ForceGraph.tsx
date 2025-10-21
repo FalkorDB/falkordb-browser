@@ -6,19 +6,17 @@
 
 import { Dispatch, SetStateAction, useContext, useEffect, useRef, useState } from "react"
 import ForceGraph2D from "react-force-graph-2d"
-import { securedFetch, GraphRef, handleZoomToFit, getTheme } from "@/lib/utils"
+import { securedFetch, GraphRef, handleZoomToFit, getTheme, Tab } from "@/lib/utils"
 import { useToast } from "@/components/ui/use-toast"
 import * as d3 from "d3"
 import { useTheme } from "next-themes"
-import { GraphData, Link, Node, Relationship, Graph, getLabelWithFewestElements } from "../api/graph/model"
-import { IndicatorContext } from "./provider"
+import { Link, Node, Relationship, Graph, getLabelWithFewestElements } from "../api/graph/model"
+import { IndicatorContext, ViewportContext } from "./provider"
 import Spinning from "./ui/spinning"
 
 interface Props {
     graph: Graph
     chartRef: GraphRef
-    data: GraphData
-    setData: Dispatch<SetStateAction<GraphData>>
     selectedElement: Node | Link | undefined
     setSelectedElement: (element: Node | Link | undefined) => void
     selectedElements: (Node | Link)[]
@@ -34,6 +32,7 @@ interface Props {
     isLoading: boolean
     handleCooldown: (ticks?: 0, isSetLoading?: boolean) => void
     cooldownTicks: number | undefined
+    currentTab: Tab
 }
 
 const NODE_SIZE = 6
@@ -142,8 +141,6 @@ const BASE_CENTER_STRENGTH = 0.1;
 export default function ForceGraph({
     graph,
     chartRef,
-    data,
-    setData,
     selectedElement,
     setSelectedElement,
     selectedElements,
@@ -159,9 +156,11 @@ export default function ForceGraph({
     isLoading,
     handleCooldown,
     cooldownTicks,
+    currentTab,
 }: Props) {
 
     const { indicator, setIndicator } = useContext(IndicatorContext)
+    const { viewport, setViewport, data, setData, isSaved } = useContext(ViewportContext)
 
     const { theme } = useTheme()
     const { toast } = useToast()
@@ -172,9 +171,43 @@ export default function ForceGraph({
 
     const [hoverElement, setHoverElement] = useState<Node | Link | undefined>()
 
+    // Load saved viewport on mount
     useEffect(() => {
-        handleZoomToFit(chartRef, undefined, data.nodes.length < 2 ? 4 : undefined)
-    }, [chartRef, data.nodes.length, data])
+        if (!chartRef.current) return;
+
+        if (isSaved) {
+            const { zoom, centerX, centerY } = viewport;
+            setTimeout(() => {
+                if (chartRef.current) {
+                    chartRef.current.zoom(zoom, 0);
+                    chartRef.current.centerAt(centerX, centerY, 0);
+                }
+            }, 100);
+        } else if (currentTab === "Graph" && graph.Elements.nodes.length > 0 && !isSaved) {
+            handleCooldown()
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [chartRef, graph.Id, currentTab, graph.Elements.nodes.length, handleCooldown, isSaved])
+
+    // Save viewport on unmount
+    useEffect(() => {
+        const chart = chartRef.current;
+
+        return () => {
+            if (chart) {
+                const zoom = chart.zoom();
+                const centerPos = chart.centerAt();
+
+                if (centerPos) {
+                    setViewport({
+                        zoom,
+                        centerX: centerPos.x,
+                        centerY: centerPos.y,
+                    });
+                }
+            }
+        };
+    }, [chartRef, graph.Id, setViewport])
 
     useEffect(() => {
         if (!parentRef.current) return;
@@ -244,6 +277,7 @@ export default function ForceGraph({
 
         // Reheat the simulation
         chartRef.current.d3ReheatSimulation();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [chartRef, graph.Elements.links.length, graph.Elements.nodes.length, graph])
 
     const onFetchNode = async (node: Node) => {

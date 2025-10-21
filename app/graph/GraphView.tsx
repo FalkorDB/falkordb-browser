@@ -4,10 +4,10 @@
 
 import { useState, useEffect, Dispatch, SetStateAction, useContext, useCallback } from "react";
 import { GitGraph, Info, Table } from "lucide-react"
-import { cn, GraphRef } from "@/lib/utils";
+import { cn, GraphRef, Tab } from "@/lib/utils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { GraphContext } from "@/app/components/provider";
-import { Label, GraphData, Link, Node, Relationship, HistoryQuery } from "../api/graph/model";
+import { GraphContext, ViewportContext } from "@/app/components/provider";
+import { Label, Link, Node, Relationship, HistoryQuery } from "../api/graph/model";
 import Button from "../components/ui/Button";
 import TableView from "./TableView";
 import Toolbar from "./toolbar";
@@ -17,12 +17,7 @@ import Labels from "./labels";
 import MetadataView from "./MetadataView";
 import ForceGraph from "../components/ForceGraph";
 
-
-type Tab = "Graph" | "Table" | "Metadata"
-
 interface Props {
-    data: GraphData
-    setData: Dispatch<SetStateAction<GraphData>>
     selectedElement: Node | Link | undefined
     setSelectedElement: (el: Node | Link | undefined) => void
     selectedElements: (Node | Link)[]
@@ -42,8 +37,6 @@ interface Props {
 }
 
 function GraphView({
-    data,
-    setData,
     selectedElement,
     setSelectedElement,
     selectedElements,
@@ -62,11 +55,11 @@ function GraphView({
     setHistoryQuery,
 }: Props) {
 
-    const { graph } = useContext(GraphContext)
+    const { graph, currentTab, setCurrentTab } = useContext(GraphContext)
+    const { setData } = useContext(ViewportContext)
 
     const [parentHeight, setParentHeight] = useState<number>(0)
     const [parentWidth, setParentWidth] = useState<number>(0)
-    const [tabsValue, setTabsValue] = useState<Tab>("Graph")
     const elementsLength = graph.getElements().length
 
     useEffect(() => {
@@ -85,21 +78,15 @@ function GraphView({
     }, [graph, setData])
 
     useEffect(() => {
-        if (tabsValue !== "Metadata" && isTabEnabled(tabsValue)) return
+        if (currentTab !== "Metadata" && isTabEnabled(currentTab)) return
 
         let defaultChecked: Tab = "Graph"
         if (elementsLength !== 0) defaultChecked = "Graph"
         else if (graph.Data.length !== 0) defaultChecked = "Table"
         else if (historyQuery.currentQuery && historyQuery.currentQuery.metadata.length > 0 && graph.Metadata.length > 0 && historyQuery.currentQuery.explain.length > 0) defaultChecked = "Metadata"
 
-        setTabsValue(defaultChecked);
+        setCurrentTab(defaultChecked);
     }, [graph, graph.Id, elementsLength, graph.Data.length])
-
-    useEffect(() => {
-        if (tabsValue === "Graph" && graph.Elements.nodes.length > 0) {
-            handleCooldown()
-        }
-    }, [tabsValue, handleCooldown, graph.Elements.nodes.length])
 
     useEffect(() => {
         setSelectedElement(undefined)
@@ -132,11 +119,11 @@ function GraphView({
     }
 
     return (
-        <Tabs value={tabsValue} onValueChange={(value) => setTabsValue(value as Tab)} className={cn("h-full w-full relative border border-border rounded-lg overflow-hidden", tabsValue === "Table" && "flex flex-col-reverse")}>
+        <Tabs value={currentTab} onValueChange={(value) => setCurrentTab(value as Tab)} className={cn("h-full w-full relative border border-border rounded-lg overflow-hidden", currentTab === "Table" && "flex flex-col-reverse")}>
             <div className="h-full w-full flex flex-col gap-4 absolute py-4 px-6 pointer-events-none z-10 justify-between">
                 <div className="grow basis-0 flex flex-col gap-6 overflow-hidden">
                     {
-                        !isLoading && tabsValue === "Graph" &&
+                        !isLoading && currentTab === "Graph" &&
                         <>
                             <Toolbar
                                 graph={graph}
@@ -161,7 +148,7 @@ function GraphView({
                 <div className="flex flex-col gap-6">
                     <GraphDetails
                         graph={graph}
-                        tabsValue={tabsValue}
+                        tabsValue={currentTab}
                     />
                     <div className="flex gap-2 items-center">
                         <TabsList className="bg-transparent flex gap-2 pointer-events-auto">
@@ -206,7 +193,7 @@ function GraphView({
                             </TabsTrigger>
                         </TabsList>
                         {
-                            graph.getElements().length > 0 && tabsValue === "Graph" && !isLoading &&
+                            graph.getElements().length > 0 && currentTab === "Graph" && !isLoading &&
                             <>
                                 <div className="h-full w-px bg-border rounded-full" />
                                 <Controls
@@ -225,8 +212,6 @@ function GraphView({
                 <ForceGraph
                     graph={graph}
                     chartRef={chartRef}
-                    data={data}
-                    setData={setData}
                     selectedElement={selectedElement}
                     setSelectedElement={setSelectedElement}
                     selectedElements={selectedElements}
@@ -239,6 +224,7 @@ function GraphView({
                     isLoading={isLoading}
                     handleCooldown={handleCooldown}
                     cooldownTicks={cooldownTicks}
+                    currentTab={currentTab}
                 />
             </TabsContent>
             <TabsContent value="Table" className="h-1 grow w-full mt-0 overflow-hidden">
