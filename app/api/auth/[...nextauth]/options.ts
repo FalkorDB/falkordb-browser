@@ -61,6 +61,7 @@ export async function getAdminConnectionForTokens(
   }
 
   // Create new Admin connection
+  // Note: Default user has "nopass" so we don't provide credentials
   const connectionOptions: FalkorDBOptions = tls
     ? {
         socket: {
@@ -70,16 +71,16 @@ export async function getAdminConnectionForTokens(
           checkServerIdentity: () => undefined,
           ca: ca ? [Buffer.from(ca, "base64").toString("utf8")] : undefined,
         },
-        username: "default", // Default admin user
-        password: "",        // Default admin password (empty)
+        username: undefined,
+        password: undefined,
       }
     : {
         socket: {
           host,
           port,
         },
-        username: "default", // Default admin user
-        password: "",        // Default admin password (empty)
+        username: undefined,
+        password: undefined,
       };
 
   adminConnectionForTokens = await FalkorDB.connect(connectionOptions);

@@ -29,14 +29,6 @@ export async function POST(request: NextRequest) {
 
     const { user: authenticatedUser } = session;
 
-    // CRITICAL: Only Admin users can revoke tokens
-    if (authenticatedUser.role !== 'Admin') {
-      return NextResponse.json(
-        { message: "Forbidden: Only Admin users can revoke tokens" },
-        { status: 403 }
-      );
-    }
-
     // Parse request body to get token to revoke
     let body;
     try {
@@ -60,6 +52,17 @@ export async function POST(request: NextRequest) {
     try {
       // Verify the token to be revoked
       const { payload } = await jwtVerify(tokenToRevoke, JWT_SECRET);
+      
+      // Permission check: Admin can revoke any token, users can only revoke their own
+      const isAdmin = authenticatedUser.role === 'Admin';
+      const isTokenOwner = authenticatedUser.id === payload.sub;
+      
+      if (!isAdmin && !isTokenOwner) {
+        return NextResponse.json(
+          { message: "Forbidden: You can only revoke your own tokens" },
+          { status: 403 }
+        );
+      }
       
       // Get Admin connection for token management (same host/port as the token)
       const adminClient = await getAdminConnectionForTokens(
