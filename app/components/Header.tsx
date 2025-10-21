@@ -128,6 +128,7 @@ export default function Header({ onSetGraphName, graphNames, graphName, onOpenGr
                             indicator={indicator}
                             title="Graph info"
                             onClick={() => onOpenGraphInfo()}
+                            data-testid="graphInfoToggle"
                         >
                             <Database size={iconSize} />
                         </Button>

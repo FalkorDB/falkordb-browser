@@ -12,8 +12,8 @@ import LoginVerification from "./loginVerification";
 import { Graph, GraphInfo, HistoryQuery, Query } from "./api/graph/model";
 import Header from "./components/Header";
 import { GraphContext, HistoryQueryContext, IndicatorContext, PanelContext, QueryLoadingContext, BrowserSettingsContext, SchemaContext } from "./components/provider";
-import Tutorial from "./graph/Tutorial";
 import GraphInfoPanel from "./graph/graphInfo";
+import Tutorial from "./components/Tutorial";
 
 const defaultQueryHistory: HistoryQuery = {
   queries: [],
@@ -75,6 +75,13 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
   const [navigateToSettings, setNavigateToSettings] = useState(false)
   const [tutorialOpen, setTutorialOpen] = useState(false)
   const [isCollapsed, setIsCollapsed] = useState(true)
+  const [userGraphsBeforeTutorial, setUserGraphsBeforeTutorial] = useState<string[]>([])
+  const [userGraphBeforeTutorial, setUserGraphBeforeTutorial] = useState<string>("")
+
+  const restartTutorial = useCallback(() => {
+    localStorage.removeItem("tutorial");
+    setTutorialOpen(true);
+  }, []);
 
   const browserSettingsContext = useMemo(() => ({
     newSettings: {
@@ -97,6 +104,8 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
     },
     hasChanges,
     setHasChanges,
+    restartTutorial,
+    tutorialOpen,
     saveSettings: () => {
       // Save settings to local storage
       localStorage.setItem("runDefaultQuery", newRunDefaultQuery.toString());
@@ -136,12 +145,12 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       setNewRefreshInterval(refreshInterval)
       setHasChanges(false)
     }
-  }), [contentPersistence, defaultQuery, hasChanges, lastLimit, limit, model, navigateToSettings, newContentPersistence, newDefaultQuery, newLimit, newModel, newRefreshInterval, newRunDefaultQuery, newSecretKey, newTimeout, refreshInterval, runDefaultQuery, secretKey, timeout, toast])
+  }), [contentPersistence, defaultQuery, hasChanges, lastLimit, limit, model, navigateToSettings, newContentPersistence, newDefaultQuery, newLimit, newModel, newRefreshInterval, newRunDefaultQuery, newSecretKey, newTimeout, refreshInterval, runDefaultQuery, secretKey, timeout, toast, restartTutorial, tutorialOpen])
 
   const historyQueryContext = useMemo(() => ({
     historyQuery,
     setHistoryQuery,
-  }), [historyQuery, setHistoryQuery])
+  }), [historyQuery])
 
   const indicatorContext = useMemo(() => ({
     indicator,
@@ -151,12 +160,12 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
   const panelContext = useMemo(() => ({
     panel,
     setPanel,
-  }), [panel, setPanel])
+  }), [panel])
 
   const queryLoadingContext = useMemo(() => ({
     isQueryLoading,
     setIsQueryLoading,
-  }), [isQueryLoading, setIsQueryLoading])
+  }), [isQueryLoading])
 
   const schemaContext = useMemo(() => ({
     schema,
@@ -165,7 +174,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
     setSchemaName,
     schemaNames,
     setSchemaNames
-  }), [schema, setSchema, schemaName, setSchemaName, schemaNames, setSchemaNames])
+  }), [schema, schemaName, schemaNames])
 
   const fetchCount = useCallback(async () => {
     if (!graphName) return;
@@ -185,7 +194,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
     } catch (error) {
       console.debug(error)
     }
-  }, [graphName, toast, setIndicator, setEdgesCount, setNodesCount]);
+  }, [graphName, toast]);
 
   const handleCooldown = useCallback((ticks?: 0, isSetLoading: boolean = true) => {
     if (typeof window !== 'undefined') {
@@ -199,7 +208,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
 
       if (canvas) canvas.setAttribute('data-engine-status', ticks === 0 ? 'stop' : 'running');
     }
-  }, [setIsLoading, setCooldownTicks]);
+  }, []);
 
   const fetchInfo = useCallback(async (type: string) => {
     if (!graphName) return []
@@ -218,6 +227,8 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
   const handelGetNewQueries = useCallback((newQuery: Query) => [...historyQuery.queries.filter(qu => qu.text !== newQuery.text), newQuery], [historyQuery.queries])
 
   const runQuery = useCallback(async (q: string, name?: string): Promise<void> => {
+    console.log("run", q);
+    
     const n = name || graphName
     let newQuery: Query = {
       elementsCount: 0,
@@ -281,7 +292,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
         status: "Success",
         elementsCount: g.getElements().length
       }
-      
+
       setGraph(g)
       fetchCount();
       setLastLimit(limit)
@@ -380,13 +391,13 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
         }
       }
     })()
-  }, [status, toast, setIndicator])
+  }, [status, toast])
 
   const checkStatus = useCallback(() => {
     securedFetch("/api/status", {
       method: "GET",
     }, toast, setIndicator)
-  }, [toast, setIndicator])
+  }, [toast])
 
   useEffect(() => {
     let interval: NodeJS.Timeout | undefined
@@ -416,7 +427,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
     await Promise.all(([["Graph", setGraphNames, setGraphName], ["Schema", setSchemaNames, setSchemaName]] as ["Graph" | "Schema", Dispatch<SetStateAction<string[]>>, Dispatch<SetStateAction<string>>][]).map(async ([type, setOptions, setName]) => {
       await fetchOptions(type, toast, setIndicator, indicator, setName, setOptions, contentPersistence)
     }))
-  }, [indicator, toast, contentPersistence, setGraphNames, setGraphName, setSchemaNames, setSchemaName, setIndicator])
+  }, [indicator, toast, contentPersistence])
 
   useEffect(() => {
     if (status !== "authenticated") return
@@ -435,6 +446,114 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       currentPanel.collapse()
     }
   }
+
+  const handleCloseTutorial = () => {
+    setTutorialOpen(false);
+  };
+
+  const handleLoadDemoGraphs = async () => {
+    try {
+      // Store current user graphs
+      setUserGraphsBeforeTutorial(graphNames);
+      setUserGraphBeforeTutorial(graphName)
+
+      // Create social demo graph
+      const socialQuery = `
+        CREATE 
+          (alice:Person {name: 'Alice', age: 30, city: 'New York'}),
+          (bob:Person {name: 'Bob', age: 25, city: 'Los Angeles'}),
+          (charlie:Person {name: 'Charlie', age: 35, city: 'Chicago'}),
+          (diana:Person {name: 'Diana', age: 28, city: 'New York'}),
+          (alice)-[:KNOWS {since: 2015}]->(bob),
+          (alice)-[:KNOWS {since: 2018}]->(charlie),
+          (bob)-[:KNOWS {since: 2020}]->(diana),
+          (charlie)-[:KNOWS {since: 2017}]->(diana),
+          (alice)-[:WORKS_WITH]->(diana)
+      `;
+
+      await getSSEGraphResult(`/api/graph/social-demo?query=${socialQuery}`, toast, setIndicator);
+
+      // Create social-test demo graph
+      const socialTestQuery = `
+      CREATE 
+      (eve:Person {name: 'Eve', age: 32}),
+      (frank:Person {name: 'Frank', age: 29}),
+      (eve)-[:FOLLOWS]->(frank)
+      `;
+
+      await getSSEGraphResult(`/api/graph/social-demo-test?query=${socialTestQuery}`, toast, setIndicator);
+
+      // Update graph list to only show demo graphs
+      setGraphNames(["social-demo", "social-demo-test"]);
+      setGraphName("")
+
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.error("Failed to load demo graphs", error);
+      toast({
+        title: "Error",
+        description: "Failed to load demo graphs",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleCleanupDemoGraphs = async () => {
+    try {
+      // Delete demo graphs
+      await securedFetch("/api/graph/social-demo", {
+        method: "DELETE",
+      }, toast, setIndicator);
+
+      await securedFetch("/api/graph/social-demo-test", {
+        method: "DELETE",
+      }, toast, setIndicator);
+
+      // Clear current graph to avoid showing deleted demo graph
+      setGraph(Graph.empty());
+      setGraphInfo(GraphInfo.empty());
+      setGraphName("");
+
+      // Restore user's original graphs
+      setGraphNames(userGraphsBeforeTutorial);
+      setGraphName(userGraphBeforeTutorial);
+
+      // Refresh graph list from server to ensure sync
+      await handleFetchOptions();
+
+      // Set to first user graph or empty after a brief delay to ensure UI updates
+      if (userGraphsBeforeTutorial.length > 0 && !userGraphBeforeTutorial) {
+        window.setTimeout(() => {
+          setGraphName(userGraphsBeforeTutorial[0]);
+        }, 100);
+
+        // Run default query for the first user graph if enabled
+        if (runDefaultQuery && defaultQuery) {
+          window.setTimeout(() => {
+            runQuery(defaultQuery, userGraphsBeforeTutorial[0]);
+          }, 150);
+        }
+      }
+
+      setUserGraphsBeforeTutorial([]);
+      setUserGraphBeforeTutorial("")
+
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.error("Failed to cleanup demo graphs", error);
+      // Still restore user graphs even if cleanup fails
+      setGraph(Graph.empty());
+      setGraphInfo(GraphInfo.empty());
+      setGraphName("");
+      setGraphNames(userGraphsBeforeTutorial);
+      setGraphName(userGraphBeforeTutorial)
+      if (userGraphsBeforeTutorial.length > 0 && !userGraphBeforeTutorial) {
+        window.setTimeout(() => {
+          setGraphName(userGraphsBeforeTutorial[0]);
+        }, 100);
+      }
+    }
+  };
 
   return (
     <ThemeProvider attribute="class" storageKey="theme" defaultTheme="system" disableTransitionOnChange>
@@ -481,13 +600,21 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
                               <div className="h-full w-full flex flex-col">
                                 {children}
                                 <div className="h-4 w-full Gradient" />
-                                {pathname === "/graph" && <Tutorial open={tutorialOpen} setOpen={setTutorialOpen} />}
                               </div>
                               :
                               children
                           }
                         </ResizablePanel>
                       </ResizablePanelGroup>
+                      {
+                        pathname === "/graph" &&
+                        <Tutorial
+                          open={tutorialOpen}
+                          onClose={handleCloseTutorial}
+                          onLoadDemoGraphs={handleLoadDemoGraphs}
+                          onCleanupDemoGraphs={handleCleanupDemoGraphs}
+                        />
+                      }
                     </QueryLoadingContext.Provider>
                   </PanelContext.Provider>
                 </IndicatorContext.Provider>

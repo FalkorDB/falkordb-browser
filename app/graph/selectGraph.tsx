@@ -36,7 +36,8 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
             contentPersistenceSettings: {
                 contentPersistence
             }
-        }
+        },
+        tutorialOpen
     } = useContext(BrowserSettingsContext)
 
     const inputRef = useRef<HTMLInputElement>(null)
@@ -49,48 +50,70 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
     const [openMenage, setOpenMenage] = useState(false)
     const [openDuplicate, setOpenDuplicate] = useState(false)
     const [isLoading, setIsLoading] = useState(false)
+
     useEffect(() => {
         setOpen(false)
     }, [selectedValue])
 
     const getOptions = useCallback(async () =>
         fetchOptions(type, toast, setIndicator, indicator, setSelectedValue, setOptions, contentPersistence)
-        , [type, toast, setIndicator, setOptions, setSelectedValue, contentPersistence])
+        , [type, toast, setIndicator, indicator, setSelectedValue, setOptions, contentPersistence])
 
 
-    const handleSetOption = async (option: string, optionName: string) => {
-        const result = await securedFetch(`api/${type === "Graph" ? "graph" : "schema"}/${prepareArg(option)}?sourceName=${prepareArg(optionName)}`, {
-            method: "PATCH",
-            headers: {
-                "Content-Type": "application/json"
+    const handleSetOption = useCallback(async (option: string, optionName: string) => {
+        const result = await securedFetch(
+            `api/${type === "Graph" ? "graph" : "schema"}/${prepareArg(option)}?sourceName=${prepareArg(optionName)}`,
+            {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" }
             },
-        }, toast, setIndicator)
+            toast,
+            setIndicator
+        )
 
         if (result.ok) {
-
-            const newOptions = options.map((opt) => opt === optionName ? option : opt)
+            const newOptions = options.map((opt) => (opt === optionName ? option : opt))
             setOptions!(newOptions)
 
             if (setSelectedValue && optionName === selectedValue) setSelectedValue(option)
 
-            handleSetRows(newOptions)
+            // Rebuild rows to reflect the updated option names
+            setRows(
+                newOptions.map(opt =>
+                    session?.user?.role === "Admin"
+                        ? ({
+                            checked: false,
+                            name: opt,
+                            cells: [{ value: opt, onChange: (value: string) => handleSetOption(value, opt), type: "text" }]
+                        })
+                        : ({ checked: false, name: opt, cells: [{ value: opt, type: "readonly" }] })
+                )
+            )
         }
 
         return result.ok
-    }
+    }, [type, toast, setIndicator, options, setOptions, setSelectedValue, selectedValue, setRows, session])
 
-    const handleSetRows = (opts: string[]) => {
-        setRows(opts.map(opt => session?.user?.role === "Admin" ? ({ checked: false, name: opt, cells: [{ value: opt, onChange: (value: string) => handleSetOption(value, opt), type: "text" }] }) : ({ checked: false, name: opt, cells: [{ value: opt, type: "readonly" }] })))
-    }
+    // Build rows whenever options change
 
     useEffect(() => {
-        handleSetRows(options)
-    }, [options])
+        setRows(
+            options.map(opt =>
+                session?.user?.role === "Admin"
+                    ? ({
+                        checked: false,
+                        name: opt,
+                        cells: [{ value: opt, onChange: (value: string) => handleSetOption(value, opt), type: "text" }]
+                    })
+                    : ({ checked: false, name: opt, cells: [{ value: opt, type: "readonly" }] })
+            )
+        )
+    }, [options, session, handleSetOption])
 
     const handleOpenChange = async (o: boolean) => {
         setOpen(o)
 
-        if (!o) return
+        if (!o || tutorialOpen) return
 
         try {
             setIsLoading(true)
@@ -104,6 +127,20 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
         setSelectedValue(value)
         setOpen(false)
     }
+
+    const handleSetRows = useCallback((opts: string[]) => {
+        setRows(
+            opts.map(opt =>
+                session?.user?.role === "Admin"
+                    ? ({
+                        checked: false,
+                        name: opt,
+                        cells: [{ value: opt, onChange: (value: string) => handleSetOption(value, opt), type: "text" }]
+                    })
+                    : ({ checked: false, name: opt, cells: [{ value: opt, type: "readonly" }] })
+            )
+        )
+    }, [session, setRows, handleSetOption])
 
     return (
         <Dialog open={openMenage} onOpenChange={setOpenMenage}>
@@ -125,7 +162,8 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
                     </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent
-                    className="h-[40dvh] min-h-fit w-[350px] mt-2 overflow-hidden border border-border rounded-lg flex flex-col items-center p-8"
+                    className="h-[40dvh] min-h-fit w-[350px] mt-2 overflow-hidden border border-border rounded-lg flex flex-col items-center p-4"
+                    preventOutsideClose={tutorialOpen}
                 >
                     <PaginationList
                         className="basis-0 grow min-h-fit p-0"
@@ -176,6 +214,7 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
                     }
                 }}
                 disableClose
+                preventOutsideClose={tutorialOpen}
                 className="flex flex-col border-none rounded-lg max-w-none h-[90dvh]"
             >
                 <DialogHeader className="flex-row justify-between items-center border-b border-border pb-4">

@@ -53,7 +53,7 @@
     .SofiaSans * {
         font-family: 'SofiaSans' !important;
         letter-spacing: 0.1px;
-        font: 400;
+        font-weight: 400;
     }
 
     .tabs-trigger {
@@ -110,6 +110,10 @@
         /* 22px */
         line-height: 2rem;
         /* 32px */
+    }
+
+    .tutorial-highlight {
+        @apply z-30 rounded-lg relative
     }
 }
 
