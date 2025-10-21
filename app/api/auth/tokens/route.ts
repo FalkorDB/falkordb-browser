@@ -1,8 +1,8 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { getClient, getAdminConnectionForTokens } from "../[...nextauth]/options";
 
 // eslint-disable-next-line import/prefer-default-export
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     // Get authenticated client (this verifies auth and gives us user info)
     const session = await getClient();

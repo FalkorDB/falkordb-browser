@@ -4,7 +4,7 @@ import { getClient, getAdminConnectionForTokens } from "../../[...nextauth]/opti
 // eslint-disable-next-line import/prefer-default-export
 export async function GET(
   request: NextRequest,
-  { params }: { params: { tokenId: string } }
+  { params }: { params: Promise<{ tokenId: string }> }
 ) {
   try {
     // Get authenticated client (this verifies auth and gives us user info)
@@ -14,7 +14,7 @@ export async function GET(
     }
 
     const { user: authenticatedUser } = session;
-    const { tokenId } = params;
+    const { tokenId } = await params;
 
     // Get Admin connection for token management
     const adminClient = await getAdminConnectionForTokens(
