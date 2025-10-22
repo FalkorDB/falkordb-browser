@@ -66,7 +66,7 @@ export default class SettingsUsersPage extends BasePage {
 
   private get userCheckboxBtn(): (selectedUser: string) => Locator {
     return (selectedUser: string) =>
-      this.page.locator(`tableCheckboxUsers${selectedUser}`);
+      this.page.getByTestId(`tableCheckboxUsers${selectedUser}`);
   }
 
   private get findUserNameInTable(): (selectedUser: string) => Locator {
