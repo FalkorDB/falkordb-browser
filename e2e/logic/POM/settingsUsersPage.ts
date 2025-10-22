@@ -61,17 +61,17 @@ export default class SettingsUsersPage extends BasePage {
 
   private get userRoleContent(): (selectedUser: string) => Locator {
     return (selectedUser: string) =>
-      this.page.locator(`//tr[@data-id='${selectedUser}']/td[4]/div/p`);
+      this.page.getByTestId(`contentUsers${selectedUser}`);
   }
 
   private get userCheckboxBtn(): (selectedUser: string) => Locator {
     return (selectedUser: string) =>
-      this.page.locator(`//tbody/tr[@data-id='${selectedUser}']/td[1]/button`);
+      this.page.locator(`tableCheckboxUsers${selectedUser}`);
   }
 
   private get findUserNameInTable(): (selectedUser: string) => Locator {
     return (selectedUser: string) =>
-      this.page.locator(`//tbody/tr[@data-id='${selectedUser}']/td[2]`);
+      this.page.getByTestId(`TableRowUsers${selectedUser}`);
   }
 
   private get deleteUsersBtn(): Locator {
@@ -83,7 +83,7 @@ export default class SettingsUsersPage extends BasePage {
   }
 
   private get searchInput(): Locator {
-    return this.page.locator('input[data-testid="searchInputUsers"]');
+    return this.page.getByTestId('searchInputUsers');
   }
 
   private get tableRoles(): Locator {

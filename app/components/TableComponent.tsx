@@ -298,13 +298,14 @@ export default function TableComponent({
                     {
                         visibleRows.map((row) => {
                             const actualIndex = rows.findIndex(r => r === row)
+                            const dataTestID = `${label}${typeof row.cells[0].value === "object" ? row.cells[0].value?.id : row.cells[0].value}`
 
                             if (actualIndex === -1) return null
 
                             return (
                                 <TableRow
                                     className="border-border"
-                                    data-testid={`tableRow${label}${row.cells[0].value}`}
+                                    data-testid={`tableRow${dataTestID}`}
                                     onMouseEnter={() => setHover(`${actualIndex}`)}
                                     onMouseLeave={() => setHover("")}
                                     data-id={typeof row.cells[0].value === "string" ? row.cells[0].value : undefined}
@@ -315,7 +316,7 @@ export default function TableComponent({
                                             <TableCell className="w-5 !pr-2 border-r border-border">
                                                 <Checkbox
                                                     className="w-6 h-6 rounded-full bg-background border-primary data-[state=checked]:bg-primary"
-                                                    data-testid={`tableCheckbox${label}${row.cells[0].value}`}
+                                                    data-testid={`tableCheckbox${dataTestID}`}
                                                     checked={row.checked}
                                                     onCheckedChange={() => {
                                                         setRows(rows.map((r, k) => {
@@ -371,6 +372,7 @@ export default function TableComponent({
                                                                     {
                                                                         cell.type === "select" ?
                                                                             <Combobox
+                                                                                data-testid={`select${label}`}
                                                                                 inTable
                                                                                 options={cell.options}
                                                                                 setSelectedValue={async (value) => {
@@ -445,7 +447,7 @@ export default function TableComponent({
                                                                 : <div className="flex items-center gap-2">
                                                                     <Tooltip>
                                                                         <TooltipTrigger asChild>
-                                                                            <p>{cell.value}</p>
+                                                                            <p data-testid={`content${dataTestID}`} >{cell.value}</p>
                                                                         </TooltipTrigger>
                                                                         <TooltipContent>
                                                                             {cell.value}
