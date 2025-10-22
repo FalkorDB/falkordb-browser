@@ -62,7 +62,14 @@ export type Message = {
     | "Schema";
 };
 
+export type ViewportState = {
+  zoom: number;
+  centerX: number;
+  centerY: number;
+};
+
 export type Cell = SelectCell | TextCell | ObjectCell | ReadOnlyCell;
+
 export interface Row {
   cells: Cell[];
   checked?: boolean;

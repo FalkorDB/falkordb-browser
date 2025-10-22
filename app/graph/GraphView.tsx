@@ -56,7 +56,7 @@ function GraphView({
 }: Props) {
 
     const { graph, currentTab, setCurrentTab } = useContext(GraphContext)
-    const { setData, data } = useContext(ViewportContext)
+    const { setData, data, isSaved, setViewport, viewport } = useContext(ViewportContext)
 
     const [parentHeight, setParentHeight] = useState<number>(0)
     const [parentWidth, setParentWidth] = useState<number>(0)
@@ -223,6 +223,9 @@ function GraphView({
                     handleCooldown={handleCooldown}
                     cooldownTicks={cooldownTicks}
                     currentTab={currentTab}
+                    viewport={viewport}
+                    setViewport={setViewport}
+                    isSaved={isSaved}
                 />
             </TabsContent>
             <TabsContent value="Table" className="h-1 grow w-full mt-0 overflow-hidden">

@@ -6,12 +6,12 @@
 
 import { Dispatch, SetStateAction, useContext, useEffect, useRef, useState } from "react"
 import ForceGraph2D from "react-force-graph-2d"
-import { securedFetch, GraphRef, handleZoomToFit, getTheme, Tab } from "@/lib/utils"
+import { securedFetch, GraphRef, handleZoomToFit, getTheme, Tab, ViewportState } from "@/lib/utils"
 import { useToast } from "@/components/ui/use-toast"
 import * as d3 from "d3"
 import { useTheme } from "next-themes"
 import { Link, Node, Relationship, Graph, getLabelWithFewestElements, GraphData } from "../api/graph/model"
-import { IndicatorContext, ViewportContext } from "./provider"
+import { IndicatorContext } from "./provider"
 import Spinning from "./ui/spinning"
 
 interface Props {
@@ -35,6 +35,9 @@ interface Props {
     handleCooldown: (ticks?: 0, isSetLoading?: boolean) => void
     cooldownTicks: number | undefined
     currentTab?: Tab
+    viewport?: ViewportState
+    setViewport?: Dispatch<SetStateAction<ViewportState>> 
+    isSaved?: boolean
 }
 
 const NODE_SIZE = 6
@@ -161,10 +164,12 @@ export default function ForceGraph({
     handleCooldown,
     cooldownTicks,
     currentTab = "Graph",
+    viewport,
+    setViewport,
+    isSaved
 }: Props) {
 
     const { indicator, setIndicator } = useContext(IndicatorContext)
-    const { viewport, setViewport, isSaved } = useContext(ViewportContext)
 
     const { theme } = useTheme()
     const { toast } = useToast()
@@ -181,9 +186,7 @@ export default function ForceGraph({
 
     // Load saved viewport on mount
     useEffect(() => {
-        if (!chartRef.current) return;
-
-        if (isSaved) {
+        if (isSaved && viewport) {
             const { zoom, centerX, centerY } = viewport;
             setTimeout(() => {
                 if (chartRef.current) {
@@ -191,18 +194,18 @@ export default function ForceGraph({
                     chartRef.current.centerAt(centerX, centerY, 0);
                 }
             }, 100);
-        } else if (currentTab === "Graph" && graph.Elements.nodes.length > 0 && !isSaved) {
+        } else if (currentTab === "Graph" && graph.Elements.nodes.length > 0) {
             handleCooldown()
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [chartRef, graph.Id, currentTab, graph.Elements.nodes.length, handleCooldown, isSaved])
+    }, [chartRef, graph.Id, currentTab, graph.Elements.nodes.length, isSaved])
 
     // Save viewport on unmount
     useEffect(() => {
         const chart = chartRef.current;
 
         return () => {
-            if (chart) {
+            if (chart && setViewport) {
                 const zoom = chart.zoom();
                 const centerPos = chart.centerAt();
 

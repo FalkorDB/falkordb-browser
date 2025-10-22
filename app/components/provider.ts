@@ -1,5 +1,5 @@
 import { createContext, Dispatch, SetStateAction } from "react";
-import { Panel, Tab } from "@/lib/utils";
+import { Panel, Tab, ViewportState } from "@/lib/utils";
 import { Graph, GraphData, GraphInfo, HistoryQuery } from "../api/graph/model";
 
 type BrowserSettingsContextType = {
@@ -126,12 +126,6 @@ type PanelContextType = {
 type QueryLoadingContextType = {
   isQueryLoading: boolean;
   setIsQueryLoading: Dispatch<SetStateAction<boolean>>;
-};
-
-type ViewportState = {
-  zoom: number;
-  centerX: number;
-  centerY: number;
 };
 
 type ViewportContextType = {
