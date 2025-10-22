@@ -10,7 +10,7 @@ export function getTokenId(payload: Record<string, unknown>): string {
 // Helper function to check if a token is active using Admin connection
 export async function isTokenActive(
   token: string,
-  adminConnection?: { get: (key: string) => Promise<string | null> }
+  adminConnection?: { get: (key: string) => Promise<string | null>; setEx: (key: string, ttl: number, value: string) => Promise<string | void> }
 ): Promise<boolean> {
   try {
     if (!process.env.NEXTAUTH_SECRET) {
@@ -37,15 +37,26 @@ export async function isTokenActive(
       return false; // Token not found, consider it revoked or expired
     }
     
-    // Token exists, update last_used timestamp
+    // Token exists, update last_used timestamp (throttled to avoid excessive writes)
     try {
+      const UPDATE_THRESHOLD_MS = 5 * 60 * 1000; // 5 minutes
       const data = JSON.parse(tokenData);
-      data.last_used = new Date().toISOString();
+      const lastUsed = data.last_used ? new Date(data.last_used).getTime() : 0;
+      const now = Date.now();
       
-      // Note: We don't update here to avoid permission issues
-      // The token is still valid
+      // Only update if more than 5 minutes have passed since last update
+      if (now - lastUsed > UPDATE_THRESHOLD_MS) {
+        data.last_used = new Date(now).toISOString();
+        
+        // Update Redis using admin connection (has SET permission)
+        await adminConnection.setEx(
+          `api_token:${tokenHash}`,
+          31536000, // 1 year TTL
+          JSON.stringify(data)
+        );
+      }
     } catch (parseError) {
-      // If we can't parse, still consider token active if it exists
+      // If we can't parse or update, still consider token active if it exists
     }
     
     return true;
