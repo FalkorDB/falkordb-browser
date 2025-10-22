@@ -139,7 +139,17 @@ type ViewportContextType = {
   setViewport: Dispatch<SetStateAction<ViewportState>>;
   data: GraphData;
   setData: Dispatch<SetStateAction<GraphData>>;
-  isSaved: boolean
+  isSaved: boolean;
+};
+
+type TableViewContextType = {
+  scrollPosition: number;
+  setScrollPosition: Dispatch<SetStateAction<number>>;
+  search: string;
+  setSearch: Dispatch<SetStateAction<string>>;
+  expand: number[];
+  setExpand: Dispatch<SetStateAction<number[]>>;
+  dataHash: string;
 };
 
 export const BrowserSettingsContext = createContext<BrowserSettingsContextType>(
@@ -271,5 +281,15 @@ export const ViewportContext = createContext<ViewportContextType>({
   setViewport: () => {},
   data: { nodes: [], links: [] },
   setData: () => {},
-  isSaved: false
+  isSaved: false,
+});
+
+export const TableViewContext = createContext<TableViewContextType>({
+  scrollPosition: 0,
+  setScrollPosition: () => {},
+  search: "",
+  setSearch: () => {},
+  expand: [],
+  setExpand: () => {},
+  dataHash: "",
 });

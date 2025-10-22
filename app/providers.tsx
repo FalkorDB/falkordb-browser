@@ -11,7 +11,7 @@ import { ImperativePanelHandle } from "react-resizable-panels";
 import LoginVerification from "./loginVerification";
 import { Graph, GraphData, GraphInfo, HistoryQuery, Query } from "./api/graph/model";
 import Header from "./components/Header";
-import { GraphContext, HistoryQueryContext, IndicatorContext, PanelContext, QueryLoadingContext, BrowserSettingsContext, SchemaContext, ViewportContext } from "./components/provider";
+import { GraphContext, HistoryQueryContext, IndicatorContext, PanelContext, QueryLoadingContext, BrowserSettingsContext, SchemaContext, ViewportContext, TableViewContext } from "./components/provider";
 import Tutorial from "./graph/Tutorial";
 import GraphInfoPanel from "./graph/graphInfo";
 
@@ -78,8 +78,12 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
   const [tutorialOpen, setTutorialOpen] = useState(false)
   const [isCollapsed, setIsCollapsed] = useState(true)
   const [viewport, setViewport] = useState<{ zoom: number; centerX: number; centerY: number }>({ centerX: 0, centerY: 0, zoom: 0 })
+  const [scrollPosition, setScrollPosition] = useState(0)
+  const [search, setSearch] = useState("")
+  const [expand, setExpand] = useState<number[]>([])
 
   const isSaved = data.nodes.some(n => n.x && n.y)
+  const dataHash = useMemo(() => JSON.stringify(graph.Data), [graph.Data])
 
   const browserSettingsContext = useMemo(() => ({
     newSettings: {
@@ -171,6 +175,16 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
     setData,
     isSaved
   }), [viewport, data, isSaved])
+
+  const tableViewContext = useMemo(() => ({
+    scrollPosition,
+    setScrollPosition,
+    search,
+    setSearch,
+    expand,
+    setExpand,
+    dataHash
+  }), [scrollPosition, search, expand, dataHash])
 
   const schemaContext = useMemo(() => ({
     schema,
@@ -469,48 +483,50 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
                   <PanelContext.Provider value={panelContext}>
                     <QueryLoadingContext.Provider value={queryLoadingContext}>
                       <ViewportContext.Provider value={viewportContext}>
-                        {
-                          pathname !== "/" && pathname !== "/login" &&
-                          <Header
-                            graphName={graphName}
-                            graphNames={pathname.includes("/schema") ? schemaNames : graphNames}
-                            onSetGraphName={handleOnSetGraphName}
-                            onOpenGraphInfo={onExpand}
-                            displayChat={displayChat}
-                          />
-                        }
-                        <ResizablePanelGroup direction="horizontal" className="w-1 grow">
-                          <ResizablePanel
-                            ref={panelRef}
-                            defaultSize={panelSize}
-                            collapsible
-                            minSize={15}
-                            maxSize={30}
-                            onCollapse={() => setIsCollapsed(true)}
-                            onExpand={() => setIsCollapsed(false)}
-                          >
-                            <GraphInfoPanel
-                              onClose={onExpand}
+                        <TableViewContext.Provider value={tableViewContext}>
+                          {
+                            pathname !== "/" && pathname !== "/login" &&
+                            <Header
+                              graphName={graphName}
+                              graphNames={pathname.includes("/schema") ? schemaNames : graphNames}
+                              onSetGraphName={handleOnSetGraphName}
+                              onOpenGraphInfo={onExpand}
+                              displayChat={displayChat}
                             />
-                          </ResizablePanel>
-                          <ResizableHandle withHandle onMouseUp={() => isCollapsed && onExpand()} className={cn("w-0", isCollapsed && "hidden")} />
-                          <ResizablePanel
-                            defaultSize={100 - panelSize}
-                            minSize={70}
-                            maxSize={100}
-                          >
-                            {
-                              (pathname === "/graph" || pathname === "/schema") ?
-                                <div className="h-full w-full flex flex-col">
-                                  {children}
-                                  <div className="h-4 w-full Gradient" />
-                                  {pathname === "/graph" && <Tutorial open={tutorialOpen} setOpen={setTutorialOpen} />}
-                                </div>
-                                :
-                                children
-                            }
-                          </ResizablePanel>
-                        </ResizablePanelGroup>
+                          }
+                          <ResizablePanelGroup direction="horizontal" className="w-1 grow">
+                            <ResizablePanel
+                              ref={panelRef}
+                              defaultSize={panelSize}
+                              collapsible
+                              minSize={15}
+                              maxSize={30}
+                              onCollapse={() => setIsCollapsed(true)}
+                              onExpand={() => setIsCollapsed(false)}
+                            >
+                              <GraphInfoPanel
+                                onClose={onExpand}
+                              />
+                            </ResizablePanel>
+                            <ResizableHandle withHandle onMouseUp={() => isCollapsed && onExpand()} className={cn("w-0", isCollapsed && "hidden")} />
+                            <ResizablePanel
+                              defaultSize={100 - panelSize}
+                              minSize={70}
+                              maxSize={100}
+                            >
+                              {
+                                (pathname === "/graph" || pathname === "/schema") ?
+                                  <div className="h-full w-full flex flex-col">
+                                    {children}
+                                    <div className="h-4 w-full Gradient" />
+                                    {pathname === "/graph" && <Tutorial open={tutorialOpen} setOpen={setTutorialOpen} />}
+                                  </div>
+                                  :
+                                  children
+                              }
+                            </ResizablePanel>
+                          </ResizablePanelGroup>
+                        </TableViewContext.Provider>
                       </ViewportContext.Provider>
                     </QueryLoadingContext.Provider>
                   </PanelContext.Provider>

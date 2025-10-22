@@ -56,7 +56,7 @@ function GraphView({
 }: Props) {
 
     const { graph, currentTab, setCurrentTab } = useContext(GraphContext)
-    const { setData } = useContext(ViewportContext)
+    const { setData, data } = useContext(ViewportContext)
 
     const [parentHeight, setParentHeight] = useState<number>(0)
     const [parentWidth, setParentWidth] = useState<number>(0)
@@ -72,10 +72,6 @@ function GraphView({
         if (tab === "Table") return graph.Data.length !== 0
         return historyQuery.currentQuery && historyQuery.currentQuery.metadata.length > 0 && graph.Metadata.length > 0 && historyQuery.currentQuery.explain.length > 0
     }, [graph, elementsLength, historyQuery.currentQuery])
-
-    useEffect(() => {
-        setData({ ...graph.Elements })
-    }, [graph, setData])
 
     useEffect(() => {
         if (currentTab !== "Metadata" && isTabEnabled(currentTab)) return
@@ -211,6 +207,8 @@ function GraphView({
             <TabsContent value="Graph" className="h-full w-full mt-0 overflow-hidden">
                 <ForceGraph
                     graph={graph}
+                    data={data}
+                    setData={setData}
                     chartRef={chartRef}
                     selectedElement={selectedElement}
                     setSelectedElement={setSelectedElement}

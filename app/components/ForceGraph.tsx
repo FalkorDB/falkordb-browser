@@ -10,12 +10,14 @@ import { securedFetch, GraphRef, handleZoomToFit, getTheme, Tab } from "@/lib/ut
 import { useToast } from "@/components/ui/use-toast"
 import * as d3 from "d3"
 import { useTheme } from "next-themes"
-import { Link, Node, Relationship, Graph, getLabelWithFewestElements } from "../api/graph/model"
+import { Link, Node, Relationship, Graph, getLabelWithFewestElements, GraphData } from "../api/graph/model"
 import { IndicatorContext, ViewportContext } from "./provider"
 import Spinning from "./ui/spinning"
 
 interface Props {
     graph: Graph
+    data: GraphData
+    setData: Dispatch<SetStateAction<GraphData>>
     chartRef: GraphRef
     selectedElement: Node | Link | undefined
     setSelectedElement: (element: Node | Link | undefined) => void
@@ -140,6 +142,8 @@ const BASE_CENTER_STRENGTH = 0.1;
 
 export default function ForceGraph({
     graph,
+    data,
+    setData,
     chartRef,
     selectedElement,
     setSelectedElement,
@@ -160,7 +164,7 @@ export default function ForceGraph({
 }: Props) {
 
     const { indicator, setIndicator } = useContext(IndicatorContext)
-    const { viewport, setViewport, data, setData, isSaved } = useContext(ViewportContext)
+    const { viewport, setViewport, isSaved } = useContext(ViewportContext)
 
     const { theme } = useTheme()
     const { toast } = useToast()
@@ -170,6 +174,10 @@ export default function ForceGraph({
     const parentRef = useRef<HTMLDivElement>(null)
 
     const [hoverElement, setHoverElement] = useState<Node | Link | undefined>()
+
+    useEffect(() => {
+        setData({ ...graph.Elements })
+    }, [graph, setData])
 
     // Load saved viewport on mount
     useEffect(() => {
