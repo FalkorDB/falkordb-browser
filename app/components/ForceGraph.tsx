@@ -34,7 +34,7 @@ interface Props {
     isLoading: boolean
     handleCooldown: (ticks?: 0, isSetLoading?: boolean) => void
     cooldownTicks: number | undefined
-    currentTab: Tab
+    currentTab?: Tab
 }
 
 const NODE_SIZE = 6
@@ -160,7 +160,7 @@ export default function ForceGraph({
     isLoading,
     handleCooldown,
     cooldownTicks,
-    currentTab,
+    currentTab = "Graph",
 }: Props) {
 
     const { indicator, setIndicator } = useContext(IndicatorContext)
