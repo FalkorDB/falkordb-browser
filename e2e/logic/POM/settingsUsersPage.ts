@@ -71,7 +71,7 @@ export default class SettingsUsersPage extends BasePage {
 
   private get findUserNameInTable(): (selectedUser: string) => Locator {
     return (selectedUser: string) =>
-      this.page.getByTestId(`TableRowUsers${selectedUser}`);
+      this.page.getByTestId(`tableRowUsers${selectedUser}`);
   }
 
   private get deleteUsersBtn(): Locator {

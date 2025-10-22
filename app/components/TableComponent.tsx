@@ -336,7 +336,7 @@ export default function TableComponent({
                                     {
                                         row.cells.map((cell, j) => (
                                             <TableCell className={cn("border-border p-0", j + 1 !== row.cells.length && "border-r")} key={j}>
-                                                <div style={{ height }} className={cn("overflow-auto", row.cells[0]?.value === editable && (cell.type !== "readonly" && cell.type !== "object") && "p-2", cell.type === "object" && "p-1")}>
+                                                <div style={{ height }} className={cn("overflow-auto p-4", row.cells[0]?.value === editable && (cell.type !== "readonly" && cell.type !== "object") && "p-2", cell.type === "object" && "p-1")}>
                                                     {
                                                         cell.type === "object" ?
                                                             <div className="pointer-events-none [&_.json-tree_.arrow]:hidden">
@@ -444,7 +444,7 @@ export default function TableComponent({
                                                                         }
                                                                     </div>
                                                                 </div>
-                                                                : <div className="flex items-center gap-2">
+                                                                : <div className="h-full flex items-center gap-2">
                                                                     <Tooltip>
                                                                         <TooltipTrigger asChild>
                                                                             <p data-testid={`content${dataTestID}`} >{cell.value}</p>
