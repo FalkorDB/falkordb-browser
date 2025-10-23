@@ -61,7 +61,7 @@ export default class SettingsUsersPage extends BasePage {
 
   private get userRoleContent(): (selectedUser: string) => Locator {
     return (selectedUser: string) =>
-      this.page.getByTestId(`contentUsers${selectedUser}`);
+      this.page.getByTestId(`contentUsers${selectedUser}Role`);
   }
 
   private get userCheckboxBtn(): (selectedUser: string) => Locator {
@@ -71,7 +71,7 @@ export default class SettingsUsersPage extends BasePage {
 
   private get findUserNameInTable(): (selectedUser: string) => Locator {
     return (selectedUser: string) =>
-      this.page.getByTestId(`tableRowUsers${selectedUser}`);
+      this.page.getByTestId(`contentUsers${selectedUser}Name`);
   }
 
   private get deleteUsersBtn(): Locator {

@@ -447,7 +447,7 @@ export default function TableComponent({
                                                                 : <div className="h-full flex items-center gap-2">
                                                                     <Tooltip>
                                                                         <TooltipTrigger asChild>
-                                                                            <p data-testid={`content${dataTestID}`} >{cell.value}</p>
+                                                                            <p data-testid={`content${dataTestID}${headers[j]}`} >{cell.value}</p>
                                                                         </TooltipTrigger>
                                                                         <TooltipContent>
                                                                             {cell.value}
