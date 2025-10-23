@@ -13,6 +13,7 @@ interface TutorialStep {
     placementAxis?: "x" | "y";
     advanceOn?: string;
     forward?: string[]
+    hidePrev?: boolean
 }
 
 const tutorialSteps: TutorialStep[] = [
@@ -48,10 +49,9 @@ const tutorialSteps: TutorialStep[] = [
         description: "Click on the 'social-demo' option to select and load this demo graph. It contains sample social network data with users, posts, and relationships that you can explore. Click the highlighted option to continue.",
         position: {},
         targetSelector: '[data-testid="selectGraphsocial-demoButton"]',
-        spotlightSelector: '[data-testid="selectGraphsocial-demo"]',
         placementAxis: "x",
-        advanceOn: "pointerdown",
-        forward: ["pointerdown", "pointerenter", "pointerleave"]
+        advanceOn: "click",
+        forward: ["click", "mouseenter", "mouseleave"]
     },
     {
         title: "Graph Info Panel",
@@ -59,6 +59,7 @@ const tutorialSteps: TutorialStep[] = [
         position: {},
         targetSelector: '[data-testid="graphInfoPanel"]',
         placementAxis: "x",
+        hidePrev: true
     },
     {
         title: "Get all nodes",
@@ -307,7 +308,7 @@ function TutorialPortal({
 
     useEffect(() => {
         const currentStep = tutorialSteps[step];
-        const { targetSelector, spotlightSelector, advanceOn } = currentStep
+        const { targetSelector, advanceOn } = currentStep
 
         // Highlight target element and add click listener
         if (targetSelector) {
@@ -328,14 +329,15 @@ function TutorialPortal({
                 // Function to update overlay position
                 const updateOverlayPosition = () => {
                     const rect = element.getBoundingClientRect();
-                    const top = Math.round(rect.top);
-                    const left = Math.round(rect.left);
-                    const width = Math.round(rect.width);
-                    const height = Math.round(rect.height);
+                    const padding = 2;
+                    const top = Math.round(rect.top) - padding;
+                    const left = Math.round(rect.left) - padding;
+                    const right = Math.round(rect.right) + padding;
+                    const bottom = Math.round(rect.bottom) + padding;
                     overlay.style.top = `${top}px`;
                     overlay.style.left = `${left}px`;
-                    overlay.style.width = `${width}px`;
-                    overlay.style.height = `${height}px`;
+                    overlay.style.width = `${right - left}px`;
+                    overlay.style.height = `${bottom - top}px`;
                 };
 
                 const resizeObserver = new ResizeObserver(updateOverlayPosition)
@@ -412,12 +414,6 @@ function TutorialPortal({
                             cancelable: true,
                         });
 
-                        if ((ev.type === "pointerenter" || ev.type === "pointerleave") && spotlightSelector) {
-                            const spotlight = document.querySelector(spotlightSelector)
-                            if (spotlight) {
-                                spotlight.dispatchEvent(clone)
-                            }
-                        }
                         element.dispatchEvent(clone);
                         return;
                     }
@@ -454,14 +450,14 @@ function TutorialPortal({
 
                 const addForwarders = () => {
                     [...forwardMouseEvents, ...forwardPointerEvents, ...forwardWheelEvents, ...forwardTouchEvents, ...forwardKeyboardEvents]
-                        .filter(e => currentStep.forward && currentStep.forward.some(ev => e == ev))
+                        .filter(e => currentStep.forward && currentStep.forward.some(ev => e === ev))
                         .forEach((type) => {
                             overlay.addEventListener(type, forwardEvent, true);
                         });
                 };
                 const removeForwarders = () => {
                     [...forwardMouseEvents, ...forwardPointerEvents, ...forwardWheelEvents, ...forwardTouchEvents, ...forwardKeyboardEvents]
-                        .filter(e => currentStep.forward && currentStep.forward.some(ev => e == ev))
+                        .filter(e => currentStep.forward && currentStep.forward.some(ev => e === ev))
                         .forEach((type) => {
                             overlay.removeEventListener(type, forwardEvent, true);
                         });
@@ -563,7 +559,7 @@ function TutorialPortal({
                         />
                         <div className="flex gap-2">
                             {
-                                step > 1 &&
+                                step > 1 && !currentStep.hidePrev &&
                                 <Button
                                     variant="Secondary"
                                     label="Previous"
@@ -616,11 +612,12 @@ function TutorialSpotlight({ targetSelector, spotlightSelector }: { targetSelect
 
         const updateSpotlight = () => {
             const rect = element.getBoundingClientRect();
-            // Align spotlight exactly with the target element, avoiding subpixel offsets
-            const left = Math.round(rect.left);
-            const top = Math.round(rect.top);
-            const right = Math.round(rect.right);
-            const bottom = Math.round(rect.bottom);
+            // Align spotlight with the target element with padding
+            const padding = 2;
+            const left = Math.round(rect.left) - padding;
+            const top = Math.round(rect.top) - padding;
+            const right = Math.round(rect.right) + padding;
+            const bottom = Math.round(rect.bottom) + padding;
 
             setSpotlightStyle({
                 clipPath: `polygon(
@@ -668,6 +665,8 @@ function Tutorial({ open, onClose, onLoadDemoGraphs, onCleanupDemoGraphs }: Tuto
     const [step, setStep] = useState(0);
     const [demoLoaded, setDemoLoaded] = useState(false);
 
+    const currentStep = tutorialSteps[step];
+
     // Load demo graphs when tutorial opens and auto-advance to step 1
     useEffect(() => {
         if (open && step === 0 && !demoLoaded && onLoadDemoGraphs) {
@@ -705,8 +704,6 @@ function Tutorial({ open, onClose, onLoadDemoGraphs, onCleanupDemoGraphs }: Tuto
     };
 
     if (!open) return null;
-
-    const currentStep = tutorialSteps[step];
 
     return (
         <>
