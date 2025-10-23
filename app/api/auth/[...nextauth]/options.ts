@@ -15,7 +15,6 @@ interface CustomJWTPayload {
   role: Role;
   host: string;
   port: number;
-  password?: string;
   tls: boolean;
   ca?: string;
 }
@@ -292,40 +291,9 @@ async function tryJWTAuthentication(): Promise<{ client: FalkorDB; user: Authent
         return { client: existingConnection, user };
       }
 
-      // Create new connection only if not found
-      const { role, client } = await newClient(
-        {
-          host: payload.host,
-          port: payload.port.toString(),
-          username: payload.username || "",
-          password: payload.password || "",
-          tls: Boolean(payload.tls).toString(),
-          ca: payload.ca || "undefined",
-        },
-        payload.sub
-      );
-
-      // Check if token is active using Admin connection for token management
-      const adminClient = await getAdminConnectionForTokens(payload.host, payload.port, payload.tls, payload.ca);
-      const adminConnection = await adminClient.connection;
-      const tokenActive = await isTokenActive(token, adminConnection);
-      if (!tokenActive) {
-        // eslint-disable-next-line no-console
-        console.warn("JWT authentication failed: token is not active (revoked or expired)");
-        return null;
-      }
-
-      const user = {
-        id: payload.sub,
-        username: payload.username,
-        role: role as Role,
-        host: payload.host,
-        port: payload.port,
-        tls: payload.tls || false,
-        ca: payload.ca,
-      };
-
-      return { client, user };
+      // eslint-disable-next-line no-console
+      console.warn("JWT authentication failed: no existing connection for user", payload.sub);
+      return null;
     } catch (error) {
       // Fall back to session auth if JWT fails
       // eslint-disable-next-line no-console
@@ -387,7 +355,6 @@ const authOptions: AuthOptions = {
           host: user.host,
           port: user.port,
           username: user.username,
-          password: user.password,
           tls: user.tls,
           ca: user.ca,
           role: user.role,

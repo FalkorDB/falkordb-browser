@@ -73,13 +73,12 @@ export async function POST(request: NextRequest) {
         sub: user.id,           // Standard JWT claim for user ID
         jti: tokenId,           // JWT ID for unique identification
         username: username || undefined,
-        password: password || undefined,
         role: user.role,
         host: user.host,
         port: user.port,
         tls: user.tls,
         ca: user.ca || undefined,
-        iat: currentTime,       // Issued at time
+        iat: currentTime,
       };
 
       const token = await new SignJWT(tokenPayload)
@@ -88,8 +87,7 @@ export async function POST(request: NextRequest) {
         .setExpirationTime("1y") // 1 year
         .sign(JWT_SECRET);
 
-      // Store the active token in Redis using ADMIN connection
-      // This is required because Read-Write and Read-Only users don't have SET/GET/DEL permissions
+      // Store the active token in Redis using Default connection
       try {
         // Get Admin connection for token management
         const adminClient = await getAdminConnectionForTokens(
