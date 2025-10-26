@@ -18,47 +18,6 @@ const DEFAULT_PORT = "6379";
 
 type LoginMode = "manual" | "url";
 
-// Parse FalkorDB URL format: falkordb://[username]:[password]@host:port[/graph]
-// or falkordb+tls://[username]:[password]@host:port[/graph] for TLS connections
-function parseFalkorDBUrl(url: string): {
-  host: string;
-  port: string;
-  username?: string;
-  password?: string;
-  tls: boolean;
-} | null {
-  try {
-    // Handle both falkordb:// and falkordb+tls:// protocols
-    const isTLS = url.startsWith("falkordb+tls://");
-    const cleanUrl = url.replace(/^falkordb(\+tls)?:\/\//, "");
-    
-    // Pattern breakdown:
-    // ^(?:([^:@]+)(?::([^@]+))?@)? - Optional username and password group
-    //   ([^:@]+) - Capture group 1: username (non-colon, non-@ characters)
-    //   (?::([^@]+))? - Optional password with colon prefix
-    //     ([^@]+) - Capture group 2: password (non-@ characters)
-    //   @ - Literal @ separator
-    // ([^:/]+) - Capture group 3: host (non-colon, non-slash characters)
-    // (?::(\d+))? - Optional port with colon prefix
-    //   (\d+) - Capture group 4: port (digits only)
-    const match = cleanUrl.match(/^(?:([^:@]+)(?::([^@]+))?@)?([^:/]+)(?::(\d+))?/);
-    
-    if (!match) return null;
-    
-    const [, username, password, host, port] = match;
-    
-    return {
-      host: host || DEFAULT_HOST,
-      port: port || DEFAULT_PORT,
-      username: username || undefined,
-      password: password || undefined,
-      tls: isTLS
-    };
-  } catch {
-    return null;
-  }
-}
-
 export default function LoginForm() {
   const { theme } = useTheme();
   const { currentTheme } = getTheme(theme)
@@ -167,48 +126,34 @@ export default function LoginForm() {
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
 
-    let connectionParams: {
-      host: string;
-      port: string;
-      username?: string;
-      password?: string;
-      tls: boolean;
+    const params: SignInOptions = {
+      redirect: false,
     };
 
     // Handle URL mode
     if (loginMode === "url") {
-      const parsed = parseFalkorDBUrl(falkordbUrl);
-      if (!parsed) {
+      // Validate URL format
+      if (!falkordbUrl.trim() || (!falkordbUrl.startsWith("falkor://") && !falkordbUrl.startsWith("falkors://"))) {
         setError({
-          message: "Invalid FalkorDB URL format. Expected: falkordb://[user:pass@]host:port or falkordb+tls://[user:pass@]host:port",
+          message: "Invalid FalkorDB URL format. Expected: falkor://[user:pass@]host:port or falkors://[user:pass@]host:port",
           show: true
         });
         return;
       }
-      connectionParams = parsed;
+      // Pass URL directly to the client
+      params.url = falkordbUrl.trim();
     } else {
       // Manual mode
-      connectionParams = {
-        host: host.trim(),
-        port: port.trim(),
-        username,
-        password,
-        tls: TLS
-      };
-    }
-
-    const params: SignInOptions = {
-      redirect: false,
-      host: connectionParams.host,
-      port: connectionParams.port,
-      tls: connectionParams.tls,
-      ca: CA
-    };
-    if (connectionParams.username) {
-      params.username = connectionParams.username;
-    }
-    if (connectionParams.password) {
-      params.password = connectionParams.password;
+      params.host = host.trim();
+      params.port = port.trim();
+      params.tls = TLS;
+      params.ca = CA;
+      if (username) {
+        params.username = username;
+      }
+      if (password) {
+        params.password = password;
+      }
     }
 
     signIn("credentials", params).then((res?: SignInResponse) => {
@@ -280,7 +225,7 @@ export default function LoginForm() {
                 <Input
                   id="falkordb-url"
                   type="text"
-                  placeholder="falkordb://user:pass@host:port/graph"
+                  placeholder="falkor://user:pass@host:port/graph"
                   value={falkordbUrl}
                   onChange={(e) => {
                     setFalkordbUrl(e.target.value);

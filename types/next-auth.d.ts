@@ -8,9 +8,9 @@ declare module "next-auth" {
     host: string;
     port: number;
     tls: boolean;
-    ca: string;
-    username: string;
-    password: string;
+    ca?: string;
+    username?: string;
+    password?: string;
   }
 
   interface Session {
