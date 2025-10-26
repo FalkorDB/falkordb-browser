@@ -95,7 +95,7 @@ export default function TableComponent({
         setTopFakeRowHeight(newTopFakeRowHeight)
         setBottomFakeRowHeight(newBottomFakeRowHeight)
         setVisibleRows(newVisibleRows)
-    }, [scrollTop, itemHeight, itemsPerPage, filteredRows, expandArr.length])
+    }, [scrollTop, itemHeight, itemsPerPage, filteredRows, expandArr.length, height])
 
     useEffect(() => {
         if (inputRef && inputRef.current && editable) {
@@ -341,7 +341,7 @@ export default function TableComponent({
                                                         cell.type === "object" ?
                                                             <div className="pointer-events-none [&_.json-tree_.arrow]:hidden">
                                                                 <JSONTree
-                                                                    key={`${expandArr.length}-${j}`}
+                                                                    key={`${expandArr.join(",")}-${j}`}
                                                                     shouldExpandNodeInitially={(keyPath) => keyPath.length === 1 && expandArr.some(e => e === j)}
                                                                     keyPath={[headers[j]]}
                                                                     valueRenderer={renderValue}
