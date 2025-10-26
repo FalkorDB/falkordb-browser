@@ -8,11 +8,47 @@ import { Check, Info } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useTheme } from "next-themes";
 import { getTheme } from "@/lib/utils";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import FormComponent, { Field } from "../components/FormComponent";
 import Dropzone from "../components/ui/Dropzone";
+import Input from "../components/ui/Input";
 
 const DEFAULT_HOST = "localhost";
 const DEFAULT_PORT = "6379";
+
+type LoginMode = "manual" | "url";
+
+// Parse FalkorDB URL format: falkordb://[username]:[password]@host:port[/graph]
+function parseFalkorDBUrl(url: string): {
+  host: string;
+  port: string;
+  username?: string;
+  password?: string;
+  tls: boolean;
+} | null {
+  try {
+    // Handle both falkordb:// and falkordb+tls:// protocols
+    const isTLS = url.startsWith("falkordb+tls://");
+    const cleanUrl = url.replace(/^falkordb(\+tls)?:\/\//, "");
+    
+    // Pattern: [username]:[password]@host:port[/graph]
+    const match = cleanUrl.match(/^(?:([^:@]+)(?::([^@]+))?@)?([^:/]+)(?::(\d+))?/);
+    
+    if (!match) return null;
+    
+    const [, username, password, host, port] = match;
+    
+    return {
+      host: host || DEFAULT_HOST,
+      port: port || DEFAULT_PORT,
+      username: username || undefined,
+      password: password || undefined,
+      tls: isTLS
+    };
+  } catch {
+    return null;
+  }
+}
 
 export default function LoginForm() {
   const { theme } = useTheme();
@@ -20,6 +56,8 @@ export default function LoginForm() {
   const router = useRouter();
 
   const [mounted, setMounted] = useState(false);
+  const [loginMode, setLoginMode] = useState<LoginMode>("manual");
+  const [falkordbUrl, setFalkordbUrl] = useState("");
   const [host, setHost] = useState("");
   const [port, setPort] = useState("");
   const [TLS, setTLS] = useState(false);
@@ -120,18 +158,48 @@ export default function LoginForm() {
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
 
+    let connectionParams: {
+      host: string;
+      port: string;
+      username?: string;
+      password?: string;
+      tls: boolean;
+    };
+
+    // Handle URL mode
+    if (loginMode === "url") {
+      const parsed = parseFalkorDBUrl(falkordbUrl);
+      if (!parsed) {
+        setError({
+          message: "Invalid FalkorDB URL format. Expected: falkordb://[user:pass@]host:port",
+          show: true
+        });
+        return;
+      }
+      connectionParams = parsed;
+    } else {
+      // Manual mode
+      connectionParams = {
+        host: host.trim(),
+        port: port.trim(),
+        username,
+        password,
+        tls: TLS
+      };
+    }
+
     const params: SignInOptions = {
       redirect: false,
-      host: host.trim(),
-      port: port.trim(),
-      tls: TLS,
+      host: connectionParams.host,
+      port: connectionParams.port,
+      tls: connectionParams.tls,
       ca: CA
     };
-    if (username) {
-      params.username = username;
+    if (connectionParams.username) {
+      params.username = connectionParams.username;
     }
-    if (password) {
-      params.password = password;
+    if (connectionParams.password) {
+      params.password = connectionParams.password;
     }
 
     signIn("credentials", params).then((res?: SignInResponse) => {
@@ -170,12 +238,62 @@ export default function LoginForm() {
       <div className="grow flex items-center justify-center">
         <div className="flex flex-col gap-8 items-center">
           {mounted && currentTheme && <Image style={{ width: 'auto', height: '80px' }} priority src={`/icons/Browser-${currentTheme}.svg`} alt="FalkorDB Browser Logo" width={0} height={0} />}
-          <FormComponent
-            fields={fields}
-            handleSubmit={onSubmit}
-            error={error}
-            submitButtonLabel="Log in"
+          
+          {/* Login Mode Toggle */}
+          <RadioGroup
+            value={loginMode}
+            onValueChange={(value) => {
+              setLoginMode(value as LoginMode);
+              setError({ message: "Invalid credentials", show: false });
+            }}
+            className="flex items-center justify-center gap-8 p-4 border border-primary rounded-lg w-full"
           >
+            <div className="flex items-center space-x-2">
+              <RadioGroupItem value="manual" id="manual" />
+              {/* eslint-disable-next-line jsx-a11y/label-has-associated-control */}
+              <label htmlFor="manual" className="text-base font-medium cursor-pointer">Manual Configuration</label>
+            </div>
+            <div className="flex items-center space-x-2">
+              <RadioGroupItem value="url" id="url" />
+              {/* eslint-disable-next-line jsx-a11y/label-has-associated-control */}
+              <label htmlFor="url" className="text-base font-medium cursor-pointer">FalkorDB URL</label>
+            </div>
+          </RadioGroup>
+
+          {loginMode === "url" ? (
+            // URL Mode
+            <form className="flex flex-col gap-4 w-full" onSubmit={onSubmit}>
+              <div className="flex flex-col gap-2">
+                {/* eslint-disable-next-line jsx-a11y/label-has-associated-control */}
+                <label htmlFor="falkordb-url" className="font-medium">FalkorDB URL</label>
+                <Input
+                  id="falkordb-url"
+                  type="text"
+                  placeholder="falkordb://user:pass@host:port/graph"
+                  value={falkordbUrl}
+                  onChange={(e) => {
+                    setFalkordbUrl(e.target.value);
+                    setError({ message: "Invalid credentials", show: false });
+                  }}
+                  required
+                />
+              </div>
+              {error && <p className="text-sm text-destructive h-5">{error.show ? error.message : ""}</p>}
+              <button
+                type="submit"
+                className="w-full bg-primary p-4 rounded-lg flex justify-center items-center gap-2 text-primary-foreground font-medium hover:bg-primary/90"
+              >
+                Log in
+              </button>
+            </form>
+          ) : (
+            // Manual Configuration Mode
+            <FormComponent
+              fields={fields}
+              handleSubmit={onSubmit}
+              error={error}
+              submitButtonLabel="Log in"
+            >
             <div className="flex flex-col gap-4">
               <div className="flex gap-2 items-center">
                 <Checkbox
@@ -256,6 +374,7 @@ export default function LoginForm() {
               )}
             </div>
           </FormComponent>
+          )}
         </div>
       </div>
       <div className="h-5 Gradient" />
