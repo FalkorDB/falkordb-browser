@@ -19,6 +19,7 @@ const DEFAULT_PORT = "6379";
 type LoginMode = "manual" | "url";
 
 // Parse FalkorDB URL format: falkordb://[username]:[password]@host:port[/graph]
+// or falkordb+tls://[username]:[password]@host:port[/graph] for TLS connections
 function parseFalkorDBUrl(url: string): {
   host: string;
   port: string;
@@ -31,7 +32,15 @@ function parseFalkorDBUrl(url: string): {
     const isTLS = url.startsWith("falkordb+tls://");
     const cleanUrl = url.replace(/^falkordb(\+tls)?:\/\//, "");
     
-    // Pattern: [username]:[password]@host:port[/graph]
+    // Pattern breakdown:
+    // ^(?:([^:@]+)(?::([^@]+))?@)? - Optional username and password group
+    //   ([^:@]+) - Capture group 1: username (non-colon, non-@ characters)
+    //   (?::([^@]+))? - Optional password with colon prefix
+    //     ([^@]+) - Capture group 2: password (non-@ characters)
+    //   @ - Literal @ separator
+    // ([^:/]+) - Capture group 3: host (non-colon, non-slash characters)
+    // (?::(\d+))? - Optional port with colon prefix
+    //   (\d+) - Capture group 4: port (digits only)
     const match = cleanUrl.match(/^(?:([^:@]+)(?::([^@]+))?@)?([^:/]+)(?::(\d+))?/);
     
     if (!match) return null;
@@ -171,7 +180,7 @@ export default function LoginForm() {
       const parsed = parseFalkorDBUrl(falkordbUrl);
       if (!parsed) {
         setError({
-          message: "Invalid FalkorDB URL format. Expected: falkordb://[user:pass@]host:port",
+          message: "Invalid FalkorDB URL format. Expected: falkordb://[user:pass@]host:port or falkordb+tls://[user:pass@]host:port",
           show: true
         });
         return;
@@ -250,11 +259,13 @@ export default function LoginForm() {
           >
             <div className="flex items-center space-x-2">
               <RadioGroupItem value="manual" id="manual" />
+              {/* Label is correctly associated via htmlFor, but eslint doesn't recognize Radix RadioGroupItem */}
               {/* eslint-disable-next-line jsx-a11y/label-has-associated-control */}
               <label htmlFor="manual" className="text-base font-medium cursor-pointer">Manual Configuration</label>
             </div>
             <div className="flex items-center space-x-2">
               <RadioGroupItem value="url" id="url" />
+              {/* Label is correctly associated via htmlFor, but eslint doesn't recognize Radix RadioGroupItem */}
               {/* eslint-disable-next-line jsx-a11y/label-has-associated-control */}
               <label htmlFor="url" className="text-base font-medium cursor-pointer">FalkorDB URL</label>
             </div>
