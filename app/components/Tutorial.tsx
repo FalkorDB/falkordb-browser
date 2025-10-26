@@ -12,7 +12,7 @@ interface TutorialStep {
     spotlightSelector?: string;
     placementAxis?: "x" | "y";
     advanceOn?: string;
-    forward?: string[]
+    forward?: (keyof HTMLElementEventMap)[]
     hidePrev?: boolean
 }
 
@@ -34,7 +34,6 @@ const tutorialSteps: TutorialStep[] = [
         targetSelector: '[data-testid="selectGraph"]',
         placementAxis: "x",
         advanceOn: "pointerdown",
-        forward: ["pointerdown"],
     },
     {
         title: "Manage Graphs",
@@ -51,7 +50,7 @@ const tutorialSteps: TutorialStep[] = [
         targetSelector: '[data-testid="selectGraphsocial-demoButton"]',
         placementAxis: "x",
         advanceOn: "click",
-        forward: ["click", "mouseenter", "mouseleave"]
+        forward: ["mouseenter", "mouseleave"]
     },
     {
         title: "Graph Info Panel",
@@ -67,8 +66,8 @@ const tutorialSteps: TutorialStep[] = [
         position: {},
         targetSelector: '[data-testid="graphInfoAllNodes"]',
         placementAxis: "x",
-        advanceOn: "pointerdown",
-        forward: ["pointerdown", "pointerenter", "pointerleave"]
+        advanceOn: "click",
+        forward: ["pointerenter", "pointerleave"]
     },
     {
         title: "Get KNOWS edge",
@@ -76,8 +75,8 @@ const tutorialSteps: TutorialStep[] = [
         position: {},
         targetSelector: '[data-testid="graphInfoKNOWSEdge"]',
         placementAxis: "x",
-        advanceOn: "pointerdown",
-        forward: ["pointerdown", "pointerenter", "pointerleave"]
+        advanceOn: "click",
+        forward: ["pointerenter", "pointerleave"]
     },
     {
         title: "Query Editor",
@@ -86,37 +85,48 @@ const tutorialSteps: TutorialStep[] = [
         targetSelector: '[data-testid="editorRun"]',
         spotlightSelector: '[data-testid="editor"]',
         placementAxis: "y",
-        advanceOn: "pointerdown",
-        forward: ["pointerdown", "pointerenter", "pointerleave"]
+        advanceOn: "click",
+        forward: ["pointerenter", "pointerleave"]
     },
     {
         title: "Graph Visualization",
         description: "Query results containing nodes and edges will be visualized here as an interactive graph. You can drag, zoom, and explore the relationships.",
         position: {},
-        targetSelector: '[data-testid="graphVisualization"]'
+        placementAxis: "x",
+        targetSelector: '.force-graph-container canvas',
+        spotlightSelector: '[data-testid="graphView"]',
+        forward: ["mousedown", "mouseup", "mousemove", "mouseenter", "mouseleave", "mouseover", "mouseout", "contextmenu", "pointerdown", "pointerup", "pointermove", "pointerenter", "pointerleave", "wheel"]
     },
     {
         title: "Table Results",
         description: "Query results can also be displayed as tables. This is useful for viewing properties, aggregations, and other non-graph data.",
         position: {},
-        targetSelector: '[data-testid="tableResults"]',
+        placementAxis: "y",
+        targetSelector: '[data-testid="tableTab"]',
+        advanceOn: "mousedown",
+        forward: ["mousedown", "mouseenter", "mouseleave"]
     },
     {
         title: "Query Metadata",
         description: "View query execution details, explain plans, and profile information in the metadata tabs below your results.",
         position: {},
-        targetSelector: '[data-testid="tableResults"]',
+        placementAxis: "y",
+        targetSelector: '[data-testid="metadataTab"]',
+        advanceOn: "mousedown",
+        forward: ["mousedown", "mouseenter", "mouseleave"]
     },
     {
         title: "Query History",
         description: "Access your previous queries here. You can filter by graph, search queries, and view metadata for each executed query.",
         position: {},
+        placementAxis: "y",
         targetSelector: '[data-testid="queryHistory"]',
     },
     {
         title: "Theme Toggle",
         description: "Switch between light and dark themes for a comfortable viewing experience.",
         position: {},
+        placementAxis: "x",
         targetSelector: '[data-testid="themeToggle"]',
     },
     {
@@ -144,10 +154,12 @@ function TutorialPortal({
     onClose: () => void;
 }) {
     const [mounted, setMounted] = useState(false);
-    const [position, setPosition] = useState<{ top?: string; bottom?: string; left?: string; right?: string; transform?: string }>({ transform: "" });
+    const [currentPosition, setCurrentPosition] = useState<{ top?: string; bottom?: string; left?: string; right?: string; transform?: string }>({ transform: "" });
     const [direction, setDirection] = useState<"left" | "right" | "top" | "bottom">();
     const [targetDisabled, setTargetDisabled] = useState(false);
     const tooltipRef = useRef<HTMLDivElement>(null);
+    const currentStep = tutorialSteps[step];
+    const { targetSelector, advanceOn, forward, description, position, title, hidePrev, placementAxis } = currentStep
 
     useEffect(() => {
         setMounted(true);
@@ -155,11 +167,8 @@ function TutorialPortal({
 
     // Calculate position based on target element
     useEffect(() => {
-        const currentStep = tutorialSteps[step];
-        const { targetSelector } = currentStep;
-
         if (!targetSelector) {
-            setPosition({ ...currentStep.position, transform: "translate(-50%, -50%)" })
+            setCurrentPosition({ ...position, transform: "translate(-50%, -50%)" })
             return () => { }
         }
 
@@ -167,7 +176,7 @@ function TutorialPortal({
         const currentTooltip = tooltipRef.current
 
         if (!element || !currentTooltip) {
-            setPosition({ ...currentStep.position, transform: "translate(-50%, -50%)" })
+            setCurrentPosition({ ...position, transform: "translate(-50%, -50%)" })
             return () => { }
         }
 
@@ -186,14 +195,14 @@ function TutorialPortal({
             let computedDirection: "left" | "right" | "top" | "bottom" | undefined;
 
             // Axis-driven auto placement overrides default when provided
-            if (currentStep.placementAxis === "x") {
+            if (placementAxis === "x") {
                 const elementCenterX = rect.left + rect.width / 2;
                 const viewportCenterX = window.innerWidth / 2;
                 // If element on the left side, place tooltip to the right of it (arrow pointing left)
                 // If element on the right side, place tooltip to the left of it (arrow pointing right)
                 computedDirection = elementCenterX < viewportCenterX ? "left" : "right";
             }
-            if (currentStep.placementAxis === "y") {
+            if (placementAxis === "y") {
                 const elementCenterY = rect.top + rect.height / 2;
                 const viewportCenterY = window.innerHeight / 2;
                 // If element above center, place tooltip below (arrow pointing up)
@@ -248,7 +257,7 @@ function TutorialPortal({
                 }
             }
 
-            setPosition(calculatedPosition);
+            setCurrentPosition(calculatedPosition);
             setDirection(computedDirection);
         }
 
@@ -268,63 +277,49 @@ function TutorialPortal({
             tooltipResizeObserver.disconnect();
             window.removeEventListener('resize', updatePosition);
         };
-    }, [step]);
-
-    // Track if the current target element is disabled (disabled | aria-disabled | inert)
-    useEffect(() => {
-        const currentStep = tutorialSteps[step];
-        const { targetSelector } = currentStep;
-
-        if (!targetSelector) {
-            setTargetDisabled(false);
-            return () => { };
-        }
-
-        const element = document.querySelector(targetSelector) as HTMLElement | null;
-
-        if (!element) {
-            setTargetDisabled(false);
-            return () => { };
-        }
-
-        const computeDisabled = () => {
-            const htmlEl = element as unknown as { disabled?: boolean };
-            const disabledAttr = element.hasAttribute('disabled');
-            const ariaDisabled = element.getAttribute('aria-disabled') === 'true';
-            const inert = element.hasAttribute('inert');
-            const nativeDisabled = Boolean(htmlEl && typeof htmlEl.disabled === 'boolean' && htmlEl.disabled);
-            setTargetDisabled(Boolean(disabledAttr || ariaDisabled || inert || nativeDisabled));
-        };
-
-        computeDisabled();
-
-        const observer = new MutationObserver(() => computeDisabled());
-        observer.observe(element, { attributes: true, attributeFilter: ['disabled', 'aria-disabled', 'inert'] });
-
-        return () => {
-            observer.disconnect();
-        };
-    }, [step]);
+    }, [placementAxis, position, step, targetSelector]);
 
     useEffect(() => {
-        const currentStep = tutorialSteps[step];
-        const { targetSelector, advanceOn } = currentStep
+        const forwardArr = [...(forward || []), advanceOn].filter(ev => !!ev)
 
         // Highlight target element and add click listener
         if (targetSelector) {
             const element = document.querySelector(targetSelector);
 
             if (element) {
-                element.classList.add('tutorial-highlight');
-
                 // Create an invisible overlay over the element to catch clicks
                 const overlay = document.createElement('div');
                 overlay.style.position = 'fixed';
-                overlay.style.zIndex = '50';
+                overlay.style.zIndex = '40';
                 overlay.style.cursor = window.getComputedStyle(element).cursor || 'default';
                 overlay.style.pointerEvents = 'auto';
-                overlay.setAttribute('data-target-disabled', String(targetDisabled));
+                const disabled = element.classList.contains("disabled")
+                overlay.setAttribute('disabled', String(disabled));
+                setTargetDisabled(disabled)
                 overlay.setAttribute('data-tutorial-overlay', 'true');
+
+
+                // Simple wheel event passthrough - only if wheel is in forward array
+                let wheelHandler: ((ev: Event) => void) | null = null;
+                if (forwardArr.includes('wheel')) {
+                    wheelHandler = (ev: Event) => {
+                        const wheelEv = ev as WheelEvent;
+                        const newEvent = new WheelEvent('wheel', {
+                            deltaX: wheelEv.deltaX,
+                            deltaY: wheelEv.deltaY,
+                            deltaZ: wheelEv.deltaZ,
+                            deltaMode: wheelEv.deltaMode,
+                            clientX: wheelEv.clientX,
+                            clientY: wheelEv.clientY,
+                            screenX: wheelEv.screenX,
+                            screenY: wheelEv.screenY,
+                            bubbles: true,
+                            cancelable: true,
+                        });
+                        element.dispatchEvent(newEvent);
+                    };
+                    overlay.addEventListener('wheel', wheelHandler, { passive: true } as EventListenerOptions);
+                }
 
                 // Function to update overlay position
                 const updateOverlayPosition = () => {
@@ -346,6 +341,9 @@ function TutorialPortal({
                     element.classList.remove('tutorial-highlight');
                     resizeObserver.disconnect()
                     window.removeEventListener('resize', updateOverlayPosition);
+                    if (wheelHandler) {
+                        overlay.removeEventListener('wheel', wheelHandler, { passive: true } as EventListenerOptions);
+                    }
                     overlay.remove();
                 }
 
@@ -375,7 +373,6 @@ function TutorialPortal({
                     'pointerleave',
                     'pointercancel',
                 ] as const;
-                const forwardWheelEvents = ['wheel'] as const;
                 const forwardTouchEvents = [
                     'touchstart',
                     'touchmove',
@@ -385,6 +382,7 @@ function TutorialPortal({
                 const forwardKeyboardEvents = ['keydown', 'keyup', 'keypress'] as const;
 
                 const forwardEvent = (ev: Event) => {
+
                     if (advanceOn === ev.type) {
                         // Advance the tutorial on the specified event type. Use a short delay
                         // so the forwarded event can reach the underlying element's handlers first.
@@ -393,13 +391,34 @@ function TutorialPortal({
                         }, 200)
                     }
 
+                    // Get the overlay and target element positions to adjust coordinates
+                    const overlayRect = overlay.getBoundingClientRect();
+                    const elementRect = element.getBoundingClientRect();
+                    const offsetX = overlayRect.left - elementRect.left;
+                    const offsetY = overlayRect.top - elementRect.top;
+
                     // Clone and dispatch event to the underlying target element
                     if (ev instanceof MouseEvent) {
+                        // Always prevent default context menu during tutorial
+                        if (ev.type === 'contextmenu') {
+                            ev.preventDefault();
+                            ev.stopPropagation();
+                        }
+
                         const clone = new MouseEvent(ev.type, {
-                            ...ev,
+                            clientX: ev.clientX - offsetX,
+                            clientY: ev.clientY - offsetY,
                             bubbles: true,
                             cancelable: true,
                             view: window,
+                            button: ev.button,
+                            buttons: ev.buttons,
+                            which: ev.which,
+                            detail: ev.detail,
+                            ctrlKey: ev.ctrlKey,
+                            shiftKey: ev.shiftKey,
+                            altKey: ev.altKey,
+                            metaKey: ev.metaKey,
                         });
                         element.dispatchEvent(clone);
 
@@ -409,22 +428,26 @@ function TutorialPortal({
                     if (ev instanceof PointerEvent) {
                         const pev = ev as PointerEvent;
                         const clone = new PointerEvent(pev.type, {
-                            ...pev,
+                            clientX: pev.clientX - offsetX,
+                            clientY: pev.clientY - offsetY,
                             bubbles: true,
                             cancelable: true,
+                            button: pev.button,
+                            buttons: pev.buttons,
+                            pressure: pev.pressure,
+                            tangentialPressure: pev.tangentialPressure,
+                            tiltX: pev.tiltX,
+                            tiltY: pev.tiltY,
+                            twist: pev.twist,
+                            pointerId: pev.pointerId,
+                            pointerType: pev.pointerType,
+                            isPrimary: pev.isPrimary,
+                            ctrlKey: pev.ctrlKey,
+                            shiftKey: pev.shiftKey,
+                            altKey: pev.altKey,
+                            metaKey: pev.metaKey,
                         });
 
-                        element.dispatchEvent(clone);
-                        return;
-                    }
-
-                    if (ev instanceof WheelEvent) {
-                        const wev = ev as WheelEvent;
-                        const clone = new WheelEvent(wev.type, {
-                            ...wev,
-                            bubbles: true,
-                            cancelable: true,
-                        });
                         element.dispatchEvent(clone);
                         return;
                     }
@@ -449,15 +472,15 @@ function TutorialPortal({
                 };
 
                 const addForwarders = () => {
-                    [...forwardMouseEvents, ...forwardPointerEvents, ...forwardWheelEvents, ...forwardTouchEvents, ...forwardKeyboardEvents]
-                        .filter(e => currentStep.forward && currentStep.forward.some(ev => e === ev))
+                    [...forwardMouseEvents, ...forwardPointerEvents, ...forwardTouchEvents, ...forwardKeyboardEvents]
+                        .filter(e => forwardArr.includes(e))
                         .forEach((type) => {
                             overlay.addEventListener(type, forwardEvent, true);
                         });
                 };
                 const removeForwarders = () => {
-                    [...forwardMouseEvents, ...forwardPointerEvents, ...forwardWheelEvents, ...forwardTouchEvents, ...forwardKeyboardEvents]
-                        .filter(e => currentStep.forward && currentStep.forward.some(ev => e === ev))
+                    [...forwardMouseEvents, ...forwardPointerEvents, ...forwardTouchEvents, ...forwardKeyboardEvents]
+                        .filter(e => forwardArr.includes(e))
                         .forEach((type) => {
                             overlay.removeEventListener(type, forwardEvent, true);
                         });
@@ -473,11 +496,10 @@ function TutorialPortal({
         }
 
         return () => { };
-    }, [step, onNext, targetDisabled]);
+    }, [step, onNext, targetDisabled, forward, advanceOn, targetSelector]);
 
     if (!mounted) return null;
 
-    const currentStep = tutorialSteps[step];
     const isLastStep = step === tutorialSteps.length - 1;
 
     const getArrowStyles = () => {
@@ -520,7 +542,7 @@ function TutorialPortal({
             ref={tooltipRef}
             className="fixed bg-background border border-border rounded-lg p-6 shadow-2xl max-w-[500px] z-50 pointer-events-auto"
             style={{
-                ...position
+                ...currentPosition
             }}
         >
             {arrowStyles.className && (
@@ -536,11 +558,11 @@ function TutorialPortal({
                             Step {step} of {tutorialSteps.length - 1}
                         </div>
                     )}
-                    <h3 className="text-xl font-semibold">{currentStep.title}</h3>
+                    <h3 className="text-xl font-semibold">{title}</h3>
                 </div>
-                <p className="text-muted-foreground">{currentStep.description}</p>
+                <p className="text-muted-foreground">{description}</p>
                 {
-                    currentStep.advanceOn && currentStep.targetSelector &&
+                    advanceOn && targetSelector &&
                     <div className="flex items-center gap-2 p-3 bg-primary/10 rounded-lg">
                         <svg className="w-5 h-5 text-primary flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122" />
@@ -551,15 +573,18 @@ function TutorialPortal({
                 {
                     step > 0 &&
                     <div className="flex justify-between items-center gap-4 pt-4">
-                        <Button
-                            className="text-nowrap"
-                            variant="Cancel"
-                            label="Skip Tutorial"
-                            onClick={onClose}
-                        />
+                        {
+                            !isLastStep &&
+                            < Button
+                                className="text-nowrap"
+                                variant="Cancel"
+                                label="Skip Tutorial"
+                                onClick={onClose}
+                            />
+                        }
                         <div className="flex gap-2">
                             {
-                                step > 1 && !currentStep.hidePrev &&
+                                step > 1 && !hidePrev &&
                                 <Button
                                     variant="Secondary"
                                     label="Previous"
@@ -568,7 +593,7 @@ function TutorialPortal({
                             }
                             {
                                 // If step does not require user action, show enabled Next/Finish
-                                !currentStep.advanceOn && (
+                                !advanceOn && (
                                     <Button
                                         disabled={targetDisabled}
                                         variant="Primary"
@@ -609,6 +634,8 @@ function TutorialSpotlight({ targetSelector, spotlightSelector }: { targetSelect
             setSpotlightStyle({});
             return () => { };
         }
+
+
 
         const updateSpotlight = () => {
             const rect = element.getBoundingClientRect();

@@ -155,6 +155,7 @@ export default function Header({ onSetGraphName, graphNames, graphName, onOpenGr
             </div>
             <div className="w-full flex flex-col gap-6 items-center">
                 <Button
+                    data-testid="settings"
                     title="Adjust application settings"
                     onClick={() => pathname.includes("/settings") ? navigateBack() : router.push("/settings")}
                 >
@@ -235,6 +236,7 @@ export default function Header({ onSetGraphName, graphNames, graphName, onOpenGr
                 {
                     mounted &&
                     <Button
+                        data-testid="themeToggle"
                         title={`Toggle theme current theme: ${theme}`}
                         onClick={() => {
                             let newTheme = ""

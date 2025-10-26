@@ -227,8 +227,6 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
   const handelGetNewQueries = useCallback((newQuery: Query) => [...historyQuery.queries.filter(qu => qu.text !== newQuery.text), newQuery], [historyQuery.queries])
 
   const runQuery = useCallback(async (q: string, name?: string): Promise<void> => {
-    console.log("run", q);
-    
     const n = name || graphName
     let newQuery: Query = {
       elementsCount: 0,
@@ -508,51 +506,35 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       await securedFetch("/api/graph/social-demo-test", {
         method: "DELETE",
       }, toast, setIndicator);
-
-      // Clear current graph to avoid showing deleted demo graph
-      setGraph(Graph.empty());
-      setGraphInfo(GraphInfo.empty());
-      setGraphName("");
-
-      // Restore user's original graphs
-      setGraphNames(userGraphsBeforeTutorial);
-      setGraphName(userGraphBeforeTutorial);
-
-      // Refresh graph list from server to ensure sync
-      await handleFetchOptions();
-
-      // Set to first user graph or empty after a brief delay to ensure UI updates
-      if (userGraphsBeforeTutorial.length > 0 && !userGraphBeforeTutorial) {
-        window.setTimeout(() => {
-          setGraphName(userGraphsBeforeTutorial[0]);
-        }, 100);
-
-        // Run default query for the first user graph if enabled
-        if (runDefaultQuery && defaultQuery) {
-          window.setTimeout(() => {
-            runQuery(defaultQuery, userGraphsBeforeTutorial[0]);
-          }, 150);
-        }
-      }
-
-      setUserGraphsBeforeTutorial([]);
-      setUserGraphBeforeTutorial("")
-
     } catch (error) {
       // eslint-disable-next-line no-console
       console.error("Failed to cleanup demo graphs", error);
-      // Still restore user graphs even if cleanup fails
-      setGraph(Graph.empty());
-      setGraphInfo(GraphInfo.empty());
-      setGraphName("");
-      setGraphNames(userGraphsBeforeTutorial);
-      setGraphName(userGraphBeforeTutorial)
-      if (userGraphsBeforeTutorial.length > 0 && !userGraphBeforeTutorial) {
-        window.setTimeout(() => {
-          setGraphName(userGraphsBeforeTutorial[0]);
-        }, 100);
-      }
     }
+
+    // Clear current graph to avoid showing deleted demo graph
+    setGraph(Graph.empty());
+    setGraphInfo(GraphInfo.empty());
+
+    if (userGraphBeforeTutorial && userGraphsBeforeTutorial.includes(userGraphBeforeTutorial)) {
+      setGraphName(userGraphBeforeTutorial);
+    } else if (userGraphsBeforeTutorial.length === 1) {
+      setGraphName(userGraphsBeforeTutorial[0]);
+
+      // Run default query for the graph if enabled
+      if (runDefaultQuery && defaultQuery) {
+        window.setTimeout(() => {
+          runQuery(defaultQuery, userGraphsBeforeTutorial[0]);
+        }, 150);
+      } else {
+        setHistoryQuery(prev => ({ ...prev, query: "", currentQuery: defaultQueryHistory.currentQuery }))
+      }
+    } else {
+      setGraphName("")
+    }
+
+    setGraphNames(userGraphsBeforeTutorial)
+    setUserGraphsBeforeTutorial([]);
+    setUserGraphBeforeTutorial("")
   };
 
   return (
