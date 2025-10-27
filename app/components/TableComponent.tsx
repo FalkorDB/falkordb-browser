@@ -12,7 +12,7 @@ import { JSONTree, KeyPath } from "react-json-tree"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Cell, cn, getTheme, Row } from "@/lib/utils";
 import { Dispatch, SetStateAction, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
-import { CheckCircle, ChevronDown, ChevronUp, Pencil, XCircle } from "lucide-react";
+import { CheckCircle, ChevronDown, ChevronsDown, ChevronsUp, Pencil, XCircle } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useTheme } from "next-themes";
 import Button from "./ui/Button";
@@ -36,8 +36,8 @@ interface Props {
     onScrollChange?: Dispatch<SetStateAction<number>>
     initialSearch?: string
     onSearchChange?: Dispatch<SetStateAction<string>>
-    initialExpand?: number[]
-    onExpandChange?: Dispatch<SetStateAction<number[]>>
+    initialExpand?: Map<number, number>
+    onExpandChange?: Dispatch<SetStateAction<Map<number, number>>>
 }
 
 export default function TableComponent({
@@ -81,9 +81,9 @@ export default function TableComponent({
     const [topFakeRowHeight, setTopFakeRowHeight] = useState<number>(0)
     const [bottomFakeRowHeight, setBottomFakeRowHeight] = useState<number>(0)
     const [visibleRows, setVisibleRows] = useState<Row[]>([])
-    const [expandArr, setExpandArr] = useState<number[]>([])
+    const expandArr = useMemo(() => new Map(initialExpand), [initialExpand])
 
-    const height = expandArr.length === 0 ? itemHeight : itemHeight * 2
+    const height = expandArr.size === 0 ? itemHeight : itemHeight * 2
 
     useEffect(() => {
         const newStartIndex = Math.max(0, Math.floor((scrollTop - (height * itemsPerPage)) / height))
@@ -95,7 +95,7 @@ export default function TableComponent({
         setTopFakeRowHeight(newTopFakeRowHeight)
         setBottomFakeRowHeight(newBottomFakeRowHeight)
         setVisibleRows(newVisibleRows)
-    }, [scrollTop, itemHeight, itemsPerPage, filteredRows, expandArr.length, height])
+    }, [scrollTop, itemHeight, itemsPerPage, filteredRows, expandArr.size, height])
 
     useEffect(() => {
         if (inputRef && inputRef.current && editable) {
@@ -159,15 +159,11 @@ export default function TableComponent({
                 setSearch(initialSearch)
             }
 
-            if (initialExpand) {
-                setExpandArr(initialExpand)
-            }
-
             setHasRestored(true)
         }, 0)
 
         return () => clearTimeout(timer)
-    }, [hasRestored, initialScrollPosition, filteredRows.length, initialSearch, initialExpand])
+    }, [hasRestored, initialScrollPosition, filteredRows.length, initialSearch])
 
     const handleSetEditable = (editValue: string, value: string) => {
         setEditable(editValue)
@@ -197,6 +193,8 @@ export default function TableComponent({
     const renderLabel = (l: any, keyPath: KeyPath) => (
         <span className={cn(keyPath.length !== 1 && "pointer-events-auto", valueClassName)}>{l[0]}:</span>
     )
+
+    const getClassName = (index: number, level?: number) => cn("text-border rounded-lg", expandArr.get(index) === level && "bg-background text-foreground")
 
     return (
         <div className={cn("h-full w-full flex flex-col gap-4", className)}>
@@ -250,26 +248,43 @@ export default function TableComponent({
                         {
                             headers.map((header, i) => (
                                 <TableHead className={cn(i + 1 !== headers.length && "border-r", "font-bold text-lg border-border")} key={header}>
-                                    <div className="flex gap-2">
-                                        {
-                                            visibleRows.some(r => r.cells.some(c => c.type === "object")) &&
-                                            <Button
-                                                onClick={() => {
-                                                    const newExpandArr = expandArr.some(e => e === i) ? [...expandArr.filter(e => e !== i)] : [...expandArr, i]
-
-                                                    setExpandArr(newExpandArr)
-
-                                                    if (onExpandChange) onExpandChange(newExpandArr)
-                                                }}
-                                            >
-                                                {
-                                                    expandArr.some(e => e === i)
-                                                        ? <ChevronUp />
-                                                        : <ChevronDown />
-                                                }
-                                            </Button>
-                                        }
+                                    <div className="flex gap-2 justify-between">
                                         <p>{header}</p>
+                                        {
+                                            visibleRows.some(r => r.cells[i].type === "object") &&
+                                            <div className="flex gap-2 bg-secondary p-1 rounded-lg">
+                                                <Button
+                                                    className={getClassName(i, 1)}
+                                                    title="Expand Root"
+                                                    onClick={() => {
+                                                        expandArr.set(i, 1)
+                                                        if (onExpandChange) onExpandChange(expandArr)
+                                                    }}
+                                                >
+                                                    <ChevronDown />
+                                                </Button>
+                                                <Button
+                                                    title="Expand All"
+                                                    className={getClassName(i, -1)}
+                                                    onClick={() => {
+                                                        expandArr.set(i, -1)
+                                                        if (onExpandChange) onExpandChange(expandArr)
+                                                    }}
+                                                >
+                                                    <ChevronsDown />
+                                                </Button>
+                                                <Button
+                                                    title="Collapse All"
+                                                    className={getClassName(i)}
+                                                    onClick={() => {
+                                                        expandArr.delete(i)
+                                                        if (onExpandChange) onExpandChange(expandArr)
+                                                    }}
+                                                >
+                                                    <ChevronsUp />
+                                                </Button>
+                                            </div>
+                                        }
                                     </div>
                                 </TableHead>
                             ))
@@ -341,8 +356,8 @@ export default function TableComponent({
                                                         cell.type === "object" ?
                                                             <div className="pointer-events-none [&_.json-tree_.arrow]:hidden">
                                                                 <JSONTree
-                                                                    key={`${expandArr.join(",")}-${j}`}
-                                                                    shouldExpandNodeInitially={(keyPath) => keyPath.length === 1 && expandArr.some(e => e === j)}
+                                                                    key={`${Array.from(expandArr.values()).join(",")}-${j}`}
+                                                                    shouldExpandNodeInitially={(keyPath) => expandArr.get(j) === -1 || keyPath.length === expandArr.get(j)}
                                                                     keyPath={[headers[j]]}
                                                                     valueRenderer={renderValue}
                                                                     labelRenderer={(keyPath) => renderLabel(keyPath, keyPath)}
