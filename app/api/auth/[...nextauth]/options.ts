@@ -265,10 +265,9 @@ const authOptions: AuthOptions = {
 
           // If URL is provided, use it; otherwise use individual parameters
           let port = 6379;
+          
           if (!credentials.url && credentials.port) {
             port = parseInt(credentials.port, 10);
-          } else if (credentials.url) {
-            port = 0;
           }
 
           const res: User = {
