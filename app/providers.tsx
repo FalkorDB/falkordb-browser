@@ -537,6 +537,21 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
     setUserGraphBeforeTutorial("")
   };
 
+  // Set initial query for tutorial
+  useEffect(() => {
+    if (tutorialOpen && graphName === "social-demo" && !historyQuery.query) {
+      const initialQuery = "MATCH p=()-[:KNOWS]-() RETURN p";
+      setHistoryQuery(prev => ({
+        ...prev,
+        query: initialQuery,
+        currentQuery: {
+          ...prev.currentQuery,
+          text: initialQuery
+        }
+      }));
+    }
+  }, [tutorialOpen, graphName, historyQuery.query, setHistoryQuery]);
+
   return (
     <ThemeProvider attribute="class" storageKey="theme" defaultTheme="system" disableTransitionOnChange>
       <LoginVerification>

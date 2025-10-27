@@ -208,18 +208,20 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
                 </DropdownMenuContent>
             </DropdownMenu>
             <DialogContent
+                data-testid="manageContent"
                 onEscapeKeyDown={(e) => {
                     if (inputRef.current === document.activeElement) {
                         e.preventDefault()
                     }
                 }}
-                disableClose
+                hideClose
+                hideOverlay={tutorialOpen}
                 preventOutsideClose={tutorialOpen}
                 className="flex flex-col border-none rounded-lg max-w-none h-[90dvh]"
             >
                 <DialogHeader className="flex-row justify-between items-center border-b border-border pb-4">
                     <DialogTitle className="text-2xl font-medium">Manage Graphs</DialogTitle>
-                    <CloseDialog />
+                    <CloseDialog data-testid="closeManage" />
                 </DialogHeader>
                 <VisuallyHidden>
                     <DialogDescription />

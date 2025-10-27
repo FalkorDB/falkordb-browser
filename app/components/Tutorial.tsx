@@ -1,3 +1,5 @@
+/* eslint-disable react/no-array-index-key */
+
 "use client";
 
 import { useEffect, useState, useRef } from "react";
@@ -7,7 +9,7 @@ import Button from "./ui/Button";
 interface TutorialStep {
     title: string;
     description: string;
-    position: { top?: string; bottom?: string; left?: string; right?: string };
+    position?: { top?: string; bottom?: string; left?: string; right?: string };
     targetSelector?: string;
     spotlightSelector?: string;
     placementAxis?: "x" | "y";
@@ -15,6 +17,21 @@ interface TutorialStep {
     forward?: (keyof HTMLElementEventMap)[]
     hidePrev?: boolean
 }
+
+const parseDescription = (description: string) => {
+    const parts = description.split(/(```[\s\S]*?```)/);
+    return parts.map((part, index) => {
+        if (part.startsWith('```') && part.endsWith('```')) {
+            const code = part.slice(3, -3).trim();
+            return (
+                <code key={index} className="block mt-2 bg-muted px-3 py-2 rounded text-sm font-mono text-foreground whitespace-pre-wrap">
+                    {code}
+                </code>
+            );
+        }
+        return <span key={index}>{part}</span>;
+    });
+};
 
 const tutorialSteps: TutorialStep[] = [
     {
@@ -30,32 +47,47 @@ const tutorialSteps: TutorialStep[] = [
     {
         title: "Select a Graph",
         description: "This dropdown lets you select which graph to work with. We've loaded demo graphs for this tour. Click the highlighted dropdown to see them.",
-        position: {},
         targetSelector: '[data-testid="selectGraph"]',
         placementAxis: "x",
         advanceOn: "pointerdown",
+        forward: ["mouseenter", "mouseleave"],
     },
     {
         title: "Manage Graphs",
         description: "The Manage button opens a comprehensive interface where you can create new graphs, delete existing ones, duplicate graphs with all their data, and export graphs to .dump files for backup or sharing.",
-        position: {},
         targetSelector: '[data-testid="manageGraphs"]',
         placementAxis: "x",
-        forward: ["pointerenter", "pointerleave"]
+        advanceOn: "click",
+        forward: ["mouseenter", "mouseleave"],
+        hidePrev: true
+    },
+    {
+        title: "Manage Graphs Window",
+        description: "Here you can see all your graphs and manage them. Each graph has actions to delete, duplicate (with all data), or export to a .dump file. You can also create new graphs from this interface. When you're done, click the close button to return to the main view.",
+        targetSelector: '[data-testid="manageContent"]',
+        placementAxis: "x",
+        hidePrev: true
+    },
+    {
+        title: "Close Manage Graphs Window",
+        description: "Here you can see all your graphs and manage them. Each graph has actions to delete, duplicate (with all data), or export to a .dump file. You can also create new graphs from this interface. When you're done, click the close button to return to the main view.",
+        targetSelector: '[data-testid="closeManage"]',
+        placementAxis: "x",
+        advanceOn: "click",
+        forward: ["mouseenter", "mouseleave"],
     },
     {
         title: "Select a Demo Graph",
         description: "Click on the 'social-demo' option to select and load this demo graph. It contains sample social network data with users, posts, and relationships that you can explore. Click the highlighted option to continue.",
-        position: {},
         targetSelector: '[data-testid="selectGraphsocial-demoButton"]',
         placementAxis: "x",
         advanceOn: "click",
-        forward: ["mouseenter", "mouseleave"]
+        forward: ["mouseenter", "mouseleave"],
+        hidePrev: true
     },
     {
         title: "Graph Info Panel",
         description: "The Graph Info panel displays node labels, edge types, and graph statistics.",
-        position: {},
         targetSelector: '[data-testid="graphInfoPanel"]',
         placementAxis: "x",
         hidePrev: true
@@ -63,76 +95,90 @@ const tutorialSteps: TutorialStep[] = [
     {
         title: "Get all nodes",
         description: "Click this button to retrieve all nodes in the graph. This will show you the total count and basic information about all nodes.",
-        position: {},
         targetSelector: '[data-testid="graphInfoAllNodes"]',
         placementAxis: "x",
         advanceOn: "click",
-        forward: ["pointerenter", "pointerleave"]
+        forward: ["mouseenter", "mouseleave"]
     },
     {
         title: "Get KNOWS edge",
         description: "Click this button to retrieve all edges of type 'KNOWS' in the graph. This will show you the count and details of all E-type relationships.",
-        position: {},
         targetSelector: '[data-testid="graphInfoKNOWSEdge"]',
         placementAxis: "x",
         advanceOn: "click",
-        forward: ["pointerenter", "pointerleave"]
+        forward: ["mouseenter", "mouseleave"]
     },
     {
         title: "Query Editor",
-        description: "Write and execute your Cypher queries here. Try running queries to retrieve nodes, relationships, or perform complex graph operations.",
-        position: {},
+        description: "Write and execute your Cypher queries here. Try modifying the query by adding a filter, for example: ```MATCH p=()-[r:KNOWS]-() WHERE r.since > 2018 RETURN p```. Then click Run to execute your modified query.",
         targetSelector: '[data-testid="editorRun"]',
         spotlightSelector: '[data-testid="editor"]',
         placementAxis: "y",
         advanceOn: "click",
-        forward: ["pointerenter", "pointerleave"]
+        forward: ["mouseenter", "mouseleave"],
+        hidePrev: true
     },
     {
         title: "Graph Visualization",
         description: "Query results containing nodes and edges will be visualized here as an interactive graph. You can drag, zoom, and explore the relationships.",
-        position: {},
         placementAxis: "x",
         targetSelector: '.force-graph-container canvas',
         spotlightSelector: '[data-testid="graphView"]',
-        forward: ["mousedown", "mouseup", "mousemove", "mouseenter", "mouseleave", "mouseover", "mouseout", "contextmenu", "pointerdown", "pointerup", "pointermove", "pointerenter", "pointerleave", "wheel"]
+        forward: ["mousedown", "mouseup", "mousemove", "mouseenter", "mouseleave", "mouseover", "mouseout", "contextmenu", "pointerdown", "pointerup", "pointermove", "pointerenter", "pointerleave", "wheel"],
+        hidePrev: true
     },
     {
         title: "Table Results",
         description: "Query results can also be displayed as tables. This is useful for viewing properties, aggregations, and other non-graph data.",
-        position: {},
         placementAxis: "y",
         targetSelector: '[data-testid="tableTab"]',
         advanceOn: "mousedown",
-        forward: ["mousedown", "mouseenter", "mouseleave"]
+        forward: ["mousedown", "mouseenter", "mouseleave"],
+        hidePrev: true
     },
     {
         title: "Query Metadata",
         description: "View query execution details, explain plans, and profile information in the metadata tabs below your results.",
-        position: {},
         placementAxis: "y",
         targetSelector: '[data-testid="metadataTab"]',
         advanceOn: "mousedown",
-        forward: ["mousedown", "mouseenter", "mouseleave"]
+        forward: ["mousedown", "mouseenter", "mouseleave"],
+        hidePrev: true
     },
     {
         title: "Query History",
         description: "Access your previous queries here. You can filter by graph, search queries, and view metadata for each executed query.",
-        position: {},
         placementAxis: "y",
         targetSelector: '[data-testid="queryHistory"]',
+        advanceOn: "click",
+        forward: ["mouseenter", "mouseleave"],
+        hidePrev: true
+    },
+    {
+        title: "Query History Window",
+        description: "Access your previous queries here. You can filter by graph, search queries, and view metadata for each executed query.",
+        placementAxis: "y",
+        targetSelector: '[data-testid="queryHistoryContent"]',
+        hidePrev: true
+    },
+    {
+        title: "Close Query History Window",
+        description: "Access your previous queries here. You can filter by graph, search queries, and view metadata for each executed query.",
+        placementAxis: "y",
+        targetSelector: '[data-testid="closeQueryHistory"]',
+        advanceOn: "click",
+        forward: ["mouseenter", "mouseleave"],
+        hidePrev: true
     },
     {
         title: "Theme Toggle",
         description: "Switch between light and dark themes for a comfortable viewing experience.",
-        position: {},
         placementAxis: "x",
         targetSelector: '[data-testid="themeToggle"]',
     },
     {
         title: "Settings",
         description: "Access browser settings to configure query limits, timeouts, default queries, AI chat features, and more. You can also retake this tour from settings.",
-        position: {},
         targetSelector: '[data-testid="settings"]',
     },
     {
@@ -287,17 +333,21 @@ function TutorialPortal({
             const element = document.querySelector(targetSelector);
 
             if (element) {
+                // Check if the element is disabled
+                const isDisabled = element instanceof HTMLButtonElement || element instanceof HTMLInputElement
+                    ? element.disabled
+                    : element.hasAttribute('disabled') ||
+                    element.classList.contains('disabled') ||
+                    window.getComputedStyle(element).pointerEvents === 'none';
+
+                setTargetDisabled(isDisabled);
+
                 // Create an invisible overlay over the element to catch clicks
                 const overlay = document.createElement('div');
                 overlay.style.position = 'fixed';
                 overlay.style.zIndex = '40';
                 overlay.style.cursor = window.getComputedStyle(element).cursor || 'default';
-                overlay.style.pointerEvents = 'auto';
-                const disabled = element.classList.contains("disabled")
-                overlay.setAttribute('disabled', String(disabled));
-                setTargetDisabled(disabled)
-                overlay.setAttribute('data-tutorial-overlay', 'true');
-
+                overlay.style.pointerEvents = isDisabled ? 'none' : 'auto';
 
                 // Simple wheel event passthrough - only if wheel is in forward array
                 let wheelHandler: ((ev: Event) => void) | null = null;
@@ -545,22 +595,28 @@ function TutorialPortal({
                 ...currentPosition
             }}
         >
-            {arrowStyles.className && (
-                <>
-                    <div className={arrowStyles.className} />
-                    <div className={arrowStyles.innerClassName} />
-                </>
-            )}
+            {
+                arrowStyles.className && (
+                    <>
+                        <div className={arrowStyles.className} />
+                        <div className={arrowStyles.innerClassName} />
+                    </>
+                )
+            }
             <div className="space-y-4">
                 <div>
-                    {step > 0 && (
-                        <div className="text-sm text-muted-foreground mb-1">
-                            Step {step} of {tutorialSteps.length - 1}
-                        </div>
-                    )}
+                    {
+                        step > 0 && (
+                            <div className="text-sm text-muted-foreground mb-1">
+                                Step {step} of {tutorialSteps.length - 1}
+                            </div>
+                        )
+                    }
                     <h3 className="text-xl font-semibold">{title}</h3>
                 </div>
-                <p className="text-muted-foreground">{description}</p>
+                <div className="text-muted-foreground">
+                    {parseDescription(description)}
+                </div>
                 {
                     advanceOn && targetSelector &&
                     <div className="flex items-center gap-2 p-3 bg-primary/10 rounded-lg">
@@ -575,7 +631,7 @@ function TutorialPortal({
                     <div className="flex justify-between items-center gap-4 pt-4">
                         {
                             !isLastStep &&
-                            < Button
+                            <Button
                                 className="text-nowrap"
                                 variant="Cancel"
                                 label="Skip Tutorial"
@@ -624,18 +680,18 @@ function TutorialSpotlight({ targetSelector, spotlightSelector }: { targetSelect
 
     useEffect(() => {
         const selector = spotlightSelector || targetSelector;
+
         if (!selector) {
             setSpotlightStyle({});
             return () => { };
         }
+
         const element = document.querySelector(selector) as HTMLElement;
 
         if (!element) {
             setSpotlightStyle({});
             return () => { };
         }
-
-
 
         const updateSpotlight = () => {
             const rect = element.getBoundingClientRect();
