@@ -2,9 +2,9 @@
 
 .docs-layout {
   background: white;
-  min-height: 100vh;
   width: 100% !important;
-  overflow-x: hidden !important;
+  height: 100vh !important;
+  overflow: hidden !important;
 }
 
 /* Force Swagger UI to take full width */

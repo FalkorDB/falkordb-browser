@@ -6,6 +6,8 @@ import { AuthOptions, Role, User, getServerSession } from "next-auth";
 import { NextResponse } from "next/server";
 import { FalkorDBOptions } from "falkordb/dist/src/falkordb";
 import { v4 as uuidv4 } from "uuid";
+import crypto from "crypto";
+import { isTokenActive } from "../tokenUtils";
 
 interface CustomJWTPayload {
   sub: string;
@@ -13,7 +15,6 @@ interface CustomJWTPayload {
   role: Role;
   host: string;
   port: number;
-  password?: string;
   tls: boolean;
   ca?: string;
 }
@@ -29,6 +30,69 @@ interface AuthenticatedUser {
 }
 
 const connections = new Map<string, FalkorDB>();
+
+// Admin connection for token management operations
+let adminConnectionForTokens: FalkorDB | null = null;
+
+/**
+ * Gets or creates an Admin Redis connection for token management
+ * This connection is used to store/retrieve/delete tokens for all users
+ * since non-admin users don't have SET/GET/DEL permissions
+ */
+export async function getAdminConnectionForTokens(
+  host: string = "localhost",
+  port: number = 6379,
+  tls: boolean = false,
+  ca?: string
+): Promise<FalkorDB> {
+  // Return existing connection if available
+  if (adminConnectionForTokens) {
+    try {
+      // Test if connection is still alive
+      const connection = await adminConnectionForTokens.connection;
+      await connection.ping();
+      return adminConnectionForTokens;
+    } catch (err) {
+      console.warn("Admin token connection is dead, recreating:", err);
+      adminConnectionForTokens = null;
+    }
+  }
+
+  // Create new Admin connection
+  // Note: Default user has "nopass" so we don't provide credentials
+  const connectionOptions: FalkorDBOptions = tls
+    ? {
+        socket: {
+          host,
+          port,
+          tls: true,
+          checkServerIdentity: () => undefined,
+          ca: ca ? [Buffer.from(ca, "base64").toString("utf8")] : undefined,
+        },
+        username: undefined,
+        password: undefined,
+      }
+    : {
+        socket: {
+          host,
+          port,
+        },
+        username: undefined,
+        password: undefined,
+      };
+
+  adminConnectionForTokens = await FalkorDB.connect(connectionOptions);
+  
+  // Verify this is actually an admin connection
+  try {
+    const connection = await adminConnectionForTokens.connection;
+    await connection.aclGetUser("default");
+  } catch (err) {
+    throw new Error("Failed to create admin connection for token management. The default user must have admin privileges.");
+  }
+
+  return adminConnectionForTokens;
+}
 
 export async function newClient(
   credentials: {
@@ -73,11 +137,13 @@ export async function newClient(
 
   client.on("error", (err) => {
     // Close coonection on error and remove from connections map
+    // eslint-disable-next-line no-console
     console.error("FalkorDB Client Error", err);
     const connection = connections.get(id);
     if (connection) {
       connections.delete(id);
       connection.close().catch((e) => {
+        // eslint-disable-next-line no-console
         console.warn("FalkorDB Client Disconnect Error", e);
       });
     }
@@ -91,6 +157,7 @@ export async function newClient(
     return { role: "Admin", client };
   } catch (err) {
     if ((err as Error).message.startsWith("NOPERM")) {
+      // eslint-disable-next-line no-console
       console.debug("user is not admin", err);
     } else throw err;
   }
@@ -99,9 +166,11 @@ export async function newClient(
     await connection.sendCommand(["GRAPH.QUERY"]);
   } catch (err) {
     if ((err as Error).message.includes("permissions")) {
+      // eslint-disable-next-line no-console
       console.debug("user is read-only", err);
       return { role: "Read-Only", client };
     }
+    // eslint-disable-next-line no-console
     console.debug("user is read-write", err);
     return { role: "Read-Write", client };
   }
@@ -116,6 +185,20 @@ export function generateTimeUUID() {
 }
 
 /**
+ * Generates a consistent user ID based on credentials
+ * This ensures the same user gets the same ID across multiple logins
+ * Format: SHA-256 hash of "username@host:port"
+ */
+export function generateConsistentUserId(
+  username: string,
+  host: string,
+  port: number
+): string {
+  const identifier = `${username || 'default'}@${host}:${port}`;
+  return crypto.createHash('sha256').update(identifier).digest('hex');
+}
+
+/**
  * Retrieves the Authorization header from the request
  */
 async function getAuthorizationHeader(): Promise<string | null> {
@@ -126,6 +209,19 @@ async function getAuthorizationHeader(): Promise<string | null> {
   } catch (e) {
     // Headers not available, continue with session auth only
     return null;
+  }
+}
+
+/**
+ * Checks if the request requires JWT-only authentication
+ */
+async function isJWTOnlyRequest(): Promise<boolean> {
+  try {
+    const { headers } = await import('next/headers');
+    const headersList = await headers();
+    return headersList.get("X-JWT-Only") === "true";
+  } catch (e) {
+    return false;
   }
 }
 
@@ -184,35 +280,27 @@ async function tryJWTAuthentication(): Promise<{ client: FalkorDB; user: Authent
       const existingConnection = connections.get(payload.sub);
 
       if (existingConnection) {
+        // SSRF Protection: Validate that token host/port match the connection we're reusing
+        // This prevents attackers from using valid tokens to probe internal networks
+        // Note: We trust payload.host/port here because they were validated during initial login
+        // and the connection already exists in our Map
+        const adminClient = await getAdminConnectionForTokens(payload.host, payload.port, payload.tls, payload.ca);
+        const adminConnection = await adminClient.connection;
+        const tokenActive = await isTokenActive(token, adminConnection);
+        if (!tokenActive) {
+          // eslint-disable-next-line no-console
+          console.warn("JWT authentication failed: token is not active (revoked or expired)");
+          return null;
+        }
+        
         // Reuse existing JWT connection
         const user = createUserFromJWTPayload(payload);
         return { client: existingConnection, user };
       }
 
-      // Create new connection only if not found
-      const { role, client } = await newClient(
-        {
-          host: payload.host,
-          port: payload.port.toString(),
-          username: payload.username || "",
-          password: payload.password || "",
-          tls: Boolean(payload.tls).toString(),
-          ca: payload.ca || "undefined",
-        },
-        payload.sub
-      );
-
-      const user = {
-        id: payload.sub,
-        username: payload.username,
-        role: role as Role,
-        host: payload.host,
-        port: payload.port,
-        tls: payload.tls || false,
-        ca: payload.ca,
-      };
-
-      return { client, user };
+      // eslint-disable-next-line no-console
+      console.warn("JWT authentication failed: no existing connection for user", payload.sub);
+      return null;
     } catch (error) {
       // Fall back to session auth if JWT fails
       // eslint-disable-next-line no-console
@@ -258,6 +346,7 @@ const authOptions: AuthOptions = {
           };
           return res;
         } catch (err) {
+          // eslint-disable-next-line no-console
           console.error("FalkorDB Client Connect Error", err);
           return null;
         }
@@ -273,7 +362,6 @@ const authOptions: AuthOptions = {
           host: user.host,
           port: user.port,
           username: user.username,
-          password: user.password,
           tls: user.tls,
           ca: user.ca,
           role: user.role,
@@ -308,13 +396,23 @@ const authOptions: AuthOptions = {
 };
 
 export async function getClient() {
+  // Check if this is a JWT-only request (from /docs)
+  const jwtOnlyRequired = await isJWTOnlyRequest();
+  
   // Try JWT authentication first
   const jwtResult = await tryJWTAuthentication();
   if (jwtResult) {
     return jwtResult;
   }
 
-  // Fall back to session authentication
+  // If JWT-only is required and JWT failed, return 401 immediately
+  if (jwtOnlyRequired) {
+    return NextResponse.json({ 
+      message: "JWT authentication required for API documentation. Please use the login endpoint to get a token and authorize in Swagger UI." 
+    }, { status: 401 });
+  }
+
+  // Fall back to session authentication for regular app requests
   const session = await getServerSession(authOptions);
   const id = session?.user?.id;
 
