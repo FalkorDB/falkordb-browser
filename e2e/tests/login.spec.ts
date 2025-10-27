@@ -55,7 +55,7 @@ test.describe(`Login tests`, () => {
         await login.Logout();
         await browser.setPageToFullScreen();
         await login.connectWithUrl("falkor://localhost:6379");
-        await new Promise((res) => { setTimeout(res, 500) });
+        await login.waitForSuccessfulLogin(urls.graphUrl);
         expect(login.getCurrentURL()).toBe(urls.graphUrl);
     })
 
@@ -64,7 +64,7 @@ test.describe(`Login tests`, () => {
         await login.Logout();
         await browser.setPageToFullScreen();
         await login.connectWithUrl(`falkor://readonlyuser:${user.password}@localhost:6379`);
-        await new Promise((res) => { setTimeout(res, 500) });
+        await login.waitForSuccessfulLogin(urls.graphUrl);
         expect(login.getCurrentURL()).toBe(urls.graphUrl);
     })
 
@@ -98,7 +98,8 @@ test.describe(`Login tests`, () => {
             if (login.getCurrentURL() === urls.graphUrl) await login.Logout();
             await browser.setPageToFullScreen();
             await login.connectWithUrl(url);
-            await new Promise((res) => { setTimeout(res, 500) });
+            // Wait for page to process the invalid login attempt
+            await login.page.waitForLoadState('networkidle');
             expect(login.getCurrentURL()).not.toBe(urls.graphUrl);
         })
     });

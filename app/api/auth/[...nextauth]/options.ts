@@ -361,7 +361,7 @@ const authOptions: AuthOptions = {
             port,
             password: credentials.url ? undefined : credentials.password,
             username: credentials.url ? undefined : credentials.username,
-            tls: credentials.url ? credentials.url.startsWith("falkors://") : credentials.tls === "true",
+            tls: credentials.url && credentials.url.trim() !== "" ? credentials.url.startsWith("falkors://") : credentials.tls === "true",
             ca: credentials.url ? undefined : credentials.ca,
             role,
           };
