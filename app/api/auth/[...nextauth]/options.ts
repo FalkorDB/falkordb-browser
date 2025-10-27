@@ -49,7 +49,7 @@ export async function newClient(
   // If URL is provided, use it directly
   if (credentials.url) {
     connectionOptions = {
-      url: credentials.url,
+      url: credentials.url ?? "falkors://localhost:6379",
     };
   } else {
     // Use individual connection parameters
