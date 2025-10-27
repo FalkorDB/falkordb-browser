@@ -64,12 +64,13 @@ export async function POST(request: NextRequest) {
         );
       }
       
-      // Get Admin connection for token management (same host/port as the token)
+      // SSRF Protection: Use authenticated user's connection params, not token payload
+      // This prevents attackers from crafting JWTs that point to internal servers
       const adminClient = await getAdminConnectionForTokens(
-        payload.host as string,
-        payload.port as number,
-        payload.tls as boolean,
-        payload.ca as string | undefined
+        authenticatedUser.host,
+        authenticatedUser.port,
+        authenticatedUser.tls,
+        authenticatedUser.ca
       );
       const adminConnection = await adminClient.connection;
       

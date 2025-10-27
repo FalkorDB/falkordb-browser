@@ -113,16 +113,17 @@ export async function POST(request: NextRequest) {
           username: user.username
         };
         
-        // Store token data with 1 year TTL (31536000 seconds = 365 days)
+        // Store token data with 1 year + 1 day TTL (31622400 seconds = 366 days)
+        // Grace period allows audit trail after JWT expiration
         await adminConnection.setEx(
           `api_token:${tokenHash}`,
-          31536000,
+          31622400,
           JSON.stringify(tokenData)
         );
         
         // Add to user's token set for easy management
         await adminConnection.sAdd(`user_tokens:${user.id}`, tokenId);
-        await adminConnection.expire(`user_tokens:${user.id}`, 31536000);
+        await adminConnection.expire(`user_tokens:${user.id}`, 31622400);
         
       } catch (redisError) {
         // eslint-disable-next-line no-console

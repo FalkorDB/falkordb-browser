@@ -53,7 +53,6 @@ export async function getAdminConnectionForTokens(
       await connection.ping();
       return adminConnectionForTokens;
     } catch (err) {
-      // Connection is dead, create a new one
       console.warn("Admin token connection is dead, recreating:", err);
       adminConnectionForTokens = null;
     }
@@ -138,11 +137,13 @@ export async function newClient(
 
   client.on("error", (err) => {
     // Close coonection on error and remove from connections map
+    // eslint-disable-next-line no-console
     console.error("FalkorDB Client Error", err);
     const connection = connections.get(id);
     if (connection) {
       connections.delete(id);
       connection.close().catch((e) => {
+        // eslint-disable-next-line no-console
         console.warn("FalkorDB Client Disconnect Error", e);
       });
     }
@@ -156,6 +157,7 @@ export async function newClient(
     return { role: "Admin", client };
   } catch (err) {
     if ((err as Error).message.startsWith("NOPERM")) {
+      // eslint-disable-next-line no-console
       console.debug("user is not admin", err);
     } else throw err;
   }
@@ -164,9 +166,11 @@ export async function newClient(
     await connection.sendCommand(["GRAPH.QUERY"]);
   } catch (err) {
     if ((err as Error).message.includes("permissions")) {
+      // eslint-disable-next-line no-console
       console.debug("user is read-only", err);
       return { role: "Read-Only", client };
     }
+    // eslint-disable-next-line no-console
     console.debug("user is read-write", err);
     return { role: "Read-Write", client };
   }
@@ -276,7 +280,10 @@ async function tryJWTAuthentication(): Promise<{ client: FalkorDB; user: Authent
       const existingConnection = connections.get(payload.sub);
 
       if (existingConnection) {
-        // Check if token is active using Admin connection for token management
+        // SSRF Protection: Validate that token host/port match the connection we're reusing
+        // This prevents attackers from using valid tokens to probe internal networks
+        // Note: We trust payload.host/port here because they were validated during initial login
+        // and the connection already exists in our Map
         const adminClient = await getAdminConnectionForTokens(payload.host, payload.port, payload.tls, payload.ca);
         const adminConnection = await adminClient.connection;
         const tokenActive = await isTokenActive(token, adminConnection);

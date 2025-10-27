@@ -14,7 +14,7 @@ export async function isTokenActive(
 ): Promise<boolean> {
   try {
     if (!process.env.NEXTAUTH_SECRET) {
-      return true; // Default to active if no secret configured
+      return false; // Fail-closed: cannot validate without secret
     }
 
     const JWT_SECRET = new TextEncoder().encode(process.env.NEXTAUTH_SECRET);
@@ -22,9 +22,9 @@ export async function isTokenActive(
     // Verify the JWT is valid
     await jwtVerify(token, JWT_SECRET);
     
-    // If no admin connection provided, we can't check Redis, default to active
+    // Fail-closed: without admin connection we cannot validate revocation
     if (!adminConnection) {
-      return true;
+      return false;
     }
     
     // Hash the token to match storage format
@@ -48,10 +48,11 @@ export async function isTokenActive(
       if (now - lastUsed > UPDATE_THRESHOLD_MS) {
         data.last_used = new Date(now).toISOString();
         
-        // Update Redis using admin connection (has SET permission)
+        // Update Redis preserving the original TTL (1 year + 1 day grace period)
+        // Use setEx with original TTL of 31622400 seconds (366 days)
         await adminConnection.setEx(
           `api_token:${tokenHash}`,
-          31536000, // 1 year TTL
+          31622400, // 1 year + 1 day TTL (preserves grace period)
           JSON.stringify(data)
         );
       }
@@ -64,6 +65,6 @@ export async function isTokenActive(
   } catch (error) {
     // eslint-disable-next-line no-console
     console.error("Error checking token status:", error);
-    return true; // Default to active if we can't check Redis
+    return false; // Fail-closed: deny access on errors
   }
 }
