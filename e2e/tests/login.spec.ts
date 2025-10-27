@@ -49,4 +49,57 @@ test.describe(`Login tests`, () => {
             expect(login.getCurrentURL()).not.toBe(urls.graphUrl)
         })
     });
+
+    test(`@admin validate login with FalkorDB URL - default user`, async () => {
+        const login = await browser.createNewPage(LoginPage, urls.loginUrl);
+        await login.Logout();
+        await browser.setPageToFullScreen();
+        await login.connectWithUrl("falkor://localhost:6379");
+        await new Promise((res) => { setTimeout(res, 500) });
+        expect(login.getCurrentURL()).toBe(urls.graphUrl);
+    })
+
+    test(`@admin validate login with FalkorDB URL - with credentials`, async () => {
+        const login = await browser.createNewPage(LoginPage, urls.loginUrl);
+        await login.Logout();
+        await browser.setPageToFullScreen();
+        await login.connectWithUrl(`falkor://readonlyuser:${user.password}@localhost:6379`);
+        await new Promise((res) => { setTimeout(res, 500) });
+        expect(login.getCurrentURL()).toBe(urls.graphUrl);
+    })
+
+    test(`@admin validate toggle between manual and URL modes`, async () => {
+        const login = await browser.createNewPage(LoginPage, urls.loginUrl);
+        await login.Logout();
+        await browser.setPageToFullScreen();
+        
+        // Verify manual mode is selected by default
+        expect(await login.isManualModeSelected()).toBe(true);
+        
+        // Switch to URL mode
+        await login.clickUrlMode();
+        expect(await login.isUrlModeSelected()).toBe(true);
+        
+        // Switch back to manual mode
+        await login.clickManualMode();
+        expect(await login.isManualModeSelected()).toBe(true);
+    })
+
+    const invalidUrls = [
+        { description: 'invalid protocol', url: 'invalid://localhost:6379' },
+        { description: 'invalid host', url: 'falkor://invalidhost:6379' },
+        { description: 'invalid port', url: 'falkor://localhost:6378' },
+        { description: 'invalid credentials', url: 'falkor://wronguser:wrongpass@localhost:6379' },
+    ];
+
+    invalidUrls.forEach(({ description, url }) => {
+        test(`@admin validate user login with invalid URL: ${description}`, async () => {
+            const login = await browser.createNewPage(LoginPage, urls.loginUrl);
+            if (login.getCurrentURL() === urls.graphUrl) await login.Logout();
+            await browser.setPageToFullScreen();
+            await login.connectWithUrl(url);
+            await new Promise((res) => { setTimeout(res, 500) });
+            expect(login.getCurrentURL()).not.toBe(urls.graphUrl);
+        })
+    });
 })

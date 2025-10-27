@@ -46,6 +46,19 @@ export default class LoginPage extends HeaderComponent {
         return this.page.getByTestId("remove-certificate-btn");
     }
 
+    // URL mode locators
+    private get manualConfigRadio(): Locator {
+        return this.page.getByRole("radio", { name: "Manual Configuration" });
+    }
+
+    private get urlModeRadio(): Locator {
+        return this.page.getByRole("radio", { name: "FalkorDB URL" });
+    }
+
+    private get falkordbUrlInput(): Locator {
+        return this.page.locator("//input[@id='falkordb-url']");
+    }
+
     async clickConnect(): Promise<void> {
         await interactWhenVisible(this.connectBtn, el => el.click(), "connect button");
     }
@@ -149,5 +162,32 @@ export default class LoginPage extends HeaderComponent {
         // Wait for the page to fully load after navigation
         await this.page.waitForLoadState('domcontentloaded');
         await this.page.waitForLoadState('networkidle');
+    }
+
+    // URL mode methods
+    async clickUrlMode(): Promise<void> {
+        await interactWhenVisible(this.urlModeRadio, el => el.click(), "URL mode radio button");
+    }
+
+    async clickManualMode(): Promise<void> {
+        await interactWhenVisible(this.manualConfigRadio, el => el.click(), "Manual mode radio button");
+    }
+
+    async isUrlModeSelected(): Promise<boolean> {
+        return await this.urlModeRadio.getAttribute('data-state') === 'checked';
+    }
+
+    async isManualModeSelected(): Promise<boolean> {
+        return await this.manualConfigRadio.getAttribute('data-state') === 'checked';
+    }
+
+    async fillFalkorDBUrl(url: string): Promise<void> {
+        await interactWhenVisible(this.falkordbUrlInput, el => el.fill(url), "FalkorDB URL input");
+    }
+
+    async connectWithUrl(url: string): Promise<void> {
+        await this.clickUrlMode();
+        await this.fillFalkorDBUrl(url);
+        await this.clickConnect();
     }
 }
