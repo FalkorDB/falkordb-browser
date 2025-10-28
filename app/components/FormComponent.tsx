@@ -161,18 +161,19 @@ export default function FormComponent({ handleSubmit, fields, error = undefined,
                                             }} />
                                 }
                                 <p className="text-sm text-gray-500">{field.description}</p>
-                                {
-                                    field.errors && errors[field.label] ?
+                                <div className="h-5">
+                                    {
+                                        field.errors && errors[field.label] &&
                                         <p className="text-sm text-destructive">{field.errors.find((err) => err.condition(field.value))?.message}</p>
-                                        : <p className="h-5" />
-                                }
+                                    }
+                                </div>
                             </div>
                         </div>
                     )
                 })
             }
             {children}
-            {error && <p className="text-sm text-destructive h-5">{error.show ? error.message : ""}</p>}
+            {error && <p className="text-sm text-destructive">{error.show ? error.message : ""}</p>}
             <div className="flex justify-end gap-2">
                 <Button
                     id="submit-button"

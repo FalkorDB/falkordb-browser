@@ -28,7 +28,7 @@ test.describe(`Login tests`, () => {
         await login.Logout();
         await browser.setPageToFullScreen();
         await login.connectWithCredentials("readonlyuser", user.password);
-        await new Promise((res) => { setTimeout(res, 500) });
+        await login.waitForUrl(urls.graphUrl)
         expect(login.getCurrentURL()).toBe(urls.graphUrl);
     })
 

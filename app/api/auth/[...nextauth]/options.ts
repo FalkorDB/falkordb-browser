@@ -348,17 +348,11 @@ const authOptions: AuthOptions = {
 
           const { role } = await newClient(credentials, id);
 
-          // If URL is provided, use it; otherwise use individual parameters
-          let port = 6379;
-          
-          if (!credentials.url && credentials.port) {
-            port = parseInt(credentials.port, 10);
-          }
-
           const res: User = {
             id,
-            host: credentials.url || credentials.host,
-            port,
+            url: credentials.url,
+            host: credentials.host,
+            port: credentials.port ? parseInt(credentials.port, 10) : 6379,
             password: credentials.url ? undefined : credentials.password,
             username: credentials.url ? undefined : credentials.username,
             tls: credentials.url && credentials.url.trim() !== "" ? credentials.url.startsWith("falkors://") : credentials.tls === "true",

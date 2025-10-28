@@ -111,7 +111,7 @@ export default class LoginPage extends HeaderComponent {
 
   async fillFalkorDBUrl(falkordbUrl: string): Promise<void> {
     await interactWhenVisible(
-      this.portInput,
+      this.falkordbUrlInput,
       (el) => el.fill(falkordbUrl),
       "falkordb url input"
     );

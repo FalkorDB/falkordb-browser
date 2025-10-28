@@ -149,9 +149,9 @@ export default function LoginForm() {
       // Validate URL format starts with falkor:// or falkors://
       const trimmedUrl = falkordbUrl.trim();
       
-      if (!trimmedUrl || (!trimmedUrl.startsWith("falkor://") && !trimmedUrl.startsWith("falkors://"))) {
+      if (trimmedUrl && (!trimmedUrl.startsWith("falkor://") && !trimmedUrl.startsWith("falkors://"))) {
         setError({
-          message: "Invalid FalkorDB URL format. Expected: falkor://[user:pass@]host[:port][/graph] or falkors://[user:pass@]host[:port][/graph]",
+          message: "Invalid FalkorDB URL format. Expected: falkor://[user:pass@]host[:port] or falkors://[user:pass@]host[:port]",
           show: true
         });
         return;
@@ -206,7 +206,7 @@ export default function LoginForm() {
   return (
     <div className="relative h-full w-full flex flex-col">
       <div className="grow flex items-center justify-center">
-        <div className="flex flex-col gap-8 items-center">
+        <div className="flex flex-col gap-8 items-center w-[500px]">
           {mounted && currentTheme && <Image style={{ width: 'auto', height: '80px' }} priority src={`/icons/Browser-${currentTheme}.svg`} alt="FalkorDB Browser Logo" width={0} height={0} />}
 
           {/* Login Mode Toggle */}
