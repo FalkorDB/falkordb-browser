@@ -141,8 +141,8 @@ type TableViewContextType = {
   setScrollPosition: Dispatch<SetStateAction<number>>;
   search: string;
   setSearch: Dispatch<SetStateAction<string>>;
-  expand: number[];
-  setExpand: Dispatch<SetStateAction<number[]>>;
+  expand: Map<number, number>;
+  setExpand: Dispatch<SetStateAction<Map<number, number>>>;
   dataHash: string;
 };
 
@@ -283,7 +283,7 @@ export const TableViewContext = createContext<TableViewContextType>({
   setScrollPosition: () => {},
   search: "",
   setSearch: () => {},
-  expand: [],
+  expand: new Map(),
   setExpand: () => {},
   dataHash: "",
 });

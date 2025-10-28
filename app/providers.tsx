@@ -80,7 +80,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
   const [viewport, setViewport] = useState<{ zoom: number; centerX: number; centerY: number }>({ centerX: 0, centerY: 0, zoom: 0 })
   const [scrollPosition, setScrollPosition] = useState(0)
   const [search, setSearch] = useState("")
-  const [expand, setExpand] = useState<number[]>([])
+  const [expand, setExpand] = useState<Map<number, number>>(new Map())
 
   const isSaved = data.nodes.some(n => n.x && n.y)
   const dataHash = useMemo(() => JSON.stringify(graph.Data), [graph.Data])
