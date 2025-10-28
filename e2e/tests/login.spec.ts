@@ -99,7 +99,7 @@ test.describe(`Login tests`, () => {
             await browser.setPageToFullScreen();
             await login.connectWithUrl(url);
             // Wait for page to process the invalid login attempt
-            await login.page.waitForLoadState('networkidle');
+            await login.waitForPageIdle();
             expect(login.getCurrentURL()).not.toBe(urls.graphUrl);
         })
     });
