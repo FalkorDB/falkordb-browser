@@ -81,7 +81,7 @@ export default function TableComponent({
     const [topFakeRowHeight, setTopFakeRowHeight] = useState<number>(0)
     const [bottomFakeRowHeight, setBottomFakeRowHeight] = useState<number>(0)
     const [visibleRows, setVisibleRows] = useState<Row[]>([])
-    const expandArr = useMemo(() => new Map(initialExpand), [initialExpand])
+    const [expandArr, setExpandArr] = useState(new Map(initialExpand))
 
     const height = expandArr.size === 0 ? itemHeight : itemHeight * 2
 
@@ -257,20 +257,24 @@ export default function TableComponent({
                                                     className={getClassName(i, 1)}
                                                     title="Expand Root"
                                                     onClick={() => {
-                                                        expandArr.set(i, 1)
-                                                        if (onExpandChange) onExpandChange(expandArr)
-                                                    }}
-                                                >
+                                                        const newExpandArr = new Map(expandArr.set(i, 1))
+                                                        setExpandArr(newExpandArr)
+                                                        
+                                                        if (onExpandChange) onExpandChange(newExpandArr)
+                                                        }}
+                                                    >
                                                     <ChevronDown />
                                                 </Button>
                                                 <Button
                                                     title="Expand All"
                                                     className={getClassName(i, -1)}
                                                     onClick={() => {
-                                                        expandArr.set(i, -1)
-                                                        if (onExpandChange) onExpandChange(expandArr)
-                                                    }}
-                                                >
+                                                        const newExpandArr = new Map(expandArr.set(i, -1))
+                                                        setExpandArr(newExpandArr)
+                                                        
+                                                        if (onExpandChange) onExpandChange(newExpandArr)
+                                                        }}
+                                                    >
                                                     <ChevronsDown />
                                                 </Button>
                                                 <Button
@@ -278,7 +282,10 @@ export default function TableComponent({
                                                     className={getClassName(i)}
                                                     onClick={() => {
                                                         expandArr.delete(i)
-                                                        if (onExpandChange) onExpandChange(expandArr)
+                                                        const newExpandArr = new Map(expandArr)
+                                                        setExpandArr(newExpandArr)
+                                                        
+                                                        if (onExpandChange) onExpandChange(newExpandArr)
                                                     }}
                                                 >
                                                     <ChevronsUp />
