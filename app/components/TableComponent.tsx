@@ -8,7 +8,7 @@
 "use client"
 
 import { Checkbox } from "@/components/ui/checkbox";
-import { JSONTree, KeyPath } from "react-json-tree"
+import { JSONTree } from "react-json-tree"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Cell, cn, getTheme, Row } from "@/lib/utils";
 import { Dispatch, SetStateAction, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
@@ -190,8 +190,8 @@ export default function TableComponent({
         <span className={cn("pointer-events-auto", valueClassName)}>{v}</span>
     )
 
-    const renderLabel = (l: any, keyPath: KeyPath) => (
-        <span className={cn(keyPath.length !== 1 && "pointer-events-auto", valueClassName)}>{l[0]}:</span>
+    const renderLabel = (l: any) => (
+        <span className={cn(valueClassName)}>{l[0]}:</span>
     )
 
     const getClassName = (index: number, level?: number) => cn("text-border rounded-lg", expandArr.get(index) === level && "bg-background text-foreground")
@@ -367,7 +367,7 @@ export default function TableComponent({
                                                                     shouldExpandNodeInitially={(keyPath) => expandArr.get(j) === -1 || keyPath.length === expandArr.get(j)}
                                                                     keyPath={[headers[j]]}
                                                                     valueRenderer={renderValue}
-                                                                    labelRenderer={(keyPath) => renderLabel(keyPath, keyPath)}
+                                                                    labelRenderer={(keyPath) => renderLabel(keyPath)}
                                                                     theme={{
                                                                         base00: "var(--background)", // background
                                                                         base01: '#000000',
