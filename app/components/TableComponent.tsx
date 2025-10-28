@@ -361,7 +361,7 @@ export default function TableComponent({
                                                 <div style={{ height }} className={cn("overflow-auto p-4", row.cells[0]?.value === editable && (cell.type !== "readonly" && cell.type !== "object") && "p-2", cell.type === "object" && "p-1")}>
                                                     {
                                                         cell.type === "object" ?
-                                                            <div className="pointer-events-none [&_.json-tree_.arrow]:hidden">
+                                                            <div className="pointer-events-none json-tree-container">
                                                                 <JSONTree
                                                                     key={`${Array.from(expandArr.values()).join(",")}-${j}`}
                                                                     shouldExpandNodeInitially={(keyPath) => expandArr.get(j) === -1 || keyPath.length === expandArr.get(j)}
