@@ -469,7 +469,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
           (alice)-[:WORKS_WITH]->(diana)
       `;
 
-      await getSSEGraphResult(`/api/graph/social-demo?query=${socialQuery}`, toast, setIndicator);
+      await getSSEGraphResult(`/api/graph/social-demo?query=${prepareArg(socialQuery)}`, toast, setIndicator);
 
       // Create social-test demo graph
       const socialTestQuery = `
@@ -479,7 +479,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       (eve)-[:FOLLOWS]->(frank)
       `;
 
-      await getSSEGraphResult(`/api/graph/social-demo-test?query=${socialTestQuery}`, toast, setIndicator);
+      await getSSEGraphResult(`/api/graph/social-demo-test?query=${prepareArg(socialTestQuery)}`, toast, setIndicator);
 
       // Update graph list to only show demo graphs
       setGraphNames(["social-demo", "social-demo-test"]);
@@ -517,6 +517,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
 
     if (userGraphBeforeTutorial && userGraphsBeforeTutorial.includes(userGraphBeforeTutorial)) {
       setGraphName(userGraphBeforeTutorial);
+      setHistoryQuery(prev => ({ ...prev, query: "", currentQuery: defaultQueryHistory.currentQuery }))
     } else if (userGraphsBeforeTutorial.length === 1) {
       setGraphName(userGraphsBeforeTutorial[0]);
 
@@ -530,27 +531,13 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       }
     } else {
       setGraphName("")
+      setHistoryQuery(prev => ({ ...prev, query: "", currentQuery: defaultQueryHistory.currentQuery }))
     }
 
     setGraphNames(userGraphsBeforeTutorial)
     setUserGraphsBeforeTutorial([]);
     setUserGraphBeforeTutorial("")
   };
-
-  // Set initial query for tutorial
-  useEffect(() => {
-    if (tutorialOpen && graphName === "social-demo" && !historyQuery.query) {
-      const initialQuery = "MATCH p=()-[:KNOWS]-() RETURN p";
-      setHistoryQuery(prev => ({
-        ...prev,
-        query: initialQuery,
-        currentQuery: {
-          ...prev.currentQuery,
-          text: initialQuery
-        }
-      }));
-    }
-  }, [tutorialOpen, graphName, historyQuery.query, setHistoryQuery]);
 
   return (
     <ThemeProvider attribute="class" storageKey="theme" defaultTheme="system" disableTransitionOnChange>

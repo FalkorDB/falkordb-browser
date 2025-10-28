@@ -94,11 +94,9 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
         return result.ok
     }, [type, toast, setIndicator, options, setOptions, setSelectedValue, selectedValue, setRows, session])
 
-    // Build rows whenever options change
-
-    useEffect(() => {
+    const handleSetRows = useCallback((opts: string[]) => {
         setRows(
-            options.map(opt =>
+            opts.map(opt =>
                 session?.user?.role === "Admin"
                     ? ({
                         checked: false,
@@ -108,7 +106,12 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
                     : ({ checked: false, name: opt, cells: [{ value: opt, type: "readonly" }] })
             )
         )
-    }, [options, session, handleSetOption])
+    }, [session, setRows, handleSetOption])
+
+    // Build rows whenever options change
+    useEffect(() => {
+        handleSetRows(options)
+    }, [options, session, handleSetRows])
 
     const handleOpenChange = async (o: boolean) => {
         setOpen(o)
@@ -127,20 +130,6 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
         setSelectedValue(value)
         setOpen(false)
     }
-
-    const handleSetRows = useCallback((opts: string[]) => {
-        setRows(
-            opts.map(opt =>
-                session?.user?.role === "Admin"
-                    ? ({
-                        checked: false,
-                        name: opt,
-                        cells: [{ value: opt, onChange: (value: string) => handleSetOption(value, opt), type: "text" }]
-                    })
-                    : ({ checked: false, name: opt, cells: [{ value: opt, type: "readonly" }] })
-            )
-        )
-    }, [session, setRows, handleSetOption])
 
     return (
         <Dialog open={openMenage} onOpenChange={setOpenMenage}>
@@ -215,7 +204,6 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
                     }
                 }}
                 hideClose
-                hideOverlay={tutorialOpen}
                 preventOutsideClose={tutorialOpen}
                 className="flex flex-col border-none rounded-lg max-w-none h-[90dvh]"
             >

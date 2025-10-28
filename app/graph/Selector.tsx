@@ -295,7 +295,6 @@ export default function Selector<T extends "Graph" | "Schema" = "Graph" | "Schem
                                 <DialogComponent
                                     label="queryHistory"
                                     preventOutsideClose={tutorialOpen}
-                                    hideOverlay={tutorialOpen}
                                     className="h-[90dvh] w-[90dvw]"
                                     open={queriesOpen}
                                     tabIndex={-1}

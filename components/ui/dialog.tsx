@@ -22,7 +22,7 @@ const DialogOverlay = React.forwardRef<
   <DialogPrimitive.Overlay
     ref={ref}
     className={cn(
-      "fixed inset-0 z-40 bg-black/80 backdrop-blur-sm data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
+      "fixed inset-0 z-[29] bg-black/80 backdrop-blur-sm data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
       className
     )}
     {...props}
@@ -33,7 +33,6 @@ DialogOverlay.displayName = DialogPrimitive.Overlay.displayName
 interface ContentProps
   extends React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content> {
   hideClose?: boolean
-  hideOverlay?: boolean
   closeSize?: number
   preventOutsideClose?: boolean
 }
@@ -41,10 +40,9 @@ interface ContentProps
 const DialogContent = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Content>,
   ContentProps
->(({ className, hideClose, hideOverlay, closeSize = 16, preventOutsideClose = false, onInteractOutside, onEscapeKeyDown, children, ...props }, ref) => (
+>(({ className, hideClose, closeSize = 16, preventOutsideClose = false, onInteractOutside, onEscapeKeyDown, children, ...props }, ref) => (
   <DialogPortal>
     {
-      !hideOverlay &&
       <DialogOverlay />
     }
     <DialogPrimitive.Content
