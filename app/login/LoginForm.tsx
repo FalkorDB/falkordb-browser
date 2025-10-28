@@ -146,13 +146,12 @@ export default function LoginForm() {
 
     // Handle URL mode
     if (loginMode === "url") {
-      // Validate URL format: falkor://[user:pass@]host:port or falkors://[user:pass@]host:port
+      // Validate URL format starts with falkor:// or falkors://
       const trimmedUrl = falkordbUrl.trim();
-      const urlPattern = /^(falkor|falkors):\/\/(?:[^:@]+:[^:@]+@)?([^:]+):(\d+)$/;
-
-      if (!urlPattern.test(trimmedUrl) && trimmedUrl) {
+      
+      if (!trimmedUrl || (!trimmedUrl.startsWith("falkor://") && !trimmedUrl.startsWith("falkors://"))) {
         setError({
-          message: "Invalid FalkorDB URL format. Expected: falkor://[user:pass@]host:port or falkors://[user:pass@]host:port",
+          message: "Invalid FalkorDB URL format. Expected: falkor://[user:pass@]host[:port][/graph] or falkors://[user:pass@]host[:port][/graph]",
           show: true
         });
         return;

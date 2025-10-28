@@ -187,6 +187,8 @@ export default class LoginPage extends HeaderComponent {
 
     async connectWithUrl(url: string): Promise<void> {
         await this.clickUrlMode();
+        // Wait for the URL input to be visible after mode switch
+        await this.falkordbUrlInput.waitFor({ state: 'visible', timeout: 5000 });
         await this.fillFalkorDBUrl(url);
         await this.clickConnect();
     }
