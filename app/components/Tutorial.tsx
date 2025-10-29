@@ -632,6 +632,7 @@ function TutorialPortal({
                         {
                             !isLastStep &&
                             <Button
+                                data-testid="skipTutorial"
                                 className="text-nowrap"
                                 variant="Cancel"
                                 label="Skip Tutorial"
