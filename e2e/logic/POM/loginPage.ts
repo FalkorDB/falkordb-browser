@@ -1,5 +1,5 @@
 import { Locator } from "@playwright/test";
-import { interactWhenVisible, waitForURL } from "@/e2e/infra/utils";
+import { interactWhenVisible, waitForElementToNotBeVisible, waitForURL } from "@/e2e/infra/utils";
 import { existsSync } from "fs";
 import urls from '../../config/urls.json'
 import HeaderComponent from "./headerComponent";
@@ -28,6 +28,10 @@ export default class LoginPage extends HeaderComponent {
 
     private get skipTutorial(): Locator {
         return this.page.getByTestId("skipTutorial");
+    }
+
+    private get tutorialSpotlight(): Locator {
+        return this.page.getByTestId("tutorialSpotlight");
     }
 
     // TLS locators
@@ -124,6 +128,7 @@ export default class LoginPage extends HeaderComponent {
 
     async handleSkipTutorial(): Promise<void>{
         await this.clickSkipTutorial();
+        await waitForElementToNotBeVisible(this.tutorialSpotlight);
     }
 
     async uploadCertificate(filePath: string): Promise<void> {

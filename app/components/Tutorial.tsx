@@ -734,6 +734,7 @@ function TutorialSpotlight({ targetSelector, spotlightSelector }: { targetSelect
 
     return (
         <div
+            data-testid="tutorialSpotlight"
             className="fixed inset-0 z-40 bg-black opacity-50 transition-all duration-300 pointer-events-auto"
             style={spotlightStyle}
         />
