@@ -42,6 +42,8 @@ export type TextCell = {
   onChange: (value: string) => Promise<boolean>;
 };
 
+export type Tab = "Graph" | "Table" | "Metadata";
+
 export type ReadOnlyCell = {
   value: string;
   type: "readonly";
@@ -60,7 +62,14 @@ export type Message = {
     | "Schema";
 };
 
+export type ViewportState = {
+  zoom: number;
+  centerX: number;
+  centerY: number;
+};
+
 export type Cell = SelectCell | TextCell | ObjectCell | ReadOnlyCell;
+
 export interface Row {
   cells: Cell[];
   checked?: boolean;
