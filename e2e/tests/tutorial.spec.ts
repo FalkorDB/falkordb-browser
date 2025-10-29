@@ -22,7 +22,7 @@ test.describe(`Tutorial Test`, () => {
     await new Promise((resolve) => {
       setTimeout(resolve, 1000);
     });
-    expect(await tutorial.isContentInCenterHidden()).toBeFalsy();
+    expect(await tutorial.isTutorialVisible()).toBeTruthy();
     await tutorial.changeLocalStorage("false");
   });
 });
