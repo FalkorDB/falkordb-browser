@@ -54,7 +54,7 @@ export default function LoginForm() {
       },
       label: "FalkorDB URL",
       type: "text",
-      placeholder: `falkors://Default:Default@${DEFAULT_HOST}:${DEFAULT_PORT}`,
+      placeholder: `falkor://Default:Default@${DEFAULT_HOST}:${DEFAULT_PORT}`,
       required: true
     }] : [
       {

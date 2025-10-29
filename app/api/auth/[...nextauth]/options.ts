@@ -113,7 +113,7 @@ export async function newClient(
   // If URL is provided, use it directly
   if (credentials.url) {
     connectionOptions = {
-      url: credentials.url ?? "falkors://localhost:6379",
+      url: credentials.url ?? "falkor://localhost:6379",
     };
   } else {
     // Use individual connection parameters
@@ -353,9 +353,9 @@ const authOptions: AuthOptions = {
             url: credentials.url,
             host: credentials.host,
             port: credentials.port ? parseInt(credentials.port, 10) : 6379,
-            password: credentials.url ? undefined : credentials.password,
-            username: credentials.url ? undefined : credentials.username,
-            tls: credentials.url && credentials.url.trim() !== "" ? credentials.url.startsWith("falkors://") : credentials.tls === "true",
+            password: credentials.password,
+            username: credentials.username,
+            tls: credentials.tls === "true",
             ca: credentials.url ? undefined : credentials.ca,
             role,
           };

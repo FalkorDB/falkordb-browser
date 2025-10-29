@@ -173,7 +173,9 @@ export default function FormComponent({ handleSubmit, fields, error = undefined,
                 })
             }
             {children}
-            {error && <p className="text-sm text-destructive">{error.show ? error.message : ""}</p>}
+            <div className="min-h-5">
+                {error && <p className="text-sm text-destructive">{error.show ? error.message : ""}</p>}
+            </div>
             <div className="flex justify-end gap-2">
                 <Button
                     id="submit-button"
