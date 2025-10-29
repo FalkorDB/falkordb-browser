@@ -40,12 +40,13 @@ export async function GET() {
     // Filter tokens based on user role
     const tokens = isAdmin 
       ? allTokens // Admin sees all tokens
-      : allTokens.filter(token => token.user_id === authenticatedUser.id); // User sees only their tokens
+      : allTokens.filter(token => token.username === authenticatedUser.username); // User sees only their tokens
     
     return NextResponse.json(
       { 
         tokens,
-        count: tokens.length
+        count: tokens.length,
+        role: authenticatedUser.role
       },
       { status: 200 }
     );

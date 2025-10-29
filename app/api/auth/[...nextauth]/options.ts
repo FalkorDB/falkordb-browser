@@ -336,7 +336,7 @@ const authOptions: AuthOptions = {
 
           const res: User = {
             id,
-            host: credentials.host,
+            host: credentials.host || "localhost",
             port: credentials.port ? parseInt(credentials.port, 10) : 6379,
             password: credentials.password,
             username: credentials.username,
@@ -362,6 +362,7 @@ const authOptions: AuthOptions = {
           host: user.host,
           port: user.port,
           username: user.username,
+          password: user.password,
           tls: user.tls,
           ca: user.ca,
           role: user.role,

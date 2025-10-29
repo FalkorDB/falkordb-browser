@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 // eslint-disable-next-line import/no-extraneous-dependencies
 import { SignJWT } from "jose";
 import crypto from "crypto";
-import { newClient, generateTimeUUID, getAdminConnectionForTokens, generateConsistentUserId } from "../[...nextauth]/options";
+import { getClient, newClient, generateTimeUUID, getAdminConnectionForTokens, generateConsistentUserId } from "../[...nextauth]/options";
 
 // eslint-disable-next-line import/prefer-default-export
 export async function POST(request: NextRequest) {
@@ -30,14 +30,26 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { username, password, host = "localhost", port = "6379", tls = "false", ca } = body;
+    const { 
+      username, 
+      password, 
+      host = "localhost", 
+      port = "6379", 
+      tls = "false", 
+      ca,
+      name = "API Token",
+      expiresAt = null,
+      ttlSeconds = 31622400 // Default: 366 days
+    } = body;
 
-    // Note: username and password are optional - same as NextAuth session behavior
-    // The newClient function handles empty credentials by using "default" user
+    // Determine if this is direct login (with credentials) or session-based PAT generation
+    let user;
+    let id;
 
-    try {
+    if (username || password || host !== "localhost" || port !== "6379" || tls !== "false" || ca) {
+      // Mode 1: Direct login with credentials (Swagger/external API)
       // Generate consistent user ID based on credentials (same user = same ID)
-      const id = generateConsistentUserId(username || "default", host, parseInt(port, 10));
+      id = generateConsistentUserId(username || "default", host, parseInt(port, 10));
 
       // Attempt to connect to FalkorDB using existing logic
       const { role } = await newClient(
@@ -53,7 +65,7 @@ export async function POST(request: NextRequest) {
       );
 
       // If connection is successful, create user object
-      const user = {
+      user = {
         id,
         host,
         port: parseInt(port, 10),
@@ -62,17 +74,59 @@ export async function POST(request: NextRequest) {
         ca,
         role,
       };
+    } else {
+      // Mode 2: PAT generation from existing session
+      const session = await getClient();
+      
+      if (session instanceof NextResponse) {
+        return session; // Return auth error
+      }
 
-      // Create JWT token with all necessary connection information
-      const currentTime = Math.floor(Date.now() / 1000);
+      user = session.user;
+      id = user.id;
+    }
+
+    try {
       
       // Generate a unique token ID
       const tokenId = generateTimeUUID();
       
+      // Create JWT token with all necessary connection information
+      const currentTime = Math.floor(Date.now() / 1000);
+      
+      // Validate and prepare expiration data
+      // Frontend sends expiresAt (ISO string or null) and ttlSeconds
+      let expiresAtDate: Date | null = null;
+      
+      if (expiresAt) {
+        expiresAtDate = new Date(expiresAt);
+        
+        // Validate the date is in the future
+        if (expiresAtDate <= new Date()) {
+          return NextResponse.json(
+            { message: "Expiration date must be in the future" },
+            { status: 400 }
+          );
+        }
+      }
+      
+      // Validate TTL is reasonable (max 1 year + grace period)
+      if (ttlSeconds > 31622400 || ttlSeconds < 1) {
+        return NextResponse.json(
+          { message: "Invalid TTL value" },
+          { status: 400 }
+        );
+      }
+      
+      // Set JWT expiration time
+      const expirationTime = expiresAtDate 
+        ? Math.floor(expiresAtDate.getTime() / 1000) 
+        : "1y"; // Use 1 year for "never" tokens
+      
       const tokenPayload = {
         sub: user.id,           // Standard JWT claim for user ID
         jti: tokenId,           // JWT ID for unique identification
-        username: username || undefined,
+        username: user.username || undefined,
         role: user.role,
         host: user.host,
         port: user.port,
@@ -84,7 +138,7 @@ export async function POST(request: NextRequest) {
       const token = await new SignJWT(tokenPayload)
         .setProtectedHeader({ alg: "HS256" })
         .setIssuedAt()
-        .setExpirationTime("1y") // 1 year
+        .setExpirationTime(expirationTime)
         .sign(JWT_SECRET);
 
       // Store the active token in Redis using Default connection
@@ -106,24 +160,24 @@ export async function POST(request: NextRequest) {
           user_id: user.id,
           token_id: tokenId,
           created_at: new Date().toISOString(),
-          expires_at: new Date(Date.now() + 31536000000).toISOString(), // 1 year (365 days)
+          expires_at: expiresAtDate ? expiresAtDate.toISOString() : null,
           last_used: null,
-          name: "API Token",
+          name,
           permissions: [user.role],
           username: user.username
         };
         
-        // Store token data with 1 year + 1 day TTL (31622400 seconds = 366 days)
-        // Grace period allows audit trail after JWT expiration
+        // Store token data with calculated TTL
+        // For "never" expiration: 366 days grace period allows audit trail after JWT expiration
         await adminConnection.setEx(
           `api_token:${tokenHash}`,
-          31622400,
+          ttlSeconds,
           JSON.stringify(tokenData)
         );
         
         // Add to user's token set for easy management
-        await adminConnection.sAdd(`user_tokens:${user.id}`, tokenId);
-        await adminConnection.expire(`user_tokens:${user.id}`, 31622400);
+        await adminConnection.sAdd(`user_tokens:${user.username}`, tokenId);
+        await adminConnection.expire(`user_tokens:${user.username}`, 31622400);
         
       } catch (redisError) {
         // eslint-disable-next-line no-console
