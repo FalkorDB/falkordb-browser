@@ -17,7 +17,7 @@ setup("setup authentication", async () => {
         const loginPage = await browserWrapper.createNewPage(LoginPage, urls.loginUrl);
         await browserWrapper.setPageToFullScreen();
         await loginPage.clickOnConnect();
-        await loginPage.dismissDialogAtStart();
+        await loginPage.handleSkipTutorial();
         const context = browserWrapper.getContext();
         await context!.storageState({ path: adminAuthFile });
         const adminContext = await playwrightRequest.newContext({ storageState: adminAuthFile });
@@ -35,7 +35,7 @@ setup("setup authentication", async () => {
             const userLoginPage = await userBrowserWrapper.createNewPage(LoginPage, urls.loginUrl);
             await userBrowserWrapper.setPageToFullScreen();
             await userLoginPage.connectWithCredentials(userName, user.password);
-            await userLoginPage.dismissDialogAtStart();
+            await userLoginPage.handleSkipTutorial();
             const userContext = userBrowserWrapper.getContext();
             await userContext!.storageState({ path: file });
         }

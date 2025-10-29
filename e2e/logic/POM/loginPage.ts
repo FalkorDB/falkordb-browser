@@ -1,5 +1,6 @@
 import { Locator } from "@playwright/test";
 import { interactWhenVisible, waitForURL } from "@/e2e/infra/utils";
+import { existsSync } from "fs";
 import urls from '../../config/urls.json'
 import HeaderComponent from "./headerComponent";
 
@@ -25,8 +26,8 @@ export default class LoginPage extends HeaderComponent {
         return this.page.locator("//input[@id='Port']");
     }
 
-    private get dissmissDialogCheckbox(): Locator {
-        return this.page.locator("//div[p[text()=\"Don't show this again\"]]//button");
+    private get skipTutorial(): Locator {
+        return this.page.getByTestId("skipTutorial");
     }
 
     // TLS locators
@@ -74,8 +75,8 @@ export default class LoginPage extends HeaderComponent {
         return interactWhenVisible(this.portInput, el => el.inputValue(), "port input");
     }
 
-    async disableTutorial(): Promise<void> {
-        await interactWhenVisible(this.dissmissDialogCheckbox, el => el.click(), "disable tutorial");
+    async clickSkipTutorial(): Promise<void> {
+        await interactWhenVisible(this.skipTutorial, el => el.click(), "skip tutorial");
     }
 
     // TLS methods
@@ -105,7 +106,7 @@ export default class LoginPage extends HeaderComponent {
     }
 
     async isCertificateRemoved(): Promise<boolean> {
-        return await this.certificateUploadedStatus.isHidden();
+        return this.certificateUploadedStatus.isHidden();
     }
 
     async clickOnConnect(): Promise<void> {
@@ -121,14 +122,12 @@ export default class LoginPage extends HeaderComponent {
         await this.clickConnect();
     }
 
-    async dismissDialogAtStart(): Promise<void>{
-        await this.disableTutorial();
-        await this.page.mouse.click(10, 10);
+    async handleSkipTutorial(): Promise<void>{
+        await this.clickSkipTutorial();
     }
 
     async uploadCertificate(filePath: string): Promise<void> {
-        const fs = require('fs');
-        if (!fs.existsSync(filePath)) {
+        if (!existsSync(filePath)) {
             throw new Error(`Certificate file does not exist: ${filePath}`);
         }
         
