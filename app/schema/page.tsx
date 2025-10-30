@@ -151,10 +151,6 @@ export default function Page() {
         window.schema = schemaGraph
 
         fetchCount()
-
-        if (schemaGraph.Elements.nodes.length > 0) {
-            handleCooldown()
-        }
     }, [fetchCount, setIndicator, setSchema, toast, schemaName])
 
     useEffect(() => {
