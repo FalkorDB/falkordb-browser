@@ -40,22 +40,95 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { token: tokenToRevoke } = body;
+    const { token: tokenToRevoke, token_id: tokenIdToRevoke } = body;
     
-    if (!tokenToRevoke) {
+    if (!tokenToRevoke && !tokenIdToRevoke) {
       return NextResponse.json(
-        { message: "Token to revoke is required in request body" },
+        { message: "Token or token_id is required in request body" },
         { status: 400 }
       );
     }
 
-    try {
-      // Verify the token to be revoked
-      const { payload } = await jwtVerify(tokenToRevoke, JWT_SECRET);
+    // SSRF Protection: Use authenticated user's connection params
+    const adminClient = await getAdminConnectionForTokens(
+      authenticatedUser.host,
+      authenticatedUser.port,
+      authenticatedUser.tls,
+      authenticatedUser.ca
+    );
+    const adminConnection = await adminClient.connection;
+
+    let tokenHash = "";
+    let tokenId = "";
+    let tokenUsername: string | undefined;
+
+    if (tokenToRevoke) {
+      // Revoke by token (original flow)
+      try {
+        // Verify the token to be revoked
+        const { payload } = await jwtVerify(tokenToRevoke, JWT_SECRET);
+        
+        // Permission check: Admin can revoke any token, users can only revoke their own
+        const isAdmin = authenticatedUser.role === 'Admin';
+        const isTokenOwner = authenticatedUser.username === payload.username;
+        
+        if (!isAdmin && !isTokenOwner) {
+          return NextResponse.json(
+            { message: "Forbidden: You can only revoke your own tokens" },
+            { status: 403 }
+          );
+        }
+        
+        // Generate token ID for revocation
+        tokenId = getTokenId(payload);
+        tokenUsername = payload.username as string | undefined;
+        
+        // Hash the token to match storage format
+        tokenHash = crypto.createHash('sha256').update(tokenToRevoke).digest('hex');
+        
+      } catch (jwtError) {
+        // eslint-disable-next-line no-console
+        console.error("JWT verification failed:", jwtError);
+        return NextResponse.json(
+          { message: "Invalid token" },
+          { status: 401 }
+        );
+      }
+    } else {
+      // Revoke by token_id (new flow for UI)
+      // First, get all token keys and find the one with matching token_id
+      const tokenKeys = await adminConnection.keys("api_token:*");
+      
+      // Fetch all tokens and find the matching one
+      const tokenDataPromises = tokenKeys.map(async (key) => {
+        const data = await adminConnection.get(key);
+        if (data) {
+          const tokenData = JSON.parse(data);
+          return { key, tokenData };
+        }
+        return null;
+      });
+      
+      const allTokenData = (await Promise.all(tokenDataPromises)).filter(Boolean);
+      const foundTokenEntry = allTokenData.find(
+        entry => entry && entry.tokenData.token_id === tokenIdToRevoke
+      );
+      
+      if (!foundTokenEntry) {
+        return NextResponse.json(
+          { message: "Token not found" },
+          { status: 404 }
+        );
+      }
+      
+      const { key, tokenData } = foundTokenEntry;
+      tokenHash = key.replace('api_token:', '');
+      tokenId = tokenData.token_id;
+      tokenUsername = tokenData.username;
       
       // Permission check: Admin can revoke any token, users can only revoke their own
       const isAdmin = authenticatedUser.role === 'Admin';
-      const isTokenOwner = authenticatedUser.id === payload.sub;
+      const isTokenOwner = authenticatedUser.username === tokenUsername;
       
       if (!isAdmin && !isTokenOwner) {
         return NextResponse.json(
@@ -63,29 +136,15 @@ export async function POST(request: NextRequest) {
           { status: 403 }
         );
       }
-      
-      // SSRF Protection: Use authenticated user's connection params, not token payload
-      // This prevents attackers from crafting JWTs that point to internal servers
-      const adminClient = await getAdminConnectionForTokens(
-        authenticatedUser.host,
-        authenticatedUser.port,
-        authenticatedUser.tls,
-        authenticatedUser.ca
-      );
-      const adminConnection = await adminClient.connection;
-      
-      // Generate token ID for revocation
-      const tokenId = getTokenId(payload);
-      
-      // Hash the token to match storage format
-      const tokenHash = crypto.createHash('sha256').update(tokenToRevoke).digest('hex');
-      
+    }
+
+    try {
       // Remove the token from Redis
       const deletedCount = await adminConnection.del(`api_token:${tokenHash}`);
       
-      // Also remove from user's token set
-      if (payload.sub) {
-        await adminConnection.sRem(`user_tokens:${payload.sub}`, tokenId);
+      // Also remove from user's token set if applicable
+      if (tokenUsername) {
+        await adminConnection.sRem(`user_tokens:${tokenUsername}`, tokenId);
       }
       
       if (deletedCount === 0) {
@@ -106,12 +165,12 @@ export async function POST(request: NextRequest) {
         { status: 200 }
       );
       
-    } catch (jwtError) {
+    } catch (deleteError) {
       // eslint-disable-next-line no-console
-      console.error("JWT verification failed:", jwtError);
+      console.error("Token deletion error:", deleteError);
       return NextResponse.json(
-        { message: "Invalid token" },
-        { status: 401 }
+        { message: "Failed to revoke token" },
+        { status: 500 }
       );
     }
     
