@@ -14,7 +14,7 @@ test.describe(`Tutorial Test`, () => {
     await browser.closeBrowser();
   });
 
-  test("@admin validate that clicking away doesn't dismisses the tutorial", async () => {
+  test("@admin validate that clicking away doesn't dismiss the tutorial", async () => {
     const tutorial = await browser.createNewPage(TutorialPanel, urls.graphUrl);
     await tutorial.changeLocalStorage("true");
     await tutorial.refreshPage();
@@ -28,7 +28,7 @@ test.describe(`Tutorial Test`, () => {
   
   test.only("@admin validate that clicking replay tutorial replay tutorial", async () => {
     const tutorial = await browser.createNewPage(TutorialPanel, urls.settingsUrl);
-    await tutorial.clickReplayTutorial()
+    await tutorial.clickReplayTutorial();
     expect(await tutorial.isTutorialVisible()).toBeTruthy();
   });
 });

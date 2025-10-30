@@ -14,8 +14,8 @@ interface TutorialStep {
     spotlightSelector?: string;
     placementAxis?: "x" | "y";
     advanceOn?: string;
-    forward?: (keyof HTMLElementEventMap)[]
-    hidePrev?: boolean
+    forward?: (keyof HTMLElementEventMap)[];
+    hidePrev?: boolean;
 }
 
 const parseDescription = (description: string) => {
@@ -102,7 +102,7 @@ const tutorialSteps: TutorialStep[] = [
     },
     {
         title: "Get KNOWS edge",
-        description: "Click this button to retrieve all edges of type 'KNOWS' in the graph. This will show you the count and details of all E-type relationships.",
+        description: "Click this button to retrieve all edges of type 'KNOWS' in the graph. This will show you the count and details of all KNOWS relationships.",
         targetSelector: '[data-testid="graphInfoKNOWSEdge"]',
         placementAxis: "x",
         advanceOn: "click",
@@ -205,7 +205,7 @@ function TutorialPortal({
     const [targetDisabled, setTargetDisabled] = useState(false);
     const tooltipRef = useRef<HTMLDivElement>(null);
     const currentStep = tutorialSteps[step];
-    const { targetSelector, advanceOn, forward, description, position, title, hidePrev, placementAxis } = currentStep
+    const { targetSelector, advanceOn, forward, description, position, title, hidePrev, placementAxis } = currentStep;
 
     useEffect(() => {
         setMounted(true);
@@ -234,10 +234,10 @@ function TutorialPortal({
         const updatePosition = () => {
             const rect = element.getBoundingClientRect();
             const offset = 60; // Distance from the element
-            const padding = 4 // Distance from viewport edges
+            const padding = 4; // Distance from viewport edges
 
 
-            let calculatedPosition: { top?: string; bottom?: string; left?: string; right?: string; transform: string } = { transform: "" };
+            let calculatedPosition: { top?: string; bottom?: string; left?: string; right?: string; transform: string };
             let computedDirection: "left" | "right" | "top" | "bottom" | undefined;
 
             // Axis-driven auto placement overrides default when provided

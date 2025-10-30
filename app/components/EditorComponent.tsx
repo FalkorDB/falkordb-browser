@@ -259,6 +259,10 @@ export default function EditorComponent({ graph, graphName, historyQuery, maximi
         [blur, lineNumber])
 
     useEffect(() => {
+        tutorialOpenRef.current = tutorialOpen
+    }, [tutorialOpen])
+
+    useEffect(() => {
         graphNameRef.current = graphName
     }, [graphName])
 
