@@ -4,7 +4,8 @@ import { SignInOptions, SignInResponse, signIn } from "next-auth/react";
 import { FormEvent, useEffect, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Image from "next/image";
-import { Check, Info } from "lucide-react";
+import Link from "next/link";
+import { Check, Info, FileText } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useTheme } from "next-themes";
 import { getTheme } from "@/lib/utils";
@@ -256,6 +257,13 @@ export default function LoginForm() {
               )}
             </div>
           </FormComponent>
+          <Link 
+            href="/docs" 
+            className="flex items-center gap-2 text-sm text-muted hover:text-primary transition-colors duration-200"
+          >
+            <FileText className="w-4 h-4" />
+            API Documentation
+          </Link>
         </div>
       </div>
       <div className="h-5 Gradient" />
