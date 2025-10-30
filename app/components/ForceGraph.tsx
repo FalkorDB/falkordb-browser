@@ -4,13 +4,13 @@
 
 "use client"
 
-import { Dispatch, SetStateAction, useContext, useEffect, useRef, useState } from "react"
+import { Dispatch, SetStateAction, useContext, useEffect, useMemo, useRef, useState } from "react"
 import ForceGraph2D from "react-force-graph-2d"
 import { securedFetch, GraphRef, handleZoomToFit, getTheme } from "@/lib/utils"
 import { useToast } from "@/components/ui/use-toast"
 import * as d3 from "d3"
 import { useTheme } from "next-themes"
-import { GraphData, Link, Node, Relationship, Graph, getLabelWithFewestElements } from "../api/graph/model"
+import { GraphData, Link, Node, Relationship, Graph, Label, getLabelWithFewestElements } from "../api/graph/model"
 import { IndicatorContext } from "./provider"
 import Spinning from "./ui/spinning"
 
@@ -27,6 +27,8 @@ interface Props {
     isAddElement?: boolean
     setSelectedNodes?: Dispatch<SetStateAction<[Node | undefined, Node | undefined]>>
     setRelationships: Dispatch<SetStateAction<Relationship[]>>
+    relationships: Relationship[]
+    labels: Label[]
     parentHeight: number
     parentWidth: number
     setParentHeight: Dispatch<SetStateAction<number>>
@@ -71,6 +73,60 @@ const getNodeDisplayText = (node: Node): string => {
     )
 
     return otherStringProperty?.[1] || node.id.toString();
+};
+
+/**
+ * Determines the display text for an edge based on the relationship's display property:
+ * 1. If displayProperty is set, use that property from link.data
+ * 2. Fallback to the relationship name
+ */
+const getEdgeDisplayText = (link: Link, relationship: Relationship): string => {
+    if (relationship.displayProperty) {
+        const value = link.data[relationship.displayProperty];
+        if (typeof value === 'string' && value.trim().length > 0) {
+            return value;
+        }
+    }
+    return link.relationship;
+};
+
+const getEdgeHoverText = (link: Link, relationship: Relationship): string => {
+    // 1. Find which property has hover enabled
+    // 2. Use that property for hover text
+    if (relationship.hoverProperty) {
+        const value = link.data[relationship.hoverProperty];
+        if (typeof value === 'string' && value.trim().length > 0) {
+            return value;
+        }
+    }
+    return link.relationship;
+};
+
+/**
+ * Determines the display text for a node based on the label's display property:
+ * 1. If displayProperty is set, use that property from node.data
+ * 2. Fallback to the existing getNodeDisplayText logic
+ */
+const getNodeDisplayTextWithLabel = (node: Node, label: Label): string => {
+    if (label.displayProperty) {
+        const value = node.data[label.displayProperty];
+        if (typeof value === 'string' && value.trim().length > 0) {
+            return value;
+        }
+    }
+    return getNodeDisplayText(node);
+};
+
+const getNodeHoverTextWithLabel = (node: Node, label: Label): string => {
+    // 1. Find which property has hover enabled
+    // 2. Use that property for hover text
+    if (label.hoverProperty) {
+        const value = node.data[label.hoverProperty];
+        if (typeof value === 'string' && value.trim().length > 0) {
+            return value;
+        }
+    }
+    return getNodeDisplayText(node);
 };
 
 /**
@@ -152,6 +208,8 @@ export default function ForceGraph({
     isAddElement = false,
     setSelectedNodes,
     setRelationships,
+    relationships,
+    labels,
     parentHeight,
     parentWidth,
     setParentHeight,
@@ -166,6 +224,12 @@ export default function ForceGraph({
     const { theme } = useTheme()
     const { toast } = useToast()
     const { background, foreground } = getTheme(theme)
+
+    // Create a stable linkLabel function that updates when relationships change
+    const linkLabelFunction = useMemo(() => (link: Link) => {
+        const relationship = relationships.find(rel => rel.name === link.relationship);
+        return relationship ? getEdgeHoverText(link, relationship) : link.relationship;
+    }, [relationships])
 
     const lastClick = useRef<{ date: Date, name: string }>({ date: new Date(), name: "" })
     const parentRef = useRef<HTMLDivElement>(null)
@@ -368,8 +432,14 @@ export default function ForceGraph({
                 ref={chartRef}
                 width={parentWidth}
                 height={parentHeight}
-                linkLabel={(link) => link.relationship}
-                nodeLabel={(node) => type === "graph" ? getNodeDisplayText(node) : node.labels[0]}
+                linkLabel={linkLabelFunction}
+                nodeLabel={(node) => {
+                    if (type === "graph") {
+                        const label = labels.find(l => node.labels.includes(l.name));
+                        return label ? getNodeHoverTextWithLabel(node, label) : getNodeDisplayText(node);
+                    }
+                    return node.labels[0];
+                }}
                 graphData={data}
                 nodeRelSize={NODE_SIZE}
                 nodeCanvasObjectMode={() => 'after'}
@@ -409,25 +479,19 @@ export default function ForceGraph({
                     ctx.font = `400 2px SofiaSans`;
                     ctx.letterSpacing = '0.1px'
 
-                    let [line1, line2] = node.displayName;
+                    // Always generate text based on current label settings
+                    let text = '';
 
-                    // If displayName is empty or invalid, generate new text wrapping
-                    if (!line1 && !line2) {
-                        let text = '';
-
-                        if (type === "graph") {
-                            text = getNodeDisplayText(node);
-                        } else {
-                            text = getLabelWithFewestElements(node.labels.map(label => graph.LabelsMap.get(label) || graph.createLabel([label])[0])).name;
-                        }
-
-                        // Calculate text wrapping for circular node
-                        const textRadius = NODE_SIZE - PADDING / 2; // Leave some padding inside the circle
-                        [line1, line2] = wrapTextForCircularNode(ctx, text, textRadius);
-
-                        // Cache the result
-                        node.displayName = [line1, line2];
+                    if (type === "graph") {
+                        const label = labels.find(l => node.labels.includes(l.name));
+                        text = label ? getNodeDisplayTextWithLabel(node, label) : getNodeDisplayText(node);
+                    } else {
+                        text = getLabelWithFewestElements(node.labels.map(label => graph.LabelsMap.get(label) || graph.createLabel([label])[0])).name;
                     }
+
+                    // Calculate text wrapping for circular node
+                    const textRadius = NODE_SIZE - PADDING / 2; // Leave some padding inside the circle
+                    const [line1, line2] = wrapTextForCircularNode(ctx, text, textRadius);
 
                     const textMetrics = ctx.measureText(line1);
                     const textHeight = textMetrics.actualBoundingBoxAscent + textMetrics.actualBoundingBoxDescent;
@@ -505,8 +569,12 @@ export default function ForceGraph({
                         ({ textWidth, textHeight } = relationship)
                     }
 
+                    // Calculate display text for width measurement
+                    const relationshipForDisplay = relationships.find(rel => rel.name === link.relationship);
+                    const displayTextForWidth = relationshipForDisplay ? getEdgeDisplayText(link, relationshipForDisplay) : link.relationship;
+
                     if (!textWidth || !textHeight) {
-                        const { width, actualBoundingBoxAscent, actualBoundingBoxDescent } = ctx.measureText(link.relationship)
+                        const { width, actualBoundingBoxAscent, actualBoundingBoxDescent } = ctx.measureText(displayTextForWidth)
 
                         textWidth = width
                         textHeight = actualBoundingBoxAscent + actualBoundingBoxDescent
@@ -531,11 +599,14 @@ export default function ForceGraph({
                         textHeight + padding * 2
                     );
 
-                    // Draw text
+                    // Draw text using configurable display property
+                    const relationshipForText = relationships.find(rel => rel.name === link.relationship);
+                    const displayText = relationshipForText ? getEdgeDisplayText(link, relationshipForText) : link.relationship;
+
                     ctx.fillStyle = foreground;
                     ctx.textAlign = 'center';
                     ctx.textBaseline = 'middle';
-                    ctx.fillText(link.relationship, 0, 0);
+                    ctx.fillText(displayText, 0, 0);
                     ctx.restore();
                 }}
                 onNodeClick={indicator === "offline" ? undefined : handleNodeClick}

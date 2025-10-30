@@ -125,6 +125,8 @@ export interface InfoLabel {
   name: string;
   color: string;
   show: boolean;
+  displayProperty?: string;
+  hoverProperty?: string;
 }
 
 export interface Label extends InfoLabel {
@@ -137,6 +139,8 @@ export interface InfoRelationship {
   name: string;
   color: string;
   show: boolean;
+  displayProperty?: string;
+  hoverProperty?: string;
 }
 
 export interface Relationship extends InfoRelationship {
@@ -272,6 +276,14 @@ export class GraphInfo {
 
     return newColor;
   }
+}
+
+export type DisplayProperties = {
+  // denote which property is being displayed for the label or relationship
+  labelDisplay?: string;
+  labelHover?: string;
+  relationshipDisplay?: string;
+  relationshipHover?: string;
 }
 
 export class Graph {
@@ -432,8 +444,8 @@ export class Graph {
     graphInfo?: GraphInfo
   ): Graph {
     const graph = Graph.empty(undefined, currentLimit, graphInfo);
+    graph.id = id; // Set ID before extend so createRelationship can access it
     graph.extend(results, isCollapsed, isSchema);
-    graph.id = id;
     return graph;
   }
 
@@ -748,6 +760,11 @@ export class Graph {
           elements: [],
         };
 
+        // Load persisted display property
+        const savedSettings = this.loadPersistedDisplayProperty();
+        c.displayProperty = savedSettings.labelDisplay;
+        c.hoverProperty = savedSettings.labelHover;
+
         this.labelsMap.set(c.name, c);
         this.labels.push(c);
       }
@@ -769,11 +786,42 @@ export class Graph {
         ...infoRelationship,
         elements: [],
       };
+
+      // Load persisted display property
+      const savedSettings = this.loadPersistedDisplayProperty();
+      l.displayProperty = savedSettings.relationshipDisplay;
+      l.hoverProperty = savedSettings.relationshipHover;
+
       this.relationshipsMap.set(l.name, l);
       this.relationships.push(l);
     }
 
     return l;
+  }
+
+  public savePersistedDisplayProperty(displayProperties: DisplayProperties): void {
+    const storageKey = `DisplayProperties_${this.id}`;
+    const savedSettings = JSON.parse(localStorage.getItem(storageKey) || '{}');
+    savedSettings.labelDisplay = displayProperties.labelDisplay;
+    savedSettings.labelHover = displayProperties.labelHover;
+    savedSettings.relationshipDisplay = displayProperties.relationshipDisplay;
+    savedSettings.relationshipHover = displayProperties.relationshipHover;
+    localStorage.setItem(storageKey, JSON.stringify(savedSettings));
+  }
+
+  public loadPersistedDisplayProperty(): DisplayProperties {
+    const output: DisplayProperties = {};
+    const storageKey = `DisplayProperties_${this.id}`;
+    try {
+      const savedSettings = JSON.parse(localStorage.getItem(storageKey) || '{}');
+      output.labelDisplay = savedSettings.labelDisplay;
+      output.labelHover = savedSettings.labelHover;
+      output.relationshipDisplay = savedSettings.relationshipDisplay;
+      output.relationshipHover = savedSettings.relationshipHover;
+    } catch (_) {
+      // Ignore errors when reading persisted display properties
+    }
+    return output;
   }
 
   public visibleLinks(visible: boolean) {
