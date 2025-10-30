@@ -126,6 +126,7 @@ export interface InfoLabel {
   color: string;
   show: boolean;
   displayProperty?: string;
+  hoverProperty?: string;
 }
 
 export interface Label extends InfoLabel {
@@ -139,6 +140,7 @@ export interface InfoRelationship {
   color: string;
   show: boolean;
   displayProperty?: string;
+  hoverProperty?: string;
 }
 
 export interface Relationship extends InfoRelationship {
@@ -749,7 +751,7 @@ export class Graph {
           ...infoLabel,
           elements: [],
         };
-        
+
         // Load persisted display property
         this.loadPersistedLabelDisplayProperty(c);
 
@@ -774,10 +776,10 @@ export class Graph {
         ...infoRelationship,
         elements: [],
       };
-      
+
       // Load persisted display property
       this.loadPersistedDisplayProperty(l);
-      
+
       this.relationshipsMap.set(l.name, l);
       this.relationships.push(l);
     }

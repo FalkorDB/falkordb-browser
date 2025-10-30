@@ -5,7 +5,7 @@
 import { useEffect, useState, useContext, Dispatch, SetStateAction } from "react"
 import { GraphRef } from "@/lib/utils"
 import Labels from "../graph/labels"
-import RelationshipControls from "../graph/relationshipControls"
+import RelationshipControls from "../graph/DisplayPropertyControls"
 import NodeControls from "../graph/nodeControls"
 import { Label, Link, Node, GraphData, Relationship } from "../api/graph/model"
 import { SchemaContext } from "../components/provider"
@@ -107,7 +107,7 @@ export default function SchemaView({
         schema.RelationshipsMap.set(relationship.name, relationship);
         setData({ ...schema.Elements });
         setRelationships([...relationships]);
-        
+
         // Persist to localStorage
         const storageKey = `relationshipDisplayProperties_${schema.Id}`;
         const existingSettings = JSON.parse(localStorage.getItem(storageKey) || '{}');
@@ -120,7 +120,7 @@ export default function SchemaView({
         schema.LabelsMap.set(label.name, label);
         setData({ ...schema.Elements });
         setLabels([...labels]);
-        
+
         // Persist to localStorage
         const storageKey = `labelDisplayProperties_${schema.Id}`;
         const existingSettings = JSON.parse(localStorage.getItem(storageKey) || '{}');

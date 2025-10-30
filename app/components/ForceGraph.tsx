@@ -81,8 +81,20 @@ const getNodeDisplayText = (node: Node): string => {
  * 2. Fallback to the relationship name
  */
 const getEdgeDisplayText = (link: Link, relationship: Relationship): string => {
-    if (relationship.displayProperty && link.data[relationship.displayProperty]) {
+    if (relationship.displayProperty) {
         const value = link.data[relationship.displayProperty];
+        if (typeof value === 'string' && value.trim().length > 0) {
+            return value;
+        }
+    }
+    return link.relationship;
+};
+
+const getEdgeHoverText = (link: Link, relationship: Relationship): string => {
+    // 1. Find which property has hover enabled
+    // 2. Use that property for hover text
+    if (relationship.hoverProperty) {
+        const value = link.data[relationship.hoverProperty];
         if (typeof value === 'string' && value.trim().length > 0) {
             return value;
         }
@@ -96,8 +108,20 @@ const getEdgeDisplayText = (link: Link, relationship: Relationship): string => {
  * 2. Fallback to the existing getNodeDisplayText logic
  */
 const getNodeDisplayTextWithLabel = (node: Node, label: Label): string => {
-    if (label.displayProperty && node.data[label.displayProperty]) {
+    if (label.displayProperty) {
         const value = node.data[label.displayProperty];
+        if (typeof value === 'string' && value.trim().length > 0) {
+            return value;
+        }
+    }
+    return getNodeDisplayText(node);
+};
+
+const getNodeHoverTextWithLabel = (node: Node, label: Label): string => {
+    // 1. Find which property has hover enabled
+    // 2. Use that property for hover text
+    if (label.hoverProperty) {
+        const value = node.data[label.hoverProperty];
         if (typeof value === 'string' && value.trim().length > 0) {
             return value;
         }
@@ -205,7 +229,7 @@ export default function ForceGraph({
     const linkLabelFunction = useMemo(() => {
         return (link: Link) => {
             const relationship = relationships.find(rel => rel.name === link.relationship);
-            return relationship ? getEdgeDisplayText(link, relationship) : link.relationship;
+            return relationship ? getEdgeHoverText(link, relationship) : link.relationship;
         };
     }, [relationships])
 
@@ -414,7 +438,7 @@ export default function ForceGraph({
                 nodeLabel={(node) => {
                     if (type === "graph") {
                         const label = labels.find(l => node.labels.includes(l.name));
-                        return label ? getNodeDisplayTextWithLabel(node, label) : getNodeDisplayText(node);
+                        return label ? getNodeHoverTextWithLabel(node, label) : getNodeDisplayText(node);
                     }
                     return node.labels[0];
                 }}
@@ -550,7 +574,7 @@ export default function ForceGraph({
                     // Calculate display text for width measurement
                     const relationshipForDisplay = relationships.find(rel => rel.name === link.relationship);
                     const displayTextForWidth = relationshipForDisplay ? getEdgeDisplayText(link, relationshipForDisplay) : link.relationship;
-                    
+
                     if (!textWidth || !textHeight) {
                         const { width, actualBoundingBoxAscent, actualBoundingBoxDescent } = ctx.measureText(displayTextForWidth)
 
@@ -580,7 +604,7 @@ export default function ForceGraph({
                     // Draw text using configurable display property
                     const relationshipForText = relationships.find(rel => rel.name === link.relationship);
                     const displayText = relationshipForText ? getEdgeDisplayText(link, relationshipForText) : link.relationship;
-                    
+
                     ctx.fillStyle = foreground;
                     ctx.textAlign = 'center';
                     ctx.textBaseline = 'middle';

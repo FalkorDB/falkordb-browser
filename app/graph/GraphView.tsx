@@ -13,9 +13,7 @@ import TableView from "./TableView";
 import Toolbar from "./toolbar";
 import Controls from "./controls";
 import GraphDetails from "./GraphDetails";
-import Labels from "./labels"
-import RelationshipControls from "./relationshipControls"
-import NodeControls from "./nodeControls";
+import DisplayPropertyControls from "./DisplayPropertyControls"
 import MetadataView from "./MetadataView";
 import ForceGraph from "../components/ForceGraph";
 
@@ -139,11 +137,24 @@ function GraphView({
         graph.RelationshipsMap.set(relationship.name, relationship);
         setData({ ...graph.Elements });
         setRelationships([...relationships]);
-        
+
         // Persist to localStorage
-        const storageKey = `relationshipDisplayProperties_${graph.Id}`;
+        const storageKey = `DisplayProperties_${graph.Id}`;
         const existingSettings = JSON.parse(localStorage.getItem(storageKey) || '{}');
-        existingSettings[relationship.name] = property;
+        existingSettings["relationshipDisplay"] = property;
+        localStorage.setItem(storageKey, JSON.stringify(existingSettings));
+    }
+
+    const onRelationshipHoverPropertyChange = (relationship: Relationship, property: string | undefined) => {
+        relationship.hoverProperty = property;
+        graph.RelationshipsMap.set(relationship.name, relationship);
+        setData({ ...graph.Elements });
+        setRelationships([...relationships]);
+
+        // Persist to localStorage
+        const storageKey = `DisplayProperties_${graph.Id}`;
+        const existingSettings = JSON.parse(localStorage.getItem(storageKey) || '{}');
+        existingSettings["relationshipHover"] = property;
         localStorage.setItem(storageKey, JSON.stringify(existingSettings));
     }
 
@@ -152,11 +163,24 @@ function GraphView({
         graph.LabelsMap.set(label.name, label);
         setData({ ...graph.Elements });
         setLabels([...labels]);
-        
+
         // Persist to localStorage
-        const storageKey = `labelDisplayProperties_${graph.Id}`;
+        const storageKey = `DisplayProperties_${graph.Id}`;
         const existingSettings = JSON.parse(localStorage.getItem(storageKey) || '{}');
-        existingSettings[label.name] = property;
+        existingSettings["labelDisplay"] = property;
+        localStorage.setItem(storageKey, JSON.stringify(existingSettings));
+    }
+
+    const onLabelHoverPropertyChange = (label: Label, property: string | undefined) => {
+        label.hoverProperty = property;
+        graph.LabelsMap.set(label.name, label);
+        setData({ ...graph.Elements });
+        setLabels([...labels]);
+
+        // Persist to localStorage
+        const storageKey = `DisplayProperties_${graph.Id}`;
+        const existingSettings = JSON.parse(localStorage.getItem(storageKey) || '{}');
+        existingSettings["labelHover"] = property;
         localStorage.setItem(storageKey, JSON.stringify(existingSettings));
     }
 
@@ -179,9 +203,9 @@ function GraphView({
                             {
                                 (labels.length !== 0 || relationships.length !== 0) &&
                                 <div className={cn("w-fit h-1 grow grid gap-4", labels.length !== 0 && relationships.length !== 0 ? "grid-rows-[minmax(0,max-content)_max-content_minmax(0,max-content)]" : "grid-rows-[minmax(0,max-content)]")}>
-                                    {labels.length !== 0 && <NodeControls labels={labels} onToggle={onLabelClick} onDisplayPropertyChange={onLabelDisplayPropertyChange} type="Graph" />}
+                                    {labels.length !== 0 && <DisplayPropertyControls labels={labels} onToggle={onLabelClick} onDisplayPropertyChange={onLabelDisplayPropertyChange} onHoverPropertyChange={onLabelHoverPropertyChange} type="Graph" />}
                                     {labels.length !== 0 && relationships.length > 0 && <div className="h-px bg-border rounded-full" />}
-                                    {relationships.length !== 0 && <RelationshipControls relationships={relationships} onToggle={onRelationshipClick} onDisplayPropertyChange={onRelationshipDisplayPropertyChange} type="Graph" />}
+                                    {relationships.length !== 0 && <DisplayPropertyControls relationships={relationships} onToggle={onRelationshipClick} onDisplayPropertyChange={onRelationshipDisplayPropertyChange} onHoverPropertyChange={onRelationshipHoverPropertyChange} type="Graph" />}
                                 </div>
                             }
                         </>
