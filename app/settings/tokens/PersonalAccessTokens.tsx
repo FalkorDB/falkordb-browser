@@ -27,6 +27,7 @@ interface GeneratedToken {
   token: string;
   name: string;
   expiresIn: string;
+  customExpirationDate?: string;
 }
 
 export default function PersonalAccessTokens() {
@@ -43,6 +44,7 @@ export default function PersonalAccessTokens() {
   // Form state
   const [tokenName, setTokenName] = useState("");
   const [expiresIn, setExpiresIn] = useState("never");
+  const [customExpirationDate, setCustomExpirationDate] = useState("");
   
   const { toast } = useToast();
   const { setIndicator } = useContext(IndicatorContext);
@@ -94,6 +96,34 @@ export default function PersonalAccessTokens() {
           expiresAt = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString();
           ttlSeconds = 90 * 24 * 60 * 60;
           break;
+        case "custom":
+          if (!customExpirationDate) {
+            toast({
+              title: "Error",
+              description: "Please select a custom expiration date",
+              variant: "destructive",
+            });
+            setIsGenerating(false);
+            return;
+          }
+          const customDate = new Date(customExpirationDate);
+          // Set to end of day (23:59:59) for better UX
+          customDate.setHours(23, 59, 59, 999);
+          const now = new Date();
+          
+          if (customDate <= now) {
+            toast({
+              title: "Error",
+              description: "Expiration date must be in the future",
+              variant: "destructive",
+            });
+            setIsGenerating(false);
+            return;
+          }
+          
+          expiresAt = customDate.toISOString();
+          ttlSeconds = Math.floor((customDate.getTime() - now.getTime()) / 1000);
+          break;
         case "never":
         default:
           expiresAt = null;
@@ -119,11 +149,13 @@ export default function PersonalAccessTokens() {
           token: data.token,
           name: tokenName,
           expiresIn,
+          customExpirationDate: expiresIn === "custom" ? customExpirationDate : undefined,
         });
         
         // Reset form
         setTokenName("");
         setExpiresIn("never");
+        setCustomExpirationDate("");
         setGenerateDialogOpen(false);
         
         // Refresh token list
@@ -181,11 +213,19 @@ export default function PersonalAccessTokens() {
     return `${date.toLocaleDateString()} ${date.toLocaleTimeString()}`;
   };
 
-  const getExpirationLabel = (expires: string) => {
+  const getExpirationLabel = (expires: string, customDate?: string) => {
     switch (expires) {
       case "30d": return "30 days";
       case "60d": return "60 days";
       case "90d": return "90 days";
+      case "custom": 
+        return customDate 
+          ? new Date(customDate).toLocaleDateString(undefined, {
+              year: 'numeric',
+              month: 'short',
+              day: 'numeric'
+            })
+          : "Custom";
       case "never": return "No expiration";
       default: return expires;
     }
@@ -253,7 +293,7 @@ export default function PersonalAccessTokens() {
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground">Expiration</p>
-                  <p className="font-medium text-sm">{getExpirationLabel(generatedToken.expiresIn)}</p>
+                  <p className="font-medium text-sm">{getExpirationLabel(generatedToken.expiresIn, generatedToken.customExpirationDate)}</p>
                 </div>
               </div>
 
@@ -405,6 +445,11 @@ export default function PersonalAccessTokens() {
                       </span>
                     </div>
                   </SelectItem>
+                  <SelectItem value="custom">
+                    <div className="flex items-center gap-2">
+                      <span>Custom</span>
+                    </div>
+                  </SelectItem>
                   <SelectItem value="never">
                     <div className="flex items-center gap-2">
                       <span>No expiration</span>
@@ -412,6 +457,22 @@ export default function PersonalAccessTokens() {
                   </SelectItem>
                 </SelectContent>
               </Select>
+              {expiresIn === "custom" && (
+                <div className="space-y-3 mt-4">
+                  <Label htmlFor="custom-date" className="text-sm p-2">
+                    Select expiration date
+                  </Label>
+                  <Input
+                    id="custom-date"
+                    type="date"
+                    value={customExpirationDate}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setCustomExpirationDate(e.target.value)}
+                    disabled={isGenerating}
+                    min={new Date().toISOString().slice(0, 10)}
+                    className="text-base h-10"
+                  />
+                </div>
+              )}
               <p className="text-sm text-muted-foreground flex items-start gap-2">
                 <span className="mt-0.5">🔒</span>
                 <span>For security, we recommend setting an expiration date for your tokens</span>
@@ -433,6 +494,7 @@ export default function PersonalAccessTokens() {
                 setGenerateDialogOpen(false);
                 setTokenName("");
                 setExpiresIn("never");
+                setCustomExpirationDate("");
               }}
               disabled={isGenerating}
             >
