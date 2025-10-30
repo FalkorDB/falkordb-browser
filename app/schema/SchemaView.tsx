@@ -56,13 +56,6 @@ export default function SchemaView({
 
     const [parentWidth, setParentWidth] = useState(0)
     const [parentHeight, setParentHeight] = useState(0)
-    const elementsLength = schema.getElements().length
-
-    useEffect(() => {
-        if (!elementsLength) return;
-
-        setData({ ...schema.Elements })
-    }, [schema, elementsLength, setData])
 
     useEffect(() => {
         setRelationships([...schema.Relationships])

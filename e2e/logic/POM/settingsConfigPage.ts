@@ -9,7 +9,7 @@ export default class SettingsConfigPage extends BasePage {
     }
 
     private get roleContentValue(): (role: string) => Locator {
-        return (role: string) => this.page.locator(`//tr[@data-id='${role}']/td[4]/div/p`)
+        return (role: string) => this.page.getByTestId(`contentConfigs${role}Value`)
     }
 
     private get EditRoleButton(): () => Locator {

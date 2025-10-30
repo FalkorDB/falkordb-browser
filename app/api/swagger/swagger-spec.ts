@@ -68,7 +68,7 @@ const swaggerSpec = {
                   password: {
                     type: "string",
                     description: "User's password",
-                    example: "password"
+                    example: ""
                   }
                 },
                 required: ["username", "password"]
@@ -102,6 +102,331 @@ const swaggerSpec = {
           },
           "400": {
             description: "Bad request - missing username or password"
+          },
+          "500": {
+            description: "Internal server error"
+          }
+        }
+      }
+    },
+    "/api/auth/revoke": {
+      post: {
+        tags: ["Authentication"],
+        summary: "Revoke JWT token",
+        description: "Revoke a JWT token by removing it from the active tokens list in Redis. Once revoked, the token cannot be used for authentication. Admins can revoke any token, while regular users can only revoke their own tokens.",
+        security: [{ bearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                required: ["token"],
+                properties: {
+                  token: {
+                    type: "string",
+                    description: "JWT token to revoke",
+                    example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                  }
+                }
+              }
+            }
+          }
+        },
+        responses: {
+          "200": {
+            description: "Token revoked successfully",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    message: {
+                      type: "string",
+                      example: "Token revoked successfully"
+                    },
+                    tokenId: {
+                      type: "string",
+                      description: "ID of the revoked token",
+                      example: "user-123-1640995200"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            description: "Bad request - missing token in request body",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    message: {
+                      type: "string",
+                      example: "Token to revoke is required in request body"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            description: "Authentication failed - invalid or missing token",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    message: {
+                      type: "string",
+                      example: "Authorization header with Bearer token required"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            description: "Forbidden - You can only revoke your own tokens (unless you are an Admin)",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    message: {
+                      type: "string",
+                      example: "Forbidden: You can only revoke your own tokens"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            description: "Server configuration error",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    message: {
+                      type: "string",
+                      example: "Server configuration error"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/tokens": {
+      get: {
+        tags: ["Authentication"],
+        summary: "List JWT tokens",
+        description: "Get a list of active JWT tokens. Admins can see all tokens from all users, while regular users can only see their own tokens.",
+        security: [{ bearerAuth: [] }],
+        responses: {
+          "200": {
+            description: "List of tokens retrieved successfully",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    tokens: {
+                      type: "array",
+                      items: {
+                        type: "object",
+                        properties: {
+                          user_id: {
+                            type: "string",
+                            description: "Hashed user identifier",
+                            example: "7262bcaecc2b06ff66e28ede90e6dce39c218685af9272d7a3fbd63ae08d17c2"
+                          },
+                          token_id: {
+                            type: "string",
+                            description: "Unique token identifier",
+                            example: "1761055513181-215c579b-c6e1-4f10-9b07-aacbf89cda21"
+                          },
+                          created_at: {
+                            type: "string",
+                            format: "date-time",
+                            description: "Token creation timestamp",
+                            example: "2025-10-21T14:05:13.182Z"
+                          },
+                          expires_at: {
+                            type: "string",
+                            format: "date-time",
+                            description: "Token expiration timestamp",
+                            example: "2026-10-21T14:05:13.182Z"
+                          },
+                          last_used: {
+                            type: "string",
+                            format: "date-time",
+                            nullable: true,
+                            description: "Last time the token was used",
+                            example: null
+                          },
+                          name: {
+                            type: "string",
+                            description: "Token name/description",
+                            example: "API Token"
+                          },
+                          permissions: {
+                            type: "array",
+                            items: {
+                              type: "string"
+                            },
+                            description: "User permissions/role",
+                            example: ["Admin"]
+                          },
+                          username: {
+                            type: "string",
+                            description: "Username associated with the token",
+                            example: "adminuser"
+                          }
+                        }
+                      }
+                    },
+                    count: {
+                      type: "number",
+                      description: "Total number of tokens returned",
+                      example: 8
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            description: "Authentication failed - invalid or missing token"
+          },
+          "500": {
+            description: "Internal server error"
+          }
+        }
+      }
+    },
+    "/api/auth/token/{tokenId}": {
+      get: {
+        tags: ["Authentication"],
+        summary: "Get token metadata",
+        description: "Get detailed metadata for a specific JWT token by its token ID. Admins can view any token, while regular users can only view their own tokens.",
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          {
+            in: "path",
+            name: "tokenId",
+            required: true,
+            schema: {
+              type: "string"
+            },
+            description: "Token ID to retrieve",
+            example: "1761053108078-554350d7-c965-4ed7-8d32-679b7f705e81"
+          }
+        ],
+        responses: {
+          "200": {
+            description: "Token metadata retrieved successfully",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    token: {
+                      type: "object",
+                      properties: {
+                        user_id: {
+                          type: "string",
+                          description: "Hashed user identifier",
+                          example: "e5d09e7d2141f77f80008ff73f04104b9484f59baa8e19a4ea758495d289fd0f"
+                        },
+                        token_id: {
+                          type: "string",
+                          description: "Unique token identifier",
+                          example: "1761053108078-554350d7-c965-4ed7-8d32-679b7f705e81"
+                        },
+                        created_at: {
+                          type: "string",
+                          format: "date-time",
+                          description: "Token creation timestamp",
+                          example: "2025-10-21T13:25:08.085Z"
+                        },
+                        expires_at: {
+                          type: "string",
+                          format: "date-time",
+                          description: "Token expiration timestamp",
+                          example: "2026-10-21T13:25:08.085Z"
+                        },
+                        last_used: {
+                          type: "string",
+                          format: "date-time",
+                          nullable: true,
+                          description: "Last time the token was used",
+                          example: null
+                        },
+                        name: {
+                          type: "string",
+                          description: "Token name/description",
+                          example: "API Token"
+                        },
+                        permissions: {
+                          type: "array",
+                          items: {
+                            type: "string"
+                          },
+                          description: "User permissions/role",
+                          example: ["Read-Only"]
+                        },
+                        username: {
+                          type: "string",
+                          description: "Username associated with the token",
+                          example: "readonlyuser"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            description: "Authentication failed - invalid or missing token"
+          },
+          "403": {
+            description: "Forbidden - You can only view your own tokens (unless you are an Admin)",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    message: {
+                      type: "string",
+                      example: "Forbidden: You can only view your own tokens"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            description: "Token not found",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    message: {
+                      type: "string",
+                      example: "Token not found"
+                    }
+                  }
+                }
+              }
+            }
           },
           "500": {
             description: "Internal server error"

@@ -28,6 +28,10 @@ export default class BasePage {
     return response;
   }
 
+  async waitForUrl(url: string) {
+    return this.page.waitForURL(url);
+  }
+
   async evaluate(expression: () => unknown) {
     return this.page.evaluate(expression);
   }

@@ -111,6 +111,10 @@
         line-height: 2rem;
         /* 32px */
     }
+
+    .json-tree-container ul > li > div {
+        @apply !hidden;
+    }
 }
 
 ::-webkit-scrollbar {
