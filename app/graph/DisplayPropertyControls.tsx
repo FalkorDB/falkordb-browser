@@ -1,9 +1,8 @@
 import { useRef, useState } from "react";
 import { cn } from "@/lib/utils";
-import { Label, Relationship } from "../api/graph/model";
 import Button from "../components/ui/Button";
-import { ChevronDown } from "lucide-react";
 import PropertyDropdown from "../components/PropertyDropdown";
+import { Label, Relationship } from "../api/graph/model";
 
 
 type LabelProps = {
@@ -41,15 +40,23 @@ const getAvailableProperties = <T extends Label | Relationship>(relationship: T)
     return Array.from(properties).sort();
 };
 
-export default function DisplayPropertyControls(props: Props) {
+export default function DisplayPropertyControls({
+    onToggle,
+    onDisplayPropertyChange,
+    onHoverPropertyChange,
+    ...rest
+}: Props) {
     const listRef = useRef<HTMLUListElement>(null);
     const [openDropdowns, setOpenDropdowns] = useState<Set<string>>(new Set());
-    const [dropdownPositions, setDropdownPositions] = useState<Record<string, { top: number; left: number }>>({});
-    const relationships = 'relationships' in props ? props.relationships : undefined;
-    const labels = 'labels' in props ? props.labels : undefined;
-    const onToggle = props.onToggle as (item: Label | Relationship) => void;
-    const onDisplayPropertyChange = props.onDisplayPropertyChange as (item: Label | Relationship, property: string | undefined) => void;
-    const onHoverPropertyChange = props.onHoverPropertyChange as (item: Label | Relationship, property: string | undefined) => void;
+    // Narrowing helpers for shared fields across Label and Relationship
+    const getIsShown = (item: Label | Relationship): boolean => (
+        'show' in item ? !!item.show : true
+    );
+    const relationships = 'relationships' in rest ? rest.relationships : undefined;
+    const labels = 'labels' in rest ? rest.labels : undefined;
+    const onToggleItem = onToggle as (item: Label | Relationship) => void;
+    const onDisplayChange = onDisplayPropertyChange as (item: Label | Relationship, property: string | undefined) => void;
+    const onHoverChange = onHoverPropertyChange as (item: Label | Relationship, property: string | undefined) => void;
 
     return (
         <div className={cn("flex flex-col gap-2 max-w-1/2 bg-background rounded-lg p-1")}>
@@ -58,17 +65,17 @@ export default function DisplayPropertyControls(props: Props) {
                 <ul ref={listRef} className={cn("flex flex-col gap-4 w-full overflow-auto pointer-events-auto")}>
                     {
                         (relationships ?? labels ?? []).length > 0 &&
-                        (relationships ?? labels ?? []).map((relationship) => {
+                        (relationships ?? labels ?? []).map((relationship: Label | Relationship) => {
                             const availableProperties = getAvailableProperties(relationship as Label | Relationship);
 
                             return (
                                 <li key={relationship.name} className="flex items-center gap-2">
                                     <Button
                                         data-testid={`${labels ? 'Labels' : 'Relationships'}Button${relationship.name}`}
-                                        className={cn("flex-1 SofiaSans", (relationship as any).show ? "opacity-100" : "opacity-50")}
+                                        className={cn("flex-1 SofiaSans", getIsShown(relationship as Label | Relationship) ? "opacity-100" : "opacity-50")}
                                         label={relationship.name}
                                         onClick={() => {
-                                            onToggle(relationship as Label | Relationship);
+                                            onToggleItem(relationship as Label | Relationship);
                                         }}
                                     >
                                         <div style={{ backgroundColor: relationship.color }} className={cn("min-w-4 min-h-4 rounded-full")} />
@@ -93,8 +100,8 @@ export default function DisplayPropertyControls(props: Props) {
                                                 newOpenDropdowns.delete(relationship.name);
                                                 setOpenDropdowns(newOpenDropdowns);
                                             }}
-                                            onDisplayPropertyChange={onDisplayPropertyChange}
-                                            onHoverPropertyChange={onHoverPropertyChange}
+                                            onDisplayPropertyChange={onDisplayChange}
+                                            onHoverPropertyChange={onHoverChange}
                                         />
                                     )}
                                 </li>

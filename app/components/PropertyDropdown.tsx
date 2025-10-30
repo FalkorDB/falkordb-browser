@@ -28,6 +28,7 @@ export default function PropertyDropdown<T extends PropertyEntity>({
     return (
         <div className="relative">
             <button
+                type="button"
                 className="h-6 w-6 p-0 border-0 bg-transparent hover:bg-muted rounded flex items-center justify-center"
                 onClick={onToggleOpen}
             >
@@ -36,9 +37,16 @@ export default function PropertyDropdown<T extends PropertyEntity>({
 
             {isOpen && (
                 <>
+                    {/* eslint-disable-next-line jsx-a11y/control-has-associated-label */}
                     <div
                         className="fixed inset-0 z-[99998] bg-black/20"
+                        role="button"
+                        tabIndex={0}
                         onClick={onClose}
+                        onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') onClose();
+                            if (e.key === 'Escape') onClose();
+                        }}
                     />
                     <div
                         className="fixed z-[99999] bg-background border border-border rounded-md shadow-2xl w-56"
@@ -61,6 +69,7 @@ export default function PropertyDropdown<T extends PropertyEntity>({
                             {/* Default/header row */}
                             <div className="grid grid-cols-[2fr_1fr_1fr] gap-2 items-center py-2 hover:bg-muted rounded px-1">
                                 <div className="text-sm truncate">Default</div>
+                                {/* eslint-disable-next-line jsx-a11y/label-has-associated-control */}
                                 <label className="flex justify-center cursor-pointer">
                                     <input
                                         type="radio"
@@ -68,8 +77,10 @@ export default function PropertyDropdown<T extends PropertyEntity>({
                                         checked={label.displayProperty === undefined}
                                         onChange={() => onDisplayPropertyChange(label, undefined)}
                                         className="h-4 w-4"
+                                        aria-label="Use default display property"
                                     />
                                 </label>
+                                {/* eslint-disable-next-line jsx-a11y/label-has-associated-control */}
                                 <label className="flex justify-center cursor-pointer">
                                     <input
                                         type="radio"
@@ -79,6 +90,7 @@ export default function PropertyDropdown<T extends PropertyEntity>({
                                             onHoverPropertyChange(label, undefined);
                                         }}
                                         className="h-4 w-4"
+                                        aria-label="Use default hover property"
                                     />
                                 </label>
                             </div>
@@ -87,6 +99,7 @@ export default function PropertyDropdown<T extends PropertyEntity>({
                             {availableProperties.map((property) => (
                                 <div key={property} className="grid grid-cols-[2fr_1fr_1fr] gap-2 items-center py-2 hover:bg-muted rounded px-1">
                                     <div className="text-sm truncate">{property}</div>
+                                    {/* eslint-disable-next-line jsx-a11y/label-has-associated-control */}
                                     <label className="flex justify-center cursor-pointer">
                                         <input
                                             type="radio"
@@ -94,8 +107,10 @@ export default function PropertyDropdown<T extends PropertyEntity>({
                                             checked={label.displayProperty === property}
                                             onChange={() => onDisplayPropertyChange(label, property)}
                                             className="h-4 w-4"
+                                            aria-label={`Set display property to ${property}`}
                                         />
                                     </label>
+                                    {/* eslint-disable-next-line jsx-a11y/label-has-associated-control */}
                                     <label className="flex justify-center cursor-pointer">
                                         <input
                                             type="radio"
@@ -105,6 +120,7 @@ export default function PropertyDropdown<T extends PropertyEntity>({
                                                 onHoverPropertyChange(label, property);
                                             }}
                                             className="h-4 w-4"
+                                            aria-label={`Set hover property to ${property}`}
                                         />
                                     </label>
                                 </div>

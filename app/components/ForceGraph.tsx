@@ -226,11 +226,9 @@ export default function ForceGraph({
     const { background, foreground } = getTheme(theme)
 
     // Create a stable linkLabel function that updates when relationships change
-    const linkLabelFunction = useMemo(() => {
-        return (link: Link) => {
-            const relationship = relationships.find(rel => rel.name === link.relationship);
-            return relationship ? getEdgeHoverText(link, relationship) : link.relationship;
-        };
+    const linkLabelFunction = useMemo(() => (link: Link) => {
+        const relationship = relationships.find(rel => rel.name === link.relationship);
+        return relationship ? getEdgeHoverText(link, relationship) : link.relationship;
     }, [relationships])
 
     const lastClick = useRef<{ date: Date, name: string }>({ date: new Date(), name: "" })

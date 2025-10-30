@@ -802,10 +802,10 @@ export class Graph {
   public savePersistedDisplayProperty(displayProperties: DisplayProperties): void {
     const storageKey = `DisplayProperties_${this.id}`;
     const savedSettings = JSON.parse(localStorage.getItem(storageKey) || '{}');
-    savedSettings["labelDisplay"] = displayProperties.labelDisplay;
-    savedSettings["labelHover"] = displayProperties.labelHover;
-    savedSettings["relationshipDisplay"] = displayProperties.relationshipDisplay;
-    savedSettings["relationshipHover"] = displayProperties.relationshipHover;
+    savedSettings.labelDisplay = displayProperties.labelDisplay;
+    savedSettings.labelHover = displayProperties.labelHover;
+    savedSettings.relationshipDisplay = displayProperties.relationshipDisplay;
+    savedSettings.relationshipHover = displayProperties.relationshipHover;
     localStorage.setItem(storageKey, JSON.stringify(savedSettings));
   }
 
@@ -814,12 +814,12 @@ export class Graph {
     const storageKey = `DisplayProperties_${this.id}`;
     try {
       const savedSettings = JSON.parse(localStorage.getItem(storageKey) || '{}');
-      output.labelDisplay = savedSettings["labelDisplay"];
-      output.labelHover = savedSettings["labelHover"];
-      output.relationshipDisplay = savedSettings["relationshipDisplay"];
-      output.relationshipHover = savedSettings["relationshipHover"];
-    } catch (error) {
-      console.warn('Failed to load persisted display properties:', error);
+      output.labelDisplay = savedSettings.labelDisplay;
+      output.labelHover = savedSettings.labelHover;
+      output.relationshipDisplay = savedSettings.relationshipDisplay;
+      output.relationshipHover = savedSettings.relationshipHover;
+    } catch (_) {
+      // Ignore errors when reading persisted display properties
     }
     return output;
   }
