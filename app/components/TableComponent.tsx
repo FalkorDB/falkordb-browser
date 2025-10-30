@@ -131,6 +131,7 @@ export default function TableComponent({
     useEffect(() => {
         if (!search) {
             setFilteredRows([...rows])
+            return undefined
         }
 
         const timeout = setTimeout(() => {
