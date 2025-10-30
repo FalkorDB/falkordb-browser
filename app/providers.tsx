@@ -3,7 +3,7 @@
 import { SessionProvider, useSession } from "next-auth/react";
 import { ThemeProvider } from 'next-themes'
 import { Dispatch, SetStateAction, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { cn, fetchOptions, formatName, getDefaultQuery, getQueryWithLimit, getSSEGraphResult, Panel, prepareArg, securedFetch, Tab } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
@@ -35,6 +35,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const { toast } = useToast()
   const { status } = useSession()
+  const router = useRouter()
 
   const panelRef = useRef<ImperativePanelHandle>(null)
 
@@ -80,10 +81,11 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
   const [userGraphsBeforeTutorial, setUserGraphsBeforeTutorial] = useState<string[]>([])
   const [userGraphBeforeTutorial, setUserGraphBeforeTutorial] = useState<string>("")
 
-  const restartTutorial = useCallback(() => {
+  const replayTutorial = useCallback(() => {
+    router.push("/graph")
     localStorage.removeItem("tutorial");
     setTutorialOpen(true);
-  }, []);
+  }, [router]);
   const [viewport, setViewport] = useState<{ zoom: number; centerX: number; centerY: number }>({ centerX: 0, centerY: 0, zoom: 0 })
   const [scrollPosition, setScrollPosition] = useState(0)
   const [search, setSearch] = useState("")
@@ -113,7 +115,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
     },
     hasChanges,
     setHasChanges,
-    restartTutorial,
+    replayTutorial,
     tutorialOpen,
     saveSettings: () => {
       // Save settings to local storage
@@ -154,7 +156,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       setNewRefreshInterval(refreshInterval)
       setHasChanges(false)
     }
-  }), [contentPersistence, defaultQuery, hasChanges, lastLimit, limit, model, navigateToSettings, newContentPersistence, newDefaultQuery, newLimit, newModel, newRefreshInterval, newRunDefaultQuery, newSecretKey, newTimeout, refreshInterval, runDefaultQuery, secretKey, timeout, toast, restartTutorial, tutorialOpen])
+  }), [contentPersistence, defaultQuery, hasChanges, lastLimit, limit, model, navigateToSettings, newContentPersistence, newDefaultQuery, newLimit, newModel, newRefreshInterval, newRunDefaultQuery, newSecretKey, newTimeout, refreshInterval, runDefaultQuery, secretKey, timeout, toast, replayTutorial, tutorialOpen])
 
   const historyQueryContext = useMemo(() => ({
     historyQuery,

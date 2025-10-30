@@ -6,17 +6,34 @@
 // /* eslint-disable arrow-body-style */
 // /* eslint-disable @typescript-eslint/no-explicit-any */
 import { Locator } from "playwright";
-import { waitForElementToBeVisible } from "@/e2e/infra/utils";
+import {
+  interactWhenVisible,
+  waitForElementToBeVisible,
+} from "@/e2e/infra/utils";
 import GraphPage from "./graphPage";
 
 export default class TutorialPanel extends GraphPage {
-  
   private get tutorialSpotlight(): Locator {
     return this.page.getByTestId("tutorialSpotlight");
   }
 
+  private get replayTutorial(): Locator {
+    return this.page.getByTestId("replayTutorial");
+  }
+
   async isTutorialVisible(): Promise<boolean> {
-    return waitForElementToBeVisible(this.tutorialSpotlight)
+    return waitForElementToBeVisible(this.tutorialSpotlight);
+  }
+
+  async clickReplayTutorial(): Promise<boolean> {
+    return interactWhenVisible(
+      this.replayTutorial,
+      async (el) => {
+        await el.click();
+        return true;
+      },
+      "Replay Tutorial"
+    );
   }
 
   async changeLocalStorage(value: string): Promise<void> {

@@ -75,7 +75,7 @@ type BrowserSettingsContextType = {
   setHasChanges: Dispatch<SetStateAction<boolean>>;
   saveSettings: () => void;
   resetSettings: () => void;
-  restartTutorial: () => void;
+  replayTutorial: () => void;
   tutorialOpen: boolean;
 };
 
@@ -204,7 +204,7 @@ export const BrowserSettingsContext = createContext<BrowserSettingsContextType>(
     setHasChanges: () => {},
     saveSettings: () => {},
     resetSettings: () => {},
-    restartTutorial: () => {},
+    replayTutorial: () => {},
     tutorialOpen: false,
   }
 );
