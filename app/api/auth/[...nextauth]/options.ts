@@ -17,6 +17,7 @@ interface CustomJWTPayload {
   port: number;
   tls: boolean;
   ca?: string;
+  url?: string;
 }
 
 interface AuthenticatedUser {
@@ -27,6 +28,7 @@ interface AuthenticatedUser {
   port: number;
   tls: boolean;
   ca?: string;
+  url?: string;
 }
 
 const connections = new Map<string, FalkorDB>();
@@ -96,39 +98,50 @@ export async function getAdminConnectionForTokens(
 
 export async function newClient(
   credentials: {
-    host: string;
-    port: string;
-    password: string;
-    username: string;
-    tls: string;
-    ca: string;
+    host?: string;
+    port?: string;
+    password?: string;
+    username?: string;
+    tls?: string;
+    ca?: string;
+    url?: string;
   },
   id: string
 ): Promise<{ role: Role; client: FalkorDB }> {
-  const connectionOptions: FalkorDBOptions =
-    credentials.tls === "true"
-      ? {
-          socket: {
-            host: credentials.host ?? "localhost",
-            port: credentials.port ? parseInt(credentials.port, 10) : 6379,
-            tls: credentials.tls === "true",
-            checkServerIdentity: () => undefined,
-            ca:
-              credentials.ca === "undefined"
-                ? undefined
-                : [Buffer.from(credentials.ca, "base64").toString("utf8")],
-          },
-          password: credentials.password ?? undefined,
-          username: credentials.username ?? undefined,
-        }
-      : {
-          socket: {
-            host: credentials.host || "localhost",
-            port: credentials.port ? parseInt(credentials.port, 10) : 6379,
-          },
-          password: credentials.password ?? undefined,
-          username: credentials.username ?? undefined,
-        };
+  let connectionOptions: FalkorDBOptions;
+
+  // If URL is provided, use it directly
+  if (credentials.url) {
+    connectionOptions = {
+      url: credentials.url ?? "falkor://localhost:6379",
+    };
+  } else {
+    // Use individual connection parameters
+    connectionOptions =
+      credentials.tls === "true"
+        ? {
+            socket: {
+              host: credentials.host ?? "localhost",
+              port: credentials.port ? parseInt(credentials.port, 10) : 6379,
+              tls: credentials.tls === "true",
+              checkServerIdentity: () => undefined,
+              ca:
+                !credentials.ca || credentials.ca === "undefined"
+                  ? undefined
+                  : [Buffer.from(credentials.ca, "base64").toString("utf8")],
+            },
+            password: credentials.password ?? undefined,
+            username: credentials.username ?? undefined,
+          }
+        : {
+            socket: {
+              host: credentials.host || "localhost",
+              port: credentials.port ? parseInt(credentials.port, 10) : 6379,
+            },
+            password: credentials.password ?? undefined,
+            username: credentials.username ?? undefined,
+          };
+  }
 
   const client = await FalkorDB.connect(connectionOptions);
 
@@ -323,6 +336,7 @@ const authOptions: AuthOptions = {
         password: { label: "Password", type: "password" },
         tls: { label: "tls", type: "boolean" },
         ca: { label: "ca", type: "string" },
+        url: { label: "url", type: "string" },
       },
       async authorize(credentials) {
         if (!credentials) {
@@ -336,12 +350,13 @@ const authOptions: AuthOptions = {
 
           const res: User = {
             id,
-            host: credentials.host || "localhost",
+            url: credentials.url,
+            host: credentials.host,
             port: credentials.port ? parseInt(credentials.port, 10) : 6379,
             password: credentials.password,
             username: credentials.username,
             tls: credentials.tls === "true",
-            ca: credentials.ca,
+            ca: credentials.url ? undefined : credentials.ca,
             role,
           };
           return res;
