@@ -26,7 +26,7 @@ test.describe(`Tutorial Test`, () => {
     await tutorial.changeLocalStorage("false");
   });
   
-  test.only("@admin validate that clicking replay tutorial replay tutorial", async () => {
+  test("@admin validate that clicking replay tutorial replay tutorial", async () => {
     const tutorial = await browser.createNewPage(TutorialPanel, urls.settingsUrl);
     await tutorial.clickReplayTutorial();
     expect(await tutorial.isTutorialVisible()).toBeTruthy();
