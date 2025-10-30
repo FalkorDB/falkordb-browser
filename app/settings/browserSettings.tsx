@@ -3,7 +3,7 @@ import { getQuerySettingsNavigationToast } from "@/components/ui/toaster";
 import { useRouter } from "next/navigation";
 import { cn, getDefaultQuery } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
-import { RotateCcw } from "lucide-react";
+import { MonitorPlay, RotateCcw } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Slider } from "@/components/ui/slider";
 import { BrowserSettingsContext } from "../components/provider";
@@ -37,6 +37,7 @@ export default function BrowserSettings() {
         setHasChanges,
         resetSettings,
         saveSettings,
+        replayTutorial,
     } = useContext(BrowserSettingsContext)
 
     const scrollableContainerRef = useRef<HTMLFormElement>(null)
@@ -308,6 +309,23 @@ export default function BrowserSettings() {
                             value={[newRefreshInterval]}
                             onValueChange={(value) => createChangeHandler(setNewRefreshInterval)(value[value.length - 1], "refreshInterval")}
                         />
+                    </div>
+                    {separator}
+                    <h1 className="text-2xl font-bold">Tutorial</h1>
+                    <div className="flex flex-col gap-6 justify-center">
+                        <div className="flex flex-col gap-2">
+                            <h2 className="text-xl font-medium">Replay Tutorial</h2>
+                            <p>Go over the browser main features by following a guided tour</p>
+                        </div>
+                        <Button
+                            data-testid="replayTutorial"
+                            className="w-fit"
+                            variant="Primary"
+                            onClick={replayTutorial}
+                            label="Replay"
+                        >
+                            <MonitorPlay />
+                        </Button>
                     </div>
                     {
                         hasChanges &&

@@ -14,7 +14,7 @@ import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import { useTheme } from "next-themes";
 import Button from "./ui/Button";
 import CloseDialog from "./CloseDialog";
-import { IndicatorContext } from "./provider";
+import { BrowserSettingsContext, IndicatorContext } from "./provider";
 import { Graph, HistoryQuery } from "../api/graph/model";
 
 export const setTheme = (monacoI: Monaco, themeName: string, backgroundColor: string, isDark: boolean) => {
@@ -231,6 +231,7 @@ const PLACEHOLDER = "Type your query here to start"
 
 export default function EditorComponent({ graph, graphName, historyQuery, maximize, setMaximize, runQuery, setHistoryQuery, editorKey, isQueryLoading }: Props) {
     const { indicator, setIndicator } = useContext(IndicatorContext)
+    const { tutorialOpen } = useContext(BrowserSettingsContext)
 
     const { toast } = useToast()
     const { theme } = useTheme()
@@ -243,6 +244,7 @@ export default function EditorComponent({ graph, graphName, historyQuery, maximi
     const graphIdRef = useRef(graph.Id)
     const graphNameRef = useRef(graphName)
     const queryRef = useRef(historyQuery.query)
+    const tutorialOpenRef = useRef(tutorialOpen)
 
     const [monacoEditor, setMonacoEditor] = useState<Monaco | null>(null)
     const [sugDisposed, setSugDisposed] = useState<monaco.IDisposable>()
@@ -255,6 +257,10 @@ export default function EditorComponent({ graph, graphName, historyQuery, maximi
         ? LINE_HEIGHT
         : Math.min(lineNumber * LINE_HEIGHT, document.body.clientHeight / 100 * MAX_HEIGHT),
         [blur, lineNumber])
+
+    useEffect(() => {
+        tutorialOpenRef.current = tutorialOpen
+    }, [tutorialOpen])
 
     useEffect(() => {
         graphNameRef.current = graphName
@@ -549,7 +555,7 @@ export default function EditorComponent({ graph, graphName, historyQuery, maximi
 
         // eslint-disable-next-line no-bitwise
         e.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, () => {
-            if (indicatorRef.current === "offline" || !queryRef.current || !graphNameRef.current) return
+            if (indicatorRef.current === "offline" || !queryRef.current || !graphNameRef.current || tutorialOpenRef.current) return
             submitQuery.current?.click();
         });
 
@@ -560,7 +566,7 @@ export default function EditorComponent({ graph, graphName, historyQuery, maximi
             keybindings: [monaco.KeyCode.Enter],
             contextMenuOrder: 1.5,
             run: async () => {
-                if (indicatorRef.current === "offline" || !queryRef.current || !graphNameRef.current) return
+                if (indicatorRef.current === "offline" || !queryRef.current || !graphNameRef.current || tutorialOpenRef.current) return
                 submitQuery.current?.click()
             },
             precondition: '!suggestWidgetVisible',
@@ -629,7 +635,7 @@ export default function EditorComponent({ graph, graphName, historyQuery, maximi
     }
 
     return (
-        <div style={{ height: editorHeight + 18 }} className="absolute w-full flex items-start gap-8 border border-border rounded-lg overflow-hidden bg-background p-2">
+        <div data-testid="editor" style={{ height: editorHeight + 18 }} className="absolute w-full flex items-start gap-8 border border-border rounded-lg overflow-hidden bg-background p-2">
             <div className="h-full w-1 grow flex rounded-lg overflow-hidden">
                 <div ref={containerRef} className="h-full relative grow w-1" data-testid="editorContainer">
                     <Editor
@@ -700,7 +706,7 @@ export default function EditorComponent({ graph, graphName, historyQuery, maximi
                 </div>
             </div>
             <Dialog open={maximize} onOpenChange={setMaximize}>
-                <DialogContent disableClose className="w-full h-full">
+                <DialogContent hideClose className="w-full h-full">
                     <div className="relative w-full h-full">
                         <VisuallyHidden>
                             <DialogTitle />

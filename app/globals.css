@@ -53,7 +53,7 @@
     .SofiaSans * {
         font-family: 'SofiaSans' !important;
         letter-spacing: 0.1px;
-        font: 400;
+        font-weight: 400;
     }
 
     .tabs-trigger {

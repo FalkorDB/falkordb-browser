@@ -305,7 +305,7 @@ export function getTheme(theme: string | undefined) {
   if (currentTheme === "system")
     currentTheme = window.matchMedia("(prefers-color-scheme: dark)").matches
       ? "dark"
-      : "light"
+      : "light";
 
   return {
     background: currentTheme === "dark" ? "#1A1A1A" : "#FFFFFF",

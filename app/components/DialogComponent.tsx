@@ -15,6 +15,8 @@ interface Props extends DialogContentProps {
     open?: boolean
     onOpenChange?: (open: boolean) => void
     description?: ReactNode
+    label?: string
+    preventOutsideClose?: boolean
     className?: string
 }
 
@@ -25,6 +27,8 @@ export default function DialogComponent({
     open,
     onOpenChange,
     description,
+    label = "",
+    preventOutsideClose,
     className,
     ...props
 }: Props) {
@@ -34,10 +38,10 @@ export default function DialogComponent({
                 {trigger}
             </DialogTrigger>
             {/* eslint-disable-next-line react/jsx-props-no-spreading */}
-            <DialogContent {...props} onEscapeKeyDown={(e) => e.stopPropagation()} className={cn("bg-background p-8 flex flex-col gap-8 rounded-lg border-none", className)} disableClose>
+            <DialogContent {...props} preventOutsideClose={preventOutsideClose} data-testid={`${label}Content`} onEscapeKeyDown={(e) => e.stopPropagation()} className={cn("bg-background p-8 flex flex-col gap-8 rounded-lg border-none", className)} hideClose>
                 <DialogHeader className="flex-row justify-between items-center border-b-2 border-border pb-4">
                     <DialogTitle className="text-2xl font-medium">{title}</DialogTitle>
-                    <CloseDialog />
+                    <CloseDialog data-testid={`close${label?.charAt(0).toUpperCase()}${label?.slice(1)}`} />
                 </DialogHeader>
                 {
                     description ?
@@ -65,5 +69,7 @@ DialogComponent.defaultProps = {
     open: undefined,
     onOpenChange: undefined,
     description: undefined,
-    className: undefined
+    label: "",
+    preventOutsideClose: undefined,
+    className: undefined,
 }

@@ -1,8 +1,8 @@
-import test, { expect } from "@playwright/test"
-import urls from '../config/urls.json'
+import test, { expect } from "@playwright/test";
+import urls from '../config/urls.json';
 import BrowserWrapper from "../infra/ui/browserWrapper";
 import LoginPage from "../logic/POM/loginPage";
-import { userRoles, user } from '../config/user.json'
+import { userRoles, user } from '../config/user.json';
 
 test.describe(`Login tests`, () => {
     let browser: BrowserWrapper;
@@ -21,7 +21,7 @@ test.describe(`Login tests`, () => {
         await browser.setPageToFullScreen();
         await login.clickOnConnect();
         expect(login.getCurrentURL()).toBe(urls.graphUrl);
-    })
+    });
 
     test(`@admin validate user login with credentials`, async () => {
         const login = await browser.createNewPage(LoginPage, urls.loginUrl);
@@ -30,7 +30,7 @@ test.describe(`Login tests`, () => {
         await login.connectWithCredentials("readonlyuser", user.password);
         await login.waitForUrl(urls.graphUrl)
         expect(login.getCurrentURL()).toBe(urls.graphUrl);
-    })
+    });
 
     const invalidInputs = [
         { description: 'invalid host', host: 'localhostt', port: '6379', username: userRoles[1].name, password: user.password },
@@ -46,8 +46,8 @@ test.describe(`Login tests`, () => {
             await browser.setPageToFullScreen();
             await login.connectWithCredentials(username, password, host, port);
             await new Promise((res) => { setTimeout(res, 500) });
-            expect(login.getCurrentURL()).not.toBe(urls.graphUrl)
-        })
+            expect(login.getCurrentURL()).not.toBe(urls.graphUrl);
+        });
     });
 
     test(`@admin validate login with FalkorDB URL - default user`, async () => {
@@ -57,7 +57,7 @@ test.describe(`Login tests`, () => {
         await login.connectWithUrl("falkor://localhost:6379");
         await login.waitForSuccessfulLogin(urls.graphUrl);
         expect(login.getCurrentURL()).toBe(urls.graphUrl);
-    })
+    });
 
     test(`@admin validate login with FalkorDB URL - with credentials`, async () => {
         const login = await browser.createNewPage(LoginPage, urls.loginUrl);
@@ -66,7 +66,7 @@ test.describe(`Login tests`, () => {
         await login.connectWithUrl(`falkor://readonlyuser:${user.password}@localhost:6379`);
         await login.waitForSuccessfulLogin(urls.graphUrl);
         expect(login.getCurrentURL()).toBe(urls.graphUrl);
-    })
+    });
 
     test(`@admin validate toggle between manual and URL modes`, async () => {
         const login = await browser.createNewPage(LoginPage, urls.loginUrl);
@@ -83,7 +83,7 @@ test.describe(`Login tests`, () => {
         // Switch back to manual mode
         await login.clickManualMode();
         expect(await login.isManualModeSelected()).toBe(true);
-    })
+    });
 
     const invalidUrls = [
         { description: 'invalid protocol', url: 'invalid://localhost:6379' },
@@ -101,6 +101,6 @@ test.describe(`Login tests`, () => {
             // Wait for page to process the invalid login attempt
             await login.waitForPageIdle();
             expect(login.getCurrentURL()).not.toBe(urls.graphUrl);
-        })
+        });
     });
 })

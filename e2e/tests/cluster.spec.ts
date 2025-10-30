@@ -102,7 +102,7 @@ test.describe("Cluster Functionality Tests", () => {
       await loginPage.fillPort(CLUSTER_NODES[0].port);
       await loginPage.clickConnect();
       await loginPage.waitForSuccessfulLogin(urls.graphUrl);
-      await loginPage.dismissDialogAtStart();
+      await loginPage.handleSkipTutorial();
       await loginPage.refreshPage();
 
       await loginPage.clickOnSettingsBtn();
@@ -126,7 +126,7 @@ test.describe("Cluster Functionality Tests", () => {
       await loginPage.fillPort(CLUSTER_NODES[0].port);
       await loginPage.clickConnect();
       await loginPage.waitForSuccessfulLogin(urls.graphUrl);
-      await loginPage.dismissDialogAtStart();
+      await loginPage.handleSkipTutorial();
       await loginPage.refreshPage();
       await loginPage.Logout();
       expect(loginPage.getCurrentURL()).toContain("/login");
@@ -142,7 +142,7 @@ test.describe("Cluster Functionality Tests", () => {
       await loginPage.fillPort(CLUSTER_NODES[0].port);
       await loginPage.clickConnect();
       await loginPage.waitForSuccessfulLogin(urls.graphUrl);
-      await loginPage.dismissDialogAtStart();
+      await loginPage.handleSkipTutorial();
 
       const graphPage = await browser.createNewPage(GraphPage, urls.graphUrl);
       const graphName = getRandomString("cluster-test");

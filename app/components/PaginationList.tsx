@@ -203,7 +203,7 @@ export default function PaginationList<T extends Item>({ list, onClick, dataTest
     }
 
     return (
-        <div className={cn("w-full flex flex-col gap-4 p-6", className)}>
+        <div className={cn("w-full flex flex-col gap-2 p-3", className)}>
             {children}
             <div className="flex gap-2 items-center">
                 <Input
@@ -265,9 +265,8 @@ export default function PaginationList<T extends Item>({ list, onClick, dataTest
 
                         return (
                             <li
-                                data-testid={`${dataTestId}${text}`}
                                 className={cn(
-                                    "border-b",
+                                    "border-b cursor-pointer",
                                     // eslint-disable-next-line no-nested-ternary
                                     selected
                                         ? "text-primary border-primary"
@@ -275,6 +274,7 @@ export default function PaginationList<T extends Item>({ list, onClick, dataTest
                                             ? "text-foreground border-foreground"
                                             : "text-border border-border"
                                 )}
+                                data-testid={`${dataTestId}${text}`}
                                 onMouseEnter={() => setHoverIndex(index)}
                                 onMouseLeave={() => searchRef.current !== document.activeElement && setHoverIndex(-1)}
                                 style={{ height: `${itemHeight}px` }}
@@ -284,6 +284,7 @@ export default function PaginationList<T extends Item>({ list, onClick, dataTest
                                     onClick ?
                                         <Button
                                             className={cn("w-full h-full text-xl gap-0", !isString ? "flex-col" : "text-center")}
+                                            data-testid={`${dataTestId}${text}Button`}
                                             title={text}
                                             onClick={() => {
                                                 onClick(text)
@@ -299,7 +300,7 @@ export default function PaginationList<T extends Item>({ list, onClick, dataTest
                     })
                 }
             </ul>
-            <ul className="flex gap-6 p-4 items-center justify-center">
+            <ul className="flex gap-6 p-2 items-center justify-center">
                 <li className="flex gap-4">
                     <Button disabled={stepCounter < 4} label="<<" title="Previous 5 pages" onClick={() => setStepCounter(prev => prev > 4 ? prev - 5 : prev)} />
                     <Button disabled={stepCounter === 0} label="<" title="Previous page" onClick={() => handleSetStepCounter(prev => prev > 0 ? prev - 1 : prev)} />

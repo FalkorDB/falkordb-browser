@@ -1,5 +1,9 @@
 import { Locator } from "@playwright/test";
-import { interactWhenVisible, waitForURL } from "@/e2e/infra/utils";
+import {
+  interactWhenVisible,
+  waitForElementToNotBeVisible,
+  waitForURL,
+} from "@/e2e/infra/utils";
 import { existsSync } from "fs";
 import urls from "../../config/urls.json";
 import HeaderComponent from "./headerComponent";
@@ -25,10 +29,12 @@ export default class LoginPage extends HeaderComponent {
     return this.page.locator("//input[@id='Port']");
   }
 
-  private get dissmissDialogCheckbox(): Locator {
-    return this.page.locator(
-      '//div[p[text()="Don\'t show this again"]]//button'
-    );
+  private get skipTutorial(): Locator {
+    return this.page.getByTestId("skipTutorial");
+  }
+
+  private get tutorialSpotlight(): Locator {
+    return this.page.getByTestId("tutorialSpotlight");
   }
 
   // TLS locators
@@ -101,6 +107,14 @@ export default class LoginPage extends HeaderComponent {
     );
   }
 
+  async clickSkipTutorial(): Promise<void> {
+    await interactWhenVisible(
+      this.skipTutorial,
+      (el) => el.click(),
+      "skip tutorial"
+    );
+  }
+
   async fillPort(port: string): Promise<void> {
     await interactWhenVisible(
       this.portInput,
@@ -125,14 +139,6 @@ export default class LoginPage extends HeaderComponent {
     );
   }
 
-  async disableTutorial(): Promise<void> {
-    await interactWhenVisible(
-      this.dissmissDialogCheckbox,
-      (el) => el.click(),
-      "disable tutorial"
-    );
-  }
-
   // TLS methods
   async clickEnableTLS(): Promise<void> {
     await interactWhenVisible(
@@ -144,6 +150,10 @@ export default class LoginPage extends HeaderComponent {
 
   async isTLSEnabled(): Promise<boolean> {
     return (await this.tlsCheckbox.getAttribute("data-state")) === "checked";
+  }
+
+  async isCertificateRemoved(): Promise<boolean> {
+    return this.certificateUploadedStatus.isHidden();
   }
 
   async clickUploadCA(): Promise<void> {
@@ -174,8 +184,9 @@ export default class LoginPage extends HeaderComponent {
     }
   }
 
-  async isCertificateRemoved(): Promise<boolean> {
-    return this.certificateUploadedStatus.isHidden();
+  async handleSkipTutorial(): Promise<void> {
+    await this.clickSkipTutorial();
+    await waitForElementToNotBeVisible(this.tutorialSpotlight);
   }
 
   async clickOnConnect(): Promise<void> {
@@ -198,11 +209,6 @@ export default class LoginPage extends HeaderComponent {
     await this.fillUsername(username);
     await this.fillPassword(password);
     await this.clickConnect();
-  }
-
-  async dismissDialogAtStart(): Promise<void> {
-    await this.disableTutorial();
-    await this.page.mouse.click(10, 10);
   }
 
   async uploadCertificate(filePath: string): Promise<void> {
