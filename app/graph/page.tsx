@@ -250,8 +250,8 @@ export default function Page() {
                     />
                 )
             case "data":
-                return <GraphDataPanel
-                    object={selectedElement!}
+                return selectedElement && <GraphDataPanel
+                    object={selectedElement}
                     setObject={handleSetSelectedElement}
                     setLabels={setLabels}
                 />

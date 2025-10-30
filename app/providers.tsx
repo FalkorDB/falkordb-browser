@@ -61,6 +61,8 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
   const [newContentPersistence, setNewContentPersistence] = useState(false)
   const [refreshInterval, setRefreshInterval] = useState(10)
   const [newRefreshInterval, setNewRefreshInterval] = useState(0)
+  const [displayTextPriority, setDisplayTextPriority] = useState<string[]>(["name", "title", "label", "id"])
+  const [newDisplayTextPriority, setNewDisplayTextPriority] = useState<string[]>(["name", "title", "label", "id"])
   const [currentTab, setCurrentTab] = useState<Tab>("Graph")
   const [newSecretKey, setNewSecretKey] = useState("")
   const [newModel, setNewModel] = useState("")
@@ -93,7 +95,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       defaultQuerySettings: { newDefaultQuery, setNewDefaultQuery },
       contentPersistenceSettings: { newContentPersistence, setNewContentPersistence },
       chatSettings: { newSecretKey, setNewSecretKey, newModel, setNewModel },
-      graphInfo: { newRefreshInterval, setNewRefreshInterval }
+      graphInfo: { newRefreshInterval, setNewRefreshInterval, newDisplayTextPriority, setNewDisplayTextPriority }
     },
     settings: {
       limitSettings: { limit, setLimit, lastLimit, setLastLimit },
@@ -102,7 +104,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       defaultQuerySettings: { defaultQuery, setDefaultQuery },
       contentPersistenceSettings: { contentPersistence, setContentPersistence },
       chatSettings: { secretKey, setSecretKey, model, setModel, navigateToSettings, setNavigateToSettings },
-      graphInfo: { refreshInterval, setRefreshInterval }
+      graphInfo: { refreshInterval, setRefreshInterval, displayTextPriority, setDisplayTextPriority }
     },
     hasChanges,
     setHasChanges,
@@ -114,6 +116,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       localStorage.setItem("defaultQuery", newDefaultQuery);
       localStorage.setItem("limit", newLimit.toString());
       localStorage.setItem("refreshInterval", newRefreshInterval.toString())
+      localStorage.setItem("displayTextPriority", JSON.stringify(newDisplayTextPriority))
 
       // Update context
       setContentPersistence(newContentPersistence);
@@ -125,6 +128,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       setSecretKey(newSecretKey);
       setModel(newModel);
       setRefreshInterval(newRefreshInterval)
+      setDisplayTextPriority(newDisplayTextPriority)
       // Reset has changes
       setHasChanges(false);
 
@@ -143,10 +147,11 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       setNewSecretKey(secretKey)
       setNewModel(model)
       setNewRefreshInterval(refreshInterval)
+      setNewDisplayTextPriority(displayTextPriority)
       setHasChanges(false)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }), [contentPersistence, defaultQuery, hasChanges, lastLimit, limit, model, navigateToSettings, newContentPersistence, newDefaultQuery, newLimit, newModel, newRefreshInterval, newRunDefaultQuery, newSecretKey, newTimeout, refreshInterval, runDefaultQuery, secretKey, timeout])
+  }), [contentPersistence, defaultQuery, hasChanges, lastLimit, limit, model, navigateToSettings, newContentPersistence, newDefaultQuery, newLimit, newModel, newRefreshInterval, newRunDefaultQuery, newSecretKey, newTimeout, refreshInterval, runDefaultQuery, secretKey, timeout, displayTextPriority, newDisplayTextPriority])
 
   const historyQueryContext = useMemo(() => ({
     historyQuery,
@@ -378,6 +383,18 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
     setContentPersistence(localStorage.getItem("contentPersistence") !== "false");
     setTutorialOpen(localStorage.getItem("tutorial") !== "false")
     setRefreshInterval(Number(localStorage.getItem("refreshInterval") || 10))
+    const storedPriority = localStorage.getItem("displayTextPriority")
+    if (storedPriority) {
+      try {
+        const parsed = JSON.parse(storedPriority)
+        setDisplayTextPriority(parsed)
+        setNewDisplayTextPriority(parsed)
+      } catch {
+        // Use default if parsing fails
+        setDisplayTextPriority(["name", "title", "label", "id"])
+        setNewDisplayTextPriority(["name", "title", "label", "id"])
+      }
+    }
   }, [status])
 
   const panelSize = useMemo(() => isCollapsed ? 0 : 15, [isCollapsed])

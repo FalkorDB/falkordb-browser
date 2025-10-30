@@ -2,16 +2,16 @@
 /* eslint-disable no-param-reassign */
 
 import { Check, CirclePlus, Pencil, Trash2, X } from "lucide-react"
-import { cn, prepareArg, securedFetch } from "@/lib/utils"
+import { cn, getNodeDisplayText, prepareArg, securedFetch } from "@/lib/utils"
 import { toast } from "@/components/ui/use-toast"
-import { Fragment, MutableRefObject, useContext, useEffect, useRef, useState } from "react"
+import { Fragment, MutableRefObject, useCallback, useContext, useEffect, useRef, useState } from "react"
 import { useSession } from "next-auth/react"
 import { Switch } from "@/components/ui/switch"
 import Input from "../components/ui/Input"
 import DialogComponent from "../components/DialogComponent"
 import CloseDialog from "../components/CloseDialog"
 import { Link, Node, Value } from "../api/graph/model"
-import { GraphContext, IndicatorContext } from "../components/provider"
+import { GraphContext, IndicatorContext, BrowserSettingsContext } from "../components/provider"
 import ToastButton from "../components/ToastButton"
 import Button from "../components/ui/Button"
 import Combobox from "../components/ui/combobox"
@@ -28,6 +28,8 @@ interface Props {
 export default function GraphDataTable({ object, type, lastObjId, className }: Props) {
 
     const { graph, graphInfo, setGraphInfo } = useContext(GraphContext)
+    const { settings: { graphInfo: graphInfoSettings } } = useContext(BrowserSettingsContext)
+    const { displayTextPriority } = graphInfoSettings
 
     const setInputRef = useRef<HTMLInputElement>(null)
     const addInputRef = useRef<HTMLInputElement>(null)
@@ -78,6 +80,8 @@ export default function GraphDataTable({ object, type, lastObjId, className }: P
         }
         setAttributes(Object.keys(object.data))
     }, [lastObjId, object, setAttributes, type])
+
+    const handleGetNodeDisplayText = useCallback((node: Node): string => getNodeDisplayText(node, displayTextPriority), [displayTextPriority]);
 
     const getDefaultVal = (t: ValueType) => {
         switch (t) {
@@ -133,6 +137,16 @@ export default function GraphDataTable({ object, type, lastObjId, className }: P
                 setGraphInfo(graphI)
 
                 object.data[key] = val
+
+                if (object.labels && handleGetNodeDisplayText(object as Node) === key) {
+                    object.displayName = ['', '']
+                }
+                
+                // Clear displayName if the changed/added key is in display text priority
+                if (displayTextPriority.includes(key) && 'displayName' in object) {
+                    (object as Node).displayName = ['', ''];
+                }
+                
                 setAttributes(Object.keys(object.data))
 
                 handleSetEditable("")
@@ -189,7 +203,13 @@ export default function GraphDataTable({ object, type, lastObjId, className }: P
                 const value = object.data[key]
 
                 graph.removeProperty(key, id, type)
+
+                if (object.labels && handleGetNodeDisplayText(object as Node) === key) {
+                    object.displayName = ['', ''];
+                }
+
                 delete object.data[key]
+                
                 setAttributes(Object.keys(object.data))
 
                 toast({

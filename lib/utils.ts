@@ -262,6 +262,34 @@ export function getQueryWithLimit(
   return [query, existingLimit];
 }
 
+export function getNodeDisplayText(
+  node: Node,
+  displayTextPriority: string[]
+) {
+  const { data: nodeData } = node;
+
+  const displayText = displayTextPriority.find(
+    (priority) =>
+      nodeData[priority] &&
+      typeof nodeData[priority] === "string" &&
+      nodeData[priority].trim().length > 0
+  );
+
+  if (displayText) return nodeData[displayText];
+
+  const otherStringProperty = Object.entries(nodeData).find(
+    ([key, value]) =>
+      key !== "name" &&
+      key !== "title" &&
+      key !== "label" &&
+      key !== "id" &&
+      typeof value === "string" &&
+      value.trim().length > 0
+  );
+
+  return otherStringProperty?.[1] || node.id.toString();
+}
+
 export const formatName = (newGraphName: string) =>
   newGraphName === '""' ? "" : newGraphName;
 
@@ -305,7 +333,7 @@ export function getTheme(theme: string | undefined) {
   if (currentTheme === "system")
     currentTheme = window.matchMedia("(prefers-color-scheme: dark)").matches
       ? "dark"
-      : "light"
+      : "light";
 
   return {
     background: currentTheme === "dark" ? "#1A1A1A" : "#FFFFFF",

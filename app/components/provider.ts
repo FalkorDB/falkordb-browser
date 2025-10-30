@@ -33,6 +33,8 @@ type BrowserSettingsContextType = {
     graphInfo: {
       newRefreshInterval: number;
       setNewRefreshInterval: Dispatch<SetStateAction<number>>;
+      newDisplayTextPriority: string[];
+      setNewDisplayTextPriority: Dispatch<SetStateAction<string[]>>;
     };
   };
   settings: {
@@ -69,6 +71,8 @@ type BrowserSettingsContextType = {
     graphInfo: {
       refreshInterval: number;
       setRefreshInterval: Dispatch<SetStateAction<number>>;
+      displayTextPriority: string[];
+      setDisplayTextPriority: Dispatch<SetStateAction<string[]>>;
     };
   };
   hasChanges: boolean;
@@ -169,7 +173,7 @@ export const BrowserSettingsContext = createContext<BrowserSettingsContextType>(
         newModel: "",
         setNewModel: () => {},
       },
-      graphInfo: { newRefreshInterval: 0, setNewRefreshInterval: () => {} },
+      graphInfo: { newRefreshInterval: 0, setNewRefreshInterval: () => {}, newDisplayTextPriority: [], setNewDisplayTextPriority: () => {} },
     },
     settings: {
       limitSettings: {
@@ -196,7 +200,7 @@ export const BrowserSettingsContext = createContext<BrowserSettingsContextType>(
         navigateToSettings: false,
         setNavigateToSettings: () => {},
       },
-      graphInfo: { refreshInterval: 0, setRefreshInterval: () => {} },
+      graphInfo: { refreshInterval: 0, setRefreshInterval: () => {}, displayTextPriority: [], setDisplayTextPriority: () => {} },
     },
     hasChanges: false,
     setHasChanges: () => {},

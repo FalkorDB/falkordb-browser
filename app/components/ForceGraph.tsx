@@ -4,14 +4,14 @@
 
 "use client"
 
-import { Dispatch, SetStateAction, useContext, useEffect, useRef, useState } from "react"
+import { Dispatch, SetStateAction, useCallback, useContext, useEffect, useRef, useState } from "react"
 import ForceGraph2D from "react-force-graph-2d"
-import { securedFetch, GraphRef, handleZoomToFit, getTheme, Tab, ViewportState } from "@/lib/utils"
+import { securedFetch, GraphRef, handleZoomToFit, getTheme, Tab, ViewportState, getNodeDisplayText } from "@/lib/utils"
 import { useToast } from "@/components/ui/use-toast"
 import * as d3 from "d3"
 import { useTheme } from "next-themes"
 import { Link, Node, Relationship, Graph, getLabelWithFewestElements, GraphData } from "../api/graph/model"
-import { IndicatorContext } from "./provider"
+import { BrowserSettingsContext, IndicatorContext } from "./provider"
 import Spinning from "./ui/spinning"
 
 interface Props {
@@ -36,46 +36,12 @@ interface Props {
     cooldownTicks: number | undefined
     currentTab?: Tab
     viewport?: ViewportState
-    setViewport?: Dispatch<SetStateAction<ViewportState>> 
+    setViewport?: Dispatch<SetStateAction<ViewportState>>
     isSaved?: boolean
 }
 
 const NODE_SIZE = 6
 const PADDING = 2;
-
-const DISPLAY_TEXT_PRIORITY = [
-    "name",
-    "title",
-    "label",
-    "id",
-    "displayName"
-]
-
-/**
- * Determines the display text for a node based on priority order:
- * 1. name
- * 2. title
- * 3. label
- * 4. id (property, not node.id)
- * 5. Any other string property
- * 6. Node ID (fallback if no properties exist)
- */
-const getNodeDisplayText = (node: Node): string => {
-    const { data } = node;
-
-    const displayText = DISPLAY_TEXT_PRIORITY.find(priority =>
-        data[priority] && typeof data[priority] === 'string' && data[priority].trim().length > 0
-    )
-
-    if (displayText) return data[displayText];
-
-    const otherStringProperty = Object.entries(data).find(([key, value]) =>
-        key !== 'name' && key !== 'title' && key !== 'label' && key !== 'id' &&
-        typeof value === 'string' && value.trim().length > 0
-    )
-
-    return otherStringProperty?.[1] || node.id.toString();
-};
 
 /**
  * Wraps text into two lines with ellipsis handling for circular nodes
@@ -170,6 +136,7 @@ export default function ForceGraph({
 }: Props) {
 
     const { indicator, setIndicator } = useContext(IndicatorContext)
+    const { settings: { graphInfo: { displayTextPriority } } } = useContext(BrowserSettingsContext)
 
     const { theme } = useTheme()
     const { toast } = useToast()
@@ -291,6 +258,19 @@ export default function ForceGraph({
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [chartRef, graph.Elements.links.length, graph.Elements.nodes.length, graph])
 
+    const handleGetNodeDisplayText = useCallback((node: Node): string => getNodeDisplayText(node, displayTextPriority), [displayTextPriority]);
+
+    // Clear cached display names when displayTextPriority changes
+    useEffect(() => {
+        data.nodes.forEach(node => {
+            node.displayName = ['', ''];
+        });
+        // Force a re-render by reheating the simulation
+        if (chartRef.current) {
+            chartRef.current.d3ReheatSimulation();
+        }
+    }, [displayTextPriority, chartRef, data.nodes]);
+
     const onFetchNode = async (node: Node) => {
         const result = await securedFetch(`/api/graph/${graph.Id}/${node.id}`, {
             method: 'GET',
@@ -344,9 +324,9 @@ export default function ForceGraph({
     const handleNodeClick = async (node: Node) => {
         const now = new Date()
         const { date, name } = lastClick.current
-        lastClick.current = { date: now, name: getNodeDisplayText(node) }
+        lastClick.current = { date: now, name: handleGetNodeDisplayText(node) }
 
-        if (now.getTime() - date.getTime() < 1000 && name === getNodeDisplayText(node)) {
+        if (now.getTime() - date.getTime() < 1000 && name === handleGetNodeDisplayText(node)) {
             if (!node.expand) {
                 await onFetchNode(node)
             } else {
@@ -414,7 +394,7 @@ export default function ForceGraph({
                 width={parentWidth}
                 height={parentHeight}
                 linkLabel={(link) => link.relationship}
-                nodeLabel={(node) => type === "graph" ? getNodeDisplayText(node) : node.labels[0]}
+                nodeLabel={(node) => type === "graph" ? handleGetNodeDisplayText(node) : node.labels[0]}
                 graphData={data}
                 nodeRelSize={NODE_SIZE}
                 nodeCanvasObjectMode={() => 'after'}
@@ -461,7 +441,7 @@ export default function ForceGraph({
                         let text = '';
 
                         if (type === "graph") {
-                            text = getNodeDisplayText(node);
+                            text = handleGetNodeDisplayText(node);
                         } else {
                             text = getLabelWithFewestElements(node.labels.map(label => graph.LabelsMap.get(label) || graph.createLabel([label])[0])).name;
                         }
