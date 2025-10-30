@@ -278,6 +278,14 @@ export class GraphInfo {
   }
 }
 
+export type DisplayProperties = {
+  // denote which property is being displayed for the label or relationship
+  labelDisplay?: string;
+  labelHover?: string;
+  relationshipDisplay?: string;
+  relationshipHover?: string;
+}
+
 export class Graph {
   private id: string;
 
@@ -753,7 +761,9 @@ export class Graph {
         };
 
         // Load persisted display property
-        this.loadPersistedLabelDisplayProperty(c);
+        const savedSettings = this.loadPersistedDisplayProperty();
+        c.displayProperty = savedSettings.labelDisplay;
+        c.hoverProperty = savedSettings.labelHover;
 
         this.labelsMap.set(c.name, c);
         this.labels.push(c);
@@ -778,7 +788,9 @@ export class Graph {
       };
 
       // Load persisted display property
-      this.loadPersistedDisplayProperty(l);
+      const savedSettings = this.loadPersistedDisplayProperty();
+      l.displayProperty = savedSettings.relationshipDisplay;
+      l.hoverProperty = savedSettings.relationshipHover;
 
       this.relationshipsMap.set(l.name, l);
       this.relationships.push(l);
@@ -787,30 +799,29 @@ export class Graph {
     return l;
   }
 
-  private loadPersistedDisplayProperty(relationship: Relationship): void {
-    try {
-      const storageKey = `relationshipDisplayProperties_${this.id}`;
-      const savedSettings = JSON.parse(localStorage.getItem(storageKey) || '{}');
-      if (savedSettings[relationship.name] !== undefined) {
-        relationship.displayProperty = savedSettings[relationship.name];
-      }
-    } catch (error) {
-      // Silently handle localStorage errors
-      console.warn('Failed to load persisted display properties:', error);
-    }
+  public savePersistedDisplayProperty(displayProperties: DisplayProperties): void {
+    const storageKey = `DisplayProperties_${this.id}`;
+    const savedSettings = JSON.parse(localStorage.getItem(storageKey) || '{}');
+    savedSettings["labelDisplay"] = displayProperties.labelDisplay;
+    savedSettings["labelHover"] = displayProperties.labelHover;
+    savedSettings["relationshipDisplay"] = displayProperties.relationshipDisplay;
+    savedSettings["relationshipHover"] = displayProperties.relationshipHover;
+    localStorage.setItem(storageKey, JSON.stringify(savedSettings));
   }
 
-  private loadPersistedLabelDisplayProperty(label: Label): void {
+  public loadPersistedDisplayProperty(): DisplayProperties {
+    const output: DisplayProperties = {};
+    const storageKey = `DisplayProperties_${this.id}`;
     try {
-      const storageKey = `labelDisplayProperties_${this.id}`;
       const savedSettings = JSON.parse(localStorage.getItem(storageKey) || '{}');
-      if (savedSettings[label.name] !== undefined) {
-        label.displayProperty = savedSettings[label.name];
-      }
+      output.labelDisplay = savedSettings["labelDisplay"];
+      output.labelHover = savedSettings["labelHover"];
+      output.relationshipDisplay = savedSettings["relationshipDisplay"];
+      output.relationshipHover = savedSettings["relationshipHover"];
     } catch (error) {
-      // Silently handle localStorage errors
-      console.warn('Failed to load persisted label display properties:', error);
+      console.warn('Failed to load persisted display properties:', error);
     }
+    return output;
   }
 
   public visibleLinks(visible: boolean) {

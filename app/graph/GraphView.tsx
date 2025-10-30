@@ -139,10 +139,9 @@ function GraphView({
         setRelationships([...relationships]);
 
         // Persist to localStorage
-        const storageKey = `DisplayProperties_${graph.Id}`;
-        const existingSettings = JSON.parse(localStorage.getItem(storageKey) || '{}');
-        existingSettings["relationshipDisplay"] = property;
-        localStorage.setItem(storageKey, JSON.stringify(existingSettings));
+        const existingSettings = graph.loadPersistedDisplayProperty();
+        existingSettings.relationshipDisplay = property;
+        graph.savePersistedDisplayProperty(existingSettings);
     }
 
     const onRelationshipHoverPropertyChange = (relationship: Relationship, property: string | undefined) => {
@@ -152,10 +151,9 @@ function GraphView({
         setRelationships([...relationships]);
 
         // Persist to localStorage
-        const storageKey = `DisplayProperties_${graph.Id}`;
-        const existingSettings = JSON.parse(localStorage.getItem(storageKey) || '{}');
-        existingSettings["relationshipHover"] = property;
-        localStorage.setItem(storageKey, JSON.stringify(existingSettings));
+        const existingSettings = graph.loadPersistedDisplayProperty();
+        existingSettings.relationshipHover = property;
+        graph.savePersistedDisplayProperty(existingSettings);
     }
 
     const onLabelDisplayPropertyChange = (label: Label, property: string | undefined) => {
@@ -165,10 +163,9 @@ function GraphView({
         setLabels([...labels]);
 
         // Persist to localStorage
-        const storageKey = `DisplayProperties_${graph.Id}`;
-        const existingSettings = JSON.parse(localStorage.getItem(storageKey) || '{}');
-        existingSettings["labelDisplay"] = property;
-        localStorage.setItem(storageKey, JSON.stringify(existingSettings));
+        const existingSettings = graph.loadPersistedDisplayProperty();
+        existingSettings.labelDisplay = property;
+        graph.savePersistedDisplayProperty(existingSettings);
     }
 
     const onLabelHoverPropertyChange = (label: Label, property: string | undefined) => {
@@ -178,10 +175,9 @@ function GraphView({
         setLabels([...labels]);
 
         // Persist to localStorage
-        const storageKey = `DisplayProperties_${graph.Id}`;
-        const existingSettings = JSON.parse(localStorage.getItem(storageKey) || '{}');
-        existingSettings["labelHover"] = property;
-        localStorage.setItem(storageKey, JSON.stringify(existingSettings));
+        const existingSettings = graph.loadPersistedDisplayProperty();
+        existingSettings.labelHover = property;
+        graph.savePersistedDisplayProperty(existingSettings);
     }
 
     return (
