@@ -8,11 +8,14 @@ import { Check, Info } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useTheme } from "next-themes";
 import { getTheme } from "@/lib/utils";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import FormComponent, { Field } from "../components/FormComponent";
 import Dropzone from "../components/ui/Dropzone";
 
 const DEFAULT_HOST = "localhost";
 const DEFAULT_PORT = "6379";
+
+type LoginMode = "manual" | "url";
 
 export default function LoginForm() {
   const { theme } = useTheme();
@@ -20,6 +23,8 @@ export default function LoginForm() {
   const router = useRouter();
 
   const [mounted, setMounted] = useState(false);
+  const [loginMode, setLoginMode] = useState<LoginMode>("manual");
+  const [falkordbUrl, setFalkordbUrl] = useState("");
   const [host, setHost] = useState("");
   const [port, setPort] = useState("");
   const [TLS, setTLS] = useState(false);
@@ -36,70 +41,85 @@ export default function LoginForm() {
   });
 
   const searchParams = useSearchParams();
-  const fields: Field[] = [
-    {
-      value: host,
+  const fields: Field[] = loginMode === "url" ?
+    [{
+      value: falkordbUrl,
       onChange: async (e: React.ChangeEvent<HTMLInputElement>) => {
-        setHost(e.target.value)
+        setFalkordbUrl(e.target.value)
         setError(prev => ({
           ...prev,
           show: false
         }))
         return true
       },
-      label: "Host",
+      label: "FalkorDB URL",
       type: "text",
-      placeholder: DEFAULT_HOST,
+      placeholder: `falkor://Default:Default@${DEFAULT_HOST}:${DEFAULT_PORT}`,
       required: true
-    },
-    {
-      value: port,
-      onChange: async (e: React.ChangeEvent<HTMLInputElement>) => {
-        setPort(e.target.value)
-        setError(prev => ({
-          ...prev,
-          show: false
-        }))
-        return true
+    }] : [
+      {
+        value: host,
+        onChange: async (e: React.ChangeEvent<HTMLInputElement>) => {
+          setHost(e.target.value)
+          setError(prev => ({
+            ...prev,
+            show: false
+          }))
+          return true
+        },
+        label: "Host",
+        type: "text",
+        placeholder: DEFAULT_HOST,
+        required: true
       },
-      label: "Port",
-      type: "text",
-      placeholder: DEFAULT_PORT,
-      required: true
-    },
-    {
-      value: username,
-      onChange: async (e: React.ChangeEvent<HTMLInputElement>) => {
-        setUsername(e.target.value)
-        setError(prev => ({
-          ...prev,
-          show: false
-        }))
-        return true
+      {
+        value: port,
+        onChange: async (e: React.ChangeEvent<HTMLInputElement>) => {
+          setPort(e.target.value)
+          setError(prev => ({
+            ...prev,
+            show: false
+          }))
+          return true
+        },
+        label: "Port",
+        type: "text",
+        placeholder: DEFAULT_PORT,
+        required: true
       },
-      label: "Username",
-      placeholder: "Default",
-      info: "You can skip entering your username when deploying a FalkorDB instance \n from localhost with default credentials.",
-      type: "text",
-      required: false
-    },
-    {
-      value: password,
-      onChange: async (e: React.ChangeEvent<HTMLInputElement>) => {
-        setPassword(e.target.value)
-        setError(prev => ({
-          ...prev,
-          show: false
-        }))
-        return true
+      {
+        value: username,
+        onChange: async (e: React.ChangeEvent<HTMLInputElement>) => {
+          setUsername(e.target.value)
+          setError(prev => ({
+            ...prev,
+            show: false
+          }))
+          return true
+        },
+        label: "Username",
+        placeholder: "Default",
+        info: "You can skip entering your username when deploying a FalkorDB instance \n from localhost with default credentials.",
+        type: "text",
+        required: false
       },
-      label: "Password",
-      placeholder: "Default",
-      info: "You can skip entering your password when deploying a FalkorDB instance \n from localhost with default credentials.",
-      type: "password",
-      required: false
-    }
-  ];
+      {
+        value: password,
+        onChange: async (e: React.ChangeEvent<HTMLInputElement>) => {
+          setPassword(e.target.value)
+          setError(prev => ({
+            ...prev,
+            show: false
+          }))
+          return true
+        },
+        label: "Password",
+        placeholder: "Default",
+        info: "You can skip entering your password when deploying a FalkorDB instance \n from localhost with default credentials.",
+        type: "password",
+        required: false
+      }
+    ];
 
   useEffect(() => {
     setMounted(true)
@@ -122,16 +142,34 @@ export default function LoginForm() {
 
     const params: SignInOptions = {
       redirect: false,
-      host: host.trim(),
-      port: port.trim(),
-      tls: TLS,
-      ca: CA
     };
-    if (username) {
-      params.username = username;
-    }
-    if (password) {
-      params.password = password;
+
+    // Handle URL mode
+    if (loginMode === "url") {
+      // Validate URL format starts with falkor:// or falkors://
+      const trimmedUrl = falkordbUrl.trim();
+      
+      if (trimmedUrl && (!trimmedUrl.startsWith("falkor://") && !trimmedUrl.startsWith("falkors://"))) {
+        setError({
+          message: "Invalid FalkorDB URL format. Expected: falkor://[user:pass@]host[:port] or falkors://[user:pass@]host[:port]",
+          show: true
+        });
+        return;
+      }
+      // Pass URL directly to the client
+      params.url = trimmedUrl;
+    } else {
+      // Manual mode
+      params.host = host.trim();
+      params.port = port.trim();
+      params.tls = TLS;
+      params.ca = CA;
+      if (username) {
+        params.username = username;
+      }
+      if (password) {
+        params.password = password;
+      }
     }
 
     signIn("credentials", params).then((res?: SignInResponse) => {
@@ -168,93 +206,119 @@ export default function LoginForm() {
   return (
     <div className="relative h-full w-full flex flex-col">
       <div className="grow flex items-center justify-center">
-        <div className="flex flex-col gap-8 items-center">
+        <div className="flex flex-col gap-8 items-center w-[500px]">
           {mounted && currentTheme && <Image style={{ width: 'auto', height: '80px' }} priority src={`/icons/Browser-${currentTheme}.svg`} alt="FalkorDB Browser Logo" width={0} height={0} />}
+
+          {/* Login Mode Toggle */}
+          <RadioGroup
+            value={loginMode}
+            onValueChange={(value) => {
+              setLoginMode(value as LoginMode);
+              setError({ message: "Invalid credentials", show: false });
+            }}
+            className="flex items-center justify-center gap-8 p-4 border border-primary rounded-lg w-full"
+          >
+            <div className="flex items-center space-x-2">
+              <RadioGroupItem value="manual" id="manual" />
+              {/* Label is correctly associated via htmlFor, but eslint doesn't recognize Radix RadioGroupItem */}
+              {/* eslint-disable-next-line jsx-a11y/label-has-associated-control */}
+              <label htmlFor="manual" className="text-base font-medium cursor-pointer">Manual Configuration</label>
+            </div>
+            <div className="flex items-center space-x-2">
+              <RadioGroupItem value="url" id="url" />
+              {/* Label is correctly associated via htmlFor, but eslint doesn't recognize Radix RadioGroupItem */}
+              {/* eslint-disable-next-line jsx-a11y/label-has-associated-control */}
+              <label htmlFor="url" className="text-base font-medium cursor-pointer">FalkorDB URL</label>
+            </div>
+          </RadioGroup>
           <FormComponent
             fields={fields}
             handleSubmit={onSubmit}
             error={error}
             submitButtonLabel="Log in"
           >
-            <div className="flex flex-col gap-4">
-              <div className="flex gap-2 items-center">
-                <Checkbox
-                  className="w-6 h-6 rounded-full bg-background border-primary data-[state=checked]:bg-primary"
-                  checked={TLS}
-                  onCheckedChange={(checked) => {
-                    setTLS(checked as boolean)
-                    setError(prev => ({
-                      ...prev,
-                      show: false
-                    }))
-                    if (!checked) {
-                      // Clear certificate when TLS is disabled
-                      setCA(undefined)
-                      setUploadedFileName("")
-                    }
-                  }}
-                  data-testid="tls-checkbox"
-                />
-                <p className="font-medium text-foreground">TLS Secured Connection</p>
-              </div>
+            {
+              loginMode === "manual" &&
+              <div className="flex flex-col gap-4">
+                <div className="flex gap-2 items-center">
+                  <Checkbox
+                    className="w-6 h-6 rounded-full bg-background border-primary data-[state=checked]:bg-primary"
+                    checked={TLS}
+                    onCheckedChange={(checked) => {
+                      setTLS(checked as boolean)
+                      setError(prev => ({
+                        ...prev,
+                        show: false
+                      }))
+                      if (!checked) {
+                        // Clear certificate when TLS is disabled
+                        setCA(undefined)
+                        setUploadedFileName("")
+                      }
+                    }}
+                    data-testid="tls-checkbox"
+                  />
+                  <p className="font-medium text-foreground">TLS Secured Connection</p>
+                </div>
 
-              {/* Certificate Upload Section */}
-              {TLS && (
-                <div id="tls-section" className="flex flex-col gap-3 p-4 bg-background border border-border rounded-lg transition-all duration-300 ease-in-out">
-                  <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 bg-primary rounded-full" />
-                    <span className="text-sm font-semibold text-muted">Certificate Authentication</span>
-                  </div>
+                {/* Certificate Upload Section */}
+                {TLS && (
+                  <div id="tls-section" className="flex flex-col gap-3 p-4 bg-background border border-border rounded-lg transition-all duration-300 ease-in-out">
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 bg-primary rounded-full" />
+                      <span className="text-sm font-semibold text-muted">Certificate Authentication</span>
+                    </div>
 
-                  <div className="flex flex-col gap-2">
-                    {!uploadedFileName ? (
-                      // Upload State
-                      <div className="relative">
-                        <Dropzone onFileDrop={onFileDrop} disabled={!TLS} />
-                        <div className="mt-2 text-xs text-muted/70 flex items-center gap-1">
-                          <Info className="w-5 h-5" aria-label="Information icon" />
-                          Upload your CA certificate file
+                    <div className="flex flex-col gap-2">
+                      {!uploadedFileName ? (
+                        // Upload State
+                        <div className="relative">
+                          <Dropzone onFileDrop={onFileDrop} disabled={!TLS} />
+                          <div className="mt-2 text-xs text-muted/70 flex items-center gap-1">
+                            <Info className="w-5 h-5" aria-label="Information icon" />
+                            Upload your CA certificate file
+                          </div>
                         </div>
-                      </div>
-                    ) : (
-                      // Success State
-                      <div className="flex items-center justify-between p-3 bg-primary/10 border border-primary/20 rounded-md transition-all duration-300 ease-in-out" data-testid="certificate-uploaded-status">
-                        <div className="flex items-center gap-3">
-                          <div className="flex-shrink-0">
-                            <div className="w-8 h-8 bg-primary/20 rounded-full flex items-center justify-center">
-                              <Check size={16} className="text-primary" />
+                      ) : (
+                        // Success State
+                        <div className="flex items-center justify-between p-3 bg-primary/10 border border-primary/20 rounded-md transition-all duration-300 ease-in-out" data-testid="certificate-uploaded-status">
+                          <div className="flex items-center gap-3">
+                            <div className="flex-shrink-0">
+                              <div className="w-8 h-8 bg-primary/20 rounded-full flex items-center justify-center">
+                                <Check size={16} className="text-primary" />
+                              </div>
+                            </div>
+                            <div className="flex flex-col">
+                              <span className="text-sm font-medium text-foreground">Certificate Uploaded</span>
+                              <span className="text-xs text-muted truncate max-w-48">{uploadedFileName}</span>
                             </div>
                           </div>
-                          <div className="flex flex-col">
-                            <span className="text-sm font-medium text-foreground">Certificate Uploaded</span>
-                            <span className="text-xs text-muted truncate max-w-48">{uploadedFileName}</span>
-                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setError(prev => ({
+                                ...prev,
+                                show: false
+                              }))
+                              setCA(undefined)
+                              setUploadedFileName("")
+                            }}
+                            className="flex-shrink-0 p-1 text-muted hover:text-foreground hover:bg-primary/20 rounded transition-colors duration-200"
+                            title="Remove certificate"
+                            data-testid="remove-certificate-btn"
+                            aria-label="Remove certificate"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                          </button>
                         </div>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setError(prev => ({
-                              ...prev,
-                              show: false
-                            }))
-                            setCA(undefined)
-                            setUploadedFileName("")
-                          }}
-                          className="flex-shrink-0 p-1 text-muted hover:text-foreground hover:bg-primary/20 rounded transition-colors duration-200"
-                          title="Remove certificate"
-                          data-testid="remove-certificate-btn"
-                          aria-label="Remove certificate"
-                        >
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                          </svg>
-                        </button>
-                      </div>
-                    )}
+                      )}
+                    </div>
                   </div>
-                </div>
-              )}
-            </div>
+                )}
+              </div>
+            }
           </FormComponent>
         </div>
       </div>
