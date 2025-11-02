@@ -96,7 +96,7 @@ export default function PersonalAccessTokens() {
           expiresAt = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString();
           ttlSeconds = 90 * 24 * 60 * 60;
           break;
-        case "custom":
+        case "custom": {
           if (!customExpirationDate) {
             toast({
               title: "Error",
@@ -124,6 +124,7 @@ export default function PersonalAccessTokens() {
           expiresAt = customDate.toISOString();
           ttlSeconds = Math.floor((customDate.getTime() - now.getTime()) / 1000);
           break;
+        }
         case "never":
         default:
           expiresAt = null;
