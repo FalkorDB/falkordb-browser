@@ -22,7 +22,7 @@ export type Query = {
   graphName: string;
   timestamp: number;
   status: "Success" | "Failed" | "Empty";
-  elementsCount: number
+  elementsCount: number;
 };
 
 const getSchemaValue = (value: string): string[] => {
@@ -159,6 +159,8 @@ export class GraphInfo {
 
   private relationships: Map<string, InfoRelationship>;
 
+  private memoryUsage: Map<string, number>;
+
   private colors: string[];
 
   private colorsCounter: number = 0;
@@ -167,11 +169,13 @@ export class GraphInfo {
     propertyKeys: string[] | undefined,
     labels: Map<string, InfoLabel>,
     relationships: Map<string, InfoRelationship>,
+    memoryUsage: Map<string, number>,
     colors?: string[]
   ) {
     this.propertyKeys = propertyKeys;
     this.labels = labels;
     this.relationships = relationships;
+    this.memoryUsage = memoryUsage;
     this.colors = [...(colors || DEFAULT_COLORS)];
   }
 
@@ -200,21 +204,33 @@ export class GraphInfo {
       this.propertyKeys,
       new Map(this.labels),
       new Map(this.relationships),
+      new Map(this.memoryUsage),
       [...this.colors]
     );
   }
 
-  public static empty(propertyKeys?: string[], colors?: string[]): GraphInfo {
-    return new GraphInfo(propertyKeys || [], new Map(), new Map(), colors);
+  public static empty(
+    propertyKeys?: string[],
+    memoryUsage?: Map<string, number>,
+    colors?: string[]
+  ): GraphInfo {
+    return new GraphInfo(
+      propertyKeys || [],
+      new Map(),
+      new Map(),
+      new Map(memoryUsage),
+      colors
+    );
   }
 
   public static create(
     propertyKeys: string[],
     labels: string[],
     relationships: string[],
+    memoryUsage: Map<string, number>,
     colors?: string[]
   ): GraphInfo {
-    const graphInfo = GraphInfo.empty(propertyKeys, colors);
+    const graphInfo = GraphInfo.empty(propertyKeys, memoryUsage, colors);
     graphInfo.createLabel(labels);
     relationships.forEach((relationship) =>
       graphInfo.createRelationship(relationship)

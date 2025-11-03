@@ -201,10 +201,10 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
     }
   }, [setIsLoading, setCooldownTicks]);
 
-  const fetchInfo = useCallback(async (type: string) => {
+  const fetchInfo = useCallback(async (type: string, name: string) => {
     if (!graphName) return []
 
-    const result = await securedFetch(`/api/graph/${graphName}/info?type=${type}`, {
+    const result = await securedFetch(`/api/graph/${name}/info?type=${type}`, {
       method: "GET",
     }, toast, setIndicator);
 
@@ -216,6 +216,23 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
   }, [graphName, toast]);
 
   const handelGetNewQueries = useCallback((newQuery: Query) => [...historyQuery.queries.filter(qu => qu.text !== newQuery.text), newQuery], [historyQuery.queries])
+
+  const getMemoryUsage = async (name: string) => {
+    const result = await securedFetch(`api/graph/${name}`, {
+      method: "GET"
+    }, toast, setIndicator)
+
+    if (!result.ok) return new Map()
+
+    const json = await result.json()
+    const entries: [string, number][] = []
+
+    for (let i = 0; i < json.result.length; i += 2) {
+      entries.push([json.result[i], json.result[i + 1]])
+    }
+
+    return new Map(entries)
+  }
 
   const runQuery = useCallback(async (q: string, name?: string): Promise<void> => {
     const n = name || graphName
@@ -246,12 +263,13 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       if (!result) throw new Error()
 
       const graphI = await Promise.all([
-        fetchInfo("(label)"),
-        fetchInfo("(relationship type)"),
-        fetchInfo("(property key)"),
+        fetchInfo("(label)", n),
+        fetchInfo("(relationship type)", n),
+        fetchInfo("(property key)", n),
       ]).then(async ([newLabels, newRelationships, newPropertyKeys]) => {
         const colorsArr = localStorage.getItem(n)
-        const gi = GraphInfo.create(newPropertyKeys, newLabels, newRelationships, colorsArr ? JSON.parse(colorsArr) : undefined)
+        const memoryUsage = await getMemoryUsage(n)
+        const gi = GraphInfo.create(newPropertyKeys, newLabels, newRelationships, memoryUsage, colorsArr ? JSON.parse(colorsArr) : undefined)
         setGraphInfo(gi)
         return gi
       }).catch((error) => {
@@ -281,7 +299,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
         status: "Success",
         elementsCount: g.getElements().length
       }
-      
+
       setGraph(g)
       fetchCount();
       setLastLimit(limit)
@@ -309,7 +327,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       }))
       setIsQueryLoading(false)
     }
-  }, [graphName, limit, timeout, toast, fetchInfo, fetchCount, handleCooldown, handelGetNewQueries]);
+  }, [graphName, limit, timeout, toast, fetchInfo, fetchCount, getMemoryUsage, handleCooldown, handelGetNewQueries]);
 
   const graphContext = useMemo(() => ({
     graph,

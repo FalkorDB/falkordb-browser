@@ -17,7 +17,7 @@ export async function GET(
     const { graph } = await params;
 
     try {
-      const result = 
+      const result = client.selectGraph(graph).memoryUsage()
 
       return NextResponse.json({ result }, { status: 200 });
     } catch (err) {

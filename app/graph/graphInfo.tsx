@@ -6,7 +6,7 @@ import Button from "../components/ui/Button";
 import { GraphContext, QueryLoadingContext } from "../components/provider";
 
 export default function GraphInfoPanel({ onClose }: { onClose: () => void }) {
-    const { graphInfo, nodesCount, edgesCount, runQuery, graphName } = useContext(GraphContext);
+    const { graphInfo: { Labels, Relationships, PropertyKeys }, nodesCount, edgesCount, runQuery, graphName } = useContext(GraphContext);
     const { isQueryLoading } = useContext(QueryLoadingContext)
 
     return (
@@ -64,7 +64,7 @@ export default function GraphInfoPanel({ onClose }: { onClose: () => void }) {
                             disabled={isQueryLoading}
                         />
                     </li>
-                    {Array.from(graphInfo.Labels.values()).filter(({ name }) => !!name).map(({ name, color }) => (
+                    {Array.from(Labels.values()).filter(({ name }) => !!name).map(({ name, color }) => (
                         <li key={name} className="max-w-full">
                             <Button
                                 style={{ backgroundColor: color }}
@@ -109,7 +109,7 @@ export default function GraphInfoPanel({ onClose }: { onClose: () => void }) {
                             disabled={isQueryLoading}
                         />
                     </li>
-                    {Array.from(graphInfo.Relationships.values()).map(({ name, color }) => (
+                    {Array.from(Relationships.values()).map(({ name, color }) => (
                         <li key={name} className="max-w-full">
                             <Button
                                 style={{ backgroundColor: color }}
@@ -126,18 +126,18 @@ export default function GraphInfoPanel({ onClose }: { onClose: () => void }) {
                 <div className="flex gap-2 items-center">
                     <h2>Property Keys</h2>
                     {
-                        graphInfo.PropertyKeys !== undefined ?
+                        PropertyKeys !== undefined ?
                             <Tooltip>
                                 <TooltipTrigger asChild>
                                     <p
                                         data-testid="propertyKeysCount"
                                         className="truncate pointer-events-auto SofiaSans"
                                     >
-                                        ({graphInfo.PropertyKeys.length})
+                                        ({PropertyKeys.length})
                                     </p>
                                 </TooltipTrigger>
                                 <TooltipContent>
-                                    {graphInfo.PropertyKeys.length}
+                                    {PropertyKeys.length}
                                 </TooltipContent>
                             </Tooltip>
                             :
@@ -146,7 +146,7 @@ export default function GraphInfoPanel({ onClose }: { onClose: () => void }) {
                 </div>
                 <ul className="flex flex-wrap gap-2 p-2 overflow-auto">
                     {
-                        graphInfo.PropertyKeys && graphInfo.PropertyKeys.map((key) => (
+                        PropertyKeys && PropertyKeys.map((key) => (
                             <li key={key} className="max-w-full">
                                 <Button
                                     className="h-6 w-full p-2 bg-border flex justify-center items-center rounded-full text-white SofiaSans"
