@@ -4,7 +4,7 @@ import { SessionProvider, useSession } from "next-auth/react";
 import { ThemeProvider } from 'next-themes'
 import { Dispatch, SetStateAction, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
-import { cn, fetchOptions, formatName, getDefaultQuery, getQueryWithLimit, getSSEGraphResult, Panel, prepareArg, securedFetch, Tab } from "@/lib/utils";
+import { cn, fetchOptions, formatName, getDefaultQuery, getQueryWithLimit, getSSEGraphResult, Panel, prepareArg, securedFetch, Tab, TextPriority } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { ImperativePanelHandle } from "react-resizable-panels";
@@ -30,6 +30,13 @@ const defaultQueryHistory: HistoryQuery = {
   },
   counter: 0
 }
+
+const DISPLAY_TEXT_PRIORITY = [
+  { name: "name", ignore: false },
+  { name: "title", ignore: false },
+  { name: "label", ignore: false },
+  { name: "id", ignore: false }
+]
 
 function ProvidersWithSession({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
@@ -61,8 +68,8 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
   const [newContentPersistence, setNewContentPersistence] = useState(false)
   const [refreshInterval, setRefreshInterval] = useState(10)
   const [newRefreshInterval, setNewRefreshInterval] = useState(0)
-  const [displayTextPriority, setDisplayTextPriority] = useState<string[]>(["name", "title", "label", "id"])
-  const [newDisplayTextPriority, setNewDisplayTextPriority] = useState<string[]>(["name", "title", "label", "id"])
+  const [displayTextPriority, setDisplayTextPriority] = useState<TextPriority[]>([])
+  const [newDisplayTextPriority, setNewDisplayTextPriority] = useState<TextPriority[]>([])
   const [currentTab, setCurrentTab] = useState<Tab>("Graph")
   const [newSecretKey, setNewSecretKey] = useState("")
   const [newModel, setNewModel] = useState("")
@@ -383,18 +390,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
     setContentPersistence(localStorage.getItem("contentPersistence") !== "false");
     setTutorialOpen(localStorage.getItem("tutorial") !== "false")
     setRefreshInterval(Number(localStorage.getItem("refreshInterval") || 10))
-    const storedPriority = localStorage.getItem("displayTextPriority")
-    if (storedPriority) {
-      try {
-        const parsed = JSON.parse(storedPriority)
-        setDisplayTextPriority(parsed)
-        setNewDisplayTextPriority(parsed)
-      } catch {
-        // Use default if parsing fails
-        setDisplayTextPriority(["name", "title", "label", "id"])
-        setNewDisplayTextPriority(["name", "title", "label", "id"])
-      }
-    }
+    setDisplayTextPriority(JSON.parse(localStorage.getItem("displayTextPriority") || JSON.stringify(DISPLAY_TEXT_PRIORITY)))
   }, [status])
 
   const panelSize = useMemo(() => isCollapsed ? 0 : 15, [isCollapsed])

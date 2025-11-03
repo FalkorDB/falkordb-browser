@@ -1,11 +1,12 @@
 import { useCallback, useContext, useEffect, useRef, useState } from "react";
 import { getQuerySettingsNavigationToast } from "@/components/ui/toaster";
 import { useRouter } from "next/navigation";
-import { cn, getDefaultQuery } from "@/lib/utils";
+import { cn, getDefaultQuery, TextPriority } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
 import { RotateCcw, PlusCircle, Trash2, ChevronUp, ChevronDown } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Slider } from "@/components/ui/slider";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { BrowserSettingsContext } from "../components/provider";
 import Button from "../components/ui/Button";
 import Input from "../components/ui/Input";
@@ -45,7 +46,7 @@ export default function BrowserSettings() {
     const router = useRouter()
 
     const [isResetting, setIsResetting] = useState(false)
-    const [newPriorityField, setNewPriorityField] = useState("")
+    const [newPriorityField, setNewPriorityField] = useState<TextPriority>({ name: "", ignore: false })
 
     useEffect(() => {
         setNewContentPersistence(contentPersistence)
@@ -105,7 +106,7 @@ export default function BrowserSettings() {
         }
     }, [hasChanges, navigateBack])
 
-    const separator = <div className="min-h-px w-[50%] bg-border rounded-full" />
+    const separator = <div className="min-h-[0.5px] w-[50%] bg-border rounded-full" />
 
     const handleScrollTo = (elementId?: string) => {
         if (elementId) {
@@ -157,19 +158,19 @@ export default function BrowserSettings() {
     }
 
     return (
-        <div className="h-full w-full flex flex-col gap-8 overflow-hidden">
+        <div className="h-full w-full flex flex-col gap-6 overflow-hidden">
             <div className="flex flex-col gap-2">
                 <h1 className="text-2xl font-medium">Browser Settings</h1>
                 <p className="text-sm text-foreground">Manage your environment&apos;s settings</p>
             </div>
-            <form ref={scrollableContainerRef} className="h-1 grow p-12 border border-border rounded-lg overflow-y-auto flex flex-col gap-8" onSubmit={handleSubmit}>
+            <form ref={scrollableContainerRef} className="h-1 grow p-4 border border-border rounded-lg overflow-y-auto flex flex-col gap-2" onSubmit={handleSubmit}>
                 <div className="flex flex-col gap-2">
                     <h1 className="text-2xl font-bold">Query Execution</h1>
                     <p className="text-sm text-muted-foreground">Control query execution and performance limits</p>
                 </div>
-                <div className="flex flex-col gap-6">
+                <div className="flex flex-col gap-2">
                     <div className="flex justify-between items-center">
-                        <div className="flex flex-col gap-2">
+                        <div className="flex flex-col gap-1">
                             <h2 className="text-xl font-medium">Timeout</h2>
                             <p>
                                 Shows a `Timed Out` error if the query takes longer than the timeout in seconds.
@@ -191,7 +192,7 @@ export default function BrowserSettings() {
                         />
                     </div>
                     <div className="flex justify-between items-center">
-                        <div className="flex flex-col gap-2">
+                        <div className="flex flex-col gap-1">
                             <h2 className="text-xl font-medium">Limit</h2>
                             <p>
                                 Limits the number of rows returned by the query.
@@ -213,14 +214,14 @@ export default function BrowserSettings() {
                         />
                     </div>
                     <div className="flex justify-between items-center">
-                        <div className="flex gap-4 items-center">
+                        <div className="flex gap-2 items-center">
                             <Switch
                                 id="runDefaultQuerySwitch"
                                 className="data-[state=unchecked]:bg-border"
                                 checked={newRunDefaultQuery}
                                 onCheckedChange={() => createChangeHandler(setNewRunDefaultQuery)(!newRunDefaultQuery, 'runDefaultQuerySwitch')}
                             />
-                            <div className="flex flex-col gap-2">
+                            <div className="flex flex-col gap-1">
                                 <h2 className="text-xl font-medium">Default Query On-load</h2>
                                 <p>Define a query to run when the graph is loaded.</p>
                             </div>
@@ -324,49 +325,52 @@ export default function BrowserSettings() {
                     <div className="flex flex-col gap-2">
                         <h2 className="text-xl font-medium">Display Text Priority</h2>
                         <p className="text-sm">Configure the priority order for displaying node text in graph visualizations. The graph will use the first available property from this list.</p>
+                        <p className="text-sm">Note: In case the property filed is used in different cases (user / USER) activate ignore case selection.</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <Input
+                            placeholder="Add new property field"
+                            value={newPriorityField.name}
+                            onChange={(e) => setNewPriorityField(prev => ({ ...prev, name: e.target.value }))}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                    e.preventDefault()
+                                    if (newPriorityField.name.trim() && !newDisplayTextPriority.some(filed => filed.name === newPriorityField.name.trim())) {
+                                        setNewDisplayTextPriority([...newDisplayTextPriority, newPriorityField])
+                                        setNewPriorityField({ name: "", ignore: false })
+                                    }
+                                }
+                            }}
+                            className="flex-1"
+                        />
+                        <Button
+                            variant="Secondary"
+                            onClick={() => {
+                                if (newPriorityField.name.trim() && !newDisplayTextPriority.some(filed => filed.name === newPriorityField.name.trim())) {
+                                    setNewDisplayTextPriority([...newDisplayTextPriority, newPriorityField])
+                                    setNewPriorityField({ name: "", ignore: false })
+                                }
+                            }}
+                            disabled={!newPriorityField.name.trim() || newDisplayTextPriority.some(filed => filed.name === newPriorityField.name.trim())}
+                        >
+                            <PlusCircle size={20} />
+                        </Button>
                     </div>
                     <ul className="flex flex-col gap-2 overflow-y-auto p-2 max-h-[200px]">
-                        <li key="add" className="flex items-center gap-2">
-                            <Input
-                                placeholder="Add new property field"
-                                value={newPriorityField}
-                                onChange={(e) => setNewPriorityField(e.target.value)}
-                                onKeyDown={(e) => {
-                                    if (e.key === 'Enter') {
-                                        e.preventDefault()
-                                        if (newPriorityField.trim() && !newDisplayTextPriority.includes(newPriorityField.trim())) {
-                                            setNewDisplayTextPriority([...newDisplayTextPriority, newPriorityField.trim()])
-                                            setNewPriorityField("")
-                                        }
-                                    }
-                                }}
-                                className="flex-1"
-                            />
-                            <Button
-                                variant="Secondary"
-                                onClick={() => {
-                                    if (newPriorityField.trim() && !newDisplayTextPriority.includes(newPriorityField.trim())) {
-                                        setNewDisplayTextPriority([...newDisplayTextPriority, newPriorityField.trim()])
-                                        setNewPriorityField("")
-                                    }
-                                }}
-                                disabled={!newPriorityField.trim() || newDisplayTextPriority.includes(newPriorityField.trim())}
-                            >
-                                <PlusCircle size={20} />
-                            </Button>
-                        </li>
                         {
-                            newDisplayTextPriority.map((field, index) => (
-                                <li key={field} className="flex items-center gap-2 p-2 border border-border rounded-md">
+                            newDisplayTextPriority.map(({ name, ignore }, index) => (
+                                <li key={name} className="flex items-center gap-2 p-1 border border-border rounded-md">
                                     <span className="text-sm font-medium w-8">{index + 1}.</span>
-                                    <span className="flex-1">{field}</span>
+                                    <span className="flex-1">{name}</span>
                                     <div className="flex gap-2">
                                         <Button
                                             onClick={() => {
                                                 if (index > 0) {
-                                                    const newPriority = [...newDisplayTextPriority];
-                                                    [newPriority[index], newPriority[index - 1]] = [newPriority[index - 1], newPriority[index]]
-                                                    setNewDisplayTextPriority(newPriority)
+                                                    setNewDisplayTextPriority(prev => {
+                                                        const newPriority = [...prev];
+                                                        [newPriority[index], newPriority[index - 1]] = [newPriority[index - 1], newPriority[index]]
+                                                        return newPriority
+                                                    })
                                                 }
                                             }}
                                             disabled={index === 0}
@@ -376,20 +380,45 @@ export default function BrowserSettings() {
                                         <Button
                                             onClick={() => {
                                                 if (index < newDisplayTextPriority.length - 1) {
-                                                    const newPriority = [...newDisplayTextPriority];
-                                                    [newPriority[index], newPriority[index + 1]] = [newPriority[index + 1], newPriority[index]]
-                                                    setNewDisplayTextPriority(newPriority)
+                                                    setNewDisplayTextPriority(prev => {
+                                                        const newPriority = [...prev];
+                                                        [newPriority[index], newPriority[index + 1]] = [newPriority[index + 1], newPriority[index]]
+                                                        return newPriority
+                                                    })
                                                 }
                                             }}
                                             disabled={index === newDisplayTextPriority.length - 1}
                                         >
                                             <ChevronDown size={20} />
                                         </Button>
+                                        <Tooltip>
+                                            <TooltipTrigger
+                                                disabled={name === "id"}
+                                                asChild
+                                            >
+                                                <Switch
+                                                    checked={ignore}
+                                                    className={!ignore ? "bg-border" : "bg-primary"}
+                                                    onCheckedChange={(checked) => {
+                                                        setNewDisplayTextPriority(prev => {
+                                                            const newPriority = [...prev]
+                                                            newPriority[index] = { ...newPriority[index], ignore: checked }
+                                                            return newPriority
+                                                        })
+                                                    }}
+                                                >
+                                                    <Trash2 size={20} />
+                                                </Switch>
+                                            </TooltipTrigger>
+                                            <TooltipContent>
+                                                <p>Ignore Case</p>
+                                            </TooltipContent>
+                                        </Tooltip>
                                         <Button
+                                            disabled={name === "id"}
                                             className="text-destructive"
                                             onClick={() => {
-                                                const newPriority = newDisplayTextPriority.filter((_, i) => i !== index)
-                                                setNewDisplayTextPriority(newPriority)
+                                                setNewDisplayTextPriority(prev => prev.filter((_, i) => i !== index))
                                             }}
                                         >
                                             <Trash2 size={20} />
