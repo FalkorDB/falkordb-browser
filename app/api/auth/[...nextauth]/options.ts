@@ -92,7 +92,6 @@ export async function getAdminConnectionForTokens(
   } catch (err) {
     throw new Error("Failed to create admin connection for token management. The default user must have admin privileges.");
   }
-
   return adminConnectionForTokens;
 }
 
@@ -268,6 +267,7 @@ function createUserFromJWTPayload(payload: CustomJWTPayload): AuthenticatedUser 
     port: payload.port,
     tls: payload.tls || false,
     ca: payload.ca,
+    url: payload.url,
   };
 }
 
@@ -283,15 +283,12 @@ async function tryJWTAuthentication(): Promise<{ client: FalkorDB; user: Authent
     try {
       const token = authorizationHeader.substring(7);
       const payload = await verifyJWTToken(token);
-
       // Validate JWT payload structure
       if (!isValidJWTPayload(payload)) {
         return null;
       }
-
       // Check for existing connection first
       const existingConnection = connections.get(payload.sub);
-
       if (existingConnection) {
         // SSRF Protection: Validate that token host/port match the connection we're reusing
         // This prevents attackers from using valid tokens to probe internal networks
@@ -305,12 +302,10 @@ async function tryJWTAuthentication(): Promise<{ client: FalkorDB; user: Authent
           console.warn("JWT authentication failed: token is not active (revoked or expired)");
           return null;
         }
-        
         // Reuse existing JWT connection
         const user = createUserFromJWTPayload(payload);
         return { client: existingConnection, user };
       }
-
       // eslint-disable-next-line no-console
       console.warn("JWT authentication failed: no existing connection for user", payload.sub);
       return null;
@@ -321,7 +316,6 @@ async function tryJWTAuthentication(): Promise<{ client: FalkorDB; user: Authent
       return null;
     }
   }
-
   return null;
 }
 
