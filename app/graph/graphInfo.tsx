@@ -10,7 +10,7 @@ export default function GraphInfoPanel({ onClose }: { onClose: () => void }) {
     const { isQueryLoading } = useContext(QueryLoadingContext)
 
     return (
-        <div className={cn(`relative h-full w-full p-6 grid grid-rows-[max-content_max-content_minmax(0,max-content)_minmax(0,max-content)_minmax(0,max-content)] gap-8 border-r border-border`)}>
+        <div data-testid="graphInfoPanel" className={cn(`relative h-full w-full p-6 grid grid-rows-[max-content_max-content_minmax(0,max-content)_minmax(0,max-content)_minmax(0,max-content)] gap-8 border-r border-border`)}>
             <Button
                 className="absolute top-2 right-2"
                 title="Close"
@@ -74,6 +74,7 @@ export default function GraphInfoPanel({ onClose }: { onClose: () => void }) {
                     <li className="max-w-full">
                         <Button
                             className="pt-1 h-6 w-6 rounded-full flex justify-center items-center bg-border text-white"
+                            data-testid="graphInfoAllNodes"
                             label="*"
                             title="All labels"
                             onClick={() => runQuery(`MATCH (n) RETURN n`)}
@@ -85,6 +86,7 @@ export default function GraphInfoPanel({ onClose }: { onClose: () => void }) {
                             <Button
                                 style={{ backgroundColor: color }}
                                 className="h-6 w-full p-2 rounded-full flex justify-center items-center text-black SofiaSans"
+                                data-testid={`graphInfo${name}Node`}
                                 label={name}
                                 onClick={() => runQuery(`MATCH (n:${name}) RETURN n`)}
                                 disabled={isQueryLoading}
@@ -119,6 +121,7 @@ export default function GraphInfoPanel({ onClose }: { onClose: () => void }) {
                     <li className="max-w-full">
                         <Button
                             className="pt-1 h-6 w-6 rounded-full flex justify-center items-center bg-border text-white"
+                            data-testid="graphInfoAllEdges"
                             label="*"
                             title="All relationships"
                             onClick={() => runQuery(`MATCH p=()-[]-() RETURN p`)}
@@ -130,6 +133,7 @@ export default function GraphInfoPanel({ onClose }: { onClose: () => void }) {
                             <Button
                                 style={{ backgroundColor: color }}
                                 className="h-6 w-full p-2 rounded-full flex justify-center items-center text-black SofiaSans"
+                                data-testid={`graphInfo${name}Edge`}
                                 label={name}
                                 onClick={() => runQuery(`MATCH p=()-[:${name}]-() RETURN p`)}
                                 disabled={isQueryLoading}

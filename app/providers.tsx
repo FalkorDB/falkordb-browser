@@ -3,17 +3,17 @@
 import { SessionProvider, useSession } from "next-auth/react";
 import { ThemeProvider } from 'next-themes'
 import { Dispatch, SetStateAction, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { usePathname } from "next/navigation";
 import { cn, fetchOptions, formatName, getDefaultQuery, getMemoryUsage, getQueryWithLimit, getSSEGraphResult, Panel, prepareArg, securedFetch } from "@/lib/utils";
+import { usePathname, useRouter } from "next/navigation";
 import { useToast } from "@/components/ui/use-toast";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { ImperativePanelHandle } from "react-resizable-panels";
 import LoginVerification from "./loginVerification";
-import { Graph, GraphInfo, HistoryQuery, Query } from "./api/graph/model";
+import { Graph, GraphData, GraphInfo, HistoryQuery, Query } from "./api/graph/model";
 import Header from "./components/Header";
-import { GraphContext, HistoryQueryContext, IndicatorContext, PanelContext, QueryLoadingContext, BrowserSettingsContext, SchemaContext } from "./components/provider";
-import Tutorial from "./graph/Tutorial";
+import { GraphContext, HistoryQueryContext, IndicatorContext, PanelContext, QueryLoadingContext, BrowserSettingsContext, SchemaContext, ViewportContext, TableViewContext } from "./components/provider";
 import GraphInfoPanel from "./graph/graphInfo";
+import Tutorial from "./components/Tutorial";
 
 const defaultQueryHistory: HistoryQuery = {
   queries: [],
@@ -35,6 +35,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const { toast } = useToast()
   const { status } = useSession()
+  const router = useRouter()
 
   const panelRef = useRef<ImperativePanelHandle>(null)
 
@@ -45,6 +46,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
   const [graphNames, setGraphNames] = useState<string[]>([])
   const [schema, setSchema] = useState<Graph>(Graph.empty())
   const [graph, setGraph] = useState<Graph>(Graph.empty())
+  const [data, setData] = useState<GraphData>({ ...graph.Elements })
   const [graphInfo, setGraphInfo] = useState<GraphInfo>(GraphInfo.empty())
   const [schemaName, setSchemaName] = useState<string>("")
   const [graphName, setGraphName] = useState<string>("")
@@ -60,6 +62,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
   const [newContentPersistence, setNewContentPersistence] = useState(false)
   const [refreshInterval, setRefreshInterval] = useState(10)
   const [newRefreshInterval, setNewRefreshInterval] = useState(0)
+  const [currentTab, setCurrentTab] = useState<Tab>("Graph")
   const [newSecretKey, setNewSecretKey] = useState("")
   const [newModel, setNewModel] = useState("")
   const [secretKey, setSecretKey] = useState("")
@@ -75,6 +78,21 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
   const [navigateToSettings, setNavigateToSettings] = useState(false)
   const [tutorialOpen, setTutorialOpen] = useState(false)
   const [isCollapsed, setIsCollapsed] = useState(true)
+  const [userGraphsBeforeTutorial, setUserGraphsBeforeTutorial] = useState<string[]>([])
+  const [userGraphBeforeTutorial, setUserGraphBeforeTutorial] = useState<string>("")
+
+  const replayTutorial = useCallback(() => {
+    router.push("/graph")
+    localStorage.removeItem("tutorial");
+    setTutorialOpen(true);
+  }, [router]);
+  const [viewport, setViewport] = useState<{ zoom: number; centerX: number; centerY: number }>({ centerX: 0, centerY: 0, zoom: 0 })
+  const [scrollPosition, setScrollPosition] = useState(0)
+  const [search, setSearch] = useState("")
+  const [expand, setExpand] = useState<Map<number, number>>(new Map())
+
+  const isSaved = data.nodes.some(n => n.x && n.y)
+  const dataHash = useMemo(() => JSON.stringify(graph.Data), [graph.Data])
 
   const browserSettingsContext = useMemo(() => ({
     newSettings: {
@@ -97,6 +115,8 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
     },
     hasChanges,
     setHasChanges,
+    replayTutorial,
+    tutorialOpen,
     saveSettings: () => {
       // Save settings to local storage
       localStorage.setItem("runDefaultQuery", newRunDefaultQuery.toString());
@@ -136,12 +156,12 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       setNewRefreshInterval(refreshInterval)
       setHasChanges(false)
     }
-  }), [contentPersistence, defaultQuery, hasChanges, lastLimit, limit, model, navigateToSettings, newContentPersistence, newDefaultQuery, newLimit, newModel, newRefreshInterval, newRunDefaultQuery, newSecretKey, newTimeout, refreshInterval, runDefaultQuery, secretKey, timeout, toast])
+  }), [contentPersistence, defaultQuery, hasChanges, lastLimit, limit, model, navigateToSettings, newContentPersistence, newDefaultQuery, newLimit, newModel, newRefreshInterval, newRunDefaultQuery, newSecretKey, newTimeout, refreshInterval, runDefaultQuery, secretKey, timeout, toast, replayTutorial, tutorialOpen])
 
   const historyQueryContext = useMemo(() => ({
     historyQuery,
     setHistoryQuery,
-  }), [historyQuery, setHistoryQuery])
+  }), [historyQuery])
 
   const indicatorContext = useMemo(() => ({
     indicator,
@@ -151,12 +171,30 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
   const panelContext = useMemo(() => ({
     panel,
     setPanel,
-  }), [panel, setPanel])
+  }), [panel])
 
   const queryLoadingContext = useMemo(() => ({
     isQueryLoading,
     setIsQueryLoading,
-  }), [isQueryLoading, setIsQueryLoading])
+  }), [isQueryLoading])
+
+  const viewportContext = useMemo(() => ({
+    viewport,
+    setViewport,
+    data,
+    setData,
+    isSaved
+  }), [viewport, data, isSaved])
+
+  const tableViewContext = useMemo(() => ({
+    scrollPosition,
+    setScrollPosition,
+    search,
+    setSearch,
+    expand,
+    setExpand,
+    dataHash
+  }), [scrollPosition, search, expand, dataHash])
 
   const schemaContext = useMemo(() => ({
     schema,
@@ -165,7 +203,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
     setSchemaName,
     schemaNames,
     setSchemaNames
-  }), [schema, setSchema, schemaName, setSchemaName, schemaNames, setSchemaNames])
+  }), [schema, schemaName, schemaNames])
 
   const fetchCount = useCallback(async () => {
     if (!graphName) return;
@@ -185,7 +223,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
     } catch (error) {
       console.debug(error)
     }
-  }, [graphName, toast, setIndicator, setEdgesCount, setNodesCount]);
+  }, [graphName, toast]);
 
   const handleCooldown = useCallback((ticks?: 0, isSetLoading: boolean = true) => {
     if (typeof window !== 'undefined') {
@@ -199,7 +237,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
 
       if (canvas) canvas.setAttribute('data-engine-status', ticks === 0 ? 'stop' : 'running');
     }
-  }, [setIsLoading, setCooldownTicks]);
+  }, []);
 
   const fetchInfo = useCallback(async (type: string, name: string) => {
     if (!graphName) return []
@@ -213,7 +251,8 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
     const json = await result.json();
 
     return json.result.data.map(({ info }: { info: string }) => info);
-  }, [graphName, toast]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [graphName]);
 
   const handelGetNewQueries = useCallback((newQuery: Query) => [...historyQuery.queries.filter(qu => qu.text !== newQuery.text), newQuery], [historyQuery.queries])
 
@@ -310,7 +349,8 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       }))
       setIsQueryLoading(false)
     }
-  }, [graphName, limit, timeout, toast, fetchInfo, fetchCount, handleCooldown, handelGetNewQueries]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [graphName, limit, timeout, fetchInfo, fetchCount, handleCooldown, handelGetNewQueries]);
 
   const graphContext = useMemo(() => ({
     graph,
@@ -325,12 +365,14 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
     setNodesCount,
     edgesCount,
     setEdgesCount,
+    currentTab,
+    setCurrentTab,
     runQuery,
     fetchCount,
     handleCooldown,
     cooldownTicks,
     isLoading,
-  }), [graph, graphInfo, graphName, graphNames, nodesCount, edgesCount, runQuery, fetchCount, handleCooldown, cooldownTicks, isLoading])
+  }), [graph, graphInfo, graphName, graphNames, nodesCount, edgesCount, currentTab, runQuery, fetchCount, handleCooldown, cooldownTicks, isLoading])
 
   useEffect(() => {
 
@@ -381,13 +423,14 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
         }
       }
     })()
-  }, [status, toast, setIndicator])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status])
 
   const checkStatus = useCallback(() => {
     securedFetch("/api/status", {
       method: "GET",
     }, toast, setIndicator)
-  }, [toast, setIndicator])
+  }, [])
 
   useEffect(() => {
     let interval: NodeJS.Timeout | undefined
@@ -417,7 +460,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
     await Promise.all(([["Graph", setGraphNames, setGraphName], ["Schema", setSchemaNames, setSchemaName]] as ["Graph" | "Schema", Dispatch<SetStateAction<string[]>>, Dispatch<SetStateAction<string>>][]).map(async ([type, setOptions, setName]) => {
       await fetchOptions(type, toast, setIndicator, indicator, setName, setOptions, contentPersistence)
     }))
-  }, [indicator, toast, contentPersistence, setGraphNames, setGraphName, setSchemaNames, setSchemaName, setIndicator])
+  }, [indicator, toast, contentPersistence])
 
   useEffect(() => {
     if (status !== "authenticated") return
@@ -437,6 +480,100 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
     }
   }
 
+  const handleCloseTutorial = () => {
+    setTutorialOpen(false);
+  };
+
+  const handleLoadDemoGraphs = async () => {
+    try {
+      // Store current user graphs
+      setUserGraphsBeforeTutorial(graphNames);
+      setUserGraphBeforeTutorial(graphName)
+
+      // Create social demo graph
+      const socialQuery = `
+        CREATE 
+          (alice:Person {name: 'Alice', age: 30, city: 'New York'}),
+          (bob:Person {name: 'Bob', age: 25, city: 'Los Angeles'}),
+          (charlie:Person {name: 'Charlie', age: 35, city: 'Chicago'}),
+          (diana:Person {name: 'Diana', age: 28, city: 'New York'}),
+          (alice)-[:KNOWS {since: 2015}]->(bob),
+          (alice)-[:KNOWS {since: 2018}]->(charlie),
+          (bob)-[:KNOWS {since: 2020}]->(diana),
+          (charlie)-[:KNOWS {since: 2017}]->(diana),
+          (alice)-[:WORKS_WITH]->(diana)
+      `;
+
+      await getSSEGraphResult(`/api/graph/social-demo?query=${prepareArg(socialQuery)}`, toast, setIndicator);
+
+      // Create social-test demo graph
+      const socialTestQuery = `
+      CREATE 
+      (eve:Person {name: 'Eve', age: 32}),
+      (frank:Person {name: 'Frank', age: 29}),
+      (eve)-[:FOLLOWS]->(frank)
+      `;
+
+      await getSSEGraphResult(`/api/graph/social-demo-test?query=${prepareArg(socialTestQuery)}`, toast, setIndicator);
+
+      // Update graph list to only show demo graphs
+      setGraphNames(["social-demo", "social-demo-test"]);
+      setGraphName("")
+
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.error("Failed to load demo graphs", error);
+      toast({
+        title: "Error",
+        description: "Failed to load demo graphs",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleCleanupDemoGraphs = async () => {
+    try {
+      // Delete demo graphs
+      await securedFetch("/api/graph/social-demo", {
+        method: "DELETE",
+      }, toast, setIndicator);
+
+      await securedFetch("/api/graph/social-demo-test", {
+        method: "DELETE",
+      }, toast, setIndicator);
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.error("Failed to cleanup demo graphs", error);
+    }
+
+    // Clear current graph to avoid showing deleted demo graph
+    setGraph(Graph.empty());
+    setGraphInfo(GraphInfo.empty());
+
+    if (userGraphBeforeTutorial && userGraphsBeforeTutorial.includes(userGraphBeforeTutorial)) {
+      setGraphName(userGraphBeforeTutorial);
+      setHistoryQuery(prev => ({ ...prev, query: "", currentQuery: defaultQueryHistory.currentQuery }))
+    } else if (userGraphsBeforeTutorial.length === 1) {
+      setGraphName(userGraphsBeforeTutorial[0]);
+
+      // Run default query for the graph if enabled
+      if (runDefaultQuery && defaultQuery) {
+        window.setTimeout(() => {
+          runQuery(defaultQuery, userGraphsBeforeTutorial[0]);
+        }, 150);
+      } else {
+        setHistoryQuery(prev => ({ ...prev, query: "", currentQuery: defaultQueryHistory.currentQuery }))
+      }
+    } else {
+      setGraphName("")
+      setHistoryQuery(prev => ({ ...prev, query: "", currentQuery: defaultQueryHistory.currentQuery }))
+    }
+
+    setGraphNames(userGraphsBeforeTutorial)
+    setUserGraphsBeforeTutorial([]);
+    setUserGraphBeforeTutorial("")
+  };
+
   return (
     <ThemeProvider attribute="class" storageKey="theme" defaultTheme="system" disableTransitionOnChange>
       <LoginVerification>
@@ -447,48 +584,60 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
                 <IndicatorContext.Provider value={indicatorContext}>
                   <PanelContext.Provider value={panelContext}>
                     <QueryLoadingContext.Provider value={queryLoadingContext}>
-                      {
-                        pathname !== "/" && pathname !== "/login" &&
-                        <Header
-                          graphName={graphName}
-                          graphNames={pathname.includes("/schema") ? schemaNames : graphNames}
-                          onSetGraphName={handleOnSetGraphName}
-                          onOpenGraphInfo={onExpand}
-                          displayChat={displayChat}
-                        />
-                      }
-                      <ResizablePanelGroup direction="horizontal" className="w-1 grow">
-                        <ResizablePanel
-                          ref={panelRef}
-                          defaultSize={panelSize}
-                          collapsible
-                          minSize={15}
-                          maxSize={30}
-                          onCollapse={() => setIsCollapsed(true)}
-                          onExpand={() => setIsCollapsed(false)}
-                        >
-                          <GraphInfoPanel
-                            onClose={onExpand}
-                          />
-                        </ResizablePanel>
-                        <ResizableHandle withHandle onMouseUp={() => isCollapsed && onExpand()} className={cn("w-0", isCollapsed && "hidden")} />
-                        <ResizablePanel
-                          defaultSize={100 - panelSize}
-                          minSize={70}
-                          maxSize={100}
-                        >
+                      <ViewportContext.Provider value={viewportContext}>
+                        <TableViewContext.Provider value={tableViewContext}>
                           {
-                            (pathname === "/graph" || pathname === "/schema") ?
-                              <div className="h-full w-full flex flex-col">
-                                {children}
-                                <div className="h-4 w-full Gradient" />
-                                {pathname === "/graph" && <Tutorial open={tutorialOpen} setOpen={setTutorialOpen} />}
-                              </div>
-                              :
-                              children
+                            pathname === "/graph" &&
+                            <Tutorial
+                              open={tutorialOpen}
+                              onClose={handleCloseTutorial}
+                              onLoadDemoGraphs={handleLoadDemoGraphs}
+                              onCleanupDemoGraphs={handleCleanupDemoGraphs}
+                            />
                           }
-                        </ResizablePanel>
-                      </ResizablePanelGroup>
+                          {
+                            pathname !== "/" && pathname !== "/login" &&
+                            <Header
+                              graphName={graphName}
+                              graphNames={pathname.includes("/schema") ? schemaNames : graphNames}
+                              onSetGraphName={handleOnSetGraphName}
+                              onOpenGraphInfo={onExpand}
+                              displayChat={displayChat}
+                            />
+                          }
+                          <ResizablePanelGroup direction="horizontal" className="w-1 grow">
+                            <ResizablePanel
+                              ref={panelRef}
+                              defaultSize={panelSize}
+                              collapsible
+                              minSize={15}
+                              maxSize={30}
+                              onCollapse={() => setIsCollapsed(true)}
+                              onExpand={() => setIsCollapsed(false)}
+                            >
+                              <GraphInfoPanel
+                                onClose={onExpand}
+                              />
+                            </ResizablePanel>
+                            <ResizableHandle withHandle onMouseUp={() => isCollapsed && onExpand()} className={cn("w-0", isCollapsed && "hidden")} />
+                            <ResizablePanel
+                              defaultSize={100 - panelSize}
+                              minSize={70}
+                              maxSize={100}
+                            >
+                              {
+                                (pathname === "/graph" || pathname === "/schema") ?
+                                  <div className="h-full w-full flex flex-col">
+                                    {children}
+                                    <div className="h-4 w-full Gradient" />
+                                  </div>
+                                  :
+                                  children
+                              }
+                            </ResizablePanel>
+                          </ResizablePanelGroup>
+                        </TableViewContext.Provider>
+                      </ViewportContext.Provider>
                     </QueryLoadingContext.Provider>
                   </PanelContext.Provider>
                 </IndicatorContext.Provider>
