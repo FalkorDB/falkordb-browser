@@ -1,0 +1,123 @@
+# CodeRabbit AI Configuration
+# Documentation: https://docs.coderabbit.ai/guides/configure-coderabbit/
+
+# Language settings
+language: en-US
+
+# Early access features
+early_access: false
+
+# Enable reviews for all PRs regardless of target branch
+reviews:
+  # Request changes workflow - CodeRabbit can request changes on PRs
+  request_changes_workflow: false
+  
+  # High level summary
+  high_level_summary: true
+  
+  # Poem style summary (optional, can be disabled)
+  poem: true
+  
+  # Review status - enable reviews
+  review_status: true
+  
+  # Collapse walkthrough on PR
+  collapse_walkthrough: false
+  
+  # Auto-review settings
+  auto_review:
+    enabled: true
+    # Review all PRs regardless of base branch
+    base_branches:
+      - "*"  # This enables reviews for PRs to ANY branch
+    drafts: false  # Set to true if you want to review draft PRs too
+  
+  # Path-based instructions for more context-aware reviews
+  path_instructions:
+    - path: "**/*.ts"
+      instructions: "Review TypeScript code for type safety, proper error handling, and Next.js best practices."
+    - path: "**/*.tsx"
+      instructions: "Review React components for proper hooks usage, accessibility, and performance."
+    - path: "e2e/**/*"
+      instructions: "Review test code for proper assertions, test coverage, and maintainability."
+    - path: "**/api/**/*"
+      instructions: "Review API routes for security, error handling, and proper HTTP status codes."
+
+# PR title suggestions - this generates PR title recommendations
+title:
+  enabled: true
+
+# Chat features
+chat:
+  # Enable chat with CodeRabbit on PRs
+  enabled: true
+  
+  # Auto-reply to questions
+  auto_reply: true
+
+# Tone of reviews
+tone_instructions: "Be concise, professional, and constructive. Focus on important issues and best practices."
+
+# Knowledge base - help CodeRabbit understand your project better
+knowledge_base:
+  # Learnings - CodeRabbit learns from your feedback
+  learnings:
+    enabled: true
+  
+  # Important files and patterns
+  important_files:
+    - "package.json"
+    - "tsconfig.json"
+    - "next.config.js"
+    - "tailwind.config.ts"
+
+# Review settings
+review:
+  # Profile to use for reviews
+  profile: "chill"  # Options: "chill" (fewer comments) or "assertive" (more thorough)
+  
+  # Commit reviews within a PR
+  commit_review: false
+  
+  # Request changes on critical issues
+  request_changes: false
+  
+  # Issue severity thresholds
+  report_issues:
+    # Report security issues
+    security: true
+    # Report potential bugs
+    bug: true
+    # Report performance issues  
+    performance: true
+    # Report code style issues
+    style: true
+
+# Tools configuration
+tools:
+  # GitHub Checks
+  github_checks:
+    enabled: true
+    timeout_ms: 90000
+  
+  # Linting
+  linting:
+    enabled: true
+  
+  # AST-based analysis
+  ast_analysis:
+    enabled: true
+
+# Ignore certain files or patterns from review
+ignore:
+  - "**/*.min.js"
+  - "**/*.min.css"
+  - "node_modules/**"
+  - "dist/**"
+  - "build/**"
+  - ".next/**"
+  - "out/**"
+  - "*.lock"
+  - "package-lock.json"
+  - "yarn.lock"
+  - "pnpm-lock.yaml"
