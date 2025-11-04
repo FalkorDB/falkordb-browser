@@ -31,6 +31,16 @@ const defaultQueryHistory: HistoryQuery = {
   counter: 0
 }
 
+/**
+ * Wraps application UI with authentication-aware providers, state, and layout for graph and schema views.
+ *
+ * This component wires authentication/session handling, global UI and graph state, periodic status checks,
+ * query execution helpers, and the nested context providers used throughout the app. It also renders the
+ * main layout including header, tutorial, graph info panel, and the resizable content panels.
+ *
+ * @param children - The React node(s) to render inside the provider-managed layout (main content area).
+ * @returns A React element containing the provider hierarchy and application layout used by graph/schema pages.
+ */
 function ProvidersWithSession({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const { toast } = useToast()

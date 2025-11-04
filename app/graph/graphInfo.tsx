@@ -5,6 +5,12 @@ import { cn } from "@/lib/utils";
 import Button from "../components/ui/Button";
 import { GraphContext, QueryLoadingContext } from "../components/provider";
 
+/**
+ * Render a side panel showing graph metadata and interactive controls to run representative queries.
+ *
+ * @param onClose - Callback invoked when the panel's close button is clicked
+ * @returns The Graph Info panel React element containing graph name, memory usage, node/edge counts, property keys, and query buttons
+ */
 export default function GraphInfoPanel({ onClose }: { onClose: () => void }) {
     const { graphInfo: { Labels, Relationships, PropertyKeys, MemoryUsage }, nodesCount, edgesCount, runQuery, graphName } = useContext(GraphContext);
     const { isQueryLoading } = useContext(QueryLoadingContext)
