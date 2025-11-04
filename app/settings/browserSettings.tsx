@@ -3,7 +3,7 @@ import { getQuerySettingsNavigationToast } from "@/components/ui/toaster";
 import { useRouter } from "next/navigation";
 import { cn, getDefaultQuery, TextPriority } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
-import { RotateCcw, PlusCircle, Trash2, ChevronUp, ChevronDown } from "lucide-react";
+import { RotateCcw, PlusCircle, Trash2, ChevronUp, ChevronDown, MonitorPlay } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Slider } from "@/components/ui/slider";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -38,6 +38,7 @@ export default function BrowserSettings() {
         setHasChanges,
         resetSettings,
         saveSettings,
+        replayTutorial,
     } = useContext(BrowserSettingsContext)
 
     const scrollableContainerRef = useRef<HTMLFormElement>(null)
@@ -429,9 +430,26 @@ export default function BrowserSettings() {
                         }
                     </ul>
                 </div>
+                {separator}
+                <h1 className="text-2xl font-bold">Tutorial</h1>
+                <div className="flex flex-col gap-6 justify-center">
+                    <div className="flex flex-col gap-2">
+                        <h2 className="text-xl font-medium">Replay Tutorial</h2>
+                        <p>Go over the browser main features by following a guided tour</p>
+                    </div>
+                    <Button
+                        data-testid="replayTutorial"
+                        className="w-fit"
+                        variant="Primary"
+                        onClick={replayTutorial}
+                        label="Replay"
+                    >
+                        <MonitorPlay />
+                    </Button>
+                </div>
                 {
                     hasChanges &&
-                    <div className="bg-background flex gap-4 p-2 sticky bottom-0 justify-center">
+                    <div className="bg-background flex gap-4 px-4 pt-2 pb-6 sticky -bottom-4 justify-center">
                         <Button
                             id="cancelQuerySettingsBtn"
                             variant="Secondary"

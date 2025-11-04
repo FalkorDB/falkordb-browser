@@ -79,6 +79,8 @@ type BrowserSettingsContextType = {
   setHasChanges: Dispatch<SetStateAction<boolean>>;
   saveSettings: () => void;
   resetSettings: () => void;
+  replayTutorial: () => void;
+  tutorialOpen: boolean;
 };
 
 type GraphContextType = {
@@ -206,6 +208,8 @@ export const BrowserSettingsContext = createContext<BrowserSettingsContextType>(
     setHasChanges: () => {},
     saveSettings: () => {},
     resetSettings: () => {},
+    replayTutorial: () => {},
+    tutorialOpen: false,
   }
 );
 
