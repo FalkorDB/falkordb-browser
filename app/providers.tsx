@@ -4,7 +4,7 @@ import { SessionProvider, useSession } from "next-auth/react";
 import { ThemeProvider } from 'next-themes'
 import { Dispatch, SetStateAction, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
-import { cn, fetchOptions, formatName, getDefaultQuery, getQueryWithLimit, getSSEGraphResult, Panel, prepareArg, securedFetch } from "@/lib/utils";
+import { cn, fetchOptions, formatName, getDefaultQuery, getMemoryUsage, getQueryWithLimit, getSSEGraphResult, Panel, prepareArg, securedFetch } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { ImperativePanelHandle } from "react-resizable-panels";
@@ -217,23 +217,6 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
 
   const handelGetNewQueries = useCallback((newQuery: Query) => [...historyQuery.queries.filter(qu => qu.text !== newQuery.text), newQuery], [historyQuery.queries])
 
-  const getMemoryUsage = async (name: string) => {
-    const result = await securedFetch(`api/graph/${name}`, {
-      method: "GET"
-    }, toast, setIndicator)
-
-    if (!result.ok) return new Map()
-
-    const json = await result.json()
-    const entries: [string, number][] = []
-
-    for (let i = 0; i < json.result.length; i += 2) {
-      entries.push([json.result[i], json.result[i + 1]])
-    }
-
-    return new Map(entries)
-  }
-
   const runQuery = useCallback(async (q: string, name?: string): Promise<void> => {
     const n = name || graphName
     let newQuery: Query = {
@@ -268,7 +251,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
         fetchInfo("(property key)", n),
       ]).then(async ([newLabels, newRelationships, newPropertyKeys]) => {
         const colorsArr = localStorage.getItem(n)
-        const memoryUsage = await getMemoryUsage(n)
+        const memoryUsage = await getMemoryUsage(n, toast, setIndicator)
         const gi = GraphInfo.create(newPropertyKeys, newLabels, newRelationships, memoryUsage, colorsArr ? JSON.parse(colorsArr) : undefined)
         setGraphInfo(gi)
         return gi
@@ -327,7 +310,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       }))
       setIsQueryLoading(false)
     }
-  }, [graphName, limit, timeout, toast, fetchInfo, fetchCount, getMemoryUsage, handleCooldown, handelGetNewQueries]);
+  }, [graphName, limit, timeout, toast, fetchInfo, fetchCount, handleCooldown, handelGetNewQueries]);
 
   const graphContext = useMemo(() => ({
     graph,

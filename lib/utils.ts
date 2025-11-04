@@ -7,7 +7,7 @@ import { type ClassValue, clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
 import { MutableRefObject } from "react";
 import { ForceGraphMethods } from "react-force-graph-2d";
-import { Node, Link, DataCell } from "@/app/api/graph/model";
+import { Node, Link, DataCell, MemoryValue } from "@/app/api/graph/model";
 
 export const screenSize = {
   sm: 640,
@@ -47,6 +47,12 @@ export type ReadOnlyCell = {
   type: "readonly";
 };
 
+export type LazyCell = {
+  value?: string;
+  loadCell: () => Promise<string>
+  type: "readonly";
+};
+
 export type Message = {
   role: "user" | "assistant";
   content: string;
@@ -60,7 +66,7 @@ export type Message = {
     | "Schema";
 };
 
-export type Cell = SelectCell | TextCell | ObjectCell | ReadOnlyCell;
+export type Cell = SelectCell | TextCell | ObjectCell | ReadOnlyCell | LazyCell;
 export interface Row {
   cells: Cell[];
   checked?: boolean;
@@ -214,6 +220,45 @@ export function handleZoomToFit(
   }
 }
 
+const processEntries = (arr: unknown[]): Map<string, MemoryValue> => {
+  const entries: [string, MemoryValue][] = [];
+
+  for (let i = 0; i < arr.length; i += 2) {
+    const key = arr[i] as string;
+    const value = arr[i + 1];
+
+    // If the value is an array, recursively process it
+    if (Array.isArray(value)) {
+      entries.push([key, processEntries(value)]);
+    } else {
+      entries.push([key, value as number]);
+    }
+  }
+
+  return new Map(entries);
+};
+
+export const getMemoryUsage = async (
+  name: string,
+  toast: any,
+  setIndicator: (indicator: "online" | "offline") => void
+): Promise<Map<string, MemoryValue>> => {
+  const result = await securedFetch(
+    `api/graph/${name}/memory`,
+    {
+      method: "GET",
+    },
+    toast,
+    setIndicator
+  );
+
+  if (!result.ok) return new Map();
+
+  const json = await result.json();
+
+  return processEntries(json.result);
+};
+
 export function createNestedObject(arr: string[]): object {
   if (arr.length === 0) return {};
 
@@ -296,7 +341,7 @@ export function getTheme(theme: string | undefined) {
   if (currentTheme === "system")
     currentTheme = window.matchMedia("(prefers-color-scheme: dark)").matches
       ? "dark"
-      : "light"
+      : "light";
 
   return {
     background: currentTheme === "dark" ? "#1A1A1A" : "#FFFFFF",

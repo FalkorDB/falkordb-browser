@@ -6,7 +6,7 @@ import Button from "../components/ui/Button";
 import { GraphContext, QueryLoadingContext } from "../components/provider";
 
 export default function GraphInfoPanel({ onClose }: { onClose: () => void }) {
-    const { graphInfo: { Labels, Relationships, PropertyKeys }, nodesCount, edgesCount, runQuery, graphName } = useContext(GraphContext);
+    const { graphInfo: { Labels, Relationships, PropertyKeys, MemoryUsage }, nodesCount, edgesCount, runQuery, graphName } = useContext(GraphContext);
     const { isQueryLoading } = useContext(QueryLoadingContext)
 
     return (
@@ -32,6 +32,23 @@ export default function GraphInfoPanel({ onClose }: { onClose: () => void }) {
                     </Tooltip>
                 </div>
             </div>
+            <div className="flex flex-col gap-2">
+                <div className="flex gap-2 items-center">
+                    <h2>Memory Usage:</h2>
+                    {
+                        MemoryUsage.get("total_graph_sz_mb") !== undefined
+                            ? <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <p className="truncate pointer-events-auto text-1.5xl SofiaSans">{MemoryUsage.get("total_graph_sz_mb")} MB</p>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                    {MemoryUsage.get("total_graph_sz_mb")} MB
+                                </TooltipContent>
+                            </Tooltip>
+                            : <Loader2 className="animate-spin" />
+                    }
+                </div>
+            </div>
             <div className="flex flex-col gap-2 overflow-hidden">
                 <div className="flex gap-2 items-center">
                     <h2>Nodes</h2>
@@ -50,8 +67,7 @@ export default function GraphInfoPanel({ onClose }: { onClose: () => void }) {
                                     {nodesCount}
                                 </TooltipContent>
                             </Tooltip>
-                            :
-                            <Loader2 data-testid="nodesCountLoader" className="animate-spin" />
+                            : <Loader2 data-testid="nodesCountLoader" className="animate-spin" />
                     }
                 </div>
                 <ul className="flex flex-wrap gap-2 p-2 overflow-auto">

@@ -114,6 +114,8 @@ export type DataRow = {
 
 export type Data = DataRow[];
 
+export type MemoryValue = number | Map<string, MemoryValue>
+
 export const DEFAULT_COLORS = [
   "hsl(246, 100%, 70%)",
   "hsl(330, 100%, 70%)",
@@ -159,7 +161,7 @@ export class GraphInfo {
 
   private relationships: Map<string, InfoRelationship>;
 
-  private memoryUsage: Map<string, number>;
+  private memoryUsage: Map<string, MemoryValue>;
 
   private colors: string[];
 
@@ -169,7 +171,7 @@ export class GraphInfo {
     propertyKeys: string[] | undefined,
     labels: Map<string, InfoLabel>,
     relationships: Map<string, InfoRelationship>,
-    memoryUsage: Map<string, number>,
+    memoryUsage: Map<string, MemoryValue>,
     colors?: string[]
   ) {
     this.propertyKeys = propertyKeys;
@@ -195,6 +197,10 @@ export class GraphInfo {
     return this.relationships;
   }
 
+  get MemoryUsage(): Map<string, MemoryValue> {
+    return this.memoryUsage;
+  }
+
   get Colors(): string[] {
     return this.colors;
   }
@@ -211,7 +217,7 @@ export class GraphInfo {
 
   public static empty(
     propertyKeys?: string[],
-    memoryUsage?: Map<string, number>,
+    memoryUsage?: Map<string, MemoryValue>,
     colors?: string[]
   ): GraphInfo {
     return new GraphInfo(
@@ -227,7 +233,7 @@ export class GraphInfo {
     propertyKeys: string[],
     labels: string[],
     relationships: string[],
-    memoryUsage: Map<string, number>,
+    memoryUsage: Map<string, MemoryValue>,
     colors?: string[]
   ): GraphInfo {
     const graphInfo = GraphInfo.empty(propertyKeys, memoryUsage, colors);
