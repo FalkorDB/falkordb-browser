@@ -21,12 +21,16 @@ export async function GET(
     const { client, user } = session;
     const { graph: graphId } = await params;
 
+    console.log(`[NODES_COUNT] Starting nodes count for graph: ${graphId}`);
+
     try {
       const graph = client.selectGraph(graphId);
 
       // Execute nodes count query
       const nodesQuery = "MATCH (n) RETURN count(n) as nodes";
+      console.log(`[NODES_COUNT] Running query for graph: ${graphId}`);
       const nodesResult = await runQuery(graph, nodesQuery, user.role);
+      console.log(`[NODES_COUNT] Query complete for graph: ${graphId}`, nodesResult);
 
       if (!nodesResult) throw new Error("Something went wrong");
 

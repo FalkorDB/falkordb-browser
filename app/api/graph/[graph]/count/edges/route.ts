@@ -21,12 +21,16 @@ export async function GET(
     const { client, user } = session;
     const { graph: graphId } = await params;
 
+    console.log(`[EDGES_COUNT] Starting edges count for graph: ${graphId}`);
+
     try {
       const graph = client.selectGraph(graphId);
 
       // Execute edges count query
       const edgesQuery = "MATCH ()-[e]->() RETURN count(e) as edges";
+      console.log(`[EDGES_COUNT] Running query for graph: ${graphId}`);
       const edgesResult = await runQuery(graph, edgesQuery, user.role);
+      console.log(`[EDGES_COUNT] Query complete for graph: ${graphId}`, edgesResult);
 
       if (!edgesResult) throw new Error("Something went wrong");
 

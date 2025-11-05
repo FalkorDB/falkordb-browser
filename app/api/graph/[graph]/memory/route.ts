@@ -16,8 +16,12 @@ export async function GET(
     const { client } = session;
     const { graph } = await params;
 
+    console.log(`[MEMORY] Starting memory usage request for graph: ${graph}`);
+
     try {
-      const result = await client.selectGraph(graph).memoryUsage()
+      console.log(`[MEMORY] About to call memoryUsage() for graph: ${graph}`);
+      const result = await client.selectGraph(graph).memoryUsage();
+      console.log(`[MEMORY] Successfully got memory usage for graph: ${graph}`, result);
       
       return NextResponse.json({ result }, { status: 200 });
     } catch (err) {
