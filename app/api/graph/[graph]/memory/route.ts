@@ -16,12 +16,12 @@ export async function GET(
     const { client } = session;
     const { graph } = await params;
 
-    console.log(`[MEMORY] Starting memory usage request for graph: ${graph}`);
-
     try {
-      console.log(`[MEMORY] About to call memoryUsage() for graph: ${graph}`);
-      const result = await client.selectGraph(graph).memoryUsage();
-      console.log(`[MEMORY] Successfully got memory usage for graph: ${graph}`, result);
+      // Use direct Redis command instead of client.selectGraph(graph).memoryUsage()
+      // The memoryUsage() method causes "Socket closed unexpectedly" after multiple calls in CI
+      // See logs: works for first 2 calls, crashes on 3rd call
+      const connection = await client.connection;
+      const result = await connection.sendCommand(["GRAPH.MEMORY", "USAGE", graph]);
       
       return NextResponse.json({ result }, { status: 200 });
     } catch (err) {
