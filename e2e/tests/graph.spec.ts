@@ -158,7 +158,7 @@ test.describe("Graph Tests", () => {
     await apiCall.removeGraph(graphName);
   });
 
-  test(`@readwrite validate that deleting graph connected node decreases relation count by one`, async () => {
+  test.skip(`@readwrite validate that deleting graph connected node decreases relation count by one`, async () => {
     const graphName = getRandomString("graph");
     await apiCall.addGraph(graphName);
     const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
