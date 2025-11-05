@@ -70,40 +70,6 @@ export default class BrowserWrapper {
 
     async closePage() {
         if (this.page) {
-            try {
-                // Log interval count before cleanup
-                const intervalCount = await this.page.evaluate(() => {
-                    const maxIntervalId = setInterval(() => {}, 0) as unknown as number;
-                    clearInterval(maxIntervalId);
-                    return maxIntervalId;
-                }).catch(() => 0);
-                
-                // eslint-disable-next-line no-console
-                console.log(`[CLEANUP] Clearing ${intervalCount} intervals before closing page`);
-                
-                // Navigate to about:blank first to stop all running code
-                await this.page.goto('about:blank', { waitUntil: 'domcontentloaded', timeout: 1000 }).catch(() => {});
-                
-                // Clear all intervals and timeouts before closing to prevent accumulation across tests
-                await this.page.evaluate(() => {
-                    // Clear all intervals (handles the polling intervals from graph page)
-                    const maxIntervalId = setInterval(() => {}, 0) as unknown as number;
-                    for (let i = 1; i <= maxIntervalId; i += 1) {
-                        clearInterval(i);
-                    }
-                    
-                    // Also clear all timeouts
-                    const maxTimeoutId = setTimeout(() => {}, 0) as unknown as number;
-                    for (let i = 1; i <= maxTimeoutId; i += 1) {
-                        clearTimeout(i);
-                    }
-                }).catch(() => {
-                    // Ignore errors if page is already closed/destroyed
-                });
-            } catch (e) {
-                // Ignore any errors during cleanup
-            }
-            
             await this.page.close();
             this.page = null;
         }
