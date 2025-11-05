@@ -51,7 +51,7 @@ export type ReadOnlyCell = {
 
 export type LazyCell = {
   value?: string;
-  loadCell: () => Promise<string>
+  loadCell: () => Promise<string>;
   type: "readonly";
 };
 
@@ -253,7 +253,7 @@ export const getMemoryUsage = async (
   setIndicator: (indicator: "online" | "offline") => void
 ): Promise<Map<string, MemoryValue>> => {
   const result = await securedFetch(
-    `api/graph/${name}/memory`,
+    `api/graph/${prepareArg(name)}/memory`,
     {
       method: "GET",
     },
