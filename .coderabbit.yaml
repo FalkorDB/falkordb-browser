@@ -1,0 +1,52 @@
+# CodeRabbit AI Configuration
+# Documentation: https://docs.coderabbit.ai/guides/configure-coderabbit/
+
+# Language settings
+language: en-US
+
+# Early access features
+early_access: false
+
+# Enable reviews for all PRs regardless of target branch
+reviews:
+  # Request changes workflow - CodeRabbit can request changes on PRs
+  request_changes_workflow: false
+  
+  # High level summary
+  high_level_summary: true
+  
+  # Poem style summary (optional, can be disabled)
+  poem: true
+  
+  # Review status - enable reviews
+  review_status: true
+  
+  # Collapse walkthrough on PR
+  collapse_walkthrough: false
+  
+  # Auto-review settings
+  auto_review:
+    enabled: true
+    # Review all PRs regardless of base branch (use regex pattern)
+    base_branches:
+      - ".*"  # This regex matches any branch name
+    drafts: false  # Set to true if you want to review draft PRs too
+  
+  # Path-based instructions for more context-aware reviews
+  path_instructions:
+    - path: "**/*.ts"
+      instructions: "Review TypeScript code for type safety, proper error handling, and Next.js best practices."
+    - path: "**/*.tsx"
+      instructions: "Review React components for proper hooks usage, accessibility, and performance."
+    - path: "e2e/**/*"
+      instructions: "Review test code for proper assertions, test coverage, and maintainability."
+    - path: "**/api/**/*"
+      instructions: "Review API routes for security, error handling, and proper HTTP status codes."
+
+# Chat features
+chat:
+  # Auto-reply to questions
+  auto_reply: true
+
+# Tone of reviews
+tone_instructions: "Be concise, professional, and constructive. Suggest PR titles using conventional commit format (feat:, fix:, docs:, refactor:, test:, chore:)."
