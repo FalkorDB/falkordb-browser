@@ -17,11 +17,7 @@ export async function GET(
     const { graph } = await params;
 
     try {
-      // Use direct Redis command instead of client.selectGraph(graph).memoryUsage()
-      // The memoryUsage() method causes "Socket closed unexpectedly" after multiple calls in CI
-      // See logs: works for first 2 calls, crashes on 3rd call
-      const connection = await client.connection;
-      const result = await connection.sendCommand(["GRAPH.MEMORY", "USAGE", graph]);
+      const result = await client.selectGraph(graph).memoryUsage()
       
       return NextResponse.json({ result }, { status: 200 });
     } catch (err) {
