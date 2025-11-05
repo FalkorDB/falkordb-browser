@@ -70,8 +70,16 @@ export default class BrowserWrapper {
 
     async closePage() {
         if (this.page) {
+            // Clear all intervals before closing to prevent accumulation across tests
+            await this.page.evaluate(() => {
+                // Clear all intervals (handles the polling intervals from graph page)
+                const maxIntervalId = setInterval(() => {}, 0) as unknown as number;
+                for (let i = 1; i <= maxIntervalId; i += 1) {
+                    clearInterval(i);
+                }
+            });
+            
             await this.page.close();
-        } else {
             this.page = null;
         }
     }

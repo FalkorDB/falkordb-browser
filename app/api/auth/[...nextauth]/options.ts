@@ -150,34 +150,13 @@ export async function newClient(
   client.on("error", (err) => {
     // Close coonection on error and remove from connections map
     // eslint-disable-next-line no-console
-    console.error("=== FalkorDB Client Error ===");
-    // eslint-disable-next-line no-console
-    console.error("Error:", err);
-    // eslint-disable-next-line no-console
-    console.error("Error message:", err.message);
-    // eslint-disable-next-line no-console
-    console.error("Error stack:", err.stack);
-    // eslint-disable-next-line no-console
-    console.error("Connection ID:", id);
-    // eslint-disable-next-line no-console
-    console.error("Active connections:", connections.size);
-    // eslint-disable-next-line no-console
-    console.error("=============================");
-    
+    console.error("FalkorDB Client Error", err);
     const connection = connections.get(id);
     if (connection) {
       connections.delete(id);
       connection.close().catch((e) => {
         // eslint-disable-next-line no-console
-        console.error("=== FalkorDB Client Disconnect Error ===");
-        // eslint-disable-next-line no-console
-        console.error("Error during disconnect:", e);
-        // eslint-disable-next-line no-console
-        console.error("Error message:", e.message);
-        // eslint-disable-next-line no-console
-        console.error("Error stack:", e.stack);
-        // eslint-disable-next-line no-console
-        console.error("========================================");
+        console.warn("FalkorDB Client Disconnect Error", e);
       });
     }
   });
