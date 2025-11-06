@@ -33,7 +33,7 @@ export default class GraphPage extends Page {
   }
 
   public get clearEditor(): Locator {
-    return this.page.getByTestId(`editorContainer`);
+    return this.page.getByTestId(`clearEditor`);
   }
 
   public get editorRun(): Locator {
