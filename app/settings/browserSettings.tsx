@@ -305,7 +305,7 @@ export default function BrowserSettings() {
                             id="refreshInterval"
                             className="w-1/3"
                             min={5}
-                            max={60}
+                            max={600}
                             value={[newRefreshInterval]}
                             onValueChange={(value) => createChangeHandler(setNewRefreshInterval)(value[value.length - 1], "refreshInterval")}
                         />

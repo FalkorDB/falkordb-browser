@@ -272,14 +272,13 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
     try {
       setIsQueryLoading(true)
 
-      const [query, existingLimit] = getQueryWithLimit(q, limit)
-      const url = `api/graph/${prepareArg(n)}?query=${prepareArg(query)}&timeout=${timeout}`;
-
       setHistoryQuery(prev => ({
         ...prev,
         query: q,
       }))
 
+      const [query, existingLimit] = getQueryWithLimit(q, limit)
+      const url = `api/graph/${prepareArg(n)}?query=${prepareArg(query)}&timeout=${timeout}`;
       const result = await getSSEGraphResult(url, toast, setIndicator);
 
       if (!result) throw new Error()
@@ -387,7 +386,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
     setRunDefaultQuery(localStorage.getItem("runDefaultQuery") !== "false")
     setContentPersistence(localStorage.getItem("contentPersistence") !== "false");
     setTutorialOpen(localStorage.getItem("tutorial") !== "false")
-    setRefreshInterval(Number(localStorage.getItem("refreshInterval") || 10))
+    setRefreshInterval(Number(localStorage.getItem("refreshInterval") || 30))
   }, [status])
 
   const panelSize = useMemo(() => isCollapsed ? 0 : 15, [isCollapsed])
