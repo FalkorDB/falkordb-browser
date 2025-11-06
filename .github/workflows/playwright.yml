@@ -133,7 +133,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: playwright-report-part-1
-          path: playwright-report/
+          path: |
+            nextjs.log
+            playwright-report/
           retention-days: 30
 
   test-part-2:
@@ -188,7 +190,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: playwright-report-part-2
-          path: playwright-report/
+          path: |
+            nextjs.log
+            playwright-report/
           retention-days: 30
 
   run-settings-tests:
@@ -245,7 +249,9 @@ jobs:
         if: always()
         with:
           name: playwright-report-settings
-          path: playwright-report/
+          path: |
+            nextjs.log
+            playwright-report/
           retention-days: 30
 
   run-tls-tests:
@@ -372,7 +378,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: playwright-report-tls
-          path: playwright-report/
+          path: |
+            nextjs.log
+            playwright-report/
           retention-days: 30
 
   run-memoryusage-tests:
@@ -427,7 +435,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: playwright-report-memoryusage
-          path: playwright-report/
+          path: |
+            nextjs.log
+            playwright-report/
           retention-days: 30
 
   run-cluster-tests:
@@ -554,6 +564,8 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: playwright-report-cluster
-          path: playwright-report/
+          path: |
+            nextjs.log
+            playwright-report/
           retention-days: 30
 
