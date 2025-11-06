@@ -211,6 +211,7 @@ test.describe("Graph Info Panel Tests", () => {
     const graph = await browser.createNewPage(GraphInfoPage, urls.graphUrl);
     await browser.setPageToFullScreen();
     await graph.selectGraphByName(graphName);
+    await graph.waitForCanvasAnimationToEnd()
     await graph.openGraphInfoButton();
     expect(await graph.isGraphInfoPanelVisible()).toBeTruthy();
     await graph.clickGraphInfoButton();

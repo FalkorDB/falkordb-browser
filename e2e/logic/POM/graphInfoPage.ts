@@ -7,8 +7,7 @@ import {
 import GraphPage from "./graphPage";
 
 export default class GraphInfoPage extends GraphPage {
-  // GRAPH INFO PANEL
-  private get graphInfoPanel(): Locator {
+  private get graphInfoPanelContainer(): Locator {
     return this.page.getByTestId("graphInfoPanel");
   }
 
@@ -45,7 +44,10 @@ export default class GraphInfoPage extends GraphPage {
   }
 
   async isGraphInfoPanelVisible(): Promise<boolean> {
-    return waitForElementToBeVisible(this.graphInfoPanel);
+    const isCollapsed =
+      (await this.graphInfoPanelContainer.getAttribute("data-panel-size")) ===
+      "0.0";
+    return !isCollapsed;
   }
 
   async clickGraphInfoButton(): Promise<void> {
@@ -58,7 +60,7 @@ export default class GraphInfoPage extends GraphPage {
 
   async openGraphInfoButton(): Promise<void> {
     if (await this.isGraphInfoPanelVisible()) return;
-    
+
     await interactWhenVisible(
       this.graphInfoButton,
       (el) => el.click(),

@@ -613,6 +613,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
                               maxSize={30}
                               onCollapse={() => setIsCollapsed(true)}
                               onExpand={() => setIsCollapsed(false)}
+                              data-testid="graphInfoPanel"
                             >
                               <GraphInfoPanel
                                 onClose={onExpand}

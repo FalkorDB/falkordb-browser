@@ -10,7 +10,7 @@ export default function GraphInfoPanel({ onClose }: { onClose: () => void }) {
     const { isQueryLoading } = useContext(QueryLoadingContext)
 
     return (
-        <div data-testid="graphInfoPanel" className={cn(`relative h-full w-full p-6 grid grid-rows-[max-content_max-content_minmax(0,max-content)_minmax(0,max-content)_minmax(0,max-content)] gap-8 border-r border-border`)}>
+        <div className={cn(`relative h-full w-full p-6 grid grid-rows-[max-content_max-content_minmax(0,max-content)_minmax(0,max-content)_minmax(0,max-content)] gap-8 border-r border-border`)}>
             <Button
                 className="absolute top-2 right-2"
                 title="Close"
