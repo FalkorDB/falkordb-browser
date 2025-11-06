@@ -182,11 +182,11 @@ test.describe("Graph Info Panel Tests", () => {
     await graph.insertQuery(CREATE_QUERY);
     await graph.clickRunQuery();
     await graph.openGraphInfoButton();
-    expect(await graph.isGraphInfoNodeButtonVisible("person2")).toBeFalsy();
+    expect(await graph.isGraphInfoNodeButtonNotVisible("person3")).toBeTruthy();
     await graph.clickClearEditorInput();
-    await graph.insertQuery("CREATE (d:person2 { name: 'Diana' })");
-    await graph.clickRunQuery();
-    expect(await graph.isGraphInfoNodeButtonVisible("person2")).toBeTruthy();
+    await graph.insertQuery("CREATE (d:person3 { name: 'Diana' })");
+    await graph.clickRunQuery(false);
+    expect(await graph.isGraphInfoNodeButtonVisible("person3")).toBeTruthy();
     await apiCall.removeGraph(graphName);
   });
 

@@ -2,6 +2,7 @@ import { Locator } from "@playwright/test";
 import {
   waitForElementToBeVisible,
   interactWhenVisible,
+  waitForElementToNotBeVisible,
 } from "@/e2e/infra/utils";
 import GraphPage from "./graphPage";
 
@@ -130,6 +131,10 @@ export default class GraphInfoPage extends GraphPage {
 
   async isGraphInfoNodeButtonVisible(label: string): Promise<boolean> {
     return waitForElementToBeVisible(this.graphInfoNodeButton(label));
+  }
+
+  async isGraphInfoNodeButtonNotVisible(label: string): Promise<boolean> {
+    return waitForElementToNotBeVisible(this.graphInfoNodeButton(label));
   }
 
   async isGraphInfoEdgeButtonVisible(relationship: string): Promise<boolean> {

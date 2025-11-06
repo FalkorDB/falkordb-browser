@@ -680,6 +680,7 @@ export default function EditorComponent({ graph, graphName, historyQuery, maximi
                     {
                         historyQuery.query &&
                         <Button
+                            data-testid="clearEditor"
                             title="Clear"
                             onClick={() => {
                                 setHistoryQuery(prev => ({

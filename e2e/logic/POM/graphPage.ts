@@ -180,7 +180,7 @@ export default class GraphPage extends Page {
     await interactWhenVisible(
       this.clearEditor,
       (el) => el.click(),
-      "Editor Input"
+      "Clear Editor Input"
     );
   }
 
