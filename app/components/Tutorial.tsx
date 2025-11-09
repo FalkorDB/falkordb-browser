@@ -754,19 +754,23 @@ function Tutorial({ open, onClose, onLoadDemoGraphs, onCleanupDemoGraphs }: Tuto
 
     // Load demo graphs when tutorial opens and auto-advance to step 1
     useEffect(() => {
-        if (open && step === 0 && !demoLoaded && onLoadDemoGraphs) {
-            onLoadDemoGraphs()
-                .then(() => {
-                    setDemoLoaded(true);
-                    // Auto-advance to the welcome step after loading
-                    setStep(1);
-                })
-                .catch(() => {
-                    // On error, still advance but graphs won't be loaded
-                    setStep(1);
-                });
+        if (open && step === 0 && !demoLoaded) {
+            if (onLoadDemoGraphs) {
+                onLoadDemoGraphs()
+                    .then(() => {
+                        setDemoLoaded(true);
+                        // Auto-advance to the welcome step after loading
+                        setStep(1);
+                    })
+                    .catch(() => {
+                        onClose();
+                    });
+            } else {
+                // If no demo loader provided, just advance to step 1
+                setStep(1);
+            }
         }
-    }, [open, step, demoLoaded, onLoadDemoGraphs]);
+    }, [open, step, demoLoaded, onLoadDemoGraphs, onClose]);
 
     const handleNextStep = () => {
         setStep(prev => Math.min(prev + 1, tutorialSteps.length - 1));

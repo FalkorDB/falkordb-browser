@@ -321,7 +321,11 @@ export default function TableComponent({
                     {
                         visibleRows.map((row) => {
                             const actualIndex = rows.findIndex(r => r === row)
-                            const dataTestID = `${label}${typeof row.cells[0].value === "object" ? row.cells[0].value?.id : row.cells[0].value}`
+                            const firstVal = row.cells[0].value
+
+                            if (!firstVal) return undefined
+                            
+                            const dataTestID = `${label}${typeof firstVal === "object" ? firstVal.id : firstVal}`
 
                             if (actualIndex === -1) return null
 
