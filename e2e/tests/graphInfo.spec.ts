@@ -217,8 +217,12 @@ test.describe("Graph Info Panel Tests", () => {
     expect(await graph.isGraphInfoPanelVisible()).toBeFalsy();
     await apiCall.removeGraph(graphName);
   });
-
+  
   test(`@readwrite Validate graph info panel is not visible when no graph is selected`, async () => {
+    const graphName1 = getRandomString("graph");
+    const graphName2 = getRandomString("graph");
+    await apiCall.addGraph(graphName1);
+    await apiCall.addGraph(graphName2);
     const graph = await browser.createNewPage(GraphInfoPage, urls.graphUrl);
     await browser.setPageToFullScreen();
     expect(await graph.isGraphInfoPanelVisible()).toBeFalsy();
