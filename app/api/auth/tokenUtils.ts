@@ -1,5 +1,28 @@
+import { NextResponse } from "next/server";
 import { jwtVerify } from "jose";
 import crypto from "crypto";
+import { executePATQuery } from "@/lib/token-storage";
+
+/**
+ * Validates JWT secret exists in environment
+ */
+export function validateJWTSecret(): { valid: boolean; secret?: Uint8Array; error?: NextResponse } {
+  if (!process.env.NEXTAUTH_SECRET) {
+    // eslint-disable-next-line no-console
+    console.error("NEXTAUTH_SECRET environment variable is required");
+    return {
+      valid: false,
+      error: NextResponse.json(
+        { message: "Server configuration error" },
+        { status: 500 }
+      ),
+    };
+  }
+  return {
+    valid: true,
+    secret: new TextEncoder().encode(process.env.NEXTAUTH_SECRET),
+  };
+}
 
 // Helper function to get token ID (jti or sub + iat)
 export function getTokenId(payload: Record<string, unknown>): string {
@@ -7,10 +30,9 @@ export function getTokenId(payload: Record<string, unknown>): string {
   return (payload.jti as string) || `${payload.sub}-${payload.iat}`;
 }
 
-// Helper function to check if a token is active using Admin connection
+// Helper function to check if a token is active using FalkorDB PAT instance
 export async function isTokenActive(
-  token: string,
-  adminConnection?: { get: (key: string) => Promise<string | null>; setEx: (key: string, ttl: number, value: string) => Promise<string | void> }
+  token: string
 ): Promise<boolean> {
   try {
     if (!process.env.NEXTAUTH_SECRET) {
@@ -22,42 +44,47 @@ export async function isTokenActive(
     // Verify the JWT is valid
     await jwtVerify(token, JWT_SECRET);
     
-    // Fail-closed: without admin connection we cannot validate revocation
-    if (!adminConnection) {
-      return false;
-    }
-    
     // Hash the token to match storage format
     const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
     
-    // Check if token exists in Redis
-    const tokenData = await adminConnection.get(`api_token:${tokenHash}`);
+    // Check if token exists in FalkorDB and is active
+    const query = `
+      MATCH (t:Token {token_hash: $tokenHash})
+      WHERE t.is_active = true 
+        AND (t.expires_at IS NULL OR t.expires_at > $now)
+      RETURN t.token_id as token_id, t.last_used as last_used
+    `;
     
-    if (!tokenData) {
-      return false; // Token not found, consider it revoked or expired
+    const now = Math.floor(Date.now() / 1000); // Unix timestamp
+    const result = await executePATQuery(query, { tokenHash, now });
+    
+    if (!result || !result.data || result.data.length === 0) {
+      return false; // Token not found, expired, or revoked
     }
     
-    // Token exists, update last_used timestamp (throttled to avoid excessive writes)
+    // Token exists and is active, update last_used timestamp (throttled)
     try {
       const UPDATE_THRESHOLD_MS = 5 * 60 * 1000; // 5 minutes
-      const data = JSON.parse(tokenData);
-      const lastUsed = data.last_used ? new Date(data.last_used).getTime() : 0;
-      const now = Date.now();
+      // FalkorDB returns objects, not arrays
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const tokenData = result.data[0] as any;
+      const lastUsed = tokenData.last_used ? tokenData.last_used * 1000 : 0; // Convert to ms
+      const nowMs = Date.now();
       
       // Only update if more than 5 minutes have passed since last update
-      if (now - lastUsed > UPDATE_THRESHOLD_MS) {
-        data.last_used = new Date(now).toISOString();
+      if (nowMs - lastUsed > UPDATE_THRESHOLD_MS) {
+        const nowUnix = Math.floor(nowMs / 1000);
+        const updateQuery = `
+          MATCH (t:Token {token_hash: $tokenHash})
+          SET t.last_used = $nowUnix
+        `;
         
-        // Update Redis preserving the original TTL (1 year + 1 day grace period)
-        // Use setEx with original TTL of 31622400 seconds (366 days)
-        await adminConnection.setEx(
-          `api_token:${tokenHash}`,
-          31622400, // 1 year + 1 day TTL (preserves grace period)
-          JSON.stringify(data)
-        );
+        await executePATQuery(updateQuery, { tokenHash, nowUnix });
       }
-    } catch (parseError) {
-      // If we can't parse or update, still consider token active if it exists
+    } catch (updateError) {
+      // If we can't update, still consider token active if it exists
+      // eslint-disable-next-line no-console
+      console.warn("Failed to update last_used timestamp:", updateError);
     }
     
     return true;

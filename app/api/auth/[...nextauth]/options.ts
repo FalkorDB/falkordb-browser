@@ -1,5 +1,3 @@
-/* eslint-disable max-classes-per-file */
-/* eslint-disable no-param-reassign */
 import { FalkorDB } from "falkordb";
 import CredentialsProvider from "next-auth/providers/credentials";
 import { AuthOptions, Role, User, getServerSession } from "next-auth";
@@ -8,6 +6,7 @@ import { FalkorDBOptions } from "falkordb/dist/src/falkordb";
 import { v4 as uuidv4 } from "uuid";
 import crypto from "crypto";
 import { isTokenActive } from "../tokenUtils";
+import { decrypt } from "../encryption";
 
 interface CustomJWTPayload {
   sub: string;
@@ -18,6 +17,7 @@ interface CustomJWTPayload {
   tls: boolean;
   ca?: string;
   url?: string;
+  pwd?: string; // Encrypted password for connection recreation
 }
 
 interface AuthenticatedUser {
@@ -55,6 +55,7 @@ export async function getAdminConnectionForTokens(
       await connection.ping();
       return adminConnectionForTokens;
     } catch (err) {
+      // eslint-disable-next-line no-console
       console.warn("Admin token connection is dead, recreating:", err);
       adminConnectionForTokens = null;
     }
@@ -92,6 +93,7 @@ export async function getAdminConnectionForTokens(
   } catch (err) {
     throw new Error("Failed to create admin connection for token management. The default user must have admin privileges.");
   }
+
   return adminConnectionForTokens;
 }
 
@@ -211,6 +213,36 @@ export function generateConsistentUserId(
 }
 
 /**
+ * Creates a new FalkorDB connection from JWT payload
+ * Decrypts the password from the JWT and establishes connection
+ * @param payload - JWT payload containing encrypted credentials
+ * @returns FalkorDB client instance
+ */
+async function createConnectionFromJWT(payload: CustomJWTPayload): Promise<FalkorDB> {
+  // Decrypt password from JWT
+  if (!payload.pwd) {
+    throw new Error('JWT does not contain encrypted password. Cannot create connection.');
+  }
+  
+  const password = decrypt(payload.pwd);
+  
+  // Create connection using newClient
+  const { client } = await newClient(
+    {
+      host: payload.host,
+      port: payload.port.toString(),
+      username: payload.username || '',
+      password,
+      tls: payload.tls.toString(),
+      ca: payload.ca || undefined,
+    },
+    payload.sub
+  );
+  
+  return client;
+}
+
+/**
  * Retrieves the Authorization header from the request
  */
 async function getAuthorizationHeader(): Promise<string | null> {
@@ -287,28 +319,61 @@ async function tryJWTAuthentication(): Promise<{ client: FalkorDB; user: Authent
       if (!isValidJWTPayload(payload)) {
         return null;
       }
-      // Check for existing connection first
-      const existingConnection = connections.get(payload.sub);
-      if (existingConnection) {
-        // SSRF Protection: Validate that token host/port match the connection we're reusing
-        // This prevents attackers from using valid tokens to probe internal networks
-        // Note: We trust payload.host/port here because they were validated during initial login
-        // and the connection already exists in our Map
-        const adminClient = await getAdminConnectionForTokens(payload.host, payload.port, payload.tls, payload.ca);
-        const adminConnection = await adminClient.connection;
-        const tokenActive = await isTokenActive(token, adminConnection);
-        if (!tokenActive) {
+
+      // Validate token is active in FalkorDB (not revoked)
+      const tokenActive = await isTokenActive(token);
+      
+      if (!tokenActive) {
+        // eslint-disable-next-line no-console
+        console.warn("JWT authentication failed: token is not active (revoked or expired)");
+        return null;
+      }
+
+      // Try to reuse existing connection (performance optimization)
+      let client = connections.get(payload.sub);
+
+      if (client) {
+        // Health check: verify connection is still alive
+        try {
+          const connection = await client.connection;
+          await connection.ping();
+          
+          // Connection is healthy, reuse it
+          const user = createUserFromJWTPayload(payload);
+          return { client, user };
+        } catch (pingError) {
+          // Connection is dead, remove from pool and recreate
           // eslint-disable-next-line no-console
-          console.warn("JWT authentication failed: token is not active (revoked or expired)");
+          console.warn("Connection health check failed, recreating:", pingError);
+          connections.delete(payload.sub);
+          
+          try {
+            await client.close();
+          } catch (closeError) {
+            // Ignore close errors on dead connections
+          }
+          
+          client = undefined; // Will be recreated below
+        }
+      }
+
+      // No existing connection or health check failed - create new connection from JWT
+      if (!client) {
+        // eslint-disable-next-line no-console
+        console.log("Creating new FalkorDB connection from JWT for user:", payload.sub);
+        
+        try {
+          client = await createConnectionFromJWT(payload);
+          // Connection is already cached in connections Map by newClient()
+        } catch (connectionError) {
+          // eslint-disable-next-line no-console
+          console.error("Failed to create connection from JWT:", connectionError);
           return null;
         }
-        // Reuse existing JWT connection
-        const user = createUserFromJWTPayload(payload);
-        return { client: existingConnection, user };
       }
-      // eslint-disable-next-line no-console
-      console.warn("JWT authentication failed: no existing connection for user", payload.sub);
-      return null;
+
+      const user = createUserFromJWTPayload(payload);
+      return { client, user };
     } catch (error) {
       // Fall back to session auth if JWT fails
       // eslint-disable-next-line no-console
