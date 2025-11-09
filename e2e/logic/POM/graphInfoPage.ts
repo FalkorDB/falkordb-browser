@@ -44,6 +44,7 @@ export default class GraphInfoPage extends GraphPage {
   }
 
   async isGraphInfoPanelVisible(): Promise<boolean> {
+    console.log(await this.graphInfoPanelContainer.getAttribute("data-panel-size"));
     const isCollapsed =
       (await this.graphInfoPanelContainer.getAttribute("data-panel-size")) ===
       "0.0";
