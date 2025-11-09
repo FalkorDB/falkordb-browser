@@ -11,7 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Editor } from "@monaco-editor/react";
 import { useTheme } from "next-themes";
 import Button from "../components/ui/Button";
-import { GraphContext, IndicatorContext } from "../components/provider";
+import { BrowserSettingsContext, GraphContext, IndicatorContext } from "../components/provider";
 import EditorComponent, { setTheme } from "../components/EditorComponent";
 import DialogComponent from "../components/DialogComponent";
 import Toolbar from "./toolbar";
@@ -95,6 +95,7 @@ export default function Selector<T extends "Graph" | "Schema" = "Graph" | "Schem
 }: Props<T>) {
 
     const { indicator } = useContext(IndicatorContext)
+    const { tutorialOpen } = useContext(BrowserSettingsContext)
     const { graphNames } = useContext(GraphContext)
 
     const { theme } = useTheme()
@@ -154,7 +155,7 @@ export default function Selector<T extends "Graph" | "Schema" = "Graph" | "Schem
 
         if (filters.some(name => name === graphName) && graphName) {
             setActiveFilters([graphName]);
-            
+
             const newFilteredQueries = [
                 ...historyQuery.queries.filter(({ graphName: n }) => graphName === n)
             ].reverse()
@@ -292,6 +293,8 @@ export default function Selector<T extends "Graph" | "Schema" = "Graph" | "Schem
                             {separator}
                             <div className="flex gap-4 items-center">
                                 <DialogComponent
+                                    label="queryHistory"
+                                    preventOutsideClose={tutorialOpen}
                                     className="h-[90dvh] w-[90dvw]"
                                     open={queriesOpen}
                                     tabIndex={-1}
