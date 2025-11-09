@@ -226,6 +226,8 @@ test.describe("Graph Info Panel Tests", () => {
     const graph = await browser.createNewPage(GraphInfoPage, urls.graphUrl);
     await browser.setPageToFullScreen();
     expect(await graph.isGraphInfoPanelVisible()).toBeFalsy();
+    await apiCall.removeGraph(graphName1);
+    await apiCall.removeGraph(graphName2);
   });
 
   test(`@readwrite Validate graph info panel updates in real-time after deleting nodes`, async () => {
