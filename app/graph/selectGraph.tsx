@@ -28,6 +28,19 @@ interface Props {
     setGraph: (graph: Graph) => void
 }
 
+/**
+ * Renders a selectable and manageable list of Graph or Schema entities with creation, export, duplicate and delete controls.
+ *
+ * Renders a dropdown for selecting an existing graph/schema and a management dialog that lists entries with memory, node, and edge metrics (admin users see editable names). Handles loading of options and per-row metric loaders, selection state, and CRUD interactions.
+ *
+ * @param props.options - Array of graph/schema names shown in the list.
+ * @param props.setOptions - Callback to replace the options array.
+ * @param props.selectedValue - Currently selected graph/schema name.
+ * @param props.setSelectedValue - Callback to update the selected graph/schema name.
+ * @param props.type - Either `"Graph"` or `"Schema"`, used to label UI and API paths.
+ * @param props.setGraph - Callback to set the active Graph model instance when selection changes.
+ * @returns The component's rendered JSX element.
+ */
 export default function SelectGraph({ options, setOptions, selectedValue, setSelectedValue, type, setGraph }: Props) {
 
     const { indicator, setIndicator } = useContext(IndicatorContext)
