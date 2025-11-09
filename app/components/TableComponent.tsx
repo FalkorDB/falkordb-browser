@@ -258,7 +258,7 @@ export default function TableComponent({
                                                     className={getClassName(i, 1)}
                                                     title="Expand Root"
                                                     onClick={() => {
-                                                        const newExpandArr = new Map(expandArr.set(i, 1))
+                                                        const newExpandArr = new Map(expandArr).set(i, 1)
                                                         setExpandArr(newExpandArr)
                                                         
                                                         if (onExpandChange) onExpandChange(newExpandArr)
@@ -270,7 +270,7 @@ export default function TableComponent({
                                                     title="Expand All"
                                                     className={getClassName(i, -1)}
                                                     onClick={() => {
-                                                        const newExpandArr = new Map(expandArr.set(i, -1))
+                                                        const newExpandArr = new Map(expandArr).set(i, -1)
                                                         setExpandArr(newExpandArr)
                                                         
                                                         if (onExpandChange) onExpandChange(newExpandArr)
@@ -282,8 +282,8 @@ export default function TableComponent({
                                                     title="Collapse All"
                                                     className={getClassName(i)}
                                                     onClick={() => {
-                                                        expandArr.delete(i)
                                                         const newExpandArr = new Map(expandArr)
+                                                        newExpandArr.delete(i)
                                                         setExpandArr(newExpandArr)
                                                         
                                                         if (onExpandChange) onExpandChange(newExpandArr)
