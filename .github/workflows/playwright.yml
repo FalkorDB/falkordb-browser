@@ -136,6 +136,7 @@ jobs:
           path: |
             nextjs.log
             playwright-report/
+            test-results/
           retention-days: 30
 
   test-part-2:
@@ -193,6 +194,7 @@ jobs:
           path: |
             nextjs.log
             playwright-report/
+            test-results/
           retention-days: 30
 
   run-settings-tests:
@@ -252,6 +254,7 @@ jobs:
           path: |
             nextjs.log
             playwright-report/
+            test-results/
           retention-days: 30
 
   run-tls-tests:
@@ -381,6 +384,7 @@ jobs:
           path: |
             nextjs.log
             playwright-report/
+            test-results/
           retention-days: 30
 
   run-cluster-tests:
@@ -510,5 +514,6 @@ jobs:
           path: |
             nextjs.log
             playwright-report/
+            test-results/
           retention-days: 30
 
