@@ -19,7 +19,7 @@ interface Token {
   created_at: string;
   last_used: string | null;
   expires_at: string | null;
-  permissions: string[];
+  role?: string;
   username: string;
 }
 
@@ -352,7 +352,7 @@ export default function PersonalAccessTokens() {
                         <TableCell>{token.username || "default"}</TableCell>
                       )}
                       {userRole === "Admin" && (
-                        <TableCell>{token.permissions?.[0] || "N/A"}</TableCell>
+                        <TableCell>{token.role || "N/A"}</TableCell>
                       )}
                       <TableCell>{formatDate(token.created_at)}</TableCell>
                       <TableCell>{formatDate(token.last_used)}</TableCell>

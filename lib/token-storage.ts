@@ -41,7 +41,6 @@ export async function getPATFalkorDBClient(): Promise<FalkorDB> {
           host,
           port,
           tls: true,
-          checkServerIdentity: () => undefined,
           ca: ca ? [Buffer.from(ca, "base64").toString("utf8")] : undefined,
         },
         username: username || undefined,
