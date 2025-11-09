@@ -165,7 +165,7 @@ test.describe("Graph Info Panel Tests", () => {
     const initialNodesCount = await graph.getGraphInfoNodesCount();
     await graph.clickClearEditorInput();
     await graph.insertQuery("CREATE (c:person1 { name: 'Charlie' })");
-    await graph.clickRunQuery();
+    await graph.clickRunQuery(false);
     const updatedNodesCount = await graph.getGraphInfoNodesCount();
     expect(parseInt(updatedNodesCount ?? "0", 10)).toBe(
       parseInt(initialNodesCount ?? "0", 10) + 1
@@ -211,7 +211,6 @@ test.describe("Graph Info Panel Tests", () => {
     const graph = await browser.createNewPage(GraphInfoPage, urls.graphUrl);
     await browser.setPageToFullScreen();
     await graph.selectGraphByName(graphName);
-    await graph.waitForCanvasAnimationToEnd()
     await graph.openGraphInfoButton();
     expect(await graph.isGraphInfoPanelVisible()).toBeTruthy();
     await graph.clickGraphInfoButton();
