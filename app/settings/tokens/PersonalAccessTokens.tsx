@@ -51,7 +51,7 @@ export default function PersonalAccessTokens() {
 
   const fetchTokens = useCallback(async () => {
     setLoading(true);
-    const result = await securedFetch("api/auth/tokens", {
+    const result = await securedFetch("/api/auth/tokens", {
       method: "GET",
     }, toast, setIndicator);
 
@@ -132,7 +132,7 @@ export default function PersonalAccessTokens() {
           break;
       }
       
-      const result = await securedFetch("api/auth/login", {
+      const result = await securedFetch("/api/auth/login", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -175,7 +175,7 @@ export default function PersonalAccessTokens() {
   const revokeToken = async (tokenId: string) => {
     setIsRevoking(true);
     try {
-      const result = await securedFetch("api/auth/revoke", {
+      const result = await securedFetch("/api/auth/revoke", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

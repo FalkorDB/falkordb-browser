@@ -82,34 +82,14 @@ export function getPATGraphName(): string {
 /**
  * Executes a Cypher query on the token management graph
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export async function executePATQuery(query: string, params: Record<string, any> = {}) {
+export async function executePATQuery(
+  query: string,
+  params: Record<string, unknown> = {}
+) {
   const client = await getPATFalkorDBClient();
   const graph = client.selectGraph(getPATGraphName());
-  
-  // Replace parameters in query (simple replacement for now)
-  let finalQuery = query;
-  Object.keys(params).forEach((key) => {
-    const value = params[key];
-    let replacement: string;
-    
-    if (value === null || value === undefined) {
-      replacement = "NULL";
-    } else if (typeof value === "string") {
-      // Escape single quotes in strings
-      replacement = `'${value.replace(/'/g, "\\'")}'`;
-    } else if (typeof value === "boolean") {
-      replacement = value ? "true" : "false";
-    } else if (typeof value === "number") {
-      replacement = value.toString();
-    } else {
-      replacement = JSON.stringify(value);
-    }
-    
-    finalQuery = finalQuery.replace(new RegExp(`\\$${key}`, "g"), replacement);
-  });
-  
-  return graph.query(finalQuery);
+
+  return graph.query(query, params);
 }
 
 /**

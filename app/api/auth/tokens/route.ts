@@ -6,9 +6,10 @@ import { getClient } from "../[...nextauth]/options";
  * Builds Cypher query based on user role (Admin sees all, users see own)
  */
 function buildTokenQuery(isAdmin: boolean): string {
-  const baseQuery = `
-    MATCH (t:Token)-[:BELONGS_TO]->(u:User${isAdmin ? '' : ' {username: $username}'})
+  return `
+    MATCH (t:Token)-[:BELONGS_TO]->(u:User)
     WHERE t.is_active = true
+      ${isAdmin ? "" : "AND t.user_id = $userId"}
     RETURN t.token_hash as token_hash,
            t.token_id as token_id,
            t.user_id as user_id,
@@ -22,8 +23,6 @@ function buildTokenQuery(isAdmin: boolean): string {
            t.last_used as last_used
     ORDER BY t.created_at DESC
   `;
-  
-  return baseQuery;
 }
 
 /**
@@ -31,7 +30,8 @@ function buildTokenQuery(isAdmin: boolean): string {
  */
 async function fetchTokens(
   isAdmin: boolean,
-  username: string
+  username: string,
+  userId: string
 ): Promise<{
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   tokens?: any[];
@@ -39,7 +39,7 @@ async function fetchTokens(
 }> {
   try {
     const query = buildTokenQuery(isAdmin);
-    const result = await executePATQuery(query, { username });
+    const result = await executePATQuery(query, { username, userId });
 
     // Transform FalkorDB objects to token objects with ISO timestamps
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -86,7 +86,8 @@ export async function GET() {
     // 3. Fetch tokens from database (with role-based filtering)
     const fetchResult = await fetchTokens(
       isAdmin,
-      authenticatedUser.username || "default"
+      authenticatedUser.username || "default",
+      authenticatedUser.id
     );
 
     if (fetchResult.error) {
