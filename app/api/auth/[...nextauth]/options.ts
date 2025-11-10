@@ -435,6 +435,7 @@ const authOptions: AuthOptions = {
           id: user.id,
           host: user.host,
           port: user.port,
+          password: user.password,
           username: user.username,
           password: user.password,
           tls: user.tls,
