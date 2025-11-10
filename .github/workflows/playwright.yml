@@ -239,15 +239,19 @@ jobs:
             echo "Using cached build artifacts"
           fi
       - name: Run token tests
+        env:
+          NEXTAUTH_SECRET: SECRET
+          PAT_FALKORDB_HOST: localhost
+          PAT_FALKORDB_PORT: 6380
+          PAT_FALKORDB_USERNAME: default
+          PAT_FALKORDB_PASSWORD: ""
+          PAT_FALKORDB_GRAPH_NAME: token_management
+          ENCRYPTION_KEY: "SECRETSECRETSECRETSECRETSECRETSECRETSECRETSECRETSECRETSECRETSE"
         run: |
-          NEXTAUTH_SECRET=SECRET \
-          PAT_FALKORDB_HOST=localhost \
-          PAT_FALKORDB_PORT=6380 \
-          PAT_FALKORDB_USERNAME=default \
-          PAT_FALKORDB_PASSWORD= \
-          PAT_FALKORDB_GRAPH_NAME=token_management \
-          ENCRYPTION_KEY=$(openssl rand -hex 32) \
-          npm start & 
+          npm start &
+          APP_PID=$!
+          echo "Waiting for app to start..."
+          sleep 10
           npx playwright test settingsTokens --reporter=dot,list
       - name: Upload artifacts
         if: always()
