@@ -43,11 +43,13 @@ export default class GraphInfoPage extends GraphPage {
     return this.page.getByTestId("graphInfoToggle");
   }
 
-  async isGraphInfoPanelVisible(): Promise<boolean> {
+  async isGraphInfoPanelContainerVisible(): Promise<boolean> {
+    await this.page.waitForTimeout(1000);
+    // Check the panel container's data-panel-size attribute
     const size = await this.graphInfoPanelContainer.getAttribute("data-panel-size");
-    console.log("Panel data-panel-size:", size); // eslint-disable-line no-console
-    if (size === null || size === undefined) return false;
+    if (!size) return false;
     const sizeNum = parseFloat(size);
+    // Panel is visible if size > 0 (collapsed = 0)
     return !Number.isNaN(sizeNum) && sizeNum > 0;
   }
 
@@ -60,8 +62,7 @@ export default class GraphInfoPage extends GraphPage {
   }
 
   async openGraphInfoButton(): Promise<void> {
-    if (await this.isGraphInfoPanelVisible()) return;
-
+    // Open panel by clicking button - it will auto-expand when graph is selected
     await interactWhenVisible(
       this.graphInfoButton,
       (el) => el.click(),

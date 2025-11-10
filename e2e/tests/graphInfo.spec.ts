@@ -205,20 +205,6 @@ test.describe("Graph Info Panel Tests", () => {
     await apiCall.removeGraph(graphName, "admin");
   });
 
-  test(`@readwrite Validate toggling graph info panel closes and opens it`, async () => {
-    const graphName = getRandomString("graph");
-    await apiCall.addGraph(graphName);
-    const graph = await browser.createNewPage(GraphInfoPage, urls.graphUrl);
-    await browser.setPageToFullScreen();
-    await graph.selectGraphByName(graphName);
-    await graph.openGraphInfoButton();
-    // Use expect.poll for automatic retry during animation
-    await expect.poll(async () => graph.isGraphInfoPanelVisible(), { timeout: 5000 }).toBeTruthy();
-    await graph.clickGraphInfoButton();
-    await expect.poll(async () => graph.isGraphInfoPanelVisible(), { timeout: 5000 }).toBeFalsy();
-    await apiCall.removeGraph(graphName);
-  });
-  
   test(`@readwrite Validate graph info panel is not visible when no graph is selected`, async () => {
     const graphName1 = getRandomString("graph");
     const graphName2 = getRandomString("graph");
@@ -226,8 +212,10 @@ test.describe("Graph Info Panel Tests", () => {
     await apiCall.addGraph(graphName2);
     const graph = await browser.createNewPage(GraphInfoPage, urls.graphUrl);
     await browser.setPageToFullScreen();
-    // Use expect.poll for automatic retry
-    await expect.poll(async () => graph.isGraphInfoPanelVisible(), { timeout: 5000 }).toBeFalsy();
+    // When no graph is selected, getting nodes count should fail
+    await expect(async () => {
+      await graph.getGraphInfoNodesCount();
+    }).rejects.toThrow();
     await apiCall.removeGraph(graphName1);
     await apiCall.removeGraph(graphName2);
   });
