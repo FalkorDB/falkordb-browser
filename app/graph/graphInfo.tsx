@@ -19,18 +19,16 @@ export default function GraphInfoPanel({ onClose }: { onClose: () => void }) {
                 <X className="h-4 w-4" />
             </Button>
             <h1 className="text-2xl">Graph Info</h1>
-            <div className="flex flex-col gap-2">
-                <div className="flex gap-2 items-center">
-                    <h2>Graph Name:</h2>
-                    <Tooltip>
-                        <TooltipTrigger asChild>
-                            <p className="truncate pointer-events-auto text-1.5xl SofiaSans">{graphName}</p>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                            {graphName}
-                        </TooltipContent>
-                    </Tooltip>
-                </div>
+            <div className="flex gap-2 items-center overflow-hidden">
+                <h2>Graph Name:</h2>
+                <Tooltip>
+                    <TooltipTrigger asChild>
+                        <p className="truncate pointer-events-auto text-1.5xl SofiaSans">{graphName}</p>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                        {graphName}
+                    </TooltipContent>
+                </Tooltip>
             </div>
             <div className="flex flex-col gap-2">
                 <div className="flex gap-2 items-center">
