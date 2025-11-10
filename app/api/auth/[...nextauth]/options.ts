@@ -27,7 +27,45 @@ interface AuthenticatedUser {
   ca?: string;
 }
 
-const connections = new Map<string, FalkorDB>();
+// Store connections with timestamp for cleanup
+interface ConnectionEntry {
+  client: FalkorDB;
+  timestamp: number;
+}
+
+const connections = new Map<string, ConnectionEntry>();
+
+// Connection timeout: 2 hours (matches JWT expiration)
+const CONNECTION_TIMEOUT_MS = 2 * 60 * 60 * 1000;
+
+/**
+ * Clean up stale connections that haven't been used recently
+ */
+function cleanupStaleConnections(): void {
+  const now = Date.now();
+  const staleIds: string[] = [];
+
+  connections.forEach((entry, id) => {
+    if (now - entry.timestamp > CONNECTION_TIMEOUT_MS) {
+      staleIds.push(id);
+    }
+  });
+
+  staleIds.forEach((id) => {
+    const entry = connections.get(id);
+    if (entry) {
+      connections.delete(id);
+      entry.client.close().catch(() => {
+        // Ignore errors during cleanup
+      });
+    }
+  });
+}
+
+// Run cleanup every 30 minutes
+if (typeof setInterval !== 'undefined') {
+  setInterval(cleanupStaleConnections, 30 * 60 * 1000);
+}
 
 export async function newClient(
   credentials: {
@@ -67,16 +105,16 @@ export async function newClient(
 
   const client = await FalkorDB.connect(connectionOptions);
 
-  // Save connection in connections map for later use
-  connections.set(id, client);
+  // Save connection in connections map with timestamp for later use
+  connections.set(id, { client, timestamp: Date.now() });
 
   client.on("error", (err) => {
-    // Close coonection on error and remove from connections map
+    // Close connection on error and remove from connections map
     console.error("FalkorDB Client Error", err);
-    const connection = connections.get(id);
-    if (connection) {
+    const entry = connections.get(id);
+    if (entry) {
       connections.delete(id);
-      connection.close().catch((e) => {
+      entry.client.close().catch((e) => {
         console.warn("FalkorDB Client Disconnect Error", e);
       });
     }
@@ -180,12 +218,15 @@ async function tryJWTAuthentication(): Promise<{ client: FalkorDB; user: Authent
       }
 
       // Check for existing connection first
-      const existingConnection = connections.get(payload.sub);
+      const existingEntry = connections.get(payload.sub);
 
-      if (existingConnection) {
+      if (existingEntry) {
+        // Update timestamp to keep connection alive
+        existingEntry.timestamp = Date.now();
+        
         // Reuse existing JWT connection
         const user = createUserFromJWTPayload(payload);
-        return { client: existingConnection, user };
+        return { client: existingEntry.client, user };
       }
 
       // JWT authentication requires an existing connection
@@ -303,11 +344,11 @@ export async function getClient() {
 
   const { user } = session;
 
-  let connection = connections.get(id);
+  let entry = connections.get(id);
 
   // If client is not found, create a new one
-  if (!connection) {
-    const { client } = await newClient(
+  if (!entry) {
+    await newClient(
       {
         host: user.host,
         port: user.port.toString() ?? "6379",
@@ -319,16 +360,17 @@ export async function getClient() {
       user.id
     );
 
-    connection = client;
+    entry = connections.get(id);
   }
 
-  const client = connection;
-
-  if (!client) {
+  if (!entry) {
     return NextResponse.json({ message: "Not authenticated" }, { status: 401 });
   }
 
-  return { client, user };
+  // Update timestamp to keep connection alive
+  entry.timestamp = Date.now();
+  
+  return { client: entry.client, user };
 }
 
 export default authOptions;

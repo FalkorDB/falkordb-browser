@@ -685,31 +685,47 @@ export class Graph {
       });
     });
 
+    // Optimize link curvature calculation by grouping links first
+    const linksByNodePair = new Map<string, Link[]>();
+    
     newElements
       .filter((element): element is Link => "source" in element)
       .forEach((link) => {
         const start = link.source;
         const end = link.target;
-        const sameNodesLinks = this.elements.links.filter(
-          (l) =>
-            (l.source.id === start.id && l.target.id === end.id) ||
-            (l.target.id === start.id && l.source.id === end.id)
-        );
+        
+        // Create a consistent key for node pairs (bidirectional)
+        const key = start.id === end.id 
+          ? `self-${start.id}` 
+          : [start.id, end.id].sort().join('-');
+        
+        if (!linksByNodePair.has(key)) {
+          linksByNodePair.set(key, []);
+        }
+        linksByNodePair.get(key)!.push(link);
+      });
+
+    // Now calculate curves for each group
+    newElements
+      .filter((element): element is Link => "source" in element)
+      .forEach((link) => {
+        const start = link.source;
+        const end = link.target;
+        
+        const key = start.id === end.id 
+          ? `self-${start.id}` 
+          : [start.id, end.id].sort().join('-');
+        
+        const sameNodesLinks = linksByNodePair.get(key) || [];
         let index = sameNodesLinks.findIndex((l) => l.id === link.id);
         index = index === -1 ? 0 : index;
         const even = index % 2 === 0;
         let curve;
 
         if (start.id === end.id) {
-          if (even) {
-            curve = Math.floor(-(index / 2)) - 3;
-          } else {
-            curve = Math.floor((index + 1) / 2) + 2;
-          }
-        } else if (even) {
-          curve = Math.floor(-(index / 2));
+          curve = even ? Math.floor(-(index / 2)) - 3 : Math.floor((index + 1) / 2) + 2;
         } else {
-          curve = Math.floor((index + 1) / 2);
+          curve = even ? Math.floor(-(index / 2)) : Math.floor((index + 1) / 2);
         }
 
         link.curve = curve * 0.4;
@@ -777,13 +793,18 @@ export class Graph {
   }
 
   public visibleLinks(visible: boolean) {
+    // Optimize by creating a Set of node IDs for O(1) lookup instead of O(n) array.includes
+    const nodeIds = new Set(this.elements.nodes.map((n) => n.id));
+    
     this.elements.links.forEach((link) => {
+      const relationship = this.RelationshipsMap.get(link.relationship);
+      
       if (
-        this.RelationshipsMap.get(link.relationship)!.show &&
+        relationship?.show &&
         visible &&
-        this.elements.nodes.map((n) => n.id).includes(link.source.id) &&
+        nodeIds.has(link.source.id) &&
         link.source.visible &&
-        this.elements.nodes.map((n) => n.id).includes(link.target.id) &&
+        nodeIds.has(link.target.id) &&
         link.target.visible
       ) {
         // eslint-disable-next-line no-param-reassign
@@ -792,10 +813,8 @@ export class Graph {
 
       if (
         !visible &&
-        ((this.elements.nodes.map((n) => n.id).includes(link.source.id) &&
-          !link.source.visible) ||
-          (this.elements.nodes.map((n) => n.id).includes(link.target.id) &&
-            !link.target.visible))
+        ((nodeIds.has(link.source.id) && !link.source.visible) ||
+          (nodeIds.has(link.target.id) && !link.target.visible))
       ) {
         // eslint-disable-next-line no-param-reassign
         link.visible = false;
@@ -804,18 +823,23 @@ export class Graph {
   }
 
   public removeLinks(ids: number[] = []): Relationship[] {
+    // Optimize with Set for O(1) lookup instead of O(n) array.includes
+    const idsSet = new Set(ids);
+    const nodeIds = new Set(this.elements.nodes.map((n) => n.id));
+    
     const links = this.elements.links.filter(
-      (link) => ids.includes(link.source.id) || ids.includes(link.target.id)
+      (link) => idsSet.has(link.source.id) || idsSet.has(link.target.id)
     );
+    
+    const linksSet = new Set(links);
 
     this.elements = {
       nodes: this.elements.nodes,
       links: this.elements.links
         .map((link) => {
           if (
-            (ids.length !== 0 && !links.includes(link)) ||
-            (this.elements.nodes.map((n) => n.id).includes(link.source.id) &&
-              this.elements.nodes.map((n) => n.id).includes(link.target.id))
+            (ids.length !== 0 && !linksSet.has(link)) ||
+            (nodeIds.has(link.source.id) && nodeIds.has(link.target.id))
           ) {
             return link;
           }

@@ -212,9 +212,14 @@ export default function ForceGraph({
 
         const nodeCount = data.nodes.length;
 
+        // Memoize square root calculations to avoid redundant computation
+        const sqrtNodeCount = Math.sqrt(nodeCount);
+        const sqrtRefNodeCount = Math.sqrt(REFERENCE_NODE_COUNT);
+        const ratio = sqrtNodeCount / sqrtRefNodeCount;
+
         // Use Math.min/Math.max for capping
-        const linkDistance = Math.max(Math.min(BASE_LINK_DISTANCE * Math.sqrt(nodeCount) / Math.sqrt(REFERENCE_NODE_COUNT), 120), 20);
-        const chargeStrength = Math.min(Math.max(BASE_CHARGE_STRENGTH * Math.sqrt(nodeCount) / Math.sqrt(REFERENCE_NODE_COUNT), -80), -1);
+        const linkDistance = Math.max(Math.min(BASE_LINK_DISTANCE * ratio, 120), 20);
+        const chargeStrength = Math.min(Math.max(BASE_CHARGE_STRENGTH * ratio, -80), -1);
 
         // Adjust link force and length
         const linkForce = chartRef.current.d3Force('link');
@@ -244,7 +249,7 @@ export default function ForceGraph({
 
         // Reheat the simulation
         chartRef.current.d3ReheatSimulation();
-    }, [chartRef, graph.Elements.links.length, graph.Elements.nodes.length, graph])
+    }, [chartRef, data.nodes.length, graph.Elements.links.length, graph.Elements.nodes.length])
 
     const onFetchNode = async (node: Node) => {
         const result = await securedFetch(`/api/graph/${graph.Id}/${node.id}`, {
