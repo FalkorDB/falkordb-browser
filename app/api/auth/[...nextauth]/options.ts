@@ -13,7 +13,6 @@ interface CustomJWTPayload {
   role: Role;
   host: string;
   port: number;
-  password?: string;
   tls: boolean;
   ca?: string;
 }
@@ -189,30 +188,10 @@ async function tryJWTAuthentication(): Promise<{ client: FalkorDB; user: Authent
         return { client: existingConnection, user };
       }
 
-      // Create new connection only if not found
-      const { role, client } = await newClient(
-        {
-          host: payload.host,
-          port: payload.port.toString(),
-          username: payload.username || "",
-          password: payload.password || "",
-          tls: Boolean(payload.tls).toString(),
-          ca: payload.ca || "undefined",
-        },
-        payload.sub
-      );
-
-      const user = {
-        id: payload.sub,
-        username: payload.username,
-        role: role as Role,
-        host: payload.host,
-        port: payload.port,
-        tls: payload.tls || false,
-        ca: payload.ca,
-      };
-
-      return { client, user };
+      // JWT authentication requires an existing connection
+      // Cannot create new connection without password
+      // Fall back to session authentication
+      return null;
     } catch (error) {
       // Fall back to session auth if JWT fails
       // eslint-disable-next-line no-console

@@ -65,11 +65,39 @@ export async function POST(req: NextRequest) {
     const connection = await client.connection;
     const { username, password, role } = (await req.json()) as CreateUser;
 
+    // Validate username
+    if (!username || typeof username !== 'string' || username.trim().length === 0) {
+      return NextResponse.json(
+        { message: "Invalid username" },
+        { status: 400 }
+      );
+    }
+
+    // Validate username format (alphanumeric, underscore, hyphen only)
+    if (!/^[a-zA-Z0-9_-]+$/.test(username)) {
+      return NextResponse.json(
+        { message: "Username can only contain letters, numbers, underscores, and hyphens" },
+        { status: 400 }
+      );
+    }
+
+    // Validate password strength
+    if (!password || typeof password !== 'string' || password.length < 8) {
+      return NextResponse.json(
+        { message: "Password must be at least 8 characters long" },
+        { status: 400 }
+      );
+    }
+
     const roleValue = ROLE.get(role);
 
     try {
-      if (!username || !password || !roleValue)
-        throw new Error("Missing parameters");
+      if (!roleValue) {
+        return NextResponse.json(
+          { message: "Invalid role" },
+          { status: 400 }
+        );
+      }
 
       try {
         const user = await connection.aclGetUser(username);
@@ -86,7 +114,7 @@ export async function POST(req: NextRequest) {
 
       await connection.aclSetUser(username, roleValue.concat(`>${password}`));
       return NextResponse.json(
-        { message: "Success" },
+        { message: "User created successfully" },
         {
           status: 201,
           headers: {
@@ -95,15 +123,14 @@ export async function POST(req: NextRequest) {
         }
       );
     } catch (error) {
-      console.error(error);
       return NextResponse.json(
-        { message: (error as Error).message },
+        { message: "Failed to create user" },
         { status: 400 }
       );
     }
   } catch (err) {
     return NextResponse.json(
-      { message: (err as Error).message },
+      { message: "Internal server error" },
       { status: 500 }
     );
   }
@@ -121,6 +148,26 @@ export async function DELETE(req: NextRequest) {
     const connection = await client.connection;
     const { users } = await req.json();
 
+    // Validate users array
+    if (!Array.isArray(users) || users.length === 0) {
+      return NextResponse.json(
+        { message: "Invalid users array" },
+        { status: 400 }
+      );
+    }
+
+    // Validate each user object
+    const hasInvalidUser = users.some(
+      (user: User) => !user.username || typeof user.username !== 'string'
+    );
+    
+    if (hasInvalidUser) {
+      return NextResponse.json(
+        { message: "Invalid user data" },
+        { status: 400 }
+      );
+    }
+
     try {
       await Promise.all(
         users.map(async (user: User) => {
@@ -130,15 +177,14 @@ export async function DELETE(req: NextRequest) {
 
       return NextResponse.json({ message: "Users deleted" }, { status: 200 });
     } catch (error) {
-      console.error(error);
       return NextResponse.json(
-        { message: (error as Error).message },
+        { message: "Failed to delete users" },
         { status: 400 }
       );
     }
   } catch (err) {
     return NextResponse.json(
-      { message: (err as Error).message },
+      { message: "Internal server error" },
       { status: 500 }
     );
   }

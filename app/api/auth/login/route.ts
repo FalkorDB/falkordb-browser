@@ -62,11 +62,12 @@ export async function POST(request: NextRequest) {
         role,
       };
 
-      // Create JWT token with all necessary connection information
+      // Create JWT token with connection information
+      // Note: Password is intentionally excluded from JWT for security
+      // The connection is maintained server-side via the connections Map
       const tokenPayload = {
         sub: user.id,           // Standard JWT claim for user ID
         username: username || undefined,
-        password: password || undefined,
         role: user.role,
         host: user.host,
         port: user.port,
