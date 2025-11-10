@@ -37,7 +37,7 @@ export default function GraphInfoPanel({ onClose }: { onClose: () => void }) {
                         MemoryUsage.get("total_graph_sz_mb") !== undefined
                             ? <Tooltip>
                                 <TooltipTrigger asChild>
-                                    <p className="truncate pointer-events-auto text-1.5xl SofiaSans">{MemoryUsage.get("total_graph_sz_mb")} MB</p>
+                                    <p className="truncate pointer-events-auto text-1.5xl SofiaSans">{MemoryUsage.get("total_graph_sz_mb") || "<1"} MB</p>
                                 </TooltipTrigger>
                                 <TooltipContent>
                                     {MemoryUsage.get("total_graph_sz_mb")} MB
