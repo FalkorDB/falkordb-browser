@@ -23,6 +23,11 @@ export type GraphRef = MutableRefObject<
 
 export type Panel = "chat" | "data" | undefined;
 
+export type TextPriority = {
+  name: string;
+  ignore: boolean;
+};
+
 export type SelectCell = {
   value: string;
   type: "select";

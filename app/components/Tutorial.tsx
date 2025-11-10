@@ -175,6 +175,7 @@ const tutorialSteps: TutorialStep[] = [
         description: "Switch between light and dark themes for a comfortable viewing experience.",
         placementAxis: "x",
         targetSelector: '[data-testid="themeToggle"]',
+        hidePrev: true
     },
     {
         title: "Settings",
