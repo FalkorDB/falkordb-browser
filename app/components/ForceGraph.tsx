@@ -4,7 +4,7 @@
 
 "use client"
 
-import { Dispatch, SetStateAction, useContext, useEffect, useRef, useState } from "react"
+import React, { Dispatch, SetStateAction, useContext, useEffect, useRef, useState } from "react"
 import ForceGraph2D from "react-force-graph-2d"
 import { securedFetch, GraphRef, handleZoomToFit, getTheme } from "@/lib/utils"
 import { useToast } from "@/components/ui/use-toast"
@@ -212,9 +212,14 @@ export default function ForceGraph({
 
         const nodeCount = data.nodes.length;
 
+        // Memoize square root calculations to avoid redundant computation
+        const sqrtNodeCount = Math.sqrt(nodeCount);
+        const sqrtRefNodeCount = Math.sqrt(REFERENCE_NODE_COUNT);
+        const ratio = sqrtNodeCount / sqrtRefNodeCount;
+
         // Use Math.min/Math.max for capping
-        const linkDistance = Math.max(Math.min(BASE_LINK_DISTANCE * Math.sqrt(nodeCount) / Math.sqrt(REFERENCE_NODE_COUNT), 120), 20);
-        const chargeStrength = Math.min(Math.max(BASE_CHARGE_STRENGTH * Math.sqrt(nodeCount) / Math.sqrt(REFERENCE_NODE_COUNT), -80), -1);
+        const linkDistance = Math.max(Math.min(BASE_LINK_DISTANCE * ratio, 120), 20);
+        const chargeStrength = Math.min(Math.max(BASE_CHARGE_STRENGTH * ratio, -80), -1);
 
         // Adjust link force and length
         const linkForce = chartRef.current.d3Force('link');
@@ -244,7 +249,7 @@ export default function ForceGraph({
 
         // Reheat the simulation
         chartRef.current.d3ReheatSimulation();
-    }, [chartRef, graph.Elements.links.length, graph.Elements.nodes.length, graph])
+    }, [chartRef, data.nodes.length, graph.Elements.links.length, graph.Elements.nodes.length])
 
     const onFetchNode = async (node: Node) => {
         const result = await securedFetch(`/api/graph/${graph.Id}/${node.id}`, {
@@ -267,16 +272,20 @@ export default function ForceGraph({
     }
 
     const deleteNeighbors = (nodes: Node[]) => {
-
         if (nodes.length === 0) return;
 
         const expandedNodes: Node[] = []
+        
+        // Convert nodes array to Set for O(1) lookup
+        const nodeIdSet = new Set(nodes.map(n => n.id));
 
         graph.Elements = {
             nodes: graph.Elements.nodes.filter(node => {
                 if (!node.collapsed) return true
 
-                const isTarget = graph.Elements.links.some(link => link.target.id === node.id && nodes.some(n => n.id === link.source.id));
+                const isTarget = graph.Elements.links.some(link => 
+                    link.target.id === node.id && nodeIdSet.has(link.source.id)
+                );
 
                 if (!isTarget) return true
 
@@ -352,9 +361,18 @@ export default function ForceGraph({
         setSelectedElements([])
     }
 
-    const isLinkSelected = (link: Link) => (selectedElement && selectedElement.source && selectedElement.id === link.id)
-        || (hoverElement && hoverElement.source && hoverElement.id === link.id)
-        || (selectedElements.length > 0 && selectedElements.some(el => el.id === link.id && el.source))
+    // Memoize selected element IDs for performance
+    const selectedElementIds = React.useMemo(() => {
+        const ids = new Set<number>();
+        if (selectedElement?.source) ids.add(selectedElement.id as number);
+        if (hoverElement?.source) ids.add(hoverElement.id as number);
+        selectedElements.forEach(el => {
+            if (el.source) ids.add(el.id as number);
+        });
+        return ids;
+    }, [selectedElement, hoverElement, selectedElements]);
+
+    const isLinkSelected = (link: Link) => selectedElementIds.has(link.id as number);
 
     return (
         <div ref={parentRef} className="w-full h-full relative">
@@ -387,15 +405,17 @@ export default function ForceGraph({
                 linkDirectionalArrowColor={(link) => link.color}
                 linkWidth={(link) => isLinkSelected(link) ? 2 : 1}
                 nodeCanvasObject={(node, ctx) => {
-
                     if (!node.x || !node.y) {
                         node.x = 0
                         node.y = 0
                     }
 
-                    ctx.lineWidth = ((selectedElement && !selectedElement.source && selectedElement.id === node.id)
+                    // Check if node is selected/hovered (optimized with early returns)
+                    const isSelected = (selectedElement && !selectedElement.source && selectedElement.id === node.id)
                         || (hoverElement && !hoverElement.source && hoverElement.id === node.id)
-                        || (selectedElements.length > 0 && selectedElements.some(el => el.id === node.id && !el.source))) ? 1.5 : 0.5
+                        || (selectedElements.length > 0 && selectedElements.some(el => el.id === node.id && !el.source));
+                    
+                    ctx.lineWidth = isSelected ? 1.5 : 0.5;
                     ctx.strokeStyle = foreground;
 
                     ctx.beginPath();

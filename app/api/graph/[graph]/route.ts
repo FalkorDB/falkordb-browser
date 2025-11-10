@@ -16,24 +16,28 @@ export async function DELETE(
 
     const { graph: graphId } = await params;
 
-    try {
-      if (graphId) {
-        const graph = client.selectGraph(graphId);
-
-        await graph.delete();
-
-        return NextResponse.json({ message: `${graphId} graph deleted` });
-      }
-    } catch (error) {
-      console.error(error);
+    // Validate graph ID
+    if (!graphId || typeof graphId !== 'string' || graphId.trim().length === 0) {
       return NextResponse.json(
-        { message: (error as Error).message },
+        { message: "Invalid graph ID" },
+        { status: 400 }
+      );
+    }
+
+    try {
+      const graph = client.selectGraph(graphId);
+      await graph.delete();
+
+      return NextResponse.json({ message: "Graph deleted successfully" });
+    } catch (error) {
+      return NextResponse.json(
+        { message: "Failed to delete graph" },
         { status: 400 }
       );
     }
   } catch (err) {
     return NextResponse.json(
-      { message: (err as Error).message },
+      { message: "Internal server error" },
       { status: 500 }
     );
   }
@@ -98,26 +102,44 @@ export async function PATCH(
     const { graph: graphId } = await params;
     const sourceName = request.nextUrl.searchParams.get("sourceName");
 
-    try {
-      if (!sourceName) throw new Error("Missing parameter sourceName");
+    // Validate graph ID
+    if (!graphId || typeof graphId !== 'string' || graphId.trim().length === 0) {
+      return NextResponse.json(
+        { message: "Invalid graph ID" },
+        { status: 400 }
+      );
+    }
 
+    // Validate source name
+    if (!sourceName || typeof sourceName !== 'string' || sourceName.trim().length === 0) {
+      return NextResponse.json(
+        { message: "Invalid source name" },
+        { status: 400 }
+      );
+    }
+
+    try {
       const data = await (
         await client.connection
       ).renameNX(sourceName, graphId);
 
-      if (!data) throw new Error(`${graphId} already exists`);
+      if (!data) {
+        return NextResponse.json(
+          { message: "Graph name already exists" },
+          { status: 409 }
+        );
+      }
 
       return NextResponse.json({ data });
     } catch (error) {
-      console.error(error);
       return NextResponse.json(
-        { message: (error as Error).message },
+        { message: "Failed to rename graph" },
         { status: 400 }
       );
     }
   } catch (err) {
     return NextResponse.json(
-      { message: (err as Error).message },
+      { message: "Internal server error" },
       { status: 500 }
     );
   }
@@ -146,8 +168,20 @@ export async function GET(
     const timeout = Number(request.nextUrl.searchParams.get("timeout"));
 
     try {
-      if (!query) throw new Error("Missing parameter query");
-      if (Number.isNaN(timeout)) throw new Error("Invalid parameter timeout");
+      // Validate query parameter
+      if (!query || typeof query !== 'string' || query.trim().length === 0) {
+        throw new Error("Invalid query parameter");
+      }
+
+      // Validate timeout
+      if (Number.isNaN(timeout) || timeout < 0) {
+        throw new Error("Invalid timeout parameter");
+      }
+
+      // Validate graph ID
+      if (!graphId || typeof graphId !== 'string' || graphId.trim().length === 0) {
+        throw new Error("Invalid graph ID");
+      }
 
       const graph = client.selectGraph(graphId);
 
@@ -156,18 +190,17 @@ export async function GET(
           ? await graph.roQuery(query, { TIMEOUT: timeout })
           : await graph.query(query, { TIMEOUT: timeout });
 
-      if (!result) throw new Error("Something went wrong");
+      if (!result) throw new Error("Query returned no result");
 
       writer.write(
         encoder.encode(`event: result\ndata: ${JSON.stringify(result)}\n\n`)
       );
       writer.close();
     } catch (error) {
-      console.error(error);
       writer.write(
         encoder.encode(
           `event: error\ndata: ${JSON.stringify({
-            message: (error as Error).message,
+            message: error instanceof Error ? error.message : "Query execution failed",
             status: 400,
           })}\n\n`
         )
@@ -175,11 +208,10 @@ export async function GET(
       writer.close();
     }
   } catch (error) {
-    console.error(error);
     writer.write(
       encoder.encode(
         `event: error\ndata: ${JSON.stringify({
-          message: (error as Error).message,
+          message: "Internal server error",
           status: 500,
         })}\n\n`
       )

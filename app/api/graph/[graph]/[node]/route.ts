@@ -17,10 +17,26 @@ export async function GET(
     const { graph: graphId, node } = await params;
     const nodeId = Number(node);
 
+    // Validate node ID
+    if (!Number.isInteger(nodeId) || nodeId < 0) {
+      return NextResponse.json(
+        { message: "Invalid node ID" },
+        { status: 400 }
+      );
+    }
+
+    // Validate graph ID
+    if (!graphId || typeof graphId !== 'string' || graphId.trim().length === 0) {
+      return NextResponse.json(
+        { message: "Invalid graph ID" },
+        { status: 400 }
+      );
+    }
+
     try {
       const graph = client.selectGraph(graphId);
 
-      // Get node's neighbors
+      // Get node's neighbors (using parameterized query to prevent injection)
       const query = `MATCH (src)-[e]-(n)
                           WHERE ID(src) = $nodeId
                           RETURN e, n`;
@@ -32,15 +48,14 @@ export async function GET(
 
       return NextResponse.json({ result }, { status: 200 });
     } catch (error) {
-      console.error(error);
       return NextResponse.json(
-        { message: (error as Error).message },
+        { message: "Failed to fetch node neighbors" },
         { status: 400 }
       );
     }
   } catch (err) {
     return NextResponse.json(
-      { message: (err as Error).message },
+      { message: "Internal server error" },
       { status: 500 }
     );
   }
@@ -62,8 +77,29 @@ export async function DELETE(
     const nodeId = Number(node);
     const { type } = await request.json();
 
+    // Validate node ID
+    if (!Number.isInteger(nodeId) || nodeId < 0) {
+      return NextResponse.json(
+        { message: "Invalid node ID" },
+        { status: 400 }
+      );
+    }
+
+    // Validate graph ID
+    if (!graphId || typeof graphId !== 'string' || graphId.trim().length === 0) {
+      return NextResponse.json(
+        { message: "Invalid graph ID" },
+        { status: 400 }
+      );
+    }
+
     try {
-      if (type === undefined) throw new Error("Type is required");
+      if (type === undefined) {
+        return NextResponse.json(
+          { message: "Type is required" },
+          { status: 400 }
+        );
+      }
 
       const graph = client.selectGraph(graphId);
       const query = type
@@ -74,22 +110,26 @@ export async function DELETE(
           ? await graph.roQuery(query, { params: { nodeId } })
           : await graph.query(query, { params: { nodeId } });
 
-      if (!result) throw new Error("Something went wrong");
+      if (!result) {
+        return NextResponse.json(
+          { message: "Failed to delete node" },
+          { status: 400 }
+        );
+      }
 
       return NextResponse.json(
         { message: "Node deleted successfully" },
         { status: 200 }
       );
     } catch (error) {
-      console.error(error);
       return NextResponse.json(
-        { message: (error as Error).message },
+        { message: "Failed to delete node" },
         { status: 400 }
       );
     }
   } catch (err) {
     return NextResponse.json(
-      { message: (err as Error).message },
+      { message: "Internal server error" },
       { status: 500 }
     );
   }
