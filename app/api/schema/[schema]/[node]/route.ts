@@ -31,6 +31,32 @@ export async function POST(
           throw new Error("Selected nodes are required");
       }
 
+      // Validate label names to prevent injection attacks
+      // Labels should only contain alphanumeric characters, underscores, and hyphens
+      const labelRegex = /^[a-zA-Z0-9_-]+$/;
+      if (label && Array.isArray(label)) {
+        const invalidLabel = label.find((l: string) => !labelRegex.test(l));
+        if (invalidLabel) {
+          return NextResponse.json(
+            { message: "Invalid label name. Only alphanumeric characters, underscores, and hyphens are allowed." },
+            { status: 400 }
+          );
+        }
+      }
+
+      // Validate selectedNodes IDs are numbers
+      if (selectedNodes && Array.isArray(selectedNodes)) {
+        const invalidNode = selectedNodes.find(
+          (node: { id: number }) => !Number.isInteger(node.id) || node.id < 0
+        );
+        if (invalidNode) {
+          return NextResponse.json(
+            { message: "Invalid node ID" },
+            { status: 400 }
+          );
+        }
+      }
+
       const formattedAttributes = formatAttributes(attributes);
       const graph = client.selectGraph(schemaName);
       const query = type
