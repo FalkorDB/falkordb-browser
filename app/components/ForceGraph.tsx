@@ -11,7 +11,7 @@ import { useToast } from "@/components/ui/use-toast"
 import * as d3 from "d3"
 import { useTheme } from "next-themes"
 import { Link, Node, Relationship, Graph, getLabelWithFewestElements, GraphData } from "../api/graph/model"
-import { IndicatorContext } from "./provider"
+import { BrowserSettingsContext, IndicatorContext } from "./provider"
 import Spinning from "./ui/spinning"
 
 interface Props {
@@ -36,46 +36,12 @@ interface Props {
     cooldownTicks: number | undefined
     currentTab?: Tab
     viewport?: ViewportState
-    setViewport?: Dispatch<SetStateAction<ViewportState>> 
+    setViewport?: Dispatch<SetStateAction<ViewportState>>
     isSaved?: boolean
 }
 
 const NODE_SIZE = 6
 const PADDING = 2;
-
-const DISPLAY_TEXT_PRIORITY = [
-    "name",
-    "title",
-    "label",
-    "id",
-    "displayName"
-]
-
-/**
- * Determines the display text for a node based on priority order:
- * 1. name
- * 2. title
- * 3. label
- * 4. id (property, not node.id)
- * 5. Any other string property
- * 6. Node ID (fallback if no properties exist)
- */
-const getNodeDisplayText = (node: Node): string => {
-    const { data } = node;
-
-    const displayText = DISPLAY_TEXT_PRIORITY.find(priority =>
-        data[priority] && typeof data[priority] === 'string' && data[priority].trim().length > 0
-    )
-
-    if (displayText) return data[displayText];
-
-    const otherStringProperty = Object.entries(data).find(([key, value]) =>
-        key !== 'name' && key !== 'title' && key !== 'label' && key !== 'id' &&
-        typeof value === 'string' && value.trim().length > 0
-    )
-
-    return otherStringProperty?.[1] || node.id.toString();
-};
 
 /**
  * Wraps text into two lines with ellipsis handling for circular nodes
@@ -170,6 +136,7 @@ export default function ForceGraph({
 }: Props) {
 
     const { indicator, setIndicator } = useContext(IndicatorContext)
+    const { settings: { graphInfo: { displayTextPriority } } } = useContext(BrowserSettingsContext)
 
     const { theme } = useTheme()
     const { toast } = useToast()
@@ -291,6 +258,17 @@ export default function ForceGraph({
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [chartRef, graph.Elements.links.length, graph.Elements.nodes.length, graph])
 
+    // Clear cached display names when displayTextPriority changes
+    useEffect(() => {
+        data.nodes.forEach(node => {
+            node.displayName = ['', ''];
+        });
+        // Force a re-render by reheating the simulation
+        if (chartRef.current) {
+            chartRef.current.d3ReheatSimulation();
+        }
+    }, [displayTextPriority, chartRef, data.nodes]);
+
     const onFetchNode = async (node: Node) => {
         const result = await securedFetch(`/api/graph/${graph.Id}/${node.id}`, {
             method: 'GET',
@@ -339,6 +317,39 @@ export default function ForceGraph({
         deleteNeighbors(expandedNodes)
 
         setRelationships(graph.removeLinks(nodes.map(n => n.id)))
+    }
+
+    const getNodeDisplayText = (node: Node) => {
+        const { data: nodeData } = node;
+
+        const displayText = displayTextPriority.find(({ name, ignore }) => {
+            const key = ignore
+                ? Object.keys(nodeData).find(
+                    (k) => k.toLowerCase() === name.toLowerCase()
+                )
+                : name;
+
+            return (
+                key &&
+                nodeData[key] &&
+                typeof nodeData[key] === "string" &&
+                nodeData[key].trim().length > 0
+            );
+        });
+
+        if (displayText) {
+            const key = displayText.ignore
+                ? Object.keys(nodeData).find(
+                    (k) => k.toLowerCase() === displayText.name.toLowerCase()
+                )
+                : displayText.name;
+
+            if (key) {
+                return String(nodeData[key]);
+            }
+        }
+
+        return String(node.id);
     }
 
     const handleNodeClick = async (node: Node) => {
