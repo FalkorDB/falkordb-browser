@@ -62,7 +62,7 @@ export default class GraphInfoPage extends GraphPage {
   }
 
   async openGraphInfoButton(): Promise<void> {
-    // Open panel by clicking button - it will auto-expand when graph is selected
+    if (await this.isGraphInfoPanelContainerVisible()) return;
     await interactWhenVisible(
       this.graphInfoButton,
       (el) => el.click(),
