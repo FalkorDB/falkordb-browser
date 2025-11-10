@@ -72,9 +72,43 @@ docker run -p 6379:6379 -it --rm falkordb/falkordb:latest
 
 Open [http://localhost:3000](http://localhost:3000) with your browser.
 
+## Troubleshooting
 
+### Build Error: "--r= is not allowed in NODE_OPTIONS"
 
+If you encounter the following error when building:
+```
+--r= is not allowed in NODE_OPTIONS
+Next.js build worker exited with code: 9
+```
 
+This is a known issue with Next.js 15.4.0+ and Node.js v24, particularly when using monitoring tools like Dynatrace or NewRelic that inject NODE_OPTIONS with the `-r` flag.
+
+**Solutions:**
+
+1. **Unset NODE_OPTIONS** (if you're not using it):
+   ```bash
+   unset NODE_OPTIONS
+   npm run build
+   ```
+
+2. **Use the long form** if you need to set require options:
+   ```bash
+   # Instead of: NODE_OPTIONS="-r module"
+   NODE_OPTIONS="--require module" npm run build
+   ```
+
+3. **Disable monitoring tool injection** (for production builds):
+   - For Dynatrace in Kubernetes: Add `dynatrace.com/inject: "false"` annotation
+   - For other tools: Consult their documentation on disabling injection
+
+4. **Use Node.js v20** instead of v24 (temporary workaround):
+   ```bash
+   nvm use 20
+   npm run build
+   ```
+
+For more information, see: https://github.com/vercel/next.js/issues/77550
 
 
 
