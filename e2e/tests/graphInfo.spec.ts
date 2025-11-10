@@ -214,6 +214,7 @@ test.describe("Graph Info Panel Tests", () => {
     await graph.openGraphInfoButton();
     expect(await graph.isGraphInfoPanelVisible()).toBeTruthy();
     await graph.clickGraphInfoButton();
+    await new Promise(() => { setTimeout(() => {}, 1000)})
     expect(await graph.isGraphInfoPanelVisible()).toBeFalsy();
     await apiCall.removeGraph(graphName);
   });
@@ -225,6 +226,7 @@ test.describe("Graph Info Panel Tests", () => {
     await apiCall.addGraph(graphName2);
     const graph = await browser.createNewPage(GraphInfoPage, urls.graphUrl);
     await browser.setPageToFullScreen();
+    await new Promise(() => { setTimeout(() => {}, 1000)})
     expect(await graph.isGraphInfoPanelVisible()).toBeFalsy();
     await apiCall.removeGraph(graphName1);
     await apiCall.removeGraph(graphName2);
