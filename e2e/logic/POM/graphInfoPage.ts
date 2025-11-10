@@ -45,12 +45,7 @@ export default class GraphInfoPage extends GraphPage {
 
   async isGraphInfoPanelContainerVisible(): Promise<boolean> {
     await this.page.waitForTimeout(1000);
-    // Check the panel container's data-panel-size attribute
-    const size = await this.graphInfoPanelContainer.getAttribute("data-panel-size");
-    if (!size) return false;
-    const sizeNum = parseFloat(size);
-    // Panel is visible if size > 0 (collapsed = 0)
-    return !Number.isNaN(sizeNum) && sizeNum > 0;
+    return waitForElementToBeVisible(this.graphInfoNodesCount);
   }
 
   async clickGraphInfoButton(): Promise<void> {
