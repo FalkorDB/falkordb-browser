@@ -238,7 +238,7 @@ export default function Page() {
             title: "Success",
             description: `${selectedElements.length > 1 ? "Elements" : "Element"} deleted`,
         })
-    }, [selectedElements, selectedElement, graph, fetchCount, handleSetSelectedElement, toast, setIndicator])
+    }, [selectedElements, selectedElement, graph, setData, fetchCount, handleSetSelectedElement, toast, setIndicator])
 
     const getCurrentPanel = useCallback(() => {
         if (!graphName) return undefined
@@ -250,16 +250,20 @@ export default function Page() {
                         onClose={() => setPanel(undefined)}
                     />
                 )
+
             case "data":
+                if (!selectedElement) return undefined
+
                 return <GraphDataPanel
-                    object={selectedElement!}
+                    object={selectedElement}
                     setObject={handleSetSelectedElement}
                     setLabels={setLabels}
                 />
+
             default:
                 return undefined
         }
-    }, [graphName, panel, selectedElement, handleSetSelectedElement, handleDeleteElement, setPanel])
+    }, [graphName, panel, selectedElement, handleSetSelectedElement, setPanel])
 
     return (
         <div className="Page p-8 gap-8">

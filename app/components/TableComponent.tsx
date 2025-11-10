@@ -339,7 +339,7 @@ export default function TableComponent({
                                                     className={getClassName(i, 1)}
                                                     title="Expand Root"
                                                     onClick={() => {
-                                                        const newExpandArr = new Map(expandArr.set(i, 1))
+                                                        const newExpandArr = new Map(expandArr).set(i, 1)
                                                         setExpandArr(newExpandArr)
 
                                                         if (onExpandChange) onExpandChange(newExpandArr)
@@ -351,7 +351,7 @@ export default function TableComponent({
                                                     title="Expand All"
                                                     className={getClassName(i, -1)}
                                                     onClick={() => {
-                                                        const newExpandArr = new Map(expandArr.set(i, -1))
+                                                        const newExpandArr = new Map(expandArr).set(i, -1)
                                                         setExpandArr(newExpandArr)
 
                                                         if (onExpandChange) onExpandChange(newExpandArr)
@@ -363,8 +363,8 @@ export default function TableComponent({
                                                     title="Collapse All"
                                                     className={getClassName(i)}
                                                     onClick={() => {
-                                                        expandArr.delete(i)
                                                         const newExpandArr = new Map(expandArr)
+                                                        newExpandArr.delete(i)
                                                         setExpandArr(newExpandArr)
 
                                                         if (onExpandChange) onExpandChange(newExpandArr)
@@ -406,7 +406,11 @@ export default function TableComponent({
                             // Then find actual index in original rows array
                             const actualIndex = rows.findIndex(r => r === row)
                             const rowId = getRowId(row);
-                            const dataTestID = `${label}${typeof row.cells[0].value === "object" ? row.cells[0].value?.id : row.cells[0].value}`
+                            const firstVal = row.cells[0].value
+
+                            if (!firstVal) return undefined
+                            
+                            const dataTestID = `${label}${typeof firstVal === "object" ? firstVal.id : firstVal}`
 
                             if (actualIndex === -1 || filteredIndex === -1) return null
 
