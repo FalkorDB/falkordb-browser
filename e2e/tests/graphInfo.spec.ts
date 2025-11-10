@@ -212,13 +212,10 @@ test.describe("Graph Info Panel Tests", () => {
     await browser.setPageToFullScreen();
     await graph.selectGraphByName(graphName);
     await graph.openGraphInfoButton();
-    // Wait for panel to be fully expanded
-    await graph.waitForGraphInfoPanelState(true);
-    expect(await graph.isGraphInfoPanelVisible()).toBeTruthy();
+    // Use expect.poll for automatic retry during animation
+    await expect.poll(async () => graph.isGraphInfoPanelVisible(), { timeout: 5000 }).toBeTruthy();
     await graph.clickGraphInfoButton();
-    // Wait for panel to be fully collapsed
-    await graph.waitForGraphInfoPanelState(false);
-    expect(await graph.isGraphInfoPanelVisible()).toBeFalsy();
+    await expect.poll(async () => graph.isGraphInfoPanelVisible(), { timeout: 5000 }).toBeFalsy();
     await apiCall.removeGraph(graphName);
   });
   
@@ -229,9 +226,8 @@ test.describe("Graph Info Panel Tests", () => {
     await apiCall.addGraph(graphName2);
     const graph = await browser.createNewPage(GraphInfoPage, urls.graphUrl);
     await browser.setPageToFullScreen();
-    // Wait for panel state to settle
-    await graph.waitForGraphInfoPanelState(false);
-    expect(await graph.isGraphInfoPanelVisible()).toBeFalsy();
+    // Use expect.poll for automatic retry
+    await expect.poll(async () => graph.isGraphInfoPanelVisible(), { timeout: 5000 }).toBeFalsy();
     await apiCall.removeGraph(graphName1);
     await apiCall.removeGraph(graphName2);
   });
