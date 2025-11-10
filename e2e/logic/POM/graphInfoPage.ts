@@ -44,11 +44,8 @@ export default class GraphInfoPage extends GraphPage {
   }
 
   async isGraphInfoPanelVisible(): Promise<boolean> {
-    console.log(await this.graphInfoPanelContainer.getAttribute("data-panel-size"));
-    const isCollapsed =
-      (await this.graphInfoPanelContainer.getAttribute("data-panel-size")) ===
-      "0.0";
-    return !isCollapsed;
+    const size = await this.graphInfoPanelContainer.getAttribute("data-panel-size");
+    return size !== "0.0" && size !== "0";
   }
 
   async clickGraphInfoButton(): Promise<void> {
@@ -142,5 +139,19 @@ export default class GraphInfoPage extends GraphPage {
 
   async isGraphInfoEdgeButtonVisible(relationship: string): Promise<boolean> {
     return waitForElementToBeVisible(this.graphInfoEdgeButton(relationship));
+  }
+
+  async waitForGraphInfoPanelState(shouldBeVisible: boolean): Promise<void> {
+    await this.page.waitForFunction(
+      ({ testId, expectedVisible }) => {
+        const panel = document.querySelector(`[data-testid="${testId}"]`);
+        if (!panel) return false;
+        const size = panel.getAttribute('data-panel-size');
+        const isVisible = size !== '0.0' && size !== '0';
+        return isVisible === expectedVisible;
+      },
+      { testId: 'graphInfoPanel', expectedVisible: shouldBeVisible },
+      { timeout: 3000 }
+    );
   }
 }
