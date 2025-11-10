@@ -23,6 +23,11 @@ export type GraphRef = MutableRefObject<
 
 export type Panel = "chat" | "data" | undefined;
 
+export type TextPriority = {
+  name: string;
+  ignore: boolean;
+};
+
 export type SelectCell = {
   value: string;
   type: "select";
@@ -42,6 +47,8 @@ export type TextCell = {
   onChange: (value: string) => Promise<boolean>;
 };
 
+export type Tab = "Graph" | "Table" | "Metadata";
+
 export type ReadOnlyCell = {
   value: string;
   type: "readonly";
@@ -60,7 +67,14 @@ export type Message = {
     | "Schema";
 };
 
+export type ViewportState = {
+  zoom: number;
+  centerX: number;
+  centerY: number;
+};
+
 export type Cell = SelectCell | TextCell | ObjectCell | ReadOnlyCell;
+
 export interface Row {
   cells: Cell[];
   checked?: boolean;
@@ -296,7 +310,7 @@ export function getTheme(theme: string | undefined) {
   if (currentTheme === "system")
     currentTheme = window.matchMedia("(prefers-color-scheme: dark)").matches
       ? "dark"
-      : "light"
+      : "light";
 
   return {
     background: currentTheme === "dark" ? "#1A1A1A" : "#FFFFFF",

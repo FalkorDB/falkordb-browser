@@ -7,8 +7,8 @@ import dynamic from "next/dynamic";
 import { ForceGraphMethods } from "react-force-graph-2d";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { ImperativePanelHandle } from "react-resizable-panels";
-import { Label, Graph, GraphData, Link, Node, Relationship, GraphInfo } from "../api/graph/model";
-import { BrowserSettingsContext, GraphContext, HistoryQueryContext, IndicatorContext, PanelContext, QueryLoadingContext } from "../components/provider";
+import { Label, Graph, Link, Node, Relationship, GraphInfo } from "../api/graph/model";
+import { BrowserSettingsContext, GraphContext, HistoryQueryContext, IndicatorContext, PanelContext, QueryLoadingContext, ViewportContext } from "../components/provider";
 import Spinning from "../components/ui/spinning";
 import Chat from "./Chat";
 import GraphDataPanel from "./GraphDataPanel";
@@ -33,6 +33,7 @@ export default function Page() {
     const { setIndicator } = useContext(IndicatorContext);
     const { panel, setPanel } = useContext(PanelContext)
     const { isQueryLoading, setIsQueryLoading } = useContext(QueryLoadingContext)
+    const { setData } = useContext(ViewportContext)
     const {
         graph,
         setGraph,
@@ -64,7 +65,6 @@ export default function Page() {
     const [selectedElement, setSelectedElement] = useState<Node | Link | undefined>()
     const [selectedElements, setSelectedElements] = useState<(Node | Link)[]>([])
     const [labels, setLabels] = useState<Label[]>([])
-    const [data, setData] = useState<GraphData>({ ...graph.Elements })
     const [relationships, setRelationships] = useState<Relationship[]>([])
     const [isCollapsed, setIsCollapsed] = useState(true)
 
@@ -237,7 +237,7 @@ export default function Page() {
             title: "Success",
             description: `${selectedElements.length > 1 ? "Elements" : "Element"} deleted`,
         })
-    }, [selectedElements, selectedElement, graph, fetchCount, handleSetSelectedElement, toast, setIndicator])
+    }, [selectedElements, selectedElement, graph, setData, fetchCount, handleSetSelectedElement, toast, setIndicator])
 
     const getCurrentPanel = useCallback(() => {
         if (!graphName) return undefined
@@ -249,16 +249,20 @@ export default function Page() {
                         onClose={() => setPanel(undefined)}
                     />
                 )
+
             case "data":
+                if (!selectedElement) return undefined
+
                 return <GraphDataPanel
-                    object={selectedElement!}
+                    object={selectedElement}
                     setObject={handleSetSelectedElement}
                     setLabels={setLabels}
                 />
+
             default:
                 return undefined
         }
-    }, [graphName, panel, selectedElement, handleSetSelectedElement, handleDeleteElement, setPanel])
+    }, [graphName, panel, selectedElement, handleSetSelectedElement, setPanel])
 
     return (
         <div className="Page p-8 gap-8">
@@ -288,8 +292,6 @@ export default function Page() {
                         selectedElements={selectedElements}
                         setSelectedElements={setSelectedElements}
                         chartRef={chartRef}
-                        data={data}
-                        setData={setData}
                         handleDeleteElement={handleDeleteElement}
                         setLabels={setLabels}
                         setRelationships={setRelationships}

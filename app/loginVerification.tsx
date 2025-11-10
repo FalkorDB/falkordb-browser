@@ -17,6 +17,9 @@ export default function LoginVerification({ children }: { children: React.ReactN
     }, [data])
 
     useEffect(() => {
+        // Skip authentication redirects for /docs routes
+        if (url.startsWith('/docs')) return
+        
         if ((url === "/login" || url === "/") && status === "authenticated") {
             router.push("/graph")
         } else if (status === "unauthenticated" && url !== "/login") {
