@@ -153,7 +153,7 @@ export default function LoginForm() {
       const urlPattern = /^(falkor|falkors|redis|rediss):\/\/(?:([^:@]+)(?::([^@]+))?@)?([^:/\s]+)(?::(\d+))?(?:\/(\d+))?$/;
       if (trimmedUrl && !urlPattern.test(trimmedUrl)) {
         setError({
-          message: "Invalid URL format. Expected: falkor[s]://[[username][:password]@][host][:port][/db-number] (also supports redis://)",
+          message: "Invalid URL format. Expected: falkor[s]://[[username][:password]@][host][:port][/db-number] (also supports redis[s]://)",
           show: true
         });
         return;
