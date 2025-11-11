@@ -81,7 +81,7 @@ export default function PersonalAccessTokens() {
     try {
       // Calculate expiration date based on selection
       let expiresAt: string | null = null;
-      let ttlSeconds: number;
+      let ttlSeconds: number | undefined;
       
       switch (expiresIn) {
         case "30d":
@@ -128,7 +128,7 @@ export default function PersonalAccessTokens() {
         case "never":
         default:
           expiresAt = null;
-          ttlSeconds = 31622400; // 366 days
+          ttlSeconds = undefined;
           break;
       }
       
@@ -140,7 +140,7 @@ export default function PersonalAccessTokens() {
         body: JSON.stringify({
           name: tokenName,
           expiresAt,
-          ttlSeconds,
+          ...(ttlSeconds !== undefined ? { ttlSeconds } : {}),
         }),
       }, toast, setIndicator);
 

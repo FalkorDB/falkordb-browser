@@ -98,7 +98,7 @@ async function authenticateUser(body: any): Promise<{ user?: any; password?: str
 /**
  * Validates token expiration parameters
  */
-function validateExpiration(expiresAt: string | null, ttlSeconds: number): { 
+function validateExpiration(expiresAt: string | null, ttlSeconds: number | undefined): { 
   valid: boolean; 
   expiresAtDate?: Date | null; 
   error?: NextResponse 
@@ -119,7 +119,8 @@ function validateExpiration(expiresAt: string | null, ttlSeconds: number): {
     }
   }
   
-  if (ttlSeconds > 31622400 || ttlSeconds < 1) {
+  // If ttlSeconds is undefined, it means "never expires" - skip validation
+  if (ttlSeconds !== undefined && (ttlSeconds > 31622400 || ttlSeconds < 1)) {
     return {
       valid: false,
       error: NextResponse.json(
@@ -204,7 +205,7 @@ async function storeTokenInFalkorDB(
       name: '${escapeString(name)}',
       role: '${escapeString(role)}',
       host: '${escapeString(host)}',
-      port: ${user.port},
+      port: ${Number.parseInt(String(user.port), 10)},
       created_at: ${nowUnix},
       expires_at: ${expiresAtUnix},
       last_used: -1,
@@ -235,7 +236,7 @@ export async function POST(request: NextRequest) {
     const { 
       name = "API Token",
       expiresAt = null,
-      ttlSeconds = 31622400, // Default: 366 days
+      ttlSeconds = undefined, // Default: never expires
     } = bodyResult.body;
 
     // 3. Authenticate user (direct login or session)

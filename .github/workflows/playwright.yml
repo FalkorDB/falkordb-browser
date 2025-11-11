@@ -251,8 +251,15 @@ jobs:
           npm start &
           APP_PID=$!
           echo "Waiting for app to start..."
-          sleep 10
+          for i in {1..30}; do
+            if curl -f http://localhost:3000 > /dev/null 2>&1; then
+              echo "App is ready"
+              break
+            fi
+            sleep 1
+          done
           npx playwright test settingsTokens --reporter=dot,list
+          kill $APP_PID || true
       - name: Upload artifacts
         if: always()
         uses: actions/upload-artifact@v4

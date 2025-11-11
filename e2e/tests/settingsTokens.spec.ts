@@ -138,10 +138,9 @@ test.describe("@Tokens Personal Access Tokens Tests", () => {
       await settingsTokensPage.clickGenerateToken();
       await settingsTokensPage.fillTokenName("");
       
-      // Generate button should be disabled without name
+      // Generate token confirm button should be disabled without name
       await settingsTokensPage.waitFor(300);
-      // The button should not allow generation without a name
-      await settingsTokensPage.cancelGenerateToken();
+      expect(await settingsTokensPage.isGenerateTokenConfirmButtonDisabled()).toBe(true);
     });
 
     test("@readonly Copy token to clipboard", async () => {

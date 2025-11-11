@@ -404,11 +404,31 @@ const authOptions: AuthOptions = {
 
         try {
           // Use consistent user ID instead of random UUID
-          const id = generateConsistentUserId(
-            credentials.username || "default",
-            credentials.host || "localhost",
-            credentials.port ? parseInt(credentials.port, 10) : 6379
-          );
+          let id: string;
+          if (credentials.url) {
+            try {
+              const parsed = new URL(credentials.url);
+              const parsedPort = parsed.port ? parseInt(parsed.port, 10) : 6379;
+              id = generateConsistentUserId(
+                credentials.username || "default",
+                parsed.hostname,
+                parsedPort
+              );
+            } catch {
+              // Fallback to host/port when URL parsing fails
+              id = generateConsistentUserId(
+                credentials.username || "default",
+                credentials.host || "localhost",
+                credentials.port ? parseInt(credentials.port, 10) : 6379
+              );
+            }
+          } else {
+            id = generateConsistentUserId(
+              credentials.username || "default",
+              credentials.host || "localhost",
+              credentials.port ? parseInt(credentials.port, 10) : 6379
+            );
+          }
 
           const { role } = await newClient(credentials, id);
 

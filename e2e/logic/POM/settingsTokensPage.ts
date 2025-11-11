@@ -328,6 +328,11 @@ export default class SettingsTokensPage extends HeaderComponent {
     return isDisabled;
   }
 
+  async isGenerateTokenConfirmButtonDisabled(): Promise<boolean> {
+    const isDisabled = await this.generateTokenConfirmButton.isDisabled();
+    return isDisabled;
+  }
+
   async waitForSuccessToast(): Promise<boolean> {
     try {
       await this.isSuccessToastVisible();
