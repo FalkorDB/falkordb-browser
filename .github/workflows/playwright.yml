@@ -87,7 +87,7 @@ jobs:
     timeout-minutes: 60
     runs-on: ubuntu-latest
     concurrency:
-      group: test-wave-1-${{ github.ref }}
+      group: test-group-a-${{ github.ref }}
       cancel-in-progress: false
 
     services:
@@ -145,7 +145,7 @@ jobs:
     timeout-minutes: 60
     runs-on: ubuntu-latest
     concurrency:
-      group: test-wave-1-${{ github.ref }}
+      group: test-group-b-${{ github.ref }}
       cancel-in-progress: false
 
     services:
@@ -203,7 +203,7 @@ jobs:
     timeout-minutes: 60
     runs-on: ubuntu-latest
     concurrency:
-      group: test-wave-2-${{ github.ref }}
+      group: test-group-a-${{ github.ref }}
       cancel-in-progress: false
 
     services:
@@ -282,7 +282,7 @@ jobs:
     needs: setup-dependencies
     runs-on: ubuntu-latest
     concurrency:
-      group: test-wave-2-${{ github.ref }}
+      group: test-group-a-${{ github.ref }}
       cancel-in-progress: false
 
     services:
@@ -343,7 +343,7 @@ jobs:
     timeout-minutes: 60
     runs-on: ubuntu-latest
     concurrency:
-      group: test-wave-3-${{ github.ref }}
+      group: test-group-b-${{ github.ref }}
       cancel-in-progress: false
 
     steps:
@@ -473,7 +473,7 @@ jobs:
     timeout-minutes: 60
     runs-on: ubuntu-latest
     concurrency:
-      group: test-wave-3-${{ github.ref }}
+      group: test-group-b-${{ github.ref }}
       cancel-in-progress: false
 
     steps:
