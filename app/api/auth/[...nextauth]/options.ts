@@ -326,6 +326,18 @@ async function tryJWTAuthentication(): Promise<{ client: FalkorDB; user: Authent
       if (!tokenActive) {
         // eslint-disable-next-line no-console
         console.warn("JWT authentication failed: token is not active (revoked or expired)");
+
+        // Clean up stale connection to prevent connection leak
+        const staleClient = connections.get(payload.sub);
+        if (staleClient) {
+          connections.delete(payload.sub);
+          try {
+            await staleClient.close();
+          } catch (closeError) {
+            // eslint-disable-next-line no-console
+            console.warn("Failed to close revoked JWT connection", closeError);
+          }
+        }
         return null;
       }
 
