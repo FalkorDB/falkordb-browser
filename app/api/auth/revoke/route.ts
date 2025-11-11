@@ -97,15 +97,16 @@ async function resolveTokenById(
   tokenUsername?: string; 
   error?: NextResponse 
 }> {
+  const escapeString = (str: string) => str.replace(/'/g, "''");
   const findQuery = `
-    MATCH (t:Token {token_id: $tokenId})-[:BELONGS_TO]->(u:User)
+    MATCH (t:Token {token_id: '${escapeString(tokenId)}'})-[:BELONGS_TO]->(u:User)
     WHERE t.is_active = true
     RETURN t.token_hash as token_hash, 
            t.token_id as token_id,
            t.username as username
   `;
   
-  const findResult = await executePATQuery(findQuery, { tokenId });
+  const findResult = await executePATQuery(findQuery);
   
   if (!findResult.data || findResult.data.length === 0) {
     return {
@@ -146,20 +147,17 @@ async function revokeTokenInDatabase(
   revokerUsername: string
 ): Promise<{ success: boolean; error?: NextResponse }> {
   try {
+    const escapeString = (str: string) => str.replace(/'/g, "''");
     const nowUnix = Math.floor(Date.now() / 1000);
     const revokeQuery = `
-      MATCH (t:Token {token_hash: $tokenHash})-[:BELONGS_TO]->(u:User)
-      MATCH (revoker:User {username: $revokerUsername})
+      MATCH (t:Token {token_hash: '${escapeString(tokenHash)}'})-[:BELONGS_TO]->(u:User)
+      MATCH (revoker:User {username: '${escapeString(revokerUsername)}'})
       SET t.is_active = false
-      CREATE (t)-[:REVOKED_BY {at: $revokedAt}]->(revoker)
+      CREATE (t)-[:REVOKED_BY {at: ${nowUnix}}]->(revoker)
       RETURN t.token_id as token_id
     `;
     
-    const revokeResult = await executePATQuery(revokeQuery, {
-      tokenHash,
-      revokerUsername,
-      revokedAt: nowUnix,
-    });
+    const revokeResult = await executePATQuery(revokeQuery);
     
     if (!revokeResult.data || revokeResult.data.length === 0) {
       return {

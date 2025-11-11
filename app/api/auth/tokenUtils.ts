@@ -47,16 +47,19 @@ export async function isTokenActive(
     // Hash the token to match storage format
     const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
     
+    // Helper to escape strings for Cypher (FalkorDB doesn't support parameterized queries)
+    const escapeString = (str: string) => str.replace(/'/g, "''");
+    
     // Check if token exists in FalkorDB and is active
+    const now = Math.floor(Date.now() / 1000); // Unix timestamp
     const query = `
-      MATCH (t:Token {token_hash: $tokenHash})
+      MATCH (t:Token {token_hash: '${escapeString(tokenHash)}'})
       WHERE t.is_active = true 
-        AND (t.expires_at IS NULL OR t.expires_at > $now)
+        AND (t.expires_at = -1 OR t.expires_at > ${now})
       RETURN t.token_id as token_id, t.last_used as last_used
     `;
     
-    const now = Math.floor(Date.now() / 1000); // Unix timestamp
-    const result = await executePATQuery(query, { tokenHash, now });
+    const result = await executePATQuery(query);
     
     if (!result || !result.data || result.data.length === 0) {
       return false; // Token not found, expired, or revoked
@@ -75,11 +78,11 @@ export async function isTokenActive(
       if (nowMs - lastUsed > UPDATE_THRESHOLD_MS) {
         const nowUnix = Math.floor(nowMs / 1000);
         const updateQuery = `
-          MATCH (t:Token {token_hash: $tokenHash})
-          SET t.last_used = $nowUnix
+          MATCH (t:Token {token_hash: '${escapeString(tokenHash)}'})
+          SET t.last_used = ${nowUnix}
         `;
         
-        await executePATQuery(updateQuery, { tokenHash, nowUnix });
+        await executePATQuery(updateQuery);
       }
     } catch (updateError) {
       // If we can't update, still consider token active if it exists

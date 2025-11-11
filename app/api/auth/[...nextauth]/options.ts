@@ -403,7 +403,12 @@ const authOptions: AuthOptions = {
         }
 
         try {
-          const id = generateTimeUUID();
+          // Use consistent user ID instead of random UUID
+          const id = generateConsistentUserId(
+            credentials.username || "default",
+            credentials.host || "localhost",
+            credentials.port ? parseInt(credentials.port, 10) : 6379
+          );
 
           const { role } = await newClient(credentials, id);
 

@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import HeaderComponent from "./headerComponent";
 import { Locator } from "@playwright/test";
 import { interactWhenVisible } from "@/e2e/infra/utils";
+import HeaderComponent from "./headerComponent";
 
 export default class SettingsTokensPage extends HeaderComponent {
   // Navigation
@@ -45,11 +45,11 @@ export default class SettingsTokensPage extends HeaderComponent {
 
   // Token List
   private get tokenTable(): Locator {
-    return this.page.getByRole("table");
+    return this.page.getByRole("table").first();
   }
 
   private get tableHeaders(): Locator {
-    return this.page.getByRole("columnheader");
+    return this.tokenTable.locator("thead th");
   }
 
   private tokenRowByName(name: string): Locator {
@@ -145,11 +145,12 @@ export default class SettingsTokensPage extends HeaderComponent {
   }
 
   async getGeneratedTokenInputValue(): Promise<string> {
-    return await interactWhenVisible(
+    const value = await interactWhenVisible(
       this.generatedTokenInput,
       (el) => el.inputValue(),
       "generated token input"
     );
+    return value;
   }
 
   async clickCopyTokenButton(): Promise<void> {
@@ -193,27 +194,30 @@ export default class SettingsTokensPage extends HeaderComponent {
   }
 
   async isTokenRowVisible(name: string): Promise<boolean> {
-    return await interactWhenVisible(
+    const isVisible = await interactWhenVisible(
       this.tokenRowByName(name),
       (el) => el.isVisible(),
       `token row ${name}`
     );
+    return isVisible;
   }
 
   async isSuccessToastVisible(): Promise<boolean> {
-    return await interactWhenVisible(
+    const isVisible = await interactWhenVisible(
       this.successToast,
       (el) => el.isVisible(),
       "success toast"
     );
+    return isVisible;
   }
 
   async isErrorToastVisible(): Promise<boolean> {
-    return await interactWhenVisible(
+    const isVisible = await interactWhenVisible(
       this.errorToast,
       (el) => el.isVisible(),
       "error toast"
     );
+    return isVisible;
   }
 
   // Actions
@@ -276,9 +280,11 @@ export default class SettingsTokensPage extends HeaderComponent {
     }
   }
 
-  async copyToken(): Promise<void> {
+  async copyToken(): Promise<string | null> {
+    const token = await this.getGeneratedToken();
     await this.clickCopyTokenButton();
     await this.waitFor(300);
+    return token;
   }
 
   async dismissTokenDisplay(): Promise<void> {
@@ -318,7 +324,8 @@ export default class SettingsTokensPage extends HeaderComponent {
   }
 
   async isGenerateButtonDisabled(): Promise<boolean> {
-    return await this.generateTokenButton.isDisabled();
+    const isDisabled = await this.generateTokenButton.isDisabled();
+    return isDisabled;
   }
 
   async waitForSuccessToast(): Promise<boolean> {
@@ -344,14 +351,18 @@ export default class SettingsTokensPage extends HeaderComponent {
       const rows = await this.page.getByRole("row").all();
       const names: string[] = [];
       
-      // Skip header row
-      for (let i = 1; i < rows.length; i++) {
-        const cells = await rows[i].getByRole("cell").all();
+      // Skip header row and process all rows
+      const rowPromises = rows.slice(1).map(async (row) => {
+        const cells = await row.getByRole("cell").all();
         if (cells.length > 0) {
           const name = await cells[0].textContent();
-          if (name) names.push(name.trim());
+          return name ? name.trim() : null;
         }
-      }
+        return null;
+      });
+      
+      const results = await Promise.all(rowPromises);
+      names.push(...results.filter((name): name is string => name !== null));
       
       return names;
     } catch {
@@ -369,13 +380,20 @@ export default class SettingsTokensPage extends HeaderComponent {
       const row = this.tokenRowByName(name);
       await this.isTokenRowVisible(name);
       
+      // Get headers to determine column indices dynamically
+      const headers = await this.getTableColumnHeaders();
+      const nameIdx = headers.findIndex(h => h.toLowerCase().includes("name"));
+      const createdIdx = headers.findIndex(h => h.toLowerCase().includes("created"));
+      const lastUsedIdx = headers.findIndex(h => h.toLowerCase().includes("last used"));
+      const expiresIdx = headers.findIndex(h => h.toLowerCase().includes("expires"));
+      
       const cells = await row.getByRole("cell").all();
       
       return {
-        name: await cells[0]?.textContent() || "",
-        created: await cells[1]?.textContent() || null,
-        lastUsed: await cells[2]?.textContent() || null,
-        expires: await cells[3]?.textContent() || null,
+        name: nameIdx >= 0 ? (await cells[nameIdx]?.textContent() || "") : "",
+        created: createdIdx >= 0 ? (await cells[createdIdx]?.textContent() || null) : null,
+        lastUsed: lastUsedIdx >= 0 ? (await cells[lastUsedIdx]?.textContent() || null) : null,
+        expires: expiresIdx >= 0 ? (await cells[expiresIdx]?.textContent() || null) : null,
       };
     } catch {
       return null;
@@ -384,9 +402,25 @@ export default class SettingsTokensPage extends HeaderComponent {
 
   async getTableColumnHeaders(): Promise<string[]> {
     try {
-      const headers = await this.tableHeaders.allTextContents();
-      return headers.filter(h => h.trim().length > 0);
-    } catch {
+      // Wait for table to be visible
+      await this.tokenTable.waitFor({ state: "visible", timeout: 5000 });
+      
+      // Get all header cells
+      const headerCells = await this.tableHeaders.all();
+      
+      // Get text content from all cells in parallel
+      const headerTexts = await Promise.all(
+        headerCells.map(async (cell) => {
+          const text = await cell.textContent();
+          return text ? text.trim() : "";
+        })
+      );
+      
+      // Filter out empty headers
+      return headerTexts.filter(h => h.length > 0);
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.error("Error getting table headers:", error);
       return [];
     }
   }

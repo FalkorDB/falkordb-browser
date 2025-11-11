@@ -417,23 +417,45 @@ export default class ApiCalls {
     expiresAt?: string | null;
     ttlSeconds?: number;
   }): Promise<any> {
-    // Use admin credentials (default user with no password)
-    return this.generateTokenAsUser("default", "", data);
+    try {
+      const headers = await getAdminToken();
+      const result = await postRequest(`${urls.api.tokenUrl}login`, data, undefined, headers);
+      return await result.json();
+    } catch (error) {
+      throw new Error(
+        `Failed to generate token. \n Error: ${(error as Error).message}`
+      );
+    }
   }
 
   async listTokens(): Promise<any> {
-    // Use admin credentials (default user with no password)
-    return this.listTokensAsUser("default", "");
+    try {
+      const headers = await getAdminToken();
+      const result = await getRequest(`${urls.api.tokenUrl}tokens`, headers);
+      return await result.json();
+    } catch (error) {
+      throw new Error(
+        `Failed to list tokens. \n Error: ${(error as Error).message}`
+      );
+    }
   }
 
   async revokeToken(data: { token?: string; token_id?: string }): Promise<any> {
-    // Use admin credentials (default user with no password)
-    return this.revokeTokenAsUser("default", "", data);
+    try {
+      const headers = await getAdminToken();
+      const result = await postRequest(`${urls.api.tokenUrl}revoke`, data, undefined, headers);
+      return await result.json();
+    } catch (error) {
+      throw new Error(
+        `Failed to revoke token. \n Error: ${(error as Error).message}`
+      );
+    }
   }
 
   async getTokenDetails(tokenId: string): Promise<any> {
     try {
-      const result = await getRequest(`${urls.api.tokenUrl}token/${tokenId}`);
+      const headers = await getAdminToken();
+      const result = await getRequest(`${urls.api.tokenUrl}token/${tokenId}`, headers);
       return await result.json();
     } catch (error) {
       throw new Error(

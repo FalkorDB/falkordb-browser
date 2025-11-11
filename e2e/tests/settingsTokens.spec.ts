@@ -103,6 +103,10 @@ test.describe("@Tokens Personal Access Tokens Tests", () => {
       );
       await settingsTokensPage.navigateToTokensTab();
 
+      // Wait for the token to appear in the table (this ensures data has loaded)
+      await settingsTokensPage.waitFor(1500);
+      expect(await settingsTokensPage.verifyTokenExists(tokenName)).toBe(true);
+      
       // Admin should see Username and Role columns
       expect(await settingsTokensPage.hasColumnHeader("Username")).toBe(true);
       expect(await settingsTokensPage.hasColumnHeader("Role")).toBe(true);
@@ -150,9 +154,8 @@ test.describe("@Tokens Personal Access Tokens Tests", () => {
       const tokenName = getRandomString("copy-token");
       await settingsTokensPage.generateToken(tokenName);
 
-      await settingsTokensPage.copyToken();
-      const success = await settingsTokensPage.waitForSuccessToast();
-      expect(success).toBe(true);
+      const copiedToken = await settingsTokensPage.copyToken();    
+      expect(copiedToken).not.toBeNull();
 
       // Cleanup
       await settingsTokensPage.dismissTokenDisplay();

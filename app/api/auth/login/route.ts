@@ -179,42 +179,42 @@ async function storeTokenInFalkorDB(
   name: string,
   expiresAtDate: Date | null
 ): Promise<void> {
+  // Validate and provide defaults for required fields
+  if (!user.id || !user.port) {
+    throw new Error('Missing parameters');
+  }
+
   const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
   const nowUnix = Math.floor(Date.now() / 1000);
-  const expiresAtUnix = expiresAtDate ? Math.floor(expiresAtDate.getTime() / 1000) : null;
+  const expiresAtUnix = expiresAtDate ? Math.floor(expiresAtDate.getTime() / 1000) : -1;
+  
+  // Use string interpolation - parameterized queries don't work with FalkorDB
+  const escapeString = (str: string) => str.replace(/'/g, "''");
+  const username = user.username || "default";
+  const host = user.host || "localhost";
+  const role = user.role || "Unknown";
   
   const query = `
-    MERGE (u:User {username: $username, user_id: $userId})
+    MERGE (u:User {username: '${escapeString(username)}', user_id: '${escapeString(user.id)}'})
     CREATE (t:Token {
-      token_hash: $tokenHash,
-      token_id: $tokenId,
-      user_id: $userId,
-      username: $username,
-      name: $tokenName,
-      role: $role,
-      host: $host,
-      port: $port,
-      created_at: $createdAt,
-      expires_at: $expiresAt,
-      last_used: NULL,
+      token_hash: '${escapeString(tokenHash)}',
+      token_id: '${escapeString(tokenId)}',
+      user_id: '${escapeString(user.id)}',
+      username: '${escapeString(username)}',
+      name: '${escapeString(name)}',
+      role: '${escapeString(role)}',
+      host: '${escapeString(host)}',
+      port: ${user.port},
+      created_at: ${nowUnix},
+      expires_at: ${expiresAtUnix},
+      last_used: -1,
       is_active: true
     })
     CREATE (t)-[:BELONGS_TO]->(u)
     RETURN t.token_id as token_id
   `;
   
-  await executePATQuery(query, {
-    username: user.username || "default",
-    userId: user.id,
-    tokenHash,
-    tokenId,
-    tokenName: name,
-    role: user.role,
-    host: user.host,
-    port: user.port,
-    createdAt: nowUnix,
-    expiresAt: expiresAtUnix,
-  });
+  await executePATQuery(query);
 }
 
 // eslint-disable-next-line import/prefer-default-export

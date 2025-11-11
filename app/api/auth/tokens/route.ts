@@ -3,29 +3,6 @@ import { executePATQuery } from "@/lib/token-storage";
 import { getClient } from "../[...nextauth]/options";
 
 /**
- * Builds Cypher query based on user role (Admin sees all, users see own)
- */
-function buildTokenQuery(isAdmin: boolean): string {
-  return `
-    MATCH (t:Token)-[:BELONGS_TO]->(u:User)
-    WHERE t.is_active = true
-      ${isAdmin ? "" : "AND t.user_id = $userId"}
-    RETURN t.token_hash as token_hash,
-           t.token_id as token_id,
-           t.user_id as user_id,
-           t.username as username,
-           t.name as name,
-           t.role as role,
-           t.host as host,
-           t.port as port,
-           t.created_at as created_at,
-           t.expires_at as expires_at,
-           t.last_used as last_used
-    ORDER BY t.created_at DESC
-  `;
-}
-
-/**
  * Fetches tokens from FalkorDB with role-based filtering
  */
 async function fetchTokens(
@@ -38,10 +15,31 @@ async function fetchTokens(
   error?: NextResponse;
 }> {
   try {
-    const query = buildTokenQuery(isAdmin);
-    const result = await executePATQuery(query, { username, userId });
+    // Use string interpolation instead of parameterized queries
+    const escapeString = (str: string) => str.replace(/'/g, "''");
+    const userFilter = isAdmin ? "" : `AND t.user_id = '${escapeString(userId)}'`;
+    
+    const query = `
+      MATCH (t:Token)-[:BELONGS_TO]->(u:User)
+      WHERE t.is_active = true ${userFilter}
+      RETURN t.token_hash as token_hash,
+             t.token_id as token_id,
+             t.user_id as user_id,
+             t.username as username,
+             t.name as name,
+             t.role as role,
+             t.host as host,
+             t.port as port,
+             t.created_at as created_at,
+             t.expires_at as expires_at,
+             t.last_used as last_used
+      ORDER BY t.created_at DESC
+    `;
+    
+    const result = await executePATQuery(query);
 
     // Transform FalkorDB objects to token objects with ISO timestamps
+    // -1 means NULL (never expires / never used)
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const tokens = (result.data || []).map((row: any) => ({
       token_hash: row.token_hash,
@@ -53,8 +51,8 @@ async function fetchTokens(
       host: row.host,
       port: row.port,
       created_at: new Date(row.created_at * 1000).toISOString(),
-      expires_at: row.expires_at ? new Date(row.expires_at * 1000).toISOString() : null,
-      last_used: row.last_used ? new Date(row.last_used * 1000).toISOString() : null,
+      expires_at: row.expires_at > 0 ? new Date(row.expires_at * 1000).toISOString() : null,
+      last_used: row.last_used > 0 ? new Date(row.last_used * 1000).toISOString() : null,
     }));
 
     return { tokens };

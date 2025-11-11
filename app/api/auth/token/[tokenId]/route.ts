@@ -10,8 +10,9 @@ async function fetchTokenById(tokenId: string): Promise<{
   tokenData?: any;
   error?: NextResponse;
 }> {
+  const escapeString = (str: string) => str.replace(/'/g, "''");
   const query = `
-    MATCH (t:Token {token_id: $tokenId})-[:BELONGS_TO]->(u:User)
+    MATCH (t:Token {token_id: '${escapeString(tokenId)}'})-[:BELONGS_TO]->(u:User)
     RETURN t.token_hash as token_hash,
            t.token_id as token_id,
            t.user_id as user_id,
@@ -26,7 +27,7 @@ async function fetchTokenById(tokenId: string): Promise<{
            t.is_active as is_active
   `;
 
-  const result = await executePATQuery(query, { tokenId });
+  const result = await executePATQuery(query);
 
   if (!result.data || result.data.length === 0) {
     return {
@@ -51,8 +52,8 @@ async function fetchTokenById(tokenId: string): Promise<{
       host: row.host,
       port: row.port,
       created_at: new Date(row.created_at * 1000).toISOString(),
-      expires_at: row.expires_at ? new Date(row.expires_at * 1000).toISOString() : null,
-      last_used: row.last_used ? new Date(row.last_used * 1000).toISOString() : null,
+      expires_at: row.expires_at > 0 ? new Date(row.expires_at * 1000).toISOString() : null,
+      last_used: row.last_used > 0 ? new Date(row.last_used * 1000).toISOString() : null,
       is_active: row.is_active,
     },
   };
