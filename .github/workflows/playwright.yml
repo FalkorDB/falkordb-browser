@@ -11,6 +11,10 @@ on:
       RUN_BROWSER_TESTS:
         required: true
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   setup-dependencies:
     name: Setup and cache dependencies
@@ -83,7 +87,7 @@ jobs:
     timeout-minutes: 60
     runs-on: ubuntu-latest
     concurrency:
-      group: test-group-a-${{ github.ref }}
+      group: test-wave-1-${{ github.ref }}
       cancel-in-progress: false
 
     services:
@@ -141,7 +145,7 @@ jobs:
     timeout-minutes: 60
     runs-on: ubuntu-latest
     concurrency:
-      group: test-group-b-${{ github.ref }}
+      group: test-wave-1-${{ github.ref }}
       cancel-in-progress: false
 
     services:
@@ -199,7 +203,7 @@ jobs:
     timeout-minutes: 60
     runs-on: ubuntu-latest
     concurrency:
-      group: test-group-a-${{ github.ref }}
+      group: test-wave-2-${{ github.ref }}
       cancel-in-progress: false
 
     services:
@@ -278,7 +282,7 @@ jobs:
     needs: setup-dependencies
     runs-on: ubuntu-latest
     concurrency:
-      group: test-group-a-${{ github.ref }}
+      group: test-wave-2-${{ github.ref }}
       cancel-in-progress: false
 
     services:
@@ -339,7 +343,7 @@ jobs:
     timeout-minutes: 60
     runs-on: ubuntu-latest
     concurrency:
-      group: test-group-b-${{ github.ref }}
+      group: test-wave-3-${{ github.ref }}
       cancel-in-progress: false
 
     steps:
@@ -469,7 +473,7 @@ jobs:
     timeout-minutes: 60
     runs-on: ubuntu-latest
     concurrency:
-      group: test-group-b-${{ github.ref }}
+      group: test-wave-3-${{ github.ref }}
       cancel-in-progress: false
 
     steps:
