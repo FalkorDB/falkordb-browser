@@ -91,7 +91,7 @@ async function authenticateUser(body: any): Promise<{ user?: any; password?: str
   return {
     user: session.user,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    password: (session.user as any).password || undefined,
+    password: (session.user as any).password as string | undefined,
   };
 }
 
@@ -142,12 +142,20 @@ async function generateJWTToken(
   userPassword: string | undefined,
   tokenId: string,
   expiresAtDate: Date | null,
+  ttlSeconds: number | undefined,
   jwtSecret: Uint8Array
 ): Promise<string> {
   const currentTime = Math.floor(Date.now() / 1000);
-  const expirationTime = expiresAtDate 
-    ? Math.floor(expiresAtDate.getTime() / 1000) 
-    : "1y";
+  
+  // Calculate expiration time based on expiresAtDate or ttlSeconds
+  let expirationTime: number | undefined;
+  if (expiresAtDate) {
+    expirationTime = Math.floor(expiresAtDate.getTime() / 1000);
+  } else if (typeof ttlSeconds === "number") {
+    expirationTime = currentTime + ttlSeconds;
+  } else {
+    expirationTime = undefined; // Never expires
+  }
   
   const tokenPayload = {
     sub: user.id,
@@ -158,15 +166,19 @@ async function generateJWTToken(
     port: user.port,
     tls: user.tls,
     ca: user.ca || undefined,
-    pwd: userPassword ? encrypt(userPassword) : undefined,
+    pwd: userPassword !== undefined ? encrypt(userPassword) : undefined,
     iat: currentTime,
   };
 
-  return new SignJWT(tokenPayload)
+  const signer = new SignJWT(tokenPayload)
     .setProtectedHeader({ alg: "HS256" })
-    .setIssuedAt()
-    .setExpirationTime(expirationTime)
-    .sign(jwtSecret);
+    .setIssuedAt();
+
+  if (expirationTime !== undefined) {
+    signer.setExpirationTime(expirationTime);
+  }
+
+  return signer.sign(jwtSecret);
 }
 
 /**
@@ -259,7 +271,8 @@ export async function POST(request: NextRequest) {
       authResult.user!,
       authResult.password,
       tokenId,
-      expirationValidation.expiresAtDate!,
+      expirationValidation.expiresAtDate ?? null,
+      ttlSeconds,
       jwtValidation.secret!
     );
 
