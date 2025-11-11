@@ -6,6 +6,7 @@ const fileds = ["used_memory", "used_memory_rss"];
 export async function GET() {
   try {
     const session = await getClient();
+
     if (session instanceof NextResponse) {
       return session;
     }
@@ -15,7 +16,6 @@ export async function GET() {
     try {
       const infoMemory = await (await client.connection).info("memory");
       const infoGraph = await client.info();
-
       const dataMemory = infoMemory
         .split("\r\n")
         .map((item: string) => {
@@ -45,6 +45,7 @@ export async function GET() {
       );
     }
   } catch (err) {
+    console.error(err);
     return NextResponse.json(
       { message: (err as Error).message },
       { status: 500 }

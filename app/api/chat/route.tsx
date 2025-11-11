@@ -1,7 +1,26 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import { getClient } from "../auth/[...nextauth]/options";
 
 const URL = "http://localhost:8080/"
+
+// Validation schema
+const postBodySchema = z.object({
+  graphName: z.string({
+    required_error: "Graph name is required",
+    invalid_type_error: "Invalid Graph name",
+  }),
+  messages: z.array(z.any(), {
+    required_error: "Messages is required",
+    invalid_type_error: "Invalid Messages",
+  }),
+  key: z.string({
+    invalid_type_error: "Invalid Key",
+  }).optional(),
+  model: z.string({
+    invalid_type_error: "Invalid Model",
+  }).optional(),
+});
 
 export async function GET() {
     try {
@@ -27,12 +46,12 @@ export async function GET() {
 
             return NextResponse.json(data)
         } catch (error) {
-            const { message } = (error as Error)
-            
+            const { message } = error as Error
+
             if (message.includes("fetch failed")) {
                 return NextResponse.json({ message: "Server is not available" }, { status: 200 })
             }
-            
+
             console.error(error)
             return NextResponse.json({ error: message }, { status: 400 })
         }
@@ -57,11 +76,14 @@ export async function POST(request: NextRequest) {
             throw new Error(await session.text())
         }
 
-        const { messages, graphName, key, model } = await request.json()
+        const validationResult = postBodySchema.safeParse(await request.json());
 
         try {
-            if (!graphName) throw new Error("Graph name is required")
-            if (!messages) throw new Error("Messages are required")
+            if (!validationResult.success) {
+                throw new Error(validationResult.error.errors[0].message);
+            }
+
+            const { messages, graphName, key, model } = validationResult.data;
 
             const requestBody = {
                 "chat_request": {
@@ -71,13 +93,6 @@ export async function POST(request: NextRequest) {
                 key,
                 model,
             }
-
-            const curlCommand = `curl -X POST "${URL}text_to_cypher" \\
-  -H "Content-Type: application/json" \\
-  -d '${JSON.stringify(requestBody, null, 2)}'`
-
-            console.log("Equivalent curl command:")
-            console.log(curlCommand)
 
             const response = await fetch(`${URL}text_to_cypher`, {
                 method: "POST",

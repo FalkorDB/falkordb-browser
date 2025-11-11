@@ -10,14 +10,14 @@ export async function GET() {
       return session;
     }
 
-    try {
-      const { client } = session;
+    const { client } = session;
 
+    try {
       await (await client.connection).ping();
 
       return NextResponse.json({ status: "online" }, { status: 200 });
-    } catch (err) {
-      console.error(err);
+    } catch (error) {
+      console.error(error);
       return NextResponse.json({ status: "offline" }, { status: 404 });
     }
   } catch (err) {

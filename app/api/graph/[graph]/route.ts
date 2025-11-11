@@ -1,5 +1,25 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import { getClient } from "@/app/api/auth/[...nextauth]/options";
+
+// Validation schemas
+const patchBodySchema = z.object({
+  sourceName: z.string({
+    required_error: "SourceName is required",
+    invalid_type_error: "Invalid SourceName",
+  }),
+});
+
+const queryParamsSchema = z.object({
+  query: z.string({
+    required_error: "Query is required",
+    invalid_type_error: "Invalid Query",
+  }),
+  timeout: z.number({
+    required_error: "Timeout is required",
+    invalid_type_error: "Invalid Timeout",
+  }),
+});
 
 export async function DELETE(
   request: NextRequest,
@@ -13,17 +33,14 @@ export async function DELETE(
     }
 
     const { client } = session;
-
     const { graph: graphId } = await params;
 
     try {
-      if (graphId) {
-        const graph = client.selectGraph(graphId);
+      const graph = client.selectGraph(graphId);
 
-        await graph.delete();
+      await graph.delete();
 
-        return NextResponse.json({ message: `${graphId} graph deleted` });
-      }
+      return NextResponse.json({ message: `Graph deleted successfully` });
     } catch (error) {
       console.error(error);
       return NextResponse.json(
@@ -32,6 +49,7 @@ export async function DELETE(
       );
     }
   } catch (err) {
+    console.error(err);
     return NextResponse.json(
       { message: (err as Error).message },
       { status: 500 }
@@ -51,17 +69,13 @@ export async function POST(
     }
 
     const { client, user } = session;
-
     const { graph: graphId } = await params;
 
     try {
       const graph = client.selectGraph(graphId);
-      const result =
-        user.role === "Read-Only"
-          ? await graph.roQuery("RETURN 1")
-          : await graph.query("RETURN 1");
 
-      if (!result) throw new Error("Something went wrong");
+      if (user.role === "Read-Only") await graph.roQuery("RETURN 1");
+      else await graph.query("RETURN 1");
 
       return NextResponse.json(
         { message: "Graph created successfully" },
@@ -75,6 +89,7 @@ export async function POST(
       );
     }
   } catch (err) {
+    console.error(err);
     return NextResponse.json(
       { message: (err as Error).message },
       { status: 500 }
@@ -94,18 +109,21 @@ export async function PATCH(
     }
 
     const { client } = session;
-
     const { graph: graphId } = await params;
-    const sourceName = request.nextUrl.searchParams.get("sourceName");
+    const validationResult = patchBodySchema.safeParse(await request.json());
 
     try {
-      if (!sourceName) throw new Error("Missing parameter sourceName");
+      if (!validationResult.success) {
+        throw new Error(validationResult.error.errors[0].message);
+      }
+
+      const { sourceName } = validationResult.data;
 
       const data = await (
         await client.connection
       ).renameNX(sourceName, graphId);
 
-      if (!data) throw new Error(`${graphId} already exists`);
+      if (!data) throw new Error(`Graph Name already exists`);
 
       return NextResponse.json({ data });
     } catch (error) {
@@ -116,6 +134,7 @@ export async function PATCH(
       );
     }
   } catch (err) {
+    console.error(err);
     return NextResponse.json(
       { message: (err as Error).message },
       { status: 500 }
@@ -123,8 +142,6 @@ export async function PATCH(
   }
 }
 
-// send a query to the graph and return the result
-// if the query is taking too long, return a timeout and save the result in the cache
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ graph: string }> }
@@ -146,17 +163,20 @@ export async function GET(
     const timeout = Number(request.nextUrl.searchParams.get("timeout"));
 
     try {
-      if (!query) throw new Error("Missing parameter query");
-      if (Number.isNaN(timeout)) throw new Error("Invalid parameter timeout");
+      const validationResult = queryParamsSchema.safeParse({ query, timeout });
+
+      if (!validationResult.success) {
+        throw new Error(validationResult.error.errors[0].message);
+      }
+
+      const validatedQuery = validationResult.data.query;
+      const validatedTimeout = validationResult.data.timeout;
 
       const graph = client.selectGraph(graphId);
-
       const result =
         user.role === "Read-Only"
-          ? await graph.roQuery(query, { TIMEOUT: timeout })
-          : await graph.query(query, { TIMEOUT: timeout });
-
-      if (!result) throw new Error("Something went wrong");
+          ? await graph.roQuery(validatedQuery, { TIMEOUT: validatedTimeout })
+          : await graph.query(validatedQuery, { TIMEOUT: validatedTimeout });
 
       writer.write(
         encoder.encode(`event: result\ndata: ${JSON.stringify(result)}\n\n`)
@@ -191,7 +211,7 @@ export async function GET(
   request.signal.addEventListener("abort", () => {
     writer.close();
   });
-  
+
   return new Response(readable, {
     headers: {
       "Content-Type": "text/event-stream",

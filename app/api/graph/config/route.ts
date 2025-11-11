@@ -11,8 +11,10 @@ export async function GET() {
     }
 
     const { client } = session;
+
     try {
       const configs = await client.configGet("*");
+
       return NextResponse.json({ configs }, { status: 200 });
     } catch (error) {
       console.error(error);
@@ -22,6 +24,7 @@ export async function GET() {
       );
     }
   } catch (err) {
+    console.error(err);
     return NextResponse.json(
       { message: (err as Error).message },
       { status: 500 }

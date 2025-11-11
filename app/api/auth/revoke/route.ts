@@ -1,8 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { jwtVerify } from "jose";
+import { z } from "zod";
 import crypto from "crypto";
 import { getTokenId } from "../tokenUtils";
 import { getClient, getAdminConnectionForTokens } from "../[...nextauth]/options";
+
+// Validation schema
+const postBodySchema = z.object({
+  token: z.string({
+    required_error: "Token is required",
+    invalid_type_error: "Invalid token",
+  }),
+});
 
 
 
@@ -29,7 +38,7 @@ export async function POST(request: NextRequest) {
 
     const { user: authenticatedUser } = session;
 
-    // Parse request body to get token to revoke
+    // Parse and validate request body
     let body;
     try {
       body = await request.json();
@@ -40,14 +49,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { token: tokenToRevoke } = body;
+    const validationResult = postBodySchema.safeParse(body);
     
-    if (!tokenToRevoke) {
+    if (!validationResult.success) {
       return NextResponse.json(
-        { message: "Token to revoke is required in request body" },
+        { message: validationResult.error.errors[0].message },
         { status: 400 }
       );
     }
+
+    const { token: tokenToRevoke } = validationResult.data;
 
     try {
       // Verify the token to be revoked

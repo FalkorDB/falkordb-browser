@@ -1,10 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import { getClient } from "../../auth/[...nextauth]/options";
-import { ROLE } from "../model";
+import { ROLE, roleValues } from "../model";
+
+// Validation schema
+const patchBodySchema = z.object({
+  role: z.enum(roleValues, {
+    required_error: "Role is required",
+    invalid_type_error: "Invalid Role",
+  }),
+});
 
 // eslint-disable-next-line import/prefer-default-export
 export async function PATCH(
-  req: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ user: string }> }
 ) {
   try {
@@ -15,14 +24,25 @@ export async function PATCH(
     }
 
     const { client } = session;
-
     const { user: username } = await params;
-    const role = ROLE.get(req.nextUrl.searchParams.get("role") || "");
+    const validationResult = patchBodySchema.safeParse(await request.json());
+
     try {
-      if (!role) throw new Error("Role is missing");
+      if (!validationResult.success) {
+        throw new Error(validationResult.error.errors[0].message);
+      }
+
+      const { role: roleName } = validationResult.data;
+      const role = ROLE.get(roleName);
+
+      if (!role) throw new Error("Invalid Role");
 
       await (await client.connection).aclSetUser(username, role);
-      return NextResponse.json({ message: "User created" }, { status: 200 });
+
+      return NextResponse.json(
+        { message: "User updated successfully" },
+        { status: 200 }
+      );
     } catch (error) {
       console.error(error);
       return NextResponse.json(
@@ -31,6 +51,7 @@ export async function PATCH(
       );
     }
   } catch (err) {
+    console.error(err);
     return NextResponse.json(
       { message: (err as Error).message },
       { status: 500 }

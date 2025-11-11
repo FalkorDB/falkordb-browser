@@ -39,8 +39,9 @@ export default function Users() {
 
     const handleSetRole = async (user: SetUser) => {
         const { username, role, oldRole } = user
-        const result = await securedFetch(`api/user/${prepareArg(username)}?role=${role}`, {
-            method: 'PATCH'
+        const result = await securedFetch(`api/user/${prepareArg(username)}`, {
+            method: 'PATCH',
+            body: JSON.stringify({ role })
         }, toast, setIndicator)
 
         if (result.ok) {

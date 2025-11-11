@@ -1,5 +1,14 @@
 import { NextResponse, NextRequest } from "next/server";
+import { z } from "zod";
 import { getClient } from "../../auth/[...nextauth]/options";
+
+// Validation schema
+const patchBodySchema = z.object({
+  sourceName: z.string({
+    required_error: "SourceName is required",
+    invalid_type_error: "Invalid SourceName",
+  }),
+});
 
 export async function GET(
   request: NextRequest,
@@ -27,14 +36,11 @@ export async function GET(
         );
 
       const graph = client.selectGraph(schemaName);
+      const query = "MATCH (n) OPTIONAL MATCH (n)-[e]-(m) RETURN * LIMIT 100";
       const result =
         user.role === "Read-Only"
-          ? await graph.roQuery(
-              "MATCH (n) OPTIONAL MATCH (n)-[e]-(m) RETURN * LIMIT 100"
-            )
-          : await graph.query(
-              "MATCH (n) OPTIONAL MATCH (n)-[e]-(m) RETURN * LIMIT 100"
-            );
+          ? await graph.roQuery(query)
+          : await graph.query(query);
 
       return NextResponse.json({ result }, { status: 200 });
     } catch (error) {
@@ -45,6 +51,7 @@ export async function GET(
       );
     }
   } catch (err) {
+    console.error(err);
     return NextResponse.json(
       { message: (err as Error).message },
       { status: 500 }
@@ -74,8 +81,6 @@ export async function POST(
           ? await graph.roQuery("RETURN 1")
           : await graph.query("RETURN 1");
 
-      if (!result) throw new Error("Something went wrong");
-
       return NextResponse.json({ result }, { status: 200 });
     } catch (error) {
       console.error(error);
@@ -85,6 +90,7 @@ export async function POST(
       );
     }
   } catch (err) {
+    console.error(err);
     return NextResponse.json(
       { message: (err as Error).message },
       { status: 500 }
@@ -104,7 +110,6 @@ export async function DELETE(
     }
 
     const { client } = session;
-
     const { schema } = await params;
     const schemaName = `${schema}_schema`;
 
@@ -114,7 +119,7 @@ export async function DELETE(
       await graph.delete();
 
       return NextResponse.json(
-        { message: `${schemaName} schema deleted` },
+        { message: `Schema deleted successfully` },
         { status: 200 }
       );
     } catch (error) {
@@ -125,6 +130,7 @@ export async function DELETE(
       );
     }
   } catch (err) {
+    console.error(err);
     return NextResponse.json(
       { message: (err as Error).message },
       { status: 500 }
@@ -144,30 +150,34 @@ export async function PATCH(
     }
 
     const { client } = session;
-
     const { schema } = await params;
     const schemaName = `${schema}_schema`;
-    const source = request.nextUrl.searchParams.get("sourceName");
+    const validationResult = patchBodySchema.safeParse(await request.json());
 
     try {
-      if (!source) throw new Error("Missing parameter sourceName");
+      if (!validationResult.success) {
+        throw new Error(validationResult.error.errors[0].message);
+      }
+
+      const { sourceName: source } = validationResult.data;
 
       const sourceName = `${source}_schema`;
       const data = await (
         await client.connection
       ).renameNX(sourceName, schemaName);
 
-      if (!data) throw new Error(`${schema} already exists`);
+      if (!data) throw new Error(`Schema Name already exists`);
 
       return NextResponse.json({ data });
-    } catch (err: unknown) {
-      console.error(err);
+    } catch (error) {
+      console.error(error);
       return NextResponse.json(
-        { message: (err as Error).message },
+        { message: (error as Error).message },
         { status: 400 }
       );
     }
   } catch (err) {
+    console.error(err);
     return NextResponse.json(
       { message: (err as Error).message },
       { status: 500 }

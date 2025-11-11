@@ -33,8 +33,11 @@ export default function DuplicateGraph({ open, onOpenChange, selectedValue, onDu
 
         try {
             setIsLoading(true)
-            const result = await securedFetch(`api/${type === "Graph" ? "graph" : "schema"}/${prepareArg(duplicateName)}/duplicate?sourceName=${prepareArg(selectedValue)}`, {
-                method: "PATCH"
+            const result = await securedFetch(`api/${type === "Graph" ? "graph" : "schema"}/${prepareArg(duplicateName)}/duplicate`, {
+                method: "PATCH",
+                body: JSON.stringify({
+                    sourceName: selectedValue
+                })
             }, toast, setIndicator)
 
             if (!result.ok) return
@@ -52,6 +55,7 @@ export default function DuplicateGraph({ open, onOpenChange, selectedValue, onDu
 
     return (
         <DialogComponent
+            overlayClassName="fixed inset-0 z-40 bg-black/80 backdrop-blur-sm data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0"
             open={open}
             onOpenChange={onOpenChange}
             trigger={<Button

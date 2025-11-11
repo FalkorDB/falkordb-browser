@@ -1,10 +1,18 @@
-import { NextRequest, NextResponse } from "next/server";
 import { getClient } from "@/app/api/auth/[...nextauth]/options";
+import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 
-// eslint-disable-next-line import/prefer-default-export
-export async function GET(
+// Validation schema
+const bodySchema = z.object({
+  label: z.string({
+    required_error: "Label is required",
+    invalid_type_error: "Invalid Label",
+  }),
+});
+
+export async function DELETE(
   request: NextRequest,
-  { params }: { params: Promise<{ graph: string; node: string }> }
+  { params }: { params: Promise<{ graph: string; element: string }> }
 ) {
   try {
     const session = await getClient();
@@ -14,21 +22,25 @@ export async function GET(
     }
 
     const { client, user } = session;
-    const { graph: graphId, node } = await params;
-    const nodeId = Number(node);
+    const { graph: graphId, element } = await params;
+    const nodeId = Number(element);
+    const validationResult = bodySchema.safeParse(await request.json());
 
     try {
+      if (!validationResult.success) {
+        throw new Error(validationResult.error.errors[0].message);
+      }
+
+      const { label } = validationResult.data;
+
+      const query = `MATCH (n) WHERE ID(n) = $nodeId REMOVE n:${label}`;
       const graph = client.selectGraph(graphId);
-
-      // Get node's neighbors
-      const query = `MATCH (src)-[e]-(n)
-                          WHERE ID(src) = $nodeId
-                          RETURN e, n`;
-
       const result =
         user.role === "Read-Only"
           ? await graph.roQuery(query, { params: { nodeId } })
           : await graph.query(query, { params: { nodeId } });
+
+      if (!result) throw new Error("Failed to delete label");
 
       return NextResponse.json({ result }, { status: 200 });
     } catch (error) {
@@ -39,6 +51,7 @@ export async function GET(
       );
     }
   } catch (err) {
+    console.error(err);
     return NextResponse.json(
       { message: (err as Error).message },
       { status: 500 }
@@ -46,9 +59,9 @@ export async function GET(
   }
 }
 
-export async function DELETE(
+export async function POST(
   request: NextRequest,
-  { params }: { params: Promise<{ graph: string; node: string }> }
+  { params }: { params: Promise<{ graph: string; element: string }> }
 ) {
   try {
     const session = await getClient();
@@ -58,26 +71,28 @@ export async function DELETE(
     }
 
     const { client, user } = session;
-    const { graph: graphId, node } = await params;
-    const nodeId = Number(node);
-    const { type } = await request.json();
+    const { graph: graphId, element } = await params;
+    const nodeId = Number(element);
+    const validationResult = bodySchema.safeParse(await request.json());
 
     try {
-      if (type === undefined) throw new Error("Type is required");
+      if (!validationResult.success) {
+        throw new Error(validationResult.error.errors[0].message);
+      }
 
+      const { label } = validationResult.data;
+
+      const query = `MATCH (n) WHERE ID(n) = $nodeId SET n:${label}`;
       const graph = client.selectGraph(graphId);
-      const query = type
-        ? `MATCH (n) WHERE ID(n) = $nodeId DELETE n`
-        : `MATCH ()-[e]-() WHERE ID(e) = $nodeId DELETE e`;
       const result =
         user.role === "Read-Only"
           ? await graph.roQuery(query, { params: { nodeId } })
           : await graph.query(query, { params: { nodeId } });
 
-      if (!result) throw new Error("Something went wrong");
+      if (!result) throw new Error("Failed to set label");
 
       return NextResponse.json(
-        { message: "Node deleted successfully" },
+        { message: "Label added successfully" },
         { status: 200 }
       );
     } catch (error) {
@@ -88,6 +103,7 @@ export async function DELETE(
       );
     }
   } catch (err) {
+    console.error(err);
     return NextResponse.json(
       { message: (err as Error).message },
       { status: 500 }

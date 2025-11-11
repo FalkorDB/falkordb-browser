@@ -17,16 +17,18 @@ export async function GET(
     const { graph } = await params;
 
     try {
-      const result = await client.selectGraph(graph).memoryUsage()
-      
+      const result = await client.selectGraph(graph).memoryUsage();
+
       return NextResponse.json({ result }, { status: 200 });
-    } catch (err) {
-        return NextResponse.json(
-          { message: (err as Error).message },
-          { status: 400 }
-        );
+    } catch (error) {
+      console.error(error);
+      return NextResponse.json(
+        { message: (error as Error).message },
+        { status: 400 }
+      );
     }
   } catch (err) {
+    console.error(err);
     return NextResponse.json(
       { message: (err as Error).message },
       { status: 500 }

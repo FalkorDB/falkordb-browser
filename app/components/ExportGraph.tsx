@@ -56,6 +56,7 @@ export default function ExportGraph({ selectedValues, type }: Props) {
 
     return (
         <DialogComponent
+            overlayClassName="fixed inset-0 z-40 bg-black/80 backdrop-blur-sm data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0"
             open={open}
             onOpenChange={setOpen}
             trigger={

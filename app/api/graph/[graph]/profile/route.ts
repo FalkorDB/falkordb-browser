@@ -18,7 +18,7 @@ export async function GET(
     const query = req.nextUrl.searchParams.get("query");
 
     try {
-      if (!query) throw new Error("Missing parameter query");
+      if (!query) throw new Error("Invalid Query");
 
       const graph = client.selectGraph(graphId);
       const result = await graph.profile(query);
@@ -32,6 +32,7 @@ export async function GET(
       );
     }
   } catch (err) {
+    console.error(err);
     return NextResponse.json(
       { message: (err as Error).message },
       { status: 500 }

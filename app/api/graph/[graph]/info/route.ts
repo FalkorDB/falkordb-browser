@@ -15,15 +15,10 @@ export async function GET(
 
     const { client, user } = session;
     const { graph: graphId } = await params;
-    const type = request.nextUrl.searchParams.get("type") as
-      | "(function)"
-      | "(property key)"
-      | "(label)"
-      | "(relationship type)"
-      | undefined;
+    const type = request.nextUrl.searchParams.get("type");
 
     try {
-      const getQuery = () => {
+      const query = (() => {
         switch (type) {
           case "(function)":
             return "CALL dbms.procedures() YIELD name as info";
@@ -34,16 +29,16 @@ export async function GET(
           case "(relationship type)":
             return "CALL db.relationshipTypes() YIELD relationshipType as info";
           default:
-            throw new Error("Type is required");
+            throw new Error("Invalid Type");
         }
-      };
+      })();
 
       const graph = client.selectGraph(graphId);
 
       const result =
         user.role === "Read-Only"
-          ? await graph.roQuery(getQuery())
-          : await graph.query(getQuery());
+          ? await graph.roQuery(query)
+          : await graph.query(query);
 
       return NextResponse.json({ result }, { status: 200 });
     } catch (error) {
@@ -54,6 +49,7 @@ export async function GET(
       );
     }
   } catch (err) {
+    console.error(err);
     return NextResponse.json(
       { message: (err as Error).message },
       { status: 500 }

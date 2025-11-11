@@ -24,19 +24,12 @@ export async function GET(
     try {
       const graph = client.selectGraph(graphId);
 
-      // Execute two separate queries for accurate counts
       const nodesQuery = "MATCH (n) RETURN count(n) as nodes";
       const edgesQuery = "MATCH ()-[e]->() RETURN count(e) as edges";
 
-      // Execute nodes count query
       const nodesResult = await runQuery(graph, nodesQuery, user.role);
-
-      // Execute edges count query  
       const edgesResult = await runQuery(graph, edgesQuery, user.role);
 
-      if (!nodesResult || !edgesResult) throw new Error("Something went wrong");
-
-      // Combine results into expected format
       const nodes = (nodesResult.data && nodesResult.data[0] && (nodesResult.data[0] as { nodes: number }).nodes) || 0;
       const edges = (edgesResult.data && edgesResult.data[0] && (edgesResult.data[0] as { edges: number }).edges) || 0;
 

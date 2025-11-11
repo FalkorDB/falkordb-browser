@@ -13,10 +13,11 @@ export async function GET(
     }
 
     const { client } = session;
-
     const { config: configName } = await params;
+
     try {
       const config = await client.configGet(configName);
+
       return NextResponse.json({ config }, { status: 200 });
     } catch (error) {
       console.error(error);
@@ -26,6 +27,7 @@ export async function GET(
       );
     }
   } catch (err) {
+    console.error(err);
     return NextResponse.json(
       { message: (err as Error).message },
       { status: 500 }
@@ -45,20 +47,21 @@ export async function POST(
     }
 
     const { client } = session;
-
     const { config: configName } = await params;
-    const value = request.nextUrl.searchParams.get("value");
+    const { value } = await request.json();
 
     try {
-      if (!value) throw new Error("Value is required");
+      const parsedValue = parseInt(value, 10);
 
-      const parsedValue =
-        configName === "CMD_INFO" ? value : parseInt(value, 10);
-
-      if (configName !== "CMD_INFO" && Number.isNaN(parsedValue))
-        throw new Error("Invalid value");
+      if (
+        !value ||
+        typeof value !== "string" ||
+        (configName === "CMD_INFO" && Number.isNaN(parsedValue))
+      )
+        throw new Error("Invalid Value");
 
       const config = await client.configSet(configName, parsedValue);
+
       return NextResponse.json({ config }, { status: 200 });
     } catch (error) {
       console.error(error);
@@ -68,6 +71,7 @@ export async function POST(
       );
     }
   } catch (err) {
+    console.error(err);
     return NextResponse.json(
       { message: (err as Error).message },
       { status: 500 }

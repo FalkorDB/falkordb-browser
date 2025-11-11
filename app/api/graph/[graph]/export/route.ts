@@ -17,9 +17,7 @@ export async function GET(
     const { graph: graphId } = await params;
 
     try {
-      const result = await (
-        await client.connection
-      ).dump(graphId);
+      const result = await (await client.connection).dump(graphId);
 
       if (!result)
         throw new Error(`Failed to retrieve graph data for ID: ${graphId}`);
@@ -32,12 +30,14 @@ export async function GET(
         },
       });
     } catch (error) {
+      console.error(error);
       return NextResponse.json(
         { message: (error as Error).message },
         { status: 400 }
       );
     }
   } catch (err) {
+    console.error(err);
     return NextResponse.json(
       { message: (err as Error).message },
       { status: 500 }

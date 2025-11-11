@@ -14,12 +14,11 @@ export async function GET(
     }
 
     const { client } = session;
-
     const { graph: graphId } = await params;
     const query = request.nextUrl.searchParams.get("query");
 
     try {
-      if (!query) throw new Error("Missing parameter query");
+      if (!query) throw new Error("Invalid Query");
 
       const graph = client.selectGraph(graphId);
       const result = await graph.explain(query);
@@ -33,6 +32,7 @@ export async function GET(
       );
     }
   } catch (err) {
+    console.error(err);
     return NextResponse.json(
       { message: (err as Error).message },
       { status: 500 }

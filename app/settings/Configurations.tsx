@@ -152,12 +152,10 @@ export default function Configurations() {
             }
         }
 
-        const result = await securedFetch(
-            `api/graph/config/${prepareArg(name)}?value=${prepareArg(value)}`,
-            { method: 'POST' },
-            toast,
-            setIndicator
-        );
+        const result = await securedFetch(`api/graph/config/${prepareArg(name)}}`, {
+            method: 'POST',
+            body: JSON.stringify({ value })
+        }, toast, setIndicator);
 
         if (!result.ok) return false;
 

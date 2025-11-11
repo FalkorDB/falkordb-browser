@@ -1,13 +1,12 @@
+import { Role } from "next-auth";
+
 export interface User {
   username: string;
   role: string;
 }
 
-export interface CreateUser {
-  username: string;
-  password: string;
-  role: string;
-}
+// Extract role values for zod validation
+export const roleValues = ["Admin", "Read-Write", "Read-Only"] as const satisfies readonly Role[];
 
 const READ_ONLY_ROLE = [
   "on",
@@ -29,7 +28,7 @@ const READ_ONLY_ROLE = [
   "+expiretime",
 ];
 
-export const ROLE = new Map<string, string[]>([
+export const ROLE = new Map<Role, string[]>([
   ["Admin", ["on", "~*", "&*", "+@all"]],
   [
     "Read-Write",

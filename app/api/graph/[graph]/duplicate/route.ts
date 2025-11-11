@@ -1,5 +1,14 @@
 import { getClient } from "@/app/api/auth/[...nextauth]/options";
 import { NextResponse, NextRequest } from "next/server";
+import { z } from "zod";
+
+// Validation schema
+const patchBodySchema = z.object({
+  sourceName: z.string({
+    required_error: "SourceName is required",
+    invalid_type_error: "Invalid SourceName",
+  }),
+});
 
 // eslint-disable-next-line import/prefer-default-export
 export async function PATCH(
@@ -15,10 +24,14 @@ export async function PATCH(
 
     const { client } = session;
     const { graph } = await params;
-    const sourceName = request.nextUrl.searchParams.get("sourceName");
+    const validationResult = patchBodySchema.safeParse(await request.json());
 
     try {
-      if (!sourceName) throw new Error("Missing parameter sourceName");
+      if (!validationResult.success) {
+        throw new Error(validationResult.error.errors[0].message);
+      }
+
+      const { sourceName } = validationResult.data;
 
       const result = await client.selectGraph(sourceName).copy(graph);
 
@@ -31,6 +44,7 @@ export async function PATCH(
       );
     }
   } catch (err) {
+    console.error(err);
     return NextResponse.json(
       { message: (err as Error).message },
       { status: 500 }

@@ -1,3 +1,5 @@
+import { roleValues } from "../user/model";
+
 // Complete Swagger specification for FalkorDB Browser API
 const swaggerSpec = {
   openapi: "3.0.0",
@@ -2302,7 +2304,7 @@ const swaggerSpec = {
                           },
                           role: {
                             type: "string",
-                            enum: ["Admin", "Read-Write", "Read-Only"],
+                            enum: roleValues,
                             example: "Read-Write"
                           },
                           selected: {
@@ -2349,7 +2351,7 @@ const swaggerSpec = {
                   },
                   role: {
                     type: "string",
-                    enum: ["Admin", "Read-Write", "Read-Only"],
+                    enum: roleValues,
                     description: "Role to assign to the user",
                     example: "Read-Write"
                   }
@@ -2479,7 +2481,7 @@ const swaggerSpec = {
             required: true,
             schema: {
               type: "string",
-              enum: ["Admin", "Read-Write", "Read-Only"]
+              enum: roleValues
             },
             description: "New role for the user"
           }

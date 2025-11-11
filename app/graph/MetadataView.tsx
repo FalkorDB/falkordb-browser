@@ -38,7 +38,7 @@ export function Profile({ graphName, query, setQuery, fetchCount, background }: 
     const handleProfile = async () => {
         setIsLoading(true)
         try {
-            const result = await securedFetch(`/api/graph/${graphName}/profile?query=${prepareArg(query.text)}`, {
+            const result = await securedFetch(`/api/graph/${prepareArg(graphName)}/profile?query=${prepareArg(query.text)}`, {
                 method: "GET",
             }, toast, setIndicator)
 

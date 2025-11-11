@@ -323,7 +323,7 @@ export default function EditorComponent({ graph, graphName, historyQuery, maximi
     const fetchSuggestions = async (detail: string): Promise<monaco.languages.CompletionItem[]> => {
         if (indicator === "offline") return []
 
-        const result = await securedFetch(`api/graph/${graphIdRef.current}/info?type=${prepareArg(detail)}`, {
+        const result = await securedFetch(`api/graph/${prepareArg(graphIdRef.current)}/info?type=${prepareArg(detail)}`, {
             method: 'GET',
         }, toast, setIndicator)
 

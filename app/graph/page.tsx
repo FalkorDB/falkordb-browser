@@ -95,7 +95,7 @@ export default function Page() {
     const fetchInfo = useCallback(async (type: string) => {
         if (!graphName) return []
 
-        const result = await securedFetch(`/api/graph/${graphName}/info?type=${type}`, {
+        const result = await securedFetch(`/api/graph/${prepareArg(graphName)}/info?type=${type}`, {
             method: "GET",
         }, toast, setIndicator);
 

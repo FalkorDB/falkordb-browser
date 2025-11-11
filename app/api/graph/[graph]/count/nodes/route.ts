@@ -23,15 +23,9 @@ export async function GET(
 
     try {
       const graph = client.selectGraph(graphId);
-
-      // Execute nodes count query
-      const nodesQuery = "MATCH (n) RETURN count(n) as nodes";
-      const nodesResult = await runQuery(graph, nodesQuery, user.role);
-
-      if (!nodesResult) throw new Error("Something went wrong");
-
-      // Extract nodes count from result
-      const nodes = (nodesResult.data && nodesResult.data[0] && (nodesResult.data[0] as { nodes: number }).nodes) || 0;
+      const query = 'MATCH (n) RETURN count(n) as nodes';
+      const result = await runQuery(graph, query, user.role);
+      const nodes = (result.data && result.data[0] && (result.data[0] as { nodes: number }).nodes) || 0;
 
       writer.write(
         encoder.encode(`event: result\ndata: ${JSON.stringify({ nodes })}\n\n`)

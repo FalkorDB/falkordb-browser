@@ -1,4 +1,4 @@
-export const formatAttribute = (att: [string, string[]]) => {
+export const formatAttribute = (att: [string, string[]]): [string, string] => {
     const [key, [t, d, u, r]] = att
     let val = `${t}`
     if (u === "true") val += "!"

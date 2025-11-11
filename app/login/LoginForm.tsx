@@ -147,7 +147,7 @@ export default function LoginForm() {
     // Handle URL mode
     if (loginMode === "url") {
       const trimmedUrl = falkordbUrl.trim();
-      
+
       // Validate URL format: falkor[s]://[[username][:password]@][host][:port][/db-number]
       // Also supports redis:// and rediss:// protocols
       const urlPattern = /^(falkor|falkors|redis|rediss):\/\/(?:([^:@]+)(?::([^@]+))?@)?([^:/\s]+)(?::(\d+))?(?:\/(\d+))?$/;

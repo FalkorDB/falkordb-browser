@@ -23,15 +23,9 @@ export async function GET(
 
     try {
       const graph = client.selectGraph(graphId);
-
-      // Execute edges count query
-      const edgesQuery = "MATCH ()-[e]->() RETURN count(e) as edges";
-      const edgesResult = await runQuery(graph, edgesQuery, user.role);
-
-      if (!edgesResult) throw new Error("Something went wrong");
-
-      // Extract edges count from result
-      const edges = (edgesResult.data && edgesResult.data[0] && (edgesResult.data[0] as { edges: number }).edges) || 0;
+      const query = 'MATCH ()-[e]->() RETURN count(e) as edges';
+      const result = await runQuery(graph, query, user.role);
+      const edges = (result.data && result.data[0] && (result.data[0] as { edges: number }).edges) || 0;
 
       writer.write(
         encoder.encode(`event: result\ndata: ${JSON.stringify({ edges })}\n\n`)

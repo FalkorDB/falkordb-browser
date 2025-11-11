@@ -255,7 +255,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
   const fetchInfo = useCallback(async (type: string, name: string) => {
     if (!graphName) return []
 
-    const result = await securedFetch(`/api/graph/${name}/info?type=${type}`, {
+    const result = await securedFetch(`/api/graph/${prepareArg(name)}/info?type=${type}`, {
       method: "GET",
     }, toast, setIndicator);
 

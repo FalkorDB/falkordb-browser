@@ -4,9 +4,9 @@
 
 "use client"
 
-import { Dispatch, SetStateAction, useContext, useEffect, useRef, useState } from "react"
+import { Dispatch, SetStateAction, useContext, useEffect, useMemo, useRef, useState } from "react"
 import ForceGraph2D from "react-force-graph-2d"
-import { securedFetch, GraphRef, handleZoomToFit, getTheme, Tab, ViewportState } from "@/lib/utils"
+import { securedFetch, GraphRef, handleZoomToFit, getTheme, Tab, ViewportState, prepareArg } from "@/lib/utils"
 import { useToast } from "@/components/ui/use-toast"
 import * as d3 from "d3"
 import { useTheme } from "next-themes"
@@ -40,7 +40,7 @@ interface Props {
     isSaved?: boolean
 }
 
-const NODE_SIZE = 6
+const NODE_SIZE = 6;
 const PADDING = 2;
 
 /**
@@ -135,21 +135,46 @@ export default function ForceGraph({
     isSaved
 }: Props) {
 
-    const { indicator, setIndicator } = useContext(IndicatorContext)
-    const { settings: { graphInfo: { displayTextPriority } } } = useContext(BrowserSettingsContext)
+    const { indicator, setIndicator } = useContext(IndicatorContext);
+    const { settings: { graphInfo: { displayTextPriority } } } = useContext(BrowserSettingsContext);
 
-    const { theme } = useTheme()
-    const { toast } = useToast()
-    const { background, foreground } = getTheme(theme)
+    const { theme } = useTheme();
+    const { toast } = useToast();
+    const { background, foreground } = getTheme(theme);
 
-    const lastClick = useRef<{ date: Date, name: string }>({ date: new Date(), name: "" })
-    const parentRef = useRef<HTMLDivElement>(null)
+    const lastClick = useRef<{ date: Date, name: string }>({ date: new Date(), name: "" });
+    const parentRef = useRef<HTMLDivElement>(null);
 
-    const [hoverElement, setHoverElement] = useState<Node | Link | undefined>()
+    const [hoverElement, setHoverElement] = useState<Node | Link | undefined>();
+
+    const getKeyFromType = (element: Node | Link) => element.source ? "nodes" : "links";
+
+    const selectedElementIdSet = useMemo(() => {
+        const ids = {
+            nodes: new Set<number>(),
+            links: new Set<number>()
+        }
+
+        if (selectedElement) {
+            ids[getKeyFromType(selectedElement)].add(selectedElement.id);
+        }
+
+        if (hoverElement) {
+            ids[getKeyFromType(hoverElement)].add(hoverElement.id);
+        }
+
+        selectedElements.forEach(e => {
+            if (e) {
+                ids[getKeyFromType(e)].add(e.id);
+            }
+        });
+
+        return ids;
+    }, [hoverElement, selectedElement, selectedElements]);
 
     useEffect(() => {
-        setData({ ...graph.Elements })
-    }, [graph, setData])
+        setData({ ...graph.Elements });
+    }, [graph, setData]);
 
     // Load saved viewport on mount
     useEffect(() => {
@@ -162,10 +187,10 @@ export default function ForceGraph({
                 }
             }, 100);
         } else if (currentTab === "Graph" && graph.Elements.nodes.length > 0) {
-            handleCooldown()
+            handleCooldown();
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [chartRef, graph.Id, currentTab, graph.Elements.nodes.length, isSaved])
+    }, [chartRef, graph.Id, currentTab, graph.Elements.nodes.length, isSaved]);
 
     // Save viewport on unmount
     useEffect(() => {
@@ -185,7 +210,7 @@ export default function ForceGraph({
                 }
             }
         };
-    }, [chartRef, graph.Id, setViewport])
+    }, [chartRef, graph.Id, setViewport]);
 
     useEffect(() => {
         if (!parentRef.current) return;
@@ -195,37 +220,39 @@ export default function ForceGraph({
         if (!canvas) return;
 
         canvas.setAttribute('data-engine-status', 'stop');
-    }, [])
+    }, []);
 
     useEffect(() => {
         const handleResize = () => {
-            if (!parentRef.current) return
-            setParentWidth(parentRef.current.clientWidth)
-            setParentHeight(parentRef.current.clientHeight)
-        }
+            if (!parentRef.current) return;
+            setParentWidth(parentRef.current.clientWidth);
+            setParentHeight(parentRef.current.clientHeight);
+        };
 
-        window.addEventListener('resize', handleResize)
+        window.addEventListener('resize', handleResize);
 
-        const observer = new ResizeObserver(handleResize)
+        const observer = new ResizeObserver(handleResize);
 
         if (parentRef.current) {
-            observer.observe(parentRef.current)
+            observer.observe(parentRef.current);
         }
 
         return () => {
-            window.removeEventListener('resize', handleResize)
-            observer.disconnect()
+            window.removeEventListener('resize', handleResize);
+            observer.disconnect();
         }
-    }, [parentRef, setParentHeight, setParentWidth])
+    }, [parentRef, setParentHeight, setParentWidth]);
 
     useEffect(() => {
         if (!chartRef.current) return;
 
         const nodeCount = data.nodes.length;
-
+        const sqrtNodeCount = Math.sqrt(nodeCount);
+        const sqrtRefNodeCount = Math.sqrt(REFERENCE_NODE_COUNT);
+        const ratio = sqrtNodeCount / sqrtRefNodeCount;
         // Use Math.min/Math.max for capping
-        const linkDistance = Math.max(Math.min(BASE_LINK_DISTANCE * Math.sqrt(nodeCount) / Math.sqrt(REFERENCE_NODE_COUNT), 120), 20);
-        const chargeStrength = Math.min(Math.max(BASE_CHARGE_STRENGTH * Math.sqrt(nodeCount) / Math.sqrt(REFERENCE_NODE_COUNT), -80), -1);
+        const linkDistance = Math.max(Math.min(BASE_LINK_DISTANCE * ratio, 120), 20);
+        const chargeStrength = Math.min(Math.max(BASE_CHARGE_STRENGTH * ratio, -80), -1);
 
         // Adjust link force and length
         const linkForce = chartRef.current.d3Force('link');
@@ -256,7 +283,7 @@ export default function ForceGraph({
         // Reheat the simulation
         chartRef.current.d3ReheatSimulation();
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [chartRef, graph.Elements.links.length, graph.Elements.nodes.length, graph])
+    }, [chartRef, graph.Elements.links.length, graph.Elements.nodes.length, graph]);
 
     // Clear cached display names when displayTextPriority changes
     useEffect(() => {
@@ -270,7 +297,7 @@ export default function ForceGraph({
     }, [displayTextPriority, chartRef, data.nodes]);
 
     const onFetchNode = async (node: Node) => {
-        const result = await securedFetch(`/api/graph/${graph.Id}/${node.id}`, {
+        const result = await securedFetch(`/api/graph/${prepareArg(graph.Id)}/${node.id}`, {
             method: 'GET',
             headers: {
                 'Content-Type': 'application/json'
@@ -278,46 +305,48 @@ export default function ForceGraph({
         }, toast, setIndicator);
 
         if (result.ok) {
-            const json = await result.json()
-            const elements = graph.extend(json.result, true)
+            const json = await result.json();
+            const elements = graph.extend(json.result, true);
             if (elements.length === 0) {
                 toast({
                     title: `No neighbors found`,
                     description: `No neighbors found`,
-                })
+                });
             }
         }
-    }
+    };
 
     const deleteNeighbors = (nodes: Node[]) => {
 
         if (nodes.length === 0) return;
 
-        const expandedNodes: Node[] = []
+        const expandedNodes: Node[] = [];
+
+        const nodeIdSet = new Set(nodes.map(n => n.id));
 
         graph.Elements = {
             nodes: graph.Elements.nodes.filter(node => {
-                if (!node.collapsed) return true
+                if (!node.collapsed) return true;
 
-                const isTarget = graph.Elements.links.some(link => link.target.id === node.id && nodes.some(n => n.id === link.source.id));
+                const isTarget = graph.Elements.links.some(link => link.target.id === node.id && nodeIdSet.has(link.source.id));
 
-                if (!isTarget) return true
+                if (!isTarget) return true;
 
-                const deleted = graph.NodesMap.delete(Number(node.id))
+                const deleted = graph.NodesMap.delete(Number(node.id));
 
                 if (deleted && node.expand) {
-                    expandedNodes.push(node)
+                    expandedNodes.push(node);
                 }
 
-                return false
+                return false;
             }),
             links: graph.Elements.links
-        }
+        };
 
-        deleteNeighbors(expandedNodes)
+        deleteNeighbors(expandedNodes);
 
-        setRelationships(graph.removeLinks(nodes.map(n => n.id)))
-    }
+        setRelationships(graph.removeLinks(nodes.map(n => n.id)));
+    };
 
     const getNodeDisplayText = (node: Node) => {
         const { data: nodeData } = node;
@@ -350,67 +379,65 @@ export default function ForceGraph({
         }
 
         return String(node.id);
-    }
+    };
 
     const handleNodeClick = async (node: Node) => {
-        const now = new Date()
-        const { date, name } = lastClick.current
-        lastClick.current = { date: now, name: getNodeDisplayText(node) }
+        const now = new Date();
+        const { date, name } = lastClick.current;
+        lastClick.current = { date: now, name: getNodeDisplayText(node) };
 
         if (now.getTime() - date.getTime() < 1000 && name === getNodeDisplayText(node)) {
             if (!node.expand) {
-                await onFetchNode(node)
+                await onFetchNode(node);
             } else {
-                deleteNeighbors([node])
+                deleteNeighbors([node]);
             }
 
-            node.expand = !node.expand
-            setData({ ...graph.Elements })
-            handleCooldown(undefined, false)
+            node.expand = !node.expand;
+            setData({ ...graph.Elements });
+            handleCooldown(undefined, false);
         }
-    }
+    };
 
     const handleHover = (element: Node | Link | null) => {
-        setHoverElement(element === null ? undefined : element)
-    }
+        setHoverElement(element === null ? undefined : element);
+    };
 
     const handleRightClick = (element: Node | Link, evt: MouseEvent) => {
         if (!element.source && isAddElement) {
             if (setSelectedNodes) {
                 setSelectedNodes(prev => {
-                    const node = element as Node
+                    const node = element as Node;
                     if (prev[0] === undefined) {
-                        return [node, undefined]
+                        return [node, undefined];
                     }
                     if (prev[1] === undefined) {
-                        return [prev[0], node]
+                        return [prev[0], node];
                     }
-                    return [node, prev[0]]
-                })
-                return
+                    return [node, prev[0]];
+                });
+                return;
             }
         }
 
         if (evt.ctrlKey) {
             if (selectedElements.includes(element)) {
-                setSelectedElements(selectedElements.filter((el) => el !== element))
+                setSelectedElements(selectedElements.filter((el) => el !== element));
             } else {
-                setSelectedElements([...selectedElements, element])
+                setSelectedElements([...selectedElements, element]);
             }
         }
 
-        setSelectedElement(element)
-    }
+        setSelectedElement(element);
+    };
 
     const handleUnselected = (evt?: MouseEvent) => {
-        if (evt?.ctrlKey || (!selectedElement && selectedElements.length === 0)) return
-        setSelectedElement(undefined)
-        setSelectedElements([])
-    }
+        if (evt?.ctrlKey || (!selectedElement && selectedElements.length === 0)) return;
+        setSelectedElement(undefined);
+        setSelectedElements([]);
+    };
 
-    const isLinkSelected = (link: Link) => (selectedElement && selectedElement.source && selectedElement.id === link.id)
-        || (hoverElement && hoverElement.source && hoverElement.id === link.id)
-        || (selectedElements.length > 0 && selectedElements.some(el => el.id === link.id && el.source))
+    const isSelected = (element: Node | Link) => selectedElementIdSet[getKeyFromType(element)].has(element.id);
 
     return (
         <div ref={parentRef} className="w-full h-full relative">
@@ -435,23 +462,21 @@ export default function ForceGraph({
                     let length = 0;
 
                     if (link.source !== link.target) {
-                        length = isLinkSelected(link) ? 4 : 2
+                        length = isSelected(link) ? 4 : 2;
                     }
 
                     return length;
                 }}
                 linkDirectionalArrowColor={(link) => link.color}
-                linkWidth={(link) => isLinkSelected(link) ? 2 : 1}
+                linkWidth={(link) => isSelected(link) ? 2 : 1}
                 nodeCanvasObject={(node, ctx) => {
 
                     if (!node.x || !node.y) {
-                        node.x = 0
-                        node.y = 0
+                        node.x = 0;
+                        node.y = 0;
                     }
 
-                    ctx.lineWidth = ((selectedElement && !selectedElement.source && selectedElement.id === node.id)
-                        || (hoverElement && !hoverElement.source && hoverElement.id === node.id)
-                        || (selectedElements.length > 0 && selectedElements.some(el => el.id === node.id && !el.source))) ? 1.5 : 0.5
+                    ctx.lineWidth = isSelected(node) ? 1.5 : 0.5;
                     ctx.strokeStyle = foreground;
 
                     ctx.beginPath();
@@ -463,7 +488,7 @@ export default function ForceGraph({
                     ctx.textAlign = 'center';
                     ctx.textBaseline = 'middle';
                     ctx.font = `400 2px SofiaSans`;
-                    ctx.letterSpacing = '0.1px'
+                    ctx.letterSpacing = '0.1px';
 
                     let [line1, line2] = node.displayName;
 
@@ -502,10 +527,10 @@ export default function ForceGraph({
                     const end = link.target;
 
                     if (!start.x || !start.y || !end.x || !end.y) {
-                        start.x = 0
-                        start.y = 0
-                        end.x = 0
-                        end.y = 0
+                        start.x = 0;
+                        start.y = 0;
+                        end.x = 0;
+                        end.y = 0;
                     }
 
                     let textX;
@@ -551,23 +576,23 @@ export default function ForceGraph({
 
                     // Get text width
                     ctx.font = '400 2px SofiaSans';
-                    ctx.letterSpacing = '0.1px'
+                    ctx.letterSpacing = '0.1px';
 
                     let textWidth;
                     let textHeight;
-                    const relationship = graph.RelationshipsMap.get(link.relationship)
+                    const relationship = graph.RelationshipsMap.get(link.relationship);
 
                     if (relationship) {
-                        ({ textWidth, textHeight } = relationship)
+                        ({ textWidth, textHeight } = relationship);
                     }
 
                     if (!textWidth || !textHeight) {
-                        const { width, actualBoundingBoxAscent, actualBoundingBoxDescent } = ctx.measureText(link.relationship)
+                        const { width, actualBoundingBoxAscent, actualBoundingBoxDescent } = ctx.measureText(link.relationship);
 
-                        textWidth = width
-                        textHeight = actualBoundingBoxAscent + actualBoundingBoxDescent
+                        textWidth = width;
+                        textHeight = actualBoundingBoxAscent + actualBoundingBoxDescent;
                         if (relationship) {
-                            graph.RelationshipsMap.set(link.relationship, { ...relationship, textWidth, textHeight })
+                            graph.RelationshipsMap.set(link.relationship, { ...relationship, textWidth, textHeight });
                         }
                     }
 
@@ -602,10 +627,10 @@ export default function ForceGraph({
                 onBackgroundClick={handleUnselected}
                 onBackgroundRightClick={handleUnselected}
                 onEngineStop={async () => {
-                    if (cooldownTicks === 0) return
+                    if (cooldownTicks === 0) return;
 
-                    handleZoomToFit(chartRef, undefined, data.nodes.length < 2 ? 4 : undefined)
-                    setTimeout(() => handleCooldown(0), 1000)
+                    handleZoomToFit(chartRef, undefined, data.nodes.length < 2 ? 4 : undefined);
+                    setTimeout(() => handleCooldown(0), 1000);
                 }}
                 linkCurvature="curve"
                 nodeVisibility="visible"
@@ -615,5 +640,5 @@ export default function ForceGraph({
                 backgroundColor={background}
             />
         </div>
-    )
-}
+    );
+};
