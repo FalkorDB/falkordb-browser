@@ -404,40 +404,33 @@ const authOptions: AuthOptions = {
 
         try {
           // Use consistent user ID instead of random UUID
-          // Always prefer host/port over URL to ensure consistency
-          // across different login methods (URL form vs manual form)
+          // Extract host/port from URL if provided, otherwise use host/port fields
           let hostname: string;
           let port: number;
+          let username: string;
 
-          // If URL is provided, try to extract host/port from it
           if (credentials.url) {
+            // Parse URL to extract host, port, and username
             try {
               const parsed = new URL(credentials.url);
-              hostname = parsed.hostname || credentials.host || "localhost";
-              if (parsed.port) {
-                port = parseInt(parsed.port, 10);
-              } else if (credentials.port) {
-                port = parseInt(credentials.port, 10);
-              } else {
-                port = 6379;
-              }
+              hostname = parsed.hostname || "localhost";
+              port = parsed.port ? parseInt(parsed.port, 10) : 6379;
+              username = parsed.username || credentials.username || "default";
             } catch {
-              // URL parsing failed, use host/port directly
+              // URL parsing failed, fall back to host/port
               hostname = credentials.host || "localhost";
               port = credentials.port ? parseInt(credentials.port, 10) : 6379;
+              username = credentials.username || "default";
             }
           } else {
-            // No URL provided, use host/port
+            // Use individual connection parameters
             hostname = credentials.host || "localhost";
             port = credentials.port ? parseInt(credentials.port, 10) : 6379;
+            username = credentials.username || "default";
           }
 
-          // Generate consistent user ID from normalized hostname and port
-          const id = generateConsistentUserId(
-            credentials.username || "default",
-            hostname,
-            port
-          );
+          // Generate consistent user ID from normalized hostname, port, and username
+          const id = generateConsistentUserId(username, hostname, port);
 
           const { role } = await newClient(credentials, id);
 
