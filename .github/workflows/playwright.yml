@@ -15,9 +15,6 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
-strategy:
-  max-parallel: 2
-
 jobs:
   setup-dependencies:
     name: Setup and cache dependencies
@@ -89,6 +86,9 @@ jobs:
     needs: setup-dependencies
     timeout-minutes: 60
     runs-on: ubuntu-latest
+    concurrency:
+      group: test-wave-1-${{ github.ref }}
+      cancel-in-progress: false
 
     services:
       falkordb:
@@ -144,6 +144,9 @@ jobs:
     needs: setup-dependencies
     timeout-minutes: 60
     runs-on: ubuntu-latest
+    concurrency:
+      group: test-wave-1-${{ github.ref }}
+      cancel-in-progress: false
 
     services:
       falkordb:
@@ -199,6 +202,9 @@ jobs:
     needs: setup-dependencies
     timeout-minutes: 60
     runs-on: ubuntu-latest
+    concurrency:
+      group: test-wave-2-${{ github.ref }}
+      cancel-in-progress: false
 
     services:
       falkordb:
@@ -275,6 +281,9 @@ jobs:
     name: Run settings tests
     needs: setup-dependencies
     runs-on: ubuntu-latest
+    concurrency:
+      group: test-wave-2-${{ github.ref }}
+      cancel-in-progress: false
 
     services:
       falkordb:
@@ -333,6 +342,9 @@ jobs:
     needs: setup-dependencies
     timeout-minutes: 60
     runs-on: ubuntu-latest
+    concurrency:
+      group: test-wave-3-${{ github.ref }}
+      cancel-in-progress: false
 
     steps:
       - uses: actions/checkout@v4
@@ -460,6 +472,9 @@ jobs:
     needs: setup-dependencies
     timeout-minutes: 60
     runs-on: ubuntu-latest
+    concurrency:
+      group: test-wave-3-${{ github.ref }}
+      cancel-in-progress: false
 
     steps:
       - uses: actions/checkout@v4
