@@ -7,10 +7,6 @@ import {
 import GraphPage from "./graphPage";
 
 export default class GraphInfoPage extends GraphPage {
-  private get graphInfoPanelContainer(): Locator {
-    return this.page.getByTestId("graphInfoPanel");
-  }
-
   private get graphInfoNodesCount(): Locator {
     return this.page.getByTestId("nodesCount");
   }
@@ -58,11 +54,7 @@ export default class GraphInfoPage extends GraphPage {
 
   async openGraphInfoButton(): Promise<void> {
     if (await this.isGraphInfoPanelContainerVisible()) return;
-    await interactWhenVisible(
-      this.graphInfoButton,
-      (el) => el.click(),
-      "Graph Info Button"
-    );
+    this.clickGraphInfoButton()
   }
 
   async getGraphInfoNodesCount(): Promise<string | null> {
