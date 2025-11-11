@@ -11,10 +11,6 @@ on:
       RUN_BROWSER_TESTS:
         required: true
 
-concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: false
-
 jobs:
   setup-dependencies:
     name: Setup and cache dependencies
