@@ -246,7 +246,7 @@ jobs:
           PAT_FALKORDB_USERNAME: default
           PAT_FALKORDB_PASSWORD: ""
           PAT_FALKORDB_GRAPH_NAME: token_management
-          ENCRYPTION_KEY: "SECRETSECRETSECRETSECRETSECRETSECRETSECRETSECRETSECRETSECRETSE"
+          ENCRYPTION_KEY: "a3f5d8c2b7e4f1a0c9d6e8b2f5a7c3d1e9f2a4b8c6d3e7f1a5b9c2d8e4f0a6b3"
         run: |
           npm start &
           APP_PID=$!
