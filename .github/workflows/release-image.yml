@@ -7,7 +7,7 @@ on:
     branches:
       - main
 env:
-  CYPHER_VERSION: v0.1.4
+  CYPHER_VERSION: v0.1.5-beta.19
 jobs:
   build-and-release:
     runs-on: ubuntu-latest
