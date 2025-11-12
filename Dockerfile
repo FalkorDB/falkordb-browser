@@ -80,7 +80,8 @@ ENV REST_PORT=8080
 ENV MCP_PORT=3001
 ENV CYPHER=1
 ENV HOSTNAME="0.0.0.0"
-
+ENV CHAT_URL=http://localhost:8080/
+ENV NEXTAUTH_URL=http://localhost:3000/
 # Use root to run supervisord (it will drop privileges for individual services)
 USER root
 
