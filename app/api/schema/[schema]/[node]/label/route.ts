@@ -1,91 +1,91 @@
-import { getClient } from "@/app/api/auth/[...nextauth]/options";
-import { NextRequest, NextResponse } from "next/server";
+// import { getClient } from "@/app/api/auth/[...nextauth]/options";
+// import { NextRequest, NextResponse } from "next/server";
 
-export async function POST(
-  request: NextRequest,
-  { params }: { params: Promise<{ schema: string; node: string }> }
-) {
-  try {
-    const session = await getClient();
+// export async function POST(
+//   request: NextRequest,
+//   { params }: { params: Promise<{ schema: string; node: string }> }
+// ) {
+//   try {
+//     const session = await getClient();
 
-    if (session instanceof NextResponse) {
-      return session;
-    }
+//     if (session instanceof NextResponse) {
+//       return session;
+//     }
 
-    const { client, user } = session;
-    const { schema, node } = await params;
-    const schemaName = `${schema}_schema`;
-    const { label } = await request.json();
+//     const { client, user } = session;
+//     const { schema, node } = await params;
+//     const schemaName = `${schema}_schema`;
+//     const { label } = await request.json();
 
-    try {
-      if (!label) throw new Error("Label is required");
+//     try {
+//       if (!label) throw new Error("Label is required");
 
-      const graph = client.selectGraph(schemaName);
-      const q = `MATCH (n) WHERE ID(n) = ${node} SET n:${label}`;
-      const result =
-        user.role === "Read-Only"
-          ? await graph.roQuery(q)
-          : await graph.query(q);
+//       const graph = client.selectGraph(schemaName);
+//       const q = `MATCH (n) WHERE ID(n) = ${node} SET n:${label}`;
+//       const result =
+//         user.role === "Read-Only"
+//           ? await graph.roQuery(q)
+//           : await graph.query(q);
 
-      if (!result) throw new Error("Something went wrong");
+//       if (!result) throw new Error("Something went wrong");
 
-      return NextResponse.json({ result }, { status: 200 });
-    } catch (error) {
-      console.error(error);
-      return NextResponse.json(
-        { message: (error as Error).message },
-        { status: 400 }
-      );
-    }
-  } catch (err) {
-    return NextResponse.json(
-      { message: (err as Error).message },
-      { status: 500 }
-    );
-  }
-}
+//       return NextResponse.json({ result }, { status: 200 });
+//     } catch (error) {
+//       console.error(error);
+//       return NextResponse.json(
+//         { message: (error as Error).message },
+//         { status: 400 }
+//       );
+//     }
+//   } catch (err) {
+//     return NextResponse.json(
+//       { message: (err as Error).message },
+//       { status: 500 }
+//     );
+//   }
+// }
 
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: Promise<{ schema: string; node: string }> }
-) {
-  try {
-    const session = await getClient();
+// export async function DELETE(
+//   request: NextRequest,
+//   { params }: { params: Promise<{ schema: string; node: string }> }
+// ) {
+//   try {
+//     const session = await getClient();
 
-    if (session instanceof NextResponse) {
-      return session;
-    }
+//     if (session instanceof NextResponse) {
+//       return session;
+//     }
 
-    const { client, user } = session;
-    const { schema, node } = await params;
-    const { label } = await request.json();
-    const schemaName = `${schema}_schema`;
+//     const { client, user } = session;
+//     const { schema, node } = await params;
+//     const { label } = await request.json();
+//     const schemaName = `${schema}_schema`;
 
-    try {
-      if (!label) throw new Error("Label is required");
+//     try {
+//       if (!label) throw new Error("Label is required");
 
-      const graph = client.selectGraph(schemaName);
+//       const graph = client.selectGraph(schemaName);
 
-      const q = `MATCH (n) WHERE ID(n) = ${node} REMOVE n:${label}`;
-      const result =
-        user.role === "Read-Only"
-          ? await graph.roQuery(q)
-          : await graph.query(q);
+//       const q = `MATCH (n) WHERE ID(n) = ${node} REMOVE n:${label}`;
+//       const result =
+//         user.role === "Read-Only"
+//           ? await graph.roQuery(q)
+//           : await graph.query(q);
 
-      if (!result) throw new Error("Something went wrong");
+//       if (!result) throw new Error("Something went wrong");
 
-      return NextResponse.json({ result }, { status: 200 });
-    } catch (error) {
-      console.error(error);
-      return NextResponse.json(
-        { message: (error as Error).message },
-        { status: 400 }
-      );
-    }
-  } catch (err) {
-    return NextResponse.json(
-      { message: (err as Error).message },
-      { status: 500 }
-    );
-  }
-}
+//       return NextResponse.json({ result }, { status: 200 });
+//     } catch (error) {
+//       console.error(error);
+//       return NextResponse.json(
+//         { message: (error as Error).message },
+//         { status: 400 }
+//       );
+//     }
+//   } catch (err) {
+//     return NextResponse.json(
+//       { message: (err as Error).message },
+//       { status: 500 }
+//     );
+//   }
+// }
