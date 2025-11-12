@@ -197,9 +197,6 @@ export default function TableComponent({
 
     const getClassName = (index: number, level?: number) => cn("text-border rounded-lg", expandArr.get(index) === level && "bg-background text-foreground")
 
-    console.log(visibleRows[0]?.cells.length);
-    console.log(headers.length);
-
     return (
         <div className={cn("h-full w-full flex flex-col gap-4", className)}>
             <div className="flex gap-4">
