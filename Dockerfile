@@ -1,6 +1,8 @@
+ARG CYPHER_VERSION=latest
+
 FROM node:22-alpine AS base
 
-FROM falkordb/text-to-cypher:latest AS cypher
+FROM falkordb/text-to-cypher:${CYPHER_VERSION} AS cypher
 
 # Install dependencies only when needed
 FROM base AS deps
@@ -67,19 +69,18 @@ COPY --from=cypher --chown=nextjs:nodejs /app/templates /app/templates
 
 # Create supervisor directories and copy config
 RUN mkdir -p /etc/supervisor/conf.d /var/log/supervisor
-RUN touch /var/run/supervisord.pid && chown nextjs:nodejs /var/run/supervisord.pid
 COPY ./entrypoint.sh /entrypoint.sh
 COPY ./supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 RUN chmod +x /entrypoint.sh
 
-EXPOSE 3000 8080
+EXPOSE 3000 8080 3001
 
 ENV PORT=3000
 ENV CYPHER=1
 ENV HOSTNAME="0.0.0.0"
 
 # Use root to run supervisord (it will drop privileges for individual services)
-USER nextjs
+USER root
 
 # server.js is created by next build from the standalone output
 # https://nextjs.org/docs/pages/api-reference/next-config-js/output
