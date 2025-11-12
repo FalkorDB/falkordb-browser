@@ -135,11 +135,11 @@ function validateExpiration(expiresAt: string | null, ttlSeconds: number | undef
 
 /**
  * Generates JWT token with user information
+ * Note: Password is NOT included in JWT - it's stored securely in Token DB (6380)
  */
 async function generateJWTToken(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   user: any,
-  userPassword: string | undefined,
   tokenId: string,
   expiresAtDate: Date | null,
   ttlSeconds: number | undefined,
@@ -157,6 +157,7 @@ async function generateJWTToken(
     expirationTime = undefined; // Never expires
   }
   
+  // JWT payload WITHOUT password for security
   const tokenPayload = {
     sub: user.id,
     jti: tokenId,
@@ -166,7 +167,6 @@ async function generateJWTToken(
     port: user.port,
     tls: user.tls,
     ca: user.ca || undefined,
-    pwd: userPassword !== undefined ? encrypt(userPassword) : undefined,
     iat: currentTime,
   };
 
@@ -190,7 +190,8 @@ async function storeTokenInFalkorDB(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   user: any,
   name: string,
-  expiresAtDate: Date | null
+  expiresAtDate: Date | null,
+  encryptedPassword: string
 ): Promise<void> {
   // Validate and provide defaults for required fields
   if (!user.id || !user.port) {
@@ -221,7 +222,8 @@ async function storeTokenInFalkorDB(
       created_at: ${nowUnix},
       expires_at: ${expiresAtUnix},
       last_used: -1,
-      is_active: true
+      is_active: true,
+      encrypted_password: '${escapeString(encryptedPassword)}'
     })
     CREATE (t)-[:BELONGS_TO]->(u)
     RETURN t.token_id as token_id
@@ -266,10 +268,9 @@ export async function POST(request: NextRequest) {
     // 5. Generate token ID
     const tokenId = generateTimeUUID();
 
-    // 6. Generate JWT token
+    // 6. Generate JWT token (without password for security)
     const token = await generateJWTToken(
       authResult.user!,
-      authResult.password,
       tokenId,
       expirationValidation.expiresAtDate ?? null,
       ttlSeconds,
@@ -278,12 +279,16 @@ export async function POST(request: NextRequest) {
 
     // 7. Store token in FalkorDB (non-blocking)
     try {
+      // Encrypt password before storing in Token DB
+      const encryptedPassword = authResult.password ? encrypt(authResult.password) : encrypt('');
+      
       await storeTokenInFalkorDB(
         token,
         tokenId,
         authResult.user!,
         name,
-        expirationValidation.expiresAtDate!
+        expirationValidation.expiresAtDate!,
+        encryptedPassword
       );
     } catch (storageError) {
       // eslint-disable-next-line no-console

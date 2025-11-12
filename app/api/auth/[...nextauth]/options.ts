@@ -6,10 +6,10 @@ import { FalkorDBOptions } from "falkordb/dist/src/falkordb";
 import { v4 as uuidv4 } from "uuid";
 import crypto from "crypto";
 import { isTokenActive } from "../tokenUtils";
-import { decrypt } from "../encryption";
 
 interface CustomJWTPayload {
   sub: string;
+  jti: string; // Token ID for fetching password from Token DB
   username?: string;
   role: Role;
   host: string;
@@ -17,7 +17,8 @@ interface CustomJWTPayload {
   tls: boolean;
   ca?: string;
   url?: string;
-  pwd?: string; // Encrypted password for connection recreation
+  // Note: Password is NOT stored in JWT for security
+  // It's stored encrypted in Token DB (6380) and fetched only when needed for reconnection
 }
 
 interface AuthenticatedUser {
@@ -212,35 +213,7 @@ export function generateConsistentUserId(
   return crypto.createHash('sha256').update(identifier).digest('hex');
 }
 
-/**
- * Creates a new FalkorDB connection from JWT payload
- * Decrypts the password from the JWT and establishes connection
- * @param payload - JWT payload containing encrypted credentials
- * @returns FalkorDB client instance
- */
-async function createConnectionFromJWT(payload: CustomJWTPayload): Promise<FalkorDB> {
-  // Decrypt password from JWT
-  if (!payload.pwd) {
-    throw new Error('JWT does not contain encrypted password. Cannot create connection.');
-  }
-  
-  const password = decrypt(payload.pwd);
-  
-  // Create connection using newClient
-  const { client } = await newClient(
-    {
-      host: payload.host,
-      port: payload.port.toString(),
-      username: payload.username || '',
-      password,
-      tls: payload.tls.toString(),
-      ca: payload.ca || undefined,
-    },
-    payload.sub
-  );
-  
-  return client;
-}
+
 
 /**
  * Retrieves the Authorization header from the request
@@ -369,21 +342,39 @@ async function tryJWTAuthentication(): Promise<{ client: FalkorDB; user: Authent
         }
       }
 
-      // No existing connection or health check failed - create new connection from JWT
+      // No existing connection or health check failed - fetch password from Token DB and reconnect
       if (!client) {
         // eslint-disable-next-line no-console
-        console.log("Creating new FalkorDB connection from JWT for user:", payload.sub);
+        console.log("Creating new FalkorDB connection for JWT user:", payload.sub);
         
         try {
-          client = await createConnectionFromJWT(payload);
+          // Fetch password from Token DB (6380) - NOT from JWT
+          const { getPasswordFromTokenDB } = await import('../tokenUtils');
+          const password = await getPasswordFromTokenDB(payload.jti);
+          
+          // Create new connection with retrieved password
+          const { client: reconnectedClient } = await newClient(
+            {
+              host: payload.host,
+              port: payload.port.toString(),
+              username: payload.username || '',
+              password,
+              tls: payload.tls.toString(),
+              ca: payload.ca || undefined,
+            },
+            payload.sub
+          );
+          
+          client = reconnectedClient;
           // Connection is already cached in connections Map by newClient()
         } catch (connectionError) {
           // eslint-disable-next-line no-console
-          console.error("Failed to create connection from JWT:", connectionError);
+          console.error("Failed to create connection from Token DB:", connectionError);
           return null;
         }
       }
 
+      // At this point, client is guaranteed to be defined (either reused or recreated)
       const user = createUserFromJWTPayload(payload);
       return { client, user };
     } catch (error) {
