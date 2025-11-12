@@ -197,6 +197,9 @@ export default function TableComponent({
 
     const getClassName = (index: number, level?: number) => cn("text-border rounded-lg", expandArr.get(index) === level && "bg-background text-foreground")
 
+    console.log(visibleRows[0]?.cells.length);
+    console.log(headers.length);
+
     return (
         <div className={cn("h-full w-full flex flex-col gap-4", className)}>
             <div className="flex gap-4">
@@ -319,15 +322,13 @@ export default function TableComponent({
                         )
                     }
                     {
-                        visibleRows.map((row) => {
+                        visibleRows.map((row, i) => {
                             const actualIndex = rows.findIndex(r => r === row)
-                            const firstVal = row.cells[0].value
-
-                            if (!firstVal) return undefined
+                            const firstVal = row.cells[0].value || i
                             
                             const dataTestID = `${label}${typeof firstVal === "object" ? firstVal.id : firstVal}`
 
-                            if (actualIndex === -1) return null
+                            if (actualIndex === -1) return undefined
 
                             return (
                                 <TableRow
