@@ -50,25 +50,25 @@ export default function Page() {
     const [labels, setLabels] = useState<Label[]>([])
     const [relationships, setRelationships] = useState<Relationship[]>([])
     const [data, setData] = useState<GraphData>(schema.Elements)
-    const [isAddRelation, setIsAddRelation] = useState(false)
+    const [isAddEdge, setIsAddEdge] = useState(false)
     const chartRef = useRef<ForceGraphMethods<Node, Link>>()
     const [edgesCount, setEdgesCount] = useState<number | undefined>()
     const [nodesCount, setNodesCount] = useState<number | undefined>()
-    const [isAddEntity, setIsAddEntity] = useState(false)
+    const [isAddNode, setIsAddNode] = useState(false)
     const [isCanvasLoading, setIsCanvasLoading] = useState(false)
     const [isCollapsed, setIsCollapsed] = useState(true)
 
     const [panelSize, graphSize] = useMemo(() => {
         if (selectedElement) return [30, 70]
-        if (isAddEntity || isAddRelation) return [40, 60]
+        if (isAddNode || isAddEdge) return [40, 60]
         return [0, 100]
-    }, [selectedElement, isAddEntity, isAddRelation])
+    }, [selectedElement, isAddNode, isAddEdge])
 
     const handleSetSelectedElement = useCallback((el: Node | Link | undefined) => {
         setSelectedElement(el)
         if (el) {
-            setIsAddEntity(false)
-            setIsAddRelation(false)
+            setIsAddNode(false)
+            setIsAddEdge(false)
         }
 
         const currentPanel = panelRef.current
@@ -79,12 +79,12 @@ export default function Page() {
         else currentPanel.collapse()
     }, [])
 
-    const handleSetIsAddEntity = useCallback((isAdd: boolean) => {
+    const handleSetIsAddNode = useCallback((isAdd: boolean) => {
         const currentPanel = panelRef.current
-        setIsAddEntity(isAdd)
+        setIsAddNode(isAdd)
 
         if (isAdd) {
-            setIsAddRelation(false)
+            setIsAddEdge(false)
             setSelectedElement(undefined)
         }
 
@@ -94,12 +94,12 @@ export default function Page() {
         else currentPanel.collapse()
     }, [])
 
-    const handleSetIsAddRelation = useCallback((isAdd: boolean) => {
+    const handleSetIsAddEdge = useCallback((isAdd: boolean) => {
         const currentPanel = panelRef.current
-        setIsAddRelation(isAdd)
+        setIsAddEdge(isAdd)
 
         if (isAdd) {
-            setIsAddEntity(false)
+            setIsAddNode(false)
             setSelectedElement(undefined)
         }
 
@@ -220,24 +220,24 @@ export default function Page() {
         handleCooldown()
     }
 
-    const onCreateElement = async (attributes: [string, string[]][], elementLabel?: string[]) => {
+    const handleCreateElement = async (attributes: [string, string[]][], elementLabel?: string[]) => {
         const fakeId = "-1"
         const result = await securedFetch(`api/schema/${prepareArg(schema.Id)}/${prepareArg(fakeId)}`, {
             method: "POST",
-            body: JSON.stringify({ type: isAddEntity, label: elementLabel, attributes, selectedNodes })
+            body: JSON.stringify({ type: isAddNode, label: elementLabel, attributes, selectedNodes })
         }, toast, setIndicator)
 
         if (result.ok) {
             const json = await result.json()
 
-            if (isAddEntity) {
+            if (isAddNode) {
                 const { labels: ls } = schema.extendNode(json.result.data[0].n, false, true, true)
                 setLabels(prev => [...prev, ...ls.filter(c => !prev.some(p => p.name === c)).map(c => schema.LabelsMap.get(c)!)])
-                handleSetIsAddEntity(false)
+                handleSetIsAddNode(false)
             } else {
                 const { relationship } = schema.extendEdge(json.result.data[0].e, false, true)
                 setRelationships(prev => [...prev, schema.RelationshipsMap.get(relationship)!])
-                handleSetIsAddRelation(false)
+                handleSetIsAddEdge(false)
             }
 
             fetchCount()
@@ -266,8 +266,8 @@ export default function Page() {
                 setSelectedElement={handleSetSelectedElement}
                 handleDeleteElement={handleDeleteElement}
                 chartRef={chartRef}
-                setIsAddEntity={handleSetIsAddEntity}
-                setIsAddRelation={handleSetIsAddRelation}
+                setIsAddNode={handleSetIsAddNode}
+                setIsAddEdge={handleSetIsAddEdge}
                 setGraph={setSchema}
                 isCanvasLoading={isCanvasLoading}
             />
@@ -280,7 +280,7 @@ export default function Page() {
                         setSelectedElement={handleSetSelectedElement}
                         selectedElements={selectedElements}
                         setSelectedElements={setSelectedElements}
-                        isAddRelation={isAddRelation}
+                        isAddRelation={isAddEdge}
                         chartRef={chartRef}
                         cooldownTicks={cooldownTicks}
                         handleCooldown={handleCooldown}
@@ -316,13 +316,13 @@ export default function Page() {
                                 schema={schema}
                                 setLabels={setLabels}
                             />
-                            : (isAddRelation || isAddEntity) &&
+                            :
                             <SchemaCreateElement
-                                onCreate={onCreateElement}
-                                setIsAdd={isAddRelation ? handleSetIsAddRelation : handleSetIsAddEntity}
+                                onCreate={handleCreateElement}
+                                setIsAdd={isAddEdge ? handleSetIsAddEdge : handleSetIsAddNode}
                                 selectedNodes={selectedNodes}
                                 setSelectedNodes={setSelectedNodes}
-                                type={isAddEntity}
+                                type={isAddNode}
                             />
                     }
                 </ResizablePanel>

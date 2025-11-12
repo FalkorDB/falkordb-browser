@@ -67,6 +67,8 @@ export default function Page() {
     const [labels, setLabels] = useState<Label[]>([])
     const [relationships, setRelationships] = useState<Relationship[]>([])
     const [isCollapsed, setIsCollapsed] = useState(true)
+    const [isAddNode, setIsAddNode] = useState(true)
+    const [isAddEdge, setIsAddEdge] = useState(true)
 
     const panelSize = useMemo(() => {
         switch (panel) {
@@ -170,6 +172,40 @@ export default function Page() {
         setIsQueryLoading(false)
     }, [fetchCount, graph.Id, graphName, setGraph, runDefaultQuery, defaultQuery, contentPersistence, setGraphName, graphNames, setIsQueryLoading])
 
+    const handleSetIsAddNode = useCallback((isAdd: boolean) => {
+        const currentPanel = panelRef.current
+        setIsAddNode(isAdd)
+
+        if (isAdd) {
+            setIsAddEdge(false)
+            setSelectedElement(undefined)
+        }
+
+        if (!currentPanel) return
+
+        if (isAdd) currentPanel.expand()
+        else currentPanel.collapse()
+    }, [])
+
+    const handleSetIsAddEdge = useCallback((isAdd: boolean) => {
+        const currentPanel = panelRef.current
+        setIsAddEdge(isAdd)
+
+        if (isAdd) {
+            setIsAddNode(false)
+            setSelectedElement(undefined)
+        }
+
+        if (!currentPanel) return
+
+        if (isAdd) currentPanel.expand()
+        else currentPanel.collapse()
+    }, [])
+
+    const handleCreateElement = (attributes: [string, string][], label: string[], type: boolean) => {
+        const result = fetch(`api/graph/${prepareArg(graphName)}/element`)
+    }
+
     const handleSetSelectedElement = useCallback((el: Node | Link | undefined) => {
         setSelectedElement(el)
         setPanel(el ? "data" : undefined)
@@ -257,6 +293,12 @@ export default function Page() {
                     object={selectedElement}
                     setObject={handleSetSelectedElement}
                     setLabels={setLabels}
+                />
+            case "add":
+                return <GraphCreatePanel
+                    type={isAddNode}
+                    onCreate={handleCreateElement}
+                    onClose={() => setPanel(undefined)}
                 />
 
             default:

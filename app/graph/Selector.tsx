@@ -38,8 +38,8 @@ interface SchemaProps {
     setSelectedElement: (el: Node | Link | undefined) => void;
     handleDeleteElement: () => Promise<void>;
     chartRef: GraphRef;
-    setIsAddEntity: (isAdd: boolean) => void;
-    setIsAddRelation: (isAdd: boolean) => void;
+    setIsAddNode: (isAdd: boolean) => void;
+    setIsAddEdge: (isAdd: boolean) => void;
     isCanvasLoading: boolean;
     runQuery?: never;
     historyQuery?: never;
@@ -59,8 +59,8 @@ interface GraphProps {
     setSelectedElement?: never;
     handleDeleteElement?: never;
     chartRef?: never;
-    setIsAddEntity?: never;
-    setIsAddRelation?: never;
+    setIsAddNode?: never;
+    setIsAddEdge?: never;
     isCanvasLoading?: never;
 }
 
@@ -86,8 +86,8 @@ export default function Selector<T extends "Graph" | "Schema" = "Graph" | "Schem
     setSelectedElement,
     handleDeleteElement,
     chartRef,
-    setIsAddEntity,
-    setIsAddRelation,
+    setIsAddNode,
+    setIsAddEdge,
     setGraph,
     type,
     isCanvasLoading,
@@ -484,7 +484,7 @@ export default function Selector<T extends "Graph" | "Schema" = "Graph" | "Schem
                             </Button>
                         </div>
                     </>
-                    : selectedElements && setSelectedElement && handleDeleteElement && setIsAddEntity && setIsAddRelation && chartRef && isCanvasLoading !== undefined && <div className="w-full h-full">
+                    : selectedElements && setSelectedElement && handleDeleteElement && setIsAddNode && setIsAddEdge && chartRef && isCanvasLoading !== undefined && <div className="w-full h-full">
                         <Toolbar
                             graph={graph}
                             label={type}
@@ -492,8 +492,8 @@ export default function Selector<T extends "Graph" | "Schema" = "Graph" | "Schem
                             selectedElements={selectedElements}
                             setSelectedElement={setSelectedElement}
                             handleDeleteElement={handleDeleteElement}
-                            setIsAddEntity={setIsAddEntity}
-                            setIsAddRelation={setIsAddRelation}
+                            setIsAddNode={setIsAddNode}
+                            setIsAddEdge={setIsAddEdge}
                             chartRef={chartRef}
                             isLoadingSchema={!!isCanvasLoading}
                         />
