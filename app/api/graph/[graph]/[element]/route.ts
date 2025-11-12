@@ -8,7 +8,7 @@ import {
 // eslint-disable-next-line import/prefer-default-export
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ graph: string; node: string }> }
+  { params }: { params: Promise<{ graph: string; element: string }> }
 ) {
   try {
     const session = await getClient();
@@ -18,8 +18,8 @@ export async function GET(
     }
 
     const { client, user } = session;
-    const { graph: graphId, node } = await params;
-    const nodeId = Number(node);
+    const { graph: graphId, element } = await params;
+    const nodeId = Number(element);
 
     try {
       const graph = client.selectGraph(graphId);
@@ -53,7 +53,7 @@ export async function GET(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: Promise<{ graph: string; node: string }> }
+  { params }: { params: Promise<{ graph: string; element: string }> }
 ) {
   try {
     const session = await getClient();
@@ -63,14 +63,14 @@ export async function DELETE(
     }
 
     const { client, user } = session;
-    const { graph: graphId, node } = await params;
-    const nodeId = Number(node);
+    const { graph: graphId, element } = await params;
+    const nodeId = Number(element);
     const body = await request.json();
 
     // Validate request body
     const validation = validateRequest(deleteGraphNodeSchema, {
       graph: graphId,
-      node,
+      node: element,
       ...body,
     });
 

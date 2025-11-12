@@ -892,7 +892,7 @@ const swaggerSpec = {
         }
       }
     },
-    "/api/graph/{graph}/{node}": {
+    "/api/graph/{graph}/{element}": {
       get: {
         tags: ["Graph"],
         summary: "Get node information",
@@ -910,12 +910,12 @@ const swaggerSpec = {
           },
           {
             in: "path",
-            name: "node",
+            name: "element",
             required: true,
             schema: {
               type: "string"
             },
-            description: "Node ID"
+            description: "Element ID"
           }
         ],
         responses: {
@@ -959,12 +959,12 @@ const swaggerSpec = {
           },
           {
             in: "path",
-            name: "node",
+            name: "element",
             required: true,
             schema: {
               type: "string"
             },
-            description: "Node or relationship ID"
+            description: "Element ID (node or relationship)"
           }
         ],
         requestBody: {
@@ -1011,7 +1011,7 @@ const swaggerSpec = {
         }
       }
     },
-    "/api/graph/{graph}/{node}/label": {
+    "/api/graph/{graph}/{element}/label": {
       post: {
         tags: ["Graph"],
         summary: "Add node label",
@@ -1029,12 +1029,12 @@ const swaggerSpec = {
           },
           {
             in: "path",
-            name: "node",
+            name: "element",
             required: true,
             schema: {
               type: "string"
             },
-            description: "Node ID"
+            description: "Element ID"
           }
         ],
         requestBody: {
@@ -1077,12 +1077,12 @@ const swaggerSpec = {
           },
           {
             in: "path",
-            name: "node",
+            name: "element",
             required: true,
             schema: {
               type: "string"
             },
-            description: "Node ID"
+            description: "Element ID"
           }
         ],
         requestBody: {
@@ -1109,7 +1109,7 @@ const swaggerSpec = {
         }
       }
     },
-    "/api/graph/{graph}/{node}/{key}": {
+    "/api/graph/{graph}/{element}/{key}": {
       post: {
         tags: ["Graph"],
         summary: "Set node/relationship property",
@@ -1127,12 +1127,12 @@ const swaggerSpec = {
           },
           {
             in: "path",
-            name: "node",
+            name: "element",
             required: true,
             schema: {
               type: "string"
             },
-            description: "Node or relationship ID"
+            description: "Element ID (node or relationship)"
           },
           {
             in: "path",
@@ -1189,12 +1189,12 @@ const swaggerSpec = {
           },
           {
             in: "path",
-            name: "node",
+            name: "element",
             required: true,
             schema: {
               type: "string"
             },
-            description: "Node or relationship ID"
+            description: "Element ID (node or relationship)"
           },
           {
             in: "path",
@@ -1909,7 +1909,7 @@ const swaggerSpec = {
         }
       }
     },
-    "/api/schema/{schema}/{node}/label": {
+    "/api/schema/{schema}/{element}/label": {
       post: {
         tags: ["Schema"],
         summary: "Add label to node",
@@ -1927,12 +1927,12 @@ const swaggerSpec = {
           },
           {
             in: "path",
-            name: "node",
+            name: "element",
             required: true,
             schema: {
               type: "string"
             },
-            description: "Node ID"
+            description: "Element ID"
           }
         ],
         requestBody: {
@@ -1976,12 +1976,12 @@ const swaggerSpec = {
           },
           {
             in: "path",
-            name: "node",
+            name: "element",
             required: true,
             schema: {
               type: "string"
             },
-            description: "Node ID"
+            description: "Element ID"
           }
         ],
         requestBody: {
@@ -2033,7 +2033,7 @@ const swaggerSpec = {
             schema: {
               type: "string"
             },
-            description: "Node ID",
+            description: "Element ID",
             example: "2"
           },
           {
@@ -2103,7 +2103,7 @@ const swaggerSpec = {
             schema: {
               type: "string"
             },
-            description: "Node ID",
+            description: "Element ID",
             example: "2"
           },
           {

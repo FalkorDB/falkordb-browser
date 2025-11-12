@@ -10,7 +10,7 @@ import {
 // eslint-disable-next-line import/prefer-default-export
 export async function POST(
   request: NextRequest,
-  { params }: { params: Promise<{ schema: string; node: string }> }
+  { params }: { params: Promise<{ schema: string; element: string }> }
 ) {
   try {
     const session = await getClient();
@@ -85,7 +85,7 @@ export async function POST(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: Promise<{ schema: string; node: string }> }
+  { params }: { params: Promise<{ schema: string; element: string }> }
 ) {
   try {
     const session = await getClient();
@@ -95,15 +95,15 @@ export async function DELETE(
     }
 
     const { client, user } = session;
-    const { schema, node } = await params;
+    const { schema, element } = await params;
     const schemaName = `${schema}_schema`;
-    const nodeId = Number(node);
+    const nodeId = Number(element);
     const body = await request.json();
 
     // Validate request body
     const validation = validateRequest(deleteSchemaNodeSchema, {
       schema,
-      node,
+      node: element,
       ...body,
     });
 

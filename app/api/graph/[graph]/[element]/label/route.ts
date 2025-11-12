@@ -1,15 +1,14 @@
 import { getClient } from "@/app/api/auth/[...nextauth]/options";
 import { NextRequest, NextResponse } from "next/server";
-import { formatAttribute } from "../utils";
 import {
-  updateSchemaNodeAttributeSchema,
-  deleteSchemaNodeAttributeSchema,
+  addGraphNodeLabelSchema,
+  removeGraphNodeLabelSchema,
   validateRequest,
 } from "../../../../validation-schemas";
 
-export async function PATCH(
+export async function DELETE(
   request: NextRequest,
-  { params }: { params: Promise<{ schema: string; node: string; key: string }> }
+  { params }: { params: Promise<{ graph: string; element: string }> }
 ) {
   try {
     const session = await getClient();
@@ -19,15 +18,14 @@ export async function PATCH(
     }
 
     const { client, user } = session;
-    const { schema, node, key } = await params;
-    const schemaName = `${schema}_schema`;
+    const { graph: graphId, element } = await params;
+    const nodeId = Number(element);
     const body = await request.json();
 
     // Validate request body
-    const validation = validateRequest(updateSchemaNodeAttributeSchema, {
-      schema,
-      node,
-      key,
+    const validation = validateRequest(removeGraphNodeLabelSchema, {
+      graph: graphId,
+      node: element,
       ...body,
     });
 
@@ -35,20 +33,18 @@ export async function PATCH(
       return NextResponse.json({ message: validation.error }, { status: 400 });
     }
 
-    const { type, attribute } = validation.data;
+    const { label } = validation.data;
 
     try {
-      const [formattedKey, formattedValue] = formatAttribute([key, attribute]);
-      const graph = client.selectGraph(schemaName);
-      const q = type
-        ? `MATCH (n) WHERE ID(n) = ${node} SET n.${formattedKey} = "${formattedValue}"`
-        : `MATCH (n)-[e]-(m) WHERE ID(e) = ${node} SET e.${formattedKey} = "${formattedValue}"`;
+      const query = `MATCH (n) WHERE ID(n) = $nodeId REMOVE n:${label}`;
+      const graph = client.selectGraph(graphId);
 
-      if (user.role === "Read-Only") await graph.roQuery(q);
-      else await graph.query(q);
+      if (user.role === "Read-Only")
+        await graph.roQuery(query, { params: { nodeId } });
+      else await graph.query(query, { params: { nodeId } });
 
       return NextResponse.json(
-        { message: "Attribute updated successfully" },
+        { message: "Label removed successfully" },
         { status: 200 }
       );
     } catch (error) {
@@ -67,9 +63,9 @@ export async function PATCH(
   }
 }
 
-export async function DELETE(
+export async function POST(
   request: NextRequest,
-  { params }: { params: Promise<{ schema: string; node: string; key: string }> }
+  { params }: { params: Promise<{ graph: string; element: string }> }
 ) {
   try {
     const session = await getClient();
@@ -79,15 +75,14 @@ export async function DELETE(
     }
 
     const { client, user } = session;
-    const { schema, node, key } = await params;
-    const schemaName = `${schema}_schema`;
+    const { graph: graphId, element } = await params;
+    const nodeId = Number(element);
     const body = await request.json();
 
     // Validate request body
-    const validation = validateRequest(deleteSchemaNodeAttributeSchema, {
-      schema,
-      node,
-      key,
+    const validation = validateRequest(addGraphNodeLabelSchema, {
+      graph: graphId,
+      node: element,
       ...body,
     });
 
@@ -95,19 +90,20 @@ export async function DELETE(
       return NextResponse.json({ message: validation.error }, { status: 400 });
     }
 
-    const { type } = validation.data;
+    const { label } = validation.data;
 
     try {
-      const graph = client.selectGraph(schemaName);
-      const q = type
-        ? `MATCH (n) WHERE ID(n) = ${node} SET n.${key} = NULL`
-        : `MATCH (n)-[e]-(m) WHERE ID(e) = ${node} SET e.${key} = NULL`;
+      const query = `MATCH (n) WHERE ID(n) = $nodeId SET n:${label}`;
+      const graph = client.selectGraph(graphId);
 
-      if (user.role === "Read-Only") await graph.roQuery(q);
-      else await graph.query(q);
+      if (user.role === "Read-Only") 
+        await graph.roQuery(query, { params: { nodeId } });
+       else 
+        await graph.query(query, { params: { nodeId } });
+      
 
       return NextResponse.json(
-        { message: "Attribute deleted successfully" },
+        { message: "Label added successfully" },
         { status: 200 }
       );
     } catch (error) {

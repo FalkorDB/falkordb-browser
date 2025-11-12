@@ -4,7 +4,7 @@ import { updateGraphNodeAttributeSchema, deleteGraphNodeAttributeSchema, validat
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: Promise<{ graph: string; node: string; key: string }> }
+  { params }: { params: Promise<{ graph: string; element: string; key: string }> }
 ) {
   try {
     const session = await getClient();
@@ -14,14 +14,14 @@ export async function POST(
     }
 
     const { client, user } = session;
-    const { graph: graphId, node, key } = await params;
-    const nodeId = Number(node);
+    const { graph: graphId, element, key } = await params;
+    const nodeId = Number(element);
     const body = await request.json();
 
     // Validate request body
     const validation = validateRequest(updateGraphNodeAttributeSchema, {
       graph: graphId,
-      node,
+      node: element,
       key,
       ...body,
     });
@@ -66,7 +66,7 @@ export async function POST(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: Promise<{ graph: string; node: string; key: string }> }
+  { params }: { params: Promise<{ graph: string; element: string; key: string }> }
 ) {
   try {
     const session = await getClient();
@@ -77,14 +77,14 @@ export async function DELETE(
 
     const { client, user } = session;
 
-    const { graph: graphId, node, key } = await params;
-    const nodeId = Number(node);
+    const { graph: graphId, element, key } = await params;
+    const nodeId = Number(element);
     const body = await request.json();
 
     // Validate request body
     const validation = validateRequest(deleteGraphNodeAttributeSchema, {
       graph: graphId,
-      node,
+      node: element,
       key,
       ...body,
     });
