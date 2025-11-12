@@ -54,7 +54,7 @@ export default class GraphInfoPage extends GraphPage {
 
   async openGraphInfoButton(): Promise<void> {
     if (await this.isGraphInfoPanelContainerVisible()) return;
-    this.clickGraphInfoButton()
+    await this.clickGraphInfoButton()
   }
 
   async getGraphInfoNodesCount(): Promise<string | null> {
