@@ -1,4 +1,4 @@
-ARG CYPHER_VERSION=v0.1.4
+ARG CYPHER_VERSION=latest
 
 FROM node:22-alpine AS base
 
