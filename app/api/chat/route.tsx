@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getClient } from "../auth/[...nextauth]/options";
+import { chatRequestSchema, validateRequest } from "../validation-schemas";
 
 const URL = "http://localhost:8080/"
 
@@ -57,11 +58,26 @@ export async function POST(request: NextRequest) {
             throw new Error(await session.text())
         }
 
-        const { messages, graphName, key, model } = await request.json()
+        const body = await request.json()
+
+        // Validate request body
+        const validation = validateRequest(chatRequestSchema, body);
+        
+        if (!validation.success) {
+            writer.write(encoder.encode(`event: error status: ${400} data: ${JSON.stringify(validation.error)}\n\n`))
+            writer.close()
+            return new Response(readable, {
+                headers: {
+                    "Content-Type": "text/event-stream",
+                    "Cache-Control": "no-cache",
+                    Connection: "keep-alive",
+                },
+            })
+        }
+
+        const { messages, graphName, key, model } = validation.data
 
         try {
-            if (!graphName) throw new Error("Graph name is required")
-            if (!messages) throw new Error("Messages are required")
 
             const requestBody = {
                 "chat_request": {

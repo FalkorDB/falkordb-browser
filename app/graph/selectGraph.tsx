@@ -62,10 +62,11 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
 
     const handleSetOption = useCallback(async (option: string, optionName: string) => {
         const result = await securedFetch(
-            `api/${type === "Graph" ? "graph" : "schema"}/${prepareArg(option)}?sourceName=${prepareArg(optionName)}`,
+            `api/${type === "Graph" ? "graph" : "schema"}/${prepareArg(option)}`,
             {
                 method: "PATCH",
-                headers: { "Content-Type": "application/json" }
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ sourceName: optionName })
             },
             toast,
             setIndicator

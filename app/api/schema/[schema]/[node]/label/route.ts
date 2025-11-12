@@ -1,5 +1,6 @@
 import { getClient } from "@/app/api/auth/[...nextauth]/options";
 import { NextRequest, NextResponse } from "next/server";
+import { addSchemaNodeLabelSchema, removeSchemaNodeLabelSchema, validateRequest } from "../../../../validation-schemas";
 
 export async function POST(
   request: NextRequest,
@@ -15,19 +16,31 @@ export async function POST(
     const { client, user } = session;
     const { schema, node } = await params;
     const schemaName = `${schema}_schema`;
-    const { label } = await request.json();
+    const body = await request.json();
+
+    // Validate request body
+    const validation = validateRequest(addSchemaNodeLabelSchema, {
+      schema,
+      node,
+      ...body,
+    });
+    
+    if (!validation.success) {
+      return NextResponse.json(
+        { message: validation.error },
+        { status: 400 }
+      );
+    }
+
+    const { label } = validation.data;
 
     try {
-      if (!label) throw new Error("Label is required");
-
       const graph = client.selectGraph(schemaName);
       const q = `MATCH (n) WHERE ID(n) = ${node} SET n:${label}`;
       const result =
         user.role === "Read-Only"
           ? await graph.roQuery(q)
           : await graph.query(q);
-
-      if (!result) throw new Error("Something went wrong");
 
       return NextResponse.json({ result }, { status: 200 });
     } catch (error) {
@@ -38,6 +51,7 @@ export async function POST(
       );
     }
   } catch (err) {
+    console.error(err);
     return NextResponse.json(
       { message: (err as Error).message },
       { status: 500 }
@@ -58,12 +72,26 @@ export async function DELETE(
 
     const { client, user } = session;
     const { schema, node } = await params;
-    const { label } = await request.json();
     const schemaName = `${schema}_schema`;
+    const body = await request.json();
+
+    // Validate request body
+    const validation = validateRequest(removeSchemaNodeLabelSchema, {
+      schema,
+      node,
+      ...body,
+    });
+    
+    if (!validation.success) {
+      return NextResponse.json(
+        { message: validation.error },
+        { status: 400 }
+      );
+    }
+
+    const { label } = validation.data;
 
     try {
-      if (!label) throw new Error("Label is required");
-
       const graph = client.selectGraph(schemaName);
 
       const q = `MATCH (n) WHERE ID(n) = ${node} REMOVE n:${label}`;
@@ -71,8 +99,6 @@ export async function DELETE(
         user.role === "Read-Only"
           ? await graph.roQuery(q)
           : await graph.query(q);
-
-      if (!result) throw new Error("Something went wrong");
 
       return NextResponse.json({ result }, { status: 200 });
     } catch (error) {
@@ -83,6 +109,7 @@ export async function DELETE(
       );
     }
   } catch (err) {
+    console.error(err);
     return NextResponse.json(
       { message: (err as Error).message },
       { status: 500 }

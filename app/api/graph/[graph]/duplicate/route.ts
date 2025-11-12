@@ -1,5 +1,6 @@
 import { getClient } from "@/app/api/auth/[...nextauth]/options";
 import { NextResponse, NextRequest } from "next/server";
+import { duplicateGraphSchema, validateRequest } from "../../../validation-schemas";
 
 // eslint-disable-next-line import/prefer-default-export
 export async function PATCH(
@@ -15,11 +16,24 @@ export async function PATCH(
 
     const { client } = session;
     const { graph: graphId } = await params;
-    const sourceName = request.nextUrl.searchParams.get("sourceName");
+    const body = await request.json();
+
+    // Validate request body
+    const validation = validateRequest(duplicateGraphSchema, {
+      graph: graphId,
+      ...body,
+    });
+    
+    if (!validation.success) {
+      return NextResponse.json(
+        { message: validation.error },
+        { status: 400 }
+      );
+    }
+
+    const { sourceName } = validation.data;
 
     try {
-      if (!sourceName) throw new Error("Missing parameter sourceName");
-
       const result = await client.selectGraph(sourceName).copy(graphId);
 
       return NextResponse.json({ result });
@@ -31,6 +45,7 @@ export async function PATCH(
       );
     }
   } catch (err) {
+    console.error(err);
     return NextResponse.json(
       { message: (err as Error).message },
       { status: 500 }

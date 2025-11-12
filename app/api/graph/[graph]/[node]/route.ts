@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getClient } from "@/app/api/auth/[...nextauth]/options";
+import {
+  deleteGraphNodeSchema,
+  validateRequest,
+} from "../../../validation-schemas";
 
 // eslint-disable-next-line import/prefer-default-export
 export async function GET(
@@ -39,6 +43,7 @@ export async function GET(
       );
     }
   } catch (err) {
+    console.error(err);
     return NextResponse.json(
       { message: (err as Error).message },
       { status: 500 }
@@ -60,21 +65,30 @@ export async function DELETE(
     const { client, user } = session;
     const { graph: graphId, node } = await params;
     const nodeId = Number(node);
-    const { type } = await request.json();
+    const body = await request.json();
+
+    // Validate request body
+    const validation = validateRequest(deleteGraphNodeSchema, {
+      graph: graphId,
+      node,
+      ...body,
+    });
+
+    if (!validation.success) {
+      return NextResponse.json({ message: validation.error }, { status: 400 });
+    }
+
+    const { type } = validation.data;
 
     try {
-      if (type === undefined) throw new Error("Type is required");
-
       const graph = client.selectGraph(graphId);
       const query = type
         ? `MATCH (n) WHERE ID(n) = $nodeId DELETE n`
         : `MATCH ()-[e]-() WHERE ID(e) = $nodeId DELETE e`;
-      const result =
-        user.role === "Read-Only"
-          ? await graph.roQuery(query, { params: { nodeId } })
-          : await graph.query(query, { params: { nodeId } });
 
-      if (!result) throw new Error("Something went wrong");
+      if (user.role === "Read-Only")
+        await graph.roQuery(query, { params: { nodeId } });
+      else await graph.query(query, { params: { nodeId } });
 
       return NextResponse.json(
         { message: "Node deleted successfully" },
@@ -88,6 +102,7 @@ export async function DELETE(
       );
     }
   } catch (err) {
+    console.error(err);
     return NextResponse.json(
       { message: (err as Error).message },
       { status: 500 }

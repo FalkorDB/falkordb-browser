@@ -1,5 +1,6 @@
 import { NextResponse, NextRequest } from "next/server";
 import { getClient } from "@/app/api/auth/[...nextauth]/options";
+import { updateGraphNodeAttributeSchema, deleteGraphNodeAttributeSchema, validateRequest } from "../../../../validation-schemas";
 
 export async function POST(
   request: NextRequest,
@@ -15,14 +16,27 @@ export async function POST(
     const { client, user } = session;
     const { graph: graphId, node, key } = await params;
     const nodeId = Number(node);
-    const { value, type } = await request.json();
+    const body = await request.json();
+
+    // Validate request body
+    const validation = validateRequest(updateGraphNodeAttributeSchema, {
+      graph: graphId,
+      node,
+      key,
+      ...body,
+    });
+    
+    if (!validation.success) {
+      return NextResponse.json(
+        { message: validation.error },
+        { status: 400 }
+      );
+    }
+
+    const { value, type } = validation.data;
 
     try {
-      if (type === undefined) throw new Error("Type is required");
-
       const graph = client.selectGraph(graphId);
-
-      if (!value) throw new Error("Value is required");
 
       const query = type
         ? `MATCH (n) WHERE ID(n) = $nodeId SET n.${key} = $value`
@@ -33,8 +47,6 @@ export async function POST(
           ? await graph.roQuery(query, { params: { nodeId, value } })
           : await graph.query(query, { params: { nodeId, value } });
 
-      if (!result) throw new Error("Something went wrong");
-
       return NextResponse.json({ result }, { status: 200 });
     } catch (error) {
       console.error(error);
@@ -44,6 +56,7 @@ export async function POST(
       );
     }
   } catch (err) {
+    console.error(err);
     return NextResponse.json(
       { message: (err as Error).message },
       { status: 500 }
@@ -66,11 +79,26 @@ export async function DELETE(
 
     const { graph: graphId, node, key } = await params;
     const nodeId = Number(node);
-    const { type } = await request.json();
+    const body = await request.json();
+
+    // Validate request body
+    const validation = validateRequest(deleteGraphNodeAttributeSchema, {
+      graph: graphId,
+      node,
+      key,
+      ...body,
+    });
+    
+    if (!validation.success) {
+      return NextResponse.json(
+        { message: validation.error },
+        { status: 400 }
+      );
+    }
+
+    const { type } = validation.data;
 
     try {
-      if (type === undefined) throw new Error("Type is required");
-
       const graph = client.selectGraph(graphId);
 
       const query = type
@@ -82,8 +110,6 @@ export async function DELETE(
           ? await graph.roQuery(query, { params: { nodeId } })
           : await graph.query(query, { params: { nodeId } });
 
-      if (!result) throw new Error("Something went wrong");
-
       return NextResponse.json({ result }, { status: 200 });
     } catch (error) {
       console.error(error);
@@ -93,6 +119,7 @@ export async function DELETE(
       );
     }
   } catch (err) {
+    console.error(err);
     return NextResponse.json(
       { message: (err as Error).message },
       { status: 500 }

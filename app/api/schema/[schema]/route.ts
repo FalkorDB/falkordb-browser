@@ -1,5 +1,6 @@
 import { NextResponse, NextRequest } from "next/server";
 import { getClient } from "../../auth/[...nextauth]/options";
+import { renameSchemaSchema, validateRequest } from "../../validation-schemas";
 
 export async function GET(
   request: NextRequest,
@@ -45,6 +46,7 @@ export async function GET(
       );
     }
   } catch (err) {
+    console.error(err);
     return NextResponse.json(
       { message: (err as Error).message },
       { status: 500 }
@@ -69,14 +71,14 @@ export async function POST(
 
     try {
       const graph = client.selectGraph(schemaName);
-      const result =
-        user.role === "Read-Only"
-          ? await graph.roQuery("RETURN 1")
-          : await graph.query("RETURN 1");
 
-      if (!result) throw new Error("Something went wrong");
+      if (user.role === "Read-Only") await graph.roQuery("RETURN 1");
+      else await graph.query("RETURN 1");
 
-      return NextResponse.json({ result }, { status: 200 });
+      return NextResponse.json(
+        { message: "Schema created successfully" },
+        { status: 200 }
+      );
     } catch (error) {
       console.error(error);
       return NextResponse.json(
@@ -85,6 +87,7 @@ export async function POST(
       );
     }
   } catch (err) {
+    console.error(err);
     return NextResponse.json(
       { message: (err as Error).message },
       { status: 500 }
@@ -125,6 +128,7 @@ export async function DELETE(
       );
     }
   } catch (err) {
+    console.error(err);
     return NextResponse.json(
       { message: (err as Error).message },
       { status: 500 }
@@ -147,11 +151,21 @@ export async function PATCH(
 
     const { schema } = await params;
     const schemaName = `${schema}_schema`;
-    const source = request.nextUrl.searchParams.get("sourceName");
+    const body = await request.json();
+
+    // Validate request body
+    const validation = validateRequest(renameSchemaSchema, {
+      schema,
+      ...body,
+    });
+
+    if (!validation.success) {
+      return NextResponse.json({ message: validation.error }, { status: 400 });
+    }
+
+    const { sourceName: source } = validation.data;
 
     try {
-      if (!source) throw new Error("Missing parameter sourceName");
-
       const sourceName = `${source}_schema`;
       const data = await (
         await client.connection
@@ -168,6 +182,7 @@ export async function PATCH(
       );
     }
   } catch (err) {
+    console.error(err);
     return NextResponse.json(
       { message: (err as Error).message },
       { status: 500 }

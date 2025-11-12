@@ -3,6 +3,7 @@ import { jwtVerify } from "jose";
 import crypto from "crypto";
 import { getTokenId } from "../tokenUtils";
 import { getClient, getAdminConnectionForTokens } from "../[...nextauth]/options";
+import { revokeTokenSchema, validateRequest } from "../../validation-schemas";
 
 
 
@@ -40,14 +41,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { token: tokenToRevoke } = body;
+    // Validate request body
+    const validation = validateRequest(revokeTokenSchema, body);
     
-    if (!tokenToRevoke) {
+    if (!validation.success) {
       return NextResponse.json(
-        { message: "Token to revoke is required in request body" },
+        { message: validation.error },
         { status: 400 }
       );
     }
+
+    const { token: tokenToRevoke } = validation.data;
 
     try {
       // Verify the token to be revoked

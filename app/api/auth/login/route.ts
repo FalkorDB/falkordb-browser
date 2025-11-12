@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { SignJWT } from "jose";
 import crypto from "crypto";
 import { newClient, generateTimeUUID, getAdminConnectionForTokens, generateConsistentUserId } from "../[...nextauth]/options";
+import { loginSchema, validateRequest } from "../../validation-schemas";
 
 // eslint-disable-next-line import/prefer-default-export
 export async function POST(request: NextRequest) {
@@ -30,10 +31,21 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { username, password, host = "localhost", port = "6379", tls = "false", ca } = body;
+    // Validate request body
+    const validation = validateRequest(loginSchema, body);
+    
+    if (!validation.success) {
+      return NextResponse.json(
+        { message: validation.error },
+        { status: 400 }
+      );
+    }
+
+    const { username, password, host, port, tls, ca } = validation.data;
 
     // Note: username and password are optional - same as NextAuth session behavior
     // The newClient function handles empty credentials by using "default" user
+    // host, port, and tls are guaranteed to have values due to Zod defaults
 
     try {
       // Generate consistent user ID based on credentials (same user = same ID)
@@ -43,10 +55,10 @@ export async function POST(request: NextRequest) {
       const { role } = await newClient(
         {
           host,
-          port: port.toString(),
+          port,
           username: username || "", // Handle undefined username like NextAuth does
           password: password || "", // Handle undefined password like NextAuth does
-          tls: tls.toString(),
+          tls,
           ca: ca || "undefined",
         },
         id
@@ -58,7 +70,7 @@ export async function POST(request: NextRequest) {
         host,
         port: parseInt(port, 10),
         username,
-        tls: tls === "true" || tls === true,
+        tls: tls === "true",
         ca,
         role,
       };
