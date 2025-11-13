@@ -51,8 +51,8 @@ const swaggerSpec = {
     "/api/auth/login": {
       post: {
         tags: ["Authentication"],
-        summary: "Generate JWT Token (Login)",
-        description: "Authenticate user and generate a JWT Personal Access Token (PAT) for external API access. Provide credentials to authenticate and generate a token.\n\n**Note:** Optional fields: `name`, `expiresAt`, `ttlSeconds`, `host`, `port`, `tls`, `ca`",
+        summary: "User login",
+        description: "Authenticate user with username and password",
         requestBody: {
           required: true,
           content: {
@@ -62,49 +62,12 @@ const swaggerSpec = {
                 properties: {
                   username: {
                     type: "string",
-                    description: "Username for database connection",
+                    description: "User's username",
                     example: "default"
                   },
                   password: {
                     type: "string",
-                    description: "Password for database connection (leave empty for 'default' user)",
-                    example: ""
-                  },
-                  name: {
-                    type: "string",
-                    description: "Token name",
-                    example: "API Token"
-                  },
-                  expiresAt: {
-                    type: "string",
-                    format: "date-time",
-                    description: "Token expiration date in ISO 8601 format",
-                    example: null
-                  },
-                  ttlSeconds: {
-                    type: "integer",
-                    description: "Time-to-live in seconds",
-                    example: 31622400
-                  },
-                  host: {
-                    type: "string",
-                    description: "FalkorDB host",
-                    example: "localhost"
-                  },
-                  port: {
-                    type: "string",
-                    description: "FalkorDB port",
-                    example: "6379"
-                  },
-                  tls: {
-                    type: "string",
-                    description: "Enable TLS connection",
-                    example: "false",
-                    enum: ["true", "false"]
-                  },
-                  ca: {
-                    type: "string",
-                    description: "Base64-encoded CA certificate for TLS",
+                    description: "User's password",
                     example: ""
                   }
                 },
@@ -115,36 +78,19 @@ const swaggerSpec = {
         },
         responses: {
           "200": {
-            description: "Token generated successfully",
+            description: "Login successful",
             content: {
               "application/json": {
                 schema: {
                   type: "object",
                   properties: {
-                    message: {
-                      type: "string",
-                      example: "Authentication successful"
-                    },
                     token: {
                       type: "string",
-                      description: "JWT authentication token (Personal Access Token)",
-                      example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "400": {
-            description: "Bad request - Invalid JSON, expiration date in the past, or invalid TTL value",
-            content: {
-              "application/json": {
-                schema: {
-                  type: "object",
-                  properties: {
-                    message: {
-                      type: "string",
-                      example: "Expiration date must be in the future"
+                      description: "JWT authentication token"
+                    },
+                    user: {
+                      type: "object",
+                      description: "User information"
                     }
                   }
                 }
@@ -152,36 +98,13 @@ const swaggerSpec = {
             }
           },
           "401": {
-            description: "Authentication failed - Invalid credentials or connection failed",
-            content: {
-              "application/json": {
-                schema: {
-                  type: "object",
-                  properties: {
-                    message: {
-                      type: "string",
-                      example: "Invalid credentials or connection failed"
-                    }
-                  }
-                }
-              }
-            }
+            description: "Invalid credentials"
+          },
+          "400": {
+            description: "Bad request - missing username or password"
           },
           "500": {
-            description: "Server configuration error - Missing NEXTAUTH_SECRET",
-            content: {
-              "application/json": {
-                schema: {
-                  type: "object",
-                  properties: {
-                    message: {
-                      type: "string",
-                      example: "Server configuration error: NEXTAUTH_SECRET is not set"
-                    }
-                  }
-                }
-              }
-            }
+            description: "Internal server error"
           }
         }
       }
@@ -190,7 +113,7 @@ const swaggerSpec = {
       post: {
         tags: ["Authentication"],
         summary: "Revoke JWT token",
-        description: "Revoke a JWT token by marking it as inactive in FalkorDB. Once revoked, the token cannot be used for authentication. \n\n**Note:** Provide either `token` or `token_id` (not both)",
+        description: "Revoke a JWT token by removing it from the active tokens list in Redis. Once revoked, the token cannot be used for authentication. Admins can revoke any token, while regular users can only revoke their own tokens.",
         security: [{ bearerAuth: [] }],
         requestBody: {
           required: true,
@@ -198,16 +121,12 @@ const swaggerSpec = {
             "application/json": {
               schema: {
                 type: "object",
+                required: ["token"],
                 properties: {
                   token: {
                     type: "string",
                     description: "JWT token to revoke",
                     example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-                  },
-                  token_id: {
-                    type: "string",
-                    description: "Token ID to revoke",
-                    example: "1761055513181-215c579b-c6e1-4f10-9b07-aacbf89cda21"
                   }
                 }
               }
@@ -307,7 +226,7 @@ const swaggerSpec = {
       get: {
         tags: ["Authentication"],
         summary: "List JWT tokens",
-        description: "Get a list of active JWT tokens.",
+        description: "Get a list of active JWT tokens. Admins can see all tokens from all users, while regular users can only see their own tokens.",
         security: [{ bearerAuth: [] }],
         responses: {
           "200": {
@@ -395,7 +314,7 @@ const swaggerSpec = {
       get: {
         tags: ["Authentication"],
         summary: "Get token metadata",
-        description: "Get detailed metadata for a specific JWT token by its token ID.",
+        description: "Get detailed metadata for a specific JWT token by its token ID. Admins can view any token, while regular users can only view their own tokens.",
         security: [{ bearerAuth: [] }],
         parameters: [
           {

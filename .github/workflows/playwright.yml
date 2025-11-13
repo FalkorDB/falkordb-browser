@@ -86,9 +86,6 @@ jobs:
     needs: setup-dependencies
     timeout-minutes: 60
     runs-on: ubuntu-latest
-    concurrency:
-      group: test-wave-1-${{ github.ref }}
-      cancel-in-progress: false
 
     services:
       falkordb:
@@ -130,7 +127,7 @@ jobs:
       - name: Run Playwright tests (shard 1 of 2)
         run: |
           NEXTAUTH_SECRET=SECRET npm start > nextjs.log 2>&1 & 
-          npx playwright test --grep-invert "@config|@tls|@cluster|@token" --shard=1/2 --reporter=dot,list
+          npx playwright test --grep-invert "@config|@tls|@cluster" --shard=1/2 --reporter=dot,list
       - name: Upload artifacts
         if: always()
         uses: actions/upload-artifact@v4
@@ -147,9 +144,6 @@ jobs:
     needs: setup-dependencies
     timeout-minutes: 60
     runs-on: ubuntu-latest
-    concurrency:
-      group: test-wave-1-${{ github.ref }}
-      cancel-in-progress: false
 
     services:
       falkordb:
@@ -191,7 +185,7 @@ jobs:
       - name: Run Playwright tests (shard 2 of 2)
         run: |
           NEXTAUTH_SECRET=SECRET npm start > nextjs.log 2>&1 &
-          npx playwright test --grep-invert "@config|@tls|@cluster|@token" --shard=2/2 --reporter=dot,list
+          npx playwright test --grep-invert "@config|@tls|@cluster" --shard=2/2 --reporter=dot,list
       - name: Upload artifacts
         if: always()
         uses: actions/upload-artifact@v4
@@ -203,93 +197,10 @@ jobs:
             test-results/
           retention-days: 30
 
-  run-token-tests:
-    name: Run token tests
-    needs: setup-dependencies
-    timeout-minutes: 60
-    runs-on: ubuntu-latest
-    concurrency:
-      group: test-wave-2-${{ github.ref }}
-      cancel-in-progress: false
-
-    services:
-      falkordb:
-        image: falkordb/falkordb:latest
-        ports:
-          - 6379:6379
-      falkordb-pat:
-        image: falkordb/falkordb:latest
-        ports:
-          - 6380:6379
-
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: lts/*
-          cache: 'npm'
-      - name: Restore dependencies cache
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.npm
-            node_modules
-            ~/.cache/ms-playwright
-          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}-${{ hashFiles('**/playwright.config.ts') }}
-          restore-keys: |
-            ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}-
-            ${{ runner.os }}-node-
-      - name: Download build artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: build-output
-          path: .next/
-        continue-on-error: true
-      - name: Fallback build if needed
-        run: |
-          if [ ! -d ".next" ] || [ -z "$(ls -A .next 2>/dev/null)" ]; then
-            echo "Build artifacts not found, building locally..."
-            npm run build
-          else
-            echo "Using cached build artifacts"
-          fi
-      - name: Run token tests
-        env:
-          NEXTAUTH_SECRET: SECRET
-          PAT_FALKORDB_HOST: localhost
-          PAT_FALKORDB_PORT: 6380
-          PAT_FALKORDB_USERNAME: default
-          PAT_FALKORDB_PASSWORD: ""
-          PAT_FALKORDB_GRAPH_NAME: token_management
-          ENCRYPTION_KEY: "a3f5d8c2b7e4f1a0c9d6e8b2f5a7c3d1e9f2a4b8c6d3e7f1a5b9c2d8e4f0a6b3"
-        run: |
-          npm start &
-          APP_PID=$!
-          echo "Waiting for app to start..."
-          for i in {1..30}; do
-            if curl -f http://localhost:3000 > /dev/null 2>&1; then
-              echo "App is ready"
-              break
-            fi
-            sleep 1
-          done
-          npx playwright test settingsTokens --reporter=dot,list
-          kill $APP_PID || true
-      - name: Upload artifacts
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: playwright-report-tokens
-          path: playwright-report/
-          retention-days: 30
-
   run-settings-tests:
     name: Run settings tests
     needs: setup-dependencies
     runs-on: ubuntu-latest
-    concurrency:
-      group: test-wave-2-${{ github.ref }}
-      cancel-in-progress: false
 
     services:
       falkordb:
@@ -351,9 +262,6 @@ jobs:
     needs: setup-dependencies
     timeout-minutes: 60
     runs-on: ubuntu-latest
-    concurrency:
-      group: test-wave-3-${{ github.ref }}
-      cancel-in-progress: false
 
     steps:
       - uses: actions/checkout@v4
@@ -484,9 +392,6 @@ jobs:
     needs: setup-dependencies
     timeout-minutes: 60
     runs-on: ubuntu-latest
-    concurrency:
-      group: test-wave-3-${{ github.ref }}
-      cancel-in-progress: false
 
     steps:
       - uses: actions/checkout@v4
