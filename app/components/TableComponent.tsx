@@ -88,7 +88,7 @@ export default function TableComponent({
     // Get stable row identifier (using first cell value)
     const getRowId = (row: Row) => {
         const val = row.cells[0]?.value;
-        return (typeof val === "object" ? val?.id : val) ?? '';
+        return (typeof val === "object" ? val?.id : val) ?? rows.findIndex(r => r === row);
     }
 
     const handleLoadLazyCell = useCallback((rowId: string | number, cellIndex: number, loadFn: () => Promise<any>) => {
@@ -409,7 +409,7 @@ export default function TableComponent({
                             // Then find actual index in original rows array
                             const actualIndex = rows.findIndex(r => r === row)
                             const rowId = getRowId(row);
-                            const firstVal = rowId || actualIndex
+                            const firstVal = rowId
                             const dataTestID = `${label}${firstVal}`
 
                             if (actualIndex === -1 || filteredIndex === -1) return undefined
