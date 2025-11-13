@@ -1,6 +1,5 @@
 import { z } from "zod";
 
-// User schemas
 export const createUser = z.object({
   username: z.string({
     required_error: "Username is required",
@@ -50,7 +49,6 @@ export const duplicateSchema = z.object({
   }),
 });
 
-// Schema element schemas
 export const createSchemaElement = z.object({
   type: z.boolean(),
   label: z.array(z.string()),
@@ -106,7 +104,19 @@ export const duplicateGraph = z.object({
   }),
 });
 
-// Graph element schemas
+export const createGraphElement = z.object({
+  type: z.boolean(),
+  label: z.array(z.string()),
+  attributes: z.record(z.string(), z.string()),
+  selectedNodes: z
+    .array(
+      z.object({
+        id: z.number(),
+      })
+    )
+    .optional(),
+});
+
 export const deleteGraphElement = z.object({
   type: z.boolean(),
 });
