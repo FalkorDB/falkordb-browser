@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { SignJWT } from "jose";
 import crypto from "crypto";
 import { newClient, generateTimeUUID, getAdminConnectionForTokens, generateConsistentUserId } from "../[...nextauth]/options";
-import { loginSchema, validateRequest } from "../../validation-schemas";
+import { login, validateBody } from "../../validate-body";
 
 // eslint-disable-next-line import/prefer-default-export
 export async function POST(request: NextRequest) {
@@ -32,7 +32,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Validate request body
-    const validation = validateRequest(loginSchema, body);
+    const validation = validateBody(login, body);
     
     if (!validation.success) {
       return NextResponse.json(

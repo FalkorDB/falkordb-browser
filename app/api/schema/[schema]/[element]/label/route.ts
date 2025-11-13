@@ -1,6 +1,6 @@
 import { getClient } from "@/app/api/auth/[...nextauth]/options";
 import { NextRequest, NextResponse } from "next/server";
-import { addSchemaNodeLabelSchema, removeSchemaNodeLabelSchema, validateRequest } from "../../../../validation-schemas";
+import { addSchemaElementLabel, removeSchemaElementLabel, validateBody } from "../../../../validate-body";
 
 export async function POST(
   request: NextRequest,
@@ -16,31 +16,28 @@ export async function POST(
     const { client, user } = session;
     const { schema, element } = await params;
     const schemaName = `${schema}_schema`;
-    const body = await request.json();
-
-    // Validate request body
-    const validation = validateRequest(addSchemaNodeLabelSchema, {
-      schema,
-      node: element,
-      ...body,
-    });
-    
-    if (!validation.success) {
-      return NextResponse.json(
-        { message: validation.error },
-        { status: 400 }
-      );
-    }
-
-    const { label } = validation.data;
+    const elementId = Number(element);
 
     try {
+      const body = await request.json();
+
+      // Validate request body
+      const validation = validateBody(addSchemaElementLabel, body);
+      
+      if (!validation.success) {
+        return NextResponse.json(
+          { message: validation.error },
+          { status: 400 }
+        );
+      }
+
+      const { label } = validation.data;
       const graph = client.selectGraph(schemaName);
-      const q = `MATCH (n) WHERE ID(n) = ${element} SET n:${label}`;
+      const q = `MATCH (n) WHERE ID(n) = $elementId SET n:${label}`;
       const result =
         user.role === "Read-Only"
-          ? await graph.roQuery(q)
-          : await graph.query(q);
+          ? await graph.roQuery(q, { params: { elementId } })
+          : await graph.query(q, { params: { elementId } });
 
       return NextResponse.json({ result }, { status: 200 });
     } catch (error) {
@@ -73,32 +70,29 @@ export async function DELETE(
     const { client, user } = session;
     const { schema, element } = await params;
     const schemaName = `${schema}_schema`;
-    const body = await request.json();
-
-    // Validate request body
-    const validation = validateRequest(removeSchemaNodeLabelSchema, {
-      schema,
-      node: element,
-      ...body,
-    });
-    
-    if (!validation.success) {
-      return NextResponse.json(
-        { message: validation.error },
-        { status: 400 }
-      );
-    }
-
-    const { label } = validation.data;
+    const elementId = Number(element);
 
     try {
+      const body = await request.json();
+
+      // Validate request body
+      const validation = validateBody(removeSchemaElementLabel, body);
+      
+      if (!validation.success) {
+        return NextResponse.json(
+          { message: validation.error },
+          { status: 400 }
+        );
+      }
+
+      const { label } = validation.data;
       const graph = client.selectGraph(schemaName);
 
-      const q = `MATCH (n) WHERE ID(n) = ${element} REMOVE n:${label}`;
+      const q = `MATCH (n) WHERE ID(n) = $elementId REMOVE n:${label}`;
       const result =
         user.role === "Read-Only"
-          ? await graph.roQuery(q)
-          : await graph.query(q);
+          ? await graph.roQuery(q, { params: { elementId } })
+          : await graph.query(q, { params: { elementId } });
 
       return NextResponse.json({ result }, { status: 200 });
     } catch (error) {

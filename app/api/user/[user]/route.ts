@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getClient } from "../../auth/[...nextauth]/options";
 import { ROLE } from "../model";
-import { updateUserRoleSchema, validateRequest } from "../../validation-schemas";
+import { updateUserRole, validateBody } from "../../validate-body";
 
 // eslint-disable-next-line import/prefer-default-export
 export async function PATCH(
@@ -18,25 +18,22 @@ export async function PATCH(
     const { client } = session;
 
     const { user: username } = await params;
-    const body = await req.json();
-    
-    // Validate request body
-    const validation = validateRequest(updateUserRoleSchema, {
-      user: username,
-      ...body,
-    });
-    
-    if (!validation.success) {
-      return NextResponse.json(
-        { message: validation.error },
-        { status: 400 }
-      );
-    }
-
-    const { role: roleKey } = validation.data;
-    const role = ROLE.get(roleKey);
     
     try {
+      const body = await req.json();
+      
+      // Validate request body
+      const validation = validateBody(updateUserRole, body);
+      
+      if (!validation.success) {
+        return NextResponse.json(
+          { message: validation.error },
+          { status: 400 }
+        );
+      }
+
+      const { role: roleKey } = validation.data;
+      const role = ROLE.get(roleKey);
       if (!role) throw new Error("Invalid role");
 
       await (await client.connection).aclSetUser(username, role);

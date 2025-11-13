@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getClient } from "@/app/api/auth/[...nextauth]/options";
 import { User, ROLE } from "./model";
-import { createUserSchema, deleteUsersSchema, validateRequest } from "../validation-schemas";
+import { createUser, deleteUsers, validateBody } from "../validate-body";
 
 export async function GET() {
   try {
@@ -65,22 +65,22 @@ export async function POST(req: NextRequest) {
 
     const { client } = session;
     const connection = await client.connection;
-    const body = await req.json();
-
-    // Validate request body
-    const validation = validateRequest(createUserSchema, body);
-    
-    if (!validation.success) {
-      return NextResponse.json(
-        { message: validation.error },
-        { status: 400 }
-      );
-    }
-
-    const { username, password, role } = validation.data;
-    const roleValue = ROLE.get(role);
 
     try {
+      const body = await req.json();
+
+      // Validate request body
+      const validation = validateBody(createUser, body);
+      
+      if (!validation.success) {
+        return NextResponse.json(
+          { message: validation.error },
+          { status: 400 }
+        );
+      }
+
+      const { username, password, role } = validation.data;
+      const roleValue = ROLE.get(role);
       if (!roleValue)
         throw new Error("Invalid role");
 
@@ -133,21 +133,21 @@ export async function DELETE(req: NextRequest) {
 
     const { client } = session;
     const connection = await client.connection;
-    const body = await req.json();
-
-    // Validate request body
-    const validation = validateRequest(deleteUsersSchema, body);
-    
-    if (!validation.success) {
-      return NextResponse.json(
-        { message: validation.error },
-        { status: 400 }
-      );
-    }
-
-    const { users } = validation.data;
 
     try {
+      const body = await req.json();
+
+      // Validate request body
+      const validation = validateBody(deleteUsers, body);
+      
+      if (!validation.success) {
+        return NextResponse.json(
+          { message: validation.error },
+          { status: 400 }
+        );
+      }
+
+      const { users } = validation.data;
       await Promise.all(
         users.map(async (user) => {
           await connection.aclDelUser(user.username);
