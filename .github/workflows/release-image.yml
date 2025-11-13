@@ -2,12 +2,18 @@ name: Release image to DockerHub
 
 on:
   workflow_dispatch:
+    inputs:
+      cypher_version:
+        description: 'text-to-cypher version to release'
+        required: true
+        default: 'v0.1.5-beta.19'
+
   push:
     tags: ["v*.*.*"]
     branches:
       - main
 env:
-  CYPHER_VERSION: v0.1.5-beta.19
+  CYPHER_VERSION: ${{ github.event.inputs.cypher_version || 'v0.1.5-beta.19' }}
 jobs:
   build-and-release:
     runs-on: ubuntu-latest
