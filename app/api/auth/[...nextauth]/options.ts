@@ -172,8 +172,7 @@ export async function newClient(
     return { role: "Admin", client };
   } catch (err) {
     if ((err as Error).message.startsWith("NOPERM")) {
-      // eslint-disable-next-line no-console
-      console.debug("user is not admin", err);
+      // User is not admin, continue to check other roles
     } else throw err;
   }
 
@@ -181,12 +180,8 @@ export async function newClient(
     await connection.sendCommand(["GRAPH.QUERY"]);
   } catch (err) {
     if ((err as Error).message.includes("permissions")) {
-      // eslint-disable-next-line no-console
-      console.debug("user is read-only", err);
       return { role: "Read-Only", client };
     }
-    // eslint-disable-next-line no-console
-    console.debug("user is read-write", err);
     return { role: "Read-Write", client };
   }
 
@@ -344,9 +339,6 @@ async function tryJWTAuthentication(): Promise<{ client: FalkorDB; user: Authent
 
       // No existing connection or health check failed - fetch password from Token DB and reconnect
       if (!client) {
-        // eslint-disable-next-line no-console
-        console.log("Creating new FalkorDB connection for JWT user:", payload.sub);
-        
         try {
           // Fetch password from Token DB (6380) - NOT from JWT
           const { getPasswordFromTokenDB } = await import('../tokenUtils');

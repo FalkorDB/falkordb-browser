@@ -111,8 +111,6 @@ export async function initializePATGraph() {
       indexes.map(async (indexQuery) => {
         try {
           await graph.query(indexQuery);
-          // eslint-disable-next-line no-console
-          console.log(`Created index: ${indexQuery}`);
         } catch (err) {
           // Index might already exist, that's okay
           const error = err as Error;
@@ -124,8 +122,6 @@ export async function initializePATGraph() {
       })
     );
 
-    // eslint-disable-next-line no-console
-    console.log("PAT graph initialized successfully");
     return true;
   } catch (err) {
     // eslint-disable-next-line no-console
