@@ -146,14 +146,12 @@ export default function LoginForm() {
 
     // Handle URL mode
     if (loginMode === "url") {
+      // Validate URL format starts with falkor:// or falkors://
       const trimmedUrl = falkordbUrl.trim();
       
-      // Validate URL format: falkor[s]://[[username][:password]@][host][:port][/db-number]
-      // Also supports redis:// and rediss:// protocols
-      const urlPattern = /^(falkor|falkors|redis|rediss):\/\/(?:([^:@]+)(?::([^@]+))?@)?([^:/\s]+)(?::(\d+))?(?:\/(\d+))?$/;
-      if (trimmedUrl && !urlPattern.test(trimmedUrl)) {
+      if (trimmedUrl && (!trimmedUrl.startsWith("falkor://") && !trimmedUrl.startsWith("falkors://"))) {
         setError({
-          message: "Invalid URL format. Expected: falkor[s]://[[username][:password]@][host][:port][/db-number] (also supports redis[s]://)",
+          message: "Invalid FalkorDB URL format. Expected: falkor://[user:pass@]host[:port] or falkors://[user:pass@]host[:port]",
           show: true
         });
         return;

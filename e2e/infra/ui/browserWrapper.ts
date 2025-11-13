@@ -71,14 +71,12 @@ export default class BrowserWrapper {
     async closePage() {
         if (this.page) {
             await this.page.close();
+        } else {
             this.page = null;
         }
     }
 
     async closeBrowser() {
-        // Close the page first (which clears intervals) before closing the browser
-        await this.closePage();
-        
         if (this.browser) {
             await this.browser.close();
         }

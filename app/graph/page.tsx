@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
-import { cn, getMemoryUsage, prepareArg, securedFetch } from "@/lib/utils";
+import { cn, prepareArg, securedFetch } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
 import dynamic from "next/dynamic";
 import { ForceGraphMethods } from "react-force-graph-2d";
@@ -115,8 +115,7 @@ export default function Page() {
             fetchInfo("(property key)"),
         ]).then(async ([newLabels, newRelationships, newPropertyKeys]) => {
             const colorsArr = localStorage.getItem(graphName)
-            const memoryUsage = await getMemoryUsage(graphName, toast, setIndicator)
-            const gi = GraphInfo.create(newPropertyKeys, newLabels, newRelationships, memoryUsage, colorsArr ? JSON.parse(colorsArr) : undefined)
+            const gi = GraphInfo.create(newPropertyKeys, newLabels, newRelationships, colorsArr ? JSON.parse(colorsArr) : undefined)
             setGraphInfo(gi)
             fetchCount()
         }).catch((error) => {
@@ -134,7 +133,7 @@ export default function Page() {
         return () => {
             clearInterval(interval)
         }
-    }, [fetchCount, fetchInfo, graphName, refreshInterval, setGraphInfo, setIndicator, toast])
+    }, [fetchInfo, graphName, refreshInterval, setGraphInfo, toast])
 
     useEffect(() => {
         setRelationships([...graph.Relationships])

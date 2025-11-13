@@ -6,11 +6,11 @@ import Button from "../components/ui/Button";
 import { GraphContext, QueryLoadingContext } from "../components/provider";
 
 export default function GraphInfoPanel({ onClose }: { onClose: () => void }) {
-    const { graphInfo: { Labels, Relationships, PropertyKeys, MemoryUsage }, nodesCount, edgesCount, runQuery, graphName } = useContext(GraphContext);
+    const { graphInfo, nodesCount, edgesCount, runQuery, graphName } = useContext(GraphContext);
     const { isQueryLoading } = useContext(QueryLoadingContext)
 
     return (
-        <div className={cn(`relative h-full w-full p-6 grid grid-rows-[max-content_max-content_minmax(0,max-content)_minmax(0,max-content)_minmax(0,max-content)] gap-8 border-r border-border`)}>
+        <div data-testid="graphInfoPanel" className={cn(`relative h-full w-full p-6 grid grid-rows-[max-content_max-content_minmax(0,max-content)_minmax(0,max-content)_minmax(0,max-content)] gap-8 border-r border-border`)}>
             <Button
                 className="absolute top-2 right-2"
                 title="Close"
@@ -19,32 +19,17 @@ export default function GraphInfoPanel({ onClose }: { onClose: () => void }) {
                 <X className="h-4 w-4" />
             </Button>
             <h1 className="text-2xl">Graph Info</h1>
-            <div className="flex gap-2 items-center overflow-hidden">
-                <h2>Graph Name:</h2>
-                <Tooltip>
-                    <TooltipTrigger asChild>
-                        <p className="truncate pointer-events-auto text-1.5xl SofiaSans">{graphName}</p>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                        {graphName}
-                    </TooltipContent>
-                </Tooltip>
-            </div>
             <div className="flex flex-col gap-2">
                 <div className="flex gap-2 items-center">
-                    <h2>Memory Usage:</h2>
-                    {
-                        MemoryUsage.get("total_graph_sz_mb") !== undefined
-                            ? <Tooltip>
-                                <TooltipTrigger asChild>
-                                    <p className="truncate pointer-events-auto text-1.5xl SofiaSans">{MemoryUsage.get("total_graph_sz_mb") || "<1"} MB</p>
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                    {MemoryUsage.get("total_graph_sz_mb")} MB
-                                </TooltipContent>
-                            </Tooltip>
-                            : <Loader2 className="animate-spin" />
-                    }
+                    <h2>Graph Name:</h2>
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <p className="truncate pointer-events-auto text-1.5xl SofiaSans">{graphName}</p>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                            {graphName}
+                        </TooltipContent>
+                    </Tooltip>
                 </div>
             </div>
             <div className="flex flex-col gap-2 overflow-hidden">
@@ -65,7 +50,8 @@ export default function GraphInfoPanel({ onClose }: { onClose: () => void }) {
                                     {nodesCount}
                                 </TooltipContent>
                             </Tooltip>
-                            : <Loader2 data-testid="nodesCountLoader" className="animate-spin" />
+                            :
+                            <Loader2 data-testid="nodesCountLoader" className="animate-spin" />
                     }
                 </div>
                 <ul className="flex flex-wrap gap-2 p-2 overflow-auto">
@@ -79,7 +65,7 @@ export default function GraphInfoPanel({ onClose }: { onClose: () => void }) {
                             disabled={isQueryLoading}
                         />
                     </li>
-                    {Array.from(Labels.values()).filter(({ name }) => !!name).map(({ name, color }) => (
+                    {Array.from(graphInfo.Labels.values()).filter(({ name }) => !!name).map(({ name, color }) => (
                         <li key={name} className="max-w-full">
                             <Button
                                 style={{ backgroundColor: color }}
@@ -126,7 +112,7 @@ export default function GraphInfoPanel({ onClose }: { onClose: () => void }) {
                             disabled={isQueryLoading}
                         />
                     </li>
-                    {Array.from(Relationships.values()).map(({ name, color }) => (
+                    {Array.from(graphInfo.Relationships.values()).map(({ name, color }) => (
                         <li key={name} className="max-w-full">
                             <Button
                                 style={{ backgroundColor: color }}
@@ -144,18 +130,18 @@ export default function GraphInfoPanel({ onClose }: { onClose: () => void }) {
                 <div className="flex gap-2 items-center">
                     <h2>Property Keys</h2>
                     {
-                        PropertyKeys !== undefined ?
+                        graphInfo.PropertyKeys !== undefined ?
                             <Tooltip>
                                 <TooltipTrigger asChild>
                                     <p
                                         data-testid="propertyKeysCount"
                                         className="truncate pointer-events-auto SofiaSans"
                                     >
-                                        ({PropertyKeys.length})
+                                        ({graphInfo.PropertyKeys.length})
                                     </p>
                                 </TooltipTrigger>
                                 <TooltipContent>
-                                    {PropertyKeys.length}
+                                    {graphInfo.PropertyKeys.length}
                                 </TooltipContent>
                             </Tooltip>
                             :
@@ -164,7 +150,7 @@ export default function GraphInfoPanel({ onClose }: { onClose: () => void }) {
                 </div>
                 <ul className="flex flex-wrap gap-2 p-2 overflow-auto">
                     {
-                        PropertyKeys && PropertyKeys.map((key) => (
+                        graphInfo.PropertyKeys && graphInfo.PropertyKeys.map((key) => (
                             <li key={key} className="max-w-full">
                                 <Button
                                     className="h-6 w-full p-2 bg-border flex justify-center items-center rounded-full text-white SofiaSans"
