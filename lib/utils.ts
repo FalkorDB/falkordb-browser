@@ -21,7 +21,7 @@ export type GraphRef = MutableRefObject<
   ForceGraphMethods<Node, Link> | undefined
 >;
 
-export type Panel = "chat" | "data" | "add" | undefined;
+export type Panel = "chat" | "data" | undefined;
 
 export type TextPriority = {
   name: string;

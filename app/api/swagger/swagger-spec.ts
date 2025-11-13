@@ -1805,11 +1805,11 @@ const swaggerSpec = {
         }
       }
     },
-    "/api/schema/{schema}/{nodeId}": {
+    "/api/schema/{schema}/{element}": {
       delete: {
         tags: ["Schema"],
-        summary: "Delete node from schema",
-        description: "Delete a specific node from the schema by ID. Set type=true for node deletion.",
+        summary: "Delete element from schema",
+        description: "Delete a specific element from the schema by ID. Set type=true for node deletion.",
         security: [{ bearerAuth: [] }],
         parameters: [
           {
@@ -1823,12 +1823,12 @@ const swaggerSpec = {
           },
           {
             in: "path",
-            name: "nodeId",
+            name: "element",
             required: true,
             schema: {
               type: "string"
             },
-            description: "Node ID to delete"
+            description: "Element ID to delete"
           }
         ],
         requestBody: {
@@ -1852,7 +1852,7 @@ const swaggerSpec = {
         },
         responses: {
           "200": {
-            description: "Node deleted successfully"
+            description: "Element deleted successfully"
           }
         }
       }
@@ -1912,8 +1912,8 @@ const swaggerSpec = {
     "/api/schema/{schema}/{element}/label": {
       post: {
         tags: ["Schema"],
-        summary: "Add label to node",
-        description: "Add a new label to an existing node in the schema",
+        summary: "Add label to element",
+        description: "Add a new label to an existing element in the schema",
         security: [{ bearerAuth: [] }],
         parameters: [
           {
@@ -1944,7 +1944,7 @@ const swaggerSpec = {
                 properties: {
                   label: {
                     type: "string",
-                    description: "Label to add to the node",
+                    description: "Label to add to the element",
                     example: "your_label"
                   }
                 },
@@ -1961,8 +1961,8 @@ const swaggerSpec = {
       },
       delete: {
         tags: ["Schema"],
-        summary: "Remove label from node",
-        description: "Remove a specific label from an existing node in the schema",
+        summary: "Remove label from element",
+        description: "Remove a specific label from an existing element in the schema",
         security: [{ bearerAuth: [] }],
         parameters: [
           {
@@ -1993,7 +1993,7 @@ const swaggerSpec = {
                 properties: {
                   label: {
                     type: "string",
-                    description: "Label to remove from the node",
+                    description: "Label to remove from the element",
                     example: "your_label"
                   }
                 },
@@ -2009,11 +2009,11 @@ const swaggerSpec = {
         }
       }
     },
-    "/api/schema/{schema}/{nodeId}/{key}": {
+    "/api/schema/{schema}/{element}/{key}": {
       patch: {
         tags: ["Schema"],
-        summary: "Add/Update attribute to node",
-        description: "Add a new attribute or update an existing attribute on a node in the schema",
+        summary: "Add/Update attribute on element",
+        description: "Add a new attribute or update an existing attribute on an element in the schema",
         security: [{ bearerAuth: [] }],
         parameters: [
           {
@@ -2028,7 +2028,7 @@ const swaggerSpec = {
           },
           {
             in: "path",
-            name: "nodeId",
+            name: "element",
             required: true,
             schema: {
               type: "string"
@@ -2082,8 +2082,8 @@ const swaggerSpec = {
       },
       delete: {
         tags: ["Schema"],
-        summary: "Remove attribute from node",
-        description: "Remove a specific attribute from a node in the schema",
+        summary: "Remove attribute from element",
+        description: "Remove a specific attribute from an element in the schema",
         security: [{ bearerAuth: [] }],
         parameters: [
           {
@@ -2098,7 +2098,7 @@ const swaggerSpec = {
           },
           {
             in: "path",
-            name: "nodeId",
+            name: "element",
             required: true,
             schema: {
               type: "string"

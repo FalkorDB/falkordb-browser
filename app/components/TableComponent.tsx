@@ -319,10 +319,9 @@ export default function TableComponent({
                         )
                     }
                     {
-                        visibleRows.map((row, i) => {
+                        visibleRows.map((row) => {
                             const actualIndex = rows.findIndex(r => r === row)
-                            const firstVal = row.cells[0].value || i
-                            
+                            const firstVal = row.cells[0].value || actualIndex
                             const dataTestID = `${label}${typeof firstVal === "object" ? firstVal.id : firstVal}`
 
                             if (actualIndex === -1) return undefined
