@@ -84,6 +84,8 @@ ENV CHAT_URL=http://localhost:8080/
 ENV NEXTAUTH_URL=http://localhost:3000/
 ENV NEXTAUTH_SECRET=SECRET
 ENV NEXT_PUBLIC_GOOGLE_ANALYTICS=ANALYTICS
+ENV DEFAULT_MODEL=gpt-4o-mini
+ENV DEFAULT_KEY=""
 
 # Use root to run supervisord (it will drop privileges for individual services)
 USER root
