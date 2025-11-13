@@ -82,6 +82,9 @@ ENV CYPHER=1
 ENV HOSTNAME="0.0.0.0"
 ENV CHAT_URL=http://localhost:8080/
 ENV NEXTAUTH_URL=http://localhost:3000/
+ENV NEXTAUTH_SECRET=SECRET
+ENV NEXT_PUBLIC_GOOGLE_ANALYTICS=ANALYTICS
+
 # Use root to run supervisord (it will drop privileges for individual services)
 USER root
 
