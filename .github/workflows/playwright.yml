@@ -128,14 +128,17 @@ jobs:
         run: |
           CHAT_URL="http://localhost:8080/"
           NEXTAUTH_URL="http://localhost:3000/"
-          NEXTAUTH_SECRET=SECRET npm start & 
+          NEXTAUTH_SECRET=SECRET npm start > nextjs.log 2>&1 & 
           npx playwright test --grep-invert "@config|@tls|@cluster" --shard=1/2 --reporter=dot,list
       - name: Upload artifacts
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: playwright-report-part-1
-          path: playwright-report/
+          path: |
+            nextjs.log
+            playwright-report/
+            test-results/
           retention-days: 30
 
   test-part-2:
@@ -185,14 +188,17 @@ jobs:
         run: |
           CHAT_URL="http://localhost:8080/"
           NEXTAUTH_URL="http://localhost:3000/"
-          NEXTAUTH_SECRET=SECRET npm start & 
+          NEXTAUTH_SECRET=SECRET npm start > nextjs.log 2>&1 &
           npx playwright test --grep-invert "@config|@tls|@cluster" --shard=2/2 --reporter=dot,list
       - name: Upload artifacts
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: playwright-report-part-2
-          path: playwright-report/
+          path: |
+            nextjs.log
+            playwright-report/
+            test-results/
           retention-days: 30
 
   run-settings-tests:
@@ -241,7 +247,7 @@ jobs:
         run: |
           CHAT_URL="http://localhost:8080/"
           NEXTAUTH_URL="http://localhost:3000/"
-          NEXTAUTH_SECRET=SECRET npm start & 
+          NEXTAUTH_SECRET=SECRET npm start > nextjs.log 2>&1 & 
           npx playwright test --grep @config --reporter=dot,list
       - name: Ensure required directories exist
         run: |
@@ -251,7 +257,10 @@ jobs:
         if: always()
         with:
           name: playwright-report-settings
-          path: playwright-report/
+          path: |
+            nextjs.log
+            playwright-report/
+            test-results/
           retention-days: 30
 
   run-tls-tests:
@@ -363,7 +372,7 @@ jobs:
           fi
       - name: Run TLS tests
         run: |
-          NEXTAUTH_SECRET=SECRET npm start & 
+          NEXTAUTH_SECRET=SECRET npm start > nextjs.log 2>&1 & 
           npx playwright test --workers=1 --reporter=dot,list --project="[TLS - Chromium]" --project="[TLS - Firefox]"
       - name: Cleanup TLS certificates
         if: always()
@@ -378,7 +387,10 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: playwright-report-tls
-          path: playwright-report/
+          path: |
+            nextjs.log
+            playwright-report/
+            test-results/
           retention-days: 30
 
   run-cluster-tests:
@@ -490,7 +502,7 @@ jobs:
           done
       - name: Run cluster tests
         run: |
-          NEXTAUTH_SECRET=SECRET npm start & 
+          NEXTAUTH_SECRET=SECRET npm start > nextjs.log 2>&1 & 
           npx playwright test --grep "@cluster" --workers=2 --reporter=dot,list
       - name: Cleanup cluster
         if: always()
@@ -505,6 +517,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: playwright-report-cluster
-          path: playwright-report/
+          path: |
+            nextjs.log
+            playwright-report/
+            test-results/
           retention-days: 30
 

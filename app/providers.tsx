@@ -3,7 +3,7 @@
 import { SessionProvider, useSession } from "next-auth/react";
 import { ThemeProvider } from 'next-themes'
 import { Dispatch, SetStateAction, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { cn, fetchOptions, formatName, getDefaultQuery, getQueryWithLimit, getSSEGraphResult, Panel, prepareArg, securedFetch, Tab, TextPriority } from "@/lib/utils";
+import { cn, fetchOptions, formatName, getDefaultQuery, getQueryWithLimit, getSSEGraphResult, Panel, prepareArg, securedFetch, Tab, getMemoryUsage, TextPriority } from "@/lib/utils";
 import { usePathname, useRouter } from "next/navigation";
 import { useToast } from "@/components/ui/use-toast";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
@@ -252,10 +252,10 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  const fetchInfo = useCallback(async (type: string) => {
+  const fetchInfo = useCallback(async (type: string, name: string) => {
     if (!graphName) return []
 
-    const result = await securedFetch(`/api/graph/${graphName}/info?type=${type}`, {
+    const result = await securedFetch(`/api/graph/${name}/info?type=${type}`, {
       method: "GET",
     }, toast, setIndicator);
 
@@ -285,25 +285,25 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
     try {
       setIsQueryLoading(true)
 
-      const [query, existingLimit] = getQueryWithLimit(q, limit)
-      const url = `api/graph/${prepareArg(n)}?query=${prepareArg(query)}&timeout=${timeout}`;
-
       setHistoryQuery(prev => ({
         ...prev,
         query: q,
       }))
 
+      const [query, existingLimit] = getQueryWithLimit(q, limit)
+      const url = `api/graph/${prepareArg(n)}?query=${prepareArg(query)}&timeout=${timeout}`;
       const result = await getSSEGraphResult(url, toast, setIndicator);
 
       if (!result) throw new Error()
 
       const graphI = await Promise.all([
-        fetchInfo("(label)"),
-        fetchInfo("(relationship type)"),
-        fetchInfo("(property key)"),
+        fetchInfo("(label)", n),
+        fetchInfo("(relationship type)", n),
+        fetchInfo("(property key)", n),
       ]).then(async ([newLabels, newRelationships, newPropertyKeys]) => {
         const colorsArr = localStorage.getItem(n)
-        const gi = GraphInfo.create(newPropertyKeys, newLabels, newRelationships, colorsArr ? JSON.parse(colorsArr) : undefined)
+        const memoryUsage = await getMemoryUsage(n, toast, setIndicator)
+        const gi = GraphInfo.create(newPropertyKeys, newLabels, newRelationships, memoryUsage, colorsArr ? JSON.parse(colorsArr) : undefined)
         setGraphInfo(gi)
         return gi
       }).catch((error) => {
@@ -399,7 +399,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
     setRunDefaultQuery(localStorage.getItem("runDefaultQuery") !== "false")
     setContentPersistence(localStorage.getItem("contentPersistence") !== "false");
     setTutorialOpen(localStorage.getItem("tutorial") !== "false")
-    setRefreshInterval(Number(localStorage.getItem("refreshInterval") || 10))
+    setRefreshInterval(Number(localStorage.getItem("refreshInterval") || 30))
     setDisplayTextPriority(JSON.parse(localStorage.getItem("displayTextPriority") || JSON.stringify(DISPLAY_TEXT_PRIORITY)))
   }, [status])
 
@@ -627,6 +627,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
                               maxSize={30}
                               onCollapse={() => setIsCollapsed(true)}
                               onExpand={() => setIsCollapsed(false)}
+                              data-testid="graphInfoPanel"
                             >
                               <GraphInfoPanel
                                 onClose={onExpand}
