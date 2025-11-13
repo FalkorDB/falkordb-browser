@@ -72,14 +72,18 @@ test.describe("Cluster Functionality Tests", () => {
       const loginPage = await browser.createNewPage(LoginPage, urls.loginUrl);
       await browser.setPageToFullScreen();
 
-      CLUSTER_NODES.forEach(async (node) => {
-        await loginPage.fillHost(node.host);
-        await loginPage.fillPort(node.port);
-        expect(await loginPage.getHost()).toBe(node.host);
-        expect(await loginPage.getPort()).toBe(node.port);
-        await loginPage.fillHost("");
-        await loginPage.fillPort("");
-      });
+      await CLUSTER_NODES.reduce(
+        (chain, node) =>
+          chain.then(async () => {
+            await loginPage.fillHost(node.host);
+            await loginPage.fillPort(node.port);
+            expect(await loginPage.getHost()).toBe(node.host);
+            expect(await loginPage.getPort()).toBe(node.port);
+            await loginPage.fillHost("");
+            await loginPage.fillPort("");
+          }),
+        Promise.resolve()
+      );
 
       expect(CLUSTER_NODES.length).toBeGreaterThan(0);
     });
