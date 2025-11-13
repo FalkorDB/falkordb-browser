@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getClient } from "@/app/api/auth/[...nextauth]/options";
-import { renameGraphSchema, validateRequest } from "../../validation-schemas";
+import { renameGraph, validateBody } from "../../validate-body";
 
 export async function DELETE(
   request: NextRequest,
@@ -96,21 +96,18 @@ export async function PATCH(
     const { client } = session;
 
     const { graph: graphId } = await params;
-    const body = await request.json();
-
-    // Validate request body
-    const validation = validateRequest(renameGraphSchema, {
-      graph: graphId,
-      ...body,
-    });
-
-    if (!validation.success) {
-      return NextResponse.json({ message: validation.error }, { status: 400 });
-    }
-
-    const { sourceName } = validation.data;
 
     try {
+      const body = await request.json();
+
+      // Validate request body
+      const validation = validateBody(renameGraph, body);
+
+      if (!validation.success) {
+        return NextResponse.json({ message: validation.error }, { status: 400 });
+      }
+
+      const { sourceName } = validation.data;
       const data = await (
         await client.connection
       ).renameNX(sourceName, graphId);

@@ -1,6 +1,6 @@
 import { NextResponse, NextRequest } from "next/server";
 import { getClient } from "../../auth/[...nextauth]/options";
-import { renameSchemaSchema, validateRequest } from "../../validation-schemas";
+import { renameSchema, validateBody } from "../../validate-body";
 
 export async function GET(
   request: NextRequest,
@@ -151,21 +151,18 @@ export async function PATCH(
 
     const { schema } = await params;
     const schemaName = `${schema}_schema`;
-    const body = await request.json();
-
-    // Validate request body
-    const validation = validateRequest(renameSchemaSchema, {
-      schema,
-      ...body,
-    });
-
-    if (!validation.success) {
-      return NextResponse.json({ message: validation.error }, { status: 400 });
-    }
-
-    const { sourceName: source } = validation.data;
 
     try {
+      const body = await request.json();
+
+      // Validate request body
+      const validation = validateBody(renameSchema, body);
+
+      if (!validation.success) {
+        return NextResponse.json({ message: validation.error }, { status: 400 });
+      }
+
+      const { sourceName: source } = validation.data;
       const sourceName = `${source}_schema`;
       const data = await (
         await client.connection

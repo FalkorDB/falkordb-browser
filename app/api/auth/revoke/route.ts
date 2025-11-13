@@ -3,7 +3,7 @@ import { jwtVerify } from "jose";
 import crypto from "crypto";
 import { getTokenId } from "../tokenUtils";
 import { getClient, getAdminConnectionForTokens } from "../[...nextauth]/options";
-import { revokeTokenSchema, validateRequest } from "../../validation-schemas";
+import { revokeToken, validateBody } from "../../validate-body";
 
 
 
@@ -42,7 +42,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Validate request body
-    const validation = validateRequest(revokeTokenSchema, body);
+    const validation = validateBody(revokeToken, body);
     
     if (!validation.success) {
       return NextResponse.json(

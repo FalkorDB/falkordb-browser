@@ -1,6 +1,6 @@
 import { getClient } from "@/app/api/auth/[...nextauth]/options";
 import { NextRequest, NextResponse } from "next/server";
-import { updateGraphConfigSchema, validateRequest } from "../../../validation-schemas";
+import { updateGraphConfig, validateBody } from "../../../validate-body";
 
 export async function GET(
   request: NextRequest,
@@ -49,24 +49,21 @@ export async function POST(
     const { client } = session;
 
     const { config: configName } = await params;
-    const body = await request.json();
-
-    // Validate request body
-    const validation = validateRequest(updateGraphConfigSchema, {
-      config: configName,
-      ...body,
-    });
-    
-    if (!validation.success) {
-      return NextResponse.json(
-        { message: validation.error },
-        { status: 400 }
-      );
-    }
-
-    const { value } = validation.data;
 
     try {
+      const body = await request.json();
+
+      // Validate request body
+      const validation = validateBody(updateGraphConfig, body);
+      
+      if (!validation.success) {
+        return NextResponse.json(
+          { message: validation.error },
+          { status: 400 }
+        );
+      }
+
+      const { value } = validation.data;
       const parsedValue =
         configName === "CMD_INFO" ? value : parseInt(value, 10);
 

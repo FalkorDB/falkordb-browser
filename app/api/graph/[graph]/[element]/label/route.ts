@@ -1,10 +1,10 @@
 import { getClient } from "@/app/api/auth/[...nextauth]/options";
 import { NextRequest, NextResponse } from "next/server";
 import {
-  addGraphNodeLabelSchema,
-  removeGraphNodeLabelSchema,
-  validateRequest,
-} from "../../../../validation-schemas";
+  addGraphElementLabel,
+  removeGraphElementLabel,
+  validateBody,
+} from "../../../../validate-body";
 
 export async function DELETE(
   request: NextRequest,
@@ -19,29 +19,25 @@ export async function DELETE(
 
     const { client, user } = session;
     const { graph: graphId, element } = await params;
-    const nodeId = Number(element);
-    const body = await request.json();
-
-    // Validate request body
-    const validation = validateRequest(removeGraphNodeLabelSchema, {
-      graph: graphId,
-      node: element,
-      ...body,
-    });
-
-    if (!validation.success) {
-      return NextResponse.json({ message: validation.error }, { status: 400 });
-    }
-
-    const { label } = validation.data;
+    const elementId = Number(element);
 
     try {
-      const query = `MATCH (n) WHERE ID(n) = $nodeId REMOVE n:${label}`;
+      const body = await request.json();
+
+      // Validate request body
+      const validation = validateBody(removeGraphElementLabel, body);
+
+      if (!validation.success) {
+        return NextResponse.json({ message: validation.error }, { status: 400 });
+      }
+
+      const { label } = validation.data;
+      const query = `MATCH (n) WHERE ID(n) = $elementId REMOVE n:${label}`;
       const graph = client.selectGraph(graphId);
 
       if (user.role === "Read-Only")
-        await graph.roQuery(query, { params: { nodeId } });
-      else await graph.query(query, { params: { nodeId } });
+        await graph.roQuery(query, { params: { elementId } });
+      else await graph.query(query, { params: { elementId } });
 
       return NextResponse.json(
         { message: "Label removed successfully" },
@@ -76,30 +72,26 @@ export async function POST(
 
     const { client, user } = session;
     const { graph: graphId, element } = await params;
-    const nodeId = Number(element);
-    const body = await request.json();
-
-    // Validate request body
-    const validation = validateRequest(addGraphNodeLabelSchema, {
-      graph: graphId,
-      node: element,
-      ...body,
-    });
-
-    if (!validation.success) {
-      return NextResponse.json({ message: validation.error }, { status: 400 });
-    }
-
-    const { label } = validation.data;
+    const elementId = Number(element);
 
     try {
-      const query = `MATCH (n) WHERE ID(n) = $nodeId SET n:${label}`;
+      const body = await request.json();
+
+      // Validate request body
+      const validation = validateBody(addGraphElementLabel, body);
+
+      if (!validation.success) {
+        return NextResponse.json({ message: validation.error }, { status: 400 });
+      }
+
+      const { label } = validation.data;
+      const query = `MATCH (n) WHERE ID(n) = $elementId SET n:${label}`;
       const graph = client.selectGraph(graphId);
 
       if (user.role === "Read-Only") 
-        await graph.roQuery(query, { params: { nodeId } });
+        await graph.roQuery(query, { params: { elementId } });
        else 
-        await graph.query(query, { params: { nodeId } });
+        await graph.query(query, { params: { elementId } });
       
 
       return NextResponse.json(

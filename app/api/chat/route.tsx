@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getClient } from "../auth/[...nextauth]/options";
-import { chatRequestSchema, validateRequest } from "../validation-schemas";
+import { chatRequest, validateBody } from "../validate-body";
 
 const URL = "http://localhost:8080/"
 
@@ -61,7 +61,7 @@ export async function POST(request: NextRequest) {
         const body = await request.json()
 
         // Validate request body
-        const validation = validateRequest(chatRequestSchema, body);
+        const validation = validateBody(chatRequest, body);
         
         if (!validation.success) {
             writer.write(encoder.encode(`event: error status: ${400} data: ${JSON.stringify(validation.error)}\n\n`))

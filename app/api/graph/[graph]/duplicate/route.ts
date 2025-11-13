@@ -1,6 +1,6 @@
 import { getClient } from "@/app/api/auth/[...nextauth]/options";
 import { NextResponse, NextRequest } from "next/server";
-import { duplicateGraphSchema, validateRequest } from "../../../validation-schemas";
+import { duplicateGraph, validateBody } from "../../../validate-body";
 
 // eslint-disable-next-line import/prefer-default-export
 export async function PATCH(
@@ -16,24 +16,21 @@ export async function PATCH(
 
     const { client } = session;
     const { graph: graphId } = await params;
-    const body = await request.json();
-
-    // Validate request body
-    const validation = validateRequest(duplicateGraphSchema, {
-      graph: graphId,
-      ...body,
-    });
-    
-    if (!validation.success) {
-      return NextResponse.json(
-        { message: validation.error },
-        { status: 400 }
-      );
-    }
-
-    const { sourceName } = validation.data;
 
     try {
+      const body = await request.json();
+
+      // Validate request body
+      const validation = validateBody(duplicateGraph, body);
+      
+      if (!validation.success) {
+        return NextResponse.json(
+          { message: validation.error },
+          { status: 400 }
+        );
+      }
+
+      const { sourceName } = validation.data;
       const result = await client.selectGraph(sourceName).copy(graphId);
 
       return NextResponse.json({ result });
