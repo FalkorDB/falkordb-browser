@@ -129,7 +129,10 @@ jobs:
           fi
       - name: Run Playwright tests (shard 1 of 2)
         run: |
-          NEXTAUTH_SECRET=SECRET npm start > nextjs.log 2>&1 & 
+          export CHAT_URL="http://localhost:8080/"
+          export NEXTAUTH_URL="http://localhost:3000/"
+          export NEXTAUTH_SECRET=SECRET
+          npm start > nextjs.log 2>&1 &
           npx playwright test --grep-invert "@config|@tls|@cluster|@token" --shard=1/2 --reporter=dot,list
       - name: Upload artifacts
         if: always()
@@ -190,7 +193,10 @@ jobs:
           fi
       - name: Run Playwright tests (shard 2 of 2)
         run: |
-          NEXTAUTH_SECRET=SECRET npm start > nextjs.log 2>&1 &
+          export CHAT_URL="http://localhost:8080/"
+          export NEXTAUTH_URL="http://localhost:3000/"
+          export NEXTAUTH_SECRET=SECRET
+          npm start > nextjs.log 2>&1 &
           npx playwright test --grep-invert "@config|@tls|@cluster|@token" --shard=2/2 --reporter=dot,list
       - name: Upload artifacts
         if: always()
@@ -330,7 +336,10 @@ jobs:
           fi
       - name: Run only config test
         run: |
-          NEXTAUTH_SECRET=SECRET npm start > nextjs.log 2>&1 & 
+          export CHAT_URL="http://localhost:8080/"
+          export NEXTAUTH_URL="http://localhost:3000/"
+          export NEXTAUTH_SECRET=SECRET 
+          npm start > nextjs.log 2>&1 & 
           npx playwright test --grep @config --reporter=dot,list
       - name: Ensure required directories exist
         run: |
