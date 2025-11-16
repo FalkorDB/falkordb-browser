@@ -21,7 +21,7 @@ export type GraphRef = MutableRefObject<
   ForceGraphMethods<Node, Link> | undefined
 >;
 
-export type Panel = "chat" | "data" | undefined;
+export type Panel = "chat" | "data" | "add" | undefined;
 
 export type TextPriority = {
   name: string;
@@ -312,6 +312,39 @@ export function getQueryWithLimit(
   return [query, existingLimit];
 }
 
+export const getNodeDisplayText = (node: Node, displayTextPriority: TextPriority[]) => {
+  const { data: nodeData } = node;
+
+  const displayText = displayTextPriority.find(({ name, ignore }) => {
+      const key = ignore
+          ? Object.keys(nodeData).find(
+              (k) => k.toLowerCase() === name.toLowerCase()
+          )
+          : name;
+
+      return (
+          key &&
+          nodeData[key] &&
+          typeof nodeData[key] === "string" &&
+          nodeData[key].trim().length > 0
+      );
+  });
+
+  if (displayText) {
+      const key = displayText.ignore
+          ? Object.keys(nodeData).find(
+              (k) => k.toLowerCase() === displayText.name.toLowerCase()
+          )
+          : displayText.name;
+
+      if (key) {
+          return String(nodeData[key]);
+      }
+  }
+
+  return String(node.id);
+}
+
 export const formatName = (newGraphName: string) =>
   newGraphName === '""' ? "" : newGraphName;
 
@@ -363,4 +396,10 @@ export function getTheme(theme: string | undefined) {
     secondary: currentTheme === "dark" ? "#242424" : "#E6E6E6",
     currentTheme,
   };
+}
+
+// Type guard: runtime check that proves elements is [Node, Node]
+export function isTwoNodes(elements: (Node | Link)[]): elements is [Node, Node] {
+  return elements.length === 2 &&
+    elements.every((e): e is Node => !!e.labels)
 }

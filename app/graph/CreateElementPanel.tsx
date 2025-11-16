@@ -3,15 +3,18 @@
 'use client'
 
 import { useCallback, useContext, useEffect, useState } from "react";
-import { ArrowRight, ArrowRightLeft, Check, Pencil, Plus, X } from "lucide-react";
+import { ArrowRight, ArrowRightLeft, Pencil, Plus, X } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useToast } from "@/components/ui/use-toast";
 import { Switch } from "@/components/ui/switch";
+import { getNodeDisplayText } from "@/lib/utils";
 import Button from "../components/ui/Button";
 import Input from "../components/ui/Input";
 import Combobox from "../components/ui/combobox";
 import { Node, Value } from "../api/graph/model";
-import { IndicatorContext } from "../components/provider";
+import { BrowserSettingsContext, IndicatorContext } from "../components/provider";
+import AddLabel from "./addLabel";
+import RemoveLabel from "./RemoveLabel";
 
 type Props =
     | {
@@ -36,6 +39,7 @@ export default function CreateElementPanel(props: Props) {
     const setSelectedNodes = !type ? props.setSelectedNodes : undefined;
 
     const { indicator } = useContext(IndicatorContext)
+    const { settings: { graphInfo: { displayTextPriority } } } = useContext(BrowserSettingsContext)
     const { toast } = useToast()
 
     const [attributes, setAttributes] = useState<[string, Value][]>([])
@@ -44,19 +48,15 @@ export default function CreateElementPanel(props: Props) {
     const [newType, setNewType] = useState<ValueType>("string")
     const [labels, setLabels] = useState<string[]>([])
     const [labelsHover, setLabelsHover] = useState<boolean>(false)
-    const [isAddLabel, setIsAddLabel] = useState<boolean>(false)
-    const [newLabel, setNewLabel] = useState<string>("")
     const [isLoading, setIsLoading] = useState<boolean>(false)
 
     const handleClose = useCallback((e?: KeyboardEvent) => {
         if (e && e.key !== "Escape") return
         setAttributes([])
         setLabels([])
-        setNewLabel("")
         setNewKey("")
         setNewVal("")
         setNewType("string")
-        setIsAddLabel(false)
         onClose()
     }, [onClose])
 
@@ -66,6 +66,8 @@ export default function CreateElementPanel(props: Props) {
             window.removeEventListener("keydown", handleClose)
         }
     }, [handleClose])
+
+    const handleGetNodeTextPriority = useCallback((node: Node) => getNodeDisplayText(node, displayTextPriority), [displayTextPriority])
 
     const getDefaultVal = (t: ValueType) => {
         switch (t) {
@@ -158,14 +160,14 @@ export default function CreateElementPanel(props: Props) {
         }
     }
 
-    const handleAddLabel = () => {
+    const handleAddLabel = async (newLabel: string) => {
         if (newLabel === "") {
             toast({
                 title: "Error",
                 description: "Label cannot be empty",
                 variant: "destructive"
             })
-            return
+            return false
         }
 
         if (labels.includes(newLabel)) {
@@ -174,7 +176,7 @@ export default function CreateElementPanel(props: Props) {
                 description: "Label already exists",
                 variant: "destructive"
             })
-            return
+            return false
         }
 
         // For edges, only allow one label
@@ -184,34 +186,24 @@ export default function CreateElementPanel(props: Props) {
                 description: "Edge can only have one label",
                 variant: "destructive"
             })
-            return
+            return false
         }
 
         setLabels(prev => [...prev, newLabel])
-        setNewLabel("")
-        setIsAddLabel(false)
+        return true
     }
 
-    const handleRemoveLabel = (removeLabel: string) => {
+    const handleRemoveLabel = async (removeLabel: string) => {
         setLabels(prev => prev.filter(l => l !== removeLabel))
+        return true
     }
 
     const handleOnCreate = async () => {
-        // Validation for edges
         if (!type) {
             if (labels.length === 0) {
                 toast({
                     title: "Error",
                     description: "Edge must have a label (relationship type)",
-                    variant: "destructive"
-                })
-                return
-            }
-
-            if (!selectedNodes || !selectedNodes[0] || !selectedNodes[1]) {
-                toast({
-                    title: "Error",
-                    description: "You must select two nodes to create an edge",
                     variant: "destructive"
                 })
                 return
@@ -229,7 +221,6 @@ export default function CreateElementPanel(props: Props) {
             setNewVal("")
             setNewType("string")
             setLabels([])
-            setIsAddLabel(false)
         } finally {
             setIsLoading(false)
         }
@@ -238,84 +229,60 @@ export default function CreateElementPanel(props: Props) {
     return (
         <div className="DataPanel p-4">
             <div className="relative flex flex-col gap-6 pb-4 border-b border-border">
-                <Button
-                    className="absolute top-0 right-0"
-                    onClick={onClose}
+                <div className="flex flex-row justify-between">
+                    <div className="flex flex-col gap-2 font-medium text-xl text-nowrap">
+                        <p>Attributes: <span className="Gradient text-transparent bg-clip-text">{attributes.length}</span></p>
+                    </div>
+                    <Button
+                        className="h-fit"
+                        title="Close"
+                        onClick={onClose}
+                    >
+                        <X />
+                    </Button>
+                </div>
+                <ul 
+                    className="flex flex-wrap gap-4" 
+                    onMouseEnter={() => setLabelsHover(true)} 
+                    onMouseLeave={() => setLabelsHover(false)}
                 >
-                    <X size={15} />
-                </Button>
-                <ul className="flex flex-wrap gap-4 min-w-[10%]" onMouseEnter={() => setLabelsHover(true)} onMouseLeave={() => setLabelsHover(false)}>
                     {labels.map((l) => (
-                        <li key={l} className="flex gap-2 px-2 py-1 bg-secondary rounded-full items-center">
+                        <li
+                            key={l}
+                            className="flex gap-2 px-2 py-1 bg-secondary rounded-full items-center"
+                        >
                             <p>{l}</p>
-                            <Button
-                                title="Remove"
-                                onClick={() => handleRemoveLabel(l)}
-                            >
-                                <X size={15} />
-                            </Button>
+                            <RemoveLabel
+                                onRemoveLabel={handleRemoveLabel}
+                                selectedLabel={l}
+                                trigger={
+                                    <Button
+                                        title="Remove Label"
+                                    >
+                                        <X size={15} />
+                                    </Button>
+                                }
+                            />
                         </li>
                     ))}
-                    <li className="h-8 flex flex-wrap gap-2">
+                    <li className="h-8 w-[106px] flex justify-center items-center">
                         {
-                            (type ? (labelsHover || labels.length === 0) : labels.length === 0) && !isAddLabel &&
-                            <Button
-                                className="p-2 text-xs justify-center border border-border"
-                                variant="Secondary"
-                                label="Add"
-                                title={type ? "Add a new label" : "Add label for relationship"}
-                                onClick={() => setIsAddLabel(true)}
-                            >
-                                <Pencil size={15} />
-                            </Button>
-                        }
-                        {
-                            isAddLabel &&
-                            <>
-                                <Input
-                                    ref={ref => ref?.focus()}
-                                    className="max-w-[20dvw]"
-                                    value={newLabel}
-                                    onChange={(e) => setNewLabel(e.target.value)}
-                                    onKeyDown={(e) => {
-                                        if (e.key === "Escape") {
-                                            e.preventDefault()
-                                            setIsAddLabel(false)
-                                            setNewLabel("")
-                                        }
-
-                                        if (e.key !== "Enter") return
-
-                                        e.preventDefault()
-                                        handleAddLabel()
-                                    }}
-                                />
-                                <Button
-                                    className="p-2 text-xs justify-center border border-border"
-                                    variant="Secondary"
-                                    label="Save"
-                                    title="Save the new label"
-                                    onClick={() => handleAddLabel()}
-                                >
-                                    <Check size={15} />
-                                </Button>
-                                <Button
-                                    className="p-2 text-xs justify-center border border-border"
-                                    variant="Secondary"
-                                    label="Cancel"
-                                    title="Discard new label"
-                                    onClick={() => {
-                                        setIsAddLabel(false)
-                                        setNewLabel("")
-                                    }}
-                                >
-                                    <X size={15} />
-                                </Button>
-                            </>
+                            (type ? (labelsHover || labels.length === 0) : labels.length === 0) &&
+                            <AddLabel
+                                onAddLabel={handleAddLabel}
+                                trigger={
+                                    <Button
+                                        className="p-2 text-nowrap text-xs justify-center border border-border rounded-full"
+                                        label="Add Label"
+                                        title={type ? "Add a new label" : "Add label for relationship"}
+                                    >
+                                        <Pencil size={15} />
+                                    </Button>
+                                }
+                            />
                         }
                     </li>
                 </ul>
-                <p className="font-medium text-xl">{attributes.length}&ensp;Attributes</p>
             </div>
             <div className="w-full h-1 grow flex flex-col justify-between items-start font-medium">
                 <div className="h-1 grow overflow-y-auto overflow-x-hidden w-full">
@@ -360,7 +327,6 @@ export default function CreateElementPanel(props: Props) {
                         </div>
                         <div className="flex items-center px-2 border-b border-border h-14">
                             <Combobox
-                                className="w-full"
                                 options={["string", "number", "boolean", "array"]}
                                 selectedValue={getArrayType(newType)}
                                 setSelectedValue={(value) => {
@@ -439,10 +405,10 @@ export default function CreateElementPanel(props: Props) {
                             <div style={{ backgroundColor: selectedNodes[0].color }} className="flex h-16 w-16 rounded-full border-2 border-border justify-center items-center overflow-hidden">
                                 <Tooltip>
                                     <TooltipTrigger asChild>
-                                        <p className="truncate">{selectedNodes[0].labels[0] || "Node 1"}</p>
+                                        <p className="truncate">{handleGetNodeTextPriority(selectedNodes[0])}</p>
                                     </TooltipTrigger>
                                     <TooltipContent>
-                                        <p>{selectedNodes[0].labels[0] || "No node selected"}</p>
+                                        <p>{handleGetNodeTextPriority(selectedNodes[0])}</p>
                                     </TooltipContent>
                                 </Tooltip>
                             </div>
@@ -450,10 +416,10 @@ export default function CreateElementPanel(props: Props) {
                             <div style={{ backgroundColor: selectedNodes[1].color }} className="flex h-16 w-16 rounded-full border-2 border-border justify-center items-center overflow-hidden">
                                 <Tooltip>
                                     <TooltipTrigger asChild>
-                                        <p className="truncate">{selectedNodes[1].labels[0] || "Node 2"}</p>
+                                        <p className="truncate">{handleGetNodeTextPriority(selectedNodes[1])}</p>
                                     </TooltipTrigger>
                                     <TooltipContent>
-                                        <p>{selectedNodes[1].labels[0] || "No node selected"}</p>
+                                        <p>{handleGetNodeTextPriority(selectedNodes[1])}</p>
                                     </TooltipContent>
                                 </Tooltip>
                             </div>

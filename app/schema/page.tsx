@@ -1,7 +1,7 @@
 'use client'
 
 import { useContext, useState, useRef, useCallback, useEffect, useMemo } from "react";
-import { cn, getSSEGraphResult, prepareArg, securedFetch } from "@/lib/utils";
+import { cn, getSSEGraphResult, isTwoNodes, prepareArg, securedFetch } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
 import dynamic from "next/dynamic";
 import { ForceGraphMethods } from "react-force-graph-2d";
@@ -43,7 +43,6 @@ export default function Page() {
 
     const panelRef = useRef<ImperativePanelHandle>(null)
 
-    const [selectedNodes, setSelectedNodes] = useState<[Node | undefined, Node | undefined]>([undefined, undefined]);
     const [selectedElement, setSelectedElement] = useState<Node | Link | undefined>()
     const [selectedElements, setSelectedElements] = useState<(Node | Link)[]>([])
     const [cooldownTicks, setCooldownTicks] = useState<number | undefined>(0)
@@ -58,10 +57,10 @@ export default function Page() {
     const [isCanvasLoading, setIsCanvasLoading] = useState(false)
     const [isCollapsed, setIsCollapsed] = useState(true)
 
-    const [panelSize, graphSize] = useMemo(() => {
-        if (selectedElement) return [30, 70]
-        if (isAddNode || isAddEdge) return [40, 60]
-        return [0, 100]
+    const panelSize = useMemo(() => {
+        if (selectedElement) return 30
+        if (isAddNode || isAddEdge) return 40
+        return 0
     }, [selectedElement, isAddNode, isAddEdge])
 
     const handleSetSelectedElement = useCallback((el: Node | Link | undefined) => {
@@ -224,7 +223,7 @@ export default function Page() {
         const fakeId = "-1"
         const result = await securedFetch(`api/schema/${prepareArg(schemaName)}/${prepareArg(fakeId)}`, {
             method: "POST",
-            body: JSON.stringify({ type: isAddNode, label: elementLabel, attributes, selectedNodes })
+            body: JSON.stringify({ type: isAddNode, label: elementLabel, attributes, selectedNodes: selectedElements })
         }, toast, setIndicator)
 
         if (result.ok) {
@@ -235,14 +234,16 @@ export default function Page() {
                 setLabels(prev => [...prev, ...ls.filter(c => !prev.some(p => p.name === c)).map(c => schema.LabelsMap.get(c)!)])
                 handleSetIsAddNode(false)
             } else {
-                const { relationship } = schema.extendEdge(json.result.data[0].e, false, true)
-                setRelationships(prev => [...prev, schema.RelationshipsMap.get(relationship)!])
+                const link = schema.extendEdge(json.result.data[0].e, false, true)
+                // Calculate curve for the newly created edge
+                link.curve = schema.calculateLinkCurve(link)
+                setRelationships(prev => [...prev, schema.RelationshipsMap.get(link.relationship)!])
                 handleSetIsAddEdge(false)
             }
 
             fetchCount()
 
-            setSelectedElement(undefined)
+            setSelectedElements([])
         }
 
         setData({ ...schema.Elements })
@@ -250,6 +251,43 @@ export default function Page() {
         handleCooldown()
 
         return result.ok
+    }
+
+    const getCurrentPanel = () => {
+        if (selectedElement) {
+            return (
+                <DataPanel
+                    object={selectedElement}
+                    setObject={handleSetSelectedElement}
+                    schema={schema}
+                    setLabels={setLabels}
+                />
+            )
+        }
+
+        if (isAddNode) {
+            return (
+                <SchemaCreateElement
+                    onCreate={handleCreateElement}
+                    setIsAdd={handleSetIsAddNode}
+                    type
+                />
+            )
+        }
+
+        if (isTwoNodes(selectedElements)) {
+            return (
+                <SchemaCreateElement
+                    onCreate={handleCreateElement}
+                    setIsAdd={handleSetIsAddEdge}
+                    selectedNodes={selectedElements}
+                    setSelectedNodes={setSelectedElements}
+                    type={false}
+                />
+            )
+        }
+
+        return null
     }
 
     return (
@@ -270,9 +308,15 @@ export default function Page() {
                 setIsAddEdge={handleSetIsAddEdge}
                 setGraph={setSchema}
                 isCanvasLoading={isCanvasLoading}
+                isAddEdge={isAddEdge}
+                isAddNode={isAddNode}
             />
             <ResizablePanelGroup direction="horizontal" className="h-1 grow">
-                <ResizablePanel defaultSize={graphSize} minSize={50} maxSize={100}>
+                <ResizablePanel
+                    defaultSize={100 - panelSize}
+                    collapsible
+                    minSize={30}
+                >
                     <SchemaView
                         edgesCount={edgesCount}
                         nodesCount={nodesCount}
@@ -280,7 +324,6 @@ export default function Page() {
                         setSelectedElement={handleSetSelectedElement}
                         selectedElements={selectedElements}
                         setSelectedElements={setSelectedElements}
-                        isAddEdge={isAddEdge}
                         chartRef={chartRef}
                         cooldownTicks={cooldownTicks}
                         handleCooldown={handleCooldown}
@@ -288,19 +331,21 @@ export default function Page() {
                         setData={setData}
                         setLabels={setLabels}
                         setRelationships={setRelationships}
-                        setSelectedNodes={setSelectedNodes}
                         labels={labels}
                         relationships={relationships}
                         isLoading={isCanvasLoading}
                     />
                 </ResizablePanel>
-                <ResizableHandle withHandle onMouseUp={() => isCollapsed && handleSetSelectedElement(undefined)} className={cn("ml-6 w-0", isCollapsed && "hidden")} />
+                <ResizableHandle
+                    withHandle
+                    onMouseUp={() => isCollapsed && handleSetSelectedElement(undefined)}
+                    className={cn("ml-6 w-0", isCollapsed && "hidden")}
+                />
                 <ResizablePanel
                     ref={panelRef}
                     collapsible
                     defaultSize={panelSize}
-                    minSize={25}
-                    maxSize={50}
+                    minSize={30}
                     onCollapse={() => {
                         setIsCollapsed(true)
                     }}
@@ -308,23 +353,7 @@ export default function Page() {
                         setIsCollapsed(false)
                     }}
                 >
-                    {
-                        selectedElement ?
-                            <DataPanel
-                                object={selectedElement}
-                                setObject={handleSetSelectedElement}
-                                schema={schema}
-                                setLabels={setLabels}
-                            />
-                            :
-                            <SchemaCreateElement
-                                onCreate={handleCreateElement}
-                                setIsAdd={isAddNode ? handleSetIsAddNode : handleSetIsAddEdge}
-                                selectedNodes={selectedNodes}
-                                setSelectedNodes={setSelectedNodes}
-                                type={isAddNode}
-                            />
-                    }
+                    {getCurrentPanel()}
                 </ResizablePanel>
             </ResizablePanelGroup>
         </div>

@@ -459,6 +459,39 @@ export class Graph {
     return graph;
   }
 
+  public calculateLinkCurve(link: Link, existingLinks: Link[] = []): number {
+    const start = link.source;
+    const end = link.target;
+    
+    // Find all links between the same nodes (including new links being added)
+    const allLinks = [...this.elements.links, ...existingLinks];
+    const sameNodesLinks = allLinks.filter(
+      (l) =>
+        (l.source.id === start.id && l.target.id === end.id) ||
+        (l.target.id === start.id && l.source.id === end.id)
+    );
+    
+    let index = sameNodesLinks.findIndex((l) => l.id === link.id);
+    index = index === -1 ? sameNodesLinks.length : index;
+    
+    const even = index % 2 === 0;
+    let curve;
+
+    if (start.id === end.id) {
+      if (even) {
+        curve = Math.floor(-(index / 2)) - 3;
+      } else {
+        curve = Math.floor((index + 1) / 2) + 2;
+      }
+    } else if (even) {
+      curve = Math.floor(-(index / 2));
+    } else {
+      curve = Math.floor((index + 1) / 2);
+    }
+
+    return curve * 0.4;
+  }
+
   public extendNode(
     cell: NodeCell,
     collapsed: boolean,
@@ -707,35 +740,11 @@ export class Graph {
       });
     });
 
-    newElements
-      .filter((element): element is Link => "source" in element)
-      .forEach((link) => {
-        const start = link.source;
-        const end = link.target;
-        const sameNodesLinks = this.elements.links.filter(
-          (l) =>
-            (l.source.id === start.id && l.target.id === end.id) ||
-            (l.target.id === start.id && l.source.id === end.id)
-        );
-        let index = sameNodesLinks.findIndex((l) => l.id === link.id);
-        index = index === -1 ? 0 : index;
-        const even = index % 2 === 0;
-        let curve;
-
-        if (start.id === end.id) {
-          if (even) {
-            curve = Math.floor(-(index / 2)) - 3;
-          } else {
-            curve = Math.floor((index + 1) / 2) + 2;
-          }
-        } else if (even) {
-          curve = Math.floor(-(index / 2));
-        } else {
-          curve = Math.floor((index + 1) / 2);
-        }
-
-        link.curve = curve * 0.4;
-      });
+    const newLinks = newElements.filter((element): element is Link => "source" in element);
+    
+    newLinks.forEach((link) => {
+      link.curve = this.calculateLinkCurve(link, newLinks);
+    });
 
     newElements
       .filter((element): element is Node => "labels" in element)

@@ -66,7 +66,7 @@ export default function Combobox<T extends string>({ id, disabled = false, inTab
           data-testid={`select${label}`}
           data-type="select"
           title={getTitle()}
-          className={cn("w-fit gap-2 items-center border border-border p-2 disabled:text-gray-300 disabled:cursor-not-allowed", inTable ? "text-sm font-light" : "text-xl font-medium", className)}
+          className={cn("w-full gap-2 items-center border border-border p-2 disabled:text-gray-300 disabled:cursor-not-allowed", inTable ? "text-sm font-light" : "text-xl font-medium", className)}
         >
           <p className="truncate">{selectedValue || `Select ${label}`}</p>
         </SelectTrigger>

@@ -18,11 +18,11 @@ import RemoveLabel from "./RemoveLabel";
 
 interface Props {
     object: Node | Link;
-    setObject: (el: Node | Link | undefined) => void;
+    onClose: () => void;
     setLabels: Dispatch<SetStateAction<Label[]>>;
 }
 
-export default function DataPanel({ object, setObject, setLabels }: Props) {
+export default function DataPanel({ object, onClose, setLabels }: Props) {
     const { setIndicator } = useContext(IndicatorContext)
     const { graph, setGraphInfo } = useContext(GraphContext)
 
@@ -36,19 +36,19 @@ export default function DataPanel({ object, setObject, setLabels }: Props) {
     const [label, setLabel] = useState<string[]>([]);
     const type = !object.source
 
-    const onClose = useCallback((e: KeyboardEvent) => {
+    const handleClose = useCallback((e: KeyboardEvent) => {
         if (e.key === "Escape") {
-            setObject(undefined)
-        }
-    }, [setObject])
-
-    useEffect(() => {
-        window.addEventListener("keydown", onClose)
-
-        return () => {
-            window.removeEventListener("keydown", onClose)
+            onClose()
         }
     }, [onClose])
+
+    useEffect(() => {
+        window.addEventListener("keydown", handleClose)
+
+        return () => {
+            window.removeEventListener("keydown", handleClose)
+        }
+    }, [handleClose])
 
     useEffect(() => {
         if (lastObjId.current !== object.id) {
@@ -125,7 +125,6 @@ export default function DataPanel({ object, setObject, setLabels }: Props) {
         }
 
         return false
-
     }
 
     return (
@@ -140,7 +139,7 @@ export default function DataPanel({ object, setObject, setLabels }: Props) {
                         className="h-fit"
                         data-testid="DataPanelClose"
                         title="Close"
-                        onClick={() => setObject(undefined)}
+                        onClick={() => onClose()}
                     >
                         <X />
                     </Button>

@@ -40,6 +40,8 @@ interface SchemaProps {
     chartRef: GraphRef;
     setIsAddNode: (isAdd: boolean) => void;
     setIsAddEdge: (isAdd: boolean) => void;
+    isAddNode: boolean;
+    isAddEdge: boolean;
     isCanvasLoading: boolean;
     runQuery?: never;
     historyQuery?: never;
@@ -61,6 +63,8 @@ interface GraphProps {
     chartRef?: never;
     setIsAddNode?: never;
     setIsAddEdge?: never;
+    isAddNode?: never;
+    isAddEdge?: never;
     isCanvasLoading?: never;
 }
 
@@ -88,6 +92,8 @@ export default function Selector<T extends "Graph" | "Schema" = "Graph" | "Schem
     chartRef,
     setIsAddNode,
     setIsAddEdge,
+    isAddNode,
+    isAddEdge,
     setGraph,
     type,
     isCanvasLoading,
@@ -487,15 +493,18 @@ export default function Selector<T extends "Graph" | "Schema" = "Graph" | "Schem
                     : selectedElements && setSelectedElement && handleDeleteElement && setIsAddNode && setIsAddEdge && chartRef && isCanvasLoading !== undefined && <div className="w-full h-full">
                         <Toolbar
                             graph={graph}
+                            graphName={graphName}
                             label={type}
                             selectedElement={selectedElement}
                             selectedElements={selectedElements}
                             setSelectedElement={setSelectedElement}
                             handleDeleteElement={handleDeleteElement}
                             setIsAddNode={setIsAddNode}
-                            setIsAddEdge={setIsAddEdge}
+                            setIsAddEdge={selectedElements.length === 2 && selectedElements.every(e => !!e.labels) ? setIsAddEdge : undefined}
                             chartRef={chartRef}
                             isLoadingSchema={!!isCanvasLoading}
+                            isAddNode={isAddNode}
+                            isAddEdge={isAddEdge}
                         />
                     </div>
             }

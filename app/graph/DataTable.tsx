@@ -330,7 +330,6 @@ export default function DataTable({ object, type, lastObjId, className }: Props)
 
     const getNewTypeInput = () => (
         <Combobox
-            className="w-full"
             options={["string", "number", "boolean", "array"]}
             selectedValue={getArrayType(newType)}
             setSelectedValue={(value) => {

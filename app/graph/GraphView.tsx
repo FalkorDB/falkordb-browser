@@ -63,7 +63,7 @@ function GraphView({
     isAddNode
 }: Props) {
 
-    const { graph, currentTab, setCurrentTab } = useContext(GraphContext)
+    const { graph, graphName, currentTab, setCurrentTab } = useContext(GraphContext)
     const { setData, data, isSaved, setViewport, viewport } = useContext(ViewportContext)
 
     const [parentHeight, setParentHeight] = useState<number>(0)
@@ -129,6 +129,7 @@ function GraphView({
                         <>
                             <Toolbar
                                 graph={graph}
+                                graphName={graphName}
                                 label="Graph"
                                 selectedElement={selectedElement}
                                 setSelectedElement={setSelectedElement}

@@ -492,6 +492,7 @@ export default function TableComponent({
                                                                         {
                                                                             cell.type === "select" ?
                                                                                 <Combobox
+                                                                                    className="w-fit"
                                                                                     data-testid={`select${label}`}
                                                                                     inTable
                                                                                     options={cell.options}

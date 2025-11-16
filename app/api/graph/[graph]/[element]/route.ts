@@ -55,7 +55,7 @@ export async function GET(
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: Promise<{ schema: string; element: string }> }
+  { params }: { params: Promise<{ graph: string; element: string }> }
 ) {
   try {
     const session = await getClient();
@@ -65,8 +65,7 @@ export async function POST(
     }
 
     const { client, user } = session;
-    const { schema } = await params;
-    const schemaName = `${schema}_schema`;
+    const { graph: graphId } = await params;
 
     try {
       const body = await request.json();
@@ -88,7 +87,7 @@ export async function POST(
           throw new Error("Label is required");
       }
       
-      const graph = client.selectGraph(schemaName);
+      const graph = client.selectGraph(graphId);
       const query = type
         ? `CREATE (n${label && label.length > 0 ? `:${label.join(":")}` : ""}${
             attributes.length > 0

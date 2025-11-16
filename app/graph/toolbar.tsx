@@ -10,6 +10,7 @@ import { GraphContext } from "../components/provider"
 
 interface Props {
     graph: Graph
+    graphName: string
     selectedElements: (Node | Link)[]
     selectedElement: Node | Link | undefined
     setSelectedElement: (el: Node | Link | undefined) => void
@@ -29,6 +30,7 @@ const ITEMS_PER_PAGE = 30
 
 export default function Toolbar({
     graph,
+    graphName,
     selectedElements,
     selectedElement,
     setSelectedElement,
@@ -272,20 +274,10 @@ export default function Toolbar({
                     </div>
                 }
             </div>
-            <div className={cn("flex gap-2", label === "Schema" && "h-full")}>
+            <div className={cn("flex flex-row-reverse gap-2", label === "Schema" && "h-full")}>
                 {
-                    graph.Id &&
+                    graphName &&
                     <>
-                        {
-                            (selectedElements.length !== 0 || selectedElement) &&
-                            <DeleteElement
-                                label={label}
-                                description="Are you sure you want to delete this element(s)?"
-                                open={deleteOpen}
-                                setOpen={setDeleteOpen}
-                                onDeleteElement={handleDeleteElement}
-                            />
-                        }
                         <Button
                             data-testid={`elementCanvasAddNode${label}`}
                             className="pointer-events-auto"
@@ -306,6 +298,16 @@ export default function Toolbar({
                             >
                                 <PlusCircle size={20} />
                             </Button>
+                        }
+                        {
+                            (selectedElements.length !== 0 || selectedElement) &&
+                            <DeleteElement
+                                label={label}
+                                description="Are you sure you want to delete this element(s)?"
+                                open={deleteOpen}
+                                setOpen={setDeleteOpen}
+                                onDeleteElement={handleDeleteElement}
+                            />
                         }
                     </>
                 }

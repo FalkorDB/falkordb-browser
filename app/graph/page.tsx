@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
-import { cn, getMemoryUsage, prepareArg, securedFetch } from "@/lib/utils";
+import { cn, getMemoryUsage, isTwoNodes, prepareArg, securedFetch } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
 import dynamic from "next/dynamic";
 import { ForceGraphMethods } from "react-force-graph-2d";
@@ -28,12 +28,6 @@ const GraphView = dynamic(() => import("./GraphView"), {
         <Spinning />
     </div>
 })
-
-// Type guard: runtime check that proves elements is [Node, Node]
-function isTwoNodes(elements: (Node | Link)[]): elements is [Node, Node] {
-    return elements.length === 2 &&
-        elements.every((e): e is Node => !!e.labels)
-}
 
 export default function Page() {
     const { historyQuery, setHistoryQuery } = useContext(HistoryQueryContext)
@@ -74,8 +68,8 @@ export default function Page() {
     const [labels, setLabels] = useState<Label[]>([])
     const [relationships, setRelationships] = useState<Relationship[]>([])
     const [isCollapsed, setIsCollapsed] = useState(true)
-    const [isAddNode, setIsAddNode] = useState(true)
-    const [isAddEdge, setIsAddEdge] = useState(true)
+    const [isAddNode, setIsAddNode] = useState(false)
+    const [isAddEdge, setIsAddEdge] = useState(false)
 
     const panelSize = useMemo(() => {
         switch (panel) {
@@ -90,16 +84,18 @@ export default function Page() {
     }, [panel])
 
     useEffect(() => {
-        if (panel !== "data") {
-            setSelectedElement(undefined)
-        }
-
         const currentPanel = panelRef.current
 
         if (!currentPanel) return
 
         if (panel) currentPanel.expand()
         else currentPanel.collapse()
+
+        if (panel !== "chat") return
+
+        setSelectedElement(undefined)
+        setIsAddNode(false)
+        setIsAddEdge(false)
     }, [panel])
 
     const fetchInfo = useCallback(async (type: string) => {
@@ -181,30 +177,16 @@ export default function Page() {
         setIsQueryLoading(false)
     }, [fetchCount, graph.Id, graphName, setGraph, runDefaultQuery, defaultQuery, contentPersistence, setGraphName, graphNames, setIsQueryLoading])
 
-    const handleSetIsAddNode = useCallback((isAdd: boolean) => {
-        const currentPanel = panelRef.current
-        setIsAddNode(isAdd)
+    const handleSetIsAdd = useCallback((mainSetter: (isAdd: boolean) => void, setter: (isAdd: boolean) => void) => (isAdd: boolean) => {
+        mainSetter(isAdd)
 
         if (isAdd) {
-            setIsAddEdge(false)
+            setter(false)
             setSelectedElement(undefined)
+            setPanel("add")
+        } else {
+            setPanel(undefined)
         }
-
-        if (!currentPanel) return
-
-        if (isAdd) currentPanel.expand()
-        else currentPanel.collapse()
-    }, [])
-
-    const handleSetIsAddEdge = useCallback((isAdd: boolean) => {
-        setIsAddEdge(isAdd)
-
-        if (isAdd) {
-            setIsAddNode(false)
-            setSelectedElement(undefined)
-        }
-
-        setPanel("add")
     }, [setPanel])
 
     const handleCreateElement = useCallback(async (attributes: [string, Value][], label: string[]) => {
@@ -225,16 +207,18 @@ export default function Page() {
             if (isAddNode) {
                 const { labels: ls } = graph.extendNode(json.result.data[0].n, false, true, true)
                 setLabels(prev => [...prev, ...ls.filter(c => !prev.some(p => p.name === c)).map(c => graph.LabelsMap.get(c)!)])
-                handleSetIsAddNode(false)
+                handleSetIsAdd(setIsAddNode, setIsAddEdge)(false)
             } else {
-                const { relationship } = graph.extendEdge(json.result.data[0].e, false, true)
-                setRelationships(prev => [...prev, graph.RelationshipsMap.get(relationship)!])
-                handleSetIsAddEdge(false)
+                const link = graph.extendEdge(json.result.data[0].e, false, true)
+                // Calculate curve for the newly created edge
+                link.curve = graph.calculateLinkCurve(link)
+                setRelationships(prev => [...prev, graph.RelationshipsMap.get(link.relationship)!])
+                handleSetIsAdd(setIsAddEdge, setIsAddNode)(false)
             }
 
             fetchCount()
 
-            setSelectedElement(undefined)
+            setSelectedElements([])
         }
 
         setData({ ...graph.Elements })
@@ -242,18 +226,16 @@ export default function Page() {
         handleCooldown()
 
         return result.ok
-    }, [fetchCount, graph, graphName, handleCooldown, handleSetIsAddEdge, handleSetIsAddNode, isAddNode, selectedElements, setData, setIndicator, toast])
+    }, [fetchCount, graph, graphName, handleCooldown, handleSetIsAdd, isAddNode, selectedElements, setData, setIndicator, toast])
 
     const handleSetSelectedElement = useCallback((el: Node | Link | undefined) => {
         setSelectedElement(el)
-        setPanel(el ? "data" : undefined)
 
-        const currentPanel = panelRef.current
-
-        if (!currentPanel) return
-
-        if (el) currentPanel.expand()
-        else currentPanel.collapse()
+        if (el) {
+            setPanel("data")
+            setIsAddEdge(false)
+            setIsAddNode(false)
+        } else setPanel(undefined)
     }, [setPanel])
 
     const handleDeleteElement = useCallback(async () => {
@@ -305,13 +287,15 @@ export default function Page() {
         setData({ ...graph.Elements })
         fetchCount()
         setSelectedElements([])
-        handleSetSelectedElement(undefined)
+
+        if (panel === "data") handleSetSelectedElement(undefined)
+        else setSelectedElement(undefined)
 
         toast({
             title: "Success",
             description: `${selectedElements.length > 1 ? "Elements" : "Element"} deleted`,
         })
-    }, [selectedElements, selectedElement, graph, setData, fetchCount, handleSetSelectedElement, toast, setIndicator])
+    }, [selectedElements, selectedElement, graph, setData, fetchCount, panel, handleSetSelectedElement, toast, setIndicator])
 
     const getCurrentPanel = useCallback(() => {
         if (!graphName) return undefined
@@ -329,9 +313,10 @@ export default function Page() {
 
                 return <DataPanel
                     object={selectedElement}
-                    setObject={handleSetSelectedElement}
+                    onClose={() => handleSetSelectedElement(undefined)}
                     setLabels={setLabels}
                 />
+
             case "add": {
                 const onCloseHandler = () => {
                     setPanel(undefined)
@@ -402,13 +387,17 @@ export default function Page() {
                         fetchCount={fetchCount}
                         historyQuery={historyQuery}
                         setHistoryQuery={setHistoryQuery}
-                        setIsAddEdge={handleSetIsAddEdge}
-                        setIsAddNode={handleSetIsAddNode}
+                        setIsAddNode={handleSetIsAdd(setIsAddNode, setIsAddEdge)}
+                        setIsAddEdge={handleSetIsAdd(setIsAddEdge, setIsAddNode)}
                         isAddEdge={isAddEdge}
                         isAddNode={isAddNode}
                     />
                 </ResizablePanel>
-                <ResizableHandle withHandle onMouseUp={() => isCollapsed && handleSetSelectedElement(undefined)} className={cn("ml-6 w-0", isCollapsed && "hidden")} />
+                <ResizableHandle
+                    withHandle
+                    onMouseUp={() => isCollapsed && handleSetSelectedElement(undefined)}
+                    className={cn("ml-6 w-0", isCollapsed && "hidden")}
+                />
                 <ResizablePanel
                     ref={panelRef}
                     collapsible
