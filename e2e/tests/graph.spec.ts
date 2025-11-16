@@ -351,6 +351,7 @@ test.describe("Graph Tests", () => {
     await apiCall.addGraph(graphName);
     const graph = await browser.createNewPage(GraphPage, urls.graphUrl);
     await graph.selectGraphByName(graphName);
+    await graph.waitForCanvasAnimationToEnd();
     expect(await graph.getNotificationErrorToast()).toBeFalsy();
     await apiCall.removeGraph(graphName, "admin");
   });

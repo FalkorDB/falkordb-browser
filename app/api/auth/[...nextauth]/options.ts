@@ -1,5 +1,3 @@
-/* eslint-disable max-classes-per-file */
-/* eslint-disable no-param-reassign */
 import { FalkorDB } from "falkordb";
 import CredentialsProvider from "next-auth/providers/credentials";
 import { AuthOptions, Role, User, getServerSession } from "next-auth";
@@ -11,6 +9,7 @@ import { isTokenActive } from "../tokenUtils";
 
 interface CustomJWTPayload {
   sub: string;
+  jti: string; // Token ID for fetching password from Token DB
   username?: string;
   role: Role;
   host: string;
@@ -18,6 +17,8 @@ interface CustomJWTPayload {
   tls: boolean;
   ca?: string;
   url?: string;
+  // Note: Password is NOT stored in JWT for security
+  // It's stored encrypted in Token DB (6380) and fetched only when needed for reconnection
 }
 
 interface AuthenticatedUser {
@@ -55,6 +56,7 @@ export async function getAdminConnectionForTokens(
       await connection.ping();
       return adminConnectionForTokens;
     } catch (err) {
+      // eslint-disable-next-line no-console
       console.warn("Admin token connection is dead, recreating:", err);
       adminConnectionForTokens = null;
     }
@@ -92,6 +94,7 @@ export async function getAdminConnectionForTokens(
   } catch (err) {
     throw new Error("Failed to create admin connection for token management. The default user must have admin privileges.");
   }
+
   return adminConnectionForTokens;
 }
 
@@ -169,8 +172,7 @@ export async function newClient(
     return { role: "Admin", client };
   } catch (err) {
     if ((err as Error).message.startsWith("NOPERM")) {
-      // eslint-disable-next-line no-console
-      console.debug("user is not admin", err);
+      // User is not admin, continue to check other roles
     } else throw err;
   }
 
@@ -178,12 +180,8 @@ export async function newClient(
     await connection.sendCommand(["GRAPH.QUERY"]);
   } catch (err) {
     if ((err as Error).message.includes("permissions")) {
-      // eslint-disable-next-line no-console
-      console.debug("user is read-only", err);
       return { role: "Read-Only", client };
     }
-    // eslint-disable-next-line no-console
-    console.debug("user is read-write", err);
     return { role: "Read-Write", client };
   }
 
@@ -209,6 +207,8 @@ export function generateConsistentUserId(
   const identifier = `${username || 'default'}@${host}:${port}`;
   return crypto.createHash('sha256').update(identifier).digest('hex');
 }
+
+
 
 /**
  * Retrieves the Authorization header from the request
@@ -287,28 +287,88 @@ async function tryJWTAuthentication(): Promise<{ client: FalkorDB; user: Authent
       if (!isValidJWTPayload(payload)) {
         return null;
       }
-      // Check for existing connection first
-      const existingConnection = connections.get(payload.sub);
-      if (existingConnection) {
-        // SSRF Protection: Validate that token host/port match the connection we're reusing
-        // This prevents attackers from using valid tokens to probe internal networks
-        // Note: We trust payload.host/port here because they were validated during initial login
-        // and the connection already exists in our Map
-        const adminClient = await getAdminConnectionForTokens(payload.host, payload.port, payload.tls, payload.ca);
-        const adminConnection = await adminClient.connection;
-        const tokenActive = await isTokenActive(token, adminConnection);
-        if (!tokenActive) {
+
+      // Validate token is active in FalkorDB (not revoked)
+      const tokenActive = await isTokenActive(token);
+      
+      if (!tokenActive) {
+        // eslint-disable-next-line no-console
+        console.warn("JWT authentication failed: token is not active (revoked or expired)");
+
+        // Clean up stale connection to prevent connection leak
+        const staleClient = connections.get(payload.sub);
+        if (staleClient) {
+          connections.delete(payload.sub);
+          try {
+            await staleClient.close();
+          } catch (closeError) {
+            // eslint-disable-next-line no-console
+            console.warn("Failed to close revoked JWT connection", closeError);
+          }
+        }
+        return null;
+      }
+
+      // Try to reuse existing connection (performance optimization)
+      let client = connections.get(payload.sub);
+
+      if (client) {
+        // Health check: verify connection is still alive
+        try {
+          const connection = await client.connection;
+          await connection.ping();
+          
+          // Connection is healthy, reuse it
+          const user = createUserFromJWTPayload(payload);
+          return { client, user };
+        } catch (pingError) {
+          // Connection is dead, remove from pool and recreate
           // eslint-disable-next-line no-console
-          console.warn("JWT authentication failed: token is not active (revoked or expired)");
+          console.warn("Connection health check failed, recreating:", pingError);
+          connections.delete(payload.sub);
+          
+          try {
+            await client.close();
+          } catch (closeError) {
+            // Ignore close errors on dead connections
+          }
+          
+          client = undefined; // Will be recreated below
+        }
+      }
+
+      // No existing connection or health check failed - fetch password from Token DB and reconnect
+      if (!client) {
+        try {
+          // Fetch password from Token DB (6380) - NOT from JWT
+          const { getPasswordFromTokenDB } = await import('../tokenUtils');
+          const password = await getPasswordFromTokenDB(payload.jti);
+          
+          // Create new connection with retrieved password
+          const { client: reconnectedClient } = await newClient(
+            {
+              host: payload.host,
+              port: payload.port.toString(),
+              username: payload.username || '',
+              password,
+              tls: payload.tls.toString(),
+              ca: payload.ca || undefined,
+            },
+            payload.sub
+          );
+          
+          client = reconnectedClient;
+          // Connection is already cached in connections Map by newClient()
+        } catch (connectionError) {
+          // eslint-disable-next-line no-console
+          console.error("Failed to create connection from Token DB:", connectionError);
           return null;
         }
-        // Reuse existing JWT connection
-        const user = createUserFromJWTPayload(payload);
-        return { client: existingConnection, user };
       }
-      // eslint-disable-next-line no-console
-      console.warn("JWT authentication failed: no existing connection for user", payload.sub);
-      return null;
+
+      // At this point, client is guaranteed to be defined (either reused or recreated)
+      const user = createUserFromJWTPayload(payload);
+      return { client, user };
     } catch (error) {
       // Fall back to session auth if JWT fails
       // eslint-disable-next-line no-console
@@ -338,7 +398,34 @@ const authOptions: AuthOptions = {
         }
 
         try {
-          const id = generateTimeUUID();
+          // Use consistent user ID instead of random UUID
+          // Extract host/port from URL if provided, otherwise use host/port fields
+          let hostname: string;
+          let port: number;
+          let username: string;
+
+          if (credentials.url) {
+            // Parse URL to extract host, port, and username
+            try {
+              const parsed = new URL(credentials.url);
+              hostname = parsed.hostname || "localhost";
+              port = parsed.port ? parseInt(parsed.port, 10) : 6379;
+              username = parsed.username || credentials.username || "default";
+            } catch {
+              // URL parsing failed, fall back to host/port
+              hostname = credentials.host || "localhost";
+              port = credentials.port ? parseInt(credentials.port, 10) : 6379;
+              username = credentials.username || "default";
+            }
+          } else {
+            // Use individual connection parameters
+            hostname = credentials.host || "localhost";
+            port = credentials.port ? parseInt(credentials.port, 10) : 6379;
+            username = credentials.username || "default";
+          }
+
+          // Generate consistent user ID from normalized hostname, port, and username
+          const id = generateConsistentUserId(username, hostname, port);
 
           const { role } = await newClient(credentials, id);
 

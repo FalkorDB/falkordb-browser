@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getClient } from "../auth/[...nextauth]/options";
 
-const URL = "http://localhost:8080/"
-
 export async function GET() {
     try {
         const session = await getClient()
@@ -12,7 +10,7 @@ export async function GET() {
         }
 
         try {
-            const response = await fetch(`${URL}configured-model`, {
+            const response = await fetch(`${process.env.CHAT_URL}configured-model`, {
                 method: "GET",
                 headers: {
                     "Content-Type": "application/json",
@@ -72,14 +70,7 @@ export async function POST(request: NextRequest) {
                 model,
             }
 
-            const curlCommand = `curl -X POST "${URL}text_to_cypher" \\
-  -H "Content-Type: application/json" \\
-  -d '${JSON.stringify(requestBody, null, 2)}'`
-
-            console.log("Equivalent curl command:")
-            console.log(curlCommand)
-
-            const response = await fetch(`${URL}text_to_cypher`, {
+            const response = await fetch(`${process.env.CHAT_URL}text_to_cypher`, {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",

@@ -219,7 +219,6 @@ export default class ApiCalls {
       )}`;
       return await getSSEGraphResult(url);
     } catch (error) {
-      console.error(error);
       throw new Error(
         `Failed to run query. \n Error: ${(error as Error).message}`
       );
@@ -412,6 +411,140 @@ export default class ApiCalls {
     }
   }
 
+  // Token API methods
+  async generateToken(data?: {
+    name?: string;
+    expiresAt?: string | null;
+    ttlSeconds?: number;
+  }): Promise<any> {
+    try {
+      const headers = await getAdminToken();
+      const result = await postRequest(`${urls.api.tokenUrl}login`, data, undefined, headers);
+      return await result.json();
+    } catch (error) {
+      throw new Error(
+        `Failed to generate token. \n Error: ${(error as Error).message}`
+      );
+    }
+  }
+
+  async listTokens(): Promise<any> {
+    try {
+      const headers = await getAdminToken();
+      const result = await getRequest(`${urls.api.tokenUrl}tokens`, headers);
+      return await result.json();
+    } catch (error) {
+      throw new Error(
+        `Failed to list tokens. \n Error: ${(error as Error).message}`
+      );
+    }
+  }
+
+  async revokeToken(data: { token?: string; token_id?: string }): Promise<any> {
+    try {
+      const headers = await getAdminToken();
+      const result = await postRequest(`${urls.api.tokenUrl}revoke`, data, undefined, headers);
+      return await result.json();
+    } catch (error) {
+      throw new Error(
+        `Failed to revoke token. \n Error: ${(error as Error).message}`
+      );
+    }
+  }
+
+  async getTokenDetails(tokenId: string): Promise<any> {
+    try {
+      const headers = await getAdminToken();
+      const result = await getRequest(`${urls.api.tokenUrl}token/${tokenId}`, headers);
+      return await result.json();
+    } catch (error) {
+      throw new Error(
+        `Failed to get token details. \n Error: ${(error as Error).message}`
+      );
+    }
+  }
+
+  async revokeAllUserTokens(tokens: string[]): Promise<void> {
+    try {
+      await Promise.all(
+        tokens.map((tokenId) => this.revokeToken({ token_id: tokenId }))
+      );
+    } catch (error) {
+      throw new Error(
+        `Failed to revoke all tokens. \n Error: ${(error as Error).message}`
+      );
+    }
+  }
+
+  // Multi-user token operations
+  async  generateTokenAsUser(
+    username: string,
+    password: string,
+    data?: {
+      name?: string;
+      expiresAt?: string | null;
+      ttlSeconds?: number;
+    }
+  ): Promise<any> {
+    try {
+      const payload = {
+        ...data,
+        username,
+        password,
+      };
+      const result = await postRequest(`${urls.api.tokenUrl}login`, payload);
+      return await result.json();
+    } catch (error) {
+      throw new Error(
+        `Failed to generate token as user ${username}. \n Error: ${(error as Error).message}`
+      );
+    }
+  }
+
+  async listTokensAsUser(username: string, password: string): Promise<any> {
+    try {
+      // First get a session/token by logging in
+      const loginResponse = await this.generateTokenAsUser(username, password);
+      const { token } = loginResponse;
+
+      // Use that token to list tokens
+      const result = await getRequest(
+        `${urls.api.tokenUrl}tokens`,
+        { Authorization: `Bearer ${token}` }
+      );
+      return await result.json();
+    } catch (error) {
+      throw new Error(
+        `Failed to list tokens as user ${username}. \n Error: ${(error as Error).message}`
+      );
+    }
+  }
+
+  async revokeTokenAsUser(
+    username: string,
+    password: string,
+    data: { token?: string; token_id?: string }
+  ): Promise<any> {
+    try {
+      // First get a session/token by logging in
+      const loginResponse = await this.generateTokenAsUser(username, password);
+      const { token } = loginResponse;
+
+      // Use that token to revoke
+      const result = await postRequest(
+        `${urls.api.tokenUrl}revoke`,
+        data,
+        undefined,
+        { Authorization: `Bearer ${token}` }
+      );
+      return await result.json();
+    } catch (error) {
+      throw new Error(
+        `Failed to revoke token as user ${username}. \n Error: ${(error as Error).message}`
+      );
+    }
+  }
+
   async addSchema(schemaName: string): Promise<AddSchemaResponse> {
     try {
       const result = await postRequest(`${urls.api.schemaUrl + schemaName}`);
@@ -444,7 +577,6 @@ export default class ApiCalls {
       }_schema?query=${encodeURIComponent(schema)}`;
       return await getSSEGraphResult(url);
     } catch (error) {
-      console.error(error);
       throw new Error(
         `Failed to run schema query. \n Error: ${(error as Error).message}`
       );
