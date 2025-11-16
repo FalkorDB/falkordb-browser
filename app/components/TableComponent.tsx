@@ -88,7 +88,6 @@ export default function TableComponent({
 
     const height = useMemo(() => expandArr.size === 0 ? itemHeight : itemHeight * 2, [expandArr.size, itemHeight])
 
-    // Get stable row identifier (using row index in original array)
     const getRowKey = useCallback((index: number) => index + topFakeRowHeight / height, [height, topFakeRowHeight])
 
     const handleLoadLazyCell = useCallback((rowId: string | number, cellIndex: number, loadFn: () => Promise<any>) => {
@@ -405,8 +404,6 @@ export default function TableComponent({
                             // Then find actual index in original rows array
                             const rowKey = getRowKey(index);
                             const dataTestID = `${label}${rowKey}`
-
-                            if (rowKey === -1) return undefined
 
                             return (
                                 <TableRow
