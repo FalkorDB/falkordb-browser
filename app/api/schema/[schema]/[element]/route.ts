@@ -42,7 +42,7 @@ export async function POST(
           throw new Error("Label is required");
       }
 
-      const formattedAttributes = formatAttributes(Object.entries(attributes));
+      const formattedAttributes = formatAttributes(attributes);
       const graph = client.selectGraph(schemaName);
       const query = type
         ? `CREATE (n${label && label.length > 0 ? `:${label.join(":")}` : ""}${

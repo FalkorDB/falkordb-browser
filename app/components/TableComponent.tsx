@@ -12,7 +12,7 @@ import { JSONTree } from "react-json-tree"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Cell, cn, getTheme, Row } from "@/lib/utils";
 import { Dispatch, SetStateAction, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
-import { CheckCircle, ChevronDown, ChevronsDown, ChevronsUp, Pencil, XCircle } from "lucide-react";
+import { CheckCircle, ChevronDown, ChevronsDown, ChevronsUp, Loader2, Pencil, XCircle } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useTheme } from "next-themes";
 import Button from "./ui/Button";
@@ -69,11 +69,12 @@ export default function TableComponent({
     const headerRef = useRef<HTMLTableRowElement>(null)
     const tableRef = useRef<HTMLTableElement>(null)
     const scrollContainerRef = useRef<HTMLDivElement>(null)
+    const loadAttemptedRef = useRef<Set<string>>(new Set());
 
     const [hasRestored, setHasRestored] = useState(false)
     const [search, setSearch] = useState<string>("")
     const [editable, setEditable] = useState<string>("")
-    const [hover, setHover] = useState<string>("")
+    const [hover, setHover] = useState(-1)
     const [newValue, setNewValue] = useState<string>("")
     const [filteredRows, setFilteredRows] = useState<Row[]>([])
     const [isLoading, setIsLoading] = useState<boolean>(false)
@@ -81,9 +82,57 @@ export default function TableComponent({
     const [topFakeRowHeight, setTopFakeRowHeight] = useState<number>(0)
     const [bottomFakeRowHeight, setBottomFakeRowHeight] = useState<number>(0)
     const [visibleRows, setVisibleRows] = useState<Row[]>([])
+    const [loadingCells, setLoadingCells] = useState<Set<string>>(new Set())
+    const [loadedCells, setLoadedCells] = useState<Set<string>>(new Set())
     const [expandArr, setExpandArr] = useState(new Map(initialExpand))
 
-    const height = expandArr.size === 0 ? itemHeight : itemHeight * 2
+    const height = useMemo(() => expandArr.size === 0 ? itemHeight : itemHeight * 2, [expandArr.size, itemHeight])
+
+    // Get stable row identifier (using row index in original array)
+    const getRowKey = useCallback((index: number) => index + topFakeRowHeight / height, [height, topFakeRowHeight])
+
+    const handleLoadLazyCell = useCallback((rowId: string | number, cellIndex: number, loadFn: () => Promise<any>) => {
+        const cellKey = `${rowId}-${cellIndex}`;
+
+        // If already loading or loaded, don't load again
+        if (loadingCells.has(cellKey) || loadedCells.has(cellKey)) {
+            return;
+        }
+
+        // Mark as loading
+        setLoadingCells(prev => new Set(prev).add(cellKey));
+
+        // Load the cell value asynchronously
+        loadFn().then(value => {
+            // Find the row by its stable identifier and update it
+            rows.forEach((r, i) => {
+                if (getRowKey(i) === rowId) {
+                    r.cells.forEach((c, j) => {
+                        if (j === cellIndex) {
+                            c.value = value
+                        }
+                    })
+                };
+            });
+
+            // Mark as loaded and remove from loading set
+            setLoadedCells(prev => new Set(prev).add(cellKey));
+            setLoadingCells(prev => {
+                const newSet = new Set(prev);
+                newSet.delete(cellKey);
+                return newSet;
+            });
+        }).catch((error) => {
+            // eslint-disable-next-line no-console
+            console.error(`Failed to load cell ${cellKey}:`, error);
+            // Remove from loading set on error
+            setLoadingCells(prev => {
+                const newSet = new Set(prev);
+                newSet.delete(cellKey);
+                return newSet;
+            });
+        });
+    }, [loadingCells, loadedCells, rows, getRowKey])
 
     useEffect(() => {
         const newStartIndex = Math.max(0, Math.floor((scrollTop - (height * itemsPerPage)) / height))
@@ -95,7 +144,13 @@ export default function TableComponent({
         setTopFakeRowHeight(newTopFakeRowHeight)
         setBottomFakeRowHeight(newBottomFakeRowHeight)
         setVisibleRows(newVisibleRows)
-    }, [scrollTop, itemHeight, itemsPerPage, filteredRows, expandArr.size, height])
+    }, [scrollTop, itemHeight, itemsPerPage, filteredRows, height])
+
+    useEffect(() => {
+        if (searchRef.current) {
+            searchRef.current.focus()
+        }
+    }, [])
 
     useEffect(() => {
         if (inputRef && inputRef.current && editable) {
@@ -144,6 +199,33 @@ export default function TableComponent({
             clearTimeout(timeout)
         }
     }, [search, rows, handleSearchFilter])
+
+    // Clean up when rows change and cells no longer have values
+    useEffect(() => {
+        // Clear both loaded cells and load attempts when rows are recreated without values
+        const newLoadedCells = new Set<string>();
+        const newLoadAttempts = new Set<string>();
+
+        rows.forEach((row, i) => {
+            const rowId = getRowKey(i);
+            row.cells.forEach((cell, cellIndex) => {
+                const cellKey = `${rowId}-${cellIndex}`;
+
+                // If cell has a value, keep it as loaded
+                if (cell.value) {
+                    newLoadedCells.add(cellKey);
+                    newLoadAttempts.add(cellKey);
+                }
+                // If it's a lazy cell without value, clear the attempt so it can retry
+                else if (cell.type === "readonly" && "loadCell" in cell) {
+                    loadAttemptedRef.current.delete(cellKey);
+                }
+            });
+        });
+
+        loadAttemptedRef.current = newLoadAttempts;
+        setLoadedCells(newLoadedCells);
+    }, [rows, getRowKey])
 
     useEffect(() => {
         // Restore scroll position on mount
@@ -260,10 +342,10 @@ export default function TableComponent({
                                                     onClick={() => {
                                                         const newExpandArr = new Map(expandArr).set(i, 1)
                                                         setExpandArr(newExpandArr)
-                                                        
+
                                                         if (onExpandChange) onExpandChange(newExpandArr)
-                                                        }}
-                                                    >
+                                                    }}
+                                                >
                                                     <ChevronDown />
                                                 </Button>
                                                 <Button
@@ -272,10 +354,10 @@ export default function TableComponent({
                                                     onClick={() => {
                                                         const newExpandArr = new Map(expandArr).set(i, -1)
                                                         setExpandArr(newExpandArr)
-                                                        
+
                                                         if (onExpandChange) onExpandChange(newExpandArr)
-                                                        }}
-                                                    >
+                                                    }}
+                                                >
                                                     <ChevronsDown />
                                                 </Button>
                                                 <Button
@@ -285,7 +367,7 @@ export default function TableComponent({
                                                         const newExpandArr = new Map(expandArr)
                                                         newExpandArr.delete(i)
                                                         setExpandArr(newExpandArr)
-                                                        
+
                                                         if (onExpandChange) onExpandChange(newExpandArr)
                                                     }}
                                                 >
@@ -319,22 +401,21 @@ export default function TableComponent({
                         )
                     }
                     {
-                        visibleRows.map((row, i) => {
-                            const actualIndex = rows.findIndex(r => r === row)
-                            const firstVal = row.cells[0].value || i
-                            
-                            const dataTestID = `${label}${typeof firstVal === "object" ? firstVal.id : firstVal}`
+                        visibleRows.map((row, index) => {
+                            // Then find actual index in original rows array
+                            const rowKey = getRowKey(index);
+                            const dataTestID = `${label}${rowKey}`
 
-                            if (actualIndex === -1) return undefined
+                            if (rowKey === -1) return undefined
 
                             return (
                                 <TableRow
                                     className="border-border"
                                     data-testid={`tableRow${dataTestID}`}
-                                    onMouseEnter={() => setHover(`${actualIndex}`)}
-                                    onMouseLeave={() => setHover("")}
+                                    onMouseEnter={() => setHover(rowKey)}
+                                    onMouseLeave={() => setHover(-1)}
                                     data-id={typeof row.cells[0].value === "string" ? row.cells[0].value : undefined}
-                                    key={actualIndex}
+                                    key={rowKey}
                                 >
                                     {
                                         setRows ?
@@ -344,8 +425,8 @@ export default function TableComponent({
                                                     data-testid={`tableCheckbox${dataTestID}`}
                                                     checked={row.checked}
                                                     onCheckedChange={() => {
-                                                        setRows(rows.map((r, k) => {
-                                                            if (k === actualIndex) {
+                                                        setRows(rows.map((r, i) => {
+                                                            if (getRowKey(i) === rowKey) {
                                                                 r.checked = !r.checked
                                                             }
                                                             return r
@@ -356,147 +437,165 @@ export default function TableComponent({
                                             : null
                                     }
                                     <TableCell className="border-r border-border">
-                                        <p>{actualIndex + 1}.</p>
+                                        <p>{index + 1}.</p>
                                     </TableCell>
                                     {
-                                        row.cells.map((cell, j) => (
-                                            <TableCell className={cn("border-border p-0", j + 1 !== row.cells.length && "border-r")} key={j}>
-                                                <div style={{ height }} className={cn("overflow-auto p-4", row.cells[0]?.value === editable && (cell.type !== "readonly" && cell.type !== "object") && "p-2", cell.type === "object" && "p-1")}>
-                                                    {
-                                                        cell.type === "object" ?
-                                                            <div className="pointer-events-none json-tree-container">
-                                                                <JSONTree
-                                                                    key={`${Array.from(expandArr.values()).join(",")}-${j}`}
-                                                                    shouldExpandNodeInitially={(keyPath) => expandArr.get(j) === -1 || keyPath.length === expandArr.get(j)}
-                                                                    keyPath={[headers[j]]}
-                                                                    valueRenderer={renderValue}
-                                                                    labelRenderer={(keyPath) => renderLabel(keyPath)}
-                                                                    theme={{
-                                                                        base00: "var(--background)", // background
-                                                                        base01: '#000000',
-                                                                        base02: '#CE9178',
-                                                                        base03: '#CE9178', // open values
-                                                                        base04: '#CE9178',
-                                                                        base05: '#CE9178',
-                                                                        base06: '#CE9178',
-                                                                        base07: '#CE9178',
-                                                                        base08: '#CE9178',
-                                                                        base09: '#b5cea8', // numbers
-                                                                        base0A: '#CE9178',
-                                                                        base0B: '#CE9178', // close values
-                                                                        base0C: '#CE9178',
-                                                                        base0D: currentTheme === "dark" ? '#66B2B5' : '#4A90A4', // * keys
-                                                                        base0E: '#ae81ff',
-                                                                        base0F: '#cc6633'
-                                                                    }}
-                                                                    data={cell.value}
-                                                                />
-                                                            </div>
-                                                            : editable === `${actualIndex}-${j}` ?
-                                                                <div className="w-full flex gap-2 items-center">
-                                                                    {
-                                                                        cell.type === "select" ?
-                                                                            <Combobox
-                                                                                data-testid={`select${label}`}
-                                                                                inTable
-                                                                                options={cell.options}
-                                                                                setSelectedValue={async (value) => {
-                                                                                    const result = await cell.onChange(value)
-                                                                                    if (result) {
-                                                                                        handleSetEditable("", "")
-                                                                                    }
-                                                                                }}
-                                                                                label={cell.selectType}
-                                                                                selectedValue={cell.value.toString()}
-                                                                            />
-                                                                            : cell.type === "text" &&
-                                                                            <Input
-                                                                                data-testid={`input${label}`}
-                                                                                ref={inputRef}
-                                                                                className="grow"
-                                                                                value={newValue}
-                                                                                onChange={(e) => setNewValue(e.target.value)}
-                                                                                onKeyDown={async (e) => {
-                                                                                    if (e.key === "Escape") {
-                                                                                        e.preventDefault()
-                                                                                        e.stopPropagation()
-                                                                                        handleSetEditable("", "")
-                                                                                    }
+                                        row.cells.map((cell, j) => {
+                                            const cellKey = `${rowKey}-${j}`;
+                                            const isCellLoading = loadingCells.has(cellKey);
+                                            const isLazyCell = cell.type === "readonly" && "loadCell" in cell && cell.loadCell;
 
-                                                                                    if (e.key !== "Enter") return
+                                            // Only load if it's a lazy cell, has no value, not currently loading, and we haven't attempted to load it yet
+                                            if (isLazyCell && !cell.value && !loadingCells.has(cellKey) && !loadAttemptedRef.current.has(cellKey)) {
+                                                loadAttemptedRef.current.add(cellKey);
+                                                handleLoadLazyCell(rowKey, j, cell.loadCell);
+                                            }
 
-                                                                                    e.preventDefault()
-                                                                                    const result = await cell.onChange(newValue)
-                                                                                    if (result) {
-                                                                                        handleSetEditable("", "")
-                                                                                    }
-                                                                                }}
-                                                                            />
-                                                                    }
-                                                                    <div className="flex flex-col gap-1">
+                                            // Show loader while loading
+                                            if (isCellLoading) {
+                                                return <TableCell className={cn(j + 1 !== row.cells.length && "border-r", row.cells[0]?.value === editable && (cell.type !== "readonly" && cell.type !== "object") && "p-2", cell.type === "object" && "p-1", "border-border")} key={j}><Loader2 className="w-4 h-4 animate-spin" /></TableCell>;
+                                            }
+
+                                            // Show value once loaded
+                                            return (
+                                                <TableCell className={cn("border-border p-0", j + 1 !== row.cells.length && "border-r")} key={cellKey}>
+                                                    <div style={{ height }} className={cn("overflow-auto p-4", row.cells[0]?.value === editable && (cell.type !== "readonly" && cell.type !== "object") && "p-2", cell.type === "object" && "p-1")}>
+                                                        {
+                                                            cell.type === "object" ?
+                                                                <div className="pointer-events-none json-tree-container">
+                                                                    <JSONTree
+                                                                        key={`${Array.from(expandArr.values()).join(",")}-${j}`}
+                                                                        shouldExpandNodeInitially={(keyPath) => expandArr.get(j) === -1 || keyPath.length === expandArr.get(j)}
+                                                                        keyPath={[headers[j]]}
+                                                                        valueRenderer={renderValue}
+                                                                        labelRenderer={(keyPath) => renderLabel(keyPath)}
+                                                                        theme={{
+                                                                            base00: "var(--background)", // background
+                                                                            base01: '#000000',
+                                                                            base02: '#CE9178',
+                                                                            base03: '#CE9178', // open values
+                                                                            base04: '#CE9178',
+                                                                            base05: '#CE9178',
+                                                                            base06: '#CE9178',
+                                                                            base07: '#CE9178',
+                                                                            base08: '#CE9178',
+                                                                            base09: '#b5cea8', // numbers
+                                                                            base0A: '#CE9178',
+                                                                            base0B: '#CE9178', // close values
+                                                                            base0C: '#CE9178',
+                                                                            base0D: currentTheme === "dark" ? '#66B2B5' : '#4A90A4', // * keys
+                                                                            base0E: '#ae81ff',
+                                                                            base0F: '#cc6633'
+                                                                        }}
+                                                                        data={cell.value}
+                                                                    />
+                                                                </div>
+                                                                : editable === cellKey ?
+                                                                    <div className="w-full flex gap-2 items-center">
                                                                         {
-                                                                            cell.type !== "select" && cell.type !== "readonly" &&
-                                                                            <Button
-                                                                                data-testid={`saveButton${label}`}
-                                                                                title="Save"
-                                                                                onClick={async () => {
-                                                                                    try {
-                                                                                        setIsLoading(true)
+                                                                            cell.type === "select" ?
+                                                                                <Combobox
+                                                                                    data-testid={`select${label}`}
+                                                                                    inTable
+                                                                                    options={cell.options}
+                                                                                    setSelectedValue={async (value) => {
+                                                                                        const result = await cell.onChange(value)
+                                                                                        if (result) {
+                                                                                            handleSetEditable("", "")
+                                                                                        }
+                                                                                    }}
+                                                                                    label={cell.selectType}
+                                                                                    selectedValue={cell.value.toString()}
+                                                                                />
+                                                                                : cell.type === "text" &&
+                                                                                <Input
+                                                                                    data-testid={`input${label}`}
+                                                                                    ref={inputRef}
+                                                                                    className="grow"
+                                                                                    value={newValue}
+                                                                                    onChange={(e) => setNewValue(e.target.value)}
+                                                                                    onKeyDown={async (e) => {
+                                                                                        if (e.key === "Escape") {
+                                                                                            e.preventDefault()
+                                                                                            e.stopPropagation()
+                                                                                            handleSetEditable("", "")
+                                                                                        }
+
+                                                                                        if (e.key !== "Enter") return
+
+                                                                                        e.preventDefault()
                                                                                         const result = await cell.onChange(newValue)
                                                                                         if (result) {
                                                                                             handleSetEditable("", "")
                                                                                         }
-                                                                                    } finally {
-                                                                                        setIsLoading(false)
-                                                                                    }
-                                                                                }}
-                                                                                isLoading={isLoading}
-                                                                            >
-                                                                                <CheckCircle className="w-4 h-4" />
-                                                                            </Button>
+                                                                                    }}
+                                                                                />
                                                                         }
-                                                                        {
-                                                                            !isLoading &&
-                                                                            <Button
-                                                                                data-testid={`cancelButton${label}`}
-                                                                                title="Cancel"
-                                                                                onClick={() => {
-                                                                                    handleSetEditable("", "")
-                                                                                }}
-                                                                            >
-                                                                                <XCircle className="w-4 h-4" />
-                                                                            </Button>
-                                                                        }
+                                                                        <div className="flex flex-col gap-1">
+                                                                            {
+                                                                                cell.type !== "select" && cell.type !== "readonly" &&
+                                                                                <Button
+                                                                                    data-testid={`saveButton${label}`}
+                                                                                    title="Save"
+                                                                                    onClick={async () => {
+                                                                                        try {
+                                                                                            setIsLoading(true)
+                                                                                            const result = await cell.onChange(newValue)
+                                                                                            if (result) {
+                                                                                                handleSetEditable("", "")
+                                                                                            }
+                                                                                        } finally {
+                                                                                            setIsLoading(false)
+                                                                                        }
+                                                                                    }}
+                                                                                    isLoading={isLoading}
+                                                                                >
+                                                                                    <CheckCircle className="w-4 h-4" />
+                                                                                </Button>
+                                                                            }
+                                                                            {
+                                                                                !isLoading &&
+                                                                                <Button
+                                                                                    data-testid={`cancelButton${label}`}
+                                                                                    title="Cancel"
+                                                                                    onClick={() => {
+                                                                                        handleSetEditable("", "")
+                                                                                    }}
+                                                                                >
+                                                                                    <XCircle className="w-4 h-4" />
+                                                                                </Button>
+                                                                            }
+                                                                        </div>
                                                                     </div>
-                                                                </div>
-                                                                : <div className="h-full flex items-center gap-2">
-                                                                    <Tooltip>
-                                                                        <TooltipTrigger asChild>
-                                                                            <p data-testid={`content${dataTestID}${headers[j]}`} >{cell.value}</p>
-                                                                        </TooltipTrigger>
-                                                                        <TooltipContent>
-                                                                            {cell.value}
-                                                                        </TooltipContent>
-                                                                    </Tooltip>
-                                                                    <div className="w-4">
-                                                                        {
-                                                                            cell.type !== "readonly" && hover === `${actualIndex}` &&
-                                                                            <Button
-                                                                                data-testid={`editButton${label}`}
-                                                                                className="disabled:cursor-text disabled:opacity-100"
-                                                                                indicator={indicator}
-                                                                                title="Edit"
-                                                                                onClick={() => handleSetEditable(`${actualIndex}-${j}`, cell.value!.toString())}
-                                                                            >
-                                                                                <Pencil className="w-4 h-4" />
-                                                                            </Button>
-                                                                        }
+                                                                    : <div className="h-full flex items-center gap-2">
+                                                                        <Tooltip>
+                                                                            <TooltipTrigger asChild>
+                                                                                <p data-testid={`content${dataTestID}${headers[j]}`} >{cell.value}</p>
+                                                                            </TooltipTrigger>
+                                                                            <TooltipContent>
+                                                                                {cell.value}
+                                                                            </TooltipContent>
+                                                                        </Tooltip>
+                                                                        <div className="w-4">
+                                                                            {
+                                                                                cell.type !== "readonly" && hover === rowKey &&
+                                                                                <Button
+                                                                                    data-testid={`editButton${label}`}
+                                                                                    className="disabled:cursor-text disabled:opacity-100"
+                                                                                    indicator={indicator}
+                                                                                    title="Edit"
+                                                                                    onClick={() => handleSetEditable(cellKey, cell.value!.toString())}
+                                                                                >
+                                                                                    <Pencil className="w-4 h-4" />
+                                                                                </Button>
+                                                                            }
+                                                                        </div>
                                                                     </div>
-                                                                </div>
-                                                    }
-                                                </div>
-                                            </TableCell>
-                                        ))
+                                                        }
+                                                    </div>
+                                                </TableCell>
+                                            )
+                                        })
                                     }
                                 </TableRow>
                             )
