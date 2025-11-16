@@ -1,4 +1,8 @@
+ARG CYPHER_VERSION=latest
+
 FROM node:22-alpine AS base
+
+FROM falkordb/text-to-cypher:${CYPHER_VERSION} AS cypher
 
 # Install dependencies only when needed
 FROM base AS deps
@@ -38,6 +42,9 @@ RUN \
 FROM base AS runner
 WORKDIR /app
 
+# Install supervisor
+RUN apk add --no-cache supervisor
+
 ENV NODE_ENV production
 # Uncomment the following line in case you want to disable telemetry during runtime.
 # ENV NEXT_TELEMETRY_DISABLED 1
@@ -56,16 +63,27 @@ RUN chown nextjs:nodejs .next
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --from=builder --chown=nextjs:nodejs /app/.env.local.template ./.env.local
+COPY --from=cypher --chown=nextjs:nodejs /app/text-to-cypher /app/text-to-cypher
+COPY --from=cypher --chown=nextjs:nodejs /app/templates /app/templates
 
 
-USER nextjs
+# Create supervisor directories and copy config
+RUN mkdir -p /etc/supervisor/conf.d /var/log/supervisor
+COPY ./entrypoint.sh /entrypoint.sh
+COPY ./supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+RUN chmod +x /entrypoint.sh
 
-EXPOSE 3000
+EXPOSE 3000 8080 3001
 
-ENV PORT 3000
+ENV PORT=3000
+ENV REST_PORT=8080
+ENV MCP_PORT=3001
+ENV CYPHER=1
+ENV HOSTNAME="0.0.0.0"
 
-ENV HOSTNAME "0.0.0.0"
+# Use root to run supervisord (it will drop privileges for individual services)
+USER root
 
 # server.js is created by next build from the standalone output
 # https://nextjs.org/docs/pages/api-reference/next-config-js/output
-CMD ["node", "server.js"]
+CMD ["/entrypoint.sh"]
