@@ -10,8 +10,8 @@ import { ImperativePanelHandle } from "react-resizable-panels";
 import { Label, Graph, GraphData, Link, Node, Relationship } from "../api/graph/model";
 import { IndicatorContext, SchemaContext } from "../components/provider";
 import Spinning from "../components/ui/spinning";
-import SchemaDataPanel from "./SchemaDataPanel";
-import SchemaCreateElement from "./SchemaCreateElement";
+import DataPanel from "./DataPanel";
+import SchemaCreateElement from "./CreateElementPanel";
 
 const Selector = dynamic(() => import("../graph/Selector"), {
     ssr: false,
@@ -220,9 +220,9 @@ export default function Page() {
         handleCooldown()
     }
 
-    const handleCreateElement = async (attributes: [string, string[]][], elementLabel?: string[]) => {
+    const handleCreateElement = async (attributes: [string, string[]][], elementLabel: string[]) => {
         const fakeId = "-1"
-        const result = await securedFetch(`api/schema/${prepareArg(schema.Id)}/${prepareArg(fakeId)}`, {
+        const result = await securedFetch(`api/schema/${prepareArg(schemaName)}/${prepareArg(fakeId)}`, {
             method: "POST",
             body: JSON.stringify({ type: isAddNode, label: elementLabel, attributes, selectedNodes })
         }, toast, setIndicator)
@@ -280,7 +280,7 @@ export default function Page() {
                         setSelectedElement={handleSetSelectedElement}
                         selectedElements={selectedElements}
                         setSelectedElements={setSelectedElements}
-                        isAddRelation={isAddEdge}
+                        isAddEdge={isAddEdge}
                         chartRef={chartRef}
                         cooldownTicks={cooldownTicks}
                         handleCooldown={handleCooldown}
@@ -310,7 +310,7 @@ export default function Page() {
                 >
                     {
                         selectedElement ?
-                            <SchemaDataPanel
+                            <DataPanel
                                 object={selectedElement}
                                 setObject={handleSetSelectedElement}
                                 schema={schema}
@@ -319,7 +319,7 @@ export default function Page() {
                             :
                             <SchemaCreateElement
                                 onCreate={handleCreateElement}
-                                setIsAdd={isAddEdge ? handleSetIsAddEdge : handleSetIsAddNode}
+                                setIsAdd={isAddNode ? handleSetIsAddNode : handleSetIsAddEdge}
                                 selectedNodes={selectedNodes}
                                 setSelectedNodes={setSelectedNodes}
                                 type={isAddNode}

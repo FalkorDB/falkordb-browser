@@ -12,7 +12,7 @@ import { useSession } from "next-auth/react";
 import Button from "../components/ui/Button";
 import { Label, Link, Node } from "../api/graph/model";
 import { IndicatorContext, GraphContext } from "../components/provider";
-import GraphDataTable from "./GraphDataTable";
+import DataTable from "./DataTable";
 import AddLabel from "./addLabel";
 import RemoveLabel from "./RemoveLabel";
 
@@ -22,7 +22,7 @@ interface Props {
     setLabels: Dispatch<SetStateAction<Label[]>>;
 }
 
-export default function GraphDataPanel({ object, setObject, setLabels }: Props) {
+export default function DataPanel({ object, setObject, setLabels }: Props) {
     const { setIndicator } = useContext(IndicatorContext)
     const { graph, setGraphInfo } = useContext(GraphContext)
 
@@ -197,7 +197,7 @@ export default function GraphDataPanel({ object, setObject, setLabels }: Props) 
                     </li>
                 </ul>
             </div>
-            <GraphDataTable
+            <DataTable
                 className="h-1 grow w-full"
                 lastObjId={lastObjId}
                 object={object}

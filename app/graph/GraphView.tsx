@@ -34,6 +34,10 @@ interface Props {
     fetchCount: () => Promise<void>
     historyQuery: HistoryQuery
     setHistoryQuery: Dispatch<SetStateAction<HistoryQuery>>
+    setIsAddNode: (isAddNode: boolean) => void
+    setIsAddEdge: (isAddEdge: boolean) => void
+    isAddNode: boolean
+    isAddEdge: boolean
 }
 
 function GraphView({
@@ -53,6 +57,10 @@ function GraphView({
     fetchCount,
     historyQuery,
     setHistoryQuery,
+    setIsAddEdge,
+    setIsAddNode,
+    isAddEdge,
+    isAddNode
 }: Props) {
 
     const { graph, currentTab, setCurrentTab } = useContext(GraphContext)
@@ -127,6 +135,10 @@ function GraphView({
                                 selectedElements={selectedElements}
                                 handleDeleteElement={handleDeleteElement}
                                 chartRef={chartRef}
+                                setIsAddEdge={selectedElements.length === 2 && selectedElements.every(e => !!e.labels) ? setIsAddEdge : undefined}
+                                setIsAddNode={setIsAddNode}
+                                isAddEdge={isAddEdge}
+                                isAddNode={isAddNode}
                             />
                             {
                                 (labels.length !== 0 || relationships.length !== 0) &&

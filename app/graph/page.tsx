@@ -7,11 +7,12 @@ import dynamic from "next/dynamic";
 import { ForceGraphMethods } from "react-force-graph-2d";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { ImperativePanelHandle } from "react-resizable-panels";
-import { Label, Graph, Link, Node, Relationship, GraphInfo } from "../api/graph/model";
+import { Label, Graph, Link, Node, Relationship, GraphInfo, Value } from "../api/graph/model";
 import { BrowserSettingsContext, GraphContext, HistoryQueryContext, IndicatorContext, PanelContext, QueryLoadingContext, ViewportContext } from "../components/provider";
 import Spinning from "../components/ui/spinning";
 import Chat from "./Chat";
-import GraphDataPanel from "./GraphDataPanel";
+import DataPanel from "./DataPanel";
+import CreateElementPanel from "./CreateElementPanel";
 
 const Selector = dynamic(() => import("./Selector"), {
     ssr: false,
@@ -27,6 +28,12 @@ const GraphView = dynamic(() => import("./GraphView"), {
         <Spinning />
     </div>
 })
+
+// Type guard: runtime check that proves elements is [Node, Node]
+function isTwoNodes(elements: (Node | Link)[]): elements is [Node, Node] {
+    return elements.length === 2 &&
+        elements.every((e): e is Node => !!e.labels)
+}
 
 export default function Page() {
     const { historyQuery, setHistoryQuery } = useContext(HistoryQueryContext)
@@ -73,6 +80,7 @@ export default function Page() {
     const panelSize = useMemo(() => {
         switch (panel) {
             case "data":
+            case "add":
                 return 30
             case "chat":
                 return 40
@@ -188,7 +196,6 @@ export default function Page() {
     }, [])
 
     const handleSetIsAddEdge = useCallback((isAdd: boolean) => {
-        const currentPanel = panelRef.current
         setIsAddEdge(isAdd)
 
         if (isAdd) {
@@ -196,15 +203,45 @@ export default function Page() {
             setSelectedElement(undefined)
         }
 
-        if (!currentPanel) return
+        setPanel("add")
+    }, [setPanel])
 
-        if (isAdd) currentPanel.expand()
-        else currentPanel.collapse()
-    }, [])
+    const handleCreateElement = useCallback(async (attributes: [string, Value][], label: string[]) => {
+        const fakeId = "-1"
+        const result = await securedFetch(`api/graph/${prepareArg(graphName)}/${fakeId}`, {
+            method: "POST",
+            body: JSON.stringify({
+                attributes,
+                label,
+                type: isAddNode,
+                selectedNodes: selectedElements
+            })
+        }, toast, setIndicator)
 
-    const handleCreateElement = (attributes: [string, string][], label: string[], type: boolean) => {
-        const result = fetch(`api/graph/${prepareArg(graphName)}/element`)
-    }
+        if (result.ok) {
+            const json = await result.json()
+
+            if (isAddNode) {
+                const { labels: ls } = graph.extendNode(json.result.data[0].n, false, true, true)
+                setLabels(prev => [...prev, ...ls.filter(c => !prev.some(p => p.name === c)).map(c => graph.LabelsMap.get(c)!)])
+                handleSetIsAddNode(false)
+            } else {
+                const { relationship } = graph.extendEdge(json.result.data[0].e, false, true)
+                setRelationships(prev => [...prev, graph.RelationshipsMap.get(relationship)!])
+                handleSetIsAddEdge(false)
+            }
+
+            fetchCount()
+
+            setSelectedElement(undefined)
+        }
+
+        setData({ ...graph.Elements })
+
+        handleCooldown()
+
+        return result.ok
+    }, [fetchCount, graph, graphName, handleCooldown, handleSetIsAddEdge, handleSetIsAddNode, isAddNode, selectedElements, setData, setIndicator, toast])
 
     const handleSetSelectedElement = useCallback((el: Node | Link | undefined) => {
         setSelectedElement(el)
@@ -289,22 +326,41 @@ export default function Page() {
             case "data":
                 if (!selectedElement) return undefined
 
-                return <GraphDataPanel
+                return <DataPanel
                     object={selectedElement}
                     setObject={handleSetSelectedElement}
                     setLabels={setLabels}
                 />
-            case "add":
-                return <GraphCreatePanel
-                    type={isAddNode}
+            case "add": {
+                const onCloseHandler = () => {
+                    setPanel(undefined)
+                    setIsAddEdge(false)
+                    setIsAddNode(false)
+                }
+
+                if (isAddNode) {
+                    return <CreateElementPanel
+                        type
+                        onCreate={handleCreateElement}
+                        onClose={onCloseHandler}
+                    />
+                }
+
+                if (!isTwoNodes(selectedElements)) return undefined
+
+                return <CreateElementPanel
+                    type={false}
                     onCreate={handleCreateElement}
-                    onClose={() => setPanel(undefined)}
+                    onClose={onCloseHandler}
+                    selectedNodes={selectedElements}
+                    setSelectedNodes={setSelectedElements}
                 />
+            }
 
             default:
                 return undefined
         }
-    }, [graphName, panel, selectedElement, handleSetSelectedElement, setPanel])
+    }, [graphName, panel, selectedElement, handleSetSelectedElement, setPanel, isAddNode, selectedElements, handleCreateElement])
 
     return (
         <div className="Page p-8 gap-8">
@@ -345,6 +401,10 @@ export default function Page() {
                         fetchCount={fetchCount}
                         historyQuery={historyQuery}
                         setHistoryQuery={setHistoryQuery}
+                        setIsAddEdge={handleSetIsAddEdge}
+                        setIsAddNode={handleSetIsAddNode}
+                        isAddEdge={isAddEdge}
+                        isAddNode={isAddNode}
                     />
                 </ResizablePanel>
                 <ResizableHandle withHandle onMouseUp={() => isCollapsed && handleSetSelectedElement(undefined)} className={cn("ml-6 w-0", isCollapsed && "hidden")} />

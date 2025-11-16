@@ -25,7 +25,7 @@ interface Props {
     className?: string
 }
 
-export default function GraphDataTable({ object, type, lastObjId, className }: Props) {
+export default function DataTable({ object, type, lastObjId, className }: Props) {
 
     const { graph, graphInfo, setGraphInfo } = useContext(GraphContext)
     const { settings: { graphInfo: graphInfoSettings } } = useContext(BrowserSettingsContext)
@@ -298,7 +298,10 @@ export default function GraphDataTable({ object, type, lastObjId, className }: P
                     ref={setInputRef}
                     data-testid={dataTestId}
                     value={newVal as number}
-                    onChange={(e) => Number(e.target.value) && setNewVal(Number(e.target.value))}
+                    onChange={(e) => {
+                        const num = Number(e.target.value)
+                        if (!Number.isNaN(num)) setNewVal(num)
+                    }}
                     onKeyDown={actionType === "set" ? handleSetKeyDown : handleAddKeyDown}
                 />
             case "object":
@@ -322,8 +325,8 @@ export default function GraphDataTable({ object, type, lastObjId, className }: P
         }
     }
 
-    const getArrayType = (t: any) => t === "object" ? "array" : t
-    const getObjectType = (t: any) => t === "array" ? "object" : t
+    const getArrayType = (t: string) => t === "object" ? "array" : t
+    const getObjectType = (t: string) => t === "array" ? "object" : t
 
     const getNewTypeInput = () => (
         <Combobox
@@ -331,7 +334,7 @@ export default function GraphDataTable({ object, type, lastObjId, className }: P
             options={["string", "number", "boolean", "array"]}
             selectedValue={getArrayType(newType)}
             setSelectedValue={(value) => {
-                const t = getObjectType(value)
+                const t = getObjectType(value) as ValueType
                 setNewType(t)
 
                 setNewVal(typeof newVal === t ? newVal : getDefaultVal(t))
@@ -551,6 +554,6 @@ export default function GraphDataTable({ object, type, lastObjId, className }: P
     )
 }
 
-GraphDataTable.defaultProps = {
+DataTable.defaultProps = {
     className: undefined
 }

@@ -5,7 +5,6 @@ import {
   deleteGraphElement,
   validateBody,
 } from "../../../validate-body";
-import { formatAttributes } from "@/app/api/schema/[schema]/[element]/utils";
 
 // eslint-disable-next-line import/prefer-default-export
 export async function GET(
@@ -80,23 +79,28 @@ export async function POST(
       }
 
       const { type, label, attributes, selectedNodes } = validation.data;
+      
       if (!type) {
         if (!selectedNodes || selectedNodes.length !== 2)
           throw new Error("Selected nodes are required");
-      }
 
+        if (!label || label.length === 0)
+          throw new Error("Label is required");
+      }
+      
+      const attributesArr = Object.entries(attributes)
       const graph = client.selectGraph(schemaName);
       const query = type
-        ? `CREATE (n${label.length > 0 ? `:${label.join(":")}` : ""}${
-            attributes?.length > 0
-              ? ` {${attributes
+        ? `CREATE (n${label && label.length > 0 ? `:${label.join(":")}` : ""}${
+            attributesArr.length > 0
+              ? ` {${attributesArr
                   .map(([k]) => `${k}: $attr_${k}`)
                   .join(",")}}`
               : ""
           }) RETURN n`
-        : `MATCH (a), (b) WHERE ID(a) = $nodeA AND ID(b) = $nodeB CREATE (a)-[e:${label[0]}${
-            formattedAttributes?.length > 0
-              ? ` {${formattedAttributes
+        : `MATCH (a), (b) WHERE ID(a) = $nodeA AND ID(b) = $nodeB CREATE (a)-[e:${label![0]}${
+            attributesArr.length > 0
+              ? ` {${attributesArr
                   .map(([k]) => `${k}: $attr_${k}`)
                   .join(",")}}`
               : ""
@@ -107,8 +111,8 @@ export async function POST(
         queryParams.nodeA = selectedNodes[0].id;
         queryParams.nodeB = selectedNodes[1].id;
       }
-      if (formattedAttributes?.length > 0) {
-        formattedAttributes.forEach(([k, v]) => {
+      if (attributesArr.length > 0) {
+        attributesArr.forEach(([k, v]) => {
           queryParams[`attr_${k}`] = v;
         });
       }

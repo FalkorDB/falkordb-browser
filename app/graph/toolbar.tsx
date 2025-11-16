@@ -16,8 +16,10 @@ interface Props {
     handleDeleteElement: () => Promise<void>
     chartRef: GraphRef
     label: "Graph" | "Schema"
-    setIsAddNode?: (isAdd: boolean) => void
-    setIsAddEdge?: (isAdd: boolean) => void
+    setIsAddNode: (isAddNode: boolean) => void
+    setIsAddEdge?: (isAddEdge: boolean) => void
+    isAddNode: boolean
+    isAddEdge: boolean
     isLoadingSchema?: boolean
 }
 
@@ -35,7 +37,9 @@ export default function Toolbar({
     label,
     setIsAddNode,
     setIsAddEdge,
-    isLoadingSchema,
+    isAddEdge,
+    isAddNode,
+    isLoadingSchema
 }: Props) {
 
     const { isLoading: isLoadingGraph } = useContext(GraphContext)
@@ -282,18 +286,15 @@ export default function Toolbar({
                                 onDeleteElement={handleDeleteElement}
                             />
                         }
-                        {
-                            setIsAddNode &&
-                            <Button
-                                data-testid={`elementCanvasAddNode${label}`}
-                                className="pointer-events-auto"
-                                variant="Secondary"
-                                title="Add Node"
-                                onClick={() => setIsAddNode(true)}
-                            >
-                                <PlusCircle size={20} />
-                            </Button>
-                        }
+                        <Button
+                            data-testid={`elementCanvasAddNode${label}`}
+                            className="pointer-events-auto"
+                            variant="Secondary"
+                            title="Add Node"
+                            onClick={() => setIsAddNode(!isAddNode)}
+                        >
+                            <PlusCircle size={20} />
+                        </Button>
                         {
                             setIsAddEdge &&
                             <Button
@@ -301,7 +302,7 @@ export default function Toolbar({
                                 className="pointer-events-auto"
                                 variant="Secondary"
                                 title="Add Edge"
-                                onClick={() => setIsAddEdge(true)}
+                                onClick={() => setIsAddEdge(!isAddEdge)}
                             >
                                 <PlusCircle size={20} />
                             </Button>
@@ -314,7 +315,6 @@ export default function Toolbar({
 }
 
 Toolbar.defaultProps = {
-    setIsAddNode: undefined,
     setIsAddEdge: undefined,
     isLoadingSchema: false,
 }

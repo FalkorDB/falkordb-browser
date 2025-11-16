@@ -33,23 +33,27 @@ export async function POST(
       }
 
       const { type, label, attributes, selectedNodes } = validation.data;
+      
       if (!type) {
         if (!selectedNodes || selectedNodes.length !== 2)
           throw new Error("Selected nodes are required");
+        
+        if (!label || label.length === 0)
+          throw new Error("Label is required");
       }
 
       const formattedAttributes = formatAttributes(Object.entries(attributes));
       const graph = client.selectGraph(schemaName);
       const query = type
-        ? `CREATE (n${label.length > 0 ? `:${label.join(":")}` : ""}${
-            formattedAttributes?.length > 0
+        ? `CREATE (n${label && label.length > 0 ? `:${label.join(":")}` : ""}${
+            formattedAttributes.length > 0
               ? ` {${formattedAttributes
                   .map(([k]) => `${k}: $attr_${k}`)
                   .join(",")}}`
               : ""
           }) RETURN n`
-        : `MATCH (a), (b) WHERE ID(a) = $nodeA AND ID(b) = $nodeB CREATE (a)-[e:${label[0]}${
-            formattedAttributes?.length > 0
+        : `MATCH (a), (b) WHERE ID(a) = $nodeA AND ID(b) = $nodeB CREATE (a)-[e:${label![0]}${
+            formattedAttributes.length > 0
               ? ` {${formattedAttributes
                   .map(([k]) => `${k}: $attr_${k}`)
                   .join(",")}}`
@@ -61,7 +65,7 @@ export async function POST(
         queryParams.nodeA = selectedNodes[0].id;
         queryParams.nodeB = selectedNodes[1].id;
       }
-      if (formattedAttributes?.length > 0) {
+      if (formattedAttributes.length > 0) {
         formattedAttributes.forEach(([k, v]) => {
           queryParams[`attr_${k}`] = v;
         });

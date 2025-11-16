@@ -18,7 +18,7 @@ interface Props {
     setSelectedElement: (el: Node | Link | undefined) => void
     selectedElements: (Node | Link)[]
     setSelectedElements: Dispatch<SetStateAction<(Node | Link)[]>>
-    isAddRelation: boolean
+    isAddEdge: boolean
     chartRef: GraphRef
     cooldownTicks: number | undefined
     handleCooldown: (ticks?: 0, isSetLoading?: boolean) => void
@@ -39,7 +39,7 @@ export default function SchemaView({
     setSelectedElement,
     selectedElements,
     setSelectedElements,
-    isAddRelation,
+    isAddEdge,
     chartRef,
     cooldownTicks,
     handleCooldown,
@@ -138,7 +138,7 @@ export default function SchemaView({
                     selectedElements={selectedElements}
                     setSelectedElements={setSelectedElements}
                     type="schema"
-                    isAddElement={isAddRelation}
+                    isAddElement={isAddEdge}
                     setSelectedNodes={setSelectedNodes}
                     isLoading={isLoading}
                     handleCooldown={handleCooldown}

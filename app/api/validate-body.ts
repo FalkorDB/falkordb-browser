@@ -51,7 +51,7 @@ export const duplicateSchema = z.object({
 
 export const createSchemaElement = z.object({
   type: z.boolean(),
-  label: z.array(z.string()),
+  label: z.array(z.string()).optional(),
   attributes: z.record(z.string(), z.array(z.string())),
   selectedNodes: z
     .array(
@@ -106,7 +106,7 @@ export const duplicateGraph = z.object({
 
 export const createGraphElement = z.object({
   type: z.boolean(),
-  label: z.array(z.string()),
+  label: z.array(z.string()).optional(),
   attributes: z.record(z.string(), z.string()),
   selectedNodes: z
     .array(
