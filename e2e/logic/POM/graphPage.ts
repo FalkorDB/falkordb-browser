@@ -32,6 +32,10 @@ export default class GraphPage extends Page {
     return this.page.getByTestId(`editorContainer`);
   }
 
+  public get clearEditor(): Locator {
+    return this.page.getByTestId(`clearEditor`);
+  }
+
   public get editorRun(): Locator {
     return this.page.getByTestId(`editorRun`);
   }
@@ -172,10 +176,18 @@ export default class GraphPage extends Page {
     );
   }
 
+  async clickClearEditorInput(): Promise<void> {
+    await interactWhenVisible(
+      this.clearEditor,
+      (el) => el.click(),
+      "Clear Editor Input"
+    );
+  }
+
   async getEditorInput(): Promise<string | null> {
     return interactWhenVisible(
       this.editorContainer,
-      (el) => el.getAttribute("value"),
+      (el) => el.getAttribute("data-value"),
       "Editor Input"
     );
   }
