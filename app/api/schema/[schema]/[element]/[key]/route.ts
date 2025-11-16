@@ -9,7 +9,9 @@ import {
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: Promise<{ schema: string; element: string; key: string }> }
+  {
+    params,
+  }: { params: Promise<{ schema: string; element: string; key: string }> }
 ) {
   try {
     const session = await getClient();
@@ -30,18 +32,27 @@ export async function PATCH(
       const validation = validateBody(updateSchemaElementAttribute, body);
 
       if (!validation.success) {
-        return NextResponse.json({ message: validation.error }, { status: 400 });
+        return NextResponse.json(
+          { message: validation.error },
+          { status: 400 }
+        );
       }
 
       const { type, attribute } = validation.data;
       const [formattedKey, formattedValue] = formatAttribute([key, attribute]);
       const graph = client.selectGraph(schemaName);
       const q = type
-        ? `MATCH (n) WHERE ID(n) = $elementId SET n.${formattedKey} = $value`
-        : `MATCH (n)-[e]-(m) WHERE ID(e) = $elementId SET e.${formattedKey} = $value`;
+        ? `MATCH (n) WHERE ID(n) = $id SET n[$formattedKey] = $value`
+        : `MATCH (n)-[e]-(m) WHERE ID(e) = $id SET e[$formattedKey] = $value`;
 
-      if (user.role === "Read-Only") await graph.roQuery(q, { params: { elementId, value: formattedValue } });
-      else await graph.query(q, { params: { elementId, value: formattedValue } });
+      if (user.role === "Read-Only")
+        await graph.roQuery(q, {
+          params: { id: elementId, value: formattedValue, key: formattedKey },
+        });
+      else
+        await graph.query(q, {
+          params: { id: elementId, value: formattedValue, key: formattedKey },
+        });
 
       return NextResponse.json(
         { message: "Attribute updated successfully" },
@@ -65,7 +76,9 @@ export async function PATCH(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: Promise<{ schema: string; element: string; key: string }> }
+  {
+    params,
+  }: { params: Promise<{ schema: string; element: string; key: string }> }
 ) {
   try {
     const session = await getClient();
@@ -86,7 +99,10 @@ export async function DELETE(
       const validation = validateBody(deleteSchemaElementAttribute, body);
 
       if (!validation.success) {
-        return NextResponse.json({ message: validation.error }, { status: 400 });
+        return NextResponse.json(
+          { message: validation.error },
+          { status: 400 }
+        );
       }
 
       const { type } = validation.data;
@@ -95,7 +111,8 @@ export async function DELETE(
         ? `MATCH (n) WHERE ID(n) = $elementId SET n.${key} = NULL`
         : `MATCH (n)-[e]-(m) WHERE ID(e) = $elementId SET e.${key} = NULL`;
 
-      if (user.role === "Read-Only") await graph.roQuery(q, { params: { elementId } });
+      if (user.role === "Read-Only")
+        await graph.roQuery(q, { params: { elementId } });
       else await graph.query(q, { params: { elementId } });
 
       return NextResponse.json(

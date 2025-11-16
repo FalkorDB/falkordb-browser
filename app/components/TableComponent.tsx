@@ -69,11 +69,12 @@ export default function TableComponent({
     const headerRef = useRef<HTMLTableRowElement>(null)
     const tableRef = useRef<HTMLTableElement>(null)
     const scrollContainerRef = useRef<HTMLDivElement>(null)
+    const loadAttemptedRef = useRef<Set<string>>(new Set());
 
     const [hasRestored, setHasRestored] = useState(false)
     const [search, setSearch] = useState<string>("")
     const [editable, setEditable] = useState<string>("")
-    const [hover, setHover] = useState<string>("")
+    const [hover, setHover] = useState(-1)
     const [newValue, setNewValue] = useState<string>("")
     const [filteredRows, setFilteredRows] = useState<Row[]>([])
     const [isLoading, setIsLoading] = useState<boolean>(false)
@@ -83,13 +84,12 @@ export default function TableComponent({
     const [visibleRows, setVisibleRows] = useState<Row[]>([])
     const [loadingCells, setLoadingCells] = useState<Set<string>>(new Set())
     const [loadedCells, setLoadedCells] = useState<Set<string>>(new Set())
-    const loadAttemptedRef = useRef<Set<string>>(new Set());
+    const [expandArr, setExpandArr] = useState(new Map(initialExpand))
 
-    // Get stable row identifier (using first cell value)
-    const getRowId = (row: Row) => {
-        const val = row.cells[0]?.value;
-        return (typeof val === "object" ? val?.id : val) ?? '';
-    }
+    const height = useMemo(() => expandArr.size === 0 ? itemHeight : itemHeight * 2, [expandArr.size, itemHeight])
+
+    // Get stable row identifier (using row index in original array)
+    const getRowKey = useCallback((index: number) => index + topFakeRowHeight / height, [height, topFakeRowHeight])
 
     const handleLoadLazyCell = useCallback((rowId: string | number, cellIndex: number, loadFn: () => Promise<any>) => {
         const cellKey = `${rowId}-${cellIndex}`;
@@ -105,8 +105,8 @@ export default function TableComponent({
         // Load the cell value asynchronously
         loadFn().then(value => {
             // Find the row by its stable identifier and update it
-            rows.forEach(r => {
-                if (getRowId(r) === rowId) {
+            rows.forEach((r, i) => {
+                if (getRowKey(i) === rowId) {
                     r.cells.forEach((c, j) => {
                         if (j === cellIndex) {
                             c.value = value
@@ -132,10 +132,7 @@ export default function TableComponent({
                 return newSet;
             });
         });
-    }, [loadingCells, loadedCells, rows])
-    const [expandArr, setExpandArr] = useState(new Map(initialExpand))
-
-    const height = expandArr.size === 0 ? itemHeight : itemHeight * 2
+    }, [loadingCells, loadedCells, rows, getRowKey])
 
     useEffect(() => {
         const newStartIndex = Math.max(0, Math.floor((scrollTop - (height * itemsPerPage)) / height))
@@ -147,7 +144,7 @@ export default function TableComponent({
         setTopFakeRowHeight(newTopFakeRowHeight)
         setBottomFakeRowHeight(newBottomFakeRowHeight)
         setVisibleRows(newVisibleRows)
-    }, [scrollTop, itemHeight, itemsPerPage, filteredRows])
+    }, [scrollTop, itemHeight, itemsPerPage, filteredRows, height])
 
     useEffect(() => {
         if (searchRef.current) {
@@ -209,8 +206,8 @@ export default function TableComponent({
         const newLoadedCells = new Set<string>();
         const newLoadAttempts = new Set<string>();
 
-        rows.forEach(row => {
-            const rowId = getRowId(row);
+        rows.forEach((row, i) => {
+            const rowId = getRowKey(i);
             row.cells.forEach((cell, cellIndex) => {
                 const cellKey = `${rowId}-${cellIndex}`;
 
@@ -228,7 +225,8 @@ export default function TableComponent({
 
         loadAttemptedRef.current = newLoadAttempts;
         setLoadedCells(newLoadedCells);
-    }, [rows])
+    }, [rows, getRowKey])
+
     useEffect(() => {
         // Restore scroll position on mount
         if (hasRestored || filteredRows.length === 0) return () => { }
@@ -403,25 +401,21 @@ export default function TableComponent({
                         )
                     }
                     {
-                        visibleRows.map((row) => {
-                            // Find index in filteredRows first
-                            const filteredIndex = filteredRows.findIndex(r => r === row)
+                        visibleRows.map((row, index) => {
                             // Then find actual index in original rows array
-                            const actualIndex = rows.findIndex(r => r === row)
-                            const rowId = getRowId(row);
-                            const firstVal = rowId || actualIndex
-                            const dataTestID = `${label}${firstVal}`
+                            const rowKey = getRowKey(index);
+                            const dataTestID = `${label}${rowKey}`
 
-                            if (actualIndex === -1 || filteredIndex === -1) return undefined
+                            if (rowKey === -1) return undefined
 
                             return (
                                 <TableRow
                                     className="border-border"
                                     data-testid={`tableRow${dataTestID}`}
-                                    onMouseEnter={() => setHover(`${actualIndex}`)}
-                                    onMouseLeave={() => setHover("")}
+                                    onMouseEnter={() => setHover(rowKey)}
+                                    onMouseLeave={() => setHover(-1)}
                                     data-id={typeof row.cells[0].value === "string" ? row.cells[0].value : undefined}
-                                    key={filteredIndex}
+                                    key={rowKey}
                                 >
                                     {
                                         setRows ?
@@ -431,8 +425,8 @@ export default function TableComponent({
                                                     data-testid={`tableCheckbox${dataTestID}`}
                                                     checked={row.checked}
                                                     onCheckedChange={() => {
-                                                        setRows(rows.map((r, k) => {
-                                                            if (k === actualIndex) {
+                                                        setRows(rows.map((r, i) => {
+                                                            if (getRowKey(i) === rowKey) {
                                                                 r.checked = !r.checked
                                                             }
                                                             return r
@@ -443,18 +437,18 @@ export default function TableComponent({
                                             : null
                                     }
                                     <TableCell className="border-r border-border">
-                                        <p>{filteredIndex + 1}.</p>
+                                        <p>{index + 1}.</p>
                                     </TableCell>
                                     {
                                         row.cells.map((cell, j) => {
-                                            const cellKey = `${rowId}-${j}`;
+                                            const cellKey = `${rowKey}-${j}`;
                                             const isCellLoading = loadingCells.has(cellKey);
                                             const isLazyCell = cell.type === "readonly" && "loadCell" in cell && cell.loadCell;
 
                                             // Only load if it's a lazy cell, has no value, not currently loading, and we haven't attempted to load it yet
                                             if (isLazyCell && !cell.value && !loadingCells.has(cellKey) && !loadAttemptedRef.current.has(cellKey)) {
                                                 loadAttemptedRef.current.add(cellKey);
-                                                handleLoadLazyCell(rowId, j, cell.loadCell);
+                                                handleLoadLazyCell(rowKey, j, cell.loadCell);
                                             }
 
                                             // Show loader while loading
@@ -464,7 +458,7 @@ export default function TableComponent({
 
                                             // Show value once loaded
                                             return (
-                                                <TableCell className={cn("border-border p-0", j + 1 !== row.cells.length && "border-r")} key={j}>
+                                                <TableCell className={cn("border-border p-0", j + 1 !== row.cells.length && "border-r")} key={cellKey}>
                                                     <div style={{ height }} className={cn("overflow-auto p-4", row.cells[0]?.value === editable && (cell.type !== "readonly" && cell.type !== "object") && "p-2", cell.type === "object" && "p-1")}>
                                                         {
                                                             cell.type === "object" ?
@@ -496,7 +490,7 @@ export default function TableComponent({
                                                                         data={cell.value}
                                                                     />
                                                                 </div>
-                                                                : editable === `${actualIndex}-${j}` ?
+                                                                : editable === cellKey ?
                                                                     <div className="w-full flex gap-2 items-center">
                                                                         {
                                                                             cell.type === "select" ?
@@ -584,13 +578,13 @@ export default function TableComponent({
                                                                         </Tooltip>
                                                                         <div className="w-4">
                                                                             {
-                                                                                cell.type !== "readonly" && hover === `${actualIndex}` &&
+                                                                                cell.type !== "readonly" && hover === rowKey &&
                                                                                 <Button
                                                                                     data-testid={`editButton${label}`}
                                                                                     className="disabled:cursor-text disabled:opacity-100"
                                                                                     indicator={indicator}
                                                                                     title="Edit"
-                                                                                    onClick={() => handleSetEditable(`${actualIndex}-${j}`, cell.value!.toString())}
+                                                                                    onClick={() => handleSetEditable(cellKey, cell.value!.toString())}
                                                                                 >
                                                                                     <Pencil className="w-4 h-4" />
                                                                                 </Button>

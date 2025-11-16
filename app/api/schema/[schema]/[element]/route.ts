@@ -39,7 +39,7 @@ export async function POST(
           throw new Error("Selected nodes are required");
       }
 
-      const formattedAttributes = formatAttributes(Object.entries(attributes));
+      const formattedAttributes = formatAttributes(attributes);
       const graph = client.selectGraph(schemaName);
       const query = type
         ? `CREATE (n${label.length > 0 ? `:${label.join(":")}` : ""}${
