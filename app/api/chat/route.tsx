@@ -48,86 +48,87 @@ export async function POST(request: NextRequest) {
     const { readable, writable } = new TransformStream()
     const writer = writable.getWriter()
 
+    request.signal.addEventListener("abort", () => {
+        writer.close()
+    })
+
     try {
         const session = await getClient()
 
         if (session instanceof NextResponse) {
-            throw new Error(await session.text())
-        }
-
-        const { messages, graphName, key, model } = await request.json()
-
-        try {
-            if (!graphName) throw new Error("Graph name is required")
-            if (!messages) throw new Error("Messages are required")
-
-            const requestBody = {
-                "chat_request": {
-                    messages,
-                },
-                "graph_name": graphName,
-                key,
-                model,
-            }
-
-            const response = await fetch(`${process.env.CHAT_URL}text_to_cypher`, {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify(requestBody)
-            });
-
-            if (!response.ok) {
-                throw new Error(`Error: ${await response.text()}`);
-            }
-
-            const reader = response.body?.getReader();
-            const decoder = new TextDecoder();
-
-            const processStream = async () => {
-                if (!reader) return;
-
-                const { done, value } = await reader.read();
-                if (done) return;
-
-                const chunk = decoder.decode(value, { stream: true });
-
-                const lines = chunk.split('\n').filter(line => line);
-                let isResult = false
-
-
-                lines.forEach(line => {
-                    const data = JSON.parse(line.split("data:")[1])
-                    const type: EventType = Object.keys(data)[0] as EventType
-
-                    isResult = type === "Result" || type === "Error"
-
-                    writer.write(encoder.encode(`event: ${type} data: ${data[type]}\n\n`))
-                })
-
-                if (!isResult) {
-                    processStream();
-                } else {
-                    writer.close();
-                }
-            };
-
-            processStream()
-        } catch (error) {
-            console.error(error)
-            writer.write(encoder.encode(`event: error status: ${400} data: ${JSON.stringify((error as Error).message)}\n\n`))
+            writer.write(encoder.encode(`event: error status: ${session.status} data: ${JSON.stringify(await session.text())}\n\n`))
             writer.close()
+        } else {
+            const { messages, graphName, key, model } = await request.json()
+
+            try {
+                if (!graphName) throw new Error("Graph name is required")
+                if (!messages) throw new Error("Messages are required")
+
+                const requestBody = {
+                    "chat_request": {
+                        messages,
+                    },
+                    "graph_name": graphName,
+                    key,
+                    model,
+                }
+
+                const response = await fetch(`${process.env.CHAT_URL}text_to_cypher`, {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify(requestBody)
+                });
+
+                if (!response.ok) {
+                    throw new Error(`Error: ${await response.text()}`);
+                }
+
+                const reader = response.body?.getReader();
+                const decoder = new TextDecoder();
+
+                const processStream = async () => {
+                    if (!reader) return;
+
+                    const { done, value } = await reader.read();
+                    if (done) return;
+
+                    const chunk = decoder.decode(value, { stream: true });
+
+                    const lines = chunk.split('\n').filter(line => line);
+                    let isResult = false
+
+
+                    lines.forEach(line => {
+                        const data = JSON.parse(line.split("data:")[1])
+                        const type: EventType = Object.keys(data)[0] as EventType
+
+                        isResult = type === "Result" || type === "Error"
+
+                        writer.write(encoder.encode(`event: ${type} data: ${data[type]}\n\n`))
+                    })
+
+                    if (!isResult) {
+                        processStream();
+                    } else {
+                        writer.close();
+                    }
+                };
+
+                processStream()
+            } catch (error) {
+                console.error(error)
+                writer.write(encoder.encode(`event: error status: ${400} data: ${JSON.stringify((error as Error).message)}\n\n`))
+                writer.close()
+            }
         }
     } catch (error) {
         console.error(error)
         writer.write(encoder.encode(`event: error status: ${500} data: ${JSON.stringify((error as Error).message)}\n\n`))
         writer.close()
     }
-
-    request.signal.addEventListener("abort", () => {
-        writer.close()
-    })
 
     return new Response(readable, {
         headers: {

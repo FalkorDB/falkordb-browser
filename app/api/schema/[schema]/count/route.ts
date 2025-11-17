@@ -11,51 +11,64 @@ export async function GET(
   const { readable, writable } = new TransformStream();
   const writer = writable.getWriter();
 
+  // Clean up if the client disconnects early
+  request.signal.addEventListener("abort", () => {
+    writer.close();
+  });
+
   try {
     const session = await getClient();
 
     if (session instanceof NextResponse) {
-      throw new Error(await session.text());
-    }
-
-    const { client, user } = session;
-    const { schema } = await params;
-    const schemaName = `${schema}_schema`;
-
-    try {
-      const graph = client.selectGraph(schemaName);
-
-      // Execute two separate queries for accurate counts
-      const nodesQuery = "MATCH (n) RETURN count(n) as nodes";
-      const edgesQuery = "MATCH ()-[e]->() RETURN count(e) as edges";
-
-      // Execute nodes count query
-      const nodesResult = await runQuery(graph, nodesQuery, user.role);
-
-      // Execute edges count query  
-      const edgesResult = await runQuery(graph, edgesQuery, user.role);
-
-      if (!nodesResult || !edgesResult) throw new Error("Something went wrong");
-
-      // Combine results into expected format
-      const nodes = (nodesResult.data && nodesResult.data[0] && (nodesResult.data[0] as { nodes: number }).nodes) || 0;
-      const edges = (edgesResult.data && edgesResult.data[0] && (edgesResult.data[0] as { edges: number }).edges) || 0;
-
-      writer.write(
-        encoder.encode(`event: result\ndata: ${JSON.stringify({ nodes, edges })}\n\n`)
-      );
-      writer.close();
-    } catch (error) {
-      console.error(error);
       writer.write(
         encoder.encode(
           `event: error\ndata: ${JSON.stringify({
-            message: (error as Error).message,
-            status: 400,
+            message: await session.text(),
+            status: session.status,
           })}\n\n`
         )
       );
       writer.close();
+    } else {
+      const { client, user } = session;
+      const { schema } = await params;
+      const schemaName = `${schema}_schema`;
+
+      try {
+        const graph = client.selectGraph(schemaName);
+
+        // Execute two separate queries for accurate counts
+        const nodesQuery = "MATCH (n) RETURN count(n) as nodes";
+        const edgesQuery = "MATCH ()-[e]->() RETURN count(e) as edges";
+
+        // Execute nodes count query
+        const nodesResult = await runQuery(graph, nodesQuery, user.role);
+
+        // Execute edges count query  
+        const edgesResult = await runQuery(graph, edgesQuery, user.role);
+
+        if (!nodesResult || !edgesResult) throw new Error("Something went wrong");
+
+        // Combine results into expected format
+        const nodes = (nodesResult.data && nodesResult.data[0] && (nodesResult.data[0] as { nodes: number }).nodes) || 0;
+        const edges = (edgesResult.data && edgesResult.data[0] && (edgesResult.data[0] as { edges: number }).edges) || 0;
+
+        writer.write(
+          encoder.encode(`event: result\ndata: ${JSON.stringify({ nodes, edges })}\n\n`)
+        );
+        writer.close();
+      } catch (error) {
+        console.error(error);
+        writer.write(
+          encoder.encode(
+            `event: error\ndata: ${JSON.stringify({
+              message: (error as Error).message,
+              status: 400,
+            })}\n\n`
+          )
+        );
+        writer.close();
+      }
     }
   } catch (error) {
     console.error(error);
@@ -69,11 +82,6 @@ export async function GET(
     );
     writer.close();
   }
-
-  // Clean up if the client disconnects early
-  request.signal.addEventListener("abort", () => {
-    writer.close();
-  });
 
   return new Response(readable, {
     headers: {

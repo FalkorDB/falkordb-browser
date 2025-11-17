@@ -133,46 +133,59 @@ export async function GET(
   const { readable, writable } = new TransformStream();
   const writer = writable.getWriter();
 
+  // Clean up if the client disconnects early
+  request.signal.addEventListener("abort", () => {
+    writer.close();
+  });
+
   try {
     const session = await getClient();
 
     if (session instanceof NextResponse) {
-      throw new Error(await session.text());
-    }
-
-    const { client, user } = session;
-    const { graph: graphId } = await params;
-    const query = request.nextUrl.searchParams.get("query");
-    const timeout = Number(request.nextUrl.searchParams.get("timeout"));
-
-    try {
-      if (!query) throw new Error("Missing parameter query");
-      if (Number.isNaN(timeout)) throw new Error("Invalid parameter timeout");
-
-      const graph = client.selectGraph(graphId);
-
-      const result =
-        user.role === "Read-Only"
-          ? await graph.roQuery(query, { TIMEOUT: timeout })
-          : await graph.query(query, { TIMEOUT: timeout });
-
-      if (!result) throw new Error("Something went wrong");
-
-      writer.write(
-        encoder.encode(`event: result\ndata: ${JSON.stringify(result)}\n\n`)
-      );
-      writer.close();
-    } catch (error) {
-      console.error(error);
       writer.write(
         encoder.encode(
           `event: error\ndata: ${JSON.stringify({
-            message: (error as Error).message,
-            status: 400,
+            message: await session.text(),
+            status: session.status,
           })}\n\n`
         )
       );
       writer.close();
+    } else {
+      const { client, user } = session;
+      const { graph: graphId } = await params;
+      const query = request.nextUrl.searchParams.get("query");
+      const timeout = Number(request.nextUrl.searchParams.get("timeout"));
+
+      try {
+        if (!query) throw new Error("Missing parameter query");
+        if (Number.isNaN(timeout)) throw new Error("Invalid parameter timeout");
+
+        const graph = client.selectGraph(graphId);
+
+        const result =
+          user.role === "Read-Only"
+            ? await graph.roQuery(query, { TIMEOUT: timeout })
+            : await graph.query(query, { TIMEOUT: timeout });
+
+        if (!result) throw new Error("Something went wrong");
+
+        writer.write(
+          encoder.encode(`event: result\ndata: ${JSON.stringify(result)}\n\n`)
+        );
+        writer.close();
+      } catch (error) {
+        console.error(error);
+        writer.write(
+          encoder.encode(
+            `event: error\ndata: ${JSON.stringify({
+              message: (error as Error).message,
+              status: 400,
+            })}\n\n`
+          )
+        );
+        writer.close();
+      }
     }
   } catch (error) {
     console.error(error);
@@ -187,11 +200,6 @@ export async function GET(
     writer.close();
   }
 
-  // Clean up if the client disconnects early
-  request.signal.addEventListener("abort", () => {
-    writer.close();
-  });
-  
   return new Response(readable, {
     headers: {
       "Content-Type": "text/event-stream",

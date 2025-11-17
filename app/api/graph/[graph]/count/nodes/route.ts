@@ -11,43 +11,62 @@ export async function GET(
   const { readable, writable } = new TransformStream();
   const writer = writable.getWriter();
 
+  // Clean up if the client disconnects early
+  request.signal.addEventListener("abort", () => {
+    writer.close();
+  });
+
   try {
     const session = await getClient();
 
     if (session instanceof NextResponse) {
-      throw new Error(await session.text());
-    }
-
-    const { client, user } = session;
-    const { graph: graphId } = await params;
-
-    try {
-      const graph = client.selectGraph(graphId);
-
-      // Execute nodes count query
-      const nodesQuery = "MATCH (n) RETURN count(n) as nodes";
-      const nodesResult = await runQuery(graph, nodesQuery, user.role);
-
-      if (!nodesResult) throw new Error("Something went wrong");
-
-      // Extract nodes count from result
-      const nodes = (nodesResult.data && nodesResult.data[0] && (nodesResult.data[0] as { nodes: number }).nodes) || 0;
-
-      writer.write(
-        encoder.encode(`event: result\ndata: ${JSON.stringify({ nodes })}\n\n`)
-      );
-      writer.close();
-    } catch (error) {
-      console.error(error);
       writer.write(
         encoder.encode(
           `event: error\ndata: ${JSON.stringify({
-            message: (error as Error).message,
-            status: 400,
+            message: await session.text(),
+            status: session.status,
           })}\n\n`
         )
       );
       writer.close();
+    } else {
+      const { client, user } = session;
+      const { graph: graphId } = await params;
+
+      try {
+        const graph = client.selectGraph(graphId);
+
+        // Execute nodes count query
+        const nodesQuery = "MATCH (n) RETURN count(n) as nodes";
+        const nodesResult = await runQuery(graph, nodesQuery, user.role);
+
+        if (!nodesResult) throw new Error("Something went wrong");
+
+        // Extract nodes count from result
+        const nodes =
+          (nodesResult.data &&
+            nodesResult.data[0] &&
+            (nodesResult.data[0] as { nodes: number }).nodes) ||
+          0;
+
+        writer.write(
+          encoder.encode(
+            `event: result\ndata: ${JSON.stringify({ nodes })}\n\n`
+          )
+        );
+        writer.close();
+      } catch (error) {
+        console.error(error);
+        writer.write(
+          encoder.encode(
+            `event: error\ndata: ${JSON.stringify({
+              message: (error as Error).message,
+              status: 400,
+            })}\n\n`
+          )
+        );
+        writer.close();
+      }
     }
   } catch (error) {
     console.error(error);
@@ -62,11 +81,6 @@ export async function GET(
     writer.close();
   }
 
-  // Clean up if the client disconnects early
-  request.signal.addEventListener("abort", () => {
-    writer.close();
-  });
-
   return new Response(readable, {
     headers: {
       "Content-Type": "text/event-stream",
@@ -75,4 +89,3 @@ export async function GET(
     },
   });
 }
-
