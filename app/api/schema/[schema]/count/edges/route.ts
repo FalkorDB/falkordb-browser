@@ -1,0 +1,87 @@
+import { getClient } from "@/app/api/auth/[...nextauth]/options";
+import { runQuery } from "@/app/api/utils";
+import { NextResponse, NextRequest } from "next/server";
+
+// eslint-disable-next-line import/prefer-default-export
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ schema: string }> }
+) {
+  const encoder = new TextEncoder();
+  const { readable, writable } = new TransformStream();
+  const writer = writable.getWriter();
+
+  // Clean up if the client disconnects early
+  request.signal.addEventListener("abort", () => {
+    writer.close();
+  });
+
+  try {
+    const session = await getClient();
+
+    if (session instanceof NextResponse) {
+      writer.write(
+        encoder.encode(
+          `event: error\ndata: ${JSON.stringify({
+            message: await session.text(),
+            status: session.status,
+          })}\n\n`
+        )
+      );
+      writer.close();
+    } else {
+      const { client, user } = session;
+      const { schema } = await params;
+      const schemaName = `${schema}_schema`;
+
+      try {
+        const graph = client.selectGraph(schemaName);
+
+        // Execute edges count query
+        const edgesQuery = "MATCH ()-[e]->() RETURN count(e) as edges";
+        const edgesResult = await runQuery(graph, edgesQuery, user.role);
+
+        if (!edgesResult) throw new Error("Something went wrong");
+
+        // Extract edges count from result
+        const edges = (edgesResult.data && edgesResult.data[0] && (edgesResult.data[0] as { edges: number }).edges) || 0;
+
+        writer.write(
+          encoder.encode(`event: result\ndata: ${JSON.stringify({ edges })}\n\n`)
+        );
+        writer.close();
+      } catch (error) {
+        console.error(error);
+        writer.write(
+          encoder.encode(
+            `event: error\ndata: ${JSON.stringify({
+              message: (error as Error).message,
+              status: 400,
+            })}\n\n`
+          )
+        );
+        writer.close();
+      }
+    }
+  } catch (error) {
+    console.error(error);
+    writer.write(
+      encoder.encode(
+        `event: error\ndata: ${JSON.stringify({
+          message: (error as Error).message,
+          status: 500,
+        })}\n\n`
+      )
+    );
+    writer.close();
+  }
+
+  return new Response(readable, {
+    headers: {
+      "Content-Type": "text/event-stream",
+      "Cache-Control": "no-cache",
+      Connection: "keep-alive",
+    },
+  });
+}
+

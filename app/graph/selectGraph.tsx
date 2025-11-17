@@ -51,6 +51,8 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
     const [openDuplicate, setOpenDuplicate] = useState(false)
     const [isLoading, setIsLoading] = useState(false)
 
+    const baseUrl = `api/${type === "Graph" ? "graph" : "schema"}`;
+
     useEffect(() => {
         setOpen(false)
     }, [selectedValue])
@@ -62,7 +64,7 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
 
     const handleSetOption = useCallback(async (option: string, optionName: string) => {
         const result = await securedFetch(
-            `api/${type === "Graph" ? "graph" : "schema"}/${prepareArg(option)}?sourceName=${prepareArg(optionName)}`,
+            `${baseUrl}/${prepareArg(option)}?sourceName=${prepareArg(optionName)}`,
             {
                 method: "PATCH",
                 headers: { "Content-Type": "application/json" }
@@ -92,7 +94,7 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
         }
 
         return result.ok
-    }, [type, toast, setIndicator, options, setOptions, setSelectedValue, selectedValue, setRows, session])
+    }, [baseUrl, toast, setIndicator, options, setOptions, setSelectedValue, selectedValue, setRows, session])
 
     const loadMemory = (opt: string) =>
         async () => {
@@ -104,7 +106,7 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
 
     const loadNodesCount = (opt: string) =>
         async () => {
-            const result = await getSSEGraphResult(`api/graph/${prepareArg(opt)}/count/nodes`, toast, setIndicator);
+            const result = await getSSEGraphResult(`${baseUrl}/${prepareArg(opt)}/count/nodes`, toast, setIndicator);
 
             if (!result) return "";
 
@@ -113,7 +115,7 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
 
     const loadEdgesCount = (opt: string) =>
         async () => {
-            const result = await getSSEGraphResult(`api/graph/${prepareArg(opt)}/count/edges`, toast, setIndicator);
+            const result = await getSSEGraphResult(`${baseUrl}/${prepareArg(opt)}/count/edges`, toast, setIndicator);
 
             if (!result) return "";
 
