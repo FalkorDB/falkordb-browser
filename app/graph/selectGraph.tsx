@@ -149,7 +149,7 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
 
     useEffect(() => {
         handleSetRows(options)
-    }, [options])
+    }, [options, session?.user.role])
 
     const handleOpenChange = async (o: boolean) => {
         setOpen(o)

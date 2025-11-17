@@ -247,6 +247,23 @@ export default function TableComponent({
         return () => clearTimeout(timer)
     }, [hasRestored, initialScrollPosition, filteredRows.length, initialSearch])
 
+    // Effect to load lazy cells - moved out of render to avoid setState during render
+    useEffect(() => {
+        visibleRows.forEach(row => {
+            const rowId = getRowId(row);
+            row.cells.forEach((cell, cellIndex) => {
+                const cellKey = `${rowId}-${cellIndex}`;
+                const isLazyCell = cell.type === "readonly" && "loadCell" in cell && cell.loadCell;
+
+                // Only load if it's a lazy cell, has no value, not currently loading, and we haven't attempted to load it yet
+                if (isLazyCell && !cell.value && !loadingCells.has(cellKey) && !loadAttemptedRef.current.has(cellKey)) {
+                    loadAttemptedRef.current.add(cellKey);
+                    handleLoadLazyCell(rowId, cellIndex, cell.loadCell);
+                }
+            });
+        });
+    }, [visibleRows, loadingCells, handleLoadLazyCell])
+
     const handleSetEditable = (editValue: string, value: string) => {
         setEditable(editValue)
         setNewValue(value)
@@ -449,13 +466,6 @@ export default function TableComponent({
                                         row.cells.map((cell, j) => {
                                             const cellKey = `${rowId}-${j}`;
                                             const isCellLoading = loadingCells.has(cellKey);
-                                            const isLazyCell = cell.type === "readonly" && "loadCell" in cell && cell.loadCell;
-
-                                            // Only load if it's a lazy cell, has no value, not currently loading, and we haven't attempted to load it yet
-                                            if (isLazyCell && !cell.value && !loadingCells.has(cellKey) && !loadAttemptedRef.current.has(cellKey)) {
-                                                loadAttemptedRef.current.add(cellKey);
-                                                handleLoadLazyCell(rowId, j, cell.loadCell);
-                                            }
 
                                             // Show loader while loading
                                             if (isCellLoading) {
