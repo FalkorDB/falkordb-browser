@@ -2,162 +2,321 @@ import { NextRequest, NextResponse } from "next/server";
 // eslint-disable-next-line import/no-extraneous-dependencies
 import { SignJWT } from "jose";
 import crypto from "crypto";
-import { newClient, generateTimeUUID, getAdminConnectionForTokens, generateConsistentUserId } from "../[...nextauth]/options";
+import { executePATQuery } from "@/lib/token-storage";
+import { getClient, newClient, generateTimeUUID, generateConsistentUserId } from "../[...nextauth]/options";
+import { encrypt } from "../encryption";
+import { validateJWTSecret } from "../tokenUtils";
 import { login, validateBody } from "../../validate-body";
 
-// eslint-disable-next-line import/prefer-default-export
-export async function POST(request: NextRequest) {
+/**
+ * Parses and validates request body
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function parseRequestBody(request: NextRequest): Promise<{ body?: any; error?: NextResponse }> {
   try {
-    // Check JWT secret at runtime
-    if (!process.env.NEXTAUTH_SECRET) {
-      // eslint-disable-next-line no-console
-      console.error("NEXTAUTH_SECRET environment variable is required");
-      return NextResponse.json(
-        { message: "Server configuration error" },
-        { status: 500 }
-      );
-    }
-    
-    const JWT_SECRET = new TextEncoder().encode(process.env.NEXTAUTH_SECRET);
-
-    // Handle JSON parsing errors properly
-    let body;
-    try {
-      body = await request.json();
-    } catch (jsonError) {
-      return NextResponse.json(
+    const body = await request.json();
+    return { body };
+  } catch (jsonError) {
+    return {
+      error: NextResponse.json(
         { message: "Invalid JSON in request body" },
         { status: 400 }
-      );
-    }
+      ),
+    };
+  }
+}
 
-    // Validate request body
-    const validation = validateBody(login, body);
-    
-    if (!validation.success) {
-      return NextResponse.json(
+/**
+ * Authenticates user via direct credentials or existing session
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function authenticateUser(body: any): Promise<{ user?: any; password?: string; error?: NextResponse }> {
+  // Validate request body using Zod schema
+  const validation = validateBody(login, body);
+  
+  if (!validation.success) {
+    return {
+      error: NextResponse.json(
         { message: validation.error },
         { status: 400 }
-      );
-    }
+      ),
+    };
+  }
 
-    const { username, password, host, port, tls, ca } = validation.data;
+  const { 
+    username, 
+    password, 
+    host, 
+    port, 
+    tls, 
+    ca,
+  } = validation.data;
 
-    // Note: username and password are optional - same as NextAuth session behavior
-    // The newClient function handles empty credentials by using "default" user
-    // host, port, and tls are guaranteed to have values due to Zod defaults
-
+  // Mode 1: Direct login with credentials (Swagger/external API)
+  if (username || password || host !== "localhost" || port !== "6379" || tls !== "false" || ca) {
     try {
-      // Generate consistent user ID based on credentials (same user = same ID)
       const id = generateConsistentUserId(username || "default", host, parseInt(port, 10));
+      const userPassword = password || "";
 
-      // Attempt to connect to FalkorDB using existing logic
       const { role } = await newClient(
         {
           host,
-          port,
-          username: username || "", // Handle undefined username like NextAuth does
-          password: password || "", // Handle undefined password like NextAuth does
-          tls,
+          port: port.toString(),
+          username: username || "",
+          password: userPassword,
+          tls: tls.toString(),
           ca: ca || "undefined",
         },
         id
       );
 
-      // If connection is successful, create user object
-      const user = {
-        id,
-        host,
-        port: parseInt(port, 10),
-        username,
-        tls: tls === "true",
-        ca,
-        role,
-      };
-
-      // Create JWT token with all necessary connection information
-      const currentTime = Math.floor(Date.now() / 1000);
-      
-      // Generate a unique token ID
-      const tokenId = generateTimeUUID();
-      
-      const tokenPayload = {
-        sub: user.id,           // Standard JWT claim for user ID
-        jti: tokenId,           // JWT ID for unique identification
-        username: username || undefined,
-        role: user.role,
-        host: user.host,
-        port: user.port,
-        tls: user.tls,
-        ca: user.ca || undefined,
-        iat: currentTime,
-      };
-
-      const token = await new SignJWT(tokenPayload)
-        .setProtectedHeader({ alg: "HS256" })
-        .setIssuedAt()
-        .setExpirationTime("1y") // 1 year
-        .sign(JWT_SECRET);
-
-      // Store the active token in Redis using Default connection
-      try {
-        // Get Admin connection for token management
-        const adminClient = await getAdminConnectionForTokens(
-          user.host,
-          user.port,
-          user.tls,
-          user.ca
-        );
-        const adminConnection = await adminClient.connection;
-        
-        // Hash the token for security (never store plain text)
-        const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
-        
-        // Create token metadata
-        const tokenData = {
-          user_id: user.id,
-          token_id: tokenId,
-          created_at: new Date().toISOString(),
-          expires_at: new Date(Date.now() + 31536000000).toISOString(), // 1 year (365 days)
-          last_used: null,
-          name: "API Token",
-          permissions: [user.role],
-          username: user.username
-        };
-        
-        // Store token data with 1 year + 1 day TTL (31622400 seconds = 366 days)
-        // Grace period allows audit trail after JWT expiration
-        await adminConnection.setEx(
-          `api_token:${tokenHash}`,
-          31622400,
-          JSON.stringify(tokenData)
-        );
-        
-        // Add to user's token set for easy management
-        await adminConnection.sAdd(`user_tokens:${user.id}`, tokenId);
-        await adminConnection.expire(`user_tokens:${user.id}`, 31622400);
-        
-      } catch (redisError) {
-        // eslint-disable-next-line no-console
-        console.error('Failed to store token in Redis:', redisError);
-        // Continue without Redis storage - token will still work but can't be revoked
-      }
-
-      return NextResponse.json(
-        {
-          message: "Authentication successful",
-          token
+      return {
+        user: {
+          id,
+          host,
+          port: parseInt(port, 10),
+          username,
+          tls: tls === "true",
+          ca,
+          role,
         },
-        { status: 200 }
-      );
+        password: userPassword,
+      };
     } catch (connectionError) {
       // eslint-disable-next-line no-console
       console.error("FalkorDB connection error:", connectionError);
-      return NextResponse.json(
-        { message: "Invalid credentials or connection failed" },
-        { status: 401 }
-      );
+      return {
+        error: NextResponse.json(
+          { message: "Invalid credentials or connection failed" },
+          { status: 401 }
+        ),
+      };
     }
+  }
+
+  // Mode 2: PAT generation from existing session
+  const session = await getClient();
+  
+  if (session instanceof NextResponse) {
+    return { error: session };
+  }
+
+  return {
+    user: session.user,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    password: (session.user as any).password as string | undefined,
+  };
+}
+
+/**
+ * Validates token expiration parameters
+ */
+function validateExpiration(expiresAt: string | null, ttlSeconds: number | undefined): { 
+  valid: boolean; 
+  expiresAtDate?: Date | null; 
+  error?: NextResponse 
+} {
+  let expiresAtDate: Date | null = null;
+  
+  if (expiresAt) {
+    expiresAtDate = new Date(expiresAt);
+    
+    if (expiresAtDate <= new Date()) {
+      return {
+        valid: false,
+        error: NextResponse.json(
+          { message: "Expiration date must be in the future" },
+          { status: 400 }
+        ),
+      };
+    }
+  }
+  
+  // If ttlSeconds is undefined, it means "never expires" - skip validation
+  if (ttlSeconds !== undefined && (ttlSeconds > 31622400 || ttlSeconds < 1)) {
+    return {
+      valid: false,
+      error: NextResponse.json(
+        { message: "Invalid TTL value" },
+        { status: 400 }
+      ),
+    };
+  }
+  
+  return { valid: true, expiresAtDate };
+}
+
+/**
+ * Generates JWT token with user information
+ * Note: Password is NOT included in JWT - it's stored securely in Token DB (6380)
+ */
+async function generateJWTToken(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  user: any,
+  tokenId: string,
+  expiresAtDate: Date | null,
+  ttlSeconds: number | undefined,
+  jwtSecret: Uint8Array
+): Promise<string> {
+  const currentTime = Math.floor(Date.now() / 1000);
+  
+  // Calculate expiration time based on expiresAtDate or ttlSeconds
+  let expirationTime: number | undefined;
+  if (expiresAtDate) {
+    expirationTime = Math.floor(expiresAtDate.getTime() / 1000);
+  } else if (typeof ttlSeconds === "number") {
+    expirationTime = currentTime + ttlSeconds;
+  } else {
+    expirationTime = undefined; // Never expires
+  }
+  
+  // JWT payload WITHOUT password for security
+  const tokenPayload = {
+    sub: user.id,
+    jti: tokenId,
+    username: user.username || "default",
+    role: user.role,
+    host: user.host,
+    port: user.port,
+    tls: user.tls,
+    ca: user.ca || undefined,
+    iat: currentTime,
+  };
+
+  const signer = new SignJWT(tokenPayload)
+    .setProtectedHeader({ alg: "HS256" })
+    .setIssuedAt();
+
+  if (expirationTime !== undefined) {
+    signer.setExpirationTime(expirationTime);
+  }
+
+  return signer.sign(jwtSecret);
+}
+
+/**
+ * Stores token metadata in FalkorDB PAT instance
+ */
+async function storeTokenInFalkorDB(
+  token: string,
+  tokenId: string,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  user: any,
+  name: string,
+  expiresAtDate: Date | null,
+  encryptedPassword: string
+): Promise<void> {
+  // Validate and provide defaults for required fields
+  if (!user.id || !user.port) {
+    throw new Error('Missing parameters');
+  }
+
+  const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+  const nowUnix = Math.floor(Date.now() / 1000);
+  const expiresAtUnix = expiresAtDate ? Math.floor(expiresAtDate.getTime() / 1000) : -1;
+  
+  // Use string interpolation - parameterized queries don't work with FalkorDB
+  const escapeString = (str: string) => str.replace(/'/g, "''");
+  const username = user.username || "default";
+  const host = user.host || "localhost";
+  const role = user.role || "Unknown";
+  
+  const query = `
+    MERGE (u:User {username: '${escapeString(username)}', user_id: '${escapeString(user.id)}'})
+    CREATE (t:Token {
+      token_hash: '${escapeString(tokenHash)}',
+      token_id: '${escapeString(tokenId)}',
+      user_id: '${escapeString(user.id)}',
+      username: '${escapeString(username)}',
+      name: '${escapeString(name)}',
+      role: '${escapeString(role)}',
+      host: '${escapeString(host)}',
+      port: ${Number.parseInt(String(user.port), 10)},
+      created_at: ${nowUnix},
+      expires_at: ${expiresAtUnix},
+      last_used: -1,
+      is_active: true,
+      encrypted_password: '${escapeString(encryptedPassword)}'
+    })
+    CREATE (t)-[:BELONGS_TO]->(u)
+    RETURN t.token_id as token_id
+  `;
+  
+  await executePATQuery(query);
+}
+
+// eslint-disable-next-line import/prefer-default-export
+export async function POST(request: NextRequest) {
+  try {
+    // 1. Validate JWT secret
+    const jwtValidation = validateJWTSecret();
+    if (!jwtValidation.valid) {
+      return jwtValidation.error!;
+    }
+
+    // 2. Parse request body
+    const bodyResult = await parseRequestBody(request);
+    if (bodyResult.error) {
+      return bodyResult.error;
+    }
+
+    const { 
+      name = "API Token",
+      expiresAt = null,
+      ttlSeconds = undefined, // Default: never expires
+    } = bodyResult.body;
+
+    // 3. Authenticate user (direct login or session)
+    const authResult = await authenticateUser(bodyResult.body);
+    if (authResult.error) {
+      return authResult.error;
+    }
+
+    // 4. Validate expiration parameters
+    const expirationValidation = validateExpiration(expiresAt, ttlSeconds);
+    if (!expirationValidation.valid) {
+      return expirationValidation.error!;
+    }
+
+    // 5. Generate token ID
+    const tokenId = generateTimeUUID();
+
+    // 6. Generate JWT token (without password for security)
+    const token = await generateJWTToken(
+      authResult.user!,
+      tokenId,
+      expirationValidation.expiresAtDate ?? null,
+      ttlSeconds,
+      jwtValidation.secret!
+    );
+
+    // 7. Store token in FalkorDB (non-blocking)
+    try {
+      // Encrypt password before storing in Token DB
+      const encryptedPassword = authResult.password ? encrypt(authResult.password) : encrypt('');
+      
+      await storeTokenInFalkorDB(
+        token,
+        tokenId,
+        authResult.user!,
+        name,
+        expirationValidation.expiresAtDate!,
+        encryptedPassword
+      );
+    } catch (storageError) {
+      // eslint-disable-next-line no-console
+      console.error('Failed to store token in FalkorDB:', storageError);
+      // Continue - token will still work but can't be managed via UI
+    }
+
+    // 8. Return success response
+    return NextResponse.json(
+      {
+        message: "Authentication successful",
+        token
+      },
+      { status: 200 }
+    );
   } catch (error) {
     // eslint-disable-next-line no-console
     console.error("Login API error:", error);

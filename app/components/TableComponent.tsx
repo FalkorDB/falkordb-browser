@@ -403,15 +403,14 @@ export default function TableComponent({
                         visibleRows.map((row, index) => {
                             // Then find actual index in original rows array
                             const rowKey = getRowKey(index);
-                            const dataTestID = `${label}${rowKey}`
+                            const rowTestID = `${label}${rowKey}`
 
                             return (
                                 <TableRow
                                     className="border-border"
-                                    data-testid={`tableRow${dataTestID}`}
+                                    data-testid={`tableRow${rowTestID}`}
                                     onMouseEnter={() => setHover(rowKey)}
                                     onMouseLeave={() => setHover(-1)}
-                                    data-id={typeof row.cells[0].value === "string" ? row.cells[0].value : undefined}
                                     key={rowKey}
                                 >
                                     {
@@ -419,7 +418,7 @@ export default function TableComponent({
                                             <TableCell className="w-5 !pr-2 border-r border-border">
                                                 <Checkbox
                                                     className="w-6 h-6 rounded-full bg-background border-primary data-[state=checked]:bg-primary"
-                                                    data-testid={`tableCheckbox${dataTestID}`}
+                                                    data-testid={`tableCheckbox${rowTestID}`}
                                                     checked={row.checked}
                                                     onCheckedChange={() => {
                                                         setRows(rows.map((r, i) => {
@@ -439,6 +438,7 @@ export default function TableComponent({
                                     {
                                         row.cells.map((cell, j) => {
                                             const cellKey = `${rowKey}-${j}`;
+                                            const cellTestId = `${label}${cellKey}`;
                                             const isCellLoading = loadingCells.has(cellKey);
                                             const isLazyCell = cell.type === "readonly" && "loadCell" in cell && cell.loadCell;
 
@@ -568,7 +568,7 @@ export default function TableComponent({
                                                                     : <div className="h-full flex items-center gap-2">
                                                                         <Tooltip>
                                                                             <TooltipTrigger asChild>
-                                                                                <p data-testid={`content${dataTestID}${headers[j]}`} >{cell.value}</p>
+                                                                                <p data-testid={`content${cellTestId}${headers[j]}`} >{cell.value}</p>
                                                                             </TooltipTrigger>
                                                                             <TooltipContent>
                                                                                 {cell.value}

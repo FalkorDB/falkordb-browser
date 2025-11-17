@@ -15,7 +15,7 @@ export default class SettingsUsersPage extends BasePage {
     return this.page.getByRole("button", { name: "Submit" });
   }
 
-  private get selectRoleBtnInAddUser(): Locator {
+  private get selectRoleBtn(): Locator {
     return this.page.getByTestId("selectRole");
   }
 
@@ -25,11 +25,7 @@ export default class SettingsUsersPage extends BasePage {
 
   private get userRow(): (selectedUser: string) => Locator {
     return (selectedUser: string) =>
-      this.page.locator(`//tbody/tr[@data-id='${selectedUser}']`);
-  }
-
-  private get userSelectRoleBtn(): Locator {
-    return this.page.locator(`button[data-testid="selectRole"]`);
+      this.page.getByTestId(`tableRowUsers${selectedUser}`);
   }
 
   private get selectUserRole(): (role: string) => Locator {
@@ -139,7 +135,7 @@ export default class SettingsUsersPage extends BasePage {
 
   async clickOnSelectRoleBtnInAddUser(): Promise<void> {
     await interactWhenVisible(
-      this.selectRoleBtnInAddUser,
+      this.selectRoleBtn,
       (el) => el.click(),
       "select role button"
     );
@@ -179,7 +175,7 @@ export default class SettingsUsersPage extends BasePage {
 
   async clickUserSelectRoleBtn(): Promise<void> {
     await interactWhenVisible(
-      this.userSelectRoleBtn,
+      this.selectRoleBtn,
       (el) => el.click(),
       "select role button"
     );
