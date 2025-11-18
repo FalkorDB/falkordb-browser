@@ -109,6 +109,7 @@ export default function Users() {
             })
             setUsers(prev => [...prev, { username, role, selected: false }])
             setRows(prev => [...prev, {
+                name: username,
                 cells: [{
                     value: username,
                     type: "readonly"
