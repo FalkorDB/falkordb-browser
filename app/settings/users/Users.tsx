@@ -69,6 +69,7 @@ export default function Users() {
                 const data = await result.json()
                 setUsers(data.result.map((user: User) => ({ ...user, selected: false })))
                 setRows(data.result.map(({ username, role }: User): Row => ({
+                    name: username,
                     cells: [{
                         value: username,
                         type: "readonly"
