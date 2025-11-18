@@ -740,10 +740,8 @@ export class Graph {
       });
     });
 
-    const newLinks = newElements.filter((element): element is Link => "source" in element);
-    
-    newLinks.forEach((link) => {
-      link.curve = this.calculateLinkCurve(link, newLinks);
+    newElements.filter((element): element is Link => !!element.source).forEach((link) => {
+      link.curve = this.calculateLinkCurve(link);
     });
 
     newElements
