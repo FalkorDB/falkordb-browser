@@ -223,7 +223,7 @@ export default function Page() {
         const fakeId = "-1"
         const result = await securedFetch(`api/schema/${prepareArg(schemaName)}/${prepareArg(fakeId)}`, {
             method: "POST",
-            body: JSON.stringify({ type: isAddNode, label: elementLabel, attributes, selectedNodes: selectedElements })
+            body: JSON.stringify({ type: isAddNode, label: elementLabel, attributes, selectedNodes: isAddNode ? undefined : selectedElements })
         }, toast, setIndicator)
 
         if (result.ok) {

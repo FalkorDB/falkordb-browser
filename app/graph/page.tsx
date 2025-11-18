@@ -197,7 +197,7 @@ export default function Page() {
                 attributes,
                 label,
                 type: isAddNode,
-                selectedNodes: selectedElements
+                selectedNodes: isAddNode ? undefined : selectedElements
             })
         }, toast, setIndicator)
 

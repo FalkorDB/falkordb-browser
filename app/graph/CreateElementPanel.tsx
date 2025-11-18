@@ -3,6 +3,7 @@
 'use client'
 
 import { Fragment, useCallback, useContext, useEffect, useRef, useState } from "react";
+import type { KeyboardEvent as ReactKeyboardEvent, MouseEvent as ReactMouseEvent } from "react";
 import { ArrowRight, ArrowRightLeft, Check, Info, Pencil, Plus, Trash2, X } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useToast } from "@/components/ui/use-toast";
@@ -56,6 +57,7 @@ export default function CreateElementPanel(props: Props) {
     const [labelsHover, setLabelsHover] = useState<boolean>(false)
     const [isLoading, setIsLoading] = useState<boolean>(false)
     const [hover, setHover] = useState<string>("")
+    const [expandedAttributes, setExpandedAttributes] = useState<Record<string, boolean>>({})
     const [editable, setEditable] = useState<string>("")
 
     const handleClose = useCallback((e?: KeyboardEvent) => {
@@ -69,6 +71,7 @@ export default function CreateElementPanel(props: Props) {
         setEditType("string")
         setEditable("")
         setHover("")
+        setExpandedAttributes({})
         onClose()
     }, [onClose])
 
@@ -134,6 +137,10 @@ export default function CreateElementPanel(props: Props) {
         setEditable("")
         setEditVal("")
         setEditType("string")
+        setExpandedAttributes(prev => ({
+            ...prev,
+            [oldKey]: false
+        }))
     }
 
     const handleSetKeyDown = (e: React.KeyboardEvent<HTMLInputElement>, key: string) => {
@@ -193,6 +200,17 @@ export default function CreateElementPanel(props: Props) {
         handleAddAttribute()
     }
 
+    const valueNeedsExpansion = (value: string) => value.length > 160 || value.split(/\r?\n/).length > 3
+
+    const handleToggleValueExpansion = (key: string, event: ReactMouseEvent<HTMLElement> | ReactKeyboardEvent<HTMLElement>) => {
+        event.preventDefault()
+        event.stopPropagation()
+        setExpandedAttributes(prev => ({
+            ...prev,
+            [key]: !prev[key]
+        }))
+    }
+
     const getCellEditableContent = (actionType: "set" | "add" = "add", key?: string) => {
         const value = actionType === "set" ? editVal : newVal
         const valueType = actionType === "set" ? editType : newType
@@ -201,7 +219,7 @@ export default function CreateElementPanel(props: Props) {
         switch (valueType) {
             case "boolean":
                 return <Switch
-                    className="data-[state=unchecked]:bg-border w-full"
+                    className="data-[state=unchecked]:bg-border"
                     checked={value as boolean}
                     onCheckedChange={(checked) => setValue(checked)}
                 />
@@ -235,6 +253,8 @@ export default function CreateElementPanel(props: Props) {
 
         return (
             <Combobox
+                className="w-fit"
+                inTable
                 options={["string", "number", "boolean"]}
                 selectedValue={valueType}
                 setSelectedValue={(val) => {
@@ -389,43 +409,76 @@ export default function CreateElementPanel(props: Props) {
                         <div className="flex items-center px-2 border-b border-border h-10"><div className="w-6" /></div>
                         {attributes.map(([key, value]) => {
                             const isComplex = isComplexType(value)
+                            const stringValue = getStringValue(value)
+                            const isExpanded = expandedAttributes[key]
+                            const shouldShowToggle = valueNeedsExpansion(stringValue)
+                            const rowHeightClass = editable === key ? "py-2 min-h-14" : "py-2 min-h-10"
 
                             return (
                                 <Fragment key={key}>
                                     <div
-                                        className={cn("flex items-center px-2 border-b border-border", editable === key ? "h-14" : "h-10")}
+                                        className={cn("flex items-center px-2 border-b border-border", rowHeightClass)}
                                         onMouseEnter={() => setHover(key)}
                                         onMouseLeave={() => setHover("")}
                                     >
                                         <p className="w-full truncate">{key}:</p>
                                     </div>
                                     <div
-                                        className={cn("flex items-center px-2 border-b border-border", editable === key ? "h-14" : "h-10")}
+                                        className={cn("flex w-full px-2 border-b border-border", rowHeightClass)}
                                         onMouseEnter={() => setHover(key)}
                                         onMouseLeave={() => setHover("")}
                                     >
                                         {
                                             editable === key ?
                                                 getCellEditableContent("set", key)
-                                                : <Button
-                                                    className="disabled:opacity-100 disabled:cursor-default w-full"
-                                                    label={getStringValue(value)}
-                                                    title={isComplex ? "Complex values cannot be edited" : "Click to edit the attribute value"}
-                                                    variant="button"
-                                                    onClick={() => !isComplex && handleSetEditable(key, value)}
-                                                    disabled={isComplex}
-                                                />
+                                                : (
+                                                    <div className="flex w-full flex-col gap-1">
+                                                        <Button
+                                                            className="disabled:opacity-100 disabled:cursor-default w-full justify-start"
+                                                            title={isComplex ? "Complex values cannot be edited" : "Click to edit the attribute value"}
+                                                            variant="button"
+                                                            onClick={() => !isComplex && handleSetEditable(key, value)}
+                                                            disabled={isComplex}
+                                                        >
+                                                            <p
+                                                                className={cn(
+                                                                    "w-full text-left text-sm whitespace-pre-wrap break-words",
+                                                                    shouldShowToggle && !isExpanded && "line-clamp-3"
+                                                                )}
+                                                            >
+                                                                {stringValue}
+                                                            </p>
+                                                        </Button>
+                                                        {
+                                                            shouldShowToggle && (
+                                                                <span
+                                                                    role="button"
+                                                                    tabIndex={0}
+                                                                    className="text-xs text-primary underline cursor-pointer self-start"
+                                                                    onClick={(event) => handleToggleValueExpansion(key, event)}
+                                                                    onKeyDown={(event) => {
+                                                                        if (event.key === "Enter" || event.key === " ") {
+                                                                            handleToggleValueExpansion(key, event)
+                                                                        }
+                                                                    }}
+                                                                >
+                                                                    {isExpanded ? "Show less" : "Show more"}
+                                                                </span>
+                                                            )
+                                                        }
+                                                    </div>
+                                                )
                                         }
                                     </div>
                                     <div
-                                        className={cn("flex items-center px-2 border-b border-border", editable === key ? "h-14" : "h-10")}
+                                        className={cn("flex items-center px-2 border-b border-border", rowHeightClass)}
                                         onMouseEnter={() => setHover(key)}
                                         onMouseLeave={() => setHover("")}
                                     >
                                         {editable === key ? getNewTypeInput("set") : <p className="w-full truncate">{typeof value}</p>}
                                     </div>
                                     <div
-                                        className={cn("flex items-center gap-1 justify-start px-2 border-b border-border", editable === key ? "h-14" : "h-10")}
+                                        className={cn("flex items-center gap-1 justify-start px-2 border-b border-border", rowHeightClass)}
                                         onMouseEnter={() => setHover(key)}
                                         onMouseLeave={() => setHover("")}
                                     >
@@ -552,6 +605,8 @@ export default function CreateElementPanel(props: Props) {
                         </div>
                         <div className="flex items-center px-2 border-b border-border h-14 opacity-50">
                             <Combobox
+                                className="w-fit"
+                                inTable
                                 disabled
                                 options={["string", "number", "boolean"]}
                                 selectedValue=""

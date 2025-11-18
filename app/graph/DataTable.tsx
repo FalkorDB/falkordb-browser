@@ -48,6 +48,7 @@ export default function DataTable({ object, type, lastObjId, className }: Props)
     const { indicator, setIndicator } = useContext(IndicatorContext)
     const { data: session } = useSession()
     const [attributes, setAttributes] = useState<string[]>([])
+    const [expandedAttributes, setExpandedAttributes] = useState<Record<string, boolean>>({})
 
     useEffect(() => {
         if (setInputRef.current && editable) {
@@ -80,6 +81,7 @@ export default function DataTable({ object, type, lastObjId, className }: Props)
             setIsAddValue(false)
         }
         setAttributes(Object.keys(object.data))
+        setExpandedAttributes({})
     }, [lastObjId, object, setAttributes, type])
 
     const getNodeDisplayKey = (node: Node) => {
@@ -337,7 +339,18 @@ export default function DataTable({ object, type, lastObjId, className }: Props)
         />
     )
 
-    const getStringValue = (value: ValueType) => {
+    const valueNeedsExpansion = (value: string) => value.length > 160 || value.split(/\r?\n/).length > 3
+
+    const handleToggleValueExpansion = (key: string, event: React.MouseEvent<HTMLElement> | React.KeyboardEvent<HTMLElement>) => {
+        event.preventDefault()
+        event.stopPropagation()
+        setExpandedAttributes(prev => ({
+            ...prev,
+            [key]: !prev[key]
+        }))
+    }
+
+    const getStringValue = (value: Value) => {
         switch (typeof value) {
             case "object":
             case "number":
@@ -345,7 +358,7 @@ export default function DataTable({ object, type, lastObjId, className }: Props)
             case "boolean":
                 return value ? "true" : "false"
             default:
-                return value
+                return typeof value === "undefined" ? "" : value as string
         }
     }
 
@@ -361,11 +374,15 @@ export default function DataTable({ object, type, lastObjId, className }: Props)
                         attributes.map((key) => {
                             const value = object.data[key]
                             const isComplex = isComplexType(value)
+                            const stringValue = getStringValue(value)
+                            const isExpanded = expandedAttributes[key]
+                            const shouldShowToggle = valueNeedsExpansion(stringValue)
+                            const rowHeightClass = editable === key ? "py-2 min-h-14" : "py-2 min-h-10"
 
                             return (
                                 <Fragment key={key}>
                                     <div
-                                        className={cn("flex items-center px-2 border-b border-border h-10", editable === key ? "h-14" : "h-10")}
+                                        className={cn("flex items-center px-2 border-b border-border", rowHeightClass)}
                                         data-testid={`DataPanelAttribute${key}`}
                                         onMouseEnter={() => setHover(key)}
                                         onMouseLeave={() => setHover("")}
@@ -374,7 +391,7 @@ export default function DataTable({ object, type, lastObjId, className }: Props)
                                         <p className="w-full truncate">{key}:</p>
                                     </div>
                                     <div
-                                        className={cn("flex items-center px-2 border-b border-border h-10", editable === key ? "h-14" : "h-10")}
+                                        className={cn("flex w-full px-2 border-b border-border", rowHeightClass)}
                                         data-testid={`DataPanelAttribute${value}`}
                                         onMouseEnter={() => setHover(key)}
                                         onMouseLeave={() => setHover("")}
@@ -383,19 +400,48 @@ export default function DataTable({ object, type, lastObjId, className }: Props)
                                         {
                                             editable === key ?
                                                 getCellEditableContent(typeof newVal as ValueType)
-                                                : <Button
-                                                    className="disabled:opacity-100 disabled:cursor-default w-full"
-                                                    data-testid="DataPanelValueSetAttribute"
-                                                    label={getStringValue(value)}
-                                                    title={isComplex ? "Complex values cannot be edited" : "Click to edit the attribute value"}
-                                                    variant="button"
-                                                    onClick={() => handleSetEditable(key, value)}
-                                                    disabled={isAddValue || isComplex}
-                                                />
+                                                : (
+                                                    <div className="flex w-full flex-col gap-1">
+                                                        <Button
+                                                            className="disabled:opacity-100 disabled:cursor-default w-full justify-start"
+                                                            data-testid="DataPanelValueSetAttribute"
+                                                            title={isComplex ? "Complex values cannot be edited" : "Click to edit the attribute value"}
+                                                            variant="button"
+                                                            onClick={() => handleSetEditable(key, value)}
+                                                            disabled={isAddValue || isComplex}
+                                                        >
+                                                            <p
+                                                                className={cn(
+                                                                    "w-full text-left text-sm whitespace-pre-wrap break-words",
+                                                                    shouldShowToggle && !isExpanded && "line-clamp-3"
+                                                                )}
+                                                            >
+                                                                {stringValue}
+                                                            </p>
+                                                        </Button>
+                                                        {
+                                                            shouldShowToggle && (
+                                                                <span
+                                                                    role="button"
+                                                                    tabIndex={0}
+                                                                    className="text-xs text-primary underline cursor-pointer self-start"
+                                                                    onClick={(event) => handleToggleValueExpansion(key, event)}
+                                                                    onKeyDown={(event) => {
+                                                                        if (event.key === "Enter" || event.key === " ") {
+                                                                            handleToggleValueExpansion(key, event)
+                                                                        }
+                                                                    }}
+                                                                >
+                                                                    {isExpanded ? "Show less" : "Show more"}
+                                                                </span>
+                                                            )
+                                                        }
+                                                    </div>
+                                                )
                                         }
                                     </div>
                                     <div
-                                        className={cn("flex items-center px-2 border-b border-border", editable === key ? "h-14" : "h-10")}
+                                        className={cn("flex items-center px-2 border-b border-border", rowHeightClass)}
                                         onMouseEnter={() => setHover(key)}
                                         onMouseLeave={() => setHover("")}
                                         key={`${key}-type`}
@@ -403,7 +449,7 @@ export default function DataTable({ object, type, lastObjId, className }: Props)
                                         {editable === key ? getNewTypeInput() : <p className="w-full truncate">{typeof value}</p>}
                                     </div>
                                     <div
-                                        className={cn("flex items-center gap-1 justify-start px-2 border-b border-border", editable === key ? "h-14" : "h-10")}
+                                        className={cn("flex items-center gap-1 justify-start px-2 border-b border-border", rowHeightClass)}
                                         onMouseEnter={() => setHover(key)}
                                         onMouseLeave={() => setHover("")}
                                         key={`${key}-actions`}
