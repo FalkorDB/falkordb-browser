@@ -1,12 +1,13 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable no-param-reassign */
 
-import { Check, CirclePlus, Pencil, Trash2, X } from "lucide-react"
+import { Check, CirclePlus, Info, Pencil, Trash2, X } from "lucide-react"
 import { cn, prepareArg, securedFetch } from "@/lib/utils"
 import { toast } from "@/components/ui/use-toast"
 import { Fragment, MutableRefObject, useContext, useEffect, useRef, useState } from "react"
 import { useSession } from "next-auth/react"
 import { Switch } from "@/components/ui/switch"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import Input from "../components/ui/Input"
 import DialogComponent from "../components/DialogComponent"
 import CloseDialog from "../components/CloseDialog"
@@ -16,7 +17,7 @@ import ToastButton from "../components/ToastButton"
 import Button from "../components/ui/Button"
 import Combobox from "../components/ui/combobox"
 
-type ValueType = "string" | "number" | "boolean" | "object"
+type ValueType = "string" | "number" | "boolean"
 
 interface Props {
     object: Node | Link
@@ -120,16 +121,24 @@ export default function DataTable({ object, type, lastObjId, className }: Props)
                 return false
             case "number":
                 return 0
-            case "object":
-                return [] as Value[]
             default:
                 return ""
         }
     }
 
+    const isComplexType = (value: Value) => {
+        const valueType = typeof value
+        return valueType !== "string" && valueType !== "number" && valueType !== "boolean"
+    }
+
     const handleSetEditable = (key: string, value?: Value) => {
         if (key !== "") {
             setIsAddValue(false)
+        }
+
+        // Don't allow editing complex types
+        if (value !== undefined && isComplexType(value)) {
+            return
         }
 
         setEditable(key)
@@ -304,15 +313,6 @@ export default function DataTable({ object, type, lastObjId, className }: Props)
                     }}
                     onKeyDown={actionType === "set" ? handleSetKeyDown : handleAddKeyDown}
                 />
-            case "object":
-                return <Input
-                    className="w-full"
-                    ref={setInputRef}
-                    data-testid={dataTestId}
-                    value={String(newVal)}
-                    onChange={(e) => setNewVal(e.target.value)}
-                    onKeyDown={actionType === "set" ? handleSetKeyDown : handleAddKeyDown}
-                />
             default:
                 return <Input
                     className="w-full"
@@ -325,17 +325,12 @@ export default function DataTable({ object, type, lastObjId, className }: Props)
         }
     }
 
-    const getArrayType = (t: string) => t === "object" ? "array" : t
-    const getObjectType = (t: string) => t === "array" ? "object" : t
-
     const getNewTypeInput = () => (
         <Combobox
-            options={["string", "number", "boolean", "array"]}
-            selectedValue={getArrayType(newType)}
-            setSelectedValue={(value) => {
-                const t = getObjectType(value) as ValueType
+            options={["string", "number", "boolean"]}
+            selectedValue={newType}
+            setSelectedValue={(t) => {
                 setNewType(t)
-
                 setNewVal(typeof newVal === t ? newVal : getDefaultVal(t))
             }}
             label="Type"
@@ -365,6 +360,7 @@ export default function DataTable({ object, type, lastObjId, className }: Props)
                     {
                         attributes.map((key) => {
                             const value = object.data[key]
+                            const isComplex = isComplexType(value)
 
                             return (
                                 <Fragment key={key}>
@@ -391,10 +387,10 @@ export default function DataTable({ object, type, lastObjId, className }: Props)
                                                     className="disabled:opacity-100 disabled:cursor-default w-full"
                                                     data-testid="DataPanelValueSetAttribute"
                                                     label={getStringValue(value)}
-                                                    title="Click to edit the attribute value"
+                                                    title={isComplex ? "Complex values cannot be edited" : "Click to edit the attribute value"}
                                                     variant="button"
                                                     onClick={() => handleSetEditable(key, value)}
-                                                    disabled={isAddValue}
+                                                    disabled={isAddValue || isComplex}
                                                 />
                                         }
                                     </div>
@@ -404,7 +400,7 @@ export default function DataTable({ object, type, lastObjId, className }: Props)
                                         onMouseLeave={() => setHover("")}
                                         key={`${key}-type`}
                                     >
-                                        {editable === key ? getNewTypeInput() : <p className="w-full truncate">{getArrayType(typeof value)}</p>}
+                                        {editable === key ? getNewTypeInput() : <p className="w-full truncate">{typeof value}</p>}
                                     </div>
                                     <div
                                         className={cn("flex items-center gap-1 justify-start px-2 border-b border-border", editable === key ? "h-14" : "h-10")}
@@ -444,14 +440,31 @@ export default function DataTable({ object, type, lastObjId, className }: Props)
                                                     </>
                                                     : hover === key &&
                                                     <>
-                                                        <Button
-                                                            data-testid="DataPanelSetAttribute"
-                                                            variant="button"
-                                                            onClick={() => handleSetEditable(key, value)}
-                                                            disabled={isAddValue}
-                                                        >
-                                                            <Pencil size={20} />
-                                                        </Button>
+                                                        {isComplex ? (
+                                                            <Tooltip>
+                                                                <TooltipTrigger asChild>
+                                                                    <Button
+                                                                        variant="button"
+                                                                        title="Complex values can only be added from Cypher"
+                                                                    >
+                                                                        <Info size={20} />
+                                                                    </Button>
+                                                                </TooltipTrigger>
+                                                                <TooltipContent>
+                                                                    <p>Complex values (arrays, objects) can only be added from Cypher queries</p>
+                                                                </TooltipContent>
+                                                            </Tooltip>
+                                                        ) : (
+                                                            <Button
+                                                                data-testid="DataPanelSetAttribute"
+                                                                variant="button"
+                                                                title="Edit"
+                                                                onClick={() => handleSetEditable(key, value)}
+                                                                disabled={isAddValue}
+                                                            >
+                                                                <Pencil size={20} />
+                                                            </Button>
+                                                        )}
                                                         <DialogComponent
                                                             trigger={
                                                                 <Button

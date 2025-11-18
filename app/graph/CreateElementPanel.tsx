@@ -2,12 +2,12 @@
 
 'use client'
 
-import { useCallback, useContext, useEffect, useState } from "react";
-import { ArrowRight, ArrowRightLeft, Pencil, Plus, X } from "lucide-react";
+import { Fragment, useCallback, useContext, useEffect, useRef, useState } from "react";
+import { ArrowRight, ArrowRightLeft, Check, Info, Pencil, Plus, Trash2, X } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useToast } from "@/components/ui/use-toast";
 import { Switch } from "@/components/ui/switch";
-import { getNodeDisplayText } from "@/lib/utils";
+import { cn, getNodeDisplayText } from "@/lib/utils";
 import Button from "../components/ui/Button";
 import Input from "../components/ui/Input";
 import Combobox from "../components/ui/combobox";
@@ -15,6 +15,8 @@ import { Node, Value } from "../api/graph/model";
 import { BrowserSettingsContext, IndicatorContext } from "../components/provider";
 import AddLabel from "./addLabel";
 import RemoveLabel from "./RemoveLabel";
+import DialogComponent from "../components/DialogComponent";
+import CloseDialog from "../components/CloseDialog";
 
 type Props =
     | {
@@ -30,7 +32,7 @@ type Props =
         type: false;
     };
 
-type ValueType = "string" | "number" | "boolean" | "object"
+type ValueType = "string" | "number" | "boolean"
 
 export default function CreateElementPanel(props: Props) {
     const { onCreate, onClose, type } = props;
@@ -42,13 +44,19 @@ export default function CreateElementPanel(props: Props) {
     const { settings: { graphInfo: { displayTextPriority } } } = useContext(BrowserSettingsContext)
     const { toast } = useToast()
 
+    const setInputRef = useRef<HTMLInputElement>(null)
+
     const [attributes, setAttributes] = useState<[string, Value][]>([])
     const [newKey, setNewKey] = useState<string>("")
     const [newVal, setNewVal] = useState<Value>("")
     const [newType, setNewType] = useState<ValueType>("string")
+    const [editVal, setEditVal] = useState<Value>("")
+    const [editType, setEditType] = useState<ValueType>("string")
     const [labels, setLabels] = useState<string[]>([])
     const [labelsHover, setLabelsHover] = useState<boolean>(false)
     const [isLoading, setIsLoading] = useState<boolean>(false)
+    const [hover, setHover] = useState<string>("")
+    const [editable, setEditable] = useState<string>("")
 
     const handleClose = useCallback((e?: KeyboardEvent) => {
         if (e && e.key !== "Escape") return
@@ -57,6 +65,10 @@ export default function CreateElementPanel(props: Props) {
         setNewKey("")
         setNewVal("")
         setNewType("string")
+        setEditVal("")
+        setEditType("string")
+        setEditable("")
+        setHover("")
         onClose()
     }, [onClose])
 
@@ -67,6 +79,12 @@ export default function CreateElementPanel(props: Props) {
         }
     }, [handleClose])
 
+    useEffect(() => {
+        if (setInputRef.current && editable) {
+            setInputRef.current.focus()
+        }
+    }, [editable])
+
     const handleGetNodeTextPriority = useCallback((node: Node) => getNodeDisplayText(node, displayTextPriority), [displayTextPriority])
 
     const getDefaultVal = (t: ValueType): Value => {
@@ -75,27 +93,62 @@ export default function CreateElementPanel(props: Props) {
                 return false
             case "number":
                 return 0
-            case "object":
-                return []
             default:
                 return ""
         }
     }
 
-    const getArrayType = (t: string) => t === "object" ? "array" : t
-
-    const getObjectType = (t: string) => t === "array" ? "object" : t
-
     const getStringValue = (value: Value) => {
         switch (typeof value) {
-            case "object":
             case "number":
                 return String(value)
             case "boolean":
                 return value ? "true" : "false"
+            case "object":
+                return String(value)
             default:
                 return value
         }
+    }
+
+    const handleSetEditable = (key: string, value?: Value) => {
+        setEditable(key)
+        setEditVal(value || "")
+        setEditType(typeof value === "undefined" ? "string" : typeof value as ValueType)
+    }
+
+    const handleUpdateAttribute = (oldKey: string) => {
+        if (editVal === "") {
+            toast({
+                title: "Error",
+                description: "Value cannot be empty",
+                variant: "destructive"
+            })
+            return
+        }
+
+        setAttributes(prev => prev.map(([key, val]) =>
+            key === oldKey ? [key, editVal] : [key, val]
+        ))
+
+        setEditable("")
+        setEditVal("")
+        setEditType("string")
+    }
+
+    const handleSetKeyDown = (e: React.KeyboardEvent<HTMLInputElement>, key: string) => {
+        if (e.key === "Escape") {
+            e.preventDefault()
+            setEditable("")
+            setEditVal("")
+            setEditType("string")
+            return
+        }
+
+        if (e.key !== 'Enter') return
+
+        e.preventDefault()
+        handleUpdateAttribute(key)
     }
 
     const handleAddAttribute = () => {
@@ -105,6 +158,7 @@ export default function CreateElementPanel(props: Props) {
                 description: "Key or value cannot be empty",
                 variant: "destructive"
             })
+
             return
         }
 
@@ -114,8 +168,10 @@ export default function CreateElementPanel(props: Props) {
                 description: "An attribute with this key already exists",
                 variant: "destructive"
             })
+
             return
         }
+
         setAttributes(prev => [...prev, [newKey, newVal]])
         setNewKey("")
         setNewVal("")
@@ -137,59 +193,63 @@ export default function CreateElementPanel(props: Props) {
         handleAddAttribute()
     }
 
-    const getCellEditableContent = () => {
-        switch (newType) {
+    const getCellEditableContent = (actionType: "set" | "add" = "add", key?: string) => {
+        const value = actionType === "set" ? editVal : newVal
+        const valueType = actionType === "set" ? editType : newType
+        const setValue = actionType === "set" ? setEditVal : setNewVal
+
+        switch (valueType) {
             case "boolean":
                 return <Switch
-                    className="data-[state=unchecked]:bg-border"
-                    checked={newVal as boolean}
-                    onCheckedChange={(checked) => setNewVal(checked)}
+                    className="data-[state=unchecked]:bg-border w-full"
+                    checked={value as boolean}
+                    onCheckedChange={(checked) => setValue(checked)}
                 />
             case "number":
                 return <Input
                     className="w-full"
-                    value={newVal as number}
+                    ref={actionType === "set" ? setInputRef : undefined}
+                    value={value as number}
                     onChange={(e) => {
                         const num = Number(e.target.value)
-                        if (!Number.isNaN(num)) setNewVal(num)
+                        if (!Number.isNaN(num)) setValue(num)
                     }}
-                    onKeyDown={handleAddKeyDown}
-                />
-            case "object":
-                return <Input
-                    className="w-full"
-                    value={`[${(newVal as Value[]).map(v => typeof v === 'string' ? `"${v}"` : JSON.stringify(v)).join(', ')}]`}
-                    onChange={(e) => setNewVal(
-                        e.target.value
-                            .replace(/^.*?\[|\].*$/g, '')  // Remove everything before first [ and after last ]
-                            .split(',')
-                            .map(s => s.trim())       // Trim whitespace from each element
-                            .filter(s => s)           // Remove empty strings
-                            .map(s => {
-                                // Parse each value to preserve type (string, number, boolean)
-                                try {
-                                    return JSON.parse(s)
-                                } catch (error) {
-                                    toast({
-                                        title: "Type Error",
-                                        description: (error as Error).message,
-                                        variant: "destructive"
-                                    })
-
-                                    return ""
-                                }
-                            })
-                    )}
-                    onKeyDown={handleAddKeyDown}
+                    onKeyDown={actionType === "set" ? (e) => handleSetKeyDown(e, key!) : handleAddKeyDown}
                 />
             default:
                 return <Input
                     className="w-full"
-                    value={newVal as string}
-                    onChange={(e) => setNewVal(e.target.value)}
-                    onKeyDown={handleAddKeyDown}
+                    ref={actionType === "set" ? setInputRef : undefined}
+                    value={value as string}
+                    onChange={(e) => setValue(e.target.value)}
+                    onKeyDown={actionType === "set" ? (e) => handleSetKeyDown(e, key!) : handleAddKeyDown}
                 />
         }
+    }
+
+    const getNewTypeInput = (actionType: "set" | "add" = "add") => {
+        const valueType = actionType === "set" ? editType : newType
+        const setType = actionType === "set" ? setEditType : setNewType
+        const value = actionType === "set" ? editVal : newVal
+        const setValue = actionType === "set" ? setEditVal : setNewVal
+
+        return (
+            <Combobox
+                options={["string", "number", "boolean"]}
+                selectedValue={valueType}
+                setSelectedValue={(val) => {
+                    const t = val as ValueType
+                    setType(t)
+                    setValue(typeof value === t ? value : getDefaultVal(t))
+                }}
+                label="Type"
+            />
+        )
+    }
+
+    const isComplexType = (value: Value) => {
+        const valueType = typeof value
+        return valueType !== "string" && valueType !== "number" && valueType !== "boolean"
     }
 
     const handleAddLabel = async (newLabel: string) => {
@@ -222,11 +282,13 @@ export default function CreateElementPanel(props: Props) {
         }
 
         setLabels(prev => [...prev, newLabel])
+
         return true
     }
 
     const handleRemoveLabel = async (removeLabel: string) => {
         setLabels(prev => prev.filter(l => l !== removeLabel))
+
         return true
     }
 
@@ -252,6 +314,8 @@ export default function CreateElementPanel(props: Props) {
             setNewKey("")
             setNewVal("")
             setNewType("string")
+            setEditVal("")
+            setEditType("string")
             setLabels([])
         } finally {
             setIsLoading(false)
@@ -323,28 +387,120 @@ export default function CreateElementPanel(props: Props) {
                         <div className="flex items-center font-medium text-muted-foreground px-2 border-b border-border h-10">Value</div>
                         <div className="flex items-center font-medium text-muted-foreground px-2 border-b border-border h-10">Type</div>
                         <div className="flex items-center px-2 border-b border-border h-10"><div className="w-6" /></div>
-                        {attributes.map(([key, value]) => (
-                            <>
-                                <div key={`${key}-key`} className="flex items-center px-2 border-b border-border h-10">
-                                    <p className="w-full truncate">{key}:</p>
-                                </div>
-                                <div key={`${key}-value`} className="flex items-center px-2 border-b border-border h-10">
-                                    <p className="w-full truncate">{getStringValue(value)}</p>
-                                </div>
-                                <div key={`${key}-type`} className="flex items-center px-2 border-b border-border h-10">
-                                    <p className="w-full truncate">{getArrayType(typeof value)}</p>
-                                </div>
-                                <div key={`${key}-actions`} className="flex items-center gap-1 justify-start px-2 border-b border-border h-10">
-                                    <Button
-                                        variant="button"
-                                        title="Remove"
-                                        onClick={() => setAttributes(prev => prev.filter(([k]) => k !== key))}
+                        {attributes.map(([key, value]) => {
+                            const isComplex = isComplexType(value)
+
+                            return (
+                                <Fragment key={key}>
+                                    <div
+                                        className={cn("flex items-center px-2 border-b border-border", editable === key ? "h-14" : "h-10")}
+                                        onMouseEnter={() => setHover(key)}
+                                        onMouseLeave={() => setHover("")}
                                     >
-                                        <X size={20} />
-                                    </Button>
-                                </div>
-                            </>
-                        ))}
+                                        <p className="w-full truncate">{key}:</p>
+                                    </div>
+                                    <div
+                                        className={cn("flex items-center px-2 border-b border-border", editable === key ? "h-14" : "h-10")}
+                                        onMouseEnter={() => setHover(key)}
+                                        onMouseLeave={() => setHover("")}
+                                    >
+                                        {
+                                            editable === key ?
+                                                getCellEditableContent("set", key)
+                                                : <Button
+                                                    className="disabled:opacity-100 disabled:cursor-default w-full"
+                                                    label={getStringValue(value)}
+                                                    title={isComplex ? "Complex values cannot be edited" : "Click to edit the attribute value"}
+                                                    variant="button"
+                                                    onClick={() => !isComplex && handleSetEditable(key, value)}
+                                                    disabled={isComplex}
+                                                />
+                                        }
+                                    </div>
+                                    <div
+                                        className={cn("flex items-center px-2 border-b border-border", editable === key ? "h-14" : "h-10")}
+                                        onMouseEnter={() => setHover(key)}
+                                        onMouseLeave={() => setHover("")}
+                                    >
+                                        {editable === key ? getNewTypeInput("set") : <p className="w-full truncate">{typeof value}</p>}
+                                    </div>
+                                    <div
+                                        className={cn("flex items-center gap-1 justify-start px-2 border-b border-border", editable === key ? "h-14" : "h-10")}
+                                        onMouseEnter={() => setHover(key)}
+                                        onMouseLeave={() => setHover("")}
+                                    >
+                                        {
+                                            editable === key ?
+                                                <>
+                                                    <Button
+                                                        variant="button"
+                                                        title="Save"
+                                                        onClick={() => handleUpdateAttribute(key)}
+                                                    >
+                                                        <Check size={20} />
+                                                    </Button>
+                                                    <Button
+                                                        variant="button"
+                                                        title="Cancel"
+                                                        onClick={() => {
+                                                            setEditable("")
+                                                            setEditVal("")
+                                                            setEditType("string")
+                                                        }}
+                                                    >
+                                                        <X size={20} />
+                                                    </Button>
+                                                </>
+                                                : hover === key &&
+                                                <>
+                                                    {isComplex ? (
+                                                        <Tooltip>
+                                                            <TooltipTrigger asChild>
+                                                                <Info size={20} />
+                                                            </TooltipTrigger>
+                                                            <TooltipContent>
+                                                                <p>Complex values (arrays, objects) can only be added from Cypher queries</p>
+                                                            </TooltipContent>
+                                                        </Tooltip>
+                                                    ) : (
+                                                        <Button
+                                                            variant="button"
+                                                            title="Edit"
+                                                            onClick={() => handleSetEditable(key, value)}
+                                                        >
+                                                            <Pencil size={20} />
+                                                        </Button>
+                                                    )}
+                                                    <DialogComponent
+                                                        trigger={
+                                                            <Button
+                                                                variant="button"
+                                                                title="Delete Attribute"
+                                                            >
+                                                                <Trash2 size={20} />
+                                                            </Button>
+                                                        }
+                                                        title="Delete Attribute"
+                                                        description="Are you sure you want to delete this attribute?"
+                                                    >
+                                                        <div className="flex justify-end gap-4">
+                                                            <Button
+                                                                variant="Delete"
+                                                                label="Delete"
+                                                                onClick={() => setAttributes(prev => prev.filter(([k]) => k !== key))}
+                                                            />
+                                                            <CloseDialog
+                                                                label="Cancel"
+                                                                variant="Cancel"
+                                                            />
+                                                        </div>
+                                                    </DialogComponent>
+                                                </>
+                                        }
+                                    </div>
+                                </Fragment>
+                            )
+                        })}
                         <div className="flex items-center px-2 border-b border-border h-14">
                             <Input
                                 className="w-full"
@@ -358,16 +514,7 @@ export default function CreateElementPanel(props: Props) {
                             {getCellEditableContent()}
                         </div>
                         <div className="flex items-center px-2 border-b border-border h-14">
-                            <Combobox
-                                options={["string", "number", "boolean", "array"]}
-                                selectedValue={getArrayType(newType)}
-                                setSelectedValue={(value) => {
-                                    const t = getObjectType(value) as ValueType
-                                    setNewType(t)
-                                    setNewVal(typeof newVal === t ? newVal : getDefaultVal(t))
-                                }}
-                                label="Type"
-                            />
+                            {getNewTypeInput()}
                         </div>
                         <div className="flex items-center gap-1 justify-start px-2 border-b border-border h-14">
                             <Button
@@ -406,7 +553,7 @@ export default function CreateElementPanel(props: Props) {
                         <div className="flex items-center px-2 border-b border-border h-14 opacity-50">
                             <Combobox
                                 disabled
-                                options={["string", "number", "boolean", "array"]}
+                                options={["string", "number", "boolean"]}
                                 selectedValue=""
                                 setSelectedValue={() => { }}
                                 label="Type"

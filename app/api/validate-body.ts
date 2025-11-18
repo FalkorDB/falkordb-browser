@@ -107,7 +107,7 @@ export const duplicateGraph = z.object({
 export const createGraphElement = z.object({
   type: z.boolean(),
   label: z.array(z.string()).optional(),
-  attributes: z.array(z.tuple([z.string(), z.string()])),
+  attributes: z.array(z.tuple([z.string(), z.union([z.string(), z.number(), z.boolean()])])),
   selectedNodes: z
     .array(
       z.object({
@@ -137,7 +137,7 @@ export const removeGraphElementLabel = z.object({
 
 export const updateGraphElementAttribute = z.object({
   type: z.boolean(),
-  value: z.any(),
+  value: z.union([z.string(), z.number(), z.boolean()]),
 });
 
 export const deleteGraphElementAttribute = z.object({

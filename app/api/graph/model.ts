@@ -5,7 +5,7 @@
 
 import { LinkObject, NodeObject } from "react-force-graph-2d";
 
-export type Value = string | number | boolean | Value[];
+export type Value = string | number | boolean;
 
 export type HistoryQuery = {
   queries: Query[];
