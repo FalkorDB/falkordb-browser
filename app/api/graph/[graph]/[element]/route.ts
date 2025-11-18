@@ -104,7 +104,7 @@ export async function POST(
               : ""
           }]->(b) RETURN e`;
       
-      const queryParams: Record<string, string | number> = {};
+      const queryParams: Record<string, string | number | boolean> = {};
       if (!type && selectedNodes) {
         queryParams.nodeA = selectedNodes[0].id;
         queryParams.nodeB = selectedNodes[1].id;
