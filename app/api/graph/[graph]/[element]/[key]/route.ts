@@ -100,13 +100,13 @@ export async function DELETE(
       const graph = client.selectGraph(graphId);
 
       const query = type
-        ? `MATCH (n) WHERE ID(n) = $id SET n.[$key] = NULL`
-        : `MATCH (n)-[e]-(m) WHERE ID(e) = $id SET e[$key] = NULL`;
+        ? `MATCH (n) WHERE ID(n) = $id SET n.${key} = NULL`
+        : `MATCH (n)-[e]-(m) WHERE ID(e) = $id SET e.${key} = NULL`;
 
       const result =
         user.role === "Read-Only"
-          ? await graph.roQuery(query, { params: { id: elementId, key } })
-          : await graph.query(query, { params: { id: elementId, key } });
+          ? await graph.roQuery(query, { params: { id: elementId } })
+          : await graph.query(query, { params: { id: elementId } });
 
       return NextResponse.json({ result }, { status: 200 });
     } catch (error) {

@@ -42,16 +42,16 @@ export async function PATCH(
       const [formattedKey, formattedValue] = formatAttribute([key, attribute]);
       const graph = client.selectGraph(schemaName);
       const q = type
-        ? `MATCH (n) WHERE ID(n) = $id SET n[$formattedKey] = $value`
-        : `MATCH (n)-[e]-(m) WHERE ID(e) = $id SET e[$formattedKey] = $value`;
+        ? `MATCH (n) WHERE ID(n) = $id SET n.${formattedKey} = $value`
+        : `MATCH (n)-[e]-(m) WHERE ID(e) = $id SET e.${formattedKey} = $value`;
 
       if (user.role === "Read-Only")
         await graph.roQuery(q, {
-          params: { id: elementId, value: formattedValue, key: formattedKey },
+          params: { id: elementId, value: formattedValue },
         });
       else
         await graph.query(q, {
-          params: { id: elementId, value: formattedValue, key: formattedKey },
+          params: { id: elementId, value: formattedValue },
         });
 
       return NextResponse.json(
