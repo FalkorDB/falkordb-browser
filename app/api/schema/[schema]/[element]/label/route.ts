@@ -33,13 +33,16 @@ export async function POST(
 
       const { label } = validation.data;
       const graph = client.selectGraph(schemaName);
-      const q = `MATCH (n) WHERE ID(n) = $elementId SET n:${label}`;
-      const result =
-        user.role === "Read-Only"
-          ? await graph.roQuery(q, { params: { elementId } })
-          : await graph.query(q, { params: { elementId } });
+      const query = `MATCH (n) WHERE ID(n) = $id SET n:${label}`;
 
-      return NextResponse.json({ result }, { status: 200 });
+      if (user.role === "Read-Only")
+        await graph.roQuery(query, { params: { id: elementId } });
+      else await graph.query(query, { params: { id: elementId } });
+
+      return NextResponse.json(
+        { message: "Label added successfully" },
+        { status: 200 }
+      );
     } catch (error) {
       console.error(error);
       return NextResponse.json(
@@ -88,13 +91,16 @@ export async function DELETE(
       const { label } = validation.data;
       const graph = client.selectGraph(schemaName);
 
-      const q = `MATCH (n) WHERE ID(n) = $elementId REMOVE n:${label}`;
-      const result =
-        user.role === "Read-Only"
-          ? await graph.roQuery(q, { params: { elementId } })
-          : await graph.query(q, { params: { elementId } });
+      const query = `MATCH (n) WHERE ID(n) = $id REMOVE n:${label}`;
 
-      return NextResponse.json({ result }, { status: 200 });
+      if (user.role === "Read-Only")
+        await graph.roQuery(query, { params: { id: elementId } });
+      else await graph.query(query, { params: { id: elementId } });
+
+      return NextResponse.json(
+        { message: "Label removed successfully" },
+        { status: 200 }
+      );
     } catch (error) {
       console.error(error);
       return NextResponse.json(

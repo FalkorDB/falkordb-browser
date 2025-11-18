@@ -90,6 +90,15 @@ export default function SchemaCreateElement(props: Props) {
       return
     }
 
+    if (attributes.some(([key]) => key === newAtt[0])) {
+      toast({
+        title: "Error",
+        description: "An attribute with this key already exists",
+        variant: "destructive"
+      })
+      return
+    }
+
     setAttributes(prev => [...prev, newAtt])
     setNewAttribute(getDefaultAttribute())
   }

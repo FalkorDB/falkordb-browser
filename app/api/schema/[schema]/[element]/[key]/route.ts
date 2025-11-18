@@ -41,16 +41,16 @@ export async function PATCH(
       const { type, attribute } = validation.data;
       const [formattedKey, formattedValue] = formatAttribute([key, attribute]);
       const graph = client.selectGraph(schemaName);
-      const q = type
-        ? `MATCH (n) WHERE ID(n) = $id SET n[$formattedKey] = $value`
-        : `MATCH (n)-[e]-(m) WHERE ID(e) = $id SET e[$formattedKey] = $value`;
+      const query = type
+        ? `MATCH (n) WHERE ID(n) = $id SET n[$key] = $value`
+        : `MATCH ()-[e]->() WHERE ID(e) = $id SET e[$key] = $value`;
 
       if (user.role === "Read-Only")
-        await graph.roQuery(q, {
+        await graph.roQuery(query, {
           params: { id: elementId, value: formattedValue, key: formattedKey },
         });
       else
-        await graph.query(q, {
+        await graph.query(query, {
           params: { id: elementId, value: formattedValue, key: formattedKey },
         });
 
@@ -107,13 +107,13 @@ export async function DELETE(
 
       const { type } = validation.data;
       const graph = client.selectGraph(schemaName);
-      const q = type
-        ? `MATCH (n) WHERE ID(n) = $elementId SET n.${key} = NULL`
-        : `MATCH (n)-[e]-(m) WHERE ID(e) = $elementId SET e.${key} = NULL`;
+      const query = type
+        ? `MATCH (n) WHERE ID(n) = $id SET n[$key] = NULL`
+        : `MATCH ()-[e]->() WHERE ID(e) = $id SET e[$key] = NULL`;
 
       if (user.role === "Read-Only")
-        await graph.roQuery(q, { params: { elementId } });
-      else await graph.query(q, { params: { elementId } });
+        await graph.roQuery(query, { params: { id: elementId, key } });
+      else await graph.query(query, { params: { id: elementId, key } });
 
       return NextResponse.json(
         { message: "Attribute deleted successfully" },

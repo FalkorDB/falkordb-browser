@@ -268,7 +268,7 @@ export default function ForceGraph({
     const handleGetNodeDisplayText = useCallback((node: Node) => getNodeDisplayText(node, displayTextPriority), [displayTextPriority])
 
     const onFetchNode = async (node: Node) => {
-        const result = await securedFetch(`/api/graph/${graph.Id}/${node.id}`, {
+        const result = await securedFetch(`/api/${type}/${graph.Id}/${node.id}`, {
             method: 'GET',
             headers: {
                 'Content-Type': 'application/json'

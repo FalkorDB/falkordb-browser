@@ -27,13 +27,13 @@ export async function GET(
 
       // Get node's neighbors
       const query = `MATCH (src)-[e]-(n)
-                          WHERE ID(src) = $elementId
+                          WHERE ID(src) = $id
                           RETURN e, n`;
 
       const result =
         user.role === "Read-Only"
-          ? await graph.roQuery(query, { params: { elementId } })
-          : await graph.query(query, { params: { elementId } });
+          ? await graph.roQuery(query, { params: { id: elementId } })
+          : await graph.query(query, { params: { id: elementId } });
 
       return NextResponse.json({ result }, { status: 200 });
     } catch (error) {
@@ -165,15 +165,15 @@ export async function DELETE(
       const { type } = validation.data;
       const graph = client.selectGraph(graphId);
       const query = type
-        ? `MATCH (n) WHERE ID(n) = $elementId DELETE n`
-        : `MATCH ()-[e]-() WHERE ID(e) = $elementId DELETE e`;
+        ? `MATCH (n) WHERE ID(n) = $id DELETE n`
+        : `MATCH ()-[e]->() WHERE ID(e) = $id DELETE e`;
 
       if (user.role === "Read-Only")
-        await graph.roQuery(query, { params: { elementId } });
-      else await graph.query(query, { params: { elementId } });
+        await graph.roQuery(query, { params: { id: elementId } });
+      else await graph.query(query, { params: { id: elementId } });
 
       return NextResponse.json(
-        { message: "Node deleted successfully" },
+        { message: "Element deleted successfully" },
         { status: 200 }
       );
     } catch (error) {

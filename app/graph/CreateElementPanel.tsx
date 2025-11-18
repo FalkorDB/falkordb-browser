@@ -69,20 +69,21 @@ export default function CreateElementPanel(props: Props) {
 
     const handleGetNodeTextPriority = useCallback((node: Node) => getNodeDisplayText(node, displayTextPriority), [displayTextPriority])
 
-    const getDefaultVal = (t: ValueType) => {
+    const getDefaultVal = (t: ValueType): Value => {
         switch (t) {
             case "boolean":
                 return false
             case "number":
                 return 0
             case "object":
-                return [] as Value[]
+                return []
             default:
                 return ""
         }
     }
 
     const getArrayType = (t: string) => t === "object" ? "array" : t
+
     const getObjectType = (t: string) => t === "array" ? "object" : t
 
     const getStringValue = (value: Value) => {
@@ -98,10 +99,21 @@ export default function CreateElementPanel(props: Props) {
     }
 
     const handleAddAttribute = () => {
-        if (!newKey || newKey === "" || !newVal || newVal === "") {
+        if (!newKey || newVal === "") {
+            toast({
+                title: "Error",
+                description: "Key or value cannot be empty",
+                variant: "destructive"
+            })
             return
         }
+
         if (attributes.some(([key]) => key === newKey)) {
+            toast({
+                title: "Error",
+                description: "An attribute with this key already exists",
+                variant: "destructive"
+            })
             return
         }
         setAttributes(prev => [...prev, [newKey, newVal]])
@@ -129,7 +141,7 @@ export default function CreateElementPanel(props: Props) {
         switch (newType) {
             case "boolean":
                 return <Switch
-                    className="data-[state=unchecked]:bg-border w-full"
+                    className="data-[state=unchecked]:bg-border"
                     checked={newVal as boolean}
                     onCheckedChange={(checked) => setNewVal(checked)}
                 />
@@ -146,8 +158,28 @@ export default function CreateElementPanel(props: Props) {
             case "object":
                 return <Input
                     className="w-full"
-                    value={String(newVal)}
-                    onChange={(e) => setNewVal(e.target.value)}
+                    value={`[${(newVal as Value[]).map(v => typeof v === 'string' ? `"${v}"` : JSON.stringify(v)).join(', ')}]`}
+                    onChange={(e) => setNewVal(
+                        e.target.value
+                            .replace(/^.*?\[|\].*$/g, '')  // Remove everything before first [ and after last ]
+                            .split(',')
+                            .map(s => s.trim())       // Trim whitespace from each element
+                            .filter(s => s)           // Remove empty strings
+                            .map(s => {
+                                // Parse each value to preserve type (string, number, boolean)
+                                try {
+                                    return JSON.parse(s)
+                                } catch (error) {
+                                    toast({
+                                        title: "Type Error",
+                                        description: (error as Error).message,
+                                        variant: "destructive"
+                                    })
+
+                                    return ""
+                                }
+                            })
+                    )}
                     onKeyDown={handleAddKeyDown}
                 />
             default:
@@ -241,9 +273,9 @@ export default function CreateElementPanel(props: Props) {
                         <X />
                     </Button>
                 </div>
-                <ul 
-                    className="flex flex-wrap gap-4" 
-                    onMouseEnter={() => setLabelsHover(true)} 
+                <ul
+                    className="flex flex-wrap gap-4"
+                    onMouseEnter={() => setLabelsHover(true)}
                     onMouseLeave={() => setLabelsHover(false)}
                 >
                     {labels.map((l) => (

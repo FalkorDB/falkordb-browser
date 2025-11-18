@@ -7,6 +7,52 @@ import {
   validateBody,
 } from "../../../validate-body";
 
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ schema: string; element: string }> }
+) {
+  try {
+    const session = await getClient();
+
+    if (session instanceof NextResponse) {
+      return session;
+    }
+
+    const { client, user } = session;
+    const { schema, element } = await params;
+    const schemaName = `${schema}_schema`;
+    const elementId = Number(element);
+
+    try {
+      const graph = client.selectGraph(schemaName);
+
+      // Get node's neighbors
+      const query = `MATCH (src)-[e]-(n)
+                          WHERE ID(src) = $id
+                          RETURN e, n`;
+
+      const result =
+        user.role === "Read-Only"
+          ? await graph.roQuery(query, { params: { id: elementId } })
+          : await graph.query(query, { params: { id: elementId } });
+
+      return NextResponse.json({ result }, { status: 200 });
+    } catch (error) {
+      console.error(error);
+      return NextResponse.json(
+        { message: (error as Error).message },
+        { status: 400 }
+      );
+    }
+  } catch (err) {
+    console.error(err);
+    return NextResponse.json(
+      { message: (err as Error).message },
+      { status: 500 }
+    );
+  }
+}
+
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ schema: string; element: string }> }
@@ -122,15 +168,15 @@ export async function DELETE(
       const { type } = validation.data;
       const graph = client.selectGraph(schemaName);
       const query = type
-        ? `MATCH (n) WHERE ID(n) = $elementId DELETE n`
-        : `MATCH ()-[e]-() WHERE ID(e) = $elementId DELETE e`;
+        ? `MATCH (n) WHERE ID(n) = $id DELETE n`
+        : `MATCH ()-[e]->() WHERE ID(e) = $id DELETE e`;
 
       if (user.role === "Read-Only")
-        await graph.roQuery(query, { params: { elementId } });
-      else await graph.query(query, { params: { elementId } });
+        await graph.roQuery(query, { params: { id: elementId } });
+      else await graph.query(query, { params: { id: elementId } });
 
       return NextResponse.json(
-        { message: "Node deleted successfully" },
+        { message: "Element deleted successfully" },
         { status: 200 }
       );
     } catch (error) {
