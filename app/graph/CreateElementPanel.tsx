@@ -2,7 +2,7 @@
 
 'use client'
 
-import { Fragment, useCallback, useContext, useEffect, useRef, useState } from "react";
+import { Fragment, useCallback, useContext, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { KeyboardEvent as ReactKeyboardEvent, MouseEvent as ReactMouseEvent } from "react";
 import { ArrowRight, ArrowRightLeft, Check, Info, Pencil, Plus, Trash2, X } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -46,6 +46,7 @@ export default function CreateElementPanel(props: Props) {
     const { toast } = useToast()
 
     const setInputRef = useRef<HTMLInputElement>(null)
+    const scrollableContainerRef = useRef<HTMLDivElement>(null)
 
     const [attributes, setAttributes] = useState<[string, Value][]>([])
     const [newKey, setNewKey] = useState<string>("")
@@ -59,6 +60,71 @@ export default function CreateElementPanel(props: Props) {
     const [hover, setHover] = useState<string>("")
     const [expandedAttributes, setExpandedAttributes] = useState<Record<string, boolean>>({})
     const [editable, setEditable] = useState<string>("")
+    const valueParagraphRefs = useRef<Record<string, HTMLParagraphElement | null>>({})
+    const [valueOverflowMap, setValueOverflowMap] = useState<Record<string, boolean>>({})
+
+    const setValueParagraphRef = useCallback((key: string) => (el: HTMLParagraphElement | null) => {
+        if (!el) {
+            delete valueParagraphRefs.current[key]
+            return
+        }
+        valueParagraphRefs.current[key] = el
+    }, [])
+
+    const measureValueOverflow = useCallback(() => {
+        if (typeof window === "undefined") return
+
+        const nextMap: Record<string, boolean> = {}
+
+        attributes.forEach(([key]) => {
+            const element = valueParagraphRefs.current[key]
+            if (!element) return
+
+            const computedStyle = window.getComputedStyle(element)
+            let lineHeight = parseFloat(computedStyle.lineHeight)
+
+            if (Number.isNaN(lineHeight)) {
+                const fontSize = parseFloat(computedStyle.fontSize)
+                lineHeight = Number.isNaN(fontSize) ? 16 : fontSize * 1.2
+            }
+
+            const collapsedHeight = lineHeight * 3
+            nextMap[key] = element.scrollHeight - collapsedHeight > 1
+        })
+
+        setValueOverflowMap((prev) => {
+            const prevKeys = Object.keys(prev)
+            const nextKeys = Object.keys(nextMap)
+
+            if (prevKeys.length === nextKeys.length && prevKeys.every((key) => prev[key] === nextMap[key])) {
+                return prev
+            }
+
+            return nextMap
+        })
+    }, [attributes])
+
+    useLayoutEffect(() => {
+        measureValueOverflow()
+        if (typeof window === "undefined") return undefined
+
+        window.addEventListener("resize", measureValueOverflow)
+        return () => {
+            window.removeEventListener("resize", measureValueOverflow)
+        }
+    }, [measureValueOverflow])
+
+    useLayoutEffect(() => {
+        if (typeof ResizeObserver === "undefined") return undefined
+        if (!scrollableContainerRef.current) return undefined
+
+        const observer = new ResizeObserver(() => measureValueOverflow())
+        observer.observe(scrollableContainerRef.current)
+
+        return () => {
+            observer.disconnect()
+        }
+    }, [measureValueOverflow])
 
     const handleClose = useCallback((e?: KeyboardEvent) => {
         if (e && e.key !== "Escape") return
@@ -200,7 +266,7 @@ export default function CreateElementPanel(props: Props) {
         handleAddAttribute()
     }
 
-    const valueNeedsExpansion = (value: string) => value.length > 160 || value.split(/\r?\n/).length > 3
+    const valueNeedsExpansion = (key: string) => Boolean(valueOverflowMap[key])
 
     const handleToggleValueExpansion = (key: string, event: ReactMouseEvent<HTMLElement> | ReactKeyboardEvent<HTMLElement>) => {
         event.preventDefault()
@@ -401,8 +467,8 @@ export default function CreateElementPanel(props: Props) {
                 </ul>
             </div>
             <div className="w-full h-1 grow flex flex-col justify-between items-start font-medium">
-                <div className="h-1 grow overflow-y-auto overflow-x-hidden w-full">
-                    <div className="grid grid-cols-[minmax(0,max-content)_minmax(0,max-content)_minmax(0,max-content)_1fr]">
+                <div ref={scrollableContainerRef} className="h-1 grow overflow-y-auto overflow-x-hidden w-full">
+                    <div className="grid grid-cols-[minmax(0,max-content)_minmax(0,max-content)_minmax(0,max-content)_minmax(60px,1fr)]">
                         <div className="flex items-center font-medium text-muted-foreground px-2 border-b border-border h-10">Key</div>
                         <div className="flex items-center font-medium text-muted-foreground px-2 border-b border-border h-10">Value</div>
                         <div className="flex items-center font-medium text-muted-foreground px-2 border-b border-border h-10">Type</div>
@@ -411,7 +477,7 @@ export default function CreateElementPanel(props: Props) {
                             const isComplex = isComplexType(value)
                             const stringValue = getStringValue(value)
                             const isExpanded = expandedAttributes[key]
-                            const shouldShowToggle = valueNeedsExpansion(stringValue)
+                            const shouldShowToggle = valueNeedsExpansion(key)
                             const rowHeightClass = editable === key ? "py-2 min-h-14" : "py-2 min-h-10"
 
                             return (
@@ -432,7 +498,7 @@ export default function CreateElementPanel(props: Props) {
                                             editable === key ?
                                                 getCellEditableContent("set", key)
                                                 : (
-                                                    <div className="flex w-full flex-col gap-1">
+                                                    <div className="flex w-full flex-col gap-1 justify-center">
                                                         <Button
                                                             className="disabled:opacity-100 disabled:cursor-default w-full justify-start"
                                                             title={isComplex ? "Complex values cannot be edited" : "Click to edit the attribute value"}
@@ -441,6 +507,7 @@ export default function CreateElementPanel(props: Props) {
                                                             disabled={isComplex}
                                                         >
                                                             <p
+                                                                ref={setValueParagraphRef(key)}
                                                                 className={cn(
                                                                     "w-full text-left text-sm whitespace-pre-wrap break-words",
                                                                     shouldShowToggle && !isExpanded && "line-clamp-3"

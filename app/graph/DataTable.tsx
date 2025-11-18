@@ -4,7 +4,7 @@
 import { Check, CirclePlus, Info, Pencil, Trash2, X } from "lucide-react"
 import { cn, prepareArg, securedFetch } from "@/lib/utils"
 import { toast } from "@/components/ui/use-toast"
-import { Fragment, MutableRefObject, useContext, useEffect, useRef, useState } from "react"
+import { Fragment, MutableRefObject, useCallback, useContext, useEffect, useLayoutEffect, useRef, useState } from "react"
 import { useSession } from "next-auth/react"
 import { Switch } from "@/components/ui/switch"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
@@ -49,6 +49,71 @@ export default function DataTable({ object, type, lastObjId, className }: Props)
     const { data: session } = useSession()
     const [attributes, setAttributes] = useState<string[]>([])
     const [expandedAttributes, setExpandedAttributes] = useState<Record<string, boolean>>({})
+    const valueParagraphRefs = useRef<Record<string, HTMLParagraphElement | null>>({})
+    const [valueOverflowMap, setValueOverflowMap] = useState<Record<string, boolean>>({})
+
+    const setValueParagraphRef = useCallback((key: string) => (el: HTMLParagraphElement | null) => {
+        if (!el) {
+            delete valueParagraphRefs.current[key]
+            return
+        }
+        valueParagraphRefs.current[key] = el
+    }, [])
+
+    const measureValueOverflow = useCallback(() => {
+        if (typeof window === "undefined") return
+
+        const nextMap: Record<string, boolean> = {}
+
+        attributes.forEach((key) => {
+            const element = valueParagraphRefs.current[key]
+            if (!element) return
+
+            const computedStyle = window.getComputedStyle(element)
+            let lineHeight = parseFloat(computedStyle.lineHeight)
+
+            if (Number.isNaN(lineHeight)) {
+                const fontSize = parseFloat(computedStyle.fontSize)
+                lineHeight = Number.isNaN(fontSize) ? 16 : fontSize * 1.2
+            }
+
+            const collapsedHeight = lineHeight * 3
+            nextMap[key] = element.scrollHeight - collapsedHeight > 1
+        })
+
+        setValueOverflowMap((prev) => {
+            const prevKeys = Object.keys(prev)
+            const nextKeys = Object.keys(nextMap)
+
+            if (prevKeys.length === nextKeys.length && prevKeys.every((key) => prev[key] === nextMap[key])) {
+                return prev
+            }
+
+            return nextMap
+        })
+    }, [attributes])
+
+    useLayoutEffect(() => {
+        measureValueOverflow()
+        if (typeof window === "undefined") return undefined
+
+        window.addEventListener("resize", measureValueOverflow)
+        return () => {
+            window.removeEventListener("resize", measureValueOverflow)
+        }
+    }, [measureValueOverflow])
+
+    useLayoutEffect(() => {
+        if (typeof ResizeObserver === "undefined") return undefined
+        if (!scrollableContainerRef.current) return undefined
+
+        const observer = new ResizeObserver(() => measureValueOverflow())
+        observer.observe(scrollableContainerRef.current)
+
+        return () => {
+            observer.disconnect()
+        }
+    }, [measureValueOverflow])
 
     useEffect(() => {
         if (setInputRef.current && editable) {
@@ -150,7 +215,7 @@ export default function DataTable({ object, type, lastObjId, className }: Props)
 
     const setProperty = async (key: string, val: Value, isUndo: boolean, actionType: ("added" | "set") = "set") => {
         const { id } = object
-        if (!val || val === "") {
+        if (val === "") {
             toast({
                 title: "Error",
                 description: "Please fill in the value field",
@@ -207,7 +272,7 @@ export default function DataTable({ object, type, lastObjId, className }: Props)
     }
 
     const handleAddValue = async (key: string, value: Value) => {
-        if (!key || key === "" || !value || value === "") {
+        if (!key || key === "" || value === "") {
             toast({
                 title: "Error",
                 description: "Please fill in both fields",
@@ -298,7 +363,7 @@ export default function DataTable({ object, type, lastObjId, className }: Props)
         switch (t) {
             case "boolean":
                 return <Switch
-                    className="data-[state=unchecked]:bg-border w-full"
+                    className="data-[state=unchecked]:bg-border"
                     checked={newVal as boolean}
                     data-testid={dataTestId}
                     onCheckedChange={(checked) => setNewVal(checked)}
@@ -339,7 +404,7 @@ export default function DataTable({ object, type, lastObjId, className }: Props)
         />
     )
 
-    const valueNeedsExpansion = (value: string) => value.length > 160 || value.split(/\r?\n/).length > 3
+    const valueNeedsExpansion = (key: string) => Boolean(valueOverflowMap[key])
 
     const handleToggleValueExpansion = (key: string, event: React.MouseEvent<HTMLElement> | React.KeyboardEvent<HTMLElement>) => {
         event.preventDefault()
@@ -365,24 +430,24 @@ export default function DataTable({ object, type, lastObjId, className }: Props)
     return (
         <div className={cn("flex flex-col gap-4 bg-background rounded-lg overflow-hidden", className)}>
             <div ref={scrollableContainerRef} className="h-1 grow overflow-y-auto overflow-x-hidden">
-                <div className="grid grid-cols-[minmax(0,max-content)_minmax(0,max-content)_minmax(0,max-content)_1fr]">
-                    <div className="flex items-center font-medium text-muted-foreground px-2 border-b border-border h-10">Key</div>
-                    <div className="flex items-center font-medium text-muted-foreground px-2 border-b border-border h-10">Value</div>
-                    <div className="flex items-center font-medium text-muted-foreground px-2 border-b border-border h-10">Type</div>
-                    <div className="flex items-center px-2 border-b border-border h-10"><div className="w-6" /></div>
+                <div className="w-full grid grid-cols-[minmax(0,max-content)_minmax(0,max-content)_minmax(0,max-content)_minmax(60px,1fr)]">
+                    <div className="flex items-center font-medium text-muted-foreground px-1 border-b border-border h-10">Key</div>
+                    <div className="flex items-center font-medium text-muted-foreground px-1 border-b border-border h-10">Value</div>
+                    <div className="flex items-center font-medium text-muted-foreground px-1 border-b border-border h-10">Type</div>
+                    <div className="flex items-center px-1 border-b border-border h-10"><div className="w-6" /></div>
                     {
                         attributes.map((key) => {
                             const value = object.data[key]
                             const isComplex = isComplexType(value)
                             const stringValue = getStringValue(value)
                             const isExpanded = expandedAttributes[key]
-                            const shouldShowToggle = valueNeedsExpansion(stringValue)
-                            const rowHeightClass = editable === key ? "py-2 min-h-14" : "py-2 min-h-10"
+                            const shouldShowToggle = valueNeedsExpansion(key)
+                            const rowClass = cn("flex items-center px-1 py-1 border-b border-border", editable === key ? "min-h-14" : "min-h-10")
 
                             return (
                                 <Fragment key={key}>
                                     <div
-                                        className={cn("flex items-center px-2 border-b border-border", rowHeightClass)}
+                                        className={rowClass}
                                         data-testid={`DataPanelAttribute${key}`}
                                         onMouseEnter={() => setHover(key)}
                                         onMouseLeave={() => setHover("")}
@@ -391,7 +456,7 @@ export default function DataTable({ object, type, lastObjId, className }: Props)
                                         <p className="w-full truncate">{key}:</p>
                                     </div>
                                     <div
-                                        className={cn("flex w-full px-2 border-b border-border", rowHeightClass)}
+                                        className={rowClass}
                                         data-testid={`DataPanelAttribute${value}`}
                                         onMouseEnter={() => setHover(key)}
                                         onMouseLeave={() => setHover("")}
@@ -411,6 +476,7 @@ export default function DataTable({ object, type, lastObjId, className }: Props)
                                                             disabled={isAddValue || isComplex}
                                                         >
                                                             <p
+                                                                ref={setValueParagraphRef(key)}
                                                                 className={cn(
                                                                     "w-full text-left text-sm whitespace-pre-wrap break-words",
                                                                     shouldShowToggle && !isExpanded && "line-clamp-3"
@@ -441,7 +507,7 @@ export default function DataTable({ object, type, lastObjId, className }: Props)
                                         }
                                     </div>
                                     <div
-                                        className={cn("flex items-center px-2 border-b border-border", rowHeightClass)}
+                                        className={rowClass}
                                         onMouseEnter={() => setHover(key)}
                                         onMouseLeave={() => setHover("")}
                                         key={`${key}-type`}
@@ -449,7 +515,7 @@ export default function DataTable({ object, type, lastObjId, className }: Props)
                                         {editable === key ? getNewTypeInput() : <p className="w-full truncate">{typeof value}</p>}
                                     </div>
                                     <div
-                                        className={cn("flex items-center gap-1 justify-start px-2 border-b border-border", rowHeightClass)}
+                                        className={rowClass}
                                         onMouseEnter={() => setHover(key)}
                                         onMouseLeave={() => setHover("")}
                                         key={`${key}-actions`}
