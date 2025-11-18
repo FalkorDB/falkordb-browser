@@ -70,11 +70,12 @@ export default function TableComponent({
     const tableRef = useRef<HTMLTableElement>(null)
     const scrollContainerRef = useRef<HTMLDivElement>(null)
     const loadAttemptedRef = useRef<Set<string>>(new Set());
+    const abortControllersRef = useRef<Map<string, AbortController>>(new Map());
 
     const [hasRestored, setHasRestored] = useState(false)
     const [search, setSearch] = useState<string>("")
     const [editable, setEditable] = useState<string>("")
-    const [hover, setHover] = useState(-1)
+    const [hover, setHover] = useState<string>("")
     const [newValue, setNewValue] = useState<string>("")
     const [filteredRows, setFilteredRows] = useState<Row[]>([])
     const [isLoading, setIsLoading] = useState<boolean>(false)
@@ -88,50 +89,79 @@ export default function TableComponent({
 
     const height = useMemo(() => expandArr.size === 0 ? itemHeight : itemHeight * 2, [expandArr.size, itemHeight])
 
-    const getRowKey = useCallback((index: number) => index + topFakeRowHeight / height, [height, topFakeRowHeight])
-
-    const handleLoadLazyCell = useCallback((rowId: string | number, cellIndex: number, loadFn: () => Promise<any>) => {
-        const cellKey = `${rowId}-${cellIndex}`;
+    const handleLoadLazyCell = useCallback((rowName: string, cellIndex: number, loadFn: () => Promise<any>) => {
+        // Use row name for stable cell key
+        const cellKey = `${rowName}-${cellIndex}`;
 
         // If already loading or loaded, don't load again
         if (loadingCells.has(cellKey) || loadedCells.has(cellKey)) {
             return;
         }
 
+        // Verify the row still exists before starting the request (prevents loading deleted rows)
+        const rowStillExists = rows.some(r => r.name === rowName);
+        if (!rowStillExists) {
+            return;
+        }
+
+        // Create abort controller for this request
+        const abortController = new AbortController();
+        abortControllersRef.current.set(cellKey, abortController);
+
         // Mark as loading
         setLoadingCells(prev => new Set(prev).add(cellKey));
 
         // Load the cell value asynchronously
         loadFn().then(value => {
-            // Find the row by its stable identifier and update it
-            rows.forEach((r, i) => {
-                if (getRowKey(i) === rowId) {
+            // Check if request was aborted
+            if (abortController.signal.aborted) {
+                return;
+            }
+
+            // Verify the row still exists and update it
+            let rowFound = false;
+            rows.forEach((r) => {
+                if (r.name === rowName) {
+                    rowFound = true;
                     r.cells.forEach((c, j) => {
                         if (j === cellIndex) {
                             c.value = value
                         }
                     })
-                };
+                }
             });
 
-            // Mark as loaded and remove from loading set
-            setLoadedCells(prev => new Set(prev).add(cellKey));
+            // Only mark as loaded if row still exists
+            if (rowFound) {
+                setLoadedCells(prev => new Set(prev).add(cellKey));
+            }
+
             setLoadingCells(prev => {
                 const newSet = new Set(prev);
                 newSet.delete(cellKey);
                 return newSet;
             });
+
+            // Clean up abort controller
+            abortControllersRef.current.delete(cellKey);
         }).catch((error) => {
-            // eslint-disable-next-line no-console
-            console.error(`Failed to load cell ${cellKey}:`, error);
+            // Only log error if not aborted
+            if (!abortController.signal.aborted) {
+                // eslint-disable-next-line no-console
+                console.error(`Failed to load cell ${cellKey}:`, error);
+            }
+
             // Remove from loading set on error
             setLoadingCells(prev => {
                 const newSet = new Set(prev);
                 newSet.delete(cellKey);
                 return newSet;
             });
+
+            // Clean up abort controller
+            abortControllersRef.current.delete(cellKey);
         });
-    }, [loadingCells, loadedCells, rows, getRowKey])
+    }, [loadingCells, loadedCells, rows])
 
     useEffect(() => {
         const newStartIndex = Math.max(0, Math.floor((scrollTop - (height * itemsPerPage)) / height))
@@ -204,11 +234,13 @@ export default function TableComponent({
         // Clear both loaded cells and load attempts when rows are recreated without values
         const newLoadedCells = new Set<string>();
         const newLoadAttempts = new Set<string>();
+        const validCellKeys = new Set<string>();
 
-        rows.forEach((row, i) => {
-            const rowId = getRowKey(i);
+        rows.forEach((row) => {
             row.cells.forEach((cell, cellIndex) => {
-                const cellKey = `${rowId}-${cellIndex}`;
+                // Use row name for stable cell key
+                const cellKey = `${row.name}-${cellIndex}`;
+                validCellKeys.add(cellKey);
 
                 // If cell has a value, keep it as loaded
                 if (cell.value) {
@@ -222,9 +254,28 @@ export default function TableComponent({
             });
         });
 
+        // Abort any pending requests for cells that no longer exist
+        abortControllersRef.current.forEach((controller, cellKey) => {
+            if (!validCellKeys.has(cellKey)) {
+                controller.abort();
+                abortControllersRef.current.delete(cellKey);
+            }
+        });
+
         loadAttemptedRef.current = newLoadAttempts;
         setLoadedCells(newLoadedCells);
-    }, [rows, getRowKey])
+
+        // Also clean up loading cells state for cells that no longer exist
+        setLoadingCells(prev => {
+            const newSet = new Set<string>();
+            prev.forEach(cellKey => {
+                if (validCellKeys.has(cellKey)) {
+                    newSet.add(cellKey);
+                }
+            });
+            return newSet;
+        });
+    }, [rows])
 
     useEffect(() => {
         // Restore scroll position on mount
@@ -246,6 +297,14 @@ export default function TableComponent({
 
         return () => clearTimeout(timer)
     }, [hasRestored, initialScrollPosition, filteredRows.length, initialSearch])
+
+    // Cleanup: abort all pending requests on unmount
+    useEffect(() => () => {
+        abortControllersRef.current.forEach((controller) => {
+            controller.abort();
+        });
+        abortControllersRef.current.clear();
+    }, [])
 
     const handleSetEditable = (editValue: string, value: string) => {
         setEditable(editValue)
@@ -401,17 +460,15 @@ export default function TableComponent({
                     }
                     {
                         visibleRows.map((row, index) => {
-                            // Then find actual index in original rows array
-                            const rowKey = getRowKey(index);
-                            const rowTestID = `${label}${rowKey}`
+                            const rowTestID = `${label}${row.name}`
 
                             return (
                                 <TableRow
                                     className="border-border"
                                     data-testid={`tableRow${rowTestID}`}
-                                    onMouseEnter={() => setHover(rowKey)}
-                                    onMouseLeave={() => setHover(-1)}
-                                    key={rowKey}
+                                    onMouseEnter={() => setHover(row.name)}
+                                    onMouseLeave={() => setHover("")}
+                                    key={row.name}
                                 >
                                     {
                                         setRows ?
@@ -421,8 +478,8 @@ export default function TableComponent({
                                                     data-testid={`tableCheckbox${rowTestID}`}
                                                     checked={row.checked}
                                                     onCheckedChange={() => {
-                                                        setRows(rows.map((r, i) => {
-                                                            if (getRowKey(i) === rowKey) {
+                                                        setRows(rows.map((r) => {
+                                                            if (r.name === row.name) {
                                                                 r.checked = !r.checked
                                                             }
                                                             return r
@@ -437,7 +494,8 @@ export default function TableComponent({
                                     </TableCell>
                                     {
                                         row.cells.map((cell, j) => {
-                                            const cellKey = `${rowKey}-${j}`;
+                                            // Use row name for stable cell key
+                                            const cellKey = `${row.name}-${j}`;
                                             const cellTestId = `${label}${cellKey}`;
                                             const isCellLoading = loadingCells.has(cellKey);
                                             const isLazyCell = cell.type === "readonly" && "loadCell" in cell && cell.loadCell;
@@ -445,7 +503,7 @@ export default function TableComponent({
                                             // Only load if it's a lazy cell, has no value, not currently loading, and we haven't attempted to load it yet
                                             if (isLazyCell && !cell.value && !loadingCells.has(cellKey) && !loadAttemptedRef.current.has(cellKey)) {
                                                 loadAttemptedRef.current.add(cellKey);
-                                                handleLoadLazyCell(rowKey, j, cell.loadCell);
+                                                handleLoadLazyCell(row.name, j, cell.loadCell);
                                             }
 
                                             // Show loader while loading
@@ -576,7 +634,7 @@ export default function TableComponent({
                                                                         </Tooltip>
                                                                         <div className="w-4">
                                                                             {
-                                                                                cell.type !== "readonly" && hover === rowKey &&
+                                                                                cell.type !== "readonly" && hover === row.name &&
                                                                                 <Button
                                                                                     data-testid={`editButton${label}`}
                                                                                     className="disabled:cursor-text disabled:opacity-100"

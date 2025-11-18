@@ -16,7 +16,8 @@ export default function TableView() {
         
         return {
             headers: Object.keys(graph.Data[0]),
-            rows: graph.Data.map((row): Row => ({
+            rows: graph.Data.map((row, index): Row => ({
+                name: `row-${index}`,
                 cells: Object.values(row).map((value) => ({
                     value,
                     type: "object"

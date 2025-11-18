@@ -214,6 +214,7 @@ export default function Configurations() {
             const description = Configs.get(name)?.description ?? "";
 
             return {
+                name,
                 cells: [
                     { value: name, type: "readonly" },
                     { value: description, type: "readonly" },
