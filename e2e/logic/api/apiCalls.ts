@@ -284,7 +284,7 @@ export default class ApiCalls {
   async deleteGraphNode(
     graph: string,
     node: string,
-    data: Record<string, string>
+    data: Record<string, string | boolean>
   ): Promise<GraphNodeResponse> {
     try {
       const result = await deleteRequest(

@@ -83,8 +83,8 @@ export type ViewportState = {
 
 export interface Row {
   cells: Cell[];
-  checked?: boolean;
   name: string;
+  checked?: boolean;
 }
 
 export function cn(...inputs: ClassValue[]) {

@@ -1,6 +1,6 @@
 import { Locator } from "@playwright/test";
 import BasePage from "@/e2e/infra/ui/basePage";
-import { interactWhenVisible, waitForTimeOut } from "../../infra/utils";
+import { interactWhenVisible, waitForElementToBeVisible, waitForTimeOut } from "../../infra/utils";
 
 export default class SettingsUsersPage extends BasePage {
   private get usersTabBtn(): Locator {
@@ -67,7 +67,7 @@ export default class SettingsUsersPage extends BasePage {
 
   private get findUserNameInTable(): (selectedUser: string) => Locator {
     return (selectedUser: string) =>
-      this.page.getByTestId(`contentUsers${selectedUser}Name`);
+      this.page.getByTestId(`tableRowUsers${selectedUser}`);
   }
 
   private get deleteUsersBtn(): Locator {
@@ -97,7 +97,8 @@ export default class SettingsUsersPage extends BasePage {
 
   async verifyUserExists(selectedUser: string): Promise<boolean> {
     await this.waitForPageIdle();
-    const isVisible = await this.findUserNameInTable(selectedUser).isVisible();
+    await this.searchForElement(selectedUser);
+    const isVisible = await waitForElementToBeVisible(this.findUserNameInTable(selectedUser));
     return isVisible;
   }
 
@@ -265,6 +266,8 @@ export default class SettingsUsersPage extends BasePage {
 
   async removeUser(selectedUser: string): Promise<void> {
     await this.waitForPageIdle();
+    // Search for user to bring into viewport (virtual scrolling)
+    await this.searchForElement(selectedUser);
     await this.clickUserCheckboxBtn(selectedUser);
     await this.clickDeleteUsersBtn();
     await this.clickConfirmUserDeleteMsg();

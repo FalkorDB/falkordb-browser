@@ -43,7 +43,7 @@ export default function DeleteUser({ users, setUsers, setRows }: DeleteUserProps
             <AlertDialogTrigger disabled={users.length === 0} asChild>
                 <Button
                     disabled={users.length === 0}
-                    variant="Primary"
+                    variant="Delete"
                     id="delete-user"
                     label="Delete Users"
                     title="Remove selected users"
