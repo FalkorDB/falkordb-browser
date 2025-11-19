@@ -465,6 +465,7 @@ export default function TableComponent({
                     }
                     {
                         visibleRows.map((row, index) => {
+                            const actualIndex = topFakeRowHeight / height + index
                             const rowTestID = `${label}${row.name}`
 
                             return (
@@ -495,7 +496,7 @@ export default function TableComponent({
                                             : null
                                     }
                                     <TableCell className="border-r border-border">
-                                        <p>{index + 1}.</p>
+                                        <p>{actualIndex + 1}.</p>
                                     </TableCell>
                                     {
                                         row.cells.map((cell, j) => {
