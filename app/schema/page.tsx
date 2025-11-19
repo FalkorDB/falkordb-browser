@@ -237,7 +237,7 @@ export default function Page() {
                 const link = schema.extendEdge(json.result.data[0].e, false, true)
                 // Calculate curve for the newly created edge
                 link.curve = schema.calculateLinkCurve(link)
-                setRelationships(prev => [...prev.filter(p => p.name === link.relationship), schema.RelationshipsMap.get(link.relationship)!])
+                setRelationships(prev => [...prev.filter(p => p.name !== link.relationship), schema.RelationshipsMap.get(link.relationship)!])
                 handleSetIsAddEdge(false)
             }
 

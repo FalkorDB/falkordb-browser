@@ -28,7 +28,7 @@ interface Props {
     valueClassName?: string
     inputRef?: React.RefObject<HTMLInputElement>,
     children?: React.ReactNode,
-    setRows?: (rows: Row[]) => void,
+    setRows?: Dispatch<SetStateAction<Row[]>>,
     className?: string
     itemHeight?: number
     itemsPerPage?: number
@@ -118,18 +118,23 @@ export default function TableComponent({
                 return;
             }
 
-            // Verify the row still exists and update it
+            // Verify the row still exists and update it immutably
             let rowFound = false;
-            rows.forEach((r) => {
-                if (r.name === rowName) {
-                    rowFound = true;
-                    r.cells.forEach((c, j) => {
-                        if (j === cellIndex) {
-                            c.value = value
-                        }
-                    })
-                }
-            });
+            if (setRows) {
+                setRows(prevRows => prevRows.map((r) => {
+                    if (r.name === rowName) {
+                        rowFound = true;
+                        return {
+                            ...r,
+                            cells: r.cells.map((c, j) => (j === cellIndex ? { ...c, value } : c))
+                        };
+                    }
+
+                    return r;
+                }));
+            } else {
+                rowFound = rows.some((r) => r.name === rowName);
+            }
 
             // Only mark as loaded if row still exists
             if (rowFound) {
@@ -161,7 +166,7 @@ export default function TableComponent({
             // Clean up abort controller
             abortControllersRef.current.delete(cellKey);
         });
-    }, [loadingCells, loadedCells, rows])
+    }, [loadingCells, loadedCells, rows, setRows])
 
     useEffect(() => {
         const newStartIndex = Math.max(0, Math.floor((scrollTop - (height * itemsPerPage)) / height))

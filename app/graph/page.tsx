@@ -212,7 +212,7 @@ export default function Page() {
                 const link = graph.extendEdge(json.result.data[0].e, false, true)
                 // Calculate curve for the newly created edge
                 link.curve = graph.calculateLinkCurve(link)
-                setRelationships(prev => [...prev.filter(p => p.name === link.relationship), graph.RelationshipsMap.get(link.relationship)!])
+                setRelationships(prev => [...prev.filter(p => p.name !== link.relationship), graph.RelationshipsMap.get(link.relationship)!])
                 handleSetIsAdd(setIsAddEdge, setIsAddNode)(false)
             }
 
