@@ -112,14 +112,14 @@ export default function Header({ onSetGraphName, graphNames, graphName, onOpenGr
                     onClick={() => router.push("/graph")}
                     data-testid="GraphsButton"
                 />
-                {separator}
+                {/* {separator}
                 <Button
                     label="SCHEMAS"
                     title="View and manage your schemas"
                     className={cn(type === "Schema" ? "text-primary" : "text-foreground")}
                     onClick={() => router.push("/schema")}
                     data-testid="SchemasButton"
-                />
+                /> */}
                 {
                     type === "Graph" && graphName &&
                     <>
