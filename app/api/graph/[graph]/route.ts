@@ -158,9 +158,47 @@ export async function GET(
 
       if (!result) throw new Error("Something went wrong");
 
-      writer.write(
-        encoder.encode(`event: result\ndata: ${JSON.stringify(result)}\n\n`)
-      );
+      const writeDataLine = (chunk: string) => {
+        writer.write(encoder.encode(`data: ${chunk}\n`));
+      };
+
+      const streamResult = () => {
+        writer.write(encoder.encode("event: result\n"));
+        writeDataLine("{");
+
+        let isFirstField = true;
+
+        const entries = Object.entries(result ?? {}).filter(
+          ([, value]) => value !== undefined
+        );
+
+        for (let idx = 0; idx < entries.length; idx += 1) {
+          const [key, value] = entries[idx];
+
+          if (key === "data" && Array.isArray(value)) {
+            writeDataLine(`${isFirstField ? "" : ","}"data":[`);
+            isFirstField = false;
+
+            for (let i = 0; i < value.length; i += 1) {
+              const row = value[i];
+              const rowChunk = JSON.stringify(row);
+              writeDataLine(i < value.length - 1 ? `${rowChunk},` : rowChunk);
+            }
+
+            writeDataLine("]");
+          } else {
+            writeDataLine(
+              `${isFirstField ? "" : ","}"${key}":${JSON.stringify(value)}`
+            );
+            isFirstField = false;
+          }
+        }
+
+        writeDataLine("}");
+        writer.write(encoder.encode("\n"));
+      };
+
+      streamResult();
       writer.close();
     } catch (error) {
       console.error(error);
