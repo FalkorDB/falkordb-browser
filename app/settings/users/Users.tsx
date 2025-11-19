@@ -39,14 +39,14 @@ export default function Users() {
 
     const handleSetRole = async (user: SetUser) => {
         const { username, role, oldRole } = user
-        const result = await securedFetch(`api/user/${prepareArg(username)}?role=${role}`, {
-            method: 'PATCH'
+        const result = await securedFetch(`api/user/${prepareArg(username)}`, {
+            method: 'PATCH',
+            body: JSON.stringify({ role })
         }, toast, setIndicator)
 
         if (result.ok) {
             setUsers(prev => prev.map(u => u.username === username ? { ...u, role } : u))
             setRows(prev => prev.map((row): Row => row.cells[0].value === username ? { ...row, cells: [row.cells[0], { ...row.cells[1], value: role }] } : row))
-
             toast({
                 title: "Success",
                 description: `${username} role updated successfully`,
@@ -115,11 +115,13 @@ export default function Users() {
                     type: "readonly"
                 }, {
                     value: role,
-                    onChange: (value: string) => {
+                    onChange: async (value: string) => {
                         setNewUser({ username, role: value, oldRole: role })
                         setOpen(true)
+                        return true
                     },
                     type: "select",
+                    options: ROLES,
                     selectType: "Role"
                 }],
                 checked: false,
