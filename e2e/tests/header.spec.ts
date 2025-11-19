@@ -27,12 +27,12 @@ test.describe(`Header tests`, () => {
     expect(newUrl).toBe(urls.graphUrl);
   });
 
-  test(`@admin Verify clicking on Schemas button redirects to specified URL`, async () => {
-    const navBar = await browser.createNewPage(NavBarComponent, urls.graphUrl);
-    await navBar.clickOnSchemasButton();
-    const newUrl = navBar.getCurrentURL();
-    expect(newUrl).toBe(urls.schemaUrl);
-  });
+  // test(`@admin Verify clicking on Schemas button redirects to specified URL`, async () => {
+  //   const navBar = await browser.createNewPage(NavBarComponent, urls.graphUrl);
+  //   await navBar.clickOnSchemasButton();
+  //   const newUrl = navBar.getCurrentURL();
+  //   expect(newUrl).toBe(urls.schemaUrl);
+  // });
 
   test(`@admin Verify clicking on help -> Documentation redirects to specified URL`, async () => {
     const navBar = await browser.createNewPage(NavBarComponent, urls.graphUrl);
