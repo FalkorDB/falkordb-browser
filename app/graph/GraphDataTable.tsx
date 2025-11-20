@@ -389,10 +389,10 @@ export default function GraphDataTable({ object, type, lastObjId, className }: P
                                                     className="disabled:opacity-100 disabled:cursor-default w-full"
                                                     data-testid="DataPanelValueSetAttribute"
                                                     label={getStringValue(value)}
-                                                    title="Click to edit the attribute value"
+                                                    title={session?.user.role === "Read-Only" ? undefined : "Click to edit the attribute value"}
                                                     variant="button"
                                                     onClick={() => handleSetEditable(key, value)}
-                                                    disabled={isAddValue}
+                                                    disabled={isAddValue || session?.user.role === "Read-Only"}
                                                 />
                                         }
                                     </div>
