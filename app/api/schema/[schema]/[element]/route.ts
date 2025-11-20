@@ -37,6 +37,8 @@ export async function POST(
       if (!type) {
         if (!selectedNodes || selectedNodes.length !== 2)
           throw new Error("Selected nodes are required");
+        if (label.length !== 1)
+          throw new Error("Label is required");
       }
 
       const formattedAttributes = formatAttributes(attributes);
