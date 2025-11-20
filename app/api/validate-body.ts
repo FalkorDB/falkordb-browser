@@ -61,7 +61,7 @@ export const duplicateSchema = z.object({
 
 export const createSchemaElement = z.object({
   type: z.boolean(),
-  label: z.array(z.string()).optional(),
+  label: z.array(z.string()),
   attributes: z.array(
     z.tuple([
       z.string().min(1, "Attribute name cannot be empty"),
