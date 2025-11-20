@@ -65,6 +65,7 @@ type BrowserSettingsContextType = {
       setSecretKey: Dispatch<SetStateAction<string>>;
       model: string;
       setModel: Dispatch<SetStateAction<string>>;
+      navigateToSettings: boolean;
       displayChat: boolean;
     };
     graphInfo: {
@@ -198,6 +199,7 @@ export const BrowserSettingsContext = createContext<BrowserSettingsContextType>(
         setSecretKey: () => {},
         model: "",
         setModel: () => {},
+        navigateToSettings: false,
         displayChat: false,
       },
       graphInfo: { refreshInterval: 0, setRefreshInterval: () => {}, displayTextPriority: [], setDisplayTextPriority: () => {} },
