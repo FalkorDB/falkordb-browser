@@ -615,7 +615,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
                               graphNames={pathname.includes("/schema") ? schemaNames : graphNames}
                               onSetGraphName={handleOnSetGraphName}
                               onOpenGraphInfo={onExpand}
-                              displayChat={displayChat}
+                              navigateToSettings={navigateToSettings}
                             />
                           }
                           <ResizablePanelGroup direction="horizontal" className="w-1 grow">
