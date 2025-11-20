@@ -2,26 +2,32 @@ import { z } from "zod";
 
 // User schemas
 export const createUser = z.object({
-  username: z.string({
-    required_error: "Username is required",
-    invalid_type_error: "Invalid Username",
-  }),
-  password: z.string({
-    required_error: "Password is required",
-    invalid_type_error: "Invalid Password",
-  }),
-  role: z.string({
-    required_error: "Role is required",
-    invalid_type_error: "Invalid Role",
-  }),
+  username: z
+    .string({
+      required_error: "Username is required",
+      invalid_type_error: "Invalid Username",
+    })
+    .min(1, "Username cannot be empty"),
+  password: z
+    .string({
+      required_error: "Password is required",
+      invalid_type_error: "Invalid Password",
+    })
+    .min(1, "Password cannot be empty"),
+  role: z
+    .string({
+      required_error: "Role is required",
+      invalid_type_error: "Invalid Role",
+    })
+    .min(1, "Role cannot be empty"),
 });
 
 export const deleteUsers = z.object({
   users: z
     .array(
       z.object({
-        username: z.string(),
-        role: z.string().optional(),
+        username: z.string().min(1, "Username cannot be empty"),
+        role: z.string().min(1, "Role cannot be empty").optional(),
         selected: z.boolean().optional(),
       })
     )
@@ -29,32 +35,45 @@ export const deleteUsers = z.object({
 });
 
 export const updateUserRole = z.object({
-  role: z.string({
-    required_error: "Role is required",
-    invalid_type_error: "Invalid Role",
-  }),
+  role: z
+    .string({
+      required_error: "Role is required",
+      invalid_type_error: "Invalid Role",
+    })
+    .min(1, "Role cannot be empty"),
 });
 
 // Schema (graph schema) schemas
 export const renameSchema = z.object({
-  sourceName: z.string({
-    required_error: "Source name is required",
-    invalid_type_error: "Invalid Source name",
-  }),
+  sourceName: z
+    .string({
+      required_error: "Source name is required",
+      invalid_type_error: "Invalid Source name",
+    })
+    .min(1, "Source name cannot be empty"),
 });
 
 export const duplicateSchema = z.object({
-  sourceName: z.string({
-    required_error: "Source name is required",
-    invalid_type_error: "Invalid Source name",
-  }),
+  sourceName: z
+    .string({
+      required_error: "Source name is required",
+      invalid_type_error: "Invalid Source name",
+    })
+    .min(1, "Source name cannot be empty"),
 });
 
 // Schema element schemas
 export const createSchemaElement = z.object({
   type: z.boolean(),
-  label: z.array(z.string()),
-  attributes: z.array(z.tuple([z.string(), z.array(z.string())])),
+  label: z.array(
+    z.string().min(1, "Label entries cannot be empty")
+  ),
+  attributes: z.array(
+    z.tuple([
+      z.string().min(1, "Attribute name cannot be empty"),
+      z.array(z.string().min(1, "Attribute values cannot be empty")),
+    ])
+  ),
   selectedNodes: z
     .array(
       z.object({
@@ -69,17 +88,21 @@ export const deleteSchemaElement = z.object({
 });
 
 export const addSchemaElementLabel = z.object({
-  label: z.string({
-    required_error: "Label is required",
-    invalid_type_error: "Invalid Label",
-  }),
+  label: z
+    .string({
+      required_error: "Label is required",
+      invalid_type_error: "Invalid Label",
+    })
+    .min(1, "Label cannot be empty"),
 });
 
 export const removeSchemaElementLabel = z.object({
-  label: z.string({
-    required_error: "Label is required",
-    invalid_type_error: "Invalid Label",
-  }),
+  label: z
+    .string({
+      required_error: "Label is required",
+      invalid_type_error: "Invalid Label",
+    })
+    .min(1, "Label cannot be empty"),
 });
 
 export const updateSchemaElementAttribute = z.object({
@@ -93,17 +116,21 @@ export const deleteSchemaElementAttribute = z.object({
 
 // Graph schemas
 export const renameGraph = z.object({
-  sourceName: z.string({
-    required_error: "Source name is required",
-    invalid_type_error: "Invalid Source name",
-  }),
+  sourceName: z
+    .string({
+      required_error: "Source name is required",
+      invalid_type_error: "Invalid Source name",
+    })
+    .min(1, "Source name cannot be empty"),
 });
 
 export const duplicateGraph = z.object({
-  sourceName: z.string({
-    required_error: "Source name is required",
-    invalid_type_error: "Invalid Source name",
-  }),
+  sourceName: z
+    .string({
+      required_error: "Source name is required",
+      invalid_type_error: "Invalid Source name",
+    })
+    .min(1, "Source name cannot be empty"),
 });
 
 // Graph element schemas
@@ -112,17 +139,21 @@ export const deleteGraphElement = z.object({
 });
 
 export const addGraphElementLabel = z.object({
-  label: z.string({
-    required_error: "Label is required",
-    invalid_type_error: "Invalid Label",
-  }),
+  label: z
+    .string({
+      required_error: "Label is required",
+      invalid_type_error: "Invalid Label",
+    })
+    .min(1, "Label cannot be empty"),
 });
 
 export const removeGraphElementLabel = z.object({
-  label: z.string({
-    required_error: "Label is required",
-    invalid_type_error: "Invalid Label",
-  }),
+  label: z
+    .string({
+      required_error: "Label is required",
+      invalid_type_error: "Invalid Label",
+    })
+    .min(1, "Label cannot be empty"),
 });
 
 export const updateGraphElementAttribute = z.object({
@@ -139,10 +170,12 @@ export const deleteGraphElementAttribute = z.object({
 
 // Graph config schemas
 export const updateGraphConfig = z.object({
-  value: z.string({
-    required_error: "Value is required",
-    invalid_type_error: "Invalid Value",
-  }),
+  value: z
+    .string({
+      required_error: "Value is required",
+      invalid_type_error: "Invalid Value",
+    })
+    .min(1, "Value cannot be empty"),
 });
 
 // Chat schemas
@@ -153,19 +186,23 @@ export const chatRequest = z.object({
       invalid_type_error: "Invalid Messages",
     })
     .min(1, "Messages are required"),
-  graphName: z.string({
-    required_error: "Graph name is required",
-    invalid_type_error: "Invalid Graph name",
-  }),
+  graphName: z
+    .string({
+      required_error: "Graph name is required",
+      invalid_type_error: "Invalid Graph name",
+    })
+    .min(1, "Graph name cannot be empty"),
   key: z
     .string({
       invalid_type_error: "Invalid API key",
     })
+    .min(1, "API key cannot be empty")
     .optional(),
   model: z
     .string({
       invalid_type_error: "Invalid Model",
     })
+    .min(1, "Model cannot be empty")
     .optional(),
 });
 
@@ -175,39 +212,47 @@ export const login = z.object({
     .string({
       invalid_type_error: "Invalid Username",
     })
+    .min(1, "Username cannot be empty")
     .optional(),
   password: z
     .string({
       invalid_type_error: "Invalid Password",
     })
+    .min(1, "Password cannot be empty")
     .optional(),
   host: z
     .string({
       invalid_type_error: "Invalid Host",
     })
+    .min(1, "Host cannot be empty")
     .default("localhost"),
   port: z
     .string({
       invalid_type_error: "Invalid Port",
     })
+    .min(1, "Port cannot be empty")
     .default("6379"),
   tls: z
     .string({
       invalid_type_error: "Invalid TLS value",
     })
+    .min(1, "TLS value cannot be empty")
     .default("false"),
   ca: z
     .string({
       invalid_type_error: "Invalid CA certificate",
     })
+    .min(1, "CA certificate cannot be empty")
     .optional(),
 });
 
 export const revokeToken = z.object({
-  token: z.string({
-    required_error: "Token is required",
-    invalid_type_error: "Invalid Token",
-  }),
+  token: z
+    .string({
+      required_error: "Token is required",
+      invalid_type_error: "Invalid Token",
+    })
+    .min(1, "Token cannot be empty"),
 });
 
 // Validation helper function
