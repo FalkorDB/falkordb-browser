@@ -20,12 +20,12 @@ export default function DeleteUser({ users, setUsers, setRows }: DeleteUserProps
     const deleteSelected = async () => {
         if (!users) return
 
-        const response = await securedFetch('/api/user/', {
+        const response = await securedFetch("/api/user", {
             method: 'DELETE',
             headers: {
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({ users })
+            body: JSON.stringify({ users: users.map(user => ({ username: user.username })) })
         }, toast, setIndicator)
 
         if (response.ok) {
