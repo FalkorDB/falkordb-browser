@@ -27,8 +27,6 @@ export const deleteUsers = z.object({
     .array(
       z.object({
         username: z.string().min(1, "Username cannot be empty"),
-        role: z.string().min(1, "Role cannot be empty").optional(),
-        selected: z.boolean().optional(),
       })
     )
     .min(1, "At least one user is required"),
@@ -65,9 +63,7 @@ export const duplicateSchema = z.object({
 // Schema element schemas
 export const createSchemaElement = z.object({
   type: z.boolean(),
-  label: z.array(
-    z.string().min(1, "Label entries cannot be empty")
-  ),
+  label: z.array(z.string()).optional(),
   attributes: z.array(
     z.tuple([
       z.string().min(1, "Attribute name cannot be empty"),
@@ -273,4 +269,3 @@ export function validateBody<T extends z.ZodTypeAny>(
     return { success: false, error: "Validation failed" };
   }
 }
-
