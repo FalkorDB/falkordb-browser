@@ -502,7 +502,7 @@ export default function TableComponent({
                                         row.cells.map((cell, j) => {
                                             // Use row name for stable cell key
                                             const cellKey = `${row.name}-${j}`;
-                                            const cellTestId = `${label}${cellKey}`;
+                                            const cellTestId = `${label}${row.name}`;
                                             const isCellLoading = loadingCells.has(cellKey);
                                             const isLazyCell = cell.type === "readonly" && "loadCell" in cell && cell.loadCell;
 
