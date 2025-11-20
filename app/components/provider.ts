@@ -67,6 +67,7 @@ type BrowserSettingsContextType = {
       setModel: Dispatch<SetStateAction<string>>;
       navigateToSettings: boolean;
       setNavigateToSettings: Dispatch<SetStateAction<boolean>>;
+      displayChat: boolean;
     };
     graphInfo: {
       refreshInterval: number;
@@ -201,6 +202,7 @@ export const BrowserSettingsContext = createContext<BrowserSettingsContextType>(
         setModel: () => {},
         navigateToSettings: false,
         setNavigateToSettings: () => {},
+        displayChat: false,
       },
       graphInfo: { refreshInterval: 0, setRefreshInterval: () => {}, displayTextPriority: [], setDisplayTextPriority: () => {} },
     },
