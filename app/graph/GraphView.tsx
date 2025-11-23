@@ -34,6 +34,10 @@ interface Props {
     fetchCount: () => Promise<void>
     historyQuery: HistoryQuery
     setHistoryQuery: Dispatch<SetStateAction<HistoryQuery>>
+    setIsAddNode: (isAddNode: boolean) => void
+    setIsAddEdge: (isAddEdge: boolean) => void
+    isAddNode: boolean
+    isAddEdge: boolean
 }
 
 function GraphView({
@@ -53,9 +57,13 @@ function GraphView({
     fetchCount,
     historyQuery,
     setHistoryQuery,
+    setIsAddEdge,
+    setIsAddNode,
+    isAddEdge,
+    isAddNode
 }: Props) {
 
-    const { graph, currentTab, setCurrentTab } = useContext(GraphContext)
+    const { graph, graphName, currentTab, setCurrentTab } = useContext(GraphContext)
     const { setData, data, isSaved, setViewport, viewport } = useContext(ViewportContext)
 
     const [parentHeight, setParentHeight] = useState<number>(0)
@@ -68,21 +76,19 @@ function GraphView({
     }, [graph, graph.Relationships, graph.Labels, setRelationships, setLabels])
 
     const isTabEnabled = useCallback((tab: Tab) => {
-        if (tab === "Graph") return elementsLength !== 0
         if (tab === "Table") return graph.Data.length !== 0
-        return historyQuery.currentQuery && historyQuery.currentQuery.metadata.length > 0 && graph.Metadata.length > 0 && historyQuery.currentQuery.explain.length > 0
-    }, [graph, elementsLength, historyQuery.currentQuery])
+        if (tab === "Metadata") return historyQuery.currentQuery && historyQuery.currentQuery.metadata.length > 0 && graph.Metadata.length > 0 && historyQuery.currentQuery.explain.length > 0
+        return true
+    }, [graph, historyQuery.currentQuery])
 
     useEffect(() => {
         if (currentTab !== "Metadata" && isTabEnabled(currentTab)) return
 
         let defaultChecked: Tab = "Graph"
-        if (elementsLength !== 0) defaultChecked = "Graph"
-        else if (graph.Data.length !== 0) defaultChecked = "Table"
-        else if (historyQuery.currentQuery && historyQuery.currentQuery.metadata.length > 0 && graph.Metadata.length > 0 && historyQuery.currentQuery.explain.length > 0) defaultChecked = "Metadata"
+        if (elementsLength === 0 && graph.Data.length !== 0) defaultChecked = "Table"
 
         setCurrentTab(defaultChecked);
-    }, [graph, graph.Id, elementsLength, graph.Data.length])
+    }, [graph, graph.Id, elementsLength, graph.Data.length, setCurrentTab, isTabEnabled])
 
     useEffect(() => {
         setSelectedElement(undefined)
@@ -123,12 +129,17 @@ function GraphView({
                         <>
                             <Toolbar
                                 graph={graph}
+                                graphName={graphName}
                                 label="Graph"
                                 selectedElement={selectedElement}
                                 setSelectedElement={setSelectedElement}
                                 selectedElements={selectedElements}
                                 handleDeleteElement={handleDeleteElement}
                                 chartRef={chartRef}
+                                setIsAddEdge={selectedElements.length === 2 && selectedElements.every(e => !!e.labels) ? setIsAddEdge : undefined}
+                                setIsAddNode={setIsAddNode}
+                                isAddEdge={isAddEdge}
+                                isAddNode={isAddNode}
                             />
                             {
                                 (labels.length !== 0 || relationships.length !== 0) &&
@@ -154,9 +165,8 @@ function GraphView({
                                 value="Graph"
                             >
                                 <Button
-                                    disabled={graph.getElements().length === 0}
                                     className="tabs-trigger"
-                                    title={graph.getElements().length === 0 ? "No Elements" : "Graph"}
+                                    title="Graph"
                                 >
                                     <GitGraph />
                                 </Button>
@@ -167,9 +177,9 @@ function GraphView({
                                 value="Table"
                             >
                                 <Button
-                                    disabled={graph.Data.length === 0}
+                                    disabled={!isTabEnabled("Table")}
                                     className="tabs-trigger"
-                                    title={graph.Data.length === 0 ? "No Data" : "Table"}
+                                    title={!isTabEnabled("Table") ? "No Data" : "Table"}
                                 >
                                     <Table />
                                 </Button>
@@ -180,9 +190,9 @@ function GraphView({
                                 value="Metadata"
                             >
                                 <Button
-                                    disabled={!historyQuery.currentQuery || historyQuery.currentQuery.metadata.length === 0 || historyQuery.currentQuery.explain.length === 0 || graph.Metadata.length === 0}
+                                    disabled={!isTabEnabled("Metadata")}
                                     className="tabs-trigger"
-                                    title={!historyQuery.currentQuery || historyQuery.currentQuery.metadata.length === 0 || historyQuery.currentQuery.explain.length === 0 || graph.Metadata.length === 0 ? "No Metadata" : "Metadata"}
+                                    title={!isTabEnabled("Metadata") ? "No Metadata" : "Metadata"}
                                 >
                                     <Info />
                                 </Button>

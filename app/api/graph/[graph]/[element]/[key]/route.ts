@@ -40,15 +40,17 @@ export async function POST(
       const graph = client.selectGraph(graphId);
 
       const query = type
-        ? `MATCH (n) WHERE ID(n) = $elementId SET n.${key} = $value`
-        : `MATCH (n)-[e]-(m) WHERE ID(e) = $elementId SET e.${key} = $value`;
+        ? `MATCH (n) WHERE ID(n) = $id SET n.${key} = $value`
+        : `MATCH ()-[e]->() WHERE ID(e) = $id SET e.${key} = $value`;
 
-      const result =
-        user.role === "Read-Only"
-          ? await graph.roQuery(query, { params: { elementId, value } })
-          : await graph.query(query, { params: { elementId, value } });
+      if (user.role === "Read-Only")
+        await graph.roQuery(query, { params: { id: elementId, value } });
+      else await graph.query(query, { params: { id: elementId, value } });
 
-      return NextResponse.json({ result }, { status: 200 });
+      return NextResponse.json(
+        { message: "Attribute updated successfully" },
+        { status: 200 }
+      );
     } catch (error) {
       console.error(error);
       return NextResponse.json(
@@ -101,14 +103,16 @@ export async function DELETE(
 
       const query = type
         ? `MATCH (n) WHERE ID(n) = $id SET n.${key} = NULL`
-        : `MATCH (n)-[e]-(m) WHERE ID(e) = $id SET e.${key} = NULL`;
+        : `MATCH ()-[e]->() WHERE ID(e) = $id SET e.${key} = NULL`;
 
-      const result =
-        user.role === "Read-Only"
-          ? await graph.roQuery(query, { params: { id: elementId } })
-          : await graph.query(query, { params: { id: elementId } });
+      if (user.role === "Read-Only")
+        await graph.roQuery(query, { params: { id: elementId } });
+      else await graph.query(query, { params: { id: elementId } });
 
-      return NextResponse.json({ result }, { status: 200 });
+      return NextResponse.json(
+        { message: "Attribute deleted successfully" },
+        { status: 200 }
+      );
     } catch (error) {
       console.error(error);
       return NextResponse.json(

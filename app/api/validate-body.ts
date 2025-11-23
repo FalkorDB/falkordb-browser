@@ -1,6 +1,5 @@
 import { z } from "zod";
 
-// User schemas
 export const createUser = z.object({
   username: z
     .string({
@@ -60,7 +59,6 @@ export const duplicateSchema = z.object({
     .min(1, "Source name cannot be empty"),
 });
 
-// Schema element schemas
 export const createSchemaElement = z.object({
   type: z.boolean(),
   label: z.array(z.string()),
@@ -129,7 +127,19 @@ export const duplicateGraph = z.object({
     .min(1, "Source name cannot be empty"),
 });
 
-// Graph element schemas
+export const createGraphElement = z.object({
+  type: z.boolean(),
+  label: z.array(z.string()).optional(),
+  attributes: z.array(z.tuple([z.string().min(1, "Attribute name cannot be empty"), z.union([z.string().min(1, "Attribute value cannot be empty"), z.number(), z.boolean()])])),
+  selectedNodes: z
+    .array(
+      z.object({
+        id: z.number(),
+      })
+    )
+    .optional(),
+});
+
 export const deleteGraphElement = z.object({
   type: z.boolean(),
 });
@@ -154,7 +164,7 @@ export const removeGraphElementLabel = z.object({
 
 export const updateGraphElementAttribute = z.object({
   type: z.boolean(),
-  value: z.any(),
+  value: z.union([z.string(), z.number(), z.boolean()]),
 });
 
 export const deleteGraphElementAttribute = z.object({

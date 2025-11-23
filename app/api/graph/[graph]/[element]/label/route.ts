@@ -32,12 +32,12 @@ export async function DELETE(
       }
 
       const { label } = validation.data;
-      const query = `MATCH (n) WHERE ID(n) = $elementId REMOVE n:${label}`;
+      const query = `MATCH (n) WHERE ID(n) = $id REMOVE n:${label}`;
       const graph = client.selectGraph(graphId);
 
       if (user.role === "Read-Only")
-        await graph.roQuery(query, { params: { elementId } });
-      else await graph.query(query, { params: { elementId } });
+        await graph.roQuery(query, { params: { id: elementId } });
+      else await graph.query(query, { params: { id: elementId } });
 
       return NextResponse.json(
         { message: "Label removed successfully" },
@@ -85,13 +85,13 @@ export async function POST(
       }
 
       const { label } = validation.data;
-      const query = `MATCH (n) WHERE ID(n) = $elementId SET n:${label}`;
+      const query = `MATCH (n) WHERE ID(n) = $id SET n:${label}`;
       const graph = client.selectGraph(graphId);
 
-      if (user.role === "Read-Only") 
-        await graph.roQuery(query, { params: { elementId } });
-       else 
-        await graph.query(query, { params: { elementId } });
+      if (user.role === "Read-Only")
+        await graph.roQuery(query, { params: { id: elementId } });
+      else
+        await graph.query(query, { params: { id: elementId } });
       
 
       return NextResponse.json(

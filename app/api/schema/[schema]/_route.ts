@@ -65,15 +65,14 @@ export async function POST(
       return session;
     }
 
-    const { client, user } = session;
+    const { client } = session;
     const { schema } = await params;
     const schemaName = `${schema}_schema`;
 
     try {
       const graph = client.selectGraph(schemaName);
 
-      if (user.role === "Read-Only") await graph.roQuery("RETURN 1");
-      else await graph.query("RETURN 1");
+      await graph.query("RETURN 1");
 
       return NextResponse.json(
         { message: "Schema created successfully" },
@@ -159,7 +158,10 @@ export async function PATCH(
       const validation = validateBody(renameSchema, body);
 
       if (!validation.success) {
-        return NextResponse.json({ message: validation.error }, { status: 400 });
+        return NextResponse.json(
+          { message: validation.error },
+          { status: 400 }
+        );
       }
 
       const { sourceName: source } = validation.data;

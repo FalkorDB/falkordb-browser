@@ -11,7 +11,7 @@ import { useSession } from "next-auth/react";
 import { Switch } from "@/components/ui/switch";
 import { prepareArg, securedFetch } from "@/lib/utils";
 import Button from "../components/ui/Button";
-import { ATTRIBUTES, getDefaultAttribute, OPTIONS } from "./SchemaCreateElement";
+import { ATTRIBUTES, getDefaultAttribute, OPTIONS } from "./CreateElementPanel";
 import Combobox from "../components/ui/combobox";
 import { Label, Graph, Link, Node } from "../api/graph/model";
 import Input from "../components/ui/Input";
@@ -27,7 +27,7 @@ interface Props {
     setLabels: (labels: Label[]) => void
 }
 
-export default function SchemaDataPanel({ object, setObject, schema, setLabels }: Props) {
+export default function DataPanel({ object, setObject, schema, setLabels }: Props) {
 
     const { indicator } = useContext(IndicatorContext)
 

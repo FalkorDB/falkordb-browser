@@ -98,7 +98,7 @@
     }
 
     .DataPanel {
-        @apply h-full w-full flex flex-col gap-2 bg-background border border-border rounded-lg;
+        @apply h-full w-full flex flex-col bg-background border border-border rounded-lg;
     }
 
     .Dropzone {
