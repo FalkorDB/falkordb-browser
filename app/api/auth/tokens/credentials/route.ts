@@ -7,6 +7,19 @@ import { newClient, generateTimeUUID, generateConsistentUserId } from "../../[..
 import { encrypt } from "../../encryption";
 import { login, validateBody } from "../../../validate-body";
 
+// Typed shape for the validated login request body
+type LoginInput = {
+  username?: string;
+  password?: string;
+  host?: string;
+  port?: string | number;
+  tls?: string | boolean;
+  ca?: string;
+  name?: string;
+  expiresAt?: string | null;
+  ttlSeconds?: number | undefined;
+};
+
 /**
  * POST /api/auth/tokens/credentials
  * Generate JWT token with direct credentials (external/API/CLI)
@@ -49,31 +62,31 @@ export async function POST(request: NextRequest) {
     }
 
     const {
-      username,
-      password,
-      host,
-      port,
-      tls,
+      username = "default",
+      password = "",
+      host = "localhost",
+      port = "6379",
+      tls = "false",
       ca,
       name = "API Token",
       expiresAt = null,
       ttlSeconds = undefined,
-    } = validation.data as any;
+    } = validation.data as LoginInput;
 
     // 3. Authenticate with Main DB (6379)
     let authenticatedUser;
     let userPassword;
     try {
-      const userId = generateConsistentUserId(username || "default", host, parseInt(port, 10));
-      userPassword = password || "";
+  const userId = generateConsistentUserId(username, String(host), parseInt(String(port), 10));
+  userPassword = password || "";
 
       const { role } = await newClient(
         {
           host,
-          port: port.toString(),
+          port: String(port),
           username: username || "",
           password: userPassword,
-          tls: tls.toString(),
+          tls: String(tls),
           ca: ca || "undefined",
         },
         userId
@@ -82,7 +95,7 @@ export async function POST(request: NextRequest) {
       authenticatedUser = {
         id: userId,
         host,
-        port: parseInt(port, 10),
+  port: parseInt(String(port), 10),
         username: username || "default",
   tls: tls === "true" || tls === true,
         ca,

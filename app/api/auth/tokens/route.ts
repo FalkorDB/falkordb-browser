@@ -3,9 +3,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { SignJWT } from "jose";
 import crypto from "crypto";
 import { executePATQuery } from "@/lib/token-storage";
-import { getClient, newClient, generateTimeUUID } from "../[...nextauth]/options";
+import { getClient, generateTimeUUID } from "../[...nextauth]/options";
 import { encrypt } from "../encryption";
-import { validateJWTSecret } from "../tokenUtils";
+
 
 /**
  * Fetches tokens from FalkorDB with role-based filtering
