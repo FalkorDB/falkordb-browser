@@ -69,6 +69,8 @@ export default function TableComponent({
     const headerRef = useRef<HTMLTableRowElement>(null)
     const tableRef = useRef<HTMLTableElement>(null)
     const scrollContainerRef = useRef<HTMLDivElement>(null)
+    const loadAttemptedRef = useRef<Set<string>>(new Set());
+    const abortControllersRef = useRef<Map<string, AbortController>>(new Map());
 
     const [hasRestored, setHasRestored] = useState(false)
     const [search, setSearch] = useState<string>("")
@@ -83,56 +85,83 @@ export default function TableComponent({
     const [visibleRows, setVisibleRows] = useState<Row[]>([])
     const [loadingCells, setLoadingCells] = useState<Set<string>>(new Set())
     const [loadedCells, setLoadedCells] = useState<Set<string>>(new Set())
-    const loadAttemptedRef = useRef<Set<string>>(new Set());
+    const [expandArr, setExpandArr] = useState(new Map(initialExpand))
 
-    // Get stable row identifier (using first cell value)
-    const getRowId = (row: Row) => row.cells[0]?.value?.toString() || '';
+    const height = useMemo(() => expandArr.size === 0 ? itemHeight : itemHeight * 2, [expandArr.size, itemHeight])
 
-    const handleLoadLazyCell = useCallback((rowId: string, cellIndex: number, loadFn: () => Promise<any>) => {
-        const cellKey = `${rowId}-${cellIndex}`;
+    const handleLoadLazyCell = useCallback((rowName: string, cellIndex: number, loadFn: () => Promise<any>) => {
+        // Use row name for stable cell key
+        const cellKey = `${rowName}-${cellIndex}`;
 
         // If already loading or loaded, don't load again
         if (loadingCells.has(cellKey) || loadedCells.has(cellKey)) {
             return;
         }
 
+        // Verify the row still exists before starting the request (prevents loading deleted rows)
+        const rowStillExists = rows.some(r => r.name === rowName);
+        if (!rowStillExists) {
+            return;
+        }
+
+        // Create abort controller for this request
+        const abortController = new AbortController();
+        abortControllersRef.current.set(cellKey, abortController);
+
         // Mark as loading
         setLoadingCells(prev => new Set(prev).add(cellKey));
 
         // Load the cell value asynchronously
         loadFn().then(value => {
-            // Find the row by its stable identifier and update it
-            rows.forEach(r => {
-                if (getRowId(r) === rowId) {
+            // Check if request was aborted
+            if (abortController.signal.aborted) {
+                return;
+            }
+
+            // Verify the row still exists and update it
+            let rowFound = false;
+            rows.forEach((r) => {
+                if (r.name === rowName) {
+                    rowFound = true;
                     r.cells.forEach((c, j) => {
                         if (j === cellIndex) {
                             c.value = value
                         }
                     })
-                };
+                }
             });
 
-            // Mark as loaded and remove from loading set
-            setLoadedCells(prev => new Set(prev).add(cellKey));
+            // Only mark as loaded if row still exists
+            if (rowFound) {
+                setLoadedCells(prev => new Set(prev).add(cellKey));
+            }
+
             setLoadingCells(prev => {
                 const newSet = new Set(prev);
                 newSet.delete(cellKey);
                 return newSet;
             });
+
+            // Clean up abort controller
+            abortControllersRef.current.delete(cellKey);
         }).catch((error) => {
-            // eslint-disable-next-line no-console
-            console.error(`Failed to load cell ${cellKey}:`, error);
+            // Only log error if not aborted
+            if (!abortController.signal.aborted) {
+                // eslint-disable-next-line no-console
+                console.error(`Failed to load cell ${cellKey}:`, error);
+            }
+
             // Remove from loading set on error
             setLoadingCells(prev => {
                 const newSet = new Set(prev);
                 newSet.delete(cellKey);
                 return newSet;
             });
+
+            // Clean up abort controller
+            abortControllersRef.current.delete(cellKey);
         });
     }, [loadingCells, loadedCells, rows])
-    const [expandArr, setExpandArr] = useState(new Map(initialExpand))
-
-    const height = expandArr.size === 0 ? itemHeight : itemHeight * 2
 
     useEffect(() => {
         const newStartIndex = Math.max(0, Math.floor((scrollTop - (height * itemsPerPage)) / height))
@@ -144,7 +173,7 @@ export default function TableComponent({
         setTopFakeRowHeight(newTopFakeRowHeight)
         setBottomFakeRowHeight(newBottomFakeRowHeight)
         setVisibleRows(newVisibleRows)
-    }, [scrollTop, itemHeight, itemsPerPage, filteredRows])
+    }, [scrollTop, itemHeight, itemsPerPage, filteredRows, height])
 
     useEffect(() => {
         if (searchRef.current) {
@@ -205,11 +234,13 @@ export default function TableComponent({
         // Clear both loaded cells and load attempts when rows are recreated without values
         const newLoadedCells = new Set<string>();
         const newLoadAttempts = new Set<string>();
+        const validCellKeys = new Set<string>();
 
-        rows.forEach(row => {
-            const rowId = getRowId(row);
+        rows.forEach((row) => {
             row.cells.forEach((cell, cellIndex) => {
-                const cellKey = `${rowId}-${cellIndex}`;
+                // Use row name for stable cell key
+                const cellKey = `${row.name}-${cellIndex}`;
+                validCellKeys.add(cellKey);
 
                 // If cell has a value, keep it as loaded
                 if (cell.value) {
@@ -223,9 +254,29 @@ export default function TableComponent({
             });
         });
 
+        // Abort any pending requests for cells that no longer exist
+        abortControllersRef.current.forEach((controller, cellKey) => {
+            if (!validCellKeys.has(cellKey)) {
+                controller.abort();
+                abortControllersRef.current.delete(cellKey);
+            }
+        });
+
         loadAttemptedRef.current = newLoadAttempts;
         setLoadedCells(newLoadedCells);
+
+        // Also clean up loading cells state for cells that no longer exist
+        setLoadingCells(prev => {
+            const newSet = new Set<string>();
+            prev.forEach(cellKey => {
+                if (validCellKeys.has(cellKey)) {
+                    newSet.add(cellKey);
+                }
+            });
+            return newSet;
+        });
     }, [rows])
+
     useEffect(() => {
         // Restore scroll position on mount
         if (hasRestored || filteredRows.length === 0) return () => { }
@@ -246,6 +297,14 @@ export default function TableComponent({
 
         return () => clearTimeout(timer)
     }, [hasRestored, initialScrollPosition, filteredRows.length, initialSearch])
+
+    // Cleanup: abort all pending requests on unmount
+    useEffect(() => () => {
+        abortControllersRef.current.forEach((controller) => {
+            controller.abort();
+        });
+        abortControllersRef.current.clear();
+    }, [])
 
     const handleSetEditable = (editValue: string, value: string) => {
         setEditable(editValue)
@@ -400,39 +459,27 @@ export default function TableComponent({
                         )
                     }
                     {
-                        visibleRows.map((row) => {
-                            // Find index in filteredRows first
-                            const filteredIndex = filteredRows.findIndex(r => r === row)
-                            // Then find actual index in original rows array
-                            const actualIndex = rows.findIndex(r => r === row)
-                            const rowId = getRowId(row);
-                            const firstVal = row.cells[0].value
-
-                            if (!firstVal) return undefined
-                            
-                            const dataTestID = `${label}${typeof firstVal === "object" ? firstVal.id : firstVal}`
-
-                            if (actualIndex === -1 || filteredIndex === -1) return null
+                        visibleRows.map((row, index) => {
+                            const rowTestID = `${label}${row.name}`
 
                             return (
                                 <TableRow
                                     className="border-border"
-                                    data-testid={`tableRow${dataTestID}`}
-                                    onMouseEnter={() => setHover(`${actualIndex}`)}
+                                    data-testid={`tableRow${rowTestID}`}
+                                    onMouseEnter={() => setHover(row.name)}
                                     onMouseLeave={() => setHover("")}
-                                    data-id={typeof row.cells[0].value === "string" ? row.cells[0].value : undefined}
-                                    key={filteredIndex}
+                                    key={row.name}
                                 >
                                     {
                                         setRows ?
                                             <TableCell className="w-5 !pr-2 border-r border-border">
                                                 <Checkbox
                                                     className="w-6 h-6 rounded-full bg-background border-primary data-[state=checked]:bg-primary"
-                                                    data-testid={`tableCheckbox${dataTestID}`}
+                                                    data-testid={`tableCheckbox${rowTestID}`}
                                                     checked={row.checked}
                                                     onCheckedChange={() => {
-                                                        setRows(rows.map((r, k) => {
-                                                            if (k === actualIndex) {
+                                                        setRows(rows.map((r) => {
+                                                            if (r.name === row.name) {
                                                                 r.checked = !r.checked
                                                             }
                                                             return r
@@ -443,18 +490,20 @@ export default function TableComponent({
                                             : null
                                     }
                                     <TableCell className="border-r border-border">
-                                        <p>{filteredIndex + 1}.</p>
+                                        <p>{index + 1}.</p>
                                     </TableCell>
                                     {
                                         row.cells.map((cell, j) => {
-                                            const cellKey = `${rowId}-${j}`;
+                                            // Use row name for stable cell key
+                                            const cellKey = `${row.name}-${j}`;
+                                            const cellTestId = `${label}${row.name}`;
                                             const isCellLoading = loadingCells.has(cellKey);
                                             const isLazyCell = cell.type === "readonly" && "loadCell" in cell && cell.loadCell;
 
                                             // Only load if it's a lazy cell, has no value, not currently loading, and we haven't attempted to load it yet
                                             if (isLazyCell && !cell.value && !loadingCells.has(cellKey) && !loadAttemptedRef.current.has(cellKey)) {
                                                 loadAttemptedRef.current.add(cellKey);
-                                                handleLoadLazyCell(rowId, j, cell.loadCell);
+                                                handleLoadLazyCell(row.name, j, cell.loadCell);
                                             }
 
                                             // Show loader while loading
@@ -464,7 +513,7 @@ export default function TableComponent({
 
                                             // Show value once loaded
                                             return (
-                                                <TableCell className={cn("border-border p-0", j + 1 !== row.cells.length && "border-r")} key={j}>
+                                                <TableCell className={cn("border-border p-0", j + 1 !== row.cells.length && "border-r")} key={cellKey}>
                                                     <div style={{ height }} className={cn("overflow-auto p-4", row.cells[0]?.value === editable && (cell.type !== "readonly" && cell.type !== "object") && "p-2", cell.type === "object" && "p-1")}>
                                                         {
                                                             cell.type === "object" ?
@@ -496,7 +545,7 @@ export default function TableComponent({
                                                                         data={cell.value}
                                                                     />
                                                                 </div>
-                                                                : editable === `${actualIndex}-${j}` ?
+                                                                : editable === cellKey ?
                                                                     <div className="w-full flex gap-2 items-center">
                                                                         {
                                                                             cell.type === "select" ?
@@ -576,7 +625,7 @@ export default function TableComponent({
                                                                     : <div className="h-full flex items-center gap-2">
                                                                         <Tooltip>
                                                                             <TooltipTrigger asChild>
-                                                                                <p data-testid={`content${dataTestID}${headers[j]}`} >{cell.value}</p>
+                                                                                <p data-testid={`content${cellTestId}${headers[j]}`} >{cell.value}</p>
                                                                             </TooltipTrigger>
                                                                             <TooltipContent>
                                                                                 {cell.value}
@@ -584,13 +633,13 @@ export default function TableComponent({
                                                                         </Tooltip>
                                                                         <div className="w-4">
                                                                             {
-                                                                                cell.type !== "readonly" && hover === `${actualIndex}` &&
+                                                                                cell.type !== "readonly" && hover === row.name &&
                                                                                 <Button
                                                                                     data-testid={`editButton${label}`}
                                                                                     className="disabled:cursor-text disabled:opacity-100"
                                                                                     indicator={indicator}
                                                                                     title="Edit"
-                                                                                    onClick={() => handleSetEditable(`${actualIndex}-${j}`, cell.value!.toString())}
+                                                                                    onClick={() => handleSetEditable(cellKey, cell.value!.toString())}
                                                                                 >
                                                                                     <Pencil className="w-4 h-4" />
                                                                                 </Button>

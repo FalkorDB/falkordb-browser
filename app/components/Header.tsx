@@ -26,7 +26,7 @@ interface Props {
     graphNames: string[]
     graphName: string
     onOpenGraphInfo: () => void
-    displayChat: boolean
+    navigateToSettings: boolean
 }
 
 function getPathType(pathname: string): "Schema" | "Graph" | undefined {
@@ -37,11 +37,11 @@ function getPathType(pathname: string): "Schema" | "Graph" | undefined {
 
 const iconSize = 30
 
-export default function Header({ onSetGraphName, graphNames, graphName, onOpenGraphInfo, displayChat }: Props) {
+export default function Header({ onSetGraphName, graphNames, graphName, onOpenGraphInfo, navigateToSettings }: Props) {
 
     const { indicator } = useContext(IndicatorContext)
     const { setPanel } = useContext(PanelContext)
-    const { hasChanges, saveSettings, resetSettings, settings: { chatSettings: { model, secretKey, navigateToSettings } } } = useContext(BrowserSettingsContext)
+    const { hasChanges, saveSettings, resetSettings, settings: { chatSettings: { model, secretKey, displayChat } } } = useContext(BrowserSettingsContext)
 
     const { theme, setTheme } = useTheme()
     const { currentTheme } = getTheme(theme)

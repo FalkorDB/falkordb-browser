@@ -6,6 +6,7 @@ import { executePATQuery } from "@/lib/token-storage";
 import { getClient, newClient, generateTimeUUID, generateConsistentUserId } from "../[...nextauth]/options";
 import { encrypt } from "../encryption";
 import { validateJWTSecret } from "../tokenUtils";
+import { login, validateBody } from "../../validate-body";
 
 /**
  * Parses and validates request body
@@ -30,14 +31,26 @@ async function parseRequestBody(request: NextRequest): Promise<{ body?: any; err
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function authenticateUser(body: any): Promise<{ user?: any; password?: string; error?: NextResponse }> {
+  // Validate request body using Zod schema
+  const validation = validateBody(login, body);
+  
+  if (!validation.success) {
+    return {
+      error: NextResponse.json(
+        { message: validation.error },
+        { status: 400 }
+      ),
+    };
+  }
+
   const { 
     username, 
     password, 
-    host = "localhost", 
-    port = "6379", 
-    tls = "false", 
+    host, 
+    port, 
+    tls, 
     ca,
-  } = body;
+  } = validation.data;
 
   // Mode 1: Direct login with credentials (Swagger/external API)
   if (username || password || host !== "localhost" || port !== "6379" || tls !== "false" || ca) {
@@ -63,7 +76,7 @@ async function authenticateUser(body: any): Promise<{ user?: any; password?: str
           host,
           port: parseInt(port, 10),
           username,
-          tls: tls === "true" || tls === true,
+          tls: tls === "true",
           ca,
           role,
         },
