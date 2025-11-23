@@ -1,7 +1,8 @@
-import { PlusCircle } from "lucide-react"
+import { ArrowRight, Circle } from "lucide-react"
 import { useCallback, useContext, useEffect, useRef, useState } from "react"
 import { cn, GraphRef, handleZoomToFit } from "@/lib/utils"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
+import { useSession } from "next-auth/react"
 import { Graph, Link, Node } from "../api/graph/model"
 import Input from "../components/ui/Input"
 import Button from "../components/ui/Button"
@@ -47,6 +48,7 @@ export default function Toolbar({
     const { isLoading: isLoadingGraph } = useContext(GraphContext)
 
     const suggestionRef = useRef<HTMLDivElement>(null)
+    const { data: session } = useSession()
 
     const [suggestions, setSuggestions] = useState<(Node | Link)[]>([])
     const [suggestionIndex, setSuggestionIndex] = useState(0)
@@ -276,27 +278,27 @@ export default function Toolbar({
             </div>
             <div className={cn("flex flex-row-reverse gap-2", label === "Schema" && "h-full")}>
                 {
-                    graphName &&
+                    graphName && session?.user.role !== "Read-Only" &&
                     <>
                         <Button
                             data-testid={`elementCanvasAddNode${label}`}
-                            className="pointer-events-auto"
+                            className="pointer-events-auto px-4 py-2.5 bg-background border-green-900"
                             variant="Secondary"
                             title="Add Node"
                             onClick={() => setIsAddNode(!isAddNode)}
                         >
-                            <PlusCircle size={20} />
+                            <Circle size={20} />
                         </Button>
                         {
                             setIsAddEdge &&
                             <Button
                                 data-testid={`elementCanvasAddEdge${label}`}
-                                className="pointer-events-auto"
+                                className="pointer-events-auto px-4 py-2.5 bg-background border-green-900"
                                 variant="Secondary"
                                 title="Add Edge"
                                 onClick={() => setIsAddEdge(!isAddEdge)}
                             >
-                                <PlusCircle size={20} />
+                                <ArrowRight size={20} />
                             </Button>
                         }
                         {

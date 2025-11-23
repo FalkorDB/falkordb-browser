@@ -455,8 +455,8 @@ export default function CreateElementPanel(props: Props) {
                                 trigger={
                                     <Button
                                         className="p-2 text-nowrap text-xs justify-center border border-border rounded-full"
-                                        label="Add Label"
-                                        title={type ? "Add a new label" : "Add label for relationship"}
+                                        label={`Add ${type ? "Label" : "Type"}`}
+                                        title={type ? "Add a new label" : "Define the relationship type"}
                                     >
                                         <Pencil size={15} />
                                     </Button>

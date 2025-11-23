@@ -205,11 +205,11 @@ export default function Page() {
             const json = await result.json()
 
             if (isAddNode) {
-                const { labels: ls } = graph.extendNode(json.result.data[0].n, false, true, true)
+                const { labels: ls } = graph.extendNode(json.result.data[0].n, false, false, true)
                 setLabels(prev => [...prev, ...ls.filter(c => !prev.some(p => p.name === c)).map(c => graph.LabelsMap.get(c)!)])
                 handleSetIsAdd(setIsAddNode, setIsAddEdge)(false)
             } else {
-                const link = graph.extendEdge(json.result.data[0].e, false, true)
+                const link = graph.extendEdge(json.result.data[0].e, false, false, true)
                 // Calculate curve for the newly created edge
                 link.curve = graph.calculateLinkCurve(link)
                 setRelationships(prev => [...prev.filter(p => p.name !== link.relationship), graph.RelationshipsMap.get(link.relationship)!])
