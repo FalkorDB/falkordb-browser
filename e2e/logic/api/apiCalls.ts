@@ -168,7 +168,8 @@ export default class ApiCalls {
   ): Promise<ChangeGraphNameResponse> {
     try {
       const result = await patchRequest(
-        `${urls.api.graphUrl + destinationGraph}?sourceName=${sourceGraph}`
+        `${urls.api.graphUrl + destinationGraph}`,
+        { sourceName: sourceGraph }
       );
       return await result.json();
     } catch (error) {
@@ -197,9 +198,9 @@ export default class ApiCalls {
     data?: any
   ): Promise<DuplicateGraphresponse> {
     try {
-      const result = await postRequest(
-        `${urls.api.graphUrl + destinationGraph}?sourceName=${sourceGraph}`,
-        data
+      const result = await patchRequest(
+        `${urls.api.graphUrl + destinationGraph}/duplicate`,
+        { sourceName: sourceGraph, ...data }
       );
       return await result.json();
     } catch (error) {
@@ -283,7 +284,7 @@ export default class ApiCalls {
   async deleteGraphNode(
     graph: string,
     node: string,
-    data: Record<string, string>
+    data: Record<string, string | boolean>
   ): Promise<GraphNodeResponse> {
     try {
       const result = await deleteRequest(
@@ -348,7 +349,8 @@ export default class ApiCalls {
   ): Promise<ModifySettingsRoleResponse> {
     try {
       const result = await postRequest(
-        `${urls.api.settingsConfig + roleName}?value=${roleValue}`
+        `${urls.api.settingsConfig + roleName}`,
+        { value: roleValue }
       );
       return await result.json();
     } catch (error) {

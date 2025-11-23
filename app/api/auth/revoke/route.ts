@@ -4,6 +4,7 @@ import crypto from "crypto";
 import { executePATQuery } from "@/lib/token-storage";
 import { getTokenId, validateJWTSecret } from "../tokenUtils";
 import { getClient } from "../[...nextauth]/options";
+import { revokeToken, validateBody } from "../../validate-body";
 
 /**
  * Parses and validates request body
@@ -15,6 +16,21 @@ async function parseRequestBody(request: NextRequest): Promise<{
 }> {
   try {
     const body = await request.json();
+    
+    // Validate request body using Zod schema (if token is provided)
+    if (body.token) {
+      const validation = validateBody(revokeToken, body);
+      
+      if (!validation.success) {
+        return {
+          error: NextResponse.json(
+            { message: validation.error },
+            { status: 400 }
+          ),
+        };
+      }
+    }
+    
     const { token: tokenToRevoke, token_id: tokenIdToRevoke } = body;
     
     if (!tokenToRevoke && !tokenIdToRevoke) {

@@ -119,7 +119,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       runDefaultQuerySettings: { runDefaultQuery, setRunDefaultQuery },
       defaultQuerySettings: { defaultQuery, setDefaultQuery },
       contentPersistenceSettings: { contentPersistence, setContentPersistence },
-      chatSettings: { secretKey, setSecretKey, model, setModel, navigateToSettings, setNavigateToSettings },
+      chatSettings: { secretKey, setSecretKey, model, setModel, displayChat, navigateToSettings },
       graphInfo: { refreshInterval, setRefreshInterval, displayTextPriority, setDisplayTextPriority }
     },
     hasChanges,
@@ -169,7 +169,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       setHasChanges(false)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }), [contentPersistence, defaultQuery, hasChanges, lastLimit, limit, model, navigateToSettings, newContentPersistence, newDefaultQuery, newLimit, newModel, newRefreshInterval, newRunDefaultQuery, newSecretKey, newTimeout, refreshInterval, runDefaultQuery, secretKey, timeout, displayTextPriority, newDisplayTextPriority, replayTutorial, tutorialOpen])
+  }), [displayChat, navigateToSettings, contentPersistence, defaultQuery, hasChanges, lastLimit, limit, model, navigateToSettings, newContentPersistence, newDefaultQuery, newLimit, newModel, newRefreshInterval, newRunDefaultQuery, newSecretKey, newTimeout, refreshInterval, runDefaultQuery, secretKey, timeout, displayTextPriority, newDisplayTextPriority, replayTutorial, tutorialOpen])
 
   const historyQueryContext = useMemo(() => ({
     historyQuery,
@@ -470,7 +470,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
   const handleFetchOptions = useCallback(async () => {
     if (indicator === "offline") return
 
-    await Promise.all(([["Graph", setGraphNames, setGraphName], ["Schema", setSchemaNames, setSchemaName]] as ["Graph" | "Schema", Dispatch<SetStateAction<string[]>>, Dispatch<SetStateAction<string>>][]).map(async ([type, setOptions, setName]) => {
+    await Promise.all(([["Graph", setGraphNames, setGraphName],/* ["Schema", setSchemaNames, setSchemaName] */] as ["Graph" | "Schema", Dispatch<SetStateAction<string[]>>, Dispatch<SetStateAction<string>>][]).map(async ([type, setOptions, setName]) => {
       await fetchOptions(type, toast, setIndicator, indicator, setName, setOptions, contentPersistence)
     }))
   }, [indicator, toast, contentPersistence])
@@ -615,7 +615,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
                               graphNames={pathname.includes("/schema") ? schemaNames : graphNames}
                               onSetGraphName={handleOnSetGraphName}
                               onOpenGraphInfo={onExpand}
-                              displayChat={displayChat}
+                              navigateToSettings={navigateToSettings}
                             />
                           }
                           <ResizablePanelGroup direction="horizontal" className="w-1 grow">

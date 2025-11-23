@@ -83,6 +83,7 @@ export type ViewportState = {
 
 export interface Row {
   cells: Cell[];
+  name: string;
   checked?: boolean;
 }
 
