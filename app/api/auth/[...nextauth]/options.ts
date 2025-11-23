@@ -521,7 +521,31 @@ export async function getClient() {
 
   let connection = connections.get(id);
 
-  // If client is not found, create a new one
+  // Health check: if connection exists, verify it's still alive
+  if (connection) {
+    try {
+      const conn = await connection.connection;
+      await conn.ping();
+
+      // Connection is healthy, reuse it
+      return { client: connection, user };
+    } catch (pingError) {
+      // Connection is dead, remove from pool and recreate
+      // eslint-disable-next-line no-console
+      console.warn("Session connection health check failed, recreating:", pingError);
+      connections.delete(id);
+
+      try {
+        await connection.close();
+      } catch (closeError) {
+        // Ignore close errors on dead connections
+      }
+
+      connection = undefined; // Will be recreated below
+    }
+  }
+
+  // No existing connection or health check failed - create new one
   if (!connection) {
     const { client } = await newClient(
       {

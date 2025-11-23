@@ -84,7 +84,35 @@ function checkViewPermission(
   return { authorized: true };
 }
 
-// eslint-disable-next-line import/prefer-default-export
+/**
+ * Checks if user has permission to revoke the token
+ */
+function checkRevokePermission(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  authenticatedUser: any,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  tokenData: any
+): { authorized: boolean; error?: NextResponse } {
+  const isAdmin = authenticatedUser.role === "Admin";
+  const isTokenOwner = authenticatedUser.id === tokenData.user_id;
+
+  if (!isAdmin && !isTokenOwner) {
+    return {
+      authorized: false,
+      error: NextResponse.json(
+        { message: "Forbidden: You can only revoke your own tokens" },
+        { status: 403 }
+      ),
+    };
+  }
+
+  return { authorized: true };
+}
+
+/**
+ * GET /api/auth/tokens/{tokenId}
+ * Get token details by token ID
+ */
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ tokenId: string }> }
@@ -123,6 +151,81 @@ export async function GET(
   } catch (error) {
     // eslint-disable-next-line no-console
     console.error("Error fetching token:", error);
+    return NextResponse.json(
+      { message: "Internal server error" },
+      { status: 500 }
+    );
+  }
+}
+
+/**
+ * DELETE /api/auth/tokens/{tokenId}
+ * Revoke token by token ID
+ */
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ tokenId: string }> }
+) {
+  try {
+    // Authenticate the user making the request
+    const session = await getClient();
+    if (session instanceof NextResponse) {
+      return session;
+    }
+    const { user: authenticatedUser } = session;
+
+    // Get tokenId from params
+    const { tokenId } = await params;
+
+    // Fetch token from database
+    const fetchResult = await fetchTokenById(tokenId);
+    if (fetchResult.error) {
+      return fetchResult.error;
+    }
+
+    // Check if token is already inactive
+    if (!fetchResult.tokenData.is_active) {
+      return NextResponse.json(
+        { message: "Token is already revoked" },
+        { status: 400 }
+      );
+    }
+
+    // Check revoke permissions
+    const permissionCheck = checkRevokePermission(
+      authenticatedUser,
+      fetchResult.tokenData
+    );
+    if (!permissionCheck.authorized) {
+      return permissionCheck.error!;
+    }
+
+    // Revoke token in database
+    const escapeString = (str: string) => str.replace(/'/g, "''");
+    const nowUnix = Math.floor(Date.now() / 1000);
+    const revokerUsername = authenticatedUser.username || "default";
+
+    const revokeQuery = `
+      MATCH (t:Token {token_id: '${escapeString(tokenId)}'})-[:BELONGS_TO]->(u:User)
+      MATCH (revoker:User {username: '${escapeString(revokerUsername)}'})
+      SET t.is_active = false
+      CREATE (t)-[:REVOKED_BY {at: ${nowUnix}}]->(revoker)
+      RETURN t.token_id as token_id
+    `;
+
+    await executePATQuery(revokeQuery);
+
+    // Return success response
+    return NextResponse.json(
+      {
+        message: "Token revoked successfully",
+        tokenId
+      },
+      { status: 200 }
+    );
+  } catch (error) {
+    // eslint-disable-next-line no-console
+    console.error("Error revoking token:", error);
     return NextResponse.json(
       { message: "Internal server error" },
       { status: 500 }
