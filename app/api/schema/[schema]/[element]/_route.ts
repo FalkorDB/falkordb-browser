@@ -1,11 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getClient } from "@/app/api/auth/[...nextauth]/options";
 import { formatAttributes } from "./utils";
+import {
+  createSchemaElement,
+  deleteSchemaElement,
+  validateBody,
+} from "../../../validate-body";
 
 // eslint-disable-next-line import/prefer-default-export
 export async function POST(
   request: NextRequest,
-  { params }: { params: Promise<{ schema: string; node: string }> }
+  { params }: { params: Promise<{ schema: string; element: string }> }
 ) {
   try {
     const session = await getClient();
@@ -17,16 +22,19 @@ export async function POST(
     const { client, user } = session;
     const { schema } = await params;
     const schemaName = `${schema}_schema`;
-    const { type, label, attributes, selectedNodes } = await request.json();
 
     try {
-      if (type === undefined) throw new Error("Type is required");
+      const body = await request.json();
 
-      if (!attributes) throw new Error("Attributes are required");
+      // Validate request body
+      const validation = validateBody(createSchemaElement, body);
 
+      if (!validation.success) {
+        return NextResponse.json({ message: validation.error }, { status: 400 });
+      }
+
+      const { type, label, attributes, selectedNodes } = validation.data;
       if (!type) {
-        if (!label) throw new Error("Label is required");
-
         if (!selectedNodes || selectedNodes.length !== 2)
           throw new Error("Selected nodes are required");
       }
@@ -37,25 +45,33 @@ export async function POST(
         ? `CREATE (n${label.length > 0 ? `:${label.join(":")}` : ""}${
             formattedAttributes?.length > 0
               ? ` {${formattedAttributes
-                  .map(([k, v]) => `${k}: "${v}"`)
+                  .map(([k]) => `${k}: $attr_${k}`)
                   .join(",")}}`
               : ""
           }) RETURN n`
-        : `MATCH (a), (b) WHERE ID(a) = ${selectedNodes[0].id} AND ID(b) = ${
-            selectedNodes[1].id
-          } CREATE (a)-[e:${label[0]}${
+        : `MATCH (a), (b) WHERE ID(a) = $nodeA AND ID(b) = $nodeB CREATE (a)-[e:${label[0]}${
             formattedAttributes?.length > 0
               ? ` {${formattedAttributes
-                  .map(([k, v]) => `${k}: "${v}"`)
+                  .map(([k]) => `${k}: $attr_${k}`)
                   .join(",")}}`
               : ""
           }]->(b) RETURN e`;
+      
+      const queryParams: Record<string, string | number> = {};
+      if (!type && selectedNodes) {
+        queryParams.nodeA = selectedNodes[0].id;
+        queryParams.nodeB = selectedNodes[1].id;
+      }
+      if (formattedAttributes?.length > 0) {
+        formattedAttributes.forEach(([k, v]) => {
+          queryParams[`attr_${k}`] = v;
+        });
+      }
+      
       const result =
         user.role === "Read-Only"
-          ? await graph.roQuery(query)
-          : await graph.query(query);
-
-      if (!result) throw new Error("Something went wrong");
+          ? await graph.roQuery(query, { params: queryParams })
+          : await graph.query(query, { params: queryParams });
 
       return NextResponse.json({ result }, { status: 200 });
     } catch (error) {
@@ -66,6 +82,7 @@ export async function POST(
       );
     }
   } catch (err) {
+    console.error(err);
     return NextResponse.json(
       { message: (err as Error).message },
       { status: 500 }
@@ -75,7 +92,7 @@ export async function POST(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: Promise<{ schema: string; node: string }> }
+  { params }: { params: Promise<{ schema: string; element: string }> }
 ) {
   try {
     const session = await getClient();
@@ -85,24 +102,29 @@ export async function DELETE(
     }
 
     const { client, user } = session;
-    const { schema, node } = await params;
+    const { schema, element } = await params;
     const schemaName = `${schema}_schema`;
-    const nodeId = Number(node);
-    const { type } = await request.json();
+    const elementId = Number(element);
 
     try {
-      if (type === undefined) throw new Error("Type is required");
+      const body = await request.json();
 
+      // Validate request body
+      const validation = validateBody(deleteSchemaElement, body);
+
+      if (!validation.success) {
+        return NextResponse.json({ message: validation.error }, { status: 400 });
+      }
+
+      const { type } = validation.data;
       const graph = client.selectGraph(schemaName);
       const query = type
-        ? `MATCH (n) WHERE ID(n) = $nodeId DELETE n`
-        : `MATCH ()-[e]-() WHERE ID(e) = $nodeId DELETE e`;
-      const result =
-        user.role === "Read-Only"
-          ? await graph.roQuery(query, { params: { nodeId } })
-          : await graph.query(query, { params: { nodeId } });
+        ? `MATCH (n) WHERE ID(n) = $elementId DELETE n`
+        : `MATCH ()-[e]-() WHERE ID(e) = $elementId DELETE e`;
 
-      if (!result) throw new Error("Something went wrong");
+      if (user.role === "Read-Only")
+        await graph.roQuery(query, { params: { elementId } });
+      else await graph.query(query, { params: { elementId } });
 
       return NextResponse.json(
         { message: "Node deleted successfully" },
@@ -116,6 +138,7 @@ export async function DELETE(
       );
     }
   } catch (err) {
+    console.error(err);
     return NextResponse.json(
       { message: (err as Error).message },
       { status: 500 }

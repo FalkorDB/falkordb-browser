@@ -31,7 +31,7 @@ export default function BrowserSettings() {
             defaultQuerySettings: { defaultQuery, setDefaultQuery },
             timeoutSettings: { timeout: timeoutValue },
             limitSettings: { limit },
-            chatSettings: { secretKey, model, navigateToSettings },
+            chatSettings: { secretKey, model, displayChat },
             graphInfo: { refreshInterval, displayTextPriority }
         },
         hasChanges,
@@ -285,7 +285,7 @@ export default function BrowserSettings() {
                         <div className="flex gap-2 items-center">
                             <p>Model</p>
                             <Combobox
-                                disabled={!navigateToSettings}
+                                disabled={!displayChat}
                                 className="p-1"
                                 label="Model"
                                 options={MODELS}
@@ -297,7 +297,7 @@ export default function BrowserSettings() {
                         <div className="w-1 grow flex gap-2 items-center">
                             <p>Secret Key</p>
                             <Input
-                                disabled={!navigateToSettings}
+                                disabled={!displayChat}
                                 className="w-1 grow"
                                 id="secretKeyInput"
                                 value={newSecretKey}

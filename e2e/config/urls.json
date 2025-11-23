@@ -5,7 +5,8 @@
         "LogoutApiUrl": "http://localhost:3000/api/auth/signout",
         "settingsConfig": "http://localhost:3000/api/graph/config/",
         "settingsUsers": "http://localhost:3000/api/user",
-        "schemaUrl": "http://localhost:3000/api/schema/"
+        "schemaUrl": "http://localhost:3000/api/schema/",
+        "tokenUrl": "http://localhost:3000/api/auth/"
     },
   
     "falkorDBWeb": "https://www.falkordb.com/",

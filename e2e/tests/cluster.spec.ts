@@ -71,16 +71,20 @@ test.describe("Cluster Functionality Tests", () => {
     test("@cluster Host and port fields accept cluster node configurations", async () => {
       const loginPage = await browser.createNewPage(LoginPage, urls.loginUrl);
       await browser.setPageToFullScreen();
-      
-      for (const node of CLUSTER_NODES) {
-        await loginPage.fillHost(node.host);
-        await loginPage.fillPort(node.port);
-        expect(await loginPage.getHost()).toBe(node.host);
-        expect(await loginPage.getPort()).toBe(node.port);
-        await loginPage.fillHost("");
-        await loginPage.fillPort("");
-      }
-      
+
+      await CLUSTER_NODES.reduce(
+        (chain, node) =>
+          chain.then(async () => {
+            await loginPage.fillHost(node.host);
+            await loginPage.fillPort(node.port);
+            expect(await loginPage.getHost()).toBe(node.host);
+            expect(await loginPage.getPort()).toBe(node.port);
+            await loginPage.fillHost("");
+            await loginPage.fillPort("");
+          }),
+        Promise.resolve()
+      );
+
       expect(CLUSTER_NODES.length).toBeGreaterThan(0);
     });
 
@@ -108,8 +112,9 @@ test.describe("Cluster Functionality Tests", () => {
       await loginPage.clickOnSettingsBtn();
       expect(loginPage.getCurrentURL()).toContain("/settings");
 
-      await loginPage.clickOnSchemasButton();
-      expect(loginPage.getCurrentURL()).toContain("/schema");
+      // Commented out due to schema code removal
+      // await loginPage.clickOnSchemasButton();
+      // expect(loginPage.getCurrentURL()).toContain("/schema");
 
       await loginPage.clickOnGraphsButton();
       expect(loginPage.getCurrentURL()).toContain("/graph");

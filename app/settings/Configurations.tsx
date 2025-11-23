@@ -153,8 +153,12 @@ export default function Configurations() {
         }
 
         const result = await securedFetch(
-            `api/graph/config/${prepareArg(name)}?value=${prepareArg(value)}`,
-            { method: 'POST' },
+            `api/graph/config/${prepareArg(name)}`,
+            { 
+                method: 'POST',
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ value })
+            },
             toast,
             setIndicator
         );
@@ -210,6 +214,7 @@ export default function Configurations() {
             const description = Configs.get(name)?.description ?? "";
 
             return {
+                name,
                 cells: [
                     { value: name, type: "readonly" },
                     { value: description, type: "readonly" },

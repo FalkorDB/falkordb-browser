@@ -33,8 +33,10 @@ export default function DuplicateGraph({ open, onOpenChange, selectedValue, onDu
 
         try {
             setIsLoading(true)
-            const result = await securedFetch(`api/${type === "Graph" ? "graph" : "schema"}/${prepareArg(duplicateName)}/duplicate?sourceName=${prepareArg(selectedValue)}`, {
-                method: "PATCH"
+            const result = await securedFetch(`api/${type === "Graph" ? "graph" : "schema"}/${prepareArg(duplicateName)}/duplicate`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ sourceName: selectedValue })
             }, toast, setIndicator)
 
             if (!result.ok) return
