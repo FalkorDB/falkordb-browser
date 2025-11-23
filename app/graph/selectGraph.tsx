@@ -4,7 +4,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/compon
 import { useCallback, useContext, useEffect, useRef, useState } from "react";
 import { DialogHeader, DialogDescription, DialogTrigger, DialogTitle, DialogContent, Dialog } from "@/components/ui/dialog";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
-import { fetchOptions, prepareArg, Row, securedFetch } from "@/lib/utils";
+import { fetchOptions, getMemoryUsage, getSSEGraphResult, prepareArg, Row, securedFetch } from "@/lib/utils";
 import { useSession } from "next-auth/react";
 import { useToast } from "@/components/ui/use-toast";
 import { ChevronDown, ChevronUp, PlusCircle, Settings } from "lucide-react";
@@ -62,10 +62,11 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
 
     const handleSetOption = useCallback(async (option: string, optionName: string) => {
         const result = await securedFetch(
-            `api/${type === "Graph" ? "graph" : "schema"}/${prepareArg(option)}?sourceName=${prepareArg(optionName)}`,
+            `api/${type === "Graph" ? "graph" : "schema"}/${prepareArg(option)}`,
             {
                 method: "PATCH",
-                headers: { "Content-Type": "application/json" }
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ sourceName: optionName })
             },
             toast,
             setIndicator
@@ -94,24 +95,60 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
         return result.ok
     }, [type, toast, setIndicator, options, setOptions, setSelectedValue, selectedValue, setRows, session])
 
-    const handleSetRows = useCallback((opts: string[]) => {
-        setRows(
-            opts.map(opt =>
-                session?.user?.role === "Admin"
-                    ? ({
-                        checked: false,
-                        name: opt,
-                        cells: [{ value: opt, onChange: (value: string) => handleSetOption(value, opt), type: "text" }]
-                    })
-                    : ({ checked: false, name: opt, cells: [{ value: opt, type: "readonly" }] })
-            )
-        )
-    }, [session, setRows, handleSetOption])
+    const loadMemory = (opt: string) =>
+        async () => {
+            const memoryMap = await getMemoryUsage(opt, toast, setIndicator);
+            const memoryValue = memoryMap.get("total_graph_sz_mb") ?? 0;
 
-    // Build rows whenever options change
+            return `${memoryValue} MB`;
+        }
+
+    const loadNodesCount = (opt: string) =>
+        async () => {
+            const result = await getSSEGraphResult(`api/graph/${prepareArg(opt)}/count/nodes`, toast, setIndicator);
+
+            if (!result) return "";
+
+            return Number(result.nodes).toLocaleString()
+        }
+
+    const loadEdgesCount = (opt: string) =>
+        async () => {
+            const result = await getSSEGraphResult(`api/graph/${prepareArg(opt)}/count/edges`, toast, setIndicator);
+
+            if (!result) return "";
+
+            return Number(result.edges).toLocaleString()
+        }
+
+    const handleSetRows = (opts: string[]) => {
+        setRows(opts.map(opt =>
+            session?.user?.role === "Admin"
+                ? ({
+                    checked: false,
+                    name: opt,
+                    cells: [
+                        { value: opt, onChange: (value: string) => handleSetOption(value, opt), type: "text" },
+                        { loadCell: loadMemory(opt), type: "readonly" },
+                        { loadCell: loadNodesCount(opt), type: "readonly" },
+                        { loadCell: loadEdgesCount(opt), type: "readonly" },
+                    ]
+                })
+                : ({
+                    checked: false,
+                    name: opt,
+                    cells: [
+                        { value: opt, type: "readonly" },
+                        { loadCell: loadMemory(opt), type: "readonly" },
+                        { loadCell: loadNodesCount(opt), type: "readonly" },
+                        { loadCell: loadEdgesCount(opt), type: "readonly" },
+                    ]
+                })))
+    }
+
     useEffect(() => {
         handleSetRows(options)
-    }, [options, session, handleSetRows])
+    }, [options])
 
     const handleOpenChange = async (o: boolean) => {
         setOpen(o)
@@ -218,7 +255,7 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
                     className="grow overflow-hidden"
                     label={`${type}s`}
                     entityName={type}
-                    headers={["Name"]}
+                    headers={["Name", "Memory Usage", "Nodes #", "Edges #"]}
                     rows={rows}
                     setRows={setRows}
                     inputRef={inputRef}

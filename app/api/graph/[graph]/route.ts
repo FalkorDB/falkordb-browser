@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getClient } from "@/app/api/auth/[...nextauth]/options";
+import { renameGraph, validateBody } from "../../validate-body";
 
 export async function DELETE(
   request: NextRequest,
@@ -32,6 +33,7 @@ export async function DELETE(
       );
     }
   } catch (err) {
+    console.error(err);
     return NextResponse.json(
       { message: (err as Error).message },
       { status: 500 }
@@ -56,12 +58,9 @@ export async function POST(
 
     try {
       const graph = client.selectGraph(graphId);
-      const result =
-        user.role === "Read-Only"
-          ? await graph.roQuery("RETURN 1")
-          : await graph.query("RETURN 1");
 
-      if (!result) throw new Error("Something went wrong");
+      if (user.role === "Read-Only") await graph.roQuery("RETURN 1");
+      else await graph.query("RETURN 1");
 
       return NextResponse.json(
         { message: "Graph created successfully" },
@@ -75,6 +74,7 @@ export async function POST(
       );
     }
   } catch (err) {
+    console.error(err);
     return NextResponse.json(
       { message: (err as Error).message },
       { status: 500 }
@@ -96,11 +96,21 @@ export async function PATCH(
     const { client } = session;
 
     const { graph: graphId } = await params;
-    const sourceName = request.nextUrl.searchParams.get("sourceName");
 
     try {
-      if (!sourceName) throw new Error("Missing parameter sourceName");
+      const body = await request.json();
 
+      // Validate request body
+      const validation = validateBody(renameGraph, body);
+
+      if (!validation.success) {
+        return NextResponse.json(
+          { message: validation.error },
+          { status: 400 }
+        );
+      }
+
+      const { sourceName } = validation.data;
       const data = await (
         await client.connection
       ).renameNX(sourceName, graphId);
@@ -116,6 +126,7 @@ export async function PATCH(
       );
     }
   } catch (err) {
+    console.error(err);
     return NextResponse.json(
       { message: (err as Error).message },
       { status: 500 }
@@ -156,11 +167,47 @@ export async function GET(
           ? await graph.roQuery(query, { TIMEOUT: timeout })
           : await graph.query(query, { TIMEOUT: timeout });
 
-      if (!result) throw new Error("Something went wrong");
+      const writeDataLine = (chunk: string) => {
+        writer.write(encoder.encode(`data: ${chunk}\n`));
+      };
 
-      writer.write(
-        encoder.encode(`event: result\ndata: ${JSON.stringify(result)}\n\n`)
-      );
+      const streamResult = () => {
+        writer.write(encoder.encode("event: result\n"));
+        writeDataLine("{");
+
+        let isFirstField = true;
+
+        const entries = Object.entries(result ?? {}).filter(
+          ([, value]) => value !== undefined
+        );
+
+        for (let idx = 0; idx < entries.length; idx += 1) {
+          const [key, value] = entries[idx];
+
+          if (key === "data" && Array.isArray(value)) {
+            writeDataLine(`${isFirstField ? "" : ","}"data":[`);
+            isFirstField = false;
+
+            for (let i = 0; i < value.length; i += 1) {
+              const row = value[i];
+              const rowChunk = JSON.stringify(row);
+              writeDataLine(i < value.length - 1 ? `${rowChunk},` : rowChunk);
+            }
+
+            writeDataLine("]");
+          } else {
+            writeDataLine(
+              `${isFirstField ? "" : ","}"${key}":${JSON.stringify(value)}`
+            );
+            isFirstField = false;
+          }
+        }
+
+        writeDataLine("}");
+        writer.write(encoder.encode("\n"));
+      };
+
+      streamResult();
       writer.close();
     } catch (error) {
       console.error(error);
@@ -191,7 +238,7 @@ export async function GET(
   request.signal.addEventListener("abort", () => {
     writer.close();
   });
-  
+
   return new Response(readable, {
     headers: {
       "Content-Type": "text/event-stream",
