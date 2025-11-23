@@ -9,9 +9,10 @@ import { IndicatorContext } from "./provider"
 interface Props {
     selectedValues: string[]
     type: "Graph" | "Schema"
+    setOpenMenage: (openMenage: boolean) => void
 }
 
-export default function ExportGraph({ selectedValues, type }: Props) {
+export default function ExportGraph({ selectedValues, type, setOpenMenage }: Props) {
 
     const [open, setOpen] = useState(false)
     const [isLoading, setIsLoading] = useState(false)
@@ -40,6 +41,7 @@ export default function ExportGraph({ selectedValues, type }: Props) {
                     link.parentNode?.removeChild(link)
                     window.URL.revokeObjectURL(url)
                     setOpen(false)
+                    setOpenMenage(false)
                 } catch (e) {
                     toast({
                         title: "Error",
@@ -62,7 +64,7 @@ export default function ExportGraph({ selectedValues, type }: Props) {
                 <Button
                     data-testid="exportGraph"
                     variant="Primary"
-                    label="Export Data"
+                    label="Export"
                     title="Export graph data to a .dump file"
                     disabled={selectedValues.length === 0}
                 />

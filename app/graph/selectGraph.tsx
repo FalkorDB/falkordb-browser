@@ -242,7 +242,7 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
                 }}
                 hideClose
                 preventOutsideClose={tutorialOpen}
-                className="flex flex-col border-none rounded-lg max-w-none h-[90dvh]"
+                className="flex flex-col border-none rounded-lg max-w-none h-[90dvh] w-[60dvw]"
             >
                 <DialogHeader className="flex-row justify-between items-center border-b border-border pb-4">
                     <DialogTitle className="text-2xl font-medium">Manage Graphs</DialogTitle>
@@ -277,6 +277,7 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
                             <ExportGraph
                                 selectedValues={rows.filter(opt => opt.checked).map(opt => opt.cells[0].value as string)}
                                 type={type}
+                                setOpenMenage={setOpenMenage}
                             />
                             <DuplicateGraph
                                 selectedValue={rows.filter(opt => opt.checked).map(opt => opt.cells[0].value as string)[0]}

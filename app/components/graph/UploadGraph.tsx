@@ -35,7 +35,13 @@ export default function UploadGraph({ disabled, open, onOpenChange }: {
                     <CloseDialog />
                 </DialogHeader>
                 <form onSubmit={onUploadData} className="grow p-4 flex flex-col gap-6">
-                    <Dropzone filesCount className="flex-col" withTable onFileDrop={setFiles} />
+                    <Dropzone
+                        filesCount
+                        className="flex-col"
+                        withTable
+                        accept={[".dump"]}
+                        onFileDrop={setFiles}
+                    />
                     <Button
                         type="submit"
                         label="Upload"
