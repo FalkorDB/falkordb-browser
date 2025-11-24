@@ -141,10 +141,18 @@ export default function Header({ onSetGraphName, graphNames, graphName, onOpenGr
                         <Button
                             className="Gradient bg-clip-text text-transparent font-semibold text-xl"
                             indicator={indicator}
+                            title={`Use English to query the graph.
+                                    The feature requires LLM model and API key.
+                                    Update local user parameters in Settings.`}
                             label="CHAT"
                             onClick={() => {
                                 if (navigateToSettings && (!model || !secretKey)) {
                                     router.push("/settings")
+                                    toast({
+                                        title: "Incomplete Chat Settings",
+                                        description: "Please complete the chat settings to use the chat feature.",
+                                        variant: "destructive",
+                                    })
                                 } else {
                                     handleSetCurrentPanel("chat")
                                 }
