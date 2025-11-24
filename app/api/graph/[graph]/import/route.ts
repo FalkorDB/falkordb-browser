@@ -32,28 +32,12 @@ export async function POST(
       const arrayBuffer = await file.arrayBuffer();
       const buffer = Buffer.from(arrayBuffer);
       const shouldReplace = replaceFlag === "true";
-      const connection = await client.connection;
-
-      // If replace is requested, delete the existing graph first
-      // GRAPH.RESTORE doesn't support REPLACE option
-      if (shouldReplace) {
-        try {
-          await connection.falkordb.delete(graphId);
-        } catch (deleteError) {
-          // Ignore error if graph doesn't exist
-          if (!(deleteError as Error).message.includes("not exist")) {
-            throw deleteError;
-          }
-        }
-      }
-
-      // Call GRAPH.RESTORE with binary payload
-      // GRAPH.RESTORE <graph> <payload>
-      const result = await connection.sendCommand([
-        "GRAPH.RESTORE",
+      const result = await (await client.connection).restore(
         graphId,
-        buffer
-      ]);
+        0,
+        buffer,
+        shouldReplace ? { REPLACE: true } : {}
+      );
 
       if (result !== "OK") {
         throw new Error(`Failed to restore graph: ${graphId}`);
