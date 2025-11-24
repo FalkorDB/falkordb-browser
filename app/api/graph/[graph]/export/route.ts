@@ -1,5 +1,8 @@
 import { getClient } from "@/app/api/auth/[...nextauth]/options";
 import { NextRequest, NextResponse } from "next/server";
+import { commandOptions } from "redis";
+
+export const runtime = "nodejs";
 
 // eslint-disable-next-line import/prefer-default-export
 export async function GET(
@@ -19,16 +22,19 @@ export async function GET(
     try {
       const result = await (
         await client.connection
-      ).dump(graphId);
+      ).dump(commandOptions({ returnBuffers: true }), graphId);
 
       if (!result)
         throw new Error(`Failed to retrieve graph data for ID: ${graphId}`);
 
-      return new NextResponse(result, {
+      const payload = new Uint8Array(result);
+
+      return new NextResponse(payload, {
         status: 200,
         headers: {
           "Content-Type": "application/octet-stream",
           "Content-Disposition": `attachment; filename="${graphId}.dump"`,
+          "Content-Length": payload.byteLength.toString(),
         },
       });
     } catch (error) {
@@ -38,6 +44,7 @@ export async function GET(
       );
     }
   } catch (err) {
+    // eslint-disable-next-line no-console
     console.error(err);
     return NextResponse.json(
       { message: (err as Error).message },

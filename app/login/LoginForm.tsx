@@ -276,7 +276,7 @@ export default function LoginForm() {
                       {!uploadedFileName ? (
                         // Upload State
                         <div className="relative">
-                          <Dropzone accept={[".crt", ".cer", ".pem", ".cert"]} title="Upload Certificate" onFileDrop={onFileDrop} disabled={!TLS} />
+                          <Dropzone accept={[".crt", ".cer", ".pem", ".key", ".pfx", ".p12"]} title="Upload Certificate" onFileDrop={onFileDrop} disabled={!TLS} />
                           <div className="mt-2 text-xs text-muted/70 flex items-center gap-1">
                             <Info className="w-5 h-5" aria-label="Information icon" />
                             Upload your CA certificate file

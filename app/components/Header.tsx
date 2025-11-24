@@ -22,7 +22,7 @@ import CreateGraph from "./CreateGraph";
 import { IndicatorContext, PanelContext, BrowserSettingsContext } from "./provider";
 
 interface Props {
-    onSetGraphName: (newGraphName: string) => void
+    onSetGraphName: (newGraphName: string, replace: boolean) => void
     graphNames: string[]
     graphName: string
     onOpenGraphInfo: () => void

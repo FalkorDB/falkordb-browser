@@ -16,7 +16,7 @@ import { IndicatorContext } from "./provider"
 import Dropzone from "./ui/Dropzone"
 
 interface Props {
-    onSetGraphName: (name: string) => void
+    onSetGraphName: (name: string, replace: boolean) => void
     type: "Graph" | "Schema"
     graphNames: string[]
     label?: string
@@ -104,7 +104,7 @@ export default function CreateGraph({
 
             if (!result.ok) return
 
-            onSetGraphName(name)
+            onSetGraphName(name, replaceExisting)
             setGraphName("")
             setDumpFile(null)
             setReplaceExisting(false)
@@ -149,7 +149,7 @@ export default function CreateGraph({
                         checked={isWithDump}
                         onCheckedChange={(setChecked) => setIsWithDump(setChecked as boolean)}
                     />
-                    <p>Create with dump file</p>
+                    <p>Upload data from dump file.</p>
                 </div>
                 {
                     isWithDump &&
@@ -165,7 +165,6 @@ export default function CreateGraph({
                             </label>
                         </div>
                         <Dropzone
-                            title="Upload Dump File"
                             filesCount
                             withTable
                             onFileDrop={handleFileDrop}

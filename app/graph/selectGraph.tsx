@@ -206,9 +206,9 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
                         <CreateGraph
                             type={type}
                             graphNames={options}
-                            onSetGraphName={(newGraphName) => {
+                            onSetGraphName={(newGraphName, replace) => {
                                 setSelectedValue(newGraphName);
-                                setOptions([...options, newGraphName]);
+                                setOptions([...(replace ? options.filter(opt => opt !== newGraphName) : options), newGraphName]);
                             }}
                             trigger={
                                 <Button

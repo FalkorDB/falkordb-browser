@@ -457,13 +457,13 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
     return () => clearInterval(interval)
   }, [checkStatus, status])
 
-  const handleOnSetGraphName = (newGraphName: string) => {
+  const handleOnSetGraphName = (newGraphName: string, replace: boolean) => {
     if (pathname.includes("/schema")) {
       setSchemaName(formatName(newGraphName))
-      setSchemaNames(prev => [...prev, formatName(newGraphName)])
+      setSchemaNames(prev => [...(replace ? prev.filter(p => p !== newGraphName) : prev), formatName(newGraphName)])
     } else {
       setGraphName(formatName(newGraphName))
-      setGraphNames(prev => [...prev, formatName(newGraphName)])
+      setGraphNames(prev => [...(replace ? prev.filter(p => p !== newGraphName) : prev), formatName(newGraphName)])
     }
   }
 
