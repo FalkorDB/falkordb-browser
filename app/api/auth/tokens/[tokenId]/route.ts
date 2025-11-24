@@ -69,7 +69,16 @@ function checkViewPermission(
   tokenData: any
 ): { authorized: boolean; error?: NextResponse } {
   const isAdmin = authenticatedUser.role === "Admin";
-  const isTokenOwner = authenticatedUser.id === tokenData.user_id;
+
+  // Normalize host (empty string defaults to localhost)
+  const authenticatedHost = authenticatedUser.host || "localhost";
+  const tokenHost = tokenData.host || "localhost";
+
+  // Check ownership
+  const isTokenOwner =
+    authenticatedUser.username === tokenData.username &&
+    authenticatedHost === tokenHost &&
+    authenticatedUser.port === tokenData.port;
 
   if (!isAdmin && !isTokenOwner) {
     return {
@@ -94,7 +103,16 @@ function checkRevokePermission(
   tokenData: any
 ): { authorized: boolean; error?: NextResponse } {
   const isAdmin = authenticatedUser.role === "Admin";
-  const isTokenOwner = authenticatedUser.id === tokenData.user_id;
+
+  // Normalize host
+  const authenticatedHost = authenticatedUser.host || "localhost";
+  const tokenHost = tokenData.host || "localhost";
+
+  // Check ownership by username + host + port (consistent across logins)
+  const isTokenOwner =
+    authenticatedUser.username === tokenData.username &&
+    authenticatedHost === tokenHost &&
+    authenticatedUser.port === tokenData.port;
 
   if (!isAdmin && !isTokenOwner) {
     return {

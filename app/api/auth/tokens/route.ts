@@ -13,7 +13,8 @@ import { encrypt } from "../encryption";
 async function fetchTokens(
   isAdmin: boolean,
   username: string,
-  userId: string
+  host: string,
+  port: number
 ): Promise<{
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   tokens?: any[];
@@ -22,7 +23,10 @@ async function fetchTokens(
   try {
     // Use string interpolation instead of parameterized queries
     const escapeString = (str: string) => str.replace(/'/g, "''");
-    const userFilter = isAdmin ? "" : `AND t.user_id = '${escapeString(userId)}'`;
+    // Filter by username + host + port
+    const userFilter = isAdmin
+      ? ""
+      : `AND t.username = '${escapeString(username)}' AND t.host = '${escapeString(host)}' AND t.port = ${port}`;
     
     const query = `
       MATCH (t:Token)-[:BELONGS_TO]->(u:User)
@@ -40,7 +44,7 @@ async function fetchTokens(
              t.last_used as last_used
       ORDER BY t.created_at DESC
     `;
-    
+
     const result = await executePATQuery(query);
 
     // Transform FalkorDB objects to token objects with ISO timestamps
@@ -89,7 +93,8 @@ export async function GET() {
     const fetchResult = await fetchTokens(
       isAdmin,
       authenticatedUser.username || "default",
-      authenticatedUser.id
+      authenticatedUser.host || "localhost",
+      authenticatedUser.port || 6379
     );
 
     if (fetchResult.error) {

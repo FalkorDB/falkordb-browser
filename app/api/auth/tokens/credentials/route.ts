@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { SignJWT } from "jose";
 import crypto from "crypto";
 import { executePATQuery } from "@/lib/token-storage";
-import { newClient, generateTimeUUID, generateConsistentUserId } from "../../[...nextauth]/options";
+import { newClient, generateTimeUUID } from "../../[...nextauth]/options";
 import { encrypt } from "../../encryption";
 import { login, validateBody } from "../../../validate-body";
 
@@ -77,8 +77,9 @@ export async function POST(request: NextRequest) {
     let authenticatedUser;
     let userPassword;
     try {
-  const userId = generateConsistentUserId(username, String(host), parseInt(String(port), 10));
-  userPassword = password || "";
+      // Generate random UUID for JWT token
+      const userId = crypto.randomUUID();
+      userPassword = password || "";
 
       const { role } = await newClient(
         {

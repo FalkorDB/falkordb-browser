@@ -332,34 +332,8 @@ const authOptions: AuthOptions = {
         }
 
         try {
-          // Use consistent user ID instead of random UUID
-          // Extract host/port from URL if provided, otherwise use host/port fields
-          let hostname: string;
-          let port: number;
-          let username: string;
-
-          if (credentials.url) {
-            // Parse URL to extract host, port, and username
-            try {
-              const parsed = new URL(credentials.url);
-              hostname = parsed.hostname || "localhost";
-              port = parsed.port ? parseInt(parsed.port, 10) : 6379;
-              username = parsed.username || credentials.username || "default";
-            } catch {
-              // URL parsing failed, fall back to host/port
-              hostname = credentials.host || "localhost";
-              port = credentials.port ? parseInt(credentials.port, 10) : 6379;
-              username = credentials.username || "default";
-            }
-          } else {
-            // Use individual connection parameters
-            hostname = credentials.host || "localhost";
-            port = credentials.port ? parseInt(credentials.port, 10) : 6379;
-            username = credentials.username || "default";
-          }
-
-          // Generate consistent user ID from normalized hostname, port, and username
-          const id = generateConsistentUserId(username, hostname, port);
+          // Generate random UUID for this session
+          const id = uuidv4();
 
           const { role } = await newClient(credentials, id);
 
