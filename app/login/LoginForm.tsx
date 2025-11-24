@@ -5,7 +5,7 @@ import { FormEvent, useEffect, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
-import { Check, Info, FileText } from "lucide-react";
+import { FileText } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useTheme } from "next-themes";
 import { getTheme } from "@/lib/utils";
@@ -30,7 +30,6 @@ export default function LoginForm() {
   const [port, setPort] = useState("");
   const [TLS, setTLS] = useState(false);
   const [CA, setCA] = useState<string>();
-  const [uploadedFileName, setUploadedFileName] = useState<string>("");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<{
@@ -149,12 +148,10 @@ export default function LoginForm() {
     if (loginMode === "url") {
       const trimmedUrl = falkordbUrl.trim();
 
-      // Validate URL format: falkor[s]://[[username][:password]@][host][:port][/db-number]
-      // Also supports redis:// and rediss:// protocols
       const urlPattern = /^(falkor|falkors|redis|rediss):\/\/(?:([^:@]+)(?::([^@]+))?@)?([^:/\s]+)(?::(\d+))?(?:\/(\d+))?$/;
       if (trimmedUrl && !urlPattern.test(trimmedUrl)) {
         setError({
-          message: "Invalid URL format. Expected: falkor[s]://[[username][:password]@][host][:port][/db-number] (also supports redis[s]://)",
+          message: "Invalid URL format. Expected: falkor[s]://[[username][:password]@][host][:port] (also supports redis[s]://)",
           show: true
         });
         return;
@@ -196,7 +193,6 @@ export default function LoginForm() {
         show: false
       }))
       setCA((reader.result as string).split(',').pop())
-      setUploadedFileName(acceptedFiles[0].name)
       setError(prev => ({
         ...prev,
         show: false
@@ -256,70 +252,29 @@ export default function LoginForm() {
                       if (!checked) {
                         // Clear certificate when TLS is disabled
                         setCA(undefined)
-                        setUploadedFileName("")
                       }
                     }}
                     data-testid="tls-checkbox"
                   />
                   <p className="font-medium text-foreground">TLS Secured Connection</p>
                 </div>
-
-                {/* Certificate Upload Section */}
-                {TLS && (
-                  <div id="tls-section" className="flex flex-col gap-3 p-4 bg-background border border-border rounded-lg transition-all duration-300 ease-in-out">
-                    <div className="flex items-center gap-2">
-                      <div className="w-2 h-2 bg-primary rounded-full" />
-                      <span className="text-sm font-semibold text-muted">Certificate Authentication</span>
-                    </div>
-
-                    <div className="flex flex-col gap-2">
-                      {!uploadedFileName ? (
-                        // Upload State
-                        <div className="relative">
-                          <Dropzone accept={[".crt", ".cer", ".pem", ".key", ".pfx", ".p12"]} title="Upload Certificate" onFileDrop={onFileDrop} disabled={!TLS} />
-                          <div className="mt-2 text-xs text-muted/70 flex items-center gap-1">
-                            <Info className="w-5 h-5" aria-label="Information icon" />
-                            Upload your CA certificate file
-                          </div>
-                        </div>
-                      ) : (
-                        // Success State
-                        <div className="flex items-center justify-between p-3 bg-primary/10 border border-primary/20 rounded-md transition-all duration-300 ease-in-out" data-testid="certificate-uploaded-status">
-                          <div className="flex items-center gap-3">
-                            <div className="flex-shrink-0">
-                              <div className="w-8 h-8 bg-primary/20 rounded-full flex items-center justify-center">
-                                <Check size={16} className="text-primary" />
-                              </div>
-                            </div>
-                            <div className="flex flex-col">
-                              <span className="text-sm font-medium text-foreground">Certificate Uploaded</span>
-                              <span className="text-xs text-muted truncate max-w-48">{uploadedFileName}</span>
-                            </div>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setError(prev => ({
-                                ...prev,
-                                show: false
-                              }))
-                              setCA(undefined)
-                              setUploadedFileName("")
-                            }}
-                            className="flex-shrink-0 p-1 text-muted hover:text-foreground hover:bg-primary/20 rounded transition-colors duration-200"
-                            title="Remove certificate"
-                            data-testid="remove-certificate-btn"
-                            aria-label="Remove certificate"
-                          >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                            </svg>
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
+                {
+                  TLS &&
+                  <Dropzone
+                    accept={[".crt", ".cer", ".pem", ".key", ".pfx", ".p12"]}
+                    title="Upload Certificate"
+                    onFileDrop={onFileDrop}
+                    onFileRemove={() => {
+                      setError(prev => ({
+                        ...prev,
+                        show: false
+                      }))
+                      setCA(undefined)
+                    }}
+                    infoContent="Certificate Authentication"
+                    disabled={!TLS}
+                  />
+                }
               </div>
             }
           </FormComponent>

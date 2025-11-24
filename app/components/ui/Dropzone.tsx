@@ -1,35 +1,45 @@
 'use client'
 
-import { ArrowDownToLine } from 'lucide-react'
+import { Check, X } from 'lucide-react'
 import React, { useCallback, useState } from 'react'
 import { useDropzone } from 'react-dropzone'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { cn } from '@/lib/utils'
 
 type TableFile = {
     name: string
     size: number
     type: string
+    lastModified: number
 }
 
 /* eslint-disable react/require-default-props */
 interface Props {
     onFileDrop: (acceptedFiles: File[]) => void
-    title?: string
-    filesCount?: boolean
+    onFileRemove: (file: TableFile, index: number) => void
+    title: string
+    infoContent?: string
     className?: string
-    withTable?: boolean
     accept?: string[]
     disabled?: boolean
 }
 
-const FileProps = [
-    "Name",
-    "Size",
-    "Type",
-]
+const formatFileSize = (size: number) => {
+    if (size === 0) return "0 B"
+    const units = ["B", "KB", "MB", "GB", "TB"]
+    const index = Math.floor(Math.log(size) / Math.log(1024))
+    const value = size / (1024 ** index)
+    return `${value.toFixed(value >= 10 ? 0 : 1)} ${units[index]}`
+}
 
-function Dropzone({ onFileDrop, title = "", filesCount = false, className = "", accept, withTable = false, disabled = false }: Props) {
+function Dropzone({
+    onFileDrop,
+    onFileRemove,
+    title,
+    infoContent,
+    className = "",
+    accept,
+    disabled = false,
+}: Props) {
 
     const [files, setFiles] = useState<TableFile[]>([])
 
@@ -38,13 +48,19 @@ function Dropzone({ onFileDrop, title = "", filesCount = false, className = "", 
             name: file.name,
             size: file.size,
             type: file.type,
+            lastModified: file.lastModified,
         }));
         setFiles(newFiles)
         onFileDrop(acceptedFiles)
     }, [onFileDrop])
 
-    const { getRootProps, getInputProps } = useDropzone({ 
-        onDrop, 
+    const handleRemoveFile = useCallback((file: TableFile, index: number) => {
+        setFiles((prev) => prev.filter((_, idx) => idx !== index))
+        onFileRemove(file, index)
+    }, [onFileRemove])
+
+    const { getRootProps, getInputProps } = useDropzone({
+        onDrop,
         disabled,
         accept: accept ? accept.reduce((acc, item) => {
             if (item.startsWith('.')) {
@@ -60,64 +76,76 @@ function Dropzone({ onFileDrop, title = "", filesCount = false, className = "", 
     })
 
     return (
-        <div className={cn('flex gap-4 grow', className)}>
+        <div className={cn("flex flex-col gap-2 rounded-lg border border-border p-2 transition-all duration-300 ease-in-out", className)}>
+            {
+                infoContent &&
+                <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 bg-primary rounded-full" />
+                    <span className="text-sm font-semibold text-muted">{infoContent}</span>
+                </div>
+            }
             {/* eslint-disable-next-line react/jsx-props-no-spreading */}
-            <div {...getRootProps(withTable ? { className: cn("Dropzone", filesCount && "py-20 px-40") } : {})}>
+            <div {...getRootProps()}>
                 {/* eslint-disable-next-line react/jsx-props-no-spreading */}
                 <input {...getInputProps()} />
-                {
-                    withTable ?
-                        <div className='flex flex-col gap-7 items-center font-medium'>
-                            <p>Drag & Drop File Here</p>
-                            <ArrowDownToLine color='#57577B' />
-                            <span>Or <span className='text-[#7167F6]'>Browse</span></span>
-                        </div>
-                        : <p className={cn('underline underline-offset-2 text-[#99E4E5]', disabled ? "opacity-30 cursor-text" : "cursor-pointer")}>{title}</p>
-                }
+                <p className={cn('underline underline-offset-2 text-[#99E4E5]', disabled ? "opacity-30 cursor-text" : "cursor-pointer")}>{title}</p>
+            </div>
+            <div className='text-lg'>
+                {`Files (${files.length})`}
             </div>
             {
-                withTable &&
-                <div className='grow bg-background flex flex-col gap-4 justify-center'>
-                    <div className='text-lg'>
-                        {`Uploaded Files ${filesCount ? `(${files.length})`: ''}`}
-                    </div>
-                    <Table parentClassName='h-1 grow overflow-auto'>
-                        <TableHeader className='border-b border-border'>
-                            <TableRow className='border-none'>
-                                {
-                                    FileProps.map((cell) => (
-                                        <TableHead key={cell} className="text-center">
-                                            {cell}
-                                        </TableHead>
-                                    ))
-                                }
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {
-                                files.length > 0 ?
-                                    files.map((row, index) => (
-                                        // eslint-disable-next-line react/no-array-index-key
-                                        <TableRow className='border-border' key={index}>
-                                            {
-                                                Object.values(row).map((cell) => (
-                                                    <TableCell className='text-center font-medium' key={cell}>
-                                                        {cell}
-                                                    </TableCell>
-                                                ))
-                                            }
-                                        </TableRow>
-                                    ))
-                                    : <TableRow>
-                                        <TableCell />
-                                    </TableRow>
-                            }
-                        </TableBody>
-                    </Table>
-                </div>
+                files.length > 0
+                    ? (
+                        <div className='flex flex-col gap-3 max-h-64 overflow-y-auto pr-2'>
+                            {files.map((file, index) => (
+                                <div
+                                    key={`${file.name}-${file.size}-${file.type}-${file.lastModified}`}
+                                    className='flex items-center justify-between p-3 bg-primary/10 border border-primary/20 rounded-md transition-all duration-300 ease-in-out'
+                                >
+                                    <div className='flex items-center gap-3'>
+                                        <div className='flex-shrink-0'>
+                                            <div className='w-10 h-10 bg-primary/20 rounded-full flex items-center justify-center'>
+                                                <Check size={16} className='text-primary' />
+                                            </div>
+                                        </div>
+                                        <div className='flex flex-col'>
+                                            <span className='text-sm font-medium text-foreground'>{file.name}</span>
+                                            <span className='text-xs text-muted truncate max-w-56'>
+                                                {`${formatFileSize(file.size)} • ${file.type || 'Unknown type'}`}
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={(event) => {
+                                            event.stopPropagation()
+                                            handleRemoveFile(file, index)
+                                        }}
+                                        className='flex-shrink-0 p-1 text-muted hover:text-foreground hover:bg-primary/20 rounded transition-colors duration-200'
+                                        title='Remove file'
+                                        aria-label='Remove file'
+                                    >
+                                        <X className='w-4 h-4' />
+                                    </button>
+                                </div>
+                            ))}
+                        </div>
+                    )
+                    : (
+                        <div className='text-sm text-muted/70 italic'>
+                            Drop a file to see it listed here.
+                        </div>
+                    )
             }
         </div>
     )
+}
+
+Dropzone.defaultProps = {
+    className: "",
+    accept: undefined,
+    disabled: false,
+    infoContent: undefined,
 }
 
 export default Dropzone

@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getClient } from "../auth/[...nextauth]/options";
 import { chatRequest, validateBody } from "../validate-body";
 
+const chatUrl = process.env.CHAT_URL || "http://localhost:8080"
+
 export async function GET() {
     try {
         const session = await getClient()
@@ -11,7 +13,7 @@ export async function GET() {
         }
 
         try {
-            const response = await fetch(`${process.env.CHAT_URL}configured-model`, {
+            const response = await fetch(`${chatUrl}configured-model`, {
                 method: "GET",
                 headers: {
                     "Content-Type": "application/json",
@@ -27,11 +29,11 @@ export async function GET() {
             return NextResponse.json(data)
         } catch (error) {
             const { message } = (error as Error)
-            
+
             if (message.includes("fetch failed")) {
                 return NextResponse.json({ message: "Server is not available" }, { status: 200 })
             }
-            
+
             console.error(error)
             return NextResponse.json({ error: message }, { status: 400 })
         }
@@ -60,7 +62,7 @@ export async function POST(request: NextRequest) {
 
         // Validate request body
         const validation = validateBody(chatRequest, body);
-        
+
         if (!validation.success) {
             writer.write(encoder.encode(`event: error status: ${400} data: ${JSON.stringify(validation.error)}\n\n`))
             writer.close()
@@ -86,7 +88,7 @@ export async function POST(request: NextRequest) {
                 model,
             }
 
-            const response = await fetch(`${process.env.CHAT_URL}text_to_cypher`, {
+            const response = await fetch(`${chatUrl}text_to_cypher`, {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",

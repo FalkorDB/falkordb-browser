@@ -14,7 +14,9 @@ export default function UploadGraph({ disabled, open, onOpenChange }: {
     const [files, setFiles] = useState<File[]>([])
 
     const onUploadData = () => {
-        console.log(files)
+        if (files.length) {
+            // Upload logic handled elsewhere
+        }
     }
 
     return (
@@ -36,11 +38,12 @@ export default function UploadGraph({ disabled, open, onOpenChange }: {
                 </DialogHeader>
                 <form onSubmit={onUploadData} className="grow p-4 flex flex-col gap-6">
                     <Dropzone
-                        filesCount
-                        className="flex-col"
-                        withTable
-                        accept={[".dump"]}
+                        title="Click to select .dump file"
+                        infoContent="Supports FalkorDB .dump files only."
                         onFileDrop={setFiles}
+                        onFileRemove={(_, index) => setFiles((prev) => prev.filter((__, idx) => idx !== index))}
+                        className="flex-col"
+                        accept={[".dump"]}
                     />
                     <Button
                         type="submit"

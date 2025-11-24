@@ -145,6 +145,7 @@ export default function CreateGraph({
                 </div>
                 <div className="flex gap-1 items-center">
                     <Checkbox
+                        className="w-6 h-6 rounded-full bg-background border-primary data-[state=checked]:bg-primary"
                         data-testid={`create${type}${label}Checkbox`}
                         checked={isWithDump}
                         onCheckedChange={(setChecked) => setIsWithDump(setChecked as boolean)}
@@ -156,18 +157,18 @@ export default function CreateGraph({
                     <>
                         <div className="flex gap-2 items-center">
                             <Checkbox
+                                className="w-6 h-6 rounded-full bg-background border-primary data-[state=checked]:bg-primary"
                                 data-testid={`create${type}ReplaceCheckbox`}
                                 checked={replaceExisting}
                                 onCheckedChange={(setChecked) => setReplaceExisting(setChecked as boolean)}
-                            />
-                            <label htmlFor={`create${type}ReplaceCheckbox`} className="text-sm cursor-pointer">
-                                Replace existing {type.toLowerCase()} if it exists
-                            </label>
+                                />
+                            <p>Replace existing {type.toLowerCase()} if it exists</p>
                         </div>
                         <Dropzone
-                            filesCount
-                            withTable
+                            title="Click to select .dump file"
+                            infoContent="Supports FalkorDB .dump files only."
                             onFileDrop={handleFileDrop}
+                            onFileRemove={() => setDumpFile(null)}
                             accept={[".dump"]}
                         />
                     </>
