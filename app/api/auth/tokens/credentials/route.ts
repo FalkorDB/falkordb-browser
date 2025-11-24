@@ -172,17 +172,23 @@ export async function POST(request: NextRequest) {
 
       const escapeString = (str: string) => str.replace(/'/g, "''");
 
+      // Normalize host and port with defaults
+      const username = authenticatedUser.username || "default";
+      const host = authenticatedUser.host || "localhost";
+      const port = authenticatedUser.port || 6379;
+      const role = authenticatedUser.role;
+
       const query = `
-        MERGE (u:User {username: '${escapeString(authenticatedUser.username)}', user_id: '${escapeString(authenticatedUser.id)}'})
+        MERGE (u:User {username: '${escapeString(username)}', user_id: '${escapeString(authenticatedUser.id)}'})
         CREATE (t:Token {
           token_hash: '${escapeString(tokenHash)}',
           token_id: '${escapeString(tokenId)}',
           user_id: '${escapeString(authenticatedUser.id)}',
-          username: '${escapeString(authenticatedUser.username)}',
+          username: '${escapeString(username)}',
           name: '${escapeString(name)}',
-          role: '${escapeString(authenticatedUser.role)}',
-          host: '${escapeString(authenticatedUser.host)}',
-          port: ${authenticatedUser.port},
+          role: '${escapeString(role)}',
+          host: '${escapeString(host)}',
+          port: ${port},
           created_at: ${nowUnix},
           expires_at: ${expiresAtUnix},
           last_used: -1,

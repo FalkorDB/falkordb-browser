@@ -27,7 +27,7 @@ async function fetchTokens(
     const userFilter = isAdmin
       ? ""
       : `AND t.username = '${escapeString(username)}' AND t.host = '${escapeString(host)}' AND t.port = ${port}`;
-    
+
     const query = `
       MATCH (t:Token)-[:BELONGS_TO]->(u:User)
       WHERE t.is_active = true ${userFilter}
@@ -224,6 +224,7 @@ export async function POST(request: NextRequest) {
       const escapeString = (str: string) => str.replace(/'/g, "''");
       const username = user.username || "default";
       const host = user.host || "localhost";
+      const port = user.port || 6379;
       const role = user.role || "Unknown";
 
       const query = `
@@ -236,7 +237,7 @@ export async function POST(request: NextRequest) {
           name: '${escapeString(name)}',
           role: '${escapeString(role)}',
           host: '${escapeString(host)}',
-          port: ${Number.parseInt(String(user.port), 10)},
+          port: ${port},
           created_at: ${nowUnix},
           expires_at: ${expiresAtUnix},
           last_used: -1,

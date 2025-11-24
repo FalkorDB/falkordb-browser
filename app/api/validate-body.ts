@@ -240,6 +240,22 @@ export const login = z.object({
     })
     .min(1, "CA certificate cannot be empty")
     .optional(),
+  name: z
+    .string({
+      invalid_type_error: "Invalid token name",
+    })
+    .optional(),
+  expiresAt: z
+    .string({
+      invalid_type_error: "Invalid expiration date",
+    })
+    .nullable()
+    .optional(),
+  ttlSeconds: z
+    .number({
+      invalid_type_error: "Invalid TTL value",
+    })
+    .optional(),
 });
 
 export const revokeToken = z.object({

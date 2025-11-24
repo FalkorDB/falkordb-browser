@@ -340,7 +340,7 @@ const authOptions: AuthOptions = {
           const res: User = {
             id,
             url: credentials.url,
-            host: credentials.host,
+            host: credentials.host || "localhost",
             port: credentials.port ? parseInt(credentials.port, 10) : 6379,
             password: credentials.password,
             username: credentials.username,
