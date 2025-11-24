@@ -38,10 +38,10 @@ export default function UploadGraph({ disabled, open, onOpenChange }: {
                 </DialogHeader>
                 <form onSubmit={onUploadData} className="grow p-4 flex flex-col gap-6">
                     <Dropzone
+                        files={files}
+                        setFiles={setFiles}
                         title="Click to select .dump file"
                         infoContent="Supports FalkorDB .dump files only."
-                        onFileDrop={setFiles}
-                        onFileRemove={(_, index) => setFiles((prev) => prev.filter((__, idx) => idx !== index))}
                         className="flex-col"
                         accept={[".dump"]}
                     />

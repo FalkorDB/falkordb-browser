@@ -45,14 +45,10 @@ export default function CreateGraph({
 
     const [isLoading, setIsLoading] = useState(false)
     const [isWithDump, setIsWithDump] = useState(false)
-    const [dumpFile, setDumpFile] = useState<File | null>(null)
+    const [dumpFile, setDumpFile] = useState<File[]>([])
     const [graphName, setGraphName] = useState("")
     const [open, setOpen] = useState(false)
     const [replaceExisting, setReplaceExisting] = useState(false)
-
-    const handleFileDrop = (files: File[]) => {
-        setDumpFile(files[0])
-    }
 
     const handleCreateGraph = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault()
@@ -89,7 +85,7 @@ export default function CreateGraph({
                 }
 
                 const formData = new FormData()
-                formData.append("file", dumpFile)
+                formData.append("file", dumpFile[0])
                 formData.append("replace", replaceExisting ? "true" : "false")
 
                 result = await securedFetch(`api/${type === "Schema" ? "schema" : "graph"}/${prepareArg(name)}/import`, {
@@ -106,7 +102,7 @@ export default function CreateGraph({
 
             onSetGraphName(name, replaceExisting)
             setGraphName("")
-            setDumpFile(null)
+            setDumpFile([])
             setReplaceExisting(false)
             setOpen(false)
             toast({
@@ -161,14 +157,15 @@ export default function CreateGraph({
                                 data-testid={`create${type}ReplaceCheckbox`}
                                 checked={replaceExisting}
                                 onCheckedChange={(setChecked) => setReplaceExisting(setChecked as boolean)}
-                                />
+                            />
                             <p>Replace existing {type.toLowerCase()} if it exists</p>
                         </div>
                         <Dropzone
+                            files={dumpFile}
+                            setFiles={setDumpFile}
                             title="Click to select .dump file"
                             infoContent="Supports FalkorDB .dump files only."
-                            onFileDrop={handleFileDrop}
-                            onFileRemove={() => setDumpFile(null)}
+                            maxFiles={1}
                             accept={[".dump"]}
                         />
                     </>

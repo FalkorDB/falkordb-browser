@@ -88,12 +88,12 @@ export default function FormComponent({ handleSubmit, fields, error = undefined,
     }
 
     return (
-        <form className={cn("flex flex-col gap-4 w-full", className)} onSubmit={onHandleSubmit}>
+        <form className={cn("flex flex-col gap-0.5 w-full", className)} onSubmit={onHandleSubmit}>
             {
                 fields.map((field) => {
                     const passwordType = show[field.label] ? "text" : "password"
                     return (
-                        <div className="flex flex-col gap-2" key={field.label}>
+                        <div className="flex flex-col gap-0.5" key={field.label}>
                             <div className={cn(field.info && "flex gap-2 items-center")}>
                                 <label className={cn(errors[field.label] && "text-destructive")} htmlFor={field.label}>{field.required && <span>*</span>} {field.label}</label>
                                 {
@@ -108,9 +108,9 @@ export default function FormComponent({ handleSubmit, fields, error = undefined,
                                     </Tooltip>
                                 }
                             </div>
-                            <div className="relative flex flex-col gap-2">
-                                {
-                                    field.type === "password" &&
+                            {
+                                field.type === "password" &&
+                                <div className="relative">
                                     <Button
                                         className="absolute right-2 top-2 z-10"
                                         onClick={() => {
@@ -126,47 +126,47 @@ export default function FormComponent({ handleSubmit, fields, error = undefined,
                                                 : <EyeOffIcon className="text-foreground" />
                                         }
                                     </Button>
-                                }
-                                {
-                                    field.type === "select" ?
-                                        <Combobox
-                                            id={field.label}
-                                            options={field.options}
-                                            label={field.selectType}
-                                            selectedValue={field.value}
-                                            setSelectedValue={field.onChange}
-                                        />
-                                        : <Input
-                                            id={field.label}
-                                            type={field.type === "password" ? passwordType : field.type}
-                                            placeholder={field.placeholder}
-                                            value={field.value}
-                                            onChange={(e) => {
-                                                field.onChange(e)
-                                                if (field.type === "password") {
-                                                    const confirmPasswordField = fields.find(f => f.label === "Confirm Password")
-                                                    if (confirmPasswordField && confirmPasswordField.errors) {
-                                                        setErrors(prev => ({
-                                                            ...prev,
-                                                            "Confirm Password": confirmPasswordField.errors!.some(err => err.condition(confirmPasswordField.value, e.target.value))
-                                                        }))
-                                                    }
-                                                }
-                                                if (field.errors) {
+                                </div>
+                            }
+                            {
+                                field.type === "select" ?
+                                    <Combobox
+                                        id={field.label}
+                                        options={field.options}
+                                        label={field.selectType}
+                                        selectedValue={field.value}
+                                        setSelectedValue={field.onChange}
+                                    />
+                                    : <Input
+                                        id={field.label}
+                                        type={field.type === "password" ? passwordType : field.type}
+                                        placeholder={field.placeholder}
+                                        value={field.value}
+                                        onChange={(e) => {
+                                            field.onChange(e)
+                                            if (field.type === "password") {
+                                                const confirmPasswordField = fields.find(f => f.label === "Confirm Password")
+                                                if (confirmPasswordField && confirmPasswordField.errors) {
                                                     setErrors(prev => ({
                                                         ...prev,
-                                                        [field.label]: field.errors!.some(err => err.condition(e.target.value))
+                                                        "Confirm Password": confirmPasswordField.errors!.some(err => err.condition(confirmPasswordField.value, e.target.value))
                                                     }))
                                                 }
-                                            }} />
+                                            }
+                                            if (field.errors) {
+                                                setErrors(prev => ({
+                                                    ...prev,
+                                                    [field.label]: field.errors!.some(err => err.condition(e.target.value))
+                                                }))
+                                            }
+                                        }} />
+                            }
+                            {field.description && <p className="text-sm text-gray-500">{field.description}</p>}
+                            <div className="h-5">
+                                {
+                                    field.errors && errors[field.label] &&
+                                    <p className="text-sm text-destructive">{field.errors.find((err) => err.condition(field.value))?.message}</p>
                                 }
-                                <p className="text-sm text-gray-500">{field.description}</p>
-                                <div className="h-5">
-                                    {
-                                        field.errors && errors[field.label] &&
-                                        <p className="text-sm text-destructive">{field.errors.find((err) => err.condition(field.value))?.message}</p>
-                                    }
-                                </div>
                             </div>
                         </div>
                     )

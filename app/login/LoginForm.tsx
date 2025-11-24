@@ -29,7 +29,7 @@ export default function LoginForm() {
   const [host, setHost] = useState("");
   const [port, setPort] = useState("");
   const [TLS, setTLS] = useState(false);
-  const [CA, setCA] = useState<string>();
+  const [files, setFiles] = useState<File[]>([]);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<{
@@ -137,6 +137,24 @@ export default function LoginForm() {
     setTLS(tls === "true")
   }, [searchParams]);
 
+  const onFileDrop = (acceptedFiles: File[]) => {
+    const reader = new FileReader()
+    let CAResult = ""
+
+    reader.onload = () => {
+      setError(prev => ({
+        ...prev,
+        show: false
+      }))
+
+      CAResult = (reader.result as string).split(',').pop() || ""
+    }
+
+    reader.readAsDataURL(acceptedFiles[0])
+
+    return CAResult
+  }
+
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
 
@@ -163,7 +181,7 @@ export default function LoginForm() {
       params.host = host.trim();
       params.port = port.trim();
       params.tls = TLS;
-      params.ca = CA;
+      params.ca = files.length ? onFileDrop(files) : undefined;
       if (username) {
         params.username = username;
       }
@@ -184,28 +202,10 @@ export default function LoginForm() {
     });
   };
 
-  const onFileDrop = (acceptedFiles: File[]) => {
-    const reader = new FileReader()
-
-    reader.onload = () => {
-      setError(prev => ({
-        ...prev,
-        show: false
-      }))
-      setCA((reader.result as string).split(',').pop())
-      setError(prev => ({
-        ...prev,
-        show: false
-      }))
-    }
-
-    reader.readAsDataURL(acceptedFiles[0])
-  }
-
   return (
     <div className="relative h-full w-full flex flex-col">
       <div className="grow flex items-center justify-center">
-        <div className="flex flex-col gap-8 items-center w-[500px]">
+        <div className="flex flex-col gap-4 items-center w-[500px]">
           {mounted && currentTheme && <Image style={{ width: 'auto', height: '80px' }} priority src={`/icons/Browser-${currentTheme}.svg`} alt="FalkorDB Browser Logo" width={0} height={0} />}
 
           {/* Login Mode Toggle */}
@@ -215,16 +215,16 @@ export default function LoginForm() {
               setLoginMode(value as LoginMode);
               setError({ message: "Invalid credentials", show: false });
             }}
-            className="flex items-center justify-center gap-8 p-4 border border-primary rounded-lg w-full"
+            className="flex items-center justify-center gap-8 p-2 border border-primary rounded-lg w-full"
           >
             <div className="flex items-center space-x-2">
-              <RadioGroupItem value="manual" id="manual" />
+              <RadioGroupItem value="manual" id="manual" size={20} />
               {/* Label is correctly associated via htmlFor, but eslint doesn't recognize Radix RadioGroupItem */}
               {/* eslint-disable-next-line jsx-a11y/label-has-associated-control */}
               <label htmlFor="manual" className="text-base font-medium cursor-pointer">Manual Configuration</label>
             </div>
             <div className="flex items-center space-x-2">
-              <RadioGroupItem value="url" id="url" />
+              <RadioGroupItem value="url" id="url" size={20} />
               {/* Label is correctly associated via htmlFor, but eslint doesn't recognize Radix RadioGroupItem */}
               {/* eslint-disable-next-line jsx-a11y/label-has-associated-control */}
               <label htmlFor="url" className="text-base font-medium cursor-pointer">FalkorDB URL</label>
@@ -251,7 +251,7 @@ export default function LoginForm() {
                       }))
                       if (!checked) {
                         // Clear certificate when TLS is disabled
-                        setCA(undefined)
+                        setFiles([]);
                       }
                     }}
                     data-testid="tls-checkbox"
@@ -261,16 +261,11 @@ export default function LoginForm() {
                 {
                   TLS &&
                   <Dropzone
+                    className="max-h-[216px]"
+                    files={files}
+                    setFiles={setFiles}
                     accept={[".crt", ".cer", ".pem", ".key", ".pfx", ".p12"]}
                     title="Upload Certificate"
-                    onFileDrop={onFileDrop}
-                    onFileRemove={() => {
-                      setError(prev => ({
-                        ...prev,
-                        show: false
-                      }))
-                      setCA(undefined)
-                    }}
                     infoContent="Certificate Authentication"
                     disabled={!TLS}
                   />

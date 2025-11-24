@@ -1,7 +1,7 @@
 'use client'
 
 import { Check, X } from 'lucide-react'
-import React, { useCallback, useState } from 'react'
+import React, { Dispatch, SetStateAction, useCallback } from 'react'
 import { useDropzone } from 'react-dropzone'
 import { cn } from '@/lib/utils'
 
@@ -14,13 +14,14 @@ type TableFile = {
 
 /* eslint-disable react/require-default-props */
 interface Props {
-    onFileDrop: (acceptedFiles: File[]) => void
-    onFileRemove: (file: TableFile, index: number) => void
+    files: File[]
+    setFiles: Dispatch<SetStateAction<File[]>>
     title: string
     infoContent?: string
     className?: string
     accept?: string[]
     disabled?: boolean
+    maxFiles?: number
 }
 
 const formatFileSize = (size: number) => {
@@ -32,36 +33,31 @@ const formatFileSize = (size: number) => {
 }
 
 function Dropzone({
-    onFileDrop,
-    onFileRemove,
+    files,
+    setFiles,
     title,
     infoContent,
     className = "",
     accept,
+    maxFiles,
     disabled = false,
 }: Props) {
-
-    const [files, setFiles] = useState<TableFile[]>([])
-
     const onDrop = useCallback((acceptedFiles: File[]) => {
-        const newFiles = acceptedFiles.map((file: File) => ({
-            name: file.name,
-            size: file.size,
-            type: file.type,
-            lastModified: file.lastModified,
-        }));
-        setFiles(newFiles)
-        onFileDrop(acceptedFiles)
-    }, [onFileDrop])
+        if (maxFiles !== 1) {
+            setFiles(prev => [...prev, ...acceptedFiles])
+        } else {
+            setFiles(acceptedFiles)
+        }
+    }, [maxFiles, setFiles])
 
-    const handleRemoveFile = useCallback((file: TableFile, index: number) => {
-        setFiles((prev) => prev.filter((_, idx) => idx !== index))
-        onFileRemove(file, index)
-    }, [onFileRemove])
+    const handleRemoveFile = useCallback((file: TableFile) => {
+        setFiles((prev) => prev.filter(p => p !== file))
+    }, [setFiles])
 
     const { getRootProps, getInputProps } = useDropzone({
         onDrop,
         disabled,
+        multiple: maxFiles !== 1,
         accept: accept ? accept.reduce((acc, item) => {
             if (item.startsWith('.')) {
                 if (!acc['application/octet-stream']) {
@@ -76,7 +72,7 @@ function Dropzone({
     })
 
     return (
-        <div className={cn("flex flex-col gap-2 rounded-lg border border-border p-2 transition-all duration-300 ease-in-out", className)}>
+        <div className={cn("flex flex-col gap-1 rounded-lg border border-border p-2 transition-all duration-300 ease-in-out", className)}>
             {
                 infoContent &&
                 <div className="flex items-center gap-2">
@@ -96,11 +92,11 @@ function Dropzone({
             {
                 files.length > 0
                     ? (
-                        <div className='flex flex-col gap-3 max-h-64 overflow-y-auto pr-2'>
-                            {files.map((file, index) => (
+                        <div className='flex flex-col gap-2 max-h-1/2 overflow-y-auto'>
+                            {files.map(file => (
                                 <div
                                     key={`${file.name}-${file.size}-${file.type}-${file.lastModified}`}
-                                    className='flex items-center justify-between p-3 bg-primary/10 border border-primary/20 rounded-md transition-all duration-300 ease-in-out'
+                                    className='flex items-center justify-between p-1 bg-primary/10 border border-primary/20 rounded-md transition-all duration-300 ease-in-out'
                                 >
                                     <div className='flex items-center gap-3'>
                                         <div className='flex-shrink-0'>
@@ -119,7 +115,7 @@ function Dropzone({
                                         type="button"
                                         onClick={(event) => {
                                             event.stopPropagation()
-                                            handleRemoveFile(file, index)
+                                            handleRemoveFile(file)
                                         }}
                                         className='flex-shrink-0 p-1 text-muted hover:text-foreground hover:bg-primary/20 rounded transition-colors duration-200'
                                         title='Remove file'
@@ -146,6 +142,7 @@ Dropzone.defaultProps = {
     accept: undefined,
     disabled: false,
     infoContent: undefined,
+    maxFiles: undefined,
 }
 
 export default Dropzone

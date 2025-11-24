@@ -20,21 +20,39 @@ const RadioGroup = React.forwardRef<
 })
 RadioGroup.displayName = RadioGroupPrimitive.Root.displayName
 
+interface RadioGroupItemProps extends React.ComponentPropsWithoutRef<typeof RadioGroupPrimitive.Item> {
+  size?: number
+}
+
+const DEFAULT_ITEM_SIZE = 6
+const DEFAULT_INDICATOR_SIZE = 3.5
+const indicatorRatio = DEFAULT_INDICATOR_SIZE / DEFAULT_ITEM_SIZE
+
 const RadioGroupItem = React.forwardRef<
   React.ElementRef<typeof RadioGroupPrimitive.Item>,
-  React.ComponentPropsWithoutRef<typeof RadioGroupPrimitive.Item>
->(({ className, ...props }, ref) => {
+  RadioGroupItemProps
+>(({ className, size, ...props }, ref) => {
+  const itemStyle = size ? { height: `${size}px`, width: `${size}px` } : {}
+  const indicatorStyle = size
+    ? { width: `${size * indicatorRatio}px`, height: `${size * indicatorRatio}px` }
+    : {}
+
   return (
     <RadioGroupPrimitive.Item
       ref={ref}
       className={cn(
-        "aspect-square h-6 w-6 rounded-full border border-primary text-primary ring-offset-background focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50",
+        "aspect-square rounded-full border border-primary text-primary ring-offset-background focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50",
+        !size && "h-6 w-6",
         className
       )}
+      style={itemStyle}
       {...props}
     >
       <RadioGroupPrimitive.Indicator className="flex items-center justify-center">
-        <Circle className="h-3.5 w-3.5 fill-current text-current" />
+        <Circle
+          style={indicatorStyle}
+          className={cn("fill-current text-current", !size && "h-3.5 w-3.5")}
+        />
       </RadioGroupPrimitive.Indicator>
     </RadioGroupPrimitive.Item>
   )
