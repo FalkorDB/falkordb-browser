@@ -53,7 +53,7 @@ export default function Header({ onSetGraphName, graphNames, graphName, onOpenGr
     const [mounted, setMounted] = useState(false)
 
     const type = getPathType(pathname)
-    const showCreate = type && session?.user?.role && session.user.role !== "Read-Only"
+    const showCreate = type && session?.user.role && session.user.role !== "Read-Only"
 
     useEffect(() => {
         setMounted(true)

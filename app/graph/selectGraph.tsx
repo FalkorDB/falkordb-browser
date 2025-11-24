@@ -81,7 +81,7 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
             // Rebuild rows to reflect the updated option names
             setRows(
                 newOptions.map(opt =>
-                    session?.user?.role === "Admin"
+                    session?.user.role === "Admin"
                         ? ({
                             checked: false,
                             name: opt,
@@ -123,7 +123,7 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
 
     const handleSetRows = (opts: string[]) => {
         setRows(opts.map(opt =>
-            session?.user?.role === "Admin"
+            session?.user.role === "Admin"
                 ? ({
                     checked: false,
                     name: opt,
@@ -261,7 +261,7 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
                     inputRef={inputRef}
                 >
                     {
-                        session?.user?.role !== "Read-Only" &&
+                        session?.user.role !== "Read-Only" &&
                         <>
                             <DeleteGraph
                                 type={type}

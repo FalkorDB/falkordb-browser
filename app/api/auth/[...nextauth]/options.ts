@@ -511,7 +511,7 @@ export async function getClient() {
 
   // Fall back to session authentication for regular app requests
   const session = await getServerSession(authOptions);
-  const id = session?.user?.id;
+  const id = session?.user.id;
 
   if (!id) {
     return NextResponse.json({ message: "Not authenticated" }, { status: 401 });

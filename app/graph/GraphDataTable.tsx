@@ -411,7 +411,7 @@ export default function GraphDataTable({ object, type, lastObjId, className }: P
                                         key={`${key}-actions`}
                                     >
                                         {
-                                            session?.user?.role !== "Read-Only" && (
+                                            session?.user.role !== "Read-Only" && (
                                                 editable === key ?
                                                     <>
                                                         <Button
@@ -534,7 +534,7 @@ export default function GraphDataTable({ object, type, lastObjId, className }: P
                     }
                 </div>
                 {
-                    session?.user?.role !== "Read-Only" &&
+                    session?.user.role !== "Read-Only" &&
                     <Button
                         className="mt-4"
                         disabled={attributes.some((key) => key === editable)}
