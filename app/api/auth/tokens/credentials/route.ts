@@ -173,22 +173,22 @@ export async function POST(request: NextRequest) {
       const escapeString = (str: string) => str.replace(/'/g, "''");
 
       // Normalize host and port with defaults
-      const username = authenticatedUser.username || "default";
-      const host = authenticatedUser.host || "localhost";
-      const port = authenticatedUser.port || 6379;
-      const role = authenticatedUser.role;
+      const tokenUsername = authenticatedUser.username || "default";
+      const tokenHost = authenticatedUser.host || "localhost";
+      const tokenPort = authenticatedUser.port || 6379;
+      const { role: tokenRole } = authenticatedUser;
 
       const query = `
-        MERGE (u:User {username: '${escapeString(username)}', user_id: '${escapeString(authenticatedUser.id)}'})
+        MERGE (u:User {username: '${escapeString(tokenUsername)}', user_id: '${escapeString(authenticatedUser.id)}'})
         CREATE (t:Token {
           token_hash: '${escapeString(tokenHash)}',
           token_id: '${escapeString(tokenId)}',
           user_id: '${escapeString(authenticatedUser.id)}',
-          username: '${escapeString(username)}',
+          username: '${escapeString(tokenUsername)}',
           name: '${escapeString(name)}',
-          role: '${escapeString(role)}',
-          host: '${escapeString(host)}',
-          port: ${port},
+          role: '${escapeString(tokenRole)}',
+          host: '${escapeString(tokenHost)}',
+          port: ${tokenPort},
           created_at: ${nowUnix},
           expires_at: ${expiresAtUnix},
           last_used: -1,

@@ -231,7 +231,15 @@ export async function DELETE(
       RETURN t.token_id as token_id
     `;
 
-    await executePATQuery(revokeQuery);
+    const revokeResult = await executePATQuery(revokeQuery);
+
+    // Validate query succeeded
+    if (!revokeResult.data || revokeResult.data.length === 0) {
+      return NextResponse.json(
+        { message: "Failed to revoke token - token or user not found" },
+        { status: 500 }
+      );
+    }
 
     // Return success response
     return NextResponse.json(

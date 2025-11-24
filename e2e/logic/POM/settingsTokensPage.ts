@@ -224,8 +224,6 @@ export default class SettingsTokensPage extends HeaderComponent {
   async navigateToTokensTab(): Promise<void> {
     await this.clickTokensTab();
     await this.waitFor(500);
-    // Wait for token table to load
-    await this.tokenTable.waitFor({ state: "visible", timeout: 5000 });
   }
 
   async clickGenerateToken(): Promise<void> {
