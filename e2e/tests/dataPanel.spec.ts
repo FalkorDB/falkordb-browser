@@ -549,7 +549,12 @@ test.describe("Data panel Tests", () => {
     const graphName = getRandomString("graph");
     await apicalls.addGraph(graphName);
     await apicalls.runQuery(graphName, CREATE_TWO_NODES_QUERY);
-    await apicalls.deleteGraphNode(graphName, "0", { type: true });
+    const idRes = await apicalls.runQuery(
+      graphName,
+      'MATCH (n {name: "a"}) RETURN ID(n) AS id LIMIT 1'
+    );
+    const nodeId = idRes?.data?.[0]?.id ?? idRes?.data?.[0]?.n?.identity ?? "0";
+    await apicalls.deleteGraphNode(graphName, String(nodeId), { type: true });
     const graph = await browser.createNewPage(DataPanel, urls.graphUrl);
     await browser.setPageToFullScreen();
     await graph.selectGraphByName(graphName);
