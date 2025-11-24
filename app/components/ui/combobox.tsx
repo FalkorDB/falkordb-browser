@@ -34,6 +34,14 @@ export default function Combobox<T extends string>({ id, disabled = false, inTab
   const [search, setSearch] = useState<string>("")
 
   useEffect(() => {
+    if (!open) {
+      setSearch("")
+      setMaxOptions(STEP)
+      setFilteredOptions([...options])
+    }
+  }, [open, options])
+
+  useEffect(() => {
     const timeout = setTimeout(() => {
       setFilteredOptions(!search ? options : options.filter((option) => option.toLowerCase().includes(search.toLowerCase())))
     }, 500)

@@ -44,6 +44,7 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
 
     const { toast } = useToast()
     const { data: session } = useSession()
+    const sessionRole = session?.user?.role
 
     const [open, setOpen] = useState(false)
     const [rows, setRows] = useState<Row[]>([])
@@ -81,7 +82,7 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
             // Rebuild rows to reflect the updated option names
             setRows(
                 newOptions.map(opt =>
-                    session?.user?.role === "Admin"
+                    sessionRole === "Admin"
                         ? ({
                             checked: false,
                             name: opt,
@@ -93,37 +94,37 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
         }
 
         return result.ok
-    }, [type, toast, setIndicator, options, setOptions, setSelectedValue, selectedValue, setRows, session])
+    }, [type, toast, setIndicator, options, setOptions, setSelectedValue, selectedValue, setRows, sessionRole])
 
-    const loadMemory = (opt: string) =>
+    const loadMemory = useCallback((opt: string) =>
         async () => {
             const memoryMap = await getMemoryUsage(opt, toast, setIndicator);
             const memoryValue = memoryMap.get("total_graph_sz_mb") ?? 0;
 
             return `${memoryValue} MB`;
-        }
+        }, [toast, setIndicator])
 
-    const loadNodesCount = (opt: string) =>
+    const loadNodesCount = useCallback((opt: string) =>
         async () => {
             const result = await getSSEGraphResult(`api/graph/${prepareArg(opt)}/count/nodes`, toast, setIndicator);
 
             if (!result) return "";
 
             return Number(result.nodes).toLocaleString()
-        }
+        }, [toast, setIndicator])
 
-    const loadEdgesCount = (opt: string) =>
+    const loadEdgesCount = useCallback((opt: string) =>
         async () => {
             const result = await getSSEGraphResult(`api/graph/${prepareArg(opt)}/count/edges`, toast, setIndicator);
 
             if (!result) return "";
 
             return Number(result.edges).toLocaleString()
-        }
+        }, [toast, setIndicator])
 
-    const handleSetRows = (opts: string[]) => {
+    const handleSetRows = useCallback((opts: string[]) => {
         setRows(opts.map(opt =>
-            session?.user?.role === "Admin"
+            sessionRole === "Admin"
                 ? ({
                     checked: false,
                     name: opt,
@@ -144,11 +145,18 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
                         { loadCell: loadEdgesCount(opt), type: "readonly" },
                     ]
                 })))
-    }
+    }, [sessionRole, handleSetOption, loadMemory, loadNodesCount, loadEdgesCount])
+
+    useEffect(() => {
+        if (!openMenage) {
+            setOpenDuplicate(false)
+            handleSetRows(options)
+        }
+    }, [openMenage, handleSetRows, options])
 
     useEffect(() => {
         handleSetRows(options)
-    }, [options])
+    }, [options, handleSetRows])
 
     const handleOpenChange = async (o: boolean) => {
         setOpen(o)

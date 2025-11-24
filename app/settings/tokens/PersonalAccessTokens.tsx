@@ -49,6 +49,22 @@ export default function PersonalAccessTokens() {
   const { toast } = useToast();
   const { setIndicator } = useContext(IndicatorContext);
 
+  useEffect(() => {
+    if (!generateDialogOpen) {
+      setTokenName("");
+      setExpiresIn("never");
+      setCustomExpirationDate("");
+      setIsGenerating(false);
+    }
+  }, [generateDialogOpen]);
+
+  useEffect(() => {
+    if (!deleteDialogOpen) {
+      setSelectedToken(null);
+      setIsRevoking(false);
+    }
+  }, [deleteDialogOpen]);
+
   const fetchTokens = useCallback(async () => {
     setLoading(true);
     const result = await securedFetch("/api/auth/tokens", {

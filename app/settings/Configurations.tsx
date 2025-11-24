@@ -154,7 +154,7 @@ export default function Configurations() {
 
         const result = await securedFetch(
             `api/graph/config/${prepareArg(name)}`,
-            { 
+            {
                 method: 'POST',
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ value })
@@ -240,11 +240,13 @@ export default function Configurations() {
     }, []);
 
     return (
-        <TableComponent
-            label="Configs"
-            entityName="Config"
-            headers={["Name", "Description", "Value"]}
-            rows={configs}
-        />
+        <div className="grow base-0 overflow-hidden">
+            <TableComponent
+                label="Configs"
+                entityName="Config"
+                headers={["Name", "Description", "Value"]}
+                rows={configs}
+            />
+        </div>
     );
 }
