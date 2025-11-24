@@ -421,7 +421,7 @@ export default class ApiCalls {
   }): Promise<any> {
     try {
       const headers = await getAdminToken();
-      const result = await postRequest(`${urls.api.tokenUrl}login`, data, undefined, headers);
+      const result = await postRequest(`${urls.api.tokenUrl}tokens`, data, undefined, headers);
       return await result.json();
     } catch (error) {
       throw new Error(
@@ -442,10 +442,10 @@ export default class ApiCalls {
     }
   }
 
-  async revokeToken(data: { token?: string; token_id?: string }): Promise<any> {
+  async revokeToken(tokenId: string): Promise<any> {
     try {
       const headers = await getAdminToken();
-      const result = await postRequest(`${urls.api.tokenUrl}revoke`, data, undefined, headers);
+      const result = await deleteRequest(`${urls.api.tokenUrl}tokens/${tokenId}`, headers);
       return await result.json();
     } catch (error) {
       throw new Error(
@@ -457,7 +457,7 @@ export default class ApiCalls {
   async getTokenDetails(tokenId: string): Promise<any> {
     try {
       const headers = await getAdminToken();
-      const result = await getRequest(`${urls.api.tokenUrl}token/${tokenId}`, headers);
+      const result = await getRequest(`${urls.api.tokenUrl}tokens/${tokenId}`, headers);
       return await result.json();
     } catch (error) {
       throw new Error(
@@ -469,7 +469,7 @@ export default class ApiCalls {
   async revokeAllUserTokens(tokens: string[]): Promise<void> {
     try {
       await Promise.all(
-        tokens.map((tokenId) => this.revokeToken({ token_id: tokenId }))
+        tokens.map((tokenId) => this.revokeToken(tokenId))
       );
     } catch (error) {
       throw new Error(
@@ -486,6 +486,9 @@ export default class ApiCalls {
       name?: string;
       expiresAt?: string | null;
       ttlSeconds?: number;
+      host?: string;
+      port?: string;
+      tls?: string;
     }
   ): Promise<any> {
     try {
@@ -493,8 +496,11 @@ export default class ApiCalls {
         ...data,
         username,
         password,
+        host: data?.host || "localhost",
+        port: data?.port || "6379",
+        tls: data?.tls || "false",
       };
-      const result = await postRequest(`${urls.api.tokenUrl}login`, payload);
+      const result = await postRequest(`${urls.api.tokenUrl}tokens/credentials`, payload);
       return await result.json();
     } catch (error) {
       throw new Error(
@@ -525,18 +531,16 @@ export default class ApiCalls {
   async revokeTokenAsUser(
     username: string,
     password: string,
-    data: { token?: string; token_id?: string }
+    tokenId: string
   ): Promise<any> {
     try {
       // First get a session/token by logging in
       const loginResponse = await this.generateTokenAsUser(username, password);
       const { token } = loginResponse;
 
-      // Use that token to revoke
-      const result = await postRequest(
-        `${urls.api.tokenUrl}revoke`,
-        data,
-        undefined,
+      // Use that token to revoke via DELETE
+      const result = await deleteRequest(
+        `${urls.api.tokenUrl}tokens/${tokenId}`,
         { Authorization: `Bearer ${token}` }
       );
       return await result.json();

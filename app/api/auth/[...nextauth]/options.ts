@@ -17,8 +17,6 @@ interface CustomJWTPayload {
   tls: boolean;
   ca?: string;
   url?: string;
-  // Note: Password is NOT stored in JWT for security
-  // It's stored encrypted in Token DB (6380) and fetched only when needed for reconnection
 }
 
 interface AuthenticatedUser {
@@ -33,70 +31,6 @@ interface AuthenticatedUser {
 }
 
 const connections = new Map<string, FalkorDB>();
-
-// Admin connection for token management operations
-let adminConnectionForTokens: FalkorDB | null = null;
-
-/**
- * Gets or creates an Admin Redis connection for token management
- * This connection is used to store/retrieve/delete tokens for all users
- * since non-admin users don't have SET/GET/DEL permissions
- */
-export async function getAdminConnectionForTokens(
-  host: string = "localhost",
-  port: number = 6379,
-  tls: boolean = false,
-  ca?: string
-): Promise<FalkorDB> {
-  // Return existing connection if available
-  if (adminConnectionForTokens) {
-    try {
-      // Test if connection is still alive
-      const connection = await adminConnectionForTokens.connection;
-      await connection.ping();
-      return adminConnectionForTokens;
-    } catch (err) {
-      // eslint-disable-next-line no-console
-      console.warn("Admin token connection is dead, recreating:", err);
-      adminConnectionForTokens = null;
-    }
-  }
-
-  // Create new Admin connection
-  // Note: Default user has "nopass" so we don't provide credentials
-  const connectionOptions: FalkorDBOptions = tls
-    ? {
-        socket: {
-          host,
-          port,
-          tls: true,
-          checkServerIdentity: () => undefined,
-          ca: ca ? [Buffer.from(ca, "base64").toString("utf8")] : undefined,
-        },
-        username: undefined,
-        password: undefined,
-      }
-    : {
-        socket: {
-          host,
-          port,
-        },
-        username: undefined,
-        password: undefined,
-      };
-
-  adminConnectionForTokens = await FalkorDB.connect(connectionOptions);
-  
-  // Verify this is actually an admin connection
-  try {
-    const connection = await adminConnectionForTokens.connection;
-    await connection.aclGetUser("default");
-  } catch (err) {
-    throw new Error("Failed to create admin connection for token management. The default user must have admin privileges.");
-  }
-
-  return adminConnectionForTokens;
-}
 
 export async function newClient(
   credentials: {

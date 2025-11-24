@@ -52,7 +52,7 @@ const swaggerSpec = {
       post: {
         tags: ["Authentication"],
   summary: "Generate JWT Token with Credentials",
-  description: "Authenticate with direct credentials and generate a JWT Personal Access Token (PAT) for external API access, CLI tools, or programmatic access. This endpoint does NOT require an existing session.\n\n**Note:** Optional fields: `name`, `expiresAt`, `ttlSeconds`",
+  description: "Authenticate with direct credentials and generate a JWT Personal Access Token (PAT) for external API access, CLI tools, or programmatic access. This endpoint does NOT require an existing session.\n\n**Note:** Optional fields: `name`, `expiresAt`, `ttlSeconds`, `host`, `port`, `tls`, `ca`.",
         requestBody: {
           required: true,
           content: {
@@ -101,11 +101,6 @@ const swaggerSpec = {
                     description: "Enable TLS connection",
                     example: "false",
                     enum: ["true", "false"]
-                  },
-                  ca: {
-                    type: "string",
-                    description: "Base64-encoded PEM CA certificate for TLS (optional)",
-                    example: "MIIDdzCCAl+gAwIBAgIUX... (base64 PEM)"
                   }
                 },
                 required: ["username", "host", "port", "tls"]

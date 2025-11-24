@@ -73,7 +73,7 @@ export async function POST(request: NextRequest) {
       ttlSeconds = undefined,
     } = validation.data as LoginInput;
 
-    // 3. Authenticate with Main DB (6379)
+    // 3. Authenticate user with provided credentials
     let authenticatedUser;
     let userPassword;
     try {
@@ -85,7 +85,7 @@ export async function POST(request: NextRequest) {
           host,
           port: String(port),
           username: username || "",
-          password: userPassword,
+          password: userPassword === "" ? undefined : userPassword,
           tls: String(tls),
           ca: ca || "undefined",
         },
@@ -95,15 +95,15 @@ export async function POST(request: NextRequest) {
       authenticatedUser = {
         id: userId,
         host,
-  port: parseInt(String(port), 10),
+        port: parseInt(String(port), 10),
         username: username || "default",
-  tls: tls === "true" || tls === true,
+        tls: tls === "true" || tls === true,
         ca,
         role,
       };
     } catch (connectionError) {
       // eslint-disable-next-line no-console
-      console.error("FalkorDB connection error:", connectionError);
+      console.error("FalkorDB connection error for user:", username, "at", host, port, connectionError);
       return NextResponse.json(
         { message: "Invalid credentials or connection failed" },
         { status: 401 }
@@ -193,9 +193,11 @@ export async function POST(request: NextRequest) {
       `;
 
       await executePATQuery(query);
+      // eslint-disable-next-line no-console
+      console.log('Token stored successfully for user:', authenticatedUser.username, 'tokenId:', tokenId);
     } catch (storageError) {
       // eslint-disable-next-line no-console
-      console.error('Failed to store token in FalkorDB:', storageError);
+      console.error('Failed to store token in FalkorDB for user:', authenticatedUser.username, storageError);
       // Continue - token will still work but can't be managed via UI
     }
 
