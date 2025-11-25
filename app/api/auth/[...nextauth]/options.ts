@@ -17,8 +17,6 @@ interface CustomJWTPayload {
   tls: boolean;
   ca?: string;
   url?: string;
-  // Note: Password is NOT stored in JWT for security
-  // It's stored encrypted in Token DB (6380) and fetched only when needed for reconnection
 }
 
 interface AuthenticatedUser {
@@ -33,70 +31,6 @@ interface AuthenticatedUser {
 }
 
 const connections = new Map<string, FalkorDB>();
-
-// Admin connection for token management operations
-let adminConnectionForTokens: FalkorDB | null = null;
-
-/**
- * Gets or creates an Admin Redis connection for token management
- * This connection is used to store/retrieve/delete tokens for all users
- * since non-admin users don't have SET/GET/DEL permissions
- */
-export async function getAdminConnectionForTokens(
-  host: string = "localhost",
-  port: number = 6379,
-  tls: boolean = false,
-  ca?: string
-): Promise<FalkorDB> {
-  // Return existing connection if available
-  if (adminConnectionForTokens) {
-    try {
-      // Test if connection is still alive
-      const connection = await adminConnectionForTokens.connection;
-      await connection.ping();
-      return adminConnectionForTokens;
-    } catch (err) {
-      // eslint-disable-next-line no-console
-      console.warn("Admin token connection is dead, recreating:", err);
-      adminConnectionForTokens = null;
-    }
-  }
-
-  // Create new Admin connection
-  // Note: Default user has "nopass" so we don't provide credentials
-  const connectionOptions: FalkorDBOptions = tls
-    ? {
-        socket: {
-          host,
-          port,
-          tls: true,
-          checkServerIdentity: () => undefined,
-          ca: ca ? [Buffer.from(ca, "base64").toString("utf8")] : undefined,
-        },
-        username: undefined,
-        password: undefined,
-      }
-    : {
-        socket: {
-          host,
-          port,
-        },
-        username: undefined,
-        password: undefined,
-      };
-
-  adminConnectionForTokens = await FalkorDB.connect(connectionOptions);
-  
-  // Verify this is actually an admin connection
-  try {
-    const connection = await adminConnectionForTokens.connection;
-    await connection.aclGetUser("default");
-  } catch (err) {
-    throw new Error("Failed to create admin connection for token management. The default user must have admin privileges.");
-  }
-
-  return adminConnectionForTokens;
-}
 
 export async function newClient(
   credentials: {
@@ -398,41 +332,15 @@ const authOptions: AuthOptions = {
         }
 
         try {
-          // Use consistent user ID instead of random UUID
-          // Extract host/port from URL if provided, otherwise use host/port fields
-          let hostname: string;
-          let port: number;
-          let username: string;
-
-          if (credentials.url) {
-            // Parse URL to extract host, port, and username
-            try {
-              const parsed = new URL(credentials.url);
-              hostname = parsed.hostname || "localhost";
-              port = parsed.port ? parseInt(parsed.port, 10) : 6379;
-              username = parsed.username || credentials.username || "default";
-            } catch {
-              // URL parsing failed, fall back to host/port
-              hostname = credentials.host || "localhost";
-              port = credentials.port ? parseInt(credentials.port, 10) : 6379;
-              username = credentials.username || "default";
-            }
-          } else {
-            // Use individual connection parameters
-            hostname = credentials.host || "localhost";
-            port = credentials.port ? parseInt(credentials.port, 10) : 6379;
-            username = credentials.username || "default";
-          }
-
-          // Generate consistent user ID from normalized hostname, port, and username
-          const id = generateConsistentUserId(username, hostname, port);
+          // Generate random UUID for this session
+          const id = uuidv4();
 
           const { role } = await newClient(credentials, id);
 
           const res: User = {
             id,
             url: credentials.url,
-            host: credentials.host,
+            host: credentials.host || "localhost",
             port: credentials.port ? parseInt(credentials.port, 10) : 6379,
             password: credentials.password,
             username: credentials.username,
@@ -521,7 +429,31 @@ export async function getClient() {
 
   let connection = connections.get(id);
 
-  // If client is not found, create a new one
+  // Health check: if connection exists, verify it's still alive
+  if (connection) {
+    try {
+      const conn = await connection.connection;
+      await conn.ping();
+
+      // Connection is healthy, reuse it
+      return { client: connection, user };
+    } catch (pingError) {
+      // Connection is dead, remove from pool and recreate
+      // eslint-disable-next-line no-console
+      console.warn("Session connection health check failed, recreating:", pingError);
+      connections.delete(id);
+
+      try {
+        await connection.close();
+      } catch (closeError) {
+        // Ignore close errors on dead connections
+      }
+
+      connection = undefined; // Will be recreated below
+    }
+  }
+
+  // No existing connection or health check failed - create new one
   if (!connection) {
     const { client } = await newClient(
       {
