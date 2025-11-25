@@ -278,7 +278,7 @@ export default function BrowserSettings() {
                 {separator}
                 <div className="flex flex-col gap-2">
                     <h1 className="text-2xl font-bold">Environment</h1>
-                    <p className="text-sm text-muted-foreground">Define your keys</p>
+                    <p className="text-sm text-muted-foreground">Define your LLM access for the chat functionality</p>
                 </div>
                 <div className="flex flex-col gap-6">
                     <div className="flex gap-4 items-center">
