@@ -132,7 +132,7 @@ export default function PersonalAccessTokens() {
           break;
       }
       
-      const result = await securedFetch("/api/auth/login", {
+      const result = await securedFetch("/api/auth/tokens", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -175,14 +175,9 @@ export default function PersonalAccessTokens() {
   const revokeToken = async (tokenId: string) => {
     setIsRevoking(true);
     try {
-      const result = await securedFetch("/api/auth/revoke", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          token_id: tokenId,
-        }),
+      // New backend expects DELETE /api/auth/tokens/{tokenId}
+      const result = await securedFetch(`/api/auth/tokens/${encodeURIComponent(tokenId)}`, {
+        method: "DELETE",
       }, toast, setIndicator);
 
       if (result.ok) {

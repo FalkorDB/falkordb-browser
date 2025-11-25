@@ -48,11 +48,11 @@ const swaggerSpec = {
     }
   ],
   paths: {
-    "/api/auth/login": {
+    "/api/auth/tokens/credentials": {
       post: {
         tags: ["Authentication"],
-        summary: "Generate JWT Token (Login)",
-        description: "Authenticate user and generate a JWT Personal Access Token (PAT) for external API access. Provide credentials to authenticate and generate a token.\n\n**Note:** Optional fields: `name`, `expiresAt`, `ttlSeconds`, `host`, `port`, `tls`, `ca`",
+  summary: "Generate JWT Token with Credentials",
+  description: "Authenticate with direct credentials and generate a JWT Personal Access Token (PAT) for external API access, CLI tools, or programmatic access. This endpoint does NOT require an existing session.\n\n**Note:** Optional fields: `name`, `expiresAt`, `ttlSeconds`, `host`, `port`, `tls`, `ca`.",
         requestBody: {
           required: true,
           content: {
@@ -67,7 +67,7 @@ const swaggerSpec = {
                   },
                   password: {
                     type: "string",
-                    description: "Password for database connection (leave empty for 'default' user)",
+                    description: "Password for database connection. Can be omitted (or empty) only when using the `default` user on localhost; otherwise a non-empty password is required.",
                     example: ""
                   },
                   name: {
@@ -83,7 +83,7 @@ const swaggerSpec = {
                   },
                   ttlSeconds: {
                     type: "integer",
-                    description: "Time-to-live in seconds",
+                    description: "Time-to-live in seconds (max: 31622400)",
                     example: 31622400
                   },
                   host: {
@@ -101,14 +101,9 @@ const swaggerSpec = {
                     description: "Enable TLS connection",
                     example: "false",
                     enum: ["true", "false"]
-                  },
-                  ca: {
-                    type: "string",
-                    description: "Base64-encoded CA certificate for TLS",
-                    example: ""
                   }
                 },
-                required: ["username", "password"]
+                required: ["username", "host", "port", "tls"]
               }
             }
           }
@@ -123,7 +118,7 @@ const swaggerSpec = {
                   properties: {
                     message: {
                       type: "string",
-                      example: "Authentication successful"
+                      example: "Token created successfully"
                     },
                     token: {
                       type: "string",
@@ -136,7 +131,7 @@ const swaggerSpec = {
             }
           },
           "400": {
-            description: "Bad request - Invalid JSON, expiration date in the past, or invalid TTL value",
+            description: "Bad request - Invalid JSON, validation error, expiration date in the past, or invalid TTL value",
             content: {
               "application/json": {
                 schema: {
@@ -176,124 +171,7 @@ const swaggerSpec = {
                   properties: {
                     message: {
                       type: "string",
-                      example: "Server configuration error: NEXTAUTH_SECRET is not set"
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/auth/revoke": {
-      post: {
-        tags: ["Authentication"],
-        summary: "Revoke JWT token",
-        description: "Revoke a JWT token by marking it as inactive in FalkorDB. Once revoked, the token cannot be used for authentication. \n\n**Note:** Provide either `token` or `token_id` (not both)",
-        security: [{ bearerAuth: [] }],
-        requestBody: {
-          required: true,
-          content: {
-            "application/json": {
-              schema: {
-                type: "object",
-                properties: {
-                  token: {
-                    type: "string",
-                    description: "JWT token to revoke",
-                    example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-                  },
-                  token_id: {
-                    type: "string",
-                    description: "Token ID to revoke",
-                    example: "1761055513181-215c579b-c6e1-4f10-9b07-aacbf89cda21"
-                  }
-                }
-              }
-            }
-          }
-        },
-        responses: {
-          "200": {
-            description: "Token revoked successfully",
-            content: {
-              "application/json": {
-                schema: {
-                  type: "object",
-                  properties: {
-                    message: {
-                      type: "string",
-                      example: "Token revoked successfully"
-                    },
-                    tokenId: {
-                      type: "string",
-                      description: "ID of the revoked token",
-                      example: "user-123-1640995200"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "400": {
-            description: "Bad request - missing token in request body",
-            content: {
-              "application/json": {
-                schema: {
-                  type: "object",
-                  properties: {
-                    message: {
-                      type: "string",
-                      example: "Token to revoke is required in request body"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "401": {
-            description: "Authentication failed - invalid or missing token",
-            content: {
-              "application/json": {
-                schema: {
-                  type: "object",
-                  properties: {
-                    message: {
-                      type: "string",
-                      example: "Authorization header with Bearer token required"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "403": {
-            description: "Forbidden - You can only revoke your own tokens (unless you are an Admin)",
-            content: {
-              "application/json": {
-                schema: {
-                  type: "object",
-                  properties: {
-                    message: {
-                      type: "string",
-                      example: "Forbidden: You can only revoke your own tokens"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "500": {
-            description: "Server configuration error",
-            content: {
-              "application/json": {
-                schema: {
-                  type: "object",
-                  properties: {
-                    message: {
-                      type: "string",
-                      example: "Server configuration error"
+                      example: "Server configuration error: NEXTAUTH_SECRET not set"
                     }
                   }
                 }
@@ -307,7 +185,7 @@ const swaggerSpec = {
       get: {
         tags: ["Authentication"],
         summary: "List JWT tokens",
-        description: "Get a list of active JWT tokens.",
+        description: "Get a list of active JWT tokens. Admins see all tokens, regular users see only their own tokens.",
         security: [{ bearerAuth: [] }],
         responses: {
           "200": {
@@ -391,11 +269,11 @@ const swaggerSpec = {
         }
       }
     },
-    "/api/auth/token/{tokenId}": {
+    "/api/auth/tokens/{tokenId}": {
       get: {
         tags: ["Authentication"],
         summary: "Get token metadata",
-        description: "Get detailed metadata for a specific JWT token by its token ID.",
+        description: "Get detailed metadata for a specific JWT token by its token ID. Admins can view any token, regular users can only view their own tokens.",
         security: [{ bearerAuth: [] }],
         parameters: [
           {
@@ -487,6 +365,101 @@ const swaggerSpec = {
                     message: {
                       type: "string",
                       example: "Forbidden: You can only view your own tokens"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            description: "Token not found",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    message: {
+                      type: "string",
+                      example: "Token not found"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            description: "Internal server error"
+          }
+        }
+      },
+      delete: {
+        tags: ["Authentication"],
+        summary: "Revoke token by ID",
+        description: "Revoke a specific JWT token by its token ID. Once revoked, the token cannot be used for authentication. Admins can revoke any token, regular users can only revoke their own tokens.",
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          {
+            in: "path",
+            name: "tokenId",
+            required: true,
+            schema: {
+              type: "string"
+            },
+            description: "Token ID to revoke",
+            example: "1761053108078-554350d7-c965-4ed7-8d32-679b7f705e81"
+          }
+        ],
+        responses: {
+          "200": {
+            description: "Token revoked successfully",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    message: {
+                      type: "string",
+                      example: "Token revoked successfully"
+                    },
+                    tokenId: {
+                      type: "string",
+                      description: "ID of the revoked token",
+                      example: "1761053108078-554350d7-c965-4ed7-8d32-679b7f705e81"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            description: "Bad request - Token is already revoked",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    message: {
+                      type: "string",
+                      example: "Token is already revoked"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            description: "Authentication failed - invalid or missing token"
+          },
+          "403": {
+            description: "Forbidden - You can only revoke your own tokens (unless you are an Admin)",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    message: {
+                      type: "string",
+                      example: "Forbidden: You can only revoke your own tokens"
                     }
                   }
                 }

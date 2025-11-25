@@ -122,7 +122,7 @@ test.describe("@Tokens Personal Access Tokens Tests", () => {
       const tokens = await apiCall.listTokens();
       const token = tokens.tokens.find((t: { name: string }) => t.name === tokenName);
       if (token) {
-        await apiCall.revokeToken({ token_id: (token as { token_id: string }).token_id });
+        await apiCall.revokeToken((token as { token_id: string }).token_id);
       }
     });
   });
@@ -189,7 +189,7 @@ test.describe("@Tokens Personal Access Tokens Tests", () => {
       const tokens = await apiCall.listTokensAsUser(readonlyUser.name, userConfig.user.password);
       const token = tokens.tokens.find((t: { name: string }) => t.name === tokenName);
       if (token) {
-        await apiCall.revokeTokenAsUser(readonlyUser.name, userConfig.user.password, { token_id: (token as { token_id: string }).token_id });
+        await apiCall.revokeTokenAsUser(readonlyUser.name, userConfig.user.password, (token as { token_id: string }).token_id);
       }
     });
 
@@ -317,7 +317,7 @@ test.describe("@Tokens Personal Access Tokens Tests", () => {
       const tokens = await apiCall.listTokensAsUser(readonlyUser.name, userConfig.user.password);
       const token = tokens.tokens.find((t: { name: string }) => t.name === tokenName);
       if (token) {
-        await apiCall.revokeTokenAsUser(readonlyUser.name, userConfig.user.password, { token_id: (token as { token_id: string }).token_id });
+        await apiCall.revokeTokenAsUser(readonlyUser.name, userConfig.user.password, (token as { token_id: string }).token_id);
       }
     });
 
@@ -375,7 +375,7 @@ test.describe("@Tokens Personal Access Tokens Tests", () => {
       const tokens = await apiCall.listTokensAsUser(readonlyUser.name, userConfig.user.password);
       const token = tokens.tokens.find((t: { name: string }) => t.name === tokenName);
       if (token) {
-        await apiCall.revokeTokenAsUser(readonlyUser.name, userConfig.user.password, { token_id: (token as { token_id: string }).token_id });
+        await apiCall.revokeTokenAsUser(readonlyUser.name, userConfig.user.password, (token as { token_id: string }).token_id);
       }
     });
   });
@@ -441,7 +441,7 @@ test.describe("@Tokens Personal Access Tokens Tests", () => {
       });
 
       expect(response.token).toBeDefined();
-      expect(response.message).toBe("Authentication successful");
+      expect(response.message).toBe("Token created successfully");
 
       // Verify via list API
       const tokens = await apiCall.listTokens();
@@ -459,7 +459,7 @@ test.describe("@Tokens Personal Access Tokens Tests", () => {
       // Cleanup
       const tokenToRevoke = tokens.tokens.find((t: { name: string }) => t.name === tokenName);
       if (tokenToRevoke) {
-        await apiCall.revokeToken({ token_id: (tokenToRevoke as { token_id: string }).token_id });
+        await apiCall.revokeToken((tokenToRevoke as { token_id: string }).token_id);
       }
     });
 
@@ -504,7 +504,7 @@ test.describe("@Tokens Personal Access Tokens Tests", () => {
       expect(token).toBeDefined();
 
       // Revoke token via API
-      const revokeResponse = await apiCall.revokeToken({ token_id: (token as { token_id: string }).token_id });
+      const revokeResponse = await apiCall.revokeToken((token as { token_id: string }).token_id);
       expect(revokeResponse.message).toContain("revoked successfully");
 
       // Verify via API token is gone
@@ -554,7 +554,7 @@ test.describe("@Tokens Personal Access Tokens Tests", () => {
         await apiCall.revokeTokenAsUser(
           readonlyUser.name,
           userConfig.user.password,
-          { token_id: (tokenToRevoke as { token_id: string }).token_id }
+          (tokenToRevoke as { token_id: string }).token_id
         );
       }
     });
@@ -576,7 +576,7 @@ test.describe("@Tokens Personal Access Tokens Tests", () => {
       const adminTokens = await apiCall.listTokens();
       const tokenToRevoke = adminTokens.tokens.find((t: { name: string }) => t.name === adminTokenName);
       if (tokenToRevoke) {
-        await apiCall.revokeToken({ token_id: (tokenToRevoke as { token_id: string }).token_id });
+        await apiCall.revokeToken((tokenToRevoke as { token_id: string }).token_id);
       }
     });
 
@@ -607,7 +607,7 @@ test.describe("@Tokens Personal Access Tokens Tests", () => {
         await apiCall.revokeTokenAsUser(
           readwriteUser.name,
           userConfig.user.password,
-          { token_id: (tokenToRevoke as { token_id: string }).token_id }
+          (tokenToRevoke as { token_id: string }).token_id
         );
       }
     });
@@ -629,7 +629,7 @@ test.describe("@Tokens Personal Access Tokens Tests", () => {
       const adminTokens = await apiCall.listTokens();
       const tokenToRevoke = adminTokens.tokens.find((t: { name: string }) => t.name === adminTokenName);
       if (tokenToRevoke) {
-        await apiCall.revokeToken({ token_id: (tokenToRevoke as { token_id: string }).token_id });
+        await apiCall.revokeToken((tokenToRevoke as { token_id: string }).token_id);
       }
     });
   });
