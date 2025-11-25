@@ -1,5 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getClient } from "@/app/api/auth/[...nextauth]/options";
+import {
+  createSchemaElement,
+  deleteSchemaElement,
+  validateBody,
+} from "@/app/api/validate-body";
 import { formatAttributes } from "./utils";
 
 // eslint-disable-next-line import/prefer-default-export
@@ -17,13 +22,17 @@ export async function POST(
     const { client, user } = session;
     const { schema } = await params;
     const schemaName = `${schema}_schema`;
-    const { type, label, attributes, selectedNodes } = await request.json();
+    const body = await request.json();
+
+    const validation = validateBody(createSchemaElement, body);
+
+    if (!validation.success) {
+      return NextResponse.json({ message: validation.error }, { status: 400 });
+    }
+
+    const { type, label, attributes, selectedNodes } = validation.data;
 
     try {
-      if (type === undefined) throw new Error("Type is required");
-
-      if (!attributes) throw new Error("Attributes are required");
-
       if (!type) {
         if (!label) throw new Error("Label is required");
 
@@ -41,8 +50,8 @@ export async function POST(
                   .join(",")}}`
               : ""
           }) RETURN n`
-        : `MATCH (a), (b) WHERE ID(a) = ${selectedNodes[0].id} AND ID(b) = ${
-            selectedNodes[1].id
+        : `MATCH (a), (b) WHERE ID(a) = ${selectedNodes![0].id} AND ID(b) = ${
+            selectedNodes![1].id
           } CREATE (a)-[e:${label[0]}${
             formattedAttributes?.length > 0
               ? ` {${formattedAttributes
@@ -88,11 +97,17 @@ export async function DELETE(
     const { schema, node } = await params;
     const schemaName = `${schema}_schema`;
     const nodeId = Number(node);
-    const { type } = await request.json();
+    const body = await request.json();
+
+    const validation = validateBody(deleteSchemaElement, body);
+
+    if (!validation.success) {
+      return NextResponse.json({ message: validation.error }, { status: 400 });
+    }
+
+    const { type } = validation.data;
 
     try {
-      if (type === undefined) throw new Error("Type is required");
-
       const graph = client.selectGraph(schemaName);
       const query = type
         ? `MATCH (n) WHERE ID(n) = $nodeId DELETE n`

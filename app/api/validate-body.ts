@@ -101,7 +101,7 @@ export const removeSchemaElementLabel = z.object({
 
 export const updateSchemaElementAttribute = z.object({
   type: z.boolean(),
-  attribute: z.any(),
+  attribute: z.array(z.string().min(1, "Attribute value cannot be empty")),
 });
 
 export const deleteSchemaElementAttribute = z.object({
@@ -130,7 +130,16 @@ export const duplicateGraph = z.object({
 export const createGraphElement = z.object({
   type: z.boolean(),
   label: z.array(z.string()).optional(),
-  attributes: z.array(z.tuple([z.string().min(1, "Attribute name cannot be empty"), z.union([z.string().min(1, "Attribute value cannot be empty"), z.number(), z.boolean()])])),
+  attributes: z.array(
+    z.tuple([
+      z.string().min(1, "Attribute name cannot be empty"),
+      z.union([
+        z.string().min(1, "Attribute value cannot be empty"),
+        z.number(),
+        z.boolean(),
+      ]),
+    ])
+  ),
   selectedNodes: z
     .array(
       z.object({
@@ -164,7 +173,11 @@ export const removeGraphElementLabel = z.object({
 
 export const updateGraphElementAttribute = z.object({
   type: z.boolean(),
-  value: z.union([z.string(), z.number(), z.boolean()]),
+  value: z.union([
+    z.string().min(1, "Attribute value cannot be empty"),
+    z.number(),
+    z.boolean(),
+  ]),
 });
 
 export const deleteGraphElementAttribute = z.object({

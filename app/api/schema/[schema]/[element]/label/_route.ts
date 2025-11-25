@@ -1,4 +1,5 @@
 import { getClient } from "@/app/api/auth/[...nextauth]/options";
+import { addSchemaElementLabel, removeSchemaElementLabel, validateBody } from "@/app/api/validate-body";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(
@@ -14,18 +15,28 @@ export async function POST(
 
     const { client, user } = session;
     const { schema, node } = await params;
+    const elementId = Number(node);
     const schemaName = `${schema}_schema`;
-    const { label } = await request.json();
+    const body = await request.json();
 
     try {
-      if (!label) throw new Error("Label is required");
+      const validation = validateBody(addSchemaElementLabel, body);
+
+      if (!validation.success) {
+        return NextResponse.json(
+          { message: validation.error },
+          { status: 400 }
+        );
+      }
+
+      const { label } = validation.data;
 
       const graph = client.selectGraph(schemaName);
-      const q = `MATCH (n) WHERE ID(n) = ${node} SET n:${label}`;
+      const query = `MATCH (n) WHERE ID(n) = $id SET n:${label}`;
       const result =
         user.role === "Read-Only"
-          ? await graph.roQuery(q)
-          : await graph.query(q);
+          ? await graph.roQuery(query, { params: { id: elementId } })
+          : await graph.query(query, { params: { id: elementId } });
 
       if (!result) throw new Error("Something went wrong");
 
@@ -58,19 +69,29 @@ export async function DELETE(
 
     const { client, user } = session;
     const { schema, node } = await params;
-    const { label } = await request.json();
+    const elementId = Number(node);
+    const body = await request.json();
     const schemaName = `${schema}_schema`;
 
     try {
-      if (!label) throw new Error("Label is required");
+      const validation = validateBody(removeSchemaElementLabel, body);
+
+      if (!validation.success) {
+        return NextResponse.json(
+          { message: validation.error },
+          { status: 400 }
+        );
+      }
+
+      const { label } = validation.data;
 
       const graph = client.selectGraph(schemaName);
 
-      const q = `MATCH (n) WHERE ID(n) = ${node} REMOVE n:${label}`;
+      const query = `MATCH (n) WHERE ID(n) = $id REMOVE n:${label}`;
       const result =
         user.role === "Read-Only"
-          ? await graph.roQuery(q)
-          : await graph.query(q);
+          ? await graph.roQuery(query, { params: { id: elementId } })
+          : await graph.query(query, { params: { id: elementId } });
 
       if (!result) throw new Error("Something went wrong");
 
