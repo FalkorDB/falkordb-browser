@@ -86,27 +86,30 @@ export default function Chat({ onClose }: Props) {
         setTimeout(scrollToBottom, 0)
         setNewMessage("")
 
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const body: any = {
+            messages: newMessages.filter(message => message.role === "user" || message.type === "Result").map(({ role, content }) => ({
+                role,
+                content
+            })),
+            graphName,
+        }
+
+        if (model) {
+            body.model = model
+        }
+
+        if (secretKey) {
+            body.key = secretKey
+        }
+
         try {
             const response = await securedFetch("/api/chat", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
                 },
-                body: JSON.stringify(!secretKey || !model ? {
-                    messages: newMessages.filter(message => message.role === "user" || message.type === "Result").map(({ role, content }) => ({
-                        role,
-                        content
-                    })),
-                    graphName,
-                } : {
-                    messages: newMessages.filter(message => message.role === "user" || message.type === "Result").map(({ role, content }) => ({
-                        role,
-                        content
-                    })),
-                    graphName,
-                    key: secretKey,
-                    model,
-                })
+                body: JSON.stringify(body)
             });
 
             if (!response.ok) {
