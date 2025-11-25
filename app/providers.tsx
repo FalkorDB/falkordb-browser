@@ -145,6 +145,11 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       setLastLimit(limit);
       setSecretKey(newSecretKey);
       setModel(newModel);
+
+      if (newSecretKey && newModel) {
+        setNavigateToSettings(false)
+      }
+      
       setRefreshInterval(newRefreshInterval)
       setDisplayTextPriority(newDisplayTextPriority)
       // Reset has changes
