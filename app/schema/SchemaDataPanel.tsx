@@ -334,7 +334,7 @@ export default function SchemaDataPanel({ object, setObject, schema, setLabels }
                         <li key={l} className="flex gap-2 px-2 py-1 bg-secondary rounded-full items-center">
                             <p>{l}</p>
                             {
-                                type && session?.user?.role !== "Read-Only" &&
+                                type && session?.user.role !== "Read-Only" &&
                                 <Button
                                     indicator={indicator}
                                     title="Remove"
@@ -513,7 +513,7 @@ export default function SchemaDataPanel({ object, setObject, schema, setLabels }
                                 <TableCell>
                                     <div className="flex gap-2 w-44">
                                         {
-                                            session?.user?.role !== "Read-Only" && (
+                                            session?.user.role !== "Read-Only" && (
                                                 editable === key ?
                                                     <>
                                                         <Button
@@ -712,7 +712,7 @@ export default function SchemaDataPanel({ object, setObject, schema, setLabels }
                 </TableBody>
                 <TableCaption>
                     {
-                        session?.user?.role !== "Read-Only" &&
+                        session?.user.role !== "Read-Only" &&
                         <Button
                             disabled={attributes.some(att => att[0] === editable)}
                             variant="Primary"

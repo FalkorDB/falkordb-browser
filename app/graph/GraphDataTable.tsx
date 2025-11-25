@@ -389,10 +389,10 @@ export default function GraphDataTable({ object, type, lastObjId, className }: P
                                                     className="disabled:opacity-100 disabled:cursor-default w-full"
                                                     data-testid="DataPanelValueSetAttribute"
                                                     label={getStringValue(value)}
-                                                    title="Click to edit the attribute value"
+                                                    title={session?.user.role === "Read-Only" ? undefined : "Click to edit the attribute value"}
                                                     variant="button"
                                                     onClick={() => handleSetEditable(key, value)}
-                                                    disabled={isAddValue}
+                                                    disabled={isAddValue || session?.user.role === "Read-Only"}
                                                 />
                                         }
                                     </div>
@@ -411,7 +411,7 @@ export default function GraphDataTable({ object, type, lastObjId, className }: P
                                         key={`${key}-actions`}
                                     >
                                         {
-                                            session?.user?.role !== "Read-Only" && (
+                                            session?.user.role !== "Read-Only" && (
                                                 editable === key ?
                                                     <>
                                                         <Button
@@ -534,7 +534,7 @@ export default function GraphDataTable({ object, type, lastObjId, className }: P
                     }
                 </div>
                 {
-                    session?.user?.role !== "Read-Only" &&
+                    session?.user.role !== "Read-Only" &&
                     <Button
                         className="mt-4"
                         disabled={attributes.some((key) => key === editable)}

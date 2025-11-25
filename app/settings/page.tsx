@@ -82,7 +82,7 @@ export default function Settings() {
                         onClick={() => handleSetCurrent("Browser")}
                     />
                     {
-                        session?.user?.role === "Admin" && indicator === "online" &&
+                        session?.user.role === "Admin" && indicator === "online" &&
                         <>
                             <Button
                                 className={cn("p-2 rounded-lg", current === "Configurations" ? "bg-background" : "text-gray-500")}
