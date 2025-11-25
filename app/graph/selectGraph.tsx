@@ -44,7 +44,7 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
 
     const { toast } = useToast()
     const { data: session } = useSession()
-    const sessionRole = session?.user?.role
+    const sessionRole = session?.user.role
 
     const [open, setOpen] = useState(false)
     const [rows, setRows] = useState<Row[]>([])
@@ -269,7 +269,7 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
                     inputRef={inputRef}
                 >
                     {
-                        session?.user?.role !== "Read-Only" &&
+                        session?.user.role !== "Read-Only" &&
                         <>
                             <DeleteGraph
                                 type={type}

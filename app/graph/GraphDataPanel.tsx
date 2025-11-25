@@ -160,7 +160,7 @@ export default function GraphDataPanel({ object, setObject, setLabels }: Props) 
                         >
                             <p>{l || "No Label"}</p>
                             {
-                                type && l && session?.user?.role !== "Read-Only" &&
+                                type && l && session?.user.role !== "Read-Only" &&
                                 <RemoveLabel
                                     onRemoveLabel={handleRemoveLabel}
                                     selectedLabel={l}
@@ -179,7 +179,7 @@ export default function GraphDataPanel({ object, setObject, setLabels }: Props) 
                     ))}
                     <li className="h-8 w-[106px] flex justify-center items-center" key="addLabel">
                         {
-                            type && (labelsHover || label.length === 0) && session?.user?.role !== "Read-Only" &&
+                            type && (labelsHover || label.length === 0) && session?.user.role !== "Read-Only" &&
                             <AddLabel
                                 onAddLabel={handleAddLabel}
                                 trigger={
