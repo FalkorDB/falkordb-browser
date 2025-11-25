@@ -78,7 +78,7 @@ const Button = forwardRef<HTMLButtonElement, Props>(({ label, variant = "button"
                     }
                 </button>
             </TooltipTrigger>
-            <TooltipContent className={cn(tooltipVariant === "Delete" && "bg-destructive border-destructive text-foreground")}>
+            <TooltipContent className={cn(tooltipVariant === "Delete" && "bg-destructive border-destructive text-foreground", "whitespace-pre-line")}>
                 {
                     indicator === "offline" && "The FalkorDB server is offline"
                 }

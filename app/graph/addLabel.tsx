@@ -1,5 +1,5 @@
 import { Plus } from "lucide-react";
-import { useState, useContext } from "react";
+import { useState, useContext, useEffect } from "react";
 import DialogComponent from "../components/DialogComponent";
 import Button from "../components/ui/Button";
 import Input from "../components/ui/Input";
@@ -27,6 +27,13 @@ export default function AddLabel({
     const [open, setOpen] = useState(false)
     const [label, setLabel] = useState("")
     const [isLoading, setIsLoading] = useState(false)
+
+    useEffect(() => {
+        if (!open) {
+            setLabel("")
+            setIsLoading(false)
+        }
+    }, [open])
 
     const handleAddLabel = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault()

@@ -44,6 +44,12 @@ export default function DeleteGraph({
     }
   }, [open, closeManage, setOpenMenage])
 
+  useEffect(() => {
+    if (!open) {
+      setIsLoading(false)
+    }
+  }, [open])
+
   const handleDelete = async (deleteGraphNames: string[]) => {
     setIsLoading(true)
     let newGraphNames

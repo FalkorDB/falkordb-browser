@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getClient } from "../auth/[...nextauth]/options";
 import { chatRequest, validateBody } from "../validate-body";
 
+const CHAT_URL = process.env.CHAT_URL || "http://localhost:8000/"
+
 export async function GET() {
     try {
         const session = await getClient()
@@ -11,7 +13,7 @@ export async function GET() {
         }
 
         try {
-            const response = await fetch(`${process.env.CHAT_URL}configured-model`, {
+            const response = await fetch(`${CHAT_URL}configured-model`, {
                 method: "GET",
                 headers: {
                     "Content-Type": "application/json",
@@ -86,7 +88,7 @@ export async function POST(request: NextRequest) {
                 model,
             }
 
-            const response = await fetch(`${process.env.CHAT_URL}text_to_cypher`, {
+            const response = await fetch(`${CHAT_URL}text_to_cypher`, {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
