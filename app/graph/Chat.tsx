@@ -18,7 +18,7 @@ export default function Chat({ onClose }: Props) {
     const { setIndicator } = useContext(IndicatorContext)
     const { graphName, runQuery } = useContext(GraphContext)
     const { isQueryLoading } = useContext(QueryLoadingContext)
-    const { settings: { chatSettings: { secretKey, model, navigateToSettings } } } = useContext(BrowserSettingsContext)
+    const { settings: { chatSettings: { secretKey, model } } } = useContext(BrowserSettingsContext)
 
     const { toast } = useToast()
 
@@ -92,7 +92,7 @@ export default function Chat({ onClose }: Props) {
                 headers: {
                     "Content-Type": "application/json",
                 },
-                body: JSON.stringify(!navigateToSettings ? {
+                body: JSON.stringify(!secretKey || !model ? {
                     messages: newMessages.filter(message => message.role === "user" || message.type === "Result").map(({ role, content }) => ({
                         role,
                         content

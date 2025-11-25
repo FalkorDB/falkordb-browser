@@ -149,7 +149,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       if (newSecretKey && newModel) {
         setNavigateToSettings(false)
       }
-      
+
       setRefreshInterval(newRefreshInterval)
       setDisplayTextPriority(newDisplayTextPriority)
       // Reset has changes
@@ -436,7 +436,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
         if (json.model) {
           setModel(json.model)
           setNewModel(json.model)
-        } else if (json.error) {
+        } else if (json.error && !model && !secretKey) {
           setNavigateToSettings(true)
         }
       }
