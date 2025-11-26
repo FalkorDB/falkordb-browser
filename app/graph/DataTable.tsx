@@ -443,6 +443,7 @@ export default function DataTable({ object, type, lastObjId, className }: Props)
                             const isExpanded = expandedAttributes[key]
                             const shouldShowToggle = valueNeedsExpansion(key)
                             const rowClass = cn("flex items-center px-1 py-1 border-b border-border", editable === key ? "min-h-14" : "min-h-10")
+                            const buttonTitle = session?.user.role === "Read-Only" ? undefined : (isComplex && "Complex values cannot be edited") || "Click to edit the attribute value"
 
                             return (
                                 <Fragment key={key}>
@@ -470,10 +471,10 @@ export default function DataTable({ object, type, lastObjId, className }: Props)
                                                         <Button
                                                             className="disabled:opacity-100 disabled:cursor-default w-full justify-start"
                                                             data-testid="DataPanelValueSetAttribute"
-                                                            title={isComplex ? "Complex values cannot be edited" : "Click to edit the attribute value"}
+                                                            title={buttonTitle}
                                                             variant="button"
                                                             onClick={() => handleSetEditable(key, value)}
-                                                            disabled={isAddValue || isComplex}
+                                                            disabled={isAddValue || isComplex || session?.user.role === "Read-Only"}
                                                         >
                                                             <p
                                                                 ref={setValueParagraphRef(key)}
@@ -521,7 +522,7 @@ export default function DataTable({ object, type, lastObjId, className }: Props)
                                         key={`${key}-actions`}
                                     >
                                         {
-                                            session?.user?.role !== "Read-Only" && (
+                                            session?.user.role !== "Read-Only" && (
                                                 editable === key ?
                                                     <>
                                                         <Button
@@ -661,7 +662,7 @@ export default function DataTable({ object, type, lastObjId, className }: Props)
                     }
                 </div>
                 {
-                    session?.user?.role !== "Read-Only" &&
+                    session?.user.role !== "Read-Only" &&
                     <Button
                         className="mt-4"
                         disabled={attributes.some((key) => key === editable)}

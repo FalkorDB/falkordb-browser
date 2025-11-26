@@ -1,4 +1,4 @@
-import { FormEvent, useContext, useState } from "react";
+import { FormEvent, useContext, useEffect, useState } from "react";
 import { prepareArg, securedFetch } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
 import DialogComponent from "../DialogComponent";
@@ -19,6 +19,13 @@ export default function DuplicateGraph({ open, onOpenChange, selectedValue, onDu
     const [isLoading, setIsLoading] = useState(false)
     const { toast } = useToast()
     const { indicator, setIndicator } = useContext(IndicatorContext)
+
+    useEffect(() => {
+        if (!open) {
+            setDuplicateName("")
+            setIsLoading(false)
+        }
+    }, [open])
 
     const handleDuplicate = async (e: FormEvent) => {
         e.preventDefault()

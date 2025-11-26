@@ -37,6 +37,12 @@ export default function Users() {
     const { toast } = useToast()
     const { setIndicator } = useContext(IndicatorContext);
 
+    useEffect(() => {
+        if (!open) {
+            setNewUser(null)
+        }
+    }, [open])
+
     const handleSetRole = async (user: SetUser) => {
         const { username, role, oldRole } = user
         const result = await securedFetch(`api/user/${prepareArg(username)}`, {

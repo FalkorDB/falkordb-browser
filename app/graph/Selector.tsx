@@ -2,7 +2,7 @@
 
 'use client'
 
-import { useEffect, useState, useContext, Dispatch, SetStateAction, useRef, useCallback } from "react";
+import { useEffect, useState, useContext, Dispatch, SetStateAction, useRef, useCallback, useMemo } from "react";
 import { cn, GraphRef, formatName, getTheme } from "@/lib/utils";
 import { History, Info, Maximize2 } from "lucide-react";
 import * as monaco from "monaco-editor";
@@ -118,19 +118,52 @@ export default function Selector<T extends "Graph" | "Schema" = "Graph" | "Schem
     const [maximize, setMaximize] = useState(false)
     const [tab, setTab] = useState<Tab>("text")
 
-    const filters = graphNames.length + 10 <= (historyQuery?.queries.length || 0) ? graphNames.filter(name => historyQuery?.queries.some(query => query.graphName === name)) : Array.from(new Set(historyQuery?.queries.map(query => query.graphName).filter(name => !!name)))
+    const filters = useMemo(() => {
+        const queries = historyQuery?.queries ?? []
+        if (graphNames.length + 10 <= queries.length) {
+            return graphNames.filter(name => queries.some(query => query.graphName === name))
+        }
+        return Array.from(new Set(queries.map(query => query.graphName).filter(name => !!name)))
+    }, [graphNames, historyQuery?.queries])
     const currentQuery = historyQuery?.counter === 0 ? historyQuery.currentQuery : historyQuery?.queries[historyQuery.counter - 1]
 
     const afterSearchCallback = useCallback((newFilteredList: Query[]) => {
         if (!historyQuery || !setHistoryQuery) return
 
         if (newFilteredList.every(q => q.text !== historyQuery.query)) {
-            setHistoryQuery(prev => ({
-                ...prev,
-                counter: 0
-            }))
+            setHistoryQuery(prev => {
+                if (prev.counter === 0) return prev
+                return {
+                    ...prev,
+                    counter: 0
+                }
+            })
         }
     }, [historyQuery, setHistoryQuery])
+
+    const resetHistoryFilters = useCallback(() => {
+        if (!historyQuery) {
+            setFilteredQueries([])
+            setActiveFilters([])
+            return
+        }
+
+        if (graphName && filters.some(name => name === graphName)) {
+            setActiveFilters([graphName])
+            const scopedQueries = [
+                ...historyQuery.queries.filter(({ graphName: n }) => graphName === n)
+            ].reverse()
+
+            setFilteredQueries(scopedQueries)
+            afterSearchCallback(scopedQueries)
+            return
+        }
+
+        const allQueries = [...historyQuery.queries].reverse()
+        setActiveFilters([])
+        setFilteredQueries(allQueries)
+        afterSearchCallback(allQueries)
+    }, [historyQuery, graphName, filters, afterSearchCallback])
 
     const handelSetFilteredQueries = useCallback((name?: string) => {
         if (!historyQuery) return
@@ -157,19 +190,17 @@ export default function Selector<T extends "Graph" | "Schema" = "Graph" | "Schem
     }, [activeFilters, afterSearchCallback, historyQuery]);
 
     useEffect(() => {
-        if (!historyQuery) return
+        resetHistoryFilters()
+    }, [resetHistoryFilters])
 
-        if (filters.some(name => name === graphName) && graphName) {
-            setActiveFilters([graphName]);
-
-            const newFilteredQueries = [
-                ...historyQuery.queries.filter(({ graphName: n }) => graphName === n)
-            ].reverse()
-
-            setFilteredQueries(newFilteredQueries)
-            afterSearchCallback(newFilteredQueries)
+    useEffect(() => {
+        if (!queriesOpen) {
+            setIsLoading(false)
+            setTab("text")
+            searchQueryRef.current?.blur()
         }
-    }, [graphName, historyQuery?.queries])
+        resetHistoryFilters()
+    }, [queriesOpen, resetHistoryFilters])
 
     const focusEditorAtEnd = () => {
         if (editorRef.current) {
