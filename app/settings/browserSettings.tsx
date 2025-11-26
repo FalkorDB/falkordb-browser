@@ -107,7 +107,7 @@ export default function BrowserSettings() {
         }
     }, [hasChanges, navigateBack])
 
-    const separator = <div className="min-h-[0.5px] w-[50%] bg-border rounded-full" />
+    const separator = <div className="min-h-[0.5px] w-full bg-border rounded-full" />
 
     const handleScrollTo = (elementId?: string) => {
         if (elementId) {
@@ -159,7 +159,7 @@ export default function BrowserSettings() {
     }
 
     return (
-        <div className="h-full w-full flex flex-col gap-6 overflow-hidden">
+        <div className="grow basis-0 w-full flex flex-col gap-6 overflow-hidden">
             <div className="flex flex-col gap-2">
                 <h1 className="text-2xl font-medium">Browser Settings</h1>
                 <p className="text-sm text-foreground">Manage your environment&apos;s settings</p>

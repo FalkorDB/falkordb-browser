@@ -105,6 +105,7 @@ export async function getSSEGraphResult(
     evtSource.addEventListener("result", (event: MessageEvent) => {
       const result = JSON.parse(event.data);
       evtSource.close();
+      setIndicator("online");
       resolve(result);
     });
 
@@ -138,25 +139,23 @@ export async function getSSEGraphResult(
 export async function securedFetch(
   input: string,
   init: RequestInit,
-  toast?: any,
-  setIndicator?: (indicator: "online" | "offline") => void
+  toast: any,
+  setIndicator: (indicator: "online" | "offline") => void
 ): Promise<Response> {
   const response = await fetch(input, init);
   const { status } = response;
   if (status >= 300) {
     const err = await response.text();
-    if (toast) {
-      toast({
-        title: "Error",
-        description: err,
-        variant: "destructive",
-      });
-    }
+    toast({
+      title: "Error",
+      description: err,
+      variant: "destructive",
+    });
     if (status === 401 || status >= 500) {
-      if (setIndicator) {
-        setIndicator("offline");
-      }
+      setIndicator("offline");
     }
+  } else {
+    setIndicator("online");
   }
   return response;
 }

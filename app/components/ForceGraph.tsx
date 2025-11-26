@@ -4,7 +4,7 @@
 
 "use client"
 
-import { Dispatch, SetStateAction, useContext, useEffect, useRef, useState } from "react"
+import { Dispatch, SetStateAction, useContext, useEffect, useMemo, useRef, useState } from "react"
 import ForceGraph2D from "react-force-graph-2d"
 import { securedFetch, GraphRef, handleZoomToFit, getTheme, Tab, ViewportState } from "@/lib/utils"
 import { useToast } from "@/components/ui/use-toast"
@@ -103,11 +103,26 @@ const wrapTextForCircularNode = (ctx: CanvasRenderingContext2D, text: string, ma
     return [line1, line2 || ''];
 };
 
-const REFERENCE_NODE_COUNT = 2000;
-const BASE_LINK_DISTANCE = 20;
-const BASE_LINK_STRENGTH = 0.5;
-const BASE_CHARGE_STRENGTH = -1;
-const BASE_CENTER_STRENGTH = 0.1;
+const LINK_DISTANCE = 50;
+const MAX_LINK_DISTANCE = 80; // Maximum distance only when clusters would overlap
+const LINK_STRENGTH = 0.5;
+const MIN_LINK_STRENGTH = 0.3; // Minimum strength for very high-degree nodes
+const COLLISION_STRENGTH = 1.35;
+const CHARGE_STRENGTH = -5; // Stronger repulsion to maintain circular arrangement
+const CENTER_STRENGTH = 0.4;
+const COLLISION_BASE_RADIUS = NODE_SIZE * 2;
+const HIGH_DEGREE_PADDING = 1.25;
+const DEGREE_STRENGTH_DECAY = 15; // Degree at which strength starts significantly decreasing
+const CROWDING_THRESHOLD = 20; // Degree threshold where we start adding distance to prevent overlap
+
+const getEndpointId = (endpoint: Node | number | string | undefined): Node["id"] | undefined => {
+    if (endpoint === undefined || endpoint === null) return undefined;
+    if (typeof endpoint === "object") return endpoint.id;
+    if (typeof endpoint === "number") return endpoint;
+
+    const parsed = Number(endpoint);
+    return Number.isNaN(parsed) ? undefined : parsed;
+};
 
 export default function ForceGraph({
     graph,
@@ -146,6 +161,26 @@ export default function ForceGraph({
     const parentRef = useRef<HTMLDivElement>(null)
 
     const [hoverElement, setHoverElement] = useState<Node | Link | undefined>()
+
+    const nodeDegreeMap = useMemo(() => {
+        const degree = new Map<Node["id"], number>();
+
+        data.nodes.forEach(node => degree.set(node.id, 0));
+
+        data.links.forEach(link => {
+            const sourceId = getEndpointId(link.source as Node | number | string);
+            const targetId = getEndpointId(link.target as Node | number | string);
+
+            if (sourceId !== undefined) {
+                degree.set(sourceId, (degree.get(sourceId) || 0) + 1);
+            }
+            if (targetId !== undefined) {
+                degree.set(targetId, (degree.get(targetId) || 0) + 1);
+            }
+        });
+
+        return degree;
+    }, [data.links, data.nodes]);
 
     useEffect(() => {
         setData({ ...graph.Elements })
@@ -221,42 +256,78 @@ export default function ForceGraph({
     useEffect(() => {
         if (!chartRef.current) return;
 
-        const nodeCount = data.nodes.length;
-
-        // Use Math.min/Math.max for capping
-        const linkDistance = Math.max(Math.min(BASE_LINK_DISTANCE * Math.sqrt(nodeCount) / Math.sqrt(REFERENCE_NODE_COUNT), 120), 20);
-        const chargeStrength = Math.min(Math.max(BASE_CHARGE_STRENGTH * Math.sqrt(nodeCount) / Math.sqrt(REFERENCE_NODE_COUNT), -80), -1);
-
-        // Adjust link force and length
         const linkForce = chartRef.current.d3Force('link');
 
         if (linkForce) {
             linkForce
-                .distance(linkDistance)
-                .strength(BASE_LINK_STRENGTH);
+                .distance((link: Link) => {
+                    const sourceId = getEndpointId(link.source as Node | number | string);
+                    const targetId = getEndpointId(link.target as Node | number | string);
+                    const sourceDegree = sourceId !== undefined ? (nodeDegreeMap.get(sourceId) || 0) : 0;
+                    const targetDegree = targetId !== undefined ? (nodeDegreeMap.get(targetId) || 0) : 0;
+                    const maxDegree = Math.max(sourceDegree, targetDegree);
+                    
+                    // Use regular link distance for all links
+                    // Only increase distance when degree is very high to prevent cluster overlap
+                    if (maxDegree >= CROWDING_THRESHOLD) {
+                        // Gradually increase distance for very high-degree nodes to prevent crowding
+                        const extraDistance = Math.min(MAX_LINK_DISTANCE - LINK_DISTANCE, (maxDegree - CROWDING_THRESHOLD) * 1.5);
+                        return LINK_DISTANCE + extraDistance;
+                    }
+                    
+                    // For normal links and moderate high-degree links, use base distance
+                    return LINK_DISTANCE;
+                })
+                .strength((link: Link) => {
+                    const sourceId = getEndpointId(link.source as Node | number | string);
+                    const targetId = getEndpointId(link.target as Node | number | string);
+                    const sourceDegree = sourceId !== undefined ? (nodeDegreeMap.get(sourceId) || 0) : 0;
+                    const targetDegree = targetId !== undefined ? (nodeDegreeMap.get(targetId) || 0) : 0;
+                    
+                    // Use the maximum degree of the two endpoints
+                    const maxDegree = Math.max(sourceDegree, targetDegree);
+                    
+                    // Gradually reduce link strength as degree increases
+                    // This allows high-degree nodes to still pull, but not as aggressively
+                    if (maxDegree <= DEGREE_STRENGTH_DECAY) {
+                        return LINK_STRENGTH;
+                    }
+                    
+                    // Scale strength down gradually: strength decreases as degree increases
+                    // Formula: MIN + (BASE - MIN) * exp(-(degree - threshold) / threshold)
+                    const strengthReduction = Math.max(0, (maxDegree - DEGREE_STRENGTH_DECAY) / DEGREE_STRENGTH_DECAY);
+                    const scaledStrength = MIN_LINK_STRENGTH + (LINK_STRENGTH - MIN_LINK_STRENGTH) * Math.exp(-strengthReduction);
+                    
+                    return Math.max(MIN_LINK_STRENGTH, scaledStrength);
+                });
         }
 
-        // Add collision force to prevent node overlap
-        chartRef.current.d3Force('collision', d3.forceCollide(NODE_SIZE * 2).strength(1));
+        // Add collision force to prevent node overlap (scale radius by node degree)
+        chartRef.current.d3Force('collision', d3.forceCollide((node: Node) => {
+            const degree = nodeDegreeMap.get(node.id) || 0;
+            return COLLISION_BASE_RADIUS + Math.sqrt(degree) * HIGH_DEGREE_PADDING;
+        }).strength(COLLISION_STRENGTH).iterations(2));
 
         // Center force to keep graph centered
         const centerForce = chartRef.current.d3Force('center');
 
         if (centerForce) {
-            centerForce.strength(BASE_CENTER_STRENGTH);
+            centerForce.strength(CENTER_STRENGTH);
         }
 
         // Add charge force to repel nodes
         const chargeForce = chartRef.current.d3Force('charge');
 
         if (chargeForce) {
-            chargeForce.strength(chargeStrength);
+            chargeForce
+                .strength(CHARGE_STRENGTH)
+                .distanceMax(300); // Increased to help maintain circular arrangement
         }
 
         // Reheat the simulation
         chartRef.current.d3ReheatSimulation();
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [chartRef, graph.Elements.links.length, graph.Elements.nodes.length, graph])
+    }, [chartRef, graph.Elements.links.length, graph.Elements.nodes.length, graph, nodeDegreeMap])
 
     // Clear cached display names when displayTextPriority changes
     useEffect(() => {

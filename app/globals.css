@@ -51,13 +51,13 @@
 
     .SofiaSans,
     .SofiaSans * {
-        font-family: 'SofiaSans' !important;
+        font-weight: 200 !important;
         letter-spacing: 0.1px;
-        font-weight: 400;
+        word-spacing: 0.5px;
     }
 
     .tabs-trigger {
-        @apply !p-2 rounded-lg data-[state=active]:!text-primary text-foreground !bg-transparent;
+        @apply !p-0 rounded-lg data-[state=active]:!text-primary text-foreground !bg-transparent;
     }
 
     .hide-scrollbar {

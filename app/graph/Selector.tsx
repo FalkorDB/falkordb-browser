@@ -287,7 +287,7 @@ export default function Selector<T extends "Graph" | "Schema" = "Graph" | "Schem
     const separator = <div className="h-[80%] w-0.5 bg-border rounded-full" />
 
     return (
-        <div className="z-20 w-full h-[50px] flex flex-row gap-4 items-center">
+        <div className="z-20 w-full h-[40px] flex flex-row gap-4 items-center">
             <SelectGraph
                 options={options}
                 setOptions={setOptions}
@@ -346,7 +346,7 @@ export default function Selector<T extends "Graph" | "Schema" = "Graph" | "Schem
                                     }
                                     title="Query History"
                                 >
-                                    <div className="h-1 grow flex gap-8 p-8">
+                                    <div className="h-1 grow flex gap-4">
                                         <PaginationList
                                             label="Query"
                                             className="w-1/2 bg-secondary rounded-lg overflow-hidden"
@@ -422,10 +422,10 @@ export default function Selector<T extends "Graph" | "Schema" = "Graph" | "Schem
                                                                 fontSize: 25,
                                                                 lineNumbersMinChars: 3,
                                                                 scrollbar: {
-                                                                    horizontal: "hidden"
+                                                                    horizontal: "auto"
                                                                 },
                                                                 scrollBeyondLastLine: false,
-                                                                wordWrap: "on",
+                                                                wordWrap: "off",
                                                                 renderWhitespace: "none"
                                                             }}
                                                             value={historyQuery.query}

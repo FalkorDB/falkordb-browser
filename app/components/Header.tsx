@@ -81,7 +81,7 @@ export default function Header({ onSetGraphName, graphNames, graphName, onOpenGr
 
     return (
         <div className="py-5 px-2 flex flex-col justify-between items-center border-r border-border">
-            <div className="w-full flex flex-col gap-6 items-center">
+            <div className="w-full flex flex-col gap-4 items-center">
                 {
                     mounted && currentTheme &&
                     <Link
@@ -161,7 +161,7 @@ export default function Header({ onSetGraphName, graphNames, graphName, onOpenGr
                     </>
                 }
             </div>
-            <div className="w-full flex flex-col gap-6 items-center">
+            <div className="w-full flex flex-col gap-4 items-center">
                 <Button
                     data-testid="settings"
                     title="Adjust application settings"
@@ -177,7 +177,7 @@ export default function Header({ onSetGraphName, graphNames, graphName, onOpenGr
                                 <FileCode size={iconSize} />
                             </Button>
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent side="right" className="bg-background w-full p-4 ml-4">
+                        <DropdownMenuContent side="right" className="bg-background w-full p-2 ml-4">
                             <DropdownMenuGroup className="h-full w-full flex flex-col gap-2 p-2">
                                 <DropdownMenuItem className="focus:bg-transparent">
                                     <a className="flex gap-2 items-center" href="https://docs.falkordb.com/" target="_blank" rel="noreferrer noreferrer">

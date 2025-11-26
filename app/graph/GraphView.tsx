@@ -116,8 +116,8 @@ function GraphView({
 
     return (
         <Tabs data-testid="graphView" value={currentTab} onValueChange={(value) => setCurrentTab(value as Tab)} className={cn("h-full w-full relative border border-border rounded-lg overflow-hidden", currentTab === "Table" && "flex flex-col-reverse")}>
-            <div className="h-full w-full flex flex-col gap-4 absolute py-4 px-6 pointer-events-none z-10 justify-between">
-                <div className="grow basis-0 flex flex-col gap-6 overflow-hidden">
+            <div className="h-full w-full flex flex-col gap-4 absolute p-2 pointer-events-none z-10 justify-between">
+                <div className="grow basis-0 flex flex-col gap-2 overflow-hidden">
                     {
                         !isLoading && currentTab === "Graph" &&
                         <>
@@ -132,7 +132,7 @@ function GraphView({
                             />
                             {
                                 (labels.length !== 0 || relationships.length !== 0) &&
-                                <div className={cn("w-fit h-1 grow grid gap-4", labels.length !== 0 && relationships.length !== 0 ? "grid-rows-[minmax(0,max-content)_max-content_minmax(0,max-content)]" : "grid-rows-[minmax(0,max-content)]")}>
+                                <div className={cn("w-fit h-1 grow grid gap-2", labels.length !== 0 && relationships.length !== 0 ? "grid-rows-[minmax(0,max-content)_max-content_minmax(0,max-content)]" : "grid-rows-[minmax(0,max-content)]")}>
                                     {labels.length !== 0 && <Labels labels={labels} onClick={onLabelClick} label="Labels" type="Graph" />}
                                     {labels.length !== 0 && relationships.length > 0 && <div className="h-px bg-border rounded-full" />}
                                     {relationships.length !== 0 && <Labels labels={relationships} onClick={onRelationshipClick} label="Relationships" type="Graph" />}
@@ -141,13 +141,13 @@ function GraphView({
                         </>
                     }
                 </div>
-                <div className="flex flex-col gap-6">
+                <div className="flex flex-col gap-4">
                     <GraphDetails
                         graph={graph}
                         tabsValue={currentTab}
                     />
                     <div className="flex gap-2 items-center">
-                        <TabsList className="bg-transparent flex gap-2 pointer-events-auto">
+                        <TabsList className="bg-transparent flex gap-2 pointer-events-auto p-0">
                             <TabsTrigger
                                 data-testid="graphTab"
                                 asChild

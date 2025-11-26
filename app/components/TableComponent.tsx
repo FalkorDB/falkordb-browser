@@ -369,7 +369,7 @@ export default function TableComponent({
                     <TableRow ref={headerRef} className="text-nowrap border-border">
                         {
                             setRows ?
-                                <TableHead className="w-5 !pr-2 border-r border-border" key={headers[0]}>
+                                <TableHead className="w-5 border-r border-border p-2 !pr-2" key={headers[0]}>
                                     <Checkbox
                                         data-testid={`tableCheckbox${label}`}
                                         className="w-6 h-6 rounded-full bg-background border-primary data-[state=checked]:bg-primary"
@@ -385,10 +385,17 @@ export default function TableComponent({
                                 </TableHead>
                                 : null
                         }
-                        <TableHead key="index" className="w-0 border-r border-border">Index</TableHead>
+                        <TableHead key="index" className="w-0 border-r border-border p-2">Index</TableHead>
                         {
                             headers.map((header, i) => (
-                                <TableHead className={cn(i + 1 !== headers.length && "border-r", "font-bold text-lg border-border")} key={header}>
+                                <TableHead
+                                    className={cn(
+                                        i + 1 !== headers.length && "border-r",
+                                        "font-bold text-lg border-border",
+                                        i === 0 && (label === "Graphs" || label === "Schemas" || label === "Users") && "w-full"
+                                    )}
+                                    key={header}
+                                >
                                     <div className="flex gap-2 justify-between">
                                         <p>{header}</p>
                                         {
@@ -472,7 +479,7 @@ export default function TableComponent({
                                 >
                                     {
                                         setRows ?
-                                            <TableCell className="w-5 !pr-2 border-r border-border">
+                                            <TableCell className="w-5 border-r border-border p-2 !pr-2">
                                                 <Checkbox
                                                     className="w-6 h-6 rounded-full bg-background border-primary data-[state=checked]:bg-primary"
                                                     data-testid={`tableCheckbox${rowTestID}`}
@@ -489,7 +496,7 @@ export default function TableComponent({
                                             </TableCell>
                                             : null
                                     }
-                                    <TableCell className="border-r border-border">
+                                    <TableCell className="border-r border-border p-2">
                                         <p>{index + 1}.</p>
                                     </TableCell>
                                     {
@@ -508,13 +515,34 @@ export default function TableComponent({
 
                                             // Show loader while loading
                                             if (isCellLoading) {
-                                                return <TableCell className={cn(j + 1 !== row.cells.length && "border-r", row.cells[0]?.value === editable && (cell.type !== "readonly" && cell.type !== "object") && "p-2", cell.type === "object" && "p-1", "border-border")} key={j}><Loader2 className="w-4 h-4 animate-spin" /></TableCell>;
+                                                return (
+                                                    <TableCell
+                                                        className={cn(
+                                                            j + 1 !== row.cells.length && "border-r",
+                                                            row.cells[0]?.value === editable && (cell.type !== "readonly" && cell.type !== "object") && "p-2",
+                                                            cell.type === "object" && "p-1",
+                                                            "border-border"
+                                                        )}
+                                                        key={j}
+                                                    >
+                                                        <Loader2 className="w-4 h-4 animate-spin" />
+                                                    </TableCell>
+                                                );
                                             }
 
                                             // Show value once loaded
                                             return (
-                                                <TableCell className={cn("border-border p-0", j + 1 !== row.cells.length && "border-r")} key={cellKey}>
-                                                    <div style={{ height }} className={cn("overflow-auto p-4", row.cells[0]?.value === editable && (cell.type !== "readonly" && cell.type !== "object") && "p-2", cell.type === "object" && "p-1")}>
+                                                <TableCell
+                                                    className={cn(
+                                                        "border-border p-0",
+                                                        j + 1 !== row.cells.length && "border-r"
+                                                    )}
+                                                    key={cellKey}
+                                                >
+                                                    <div
+                                                        style={{ height }}
+                                                        className={cn("overflow-auto p-2", cell.type === "object" && "p-1", j === 0 && "w-full")}
+                                                    >
                                                         {
                                                             cell.type === "object" ?
                                                                 <div className="pointer-events-none json-tree-container">
@@ -546,7 +574,7 @@ export default function TableComponent({
                                                                     />
                                                                 </div>
                                                                 : editable === cellKey ?
-                                                                    <div className="w-full flex gap-2 items-center">
+                                                                    <div className="h-full w-full flex gap-2 items-center">
                                                                         {
                                                                             cell.type === "select" ?
                                                                                 <Combobox
@@ -586,7 +614,7 @@ export default function TableComponent({
                                                                                     }}
                                                                                 />
                                                                         }
-                                                                        <div className="flex flex-col gap-1">
+                                                                        <div className="flex gap-1">
                                                                             {
                                                                                 cell.type !== "select" && cell.type !== "readonly" &&
                                                                                 <Button

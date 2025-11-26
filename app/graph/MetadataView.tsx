@@ -178,14 +178,14 @@ export default function MetadataView({ graphName, query, setQuery, fetchCount }:
     const { background } = getTheme(theme)
 
     return (
-        <div className="h-full grid grid-cols-2 grid-rows-2 overflow-hidden">
-            <div className="flex flex-col gap-4 border-r border-border p-12 overflow-auto row-span-2">
+        <div className="h-full grid grid-cols-2 grid-rows-3 overflow-hidden">
+            <div className="flex flex-col gap-2 p-2 overflow-auto border-border row-span-3 border-r">
                 <Profile background={background} graphName={graphName} query={query} setQuery={setQuery} fetchCount={fetchCount} />
             </div>
-            <div className="flex flex-col gap-4 p-12 overflow-auto overflow-x-hidden border-b border-border">
+            <div className="flex flex-col gap-2 p-2 overflow-auto border-border row-span-1 border-b">
                 <Metadata query={query} />
             </div>
-            <div className="flex flex-col gap-4 p-12 overflow-auto overflow-x-hidden border-border">
+            <div className="flex flex-col gap-2 p-2 overflow-auto border-border row-span-2">
                 <Explain background={background} query={query} />
             </div>
         </div>

@@ -42,7 +42,7 @@ export default function TableView() {
     return (
         <TableComponent
             label="TableView"
-            className="p-12"
+            className="p-2 pb-10"
             valueClassName="SofiaSans text-xl"
             headers={tableData.headers}
             rows={tableData.rows}

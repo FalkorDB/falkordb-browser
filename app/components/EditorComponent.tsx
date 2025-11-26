@@ -57,6 +57,9 @@ interface Props {
     isQueryLoading: boolean
 }
 
+const MAX_HEIGHT = 20
+const LINE_HEIGHT = 22
+const PLACEHOLDER = "Type your query here to start"
 const monacoOptions: monaco.editor.IStandaloneEditorConstructionOptions = {
     renderLineHighlight: "none",
     glyphMargin: false,
@@ -73,10 +76,10 @@ const monacoOptions: monaco.editor.IStandaloneEditorConstructionOptions = {
     links: false,
     minimap: { enabled: false },
     automaticLayout: true,
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: "400",
     wordWrap: "off",
-    lineHeight: 32,
+    lineHeight: LINE_HEIGHT,
     lineNumbersMinChars: 2,
     overviewRulerLanes: 0,
     overviewRulerBorder: false,
@@ -223,11 +226,6 @@ const SUGGESTIONS: monaco.languages.CompletionItem[] = [
         detail: "(function)"
     }))
 ]
-
-const MAX_HEIGHT = 20
-const LINE_HEIGHT = 32
-
-const PLACEHOLDER = "Type your query here to start"
 
 export default function EditorComponent({ graph, graphName, historyQuery, maximize, setMaximize, runQuery, setHistoryQuery, editorKey, isQueryLoading }: Props) {
     const { indicator, setIndicator } = useContext(IndicatorContext)
@@ -672,7 +670,7 @@ export default function EditorComponent({ graph, graphName, historyQuery, maximi
                             editorRef.current = e
                         }}
                     />
-                    <span ref={placeholderRef} className="w-full top-0 left-0 absolute pointer-events-none text-2xl truncate SofiaSans">
+                    <span ref={placeholderRef} className="w-full top-0 left-0 absolute pointer-events-none truncate SofiaSans">
                         {PLACEHOLDER}
                     </span>
                 </div>
@@ -764,7 +762,7 @@ export default function EditorComponent({ graph, graphName, historyQuery, maximi
                                 },
                                 lineNumbersMinChars: 3,
                                 minimap: { enabled: false },
-                                lineHeight: 30,
+                                lineHeight: LINE_HEIGHT,
                                 fontSize: 25,
                             }}
                             value={historyQuery.query}

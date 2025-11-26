@@ -99,7 +99,7 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
     const loadMemory = useCallback((opt: string) =>
         async () => {
             const memoryMap = await getMemoryUsage(opt, toast, setIndicator);
-            const memoryValue = memoryMap.get("total_graph_sz_mb") ?? 0;
+            const memoryValue = memoryMap.get("total_graph_sz_mb") || '<1';
 
             return `${memoryValue} MB`;
         }, [toast, setIndicator])
@@ -181,7 +181,7 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
             <DropdownMenu open={open} onOpenChange={handleOpenChange}>
                 <DropdownMenuTrigger disabled={options.length === 0 || indicator === "offline"} asChild>
                     <Button
-                        className="h-full w-[230px] text-2xl bg-background rounded-lg border border-border p-2 justify-left disabled:text-gray-400 disabled:opacity-100 SofiaSans"
+                        className="h-full w-[230px] bg-background rounded-lg border border-border p-2 justify-left disabled:text-gray-400 disabled:opacity-100 SofiaSans"
                         label={selectedValue || `Select ${type}`}
                         title={options.length === 0 ? `There are no ${type}` : undefined}
                         indicator={indicator}
@@ -196,7 +196,7 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
                     </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent
-                    className="h-[40dvh] min-h-fit w-[350px] mt-2 overflow-hidden border border-border rounded-lg flex flex-col items-center p-4"
+                    className="h-[40dvh] min-h-fit w-[350px] mt-2 overflow-hidden border border-border rounded-lg flex flex-col items-center p-2"
                     preventOutsideClose={tutorialOpen}
                 >
                     <PaginationList
@@ -250,7 +250,7 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
                 }}
                 hideClose
                 preventOutsideClose={tutorialOpen}
-                className="flex flex-col border-none rounded-lg max-w-none h-[90dvh]"
+                className="flex flex-col border-none rounded-lg max-w-none h-[90dvh] w-[40dvw] p-2"
             >
                 <DialogHeader className="flex-row justify-between items-center border-b border-border pb-4">
                     <DialogTitle className="text-2xl font-medium">Manage Graphs</DialogTitle>
@@ -267,6 +267,7 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
                     rows={rows}
                     setRows={setRows}
                     inputRef={inputRef}
+                    itemHeight={36}
                 >
                     {
                         session?.user.role !== "Read-Only" &&
