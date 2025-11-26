@@ -1,4 +1,9 @@
 import { getClient } from "@/app/api/auth/[...nextauth]/options";
+import {
+  deleteSchemaElementAttribute,
+  updateSchemaElementAttribute,
+  validateBody,
+} from "@/app/api/validate-body";
 import { NextRequest, NextResponse } from "next/server";
 import { formatAttribute } from "../utils";
 
@@ -16,21 +21,29 @@ export async function PATCH(
     const { client, user } = session;
     const { schema, node, key } = await params;
     const schemaName = `${schema}_schema`;
-    const { type, attribute } = await request.json();
+    const elementId = Number(node);
+    const body = await request.json();
 
     try {
-      if (!attribute) throw new Error("Attribute is required");
-      if (type === undefined) throw new Error("Type is required");
+      const validation = validateBody(updateSchemaElementAttribute, body);
 
+      if (!validation.success) {
+        return NextResponse.json(
+          { message: validation.error },
+          { status: 400 }
+        );
+      }
+
+      const { type, attribute } = validation.data;
       const [formattedKey, formattedValue] = formatAttribute([key, attribute]);
       const graph = client.selectGraph(schemaName);
       const q = type
-        ? `MATCH (n) WHERE ID(n) = ${node} SET n.${formattedKey} = "${formattedValue}"`
-        : `MATCH (n)-[e]-(m) WHERE ID(e) = ${node} SET e.${formattedKey} = "${formattedValue}"`;
+        ? `MATCH (n) WHERE ID(n) = $id SET n.${formattedKey} = $value`
+        : `MATCH (n)-[e]-(m) WHERE ID(e) = $id SET e.${formattedKey} = $value`;
       const result =
         user.role === "Read-Only"
-          ? await graph.roQuery(q)
-          : await graph.query(q);
+          ? await graph.roQuery(q, { params: { id: elementId, value: formattedValue } })
+          : await graph.query(q, { params: { id: elementId, value: formattedValue } });
 
       if (!result) throw new Error("Something went wrong");
 
@@ -67,19 +80,29 @@ export async function DELETE(
     const { client, user } = session;
     const { schema, node, key } = await params;
     const schemaName = `${schema}_schema`;
-    const { type } = await request.json();
+    const elementId = Number(node);
+    const body = await request.json();
 
     try {
-      if (type === undefined) throw new Error("Type is required");
+      const validation = validateBody(deleteSchemaElementAttribute, body);
+
+      if (!validation.success) {
+        return NextResponse.json(
+          { message: validation.error },
+          { status: 400 }
+        );
+      }
+
+      const { type } = validation.data;
 
       const graph = client.selectGraph(schemaName);
       const q = type
-        ? `MATCH (n) WHERE ID(n) = ${node} SET n.${key} = NULL`
-        : `MATCH (n)-[e]-(m) WHERE ID(e) = ${node} SET e.${key} = NULL`;
+        ? `MATCH (n) WHERE ID(n) = $id SET n.${key} = NULL`
+        : `MATCH (n)-[e]-(m) WHERE ID(e) = $id SET e.${key} = NULL`;
       const result =
         user.role === "Read-Only"
-          ? await graph.roQuery(q)
-          : await graph.query(q);
+          ? await graph.roQuery(q, { params: { id: elementId } })
+          : await graph.query(q, { params: { id: elementId } });
 
       if (!result) throw new Error("Something went wrong");
 

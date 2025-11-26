@@ -38,8 +38,10 @@ interface SchemaProps {
     setSelectedElement: (el: Node | Link | undefined) => void;
     handleDeleteElement: () => Promise<void>;
     chartRef: GraphRef;
-    setIsAddEntity: (isAdd: boolean) => void;
-    setIsAddRelation: (isAdd: boolean) => void;
+    setIsAddNode: (isAdd: boolean) => void;
+    setIsAddEdge: (isAdd: boolean) => void;
+    isAddNode: boolean;
+    isAddEdge: boolean;
     isCanvasLoading: boolean;
     runQuery?: never;
     historyQuery?: never;
@@ -59,8 +61,10 @@ interface GraphProps {
     setSelectedElement?: never;
     handleDeleteElement?: never;
     chartRef?: never;
-    setIsAddEntity?: never;
-    setIsAddRelation?: never;
+    setIsAddNode?: never;
+    setIsAddEdge?: never;
+    isAddNode?: never;
+    isAddEdge?: never;
     isCanvasLoading?: never;
 }
 
@@ -86,8 +90,10 @@ export default function Selector<T extends "Graph" | "Schema" = "Graph" | "Schem
     setSelectedElement,
     handleDeleteElement,
     chartRef,
-    setIsAddEntity,
-    setIsAddRelation,
+    setIsAddNode,
+    setIsAddEdge,
+    isAddNode,
+    isAddEdge,
     setGraph,
     type,
     isCanvasLoading,
@@ -515,18 +521,21 @@ export default function Selector<T extends "Graph" | "Schema" = "Graph" | "Schem
                             </Button>
                         </div>
                     </>
-                    : selectedElements && setSelectedElement && handleDeleteElement && setIsAddEntity && setIsAddRelation && chartRef && isCanvasLoading !== undefined && <div className="w-full h-full">
+                    : selectedElements && setSelectedElement && handleDeleteElement && setIsAddNode && setIsAddEdge && chartRef && isCanvasLoading !== undefined && <div className="w-full h-full">
                         <Toolbar
                             graph={graph}
+                            graphName={graphName}
                             label={type}
                             selectedElement={selectedElement}
                             selectedElements={selectedElements}
                             setSelectedElement={setSelectedElement}
                             handleDeleteElement={handleDeleteElement}
-                            setIsAddEntity={setIsAddEntity}
-                            setIsAddRelation={setIsAddRelation}
+                            setIsAddNode={setIsAddNode}
+                            setIsAddEdge={selectedElements.length === 2 && selectedElements.every(e => !!e.labels) ? setIsAddEdge : undefined}
                             chartRef={chartRef}
                             isLoadingSchema={!!isCanvasLoading}
+                            isAddNode={isAddNode}
+                            isAddEdge={isAddEdge}
                         />
                     </div>
             }

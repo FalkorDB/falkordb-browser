@@ -4,9 +4,9 @@
 
 "use client"
 
-import { Dispatch, SetStateAction, useContext, useEffect, useRef, useState } from "react"
+import { Dispatch, SetStateAction, useCallback, useContext, useEffect, useRef, useState } from "react"
 import ForceGraph2D from "react-force-graph-2d"
-import { securedFetch, GraphRef, handleZoomToFit, getTheme, Tab, ViewportState } from "@/lib/utils"
+import { securedFetch, GraphRef, handleZoomToFit, getTheme, Tab, ViewportState, getNodeDisplayText } from "@/lib/utils"
 import { useToast } from "@/components/ui/use-toast"
 import * as d3 from "d3"
 import { useTheme } from "next-themes"
@@ -24,8 +24,6 @@ interface Props {
     selectedElements: (Node | Link)[]
     setSelectedElements: Dispatch<SetStateAction<(Node | Link)[]>>
     type?: "schema" | "graph"
-    isAddElement?: boolean
-    setSelectedNodes?: Dispatch<SetStateAction<[Node | undefined, Node | undefined]>>
     setRelationships: Dispatch<SetStateAction<Relationship[]>>
     parentHeight: number
     parentWidth: number
@@ -119,8 +117,6 @@ export default function ForceGraph({
     selectedElements,
     setSelectedElements,
     type = "graph",
-    isAddElement = false,
-    setSelectedNodes,
     setRelationships,
     parentHeight,
     parentWidth,
@@ -269,8 +265,10 @@ export default function ForceGraph({
         }
     }, [displayTextPriority, chartRef, data.nodes]);
 
+    const handleGetNodeDisplayText = useCallback((node: Node) => getNodeDisplayText(node, displayTextPriority), [displayTextPriority])
+
     const onFetchNode = async (node: Node) => {
-        const result = await securedFetch(`/api/graph/${graph.Id}/${node.id}`, {
+        const result = await securedFetch(`/api/${type}/${graph.Id}/${node.id}`, {
             method: 'GET',
             headers: {
                 'Content-Type': 'application/json'
@@ -290,7 +288,6 @@ export default function ForceGraph({
     }
 
     const deleteNeighbors = (nodes: Node[]) => {
-
         if (nodes.length === 0) return;
 
         const expandedNodes: Node[] = []
@@ -319,45 +316,12 @@ export default function ForceGraph({
         setRelationships(graph.removeLinks(nodes.map(n => n.id)))
     }
 
-    const getNodeDisplayText = (node: Node) => {
-        const { data: nodeData } = node;
-
-        const displayText = displayTextPriority.find(({ name, ignore }) => {
-            const key = ignore
-                ? Object.keys(nodeData).find(
-                    (k) => k.toLowerCase() === name.toLowerCase()
-                )
-                : name;
-
-            return (
-                key &&
-                nodeData[key] &&
-                typeof nodeData[key] === "string" &&
-                nodeData[key].trim().length > 0
-            );
-        });
-
-        if (displayText) {
-            const key = displayText.ignore
-                ? Object.keys(nodeData).find(
-                    (k) => k.toLowerCase() === displayText.name.toLowerCase()
-                )
-                : displayText.name;
-
-            if (key) {
-                return String(nodeData[key]);
-            }
-        }
-
-        return String(node.id);
-    }
-
     const handleNodeClick = async (node: Node) => {
         const now = new Date()
         const { date, name } = lastClick.current
-        lastClick.current = { date: now, name: getNodeDisplayText(node) }
+        lastClick.current = { date: now, name: handleGetNodeDisplayText(node) }
 
-        if (now.getTime() - date.getTime() < 1000 && name === getNodeDisplayText(node)) {
+        if (now.getTime() - date.getTime() < 1000 && name === handleGetNodeDisplayText(node)) {
             if (!node.expand) {
                 await onFetchNode(node)
             } else {
@@ -375,22 +339,6 @@ export default function ForceGraph({
     }
 
     const handleRightClick = (element: Node | Link, evt: MouseEvent) => {
-        if (!element.source && isAddElement) {
-            if (setSelectedNodes) {
-                setSelectedNodes(prev => {
-                    const node = element as Node
-                    if (prev[0] === undefined) {
-                        return [node, undefined]
-                    }
-                    if (prev[1] === undefined) {
-                        return [prev[0], node]
-                    }
-                    return [node, prev[0]]
-                })
-                return
-            }
-        }
-
         if (evt.ctrlKey) {
             if (selectedElements.includes(element)) {
                 setSelectedElements(selectedElements.filter((el) => el !== element))
@@ -425,7 +373,7 @@ export default function ForceGraph({
                 width={parentWidth}
                 height={parentHeight}
                 linkLabel={(link) => link.relationship}
-                nodeLabel={(node) => type === "graph" ? getNodeDisplayText(node) : node.labels[0]}
+                nodeLabel={(node) => type === "graph" ? handleGetNodeDisplayText(node) : node.labels[0]}
                 graphData={data}
                 nodeRelSize={NODE_SIZE}
                 nodeCanvasObjectMode={() => 'after'}
@@ -472,7 +420,7 @@ export default function ForceGraph({
                         let text = '';
 
                         if (type === "graph") {
-                            text = getNodeDisplayText(node);
+                            text = handleGetNodeDisplayText(node);
                         } else {
                             text = getLabelWithFewestElements(node.labels.map(label => graph.LabelsMap.get(label) || graph.createLabel([label])[0])).name;
                         }
