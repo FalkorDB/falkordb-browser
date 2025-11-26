@@ -135,6 +135,8 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       localStorage.setItem("limit", newLimit.toString());
       localStorage.setItem("refreshInterval", newRefreshInterval.toString())
       localStorage.setItem("displayTextPriority", JSON.stringify(newDisplayTextPriority))
+      localStorage.setItem("model", newModel)
+      localStorage.setItem("secretKey", newSecretKey)
 
       // Update context
       setContentPersistence(newContentPersistence);
@@ -145,11 +147,6 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
       setLastLimit(limit);
       setSecretKey(newSecretKey);
       setModel(newModel);
-
-      if (newSecretKey && newModel) {
-        setNavigateToSettings(false)
-      }
-
       setRefreshInterval(newRefreshInterval)
       setDisplayTextPriority(newDisplayTextPriority)
       // Reset has changes
@@ -406,6 +403,8 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
     setTutorialOpen(localStorage.getItem("tutorial") !== "false")
     setRefreshInterval(Number(localStorage.getItem("refreshInterval") || 30))
     setDisplayTextPriority(JSON.parse(localStorage.getItem("displayTextPriority") || JSON.stringify(DISPLAY_TEXT_PRIORITY)))
+    setSecretKey(localStorage.getItem("secretKey") || "")
+    setModel(localStorage.getItem("model") || "")
   }, [status])
 
   const panelSize = useMemo(() => isCollapsed ? 0 : 15, [isCollapsed])
@@ -432,11 +431,7 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
         const json = await result.json()
 
         if (!json.message) setDisplayChat(true)
-
-        if (json.model) {
-          setModel(json.model)
-          setNewModel(json.model)
-        } else if (json.error && !model && !secretKey) {
+        if (!json.model && json.error) {
           setNavigateToSettings(true)
         }
       }

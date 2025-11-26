@@ -41,7 +41,7 @@ export default function Header({ onSetGraphName, graphNames, graphName, onOpenGr
 
     const { indicator } = useContext(IndicatorContext)
     const { setPanel } = useContext(PanelContext)
-    const { hasChanges, saveSettings, resetSettings, settings: { chatSettings: { displayChat } } } = useContext(BrowserSettingsContext)
+    const { hasChanges, saveSettings, resetSettings, settings: { chatSettings: { model, secretKey, displayChat } } } = useContext(BrowserSettingsContext)
 
     const { theme, setTheme } = useTheme()
     const { currentTheme } = getTheme(theme)
@@ -146,7 +146,7 @@ export default function Header({ onSetGraphName, graphNames, graphName, onOpenGr
                                     Update local user parameters in Settings.`}
                             label="CHAT"
                             onClick={() => {
-                                if (navigateToSettings) {
+                                if (navigateToSettings && (!model || !secretKey)) {
                                     router.push("/settings")
                                     toast({
                                         title: "Incomplete Chat Settings",
