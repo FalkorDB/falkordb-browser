@@ -209,7 +209,7 @@ export default function DataTable({ object, type, lastObjId, className }: Props)
         }
 
         setEditable(key)
-        setNewVal(value || "")
+        setNewVal(value ?? "")
         setNewType(typeof value === "undefined" ? "string" : typeof value as ValueType)
     }
 
