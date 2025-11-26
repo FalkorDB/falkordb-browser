@@ -55,7 +55,7 @@ const DrawerContent = React.forwardRef<
       )}
       {...props}
     >
-      <div className={cn("mx-auto mt-t h-2 w-[100px] rounded-full bg-muted cursor-grab active:cursor-grabbing", (side === "left" || side === "right") && "w-2 h-[100px] my-auto", side === "left" && "mr-2", side === "right" && "ml-2")} />
+      <div className={cn("mx-auto mt-2 h-2 w-[100px] rounded-full bg-muted cursor-grab active:cursor-grabbing", (side === "left" || side === "right") && "w-2 h-[100px] my-auto", side === "left" && "mr-2", side === "right" && "ml-2")} />
       {children}
     </DrawerPrimitive.Content>
   </DrawerPortal>
