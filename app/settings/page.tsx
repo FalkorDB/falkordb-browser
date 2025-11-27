@@ -71,7 +71,7 @@ export default function Settings() {
     }
 
     return (
-        <div className="Page p-12">
+        <div className="Page p-2">
             <p className="text-sm text-foreground"><span className="opacity-50">Settings</span> {`> ${current}`}</p>
             <div className="flex flex-col gap-8 items-center p-2">
                 <div className="w-fit bg-background flex gap-2 p-2 rounded-lg">

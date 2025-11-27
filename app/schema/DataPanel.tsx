@@ -29,7 +29,7 @@ interface Props {
 
 export default function DataPanel({ object, setObject, schema, setLabels }: Props) {
 
-    const { indicator } = useContext(IndicatorContext)
+    const { indicator, setIndicator } = useContext(IndicatorContext)
 
     const { data: session } = useSession()
     const { toast } = useToast()
@@ -84,7 +84,7 @@ export default function DataPanel({ object, setObject, schema, setLabels }: Prop
         const { ok } = await securedFetch(`api/schema/${prepareArg(schema.Id)}/${prepareArg(object.id.toString())}/${prepareArg(att[0])}`, {
             method: "PATCH",
             body: JSON.stringify({ type, attribute: att[1] })
-        }, toast)
+        }, toast, setIndicator)
 
         return ok
     }
@@ -149,7 +149,7 @@ export default function DataPanel({ object, setObject, schema, setLabels }: Prop
             const { ok } = await securedFetch(`api/schema/${prepareArg(schema.Id)}/${prepareArg(object.id.toString())}/${prepareArg(key)}`, {
                 method: "DELETE",
                 body: JSON.stringify({ type })
-            }, toast)
+            }, toast, setIndicator)
 
             if (ok) {
                 const att = attributes.find(([k]) => k === key)
@@ -276,7 +276,7 @@ export default function DataPanel({ object, setObject, schema, setLabels }: Prop
             const result = await securedFetch(`api/schema/${prepareArg(schema.Id)}/${prepareArg(object.id.toString())}/label`, {
                 method: "POST",
                 body: JSON.stringify({ label: newLabel })
-            }, toast)
+            }, toast, setIndicator)
 
             if (result.ok) {
                 setLabels([...schema.addLabel(newLabel, node, false)])
@@ -306,7 +306,7 @@ export default function DataPanel({ object, setObject, schema, setLabels }: Prop
             const result = await securedFetch(`api/schema/${prepareArg(schema.Id)}/${prepareArg(object.id.toString())}/label`, {
                 method: "DELETE",
                 body: JSON.stringify({ label: removeLabel })
-            }, toast)
+            }, toast, setIndicator)
 
             if (result.ok) {
                 schema.removeLabel(removeLabel, node, false)

@@ -349,7 +349,7 @@ export default function Page() {
     }, [graphName, panel, selectedElement, handleSetSelectedElement, setPanel, isAddNode, selectedElements, handleCreateElement])
 
     return (
-        <div className="Page p-8 gap-8">
+        <div className="Page p-2 gap-2">
             <Selector
                 type="Graph"
                 graph={graph}

@@ -1,6 +1,6 @@
 /* eslint-disable no-case-declarations */
 /* eslint-disable react/no-array-index-key */
-import { cn, Message, securedFetch } from "@/lib/utils"
+import { cn, Message } from "@/lib/utils"
 import { useContext, useEffect, useState } from "react"
 import { ChevronDown, ChevronRight, CircleArrowUp, Copy, Loader2, Play, Search, X } from "lucide-react"
 import { useToast } from "@/components/ui/use-toast"
@@ -104,7 +104,7 @@ export default function Chat({ onClose }: Props) {
         }
 
         try {
-            const response = await securedFetch("/api/chat", {
+            const response = await fetch("/api/chat", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",

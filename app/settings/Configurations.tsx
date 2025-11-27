@@ -246,6 +246,7 @@ export default function Configurations() {
                 entityName="Config"
                 headers={["Name", "Description", "Value"]}
                 rows={configs}
+                itemHeight={60}
             />
         </div>
     );

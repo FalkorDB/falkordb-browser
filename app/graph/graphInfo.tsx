@@ -10,7 +10,7 @@ export default function GraphInfoPanel({ onClose }: { onClose: () => void }) {
     const { isQueryLoading } = useContext(QueryLoadingContext)
 
     return (
-        <div className={cn(`relative h-full w-full p-6 grid grid-rows-[max-content_max-content_minmax(0,max-content)_minmax(0,max-content)_minmax(0,max-content)] gap-8 border-r border-border`)}>
+        <div className={cn(`relative h-full w-full p-2 grid grid-rows-[max-content_max-content_minmax(0,max-content)_minmax(0,max-content)_minmax(0,max-content)] gap-8 border-r border-border`)}>
             <Button
                 className="absolute top-2 right-2"
                 title="Close"
@@ -23,7 +23,7 @@ export default function GraphInfoPanel({ onClose }: { onClose: () => void }) {
                 <h2>Graph Name:</h2>
                 <Tooltip>
                     <TooltipTrigger asChild>
-                        <p className="truncate pointer-events-auto text-1.5xl SofiaSans">{graphName}</p>
+                        <p className="truncate pointer-events-auto SofiaSans">{graphName}</p>
                     </TooltipTrigger>
                     <TooltipContent>
                         {graphName}
@@ -37,7 +37,7 @@ export default function GraphInfoPanel({ onClose }: { onClose: () => void }) {
                         MemoryUsage.get("total_graph_sz_mb") !== undefined
                             ? <Tooltip>
                                 <TooltipTrigger asChild>
-                                    <p className="truncate pointer-events-auto text-1.5xl SofiaSans">{MemoryUsage.get("total_graph_sz_mb") || "<1"} MB</p>
+                                    <p className="truncate pointer-events-auto SofiaSans">{MemoryUsage.get("total_graph_sz_mb") || "<1"} MB</p>
                                 </TooltipTrigger>
                                 <TooltipContent>
                                     {MemoryUsage.get("total_graph_sz_mb")} MB
