@@ -3,11 +3,12 @@ import { Loader2, X } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import Button from "../components/ui/Button";
-import { GraphContext, QueryLoadingContext } from "../components/provider";
+import { BrowserSettingsContext, GraphContext, QueryLoadingContext } from "../components/provider";
 
 export default function GraphInfoPanel({ onClose }: { onClose: () => void }) {
     const { graphInfo: { Labels, Relationships, PropertyKeys, MemoryUsage }, nodesCount, edgesCount, runQuery, graphName } = useContext(GraphContext);
     const { isQueryLoading } = useContext(QueryLoadingContext)
+    const { settings: { graphInfo: { showMemoryUsage } } } = useContext(BrowserSettingsContext)
 
     return (
         <div className={cn(`relative h-full w-full p-2 grid grid-rows-[max-content_max-content_minmax(0,max-content)_minmax(0,max-content)_minmax(0,max-content)] gap-8 border-r border-border`)}>
@@ -30,23 +31,26 @@ export default function GraphInfoPanel({ onClose }: { onClose: () => void }) {
                     </TooltipContent>
                 </Tooltip>
             </div>
-            <div className="flex flex-col gap-2">
-                <div className="flex gap-2 items-center">
-                    <h2>Memory Usage:</h2>
-                    {
-                        MemoryUsage.get("total_graph_sz_mb") !== undefined
-                            ? <Tooltip>
-                                <TooltipTrigger asChild>
-                                    <p className="truncate pointer-events-auto SofiaSans">{MemoryUsage.get("total_graph_sz_mb") || "<1"} MB</p>
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                    {MemoryUsage.get("total_graph_sz_mb")} MB
-                                </TooltipContent>
-                            </Tooltip>
-                            : <Loader2 className="animate-spin" />
-                    }
+            {
+                showMemoryUsage &&
+                <div className="flex flex-col gap-2">
+                    <div className="flex gap-2 items-center">
+                        <h2>Memory Usage:</h2>
+                        {
+                            MemoryUsage.get("total_graph_sz_mb") !== undefined
+                                ? <Tooltip>
+                                    <TooltipTrigger asChild>
+                                        <p className="truncate pointer-events-auto SofiaSans">{MemoryUsage.get("total_graph_sz_mb") || "<1"} MB</p>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                        {MemoryUsage.get("total_graph_sz_mb")} MB
+                                    </TooltipContent>
+                                </Tooltip>
+                                : <Loader2 className="animate-spin" />
+                        }
+                    </div>
                 </div>
-            </div>
+            }
             <div className="flex flex-col gap-2 overflow-hidden">
                 <div className="flex gap-2 items-center">
                     <h2>Nodes</h2>

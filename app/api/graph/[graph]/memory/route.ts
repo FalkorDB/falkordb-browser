@@ -1,5 +1,7 @@
 import { getClient } from "@/app/api/auth/[...nextauth]/options";
 import { NextRequest, NextResponse } from "next/server";
+import { GET as getDBVersion } from "@/app/api/auth/DBVersion/route";
+import { MEMORY_USAGE_VERSION_THRESHOLD } from "@/lib/utils";
 
 // eslint-disable-next-line import/prefer-default-export
 export async function GET(
@@ -11,6 +13,17 @@ export async function GET(
 
     if (session instanceof NextResponse) {
       return session;
+    }
+
+    const [name, version] = await (await getDBVersion()).json().then((res) => res.result);
+
+    if (name !== "graph" || version < MEMORY_USAGE_VERSION_THRESHOLD) {
+      return NextResponse.json(
+        {
+          message: `Memory usage feature requires graph module version ${MEMORY_USAGE_VERSION_THRESHOLD} or higher. Current version: ${version}`,
+        },
+        { status: 400 }
+      );
     }
 
     const { client } = session;

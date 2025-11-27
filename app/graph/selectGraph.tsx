@@ -35,7 +35,8 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
         settings: {
             contentPersistenceSettings: {
                 contentPersistence
-            }
+            },
+            graphInfo: { showMemoryUsage }
         },
         tutorialOpen
     } = useContext(BrowserSettingsContext)
@@ -123,29 +124,29 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
         }, [toast, setIndicator])
 
     const handleSetRows = useCallback((opts: string[]) => {
-        setRows(opts.map(opt =>
-            sessionRole === "Admin"
-                ? ({
-                    checked: false,
-                    name: opt,
-                    cells: [
-                        { value: opt, onChange: (value: string) => handleSetOption(value, opt), type: "text" },
-                        { loadCell: loadMemory(opt), type: "readonly" },
-                        { loadCell: loadNodesCount(opt), type: "readonly" },
-                        { loadCell: loadEdgesCount(opt), type: "readonly" },
-                    ]
-                })
-                : ({
-                    checked: false,
-                    name: opt,
-                    cells: [
-                        { value: opt, type: "readonly" },
-                        { loadCell: loadMemory(opt), type: "readonly" },
-                        { loadCell: loadNodesCount(opt), type: "readonly" },
-                        { loadCell: loadEdgesCount(opt), type: "readonly" },
-                    ]
-                })))
-    }, [sessionRole, handleSetOption, loadMemory, loadNodesCount, loadEdgesCount])
+        setRows(opts.map((opt) => {
+            const baseCell = sessionRole === "Admin"
+                ? { value: opt, onChange: (value: string) => handleSetOption(value, opt), type: "text" as const }
+                : { value: opt, type: "readonly" as const };
+
+            const cells: Row["cells"] = [baseCell];
+
+            if (showMemoryUsage) {
+                cells.push({ loadCell: loadMemory(opt), type: "readonly" });
+            }
+
+            cells.push(
+                { loadCell: loadNodesCount(opt), type: "readonly" },
+                { loadCell: loadEdgesCount(opt), type: "readonly" }
+            );
+
+            return {
+                checked: false,
+                name: opt,
+                cells
+            };
+        }));
+    }, [sessionRole, handleSetOption, loadMemory, loadNodesCount, loadEdgesCount, showMemoryUsage])
 
     useEffect(() => {
         if (!openMenage) {
@@ -263,7 +264,12 @@ export default function SelectGraph({ options, setOptions, selectedValue, setSel
                     className="grow overflow-hidden"
                     label={`${type}s`}
                     entityName={type}
-                    headers={["Name", "Memory Usage", "Nodes #", "Edges #"]}
+                    headers={[
+                        "Name",
+                        ...(showMemoryUsage ? ["Memory Usage"] : []),
+                        "Nodes #",
+                        "Edges #"
+                    ]}
                     rows={rows}
                     setRows={setRows}
                     inputRef={inputRef}
