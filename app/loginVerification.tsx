@@ -13,7 +13,7 @@ export default function LoginVerification({ children }: { children: React.ReactN
 
     useEffect(() => {
         if (data?.user || data === undefined) return
-        localStorage.removeItem("query history")
+        localStorage.removeItem("savedContent")
     }, [data])
 
     useEffect(() => {
