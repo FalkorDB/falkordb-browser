@@ -1,3 +1,4 @@
+/* eslint-disable react/destructuring-assignment */
 /* eslint-disable react/no-array-index-key */
 
 'use client'
@@ -10,18 +11,26 @@ import { useToast } from "@/components/ui/use-toast";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import Button from "../components/ui/Button";
 import Combobox from "../components/ui/combobox";
-import { Node } from "../api/graph/model";
+import { Link, Node } from "../api/graph/model";
 import Input from "../components/ui/Input";
 import ToastButton from "../components/ToastButton";
 import { IndicatorContext } from "../components/provider";
+import AddLabel from "../graph/addLabel";
+import RemoveLabel from "../graph/RemoveLabel";
 
-interface Props {
-  onCreate: (element: [string, string[]][], label?: string[]) => Promise<boolean>
-  setIsAdd: (isAdd: boolean) => void
-  selectedNodes: [Node | undefined, Node | undefined]
-  setSelectedNodes: Dispatch<SetStateAction<[Node | undefined, Node | undefined]>>
-  type: boolean
-}
+type Props =
+  | {
+      onCreate: (element: [string, string[]][], label: string[]) => Promise<boolean>
+      setIsAdd: (isAdd: boolean) => void
+      type: true
+    }
+  | {
+      onCreate: (element: [string, string[]][], label: string[]) => Promise<boolean>
+      setIsAdd: (isAdd: boolean) => void
+      selectedNodes: [Node, Node]
+      setSelectedNodes: Dispatch<SetStateAction<(Node | Link)[]>>
+      type: false
+    }
 
 export const ATTRIBUTES = ["Type", "Description", "Unique", "Required"]
 
@@ -29,7 +38,11 @@ export const OPTIONS = ["String", "Integer", "Float", "Geospatial", "Boolean"]
 
 export const getDefaultAttribute = (): [string, string[]] => ["", ["", "", "false", "false"]]
 
-export default function SchemaCreateElement({ onCreate, setIsAdd, selectedNodes, setSelectedNodes, type }: Props) {
+export default function SchemaCreateElement(props: Props) {
+  const { onCreate, setIsAdd, type } = props
+
+  const selectedNodes = !type ? props.selectedNodes : undefined
+  const setSelectedNodes = !type ? props.setSelectedNodes : undefined
 
   const { indicator } = useContext(IndicatorContext)
 
@@ -39,9 +52,7 @@ export default function SchemaCreateElement({ onCreate, setIsAdd, selectedNodes,
   const [attribute, setAttribute] = useState<[string, string[]]>(getDefaultAttribute())
   const [attributes, setAttributes] = useState<[string, string[]][]>([])
   const [labelsHover, setLabelsHover] = useState<boolean>(false)
-  const [isAddLabel, setIsAddLabel] = useState<boolean>(false)
   const [isLoading, setIsLoading] = useState<boolean>(false)
-  const [newLabel, setNewLabel] = useState<string>("")
   const [editable, setEditable] = useState<string>("")
   const [label, setLabel] = useState<string[]>([])
   const [hover, setHover] = useState<string>("")
@@ -76,6 +87,15 @@ export default function SchemaCreateElement({ onCreate, setIsAdd, selectedNodes,
         variant: "destructive"
       })
 
+      return
+    }
+
+    if (attributes.some(([key]) => key === newAtt[0])) {
+      toast({
+        title: "Error",
+        description: "An attribute with this key already exists",
+        variant: "destructive"
+      })
       return
     }
 
@@ -150,16 +170,6 @@ export default function SchemaCreateElement({ onCreate, setIsAdd, selectedNodes,
 
         return
       }
-
-      if (!selectedNodes[0] || !selectedNodes[1]) {
-        toast({
-          title: "Error",
-          description: "You must select two nodes to create a relation",
-          variant: "destructive"
-        })
-
-        return
-      }
     }
 
     try {
@@ -171,24 +181,24 @@ export default function SchemaCreateElement({ onCreate, setIsAdd, selectedNodes,
       setAttributes([])
       setAttribute(getDefaultAttribute())
       setLabel([])
-      setIsAddLabel(false)
     } finally {
       setIsLoading(false)
     }
   }
 
-  const handleRemoveLabel = (removeLabel: string) => {
+  const handleRemoveLabel = async (removeLabel: string) => {
     setLabel(prev => prev.filter(l => l !== removeLabel))
+    return true
   }
 
-  const handleAddLabel = () => {
+  const handleAddLabel = async (newLabel: string) => {
     if (newLabel === "") {
       toast({
         title: "Error",
         description: "Label cannot be empty",
         variant: "destructive"
       })
-      return
+      return false
     }
 
     if (label.includes(newLabel)) {
@@ -198,113 +208,81 @@ export default function SchemaCreateElement({ onCreate, setIsAdd, selectedNodes,
         variant: "destructive"
       })
 
-      return
+      return false
     }
 
     setLabel(prev => [...prev, newLabel])
-    setNewLabel("")
-    setIsAddLabel(false)
+    return true
   }
 
   const onClose = () => {
-    setSelectedNodes([undefined, undefined])
+    if (setSelectedNodes) {
+      setSelectedNodes([])
+    }
     setAttributes([])
     setLabel([])
-    setNewLabel("")
     setNewAttribute(getDefaultAttribute())
     setAttribute(getDefaultAttribute())
     setEditable("")
-    setIsAddLabel(false)
     setIsAdd(false)
   }
 
   return (
     <div className="DataPanel">
-      <div className="relative w-full flex justify-between items-center p-6" id="headerDataPanel">
-        <Button
-          className="absolute top-2 right-2"
-          onClick={() => onClose()}
+      <div className="relative w-full flex flex-col gap-6 p-6 border-b border-border" id="headerDataPanel">
+        <div className="flex flex-row justify-between">
+          <div className="flex flex-col gap-2 font-medium text-xl text-nowrap">
+            <p data-testid="DataPanelAttributesCount">Attributes: <span className="Gradient text-transparent bg-clip-text">{attributes.length}</span></p>
+          </div>
+          <Button
+            className="h-fit"
+            title="Close"
+            onClick={() => onClose()}
+          >
+            <X />
+          </Button>
+        </div>
+        <ul 
+          className="flex flex-wrap gap-4" 
+          onMouseEnter={() => setLabelsHover(true)} 
+          onMouseLeave={() => setLabelsHover(false)}
         >
-          <X size={15} />
-        </Button>
-        <ul className="flex flex-wrap gap-4 min-w-[10%]" onMouseEnter={() => setLabelsHover(true)} onMouseLeave={() => setLabelsHover(false)}>
           {label.map((l) => (
             <li key={l} className="flex gap-2 px-2 py-1 bg-secondary rounded-full items-center">
               <p>{l}</p>
-              <Button
-                title="Remove"
-                onClick={() => handleRemoveLabel(l)}
-                data-testid={`removeLabelButton${l}`}
-              >
-                <X size={15} />
-              </Button>
+              <RemoveLabel
+                onRemoveLabel={handleRemoveLabel}
+                selectedLabel={l}
+                trigger={
+                  <Button
+                    title="Remove Label"
+                    data-testid={`removeLabelButton${l}`}
+                  >
+                    <X size={15} />
+                  </Button>
+                }
+              />
             </li>
           ))}
-          <li className="h-8 flex flex-wrap gap-2">
+          <li className="h-8 w-[106px] flex justify-center items-center">
             {
-              (type ? (labelsHover || label.length === 0) : label.length === 0) && !isAddLabel &&
-              <Button
-                className="p-2 text-xs justify-center border border-border"
-                variant="Secondary"
-                label="Add"
-                title="Add a new label"
-                onClick={() => setIsAddLabel(true)}
-                data-testid="addNewLabelButton"
-              >
-                <Pencil size={15} />
-              </Button>
-            }
-            {
-              isAddLabel &&
-              <>
-                <Input
-                  ref={ref => ref?.focus()}
-                  className="max-w-[20dvw]"
-                  value={newLabel}
-                  onChange={(e) => setNewLabel(e.target.value)}
-                  data-testid="newLabelInput"
-                  onKeyDown={(e) => {
-
-                    if (e.key === "Escape") {
-                      e.preventDefault()
-                      setIsAddLabel(false)
-                      setNewLabel("")
-                    }
-
-                    if (e.key !== "Enter") return
-
-                    e.preventDefault()
-                    handleAddLabel()
-                  }}
-                />
-                <Button
-                  className="p-2 text-xs justify-center border border-border"
-                  variant="Secondary"
-                  label="Save"
-                  title="Save the new label"
-                  onClick={() => handleAddLabel()}
-                  data-testid="saveNewLabelButton"
-                >
-                  <Check size={15} />
-                </Button>
-                <Button
-                  className="p-2 text-xs justify-center border border-border"
-                  variant="Secondary"
-                  label="Cancel"
-                  title="Discard new label"
-                  onClick={() => {
-                    setIsAddLabel(false)
-                    setNewLabel("")
-                  }}
-                  data-testid="cancelNewLabelButton"
-                >
-                  <X size={15} />
-                </Button>
-              </>
+              (type ? (labelsHover || label.length === 0) : label.length === 0) &&
+              <AddLabel
+                onAddLabel={handleAddLabel}
+                trigger={
+                  <Button
+                    className="p-2 text-nowrap text-xs justify-center border border-border rounded-full"
+                    label="Add Label"
+                    title="Add a new label"
+                    data-testid="addNewLabelButton"
+                  >
+                    <Pencil size={15} />
+                  </Button>
+                }
+              />
             }
           </li>
         </ul>
-        <p className="font-medium text-xl" data-testid="DataPanelAttributesCount">{attributes.length}&ensp;Attributes</p>
       </div>
       <div className="w-full h-1 grow flex flex-col justify-between items-start font-medium">
         <Table data-testid="attributesTable">
@@ -614,27 +592,27 @@ export default function SchemaCreateElement({ onCreate, setIsAdd, selectedNodes,
           </TableBody>
         </Table>
         {
-          !type &&
+          !type && selectedNodes && selectedNodes.length === 2 &&
           <div className="w-full flex flex-col gap-2" id="relationSelection">
             <div className="w-full flex justify-between p-4 items-center" data-testid="relationSelectionHeader">
-              <div style={{ backgroundColor: selectedNodes[0]?.color }} className="flex h-16 w-16 rounded-full border-2 border-border justify-center items-center overflow-hidden">
+              <div style={{ backgroundColor: selectedNodes[0].color }} className="flex h-16 w-16 rounded-full border-2 border-border justify-center items-center overflow-hidden">
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <p className="truncate" data-testid="selectedNode1">{selectedNodes[0]?.labels[0]}</p>
+                    <p className="truncate" data-testid="selectedNode1">{selectedNodes[0].labels[0]}</p>
                   </TooltipTrigger>
                   <TooltipContent>
-                    <p>{selectedNodes[0]?.labels[0]}</p>
+                    <p>{selectedNodes[0].labels[0]}</p>
                   </TooltipContent>
                 </Tooltip>
               </div>
               <ArrowRight strokeWidth={1} size={30} />
-              <div style={{ backgroundColor: selectedNodes[1]?.color }} className="flex h-16 w-16 rounded-full border-2 border-border justify-center items-center overflow-hidden">
+              <div style={{ backgroundColor: selectedNodes[1].color }} className="flex h-16 w-16 rounded-full border-2 border-border justify-center items-center overflow-hidden">
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <p className="truncate" data-testid="selectedNode2">{selectedNodes[1]?.labels[0]}</p>
+                    <p className="truncate" data-testid="selectedNode2">{selectedNodes[1].labels[0]}</p>
                   </TooltipTrigger>
                   <TooltipContent>
-                    <p>{selectedNodes[1]?.labels[0]}</p>
+                    <p>{selectedNodes[1].labels[0]}</p>
                   </TooltipContent>
                 </Tooltip>
               </div>
@@ -645,7 +623,7 @@ export default function SchemaCreateElement({ onCreate, setIsAdd, selectedNodes,
                 label="Clear"
                 title="Clear selected nodes for relation"
                 data-testid="clearSelectedNodesButton"
-                onClick={() => setSelectedNodes([undefined, undefined])}
+                onClick={() => setSelectedNodes && setSelectedNodes([])}
               >
                 <Trash2 size={20} />
               </Button>
@@ -654,7 +632,10 @@ export default function SchemaCreateElement({ onCreate, setIsAdd, selectedNodes,
                 label="Swap"
                 title="Swap the order of selected nodes"
                 data-testid="swapSelectedNodesButton"
-                onClick={() => setSelectedNodes(prev => [prev[1], prev[0]])}
+                onClick={() => setSelectedNodes && setSelectedNodes(prev => {
+                  const nodes = prev.filter((e): e is Node => !!e.labels) as [Node, Node]
+                  return [nodes[1], nodes[0]]
+                })}
               >
                 <ArrowRightLeft size={20} />
               </Button>

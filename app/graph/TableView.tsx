@@ -13,13 +13,20 @@ export default function TableView() {
 
     const tableData = useMemo(() => {
         if (graph.Data.length === 0) return undefined;
-        
+
+        const headers = graph.Data.reduce<string[]>((acc, row) => {
+            Object.keys(row).forEach((key) => {
+                if (!acc.includes(key)) acc.push(key);
+            });
+            return acc;
+        }, []);
+
         return {
-            headers: Object.keys(graph.Data[0]),
+            headers,
             rows: graph.Data.map((row, index): Row => ({
                 name: `row-${index}`,
-                cells: Object.values(row).map((value) => ({
-                    value,
+                cells: headers.map((header) => ({
+                    value: row[header] ?? null,
                     type: "object"
                 }))
             }))
