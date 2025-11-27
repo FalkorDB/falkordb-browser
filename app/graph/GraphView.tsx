@@ -3,7 +3,7 @@
 'use client'
 
 import { useState, useEffect, Dispatch, SetStateAction, useContext, useCallback } from "react";
-import { GitGraph, Info, Table } from "lucide-react"
+import { GitGraph, ScrollText, Table } from "lucide-react"
 import { cn, GraphRef, Tab } from "@/lib/utils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { GraphContext, ViewportContext } from "@/app/components/provider";
@@ -194,7 +194,7 @@ function GraphView({
                                     className="tabs-trigger"
                                     title={!isTabEnabled("Metadata") ? "No Metadata" : "Metadata"}
                                 >
-                                    <Info />
+                                    <ScrollText />
                                 </Button>
                             </TabsTrigger>
                         </TabsList>

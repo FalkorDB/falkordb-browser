@@ -17,6 +17,7 @@ export interface Props extends React.DetailedHTMLProps<React.ButtonHTMLAttribute
     isLoading?: boolean
     indicator?: "offline" | "online"
     tooltipVariant?: Variant
+    tooltipSide?: "top" | "bottom" | "left" | "right"
 }
 
 const getClassName = (variant: Variant, disable: boolean | undefined, open: boolean | undefined, isLoading: boolean, classN: string | undefined) => {
@@ -51,7 +52,7 @@ const getClassName = (variant: Variant, disable: boolean | undefined, open: bool
     return className
 }
 
-const Button = forwardRef<HTMLButtonElement, Props>(({ label, variant = "button", open, className, title, type = "button", disabled, children, isLoading = false, indicator, tooltipVariant = variant, ...props }, ref) =>
+const Button = forwardRef<HTMLButtonElement, Props>(({ label, variant = "button", open, className, title, type = "button", disabled, children, isLoading = false, indicator, tooltipVariant = variant, tooltipSide, ...props }, ref) =>
     title !== "" && (title || label || indicator === "offline") && variant !== "Cancel" ? (
         <Tooltip>
             <TooltipTrigger asChild>
@@ -78,7 +79,7 @@ const Button = forwardRef<HTMLButtonElement, Props>(({ label, variant = "button"
                     }
                 </button>
             </TooltipTrigger>
-            <TooltipContent className={cn(tooltipVariant === "Delete" && "bg-destructive border-destructive text-foreground", "whitespace-pre-line")}>
+            <TooltipContent side={tooltipSide} className={cn(tooltipVariant === "Delete" && "bg-destructive border-destructive text-foreground", "whitespace-pre-line")}>
                 {
                     indicator === "offline" && "The FalkorDB server is offline"
                 }
