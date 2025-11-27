@@ -19,7 +19,7 @@ export async function GET() {
       console.error(error);
       return NextResponse.json(
         { message: (error as Error).message },
-        { status: 400 }
+        { status: (error as Error).message.includes("NOPERM") ? 200 : 400 }
       );
     }
   } catch (err) {

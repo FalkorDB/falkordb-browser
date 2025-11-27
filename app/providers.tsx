@@ -397,10 +397,11 @@ function ProvidersWithSession({ children }: { children: React.ReactNode }) {
         method: "GET",
       }, toast, setIndicator)
 
-      if (result.ok) {
-        const [name, version] = (await result.json()).result
-        setShowMemoryUsage(name === "graph" && version >= MEMORY_USAGE_VERSION_THRESHOLD)
-      }
+      if (!result.ok) return
+
+      const [name, version] = (await result.json()).result || ["", 0]
+
+      setShowMemoryUsage(name === "graph" && version >= MEMORY_USAGE_VERSION_THRESHOLD)
     })()
   }, [status, toast])
 

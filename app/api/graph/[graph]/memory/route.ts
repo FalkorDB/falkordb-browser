@@ -15,7 +15,18 @@ export async function GET(
       return session;
     }
 
-    const [name, version] = await (await getDBVersion()).json().then((res) => res.result);
+    const res = await getDBVersion();
+
+    if (!res.ok) {
+      return NextResponse.json(
+        {
+          message: `Failed to retrieve database version: ${await res.text()}`,
+        },
+        { status: 400 }
+      );
+    }
+
+    const [name, version] = (await res.json()).result || ["", 0];
 
     if (name !== "graph" || version < MEMORY_USAGE_VERSION_THRESHOLD) {
       return NextResponse.json(
@@ -30,14 +41,14 @@ export async function GET(
     const { graph } = await params;
 
     try {
-      const result = await client.selectGraph(graph).memoryUsage()
-      
+      const result = await client.selectGraph(graph).memoryUsage();
+
       return NextResponse.json({ result }, { status: 200 });
     } catch (err) {
-        return NextResponse.json(
-          { message: (err as Error).message },
-          { status: 400 }
-        );
+      return NextResponse.json(
+        { message: (err as Error).message },
+        { status: 400 }
+      );
     }
   } catch (err) {
     return NextResponse.json(
